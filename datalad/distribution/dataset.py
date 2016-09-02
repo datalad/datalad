@@ -10,12 +10,16 @@
 """
 
 import logging
-lgr = logging.getLogger('datalad.dataset')
 
-lgr.log(5, "Importing dataset")
-
-from os.path import abspath, join as opj, normpath, realpath, relpath
-from six import string_types, PY2
+from os.path import abspath
+from os.path import join as opj
+from os.path import normpath
+from os.path import realpath
+from os.path import relpath
+from os.path import commonprefix
+from os.path import sep
+from six import string_types
+from six import PY2
 from functools import wraps
 import uuid
 
@@ -29,6 +33,15 @@ from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
 from datalad.support.dsconfig import ConfigManager
+
+lgr = logging.getLogger('datalad.dataset')
+
+lgr.log(5, "Importing dataset")
+
+
+def _with_sep(path):
+    """Little helper to guarantee that path ends with /"""
+    return path + sep if not path.endswith(sep) else path
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -188,8 +201,10 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
+    # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                            recursive=False):
+                        recursive=False, recursion_limit=None):
+
         """Get names/paths of all known dataset_datasets (subdatasets),
         optionally matching a specific name pattern.
 
@@ -204,13 +219,18 @@ class Dataset(object):
           If True, absolute paths will be returned.
         recursive : bool
           If True, recurse into all subdatasets and report them too.
-
+        recursion_limit: int or None
+          If not None, set the number of subdataset levels to recurse into.
         Returns
         -------
         list(Dataset paths) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
+
+        if recursion_limit is not None and (recursion_limit <= 0):
+            return []
+
         if pattern is not None:
             raise NotImplementedError
 
@@ -239,7 +259,7 @@ class Dataset(object):
 
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
-        if recursive:
+        if recursive and (recursion_limit is None or recursion_limit > 1):
             rsm = []
             for sm in submodules:
                 rsm.append(sm)
@@ -248,7 +268,9 @@ class Dataset(object):
                     [opj(sm, sdsh)
                      for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
-                         recursive=recursive)])
+                         recursive=recursive,
+                         recursion_limit=(recursion_limit - 1)
+                         if recursion_limit is not None else None)])
             submodules = rsm
 
         if absolute:
@@ -259,6 +281,7 @@ class Dataset(object):
     def create_subdataset(self, path,
                           force=False,
                           name=None,
+                          force=False,
                           description=None,
                           no_annex=False,
                           annex_version=None,
@@ -278,6 +301,8 @@ class Dataset(object):
           path to the subdataset to be created
         name: str
           name of the subdataset
+        force: bool
+          enforce creation of a subdataset in a non-empty directory
         description: str
           a human-readable description of the dataset, that helps to identify it.
           Note: Doesn't work with `no_annex`
@@ -311,8 +336,8 @@ class Dataset(object):
         subds = Dataset(path)
 
         # create the dataset
-        subds.create(description=description,
-                     force=force,
+        subds.create(force=force,
+                     description=description,
                      no_annex=no_annex,
                      annex_version=annex_version,
                      annex_backend=annex_backend,
@@ -408,6 +433,41 @@ class Dataset(object):
                 sds_relpath = relpath(sds_path, realpath(self.path))
                 sds_path = normpath(opj(self.path, sds_relpath))
             return Dataset(sds_path)
+
+    def get_containing_subdataset(self, path, recursion_limit=None):
+        """Get the (sub-)dataset containing `path`
+
+        Parameters
+        ----------
+        path : str
+          Path to determine the containing (sub-)dataset for
+        recursion_limit: int
+          limit the subdatasets to take into account to the given number of
+          hierarchy levels
+
+        Returns
+        -------
+        Dataset
+        """
+
+        if recursion_limit is not None and (recursion_limit < 1):
+            lgr.warning("recursion limit < 1 (%s) always results in self.")
+            return self
+
+        if is_explicit_path(path):
+            path = resolve_path(path, self)
+            if not path.startswith(self.path):
+                # TODO: - have dedicated exception
+                raise ValueError("path {0} not in dataset {1}.".format(path, self))
+            path = relpath(path, self.path)
+
+        for subds in self.get_subdatasets(recursive=True,
+                                          recursion_limit=recursion_limit,
+                                          absolute=False):
+            common = commonprefix((_with_sep(subds), _with_sep(path)))
+            if common.endswith(sep) and common == _with_sep(subds):
+                return Dataset(path=opj(self.path, common))
+        return self
 
 
 @optional_args

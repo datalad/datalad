@@ -237,8 +237,9 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     target_files = {
         './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/statuses/incoming.json',
-        './file1.nii', './dir1/file2.nii',
         './.datalad/meta/balsa.json',
+        './.datalad/config',
+        './file1.nii', './dir1/file2.nii',
     }
 
     eq_(set(all_files), target_files)
@@ -339,10 +340,11 @@ def test_balsa_pipeline2(ind, topurl, outd, clonedir):
     ok_file_under_git(fpath2, annexed=True)
 
     target_files = {
+        './.datalad/config',
         './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/statuses/incoming.json',
-        './file1.nii', './dir1/file2.nii',
         './.datalad/meta/balsa.json',
+        './file1.nii', './dir1/file2.nii',
     }
 
     eq_(set(all_files), target_files)

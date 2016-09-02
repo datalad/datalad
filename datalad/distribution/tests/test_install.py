@@ -21,7 +21,6 @@ from ..dataset import Dataset
 from datalad.api import create
 from datalad.api import install
 from datalad.consts import DATASETS_TOPURL
-from datalad.distribution.install import get_containing_subdataset
 from datalad.distribution.install import _get_installationpath_from_url
 from datalad.distribution.install import _get_git_url_from_source
 from datalad.utils import chpwd
@@ -53,6 +52,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.utils import _path_
+
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
@@ -90,28 +90,6 @@ def test_get_git_url_from_source():
         'ssh://somewhe.re/else')
 
 
-@with_tree(tree={'test.txt': 'whatever'})
-def test_get_containing_subdataset(path):
-
-    ds = create(path, force=True)
-    ds.install(path='test.txt')
-    ds.save("Initial commit")
-    subds = ds.install("sub", source=path)
-    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
-    eq_(get_containing_subdataset(ds, "some").path, ds.path)
-    # make sure the subds is found, even when it is not present, but still
-    # known
-    shutil.rmtree(subds.path)
-    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
-
-    outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, get_containing_subdataset, ds, outside_path)
-    assert_raises(ValueError, get_containing_subdataset, ds,
-                  opj(os.curdir, outside_path))
-    assert_raises(ValueError, get_containing_subdataset, ds,
-                  abspath(outside_path))
-
-
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
 @with_tempfile(mkdir=True)
 def test_install_plain_git(src, path):
@@ -134,22 +112,6 @@ def test_install_plain_git(src, path):
     ok_startswith(ifiles, ds.path)
     ok_(ifiles.endswith('test2.txt'))
     ok_('test2.txt' in ds.repo.get_indexed_files())
-
-
-@with_tree(tree={'test.txt': 'some',
-                 'dir': {'testindir': 'someother',
-                         'testindir2': 'none'}})
-def test_install_files(path):
-    ds = create(path, force=True)
-    # install a single file
-    eq_(ds.install('test.txt'), opj(path, 'test.txt'))
-    # install it again, should given same result
-    eq_(ds.install('test.txt'), opj(path, 'test.txt'))
-    # install multiple files in a dir
-    eq_(ds.install('dir', recursive=True),
-        [opj(path, 'dir', 'testindir'),
-         opj(path, 'dir', 'testindir2')])
-    # TODO: check git
 
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
@@ -186,51 +148,6 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=False)
     assert_true(os.path.lexists(opj(ds.path, 'test-annex.dat')))
-
-@with_testrepos(flavors=['local-url', 'network', 'local'])
-@with_tempfile
-def test_install_into_dataset(source, top_path):
-    ds = create(top_path)
-    subds = ds.install(path="sub", source=source)
-    assert_true(isdir(opj(subds.path, '.git')))
-    ok_(subds.is_installed())
-    # sub is clean:
-    ok_clean_git(subds.path, annex=False)
-    # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
-    assert_in('sub', ds.get_subdatasets())
-
-
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
-@with_tempfile(mkdir=True)
-def test_install_subdataset(src, path):
-    # get the superdataset:
-    ds = install(path=path, source=src)
-
-    # subdataset not installed:
-    subds = Dataset(opj(path, 'subm 1'))
-    assert_false(subds.is_installed())
-
-    # install it:
-    ds.install('subm 1')
-    assert_true(isdir(opj(subds.path, '.git')))
-
-    ok_(subds.is_installed())
-    # Verify that it is the correct submodule installed and not
-    # new repository initiated
-    assert_equal(set(subds.repo.get_indexed_files()),
-                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
-
-    # Now the obnoxious install an annex file within not yet
-    # initialized repository!
-    with swallow_outputs():  # progress bar
-        ds.install(opj('subm 2', 'test-annex.dat'))
-    subds2 = Dataset(opj(path, 'subm 2'))
-    assert(subds2.is_installed())
-    assert(subds2.repo.file_has_content('test-annex.dat'))
-    # we shouldn't be able silently ignore attempt to provide source while
-    # "installing" file under git
-    assert_raises(FileInGitError, ds.install, opj('subm 2', 'INFO.txt'), source="http://bogusbogus")
 
 
 @with_tree(tree={
@@ -318,6 +235,64 @@ def test_guess_dot_git():
         yield _test_guess_dot_git, annex
 
 
+@with_testrepos(flavors=['local-url', 'network', 'local'])
+@with_tempfile
+def test_install_into_dataset(source, top_path):
+
+    ds = create(top_path)
+    subds = ds.install(path="sub", source=source)
+    assert_true(isdir(opj(subds.path, '.git')))
+    ok_(subds.is_installed())
+    # sub is clean:
+    ok_clean_git(subds.path, annex=False)
+    # top is not:
+    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
+    # unless committed the subds should not show up in the parent
+    # this is the same behavior that 'git submodule status' implements
+    # ben: this is not true. 'git submodule status' does show it.
+    #      TODO: Figure out, why it didn't show up before.
+    #      (no commit would be a reason, but doesn't apply here)
+    assert_in('sub', ds.get_subdatasets())
+    ds.save('addsub')
+    assert_in('sub', ds.get_subdatasets())
+
+
+@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
+@with_tempfile(mkdir=True)
+def test_install_subdataset(src, path):
+
+    # get the superdataset:
+    ds = install(path=path, source=src)
+
+    # subdataset not installed:
+    subds = Dataset(opj(path, 'subm 1'))
+    assert_false(subds.is_installed())
+
+    # install it:
+    ds.install('subm 1')
+    assert_true(isdir(opj(subds.path, '.git')))
+
+    ok_(subds.is_installed())
+    # Verify that it is the correct submodule installed and not
+    # new repository initiated
+    assert_equal(set(subds.repo.get_indexed_files()),
+                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
+
+    # Now the obnoxious install an annex file within not yet
+    # initialized repository!
+
+    # ben: this test doesn't match current API definition of add;
+    # outcommented for now
+    # with swallow_outputs():  # progress bar
+    #     ds.add(opj('sub2', 'test-annex.dat'))
+    # subds2 = Dataset(opj(path, 'sub2'))
+    # assert(subds2.is_installed())
+    # assert(subds2.repo.file_has_content('test-annex.dat'))
+    # # we shouldn't be able silently ignore attempt to provide source while
+    # # "installing" file under git
+    # assert_raises(FileInGitError, ds.add, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
+
+
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
@@ -336,3 +311,4 @@ def test_install_datasets_root(tdir):
     with chpwd(tdir):
         install("///")
         ok_(exists('datasets.datalad.org'))
+

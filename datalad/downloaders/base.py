@@ -237,8 +237,8 @@ class BaseDownloader(object):
                 content, "Download of the url %s has failed: " % url)
 
         if target_size and target_size != downloaded_size:
-            raise IncompleteDownloadError("Downloaded size %d differs from originally announced %d"
-                                          % (downloaded_size, target_size))
+            raise (IncompleteDownloadError if target_size > downloaded_size else UnaccountedDownloadError)(
+                "Downloaded size %d differs from originally announced %d" % (downloaded_size, target_size))
 
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
@@ -405,6 +405,7 @@ class BaseDownloader(object):
 
         if cache:
             cache_key = msgpack.dumps(url)
+            lgr.debug("Loading content for url %s from cache", url)
             res = self.cache.get(cache_key)
             if res is not None:
                 try:

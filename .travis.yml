@@ -8,6 +8,9 @@ cache:
 matrix:
   include:
   - python: 2.7
+    env:
+    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
+    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
   # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
   #- python: 2.7
   #  env:

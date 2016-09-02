@@ -10,48 +10,20 @@
 """
 
 
-
-import os
-import shutil
-from os.path import join as opj, abspath, isdir
-from os.path import exists
-from os.path import realpath
-
-from mock import patch
+from os.path import join as opj
 
 from ..dataset import Dataset
 from datalad.api import create
-from datalad.api import install
-from datalad.consts import DATASETS_TOPURL
-from datalad.distribution.install import get_containing_subdataset
-from datalad.distribution.install import _get_installationpath_from_url
-from datalad.distribution.install import _get_git_url_from_source
 from datalad.utils import chpwd
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileInGitError
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.cmd import Runner
 
-from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
-
-from nose.tools import ok_, eq_, assert_false
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_equal, assert_true
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
-from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import eq_
+from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import swallow_logs
 
 
 @with_tempfile(mkdir=True)
@@ -68,12 +40,17 @@ def test_create_raises(path, outside_path):
 
     with open(opj(path, "somefile.tst"), 'w') as f:
         f.write("some")
-    # non-empty without force:
+    # non-empty without `force`:
     assert_raises(ValueError, ds.create, force=False)
-    # non-empty with force:
+    # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
     assert_raises(ValueError, ds.create_subdataset, outside_path)
+
+    # create a sub:
+    ds.create_subdataset('sub')
+    # fail when doing it again without `force`:
+    assert_raises(ValueError, ds.create_subdataset, 'sub')
 
 
 @with_tempfile
@@ -100,8 +77,7 @@ def test_create(path):
     ok_clean_git(ds.path, annex=True)
 
     # check default backend
-    assert_equal(
-        ds.repo.repo.config_reader().get_value("annex", "backends"),
+    eq_(ds.repo.repo.config_reader().get_value("annex", "backends"),
         'MD5E')
     runner = Runner()
     # check description in `info`
@@ -109,8 +85,7 @@ def test_create(path):
     cmlout = runner.run(cmd, cwd=path)
     assert_in('funny [here]', cmlout[0])
     # check datset ID
-    assert_equal(
-        ds.config.get_value('datalad.dataset', 'id'),
+    eq_(ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
     assert_equal(
         ds.config.get_value('datalad.metadata', 'nativetype'),

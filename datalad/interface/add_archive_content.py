@@ -466,7 +466,8 @@ class AddArchiveContent(Interface):
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
-                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full'))
+                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
+                    _datalad_msg=True
                 )
                 commit_stats.reset()
         finally:

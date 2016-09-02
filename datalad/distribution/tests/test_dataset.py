@@ -10,8 +10,11 @@
 """
 
 import os
+import shutil
 from os.path import join as opj, abspath, normpath
+
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
+from datalad.api import create
 from datalad.utils import chpwd, getpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -104,6 +107,14 @@ def test_get_subdatasets(path):
         {'sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1',
          'sub dataset1/sub sub dataset1/subm 2', 'sub dataset1/subm 1',
          'sub dataset1/subm 2', 'sub dataset1'})
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=0)),
+        set([]))
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=1)),
+        {'sub dataset1'})
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=2)),
+        {'sub dataset1', 'sub dataset1/sub sub dataset1', 'sub dataset1/subm 1',
+         'sub dataset1/subm 2'})
+
     # TODO:  More Flavors!
 
 
@@ -184,7 +195,8 @@ def test_subdatasets(path):
     ds.install(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
-    # add a subdataset
+
+    # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
     subdss = ds.get_subdatasets()
@@ -202,25 +214,50 @@ def test_subdatasets(path):
     # TODO actual submodule checkout is still there
 
 
+@with_tree(tree={'test.txt': 'whatever'})
+def test_get_containing_subdataset(path):
+
+    ds = create(path, force=True)
+    ds.install(path='test.txt')
+    ds.save("Initial commit")
+    subds = ds.create_subdataset("sub")
+
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset("some").path, ds.path)
+    # make sure the subds is found, even when it is not present, but still
+    # known
+    shutil.rmtree(subds.path)
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+
+    outside_path = opj(os.pardir, "somewhere", "else")
+    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
+    assert_raises(ValueError, ds.get_containing_subdataset,
+                  opj(os.curdir, outside_path))
+    assert_raises(ValueError, ds.get_containing_subdataset,
+                  abspath(outside_path))
+
+
 @with_tempfile(mkdir=True)
 def test_require_dataset(path):
-    # in this folder by default
-    assert_equal(
-        require_dataset(None).path,
-        abspath(os.path.curdir))
     with chpwd(path):
         assert_raises(
             InsufficientArgumentsError,
             require_dataset,
             None)
-    assert_equal(
-        require_dataset('some', check_installed=False).path,
-        abspath('some'))
-    assert_raises(
-        ValueError,
-        require_dataset,
-        'some',
-        check_installed=True)
+        create('.')
+        # in this folder by default
+        assert_equal(
+            require_dataset(None).path,
+            path)
+
+        assert_equal(
+            require_dataset('some', check_installed=False).path,
+            abspath('some'))
+        assert_raises(
+            ValueError,
+            require_dataset,
+            'some',
+            check_installed=True)
 
 
 @with_tempfile(mkdir=True)

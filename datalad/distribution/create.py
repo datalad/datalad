@@ -14,6 +14,7 @@ import logging
 
 from os import listdir
 from os.path import isdir
+from os.path import realpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -99,6 +100,10 @@ class Create(Interface):
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
+        no_commit=Parameter(
+            args=("--no-commit",),
+            doc="""if set, do not commit automatically""",
+            action='store_true'),
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -138,6 +143,7 @@ class Create(Interface):
             add_to_super=False,
             name=None,
             no_annex=False,
+            no_commit=False,
             annex_version=None,
             annex_backend='MD5E',
             native_metadata_type=None,
@@ -145,6 +151,8 @@ class Create(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
+        if not isinstance(force, bool):
+            raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
         if path:
             if isinstance(path, Dataset):
                 ds = path
@@ -182,54 +190,57 @@ class Create(Interface):
                 annex_opts=annex_opts,
                 annex_init_opts=annex_init_opts)
 
+        if no_annex:
+            if description:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "description for annex repo and declaring "
+                                 "no annex repo.")
+            if annex_opts:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "options for annex and declaring no "
+                                 "annex repo.")
+            if annex_init_opts:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "options for annex init and declaring no "
+                                 "annex repo.")
+
+            lgr.info("Creating a new git repo at %s", ds.path)
+            vcs = GitRepo(ds.path, url=None, create=True,
+                          git_opts=git_opts)
         else:
-            if no_annex:
-                if description:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "description for annex repo and declaring "
-                                     "no annex repo.")
-                if annex_opts:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "options for annex and declaring no "
-                                     "annex repo.")
-                if annex_init_opts:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "options for annex init and declaring no "
-                                     "annex repo.")
+            # always come with annex when created from scratch
+            lgr.info("Creating a new annex repo at %s", ds.path)
+            vcs = AnnexRepo(ds.path, url=None, create=True,
+                            backend=annex_backend,
+                            version=annex_version,
+                            description=description,
+                            git_opts=git_opts,
+                            annex_opts=annex_opts,
+                            annex_init_opts=annex_init_opts)
 
-                lgr.info("Creating a new git repo at %s", ds.path)
-                vcs = GitRepo(ds.path, url=None, create=True,
-                              git_opts=git_opts)
-            else:
-                # always come with annex when created from scratch
-                lgr.info("Creating a new annex repo at %s", ds.path)
-                vcs = AnnexRepo(ds.path, url=None, create=True,
-                                backend=annex_backend,
-                                version=annex_version,
-                                description=description,
-                                git_opts=git_opts,
-                                annex_opts=annex_opts,
-                                annex_init_opts=annex_init_opts)
+        if native_metadata_type is not None:
+            if not isinstance(native_metadata_type, list):
+                native_metadata_type = [native_metadata_type]
+            for nt in native_metadata_type:
+                ds.config.add('datalad.metadata.nativetype', nt)
 
-            # record the ID of this repo for the afterlife
-            # to be able to track siblings and children
-            id_var = 'datalad.dataset.id'
-            if id_var in ds.config:
-                # make sure we reset this variable completely, in case of a re-create
-                ds.config.unset(id_var, where='dataset')
-            ds.config.add(id_var, ds.id, where='dataset')
+        # record the ID of this repo for the afterlife
+        # to be able to track siblings and children
+        id_var = 'datalad.dataset.id'
+        if id_var in ds.config:
+            # make sure we reset this variable completely, in case of a re-create
+            ds.config.unset(id_var, where='dataset')
+        ds.config.add(id_var, ds.id, where='dataset')
 
-            if native_metadata_type is not None:
-                if not isinstance(native_metadata_type, list):
-                    native_metadata_type = [native_metadata_type]
-                for nt in native_metadata_type:
-                    ds.config.add('datalad.metadata.nativetype', nt)
+        # save everthing
+        ds.repo.add('.datalad', git=True)
 
-            # save everthing
-            ds.repo.add('.datalad', git=True)
-            vcs.commit(msg="[DATALAD] initial commit",
-                       options=to_options(allow_empty=True))
-            return ds
+        if not no_commit:
+            vcs.commit(msg="Initial commit",
+                       options=to_options(allow_empty=True),
+                       _datalad_msg=True)
+
+        return ds
 
     @staticmethod
     def result_renderer_cmdline(res, args):
