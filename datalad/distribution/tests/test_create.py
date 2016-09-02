@@ -23,6 +23,7 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_equal
 from datalad.tests.utils import ok_clean_git
 
 

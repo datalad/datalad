@@ -279,7 +279,6 @@ class Dataset(object):
             return submodules
 
     def create_subdataset(self, path,
-                          force=False,
                           name=None,
                           force=False,
                           description=None,
@@ -329,7 +328,6 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        from .install import _with_sep
         if not realpath(path).startswith(_with_sep(realpath(self.path))):  # realpath OK
             raise ValueError("path %s outside dataset %s" % (path, self))
 
