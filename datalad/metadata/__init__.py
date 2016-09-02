@@ -9,12 +9,10 @@
 """Metadata handling (parsing, storing, querying)"""
 
 
-import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, relpath
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
-from ..log import lgr
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -68,7 +66,7 @@ def _get_base_dataset_metadata(ds_identifier):
     }
 
 
-def get_implicit_metadata(ds, ds_identifier=None):
+def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
@@ -80,6 +78,8 @@ def get_implicit_metadata(ds, ds_identifier=None):
     """
     if ds_identifier is None:
         ds_identifier = ds.id
+    if subdatasets is None:
+        subdatasets = []
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
@@ -89,7 +89,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
 
     # shortcut
     repo = ds.repo.repo
-    if repo.head.reference.is_valid():
+    if repo.head.is_valid():
         meta['dcterms:modified'] = repo.head.commit.authored_datetime.isoformat()
         # maybe use something like git-describe instead -- but tag-references
         # might changes...
@@ -128,11 +128,10 @@ def get_implicit_metadata(ds, ds_identifier=None):
     ## metadata on all subdataset
     subdss = []
     # we only want immediate subdatasets
-    for subds_path in ds.get_subdatasets(recursive=False):
-        subds = Dataset(opj(ds.path, subds_path))
+    for subds in subdatasets:
         subds_id = subds.id
         submeta = {
-            'location': subds_path,
+            'location': relpath(subds.path, ds.path),
             'type': 'Dataset'}
         if not subds_id.startswith('_:'):
             submeta['@id'] = subds_id
@@ -169,24 +168,23 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
 
+    # pregenerate Dataset objects for all relevants subdataset
+    # needed to get consistent IDs across the entire meta data graph
+    # we need these, even if we `ignore_subdatasets`, as we still want
+    # to list the parts of this dataset, even without additional meta data
+    # about it
+    subdss = [Dataset(opj(ds.path, p)) for p in ds.get_subdatasets(recursive=False)]
     # start with the implicit meta data, currently there is no cache for
     # this type of meta data, as it will change with every clone.
-    # In contrast, native meta data is cached, although the UUIDs in it will
-    # not necessarily match this clone. However, this clone should have a
-    # 'hasVersion' meta data item that lists the respective UUID, and consequently
-    # we know which clone was used to extract/cache the meta data
-    # XXX it may be worth the put the combined output of this function in a separate
-    # cache on the local machine, in order to speed up meta data access, but maybe this
-    # is already the domain of a `query` implementation
-    implicit_meta = get_implicit_metadata(ds, ds_identifier)
+    # In contrast, native meta data is cached.
+    implicit_meta = _get_implicit_metadata(
+        ds, ds_identifier, subdatasets=subdss)
     # create a lookup dict to find parts by subdataset mountpoint
     has_part = implicit_meta.get('dcterms:hasPart', [])
     if not isinstance(has_part, list):
         has_part = [has_part]
     has_part = {hp['location']: hp for hp in has_part}
 
-    # XXX this logic is flawed
-    #ds_versions = _get_version_ids_from_implicit_meta(implicit_meta)
     meta.append(implicit_meta)
 
     # from cache?
@@ -206,8 +204,8 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             meta.append(cached_meta)
     # for any subdataset that is actually registered (avoiding stale copies)
     if not ignore_subdatasets:
-        for subds_path in ds.get_subdatasets(recursive=False):
-            subds = Dataset(opj(ds.path, subds_path))
+        for subds in subdss:
+            subds_path = relpath(subds.path, ds.path)
             if ignore_cache and subds.is_installed():
                 meta.extend(
                     get_metadata(subds, guess_type=guess_type,
@@ -244,11 +242,11 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                     # we a new UUID
                     if not '@id' in has_part[subds_path]:
                         # this must be an uninstalled subdataset
-                        # look for a meta data set that knows about being part of any
-                        # sibling of this dataset, so we can use its @id
+                        # look for a meta data set that knows about being part
+                        # of this dataset, so we can use its @id
                         for md in subds_meta:
                             cand_id = md.get('dcterms:isPartOf', None)
-                            if cand_id in ds_versions and '@id' in md:
+                            if cand_id == ds_identifier and '@id' in md:
                                 has_part[subds_path]['@id'] = md['@id']
                                 break
 
