@@ -407,5 +407,13 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
 
         # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
-        if shared == 'all':
-            ssh(['chmod', 'a+r', '-R', dirname(webresources_remote)])
+        mode = None
+        if shared.lower() in ('true', 'all', 'world', 'everybody'):
+            mode = 'a+rX'
+        elif shared.lower() == 'group':
+            mode = 'g+rX'
+        elif shared.startswith('0'):
+            mode = shared
+
+        if mode:
+            ssh(['chmod', mode, '-R', dirname(webresources_remote)])
