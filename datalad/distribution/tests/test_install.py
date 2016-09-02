@@ -90,33 +90,6 @@ def test_get_git_url_from_source():
         'ssh://somewhe.re/else')
 
 
-# <<<<<<< HEAD
-# @with_tree(tree={'test.txt': 'whatever'})
-# def test_get_containing_subdataset(path):
-#
-#     ds = create(path, force=True)
-#     ds.install(path='test.txt')
-#     ds.save("Initial commit")
-#     sub_path = opj(path, "sub")
-#     subds = create(sub_path, add_to_super=True)
-#     # symlinks in path are evil!  TODO: unify one way or another
-#     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
-#     eq_(get_containing_subdataset(ds, "some").path, ds.path)
-#     # make sure the subds is found, even when it is not present, but still
-#     # known
-#     shutil.rmtree(subds.path)
-#     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
-#
-#     outside_path = opj(os.pardir, "somewhere", "else")
-#     assert_raises(ValueError, get_containing_subdataset, ds, outside_path)
-#     assert_raises(ValueError, get_containing_subdataset, ds,
-#                   opj(os.curdir, outside_path))
-#     assert_raises(ValueError, get_containing_subdataset, ds,
-#                   abspath(outside_path))
-#
-#
-# =======
-# >>>>>>> origin/master
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
 @with_tempfile(mkdir=True)
 def test_install_plain_git(src, path):
@@ -176,56 +149,6 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_clean_git(ds.path, annex=False)
     assert_true(os.path.lexists(opj(ds.path, 'test-annex.dat')))
 
-<<<<<<< HEAD
-
-@with_testrepos(flavors=['local-url', 'network', 'local'])
-@with_tempfile
-def test_install_into_dataset(source, top_path):
-    ds = create(top_path)
-    # install is no longer doing "create" action, so test RFed to reflect that
-    subds = create(opj(top_path, 'sub'), add_to_super=True)
-    assert_true(isdir(opj(subds.path, '.git')))
-    ok_(subds.is_installed())
-    # sub is clean:
-    ok_clean_git(subds.path, annex=False)
-    # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
-    assert_in('sub', ds.get_subdatasets())
-
-
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
-@with_tempfile(mkdir=True)
-def test_install_subdataset(src, path):
-    # get the superdataset:
-    ds = install(path=path, source=src)
-
-    # subdataset not installed:
-    subds = Dataset(opj(path, 'subm 1'))
-    assert_false(subds.is_installed())
-
-    # install it:
-    ds.install('subm 1')
-    assert_true(isdir(opj(subds.path, '.git')))
-
-    ok_(subds.is_installed())
-    # Verify that it is the correct submodule installed and not
-    # new repository initiated
-    assert_equal(set(subds.repo.get_indexed_files()),
-                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
-
-    # Now the obnoxious install of an annex file within not yet
-    # initialized repository!
-    with swallow_outputs():  # progress bar
-        ds.install(opj('subm 2', 'test-annex.dat'))
-    subds2 = Dataset(opj(path, 'subm 2'))
-    assert(subds2.is_installed())
-    assert(subds2.repo.file_has_content('test-annex.dat'))
-    # we shouldn't be able silently ignore attempt to provide source while
-    # "installing" file under git
-    assert_raises(FileInGitError, ds.install, opj('subm 2', 'INFO.txt'), source="http://bogusbogus")
-
-=======
->>>>>>> origin/master
 
 @with_tree(tree={
     'ds': {'test.txt': 'some'},

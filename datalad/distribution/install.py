@@ -412,7 +412,7 @@ class Install(Interface):
             if recursive:
                 if recursive == "data" and isinstance(ds.repo, AnnexRepo):
                     ds.repo.get('.')
-                for sm in sorted(ds.repo.get_submodules()):
+                for sm in ds.repo.get_submodules():
                     _install_subds_from_flexible_source(
                         ds, sm.path, sm.url, recursive=recursive)
             return ds
