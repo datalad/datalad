@@ -10,6 +10,7 @@
 """
 
 import os
+import re
 from os.path import join as opj, abspath, basename, exists
 
 from git.exc import GitCommandError
@@ -28,10 +29,34 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
 from datalad.tests.utils import ok_generator
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import ok_exists
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.utils import on_windows
+from datalad.utils import _path_
+
+
+def _test_correct_publish(target_path, rootds=False):
+
+    paths = [_path_(".git/hooks/post-update")]
+
+    # pushed web-interface html to dataset
+    if rootds:
+        paths += ['index.html', _path_(".git/datalad/web")]
+
+    for path in paths:
+        ok_exists(opj(target_path, path))
+
+    # not created dataset metatadata directory in dataset
+    assert_false(exists(opj(target_path, ".git", "datalad", "metadata")))
+
+    # correct ls_json command in hook content
+    ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
+                        '.*datalad ls -r --json file %s.*' % target_path[:-1],
+                        re_=True,
+                        flags=re.DOTALL)
 
 
 @skip_ssh
@@ -117,6 +142,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
+        _test_correct_publish(target_path)
+
         # now, push should work:
         publish(dataset=source, to="local_target")
 
@@ -124,7 +151,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
+@with_tempfile
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
@@ -138,18 +165,31 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))
 
-    create_publication_target_sshwebserver(dataset=source,
-                                           sshurl="ssh://localhost",
-                                           target_dir=target_path + "/%NAME",
-                                           recursive=True)
+    for flat in False, True:
+        target_path_ = target_dir_tpl = target_path + "-" + str(flat)
 
-    # raise if git repos were not created:
-    t_super = GitRepo(opj(target_path, basename(src_path)), create=False)
-    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-subm 1"),
-                     create=False)
-    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-subm 2"),
-                     create=False)
+        if flat:
+            target_dir_tpl += "/%NAME"
+            sep = '-'
+        else:
+            sep = os.path.sep
+        remote_name = 'remote-' + str(flat)
+        create_publication_target_sshwebserver(target=remote_name,
+                                               dataset=source,
+                                               sshurl="ssh://localhost",
+                                               target_dir=target_dir_tpl,
+                                               recursive=True)
 
-    for repo in [source.repo, sub1.repo, sub2.repo]:
-        assert_not_in("local_target", repo.get_remotes())
+        # raise if git repos were not created
+        for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
+            target_dir = opj(target_path_, basename(src_path) if flat else "").rstrip(os.path.sep) + suffix
+            # raise if git repos were not created
+            GitRepo(target_dir, create=False)
 
+            _test_correct_publish(target_dir, rootds=not suffix)
+
+        for repo in [source.repo, sub1.repo, sub2.repo]:
+            assert_not_in("local_target", repo.get_remotes())
+
+        # now, push should work:
+        #publish(dataset=source, to=remote_name)
