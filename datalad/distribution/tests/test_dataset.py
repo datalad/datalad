@@ -226,14 +226,30 @@ def test_require_dataset(path):
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
     ds = Dataset(path)
-    # ID made from path
-    assert_true(ds.id.startswith('_:_'))
+    dsorigid = ds.id
+    # ID is always a UUID
+    assert_equal(ds.id.count('-'), 4)
+    assert_equal(len(ds.id), 36)
+    # creating a new object for the same path (no ID on record)
+    # does not yields the same ID
+    newds = Dataset(path)
+    assert_false(ds is newds)
+    assert_true(ds.id != newds.id)
+    # recreating the dataset does NOT change the id
     ds.create(no_annex=True)
-    # still "blank node" ID
-    assert_true(ds.id.startswith('_:'))
-    assert_true(ds.repo.get_hexsha() in ds.id)
+    assert_equal(ds.id, dsorigid)
+    # even adding an annex doesn't
     ds.create(force=True)
-    assert_equal(
-        ds.repo.repo.config_reader().get_value(
-            'annex', 'uuid', default='NOTHING'),
-        ds.id)
+    assert_equal(ds.id, dsorigid)
+    # dataset ID and annex UUID have nothing to do with each other
+    # if an ID was already generated
+    assert_true(ds.repo.uuid != ds.id)
+    # creating a new object for the same dataset with an ID on record
+    # yields the same ID
+    newds = Dataset(path)
+    assert_false(ds is newds)
+    assert_equal(ds.id, newds.id)
+    # even if we generate a dataset from scratch with an annex UUID right away,
+    # this is also not the ID
+    annexds = Dataset(opj(path, 'scratch')).create()
+    assert_true(annexds.id != annexds.repo.uuid)

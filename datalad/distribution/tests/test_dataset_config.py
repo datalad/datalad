@@ -19,8 +19,8 @@ from datalad.api import create
 # Let's document any configuration option supported in this
 # reference configuration
 _config_file_content = """\
-[datalad "annex"]
-    origin = nothing
+[datalad "dataset"]
+    id = nothing
 """
 
 _dataset_config_template = {
@@ -35,7 +35,7 @@ def test_configuration_access(path):
     # there is something prior creation
     assert_true(ds.config is not None)
     # creation must change the uuid setting
-    assert_equal(ds.config['datalad.annex.origin'], 'nothing')
+    assert_equal(ds.config['datalad.dataset.id'], 'nothing')
     # create resets this value and records the actual uuid
     ds.create(force=True)
-    assert_equal(ds.config.get_value('datalad.annex', 'origin', default='nothing'), ds.id)
+    assert_equal(ds.config.get_value('datalad.dataset', 'id', default='nothing'), ds.id)
