@@ -408,11 +408,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
         mode = None
-        if shared.lower() in ('true', 'all', 'world', 'everybody'):
+        if shared in (True, 'true', 'all', 'world', 'everybody'):
             mode = 'a+rX'
-        elif shared.lower() == 'group':
+        elif shared == 'group':
             mode = 'g+rX'
-        elif shared.startswith('0'):
+        elif str(shared).startswith('0'):
             mode = shared
 
         if mode:
