@@ -420,3 +420,4 @@ def test_path_():
     else:
         p = 'a/b/c'
         assert(_path_(p) is p)  # nothing is done to it whatsoever
+        eq_(_path_(p, 'd'), 'a/b/c/d')
