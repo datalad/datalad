@@ -557,6 +557,7 @@ from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
 
 _TESTREPOS = None
 
+
 def _get_testrepos_uris(regex, flavors):
     global _TESTREPOS
     # we should instantiate those whenever test repos actually asked for
@@ -651,7 +652,6 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
-
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
         # we should always have at least one repo to test on, unless explicitly only
         # network was requested by we are running without networked tests
