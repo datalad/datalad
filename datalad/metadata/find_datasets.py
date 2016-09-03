@@ -104,7 +104,7 @@ class FindDatasets(Interface):
                     lgr.warning('meta data match, but no to-be-reported properties found')
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, cmdlineargs):
         from datalad.ui import ui
         if res is None:
             res = []
