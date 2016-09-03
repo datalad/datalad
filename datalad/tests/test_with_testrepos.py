@@ -6,13 +6,14 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Tests for with_testrepos decorator"""
 
 import git
 import os
 
 from .utils import eq_, ok_, with_testrepos, with_tempfile
 from datalad.cmd import Runner
-from .utils import local_testrepo_flavors
+
 
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_having_annex(path):
@@ -26,10 +27,12 @@ def test_having_annex(path):
     ok_('origin/git-annex' in refs, msg="Didn't find git-annex among refs %s"
                                         % refs)
 
+
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
     ok_('github.com' in url)
     ok_(url.startswith('git://github.com/datalad/testrepo--'))
+
 
 @with_testrepos
 @with_tempfile
