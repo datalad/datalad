@@ -130,7 +130,7 @@ class AggregateMetaData(Interface):
             _store_json(
                 opj(metapath, relpath(subds.path, dataset.path)),
                 subds_meta)
-        if save:
+        if save and exists(opj(dataset.repo.path, metapath)):
             dataset.repo.add(metapath, git=True)
             if dataset.repo.repo.is_dirty(
                     index=True,
