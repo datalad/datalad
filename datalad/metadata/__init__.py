@@ -197,8 +197,6 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
     # from cache?
     if ignore_cache or not exists(main_meta_fname):
-        if not ignore_cache:
-            lgr.info('no extracted native meta data available for {}, use the ``aggregate_metadata`` command to avoid slow operation'.format(ds))
         meta.extend(
             get_native_metadata(
                 ds,
