@@ -22,7 +22,7 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph
 
 
-class FindDatasets(Interface):
+class SearchDatasets(Interface):
     """
     """
 
@@ -55,16 +55,19 @@ class FindDatasets(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='query')
+    @datasetmethod(name='search_datasets')
     def __call__(match, dataset, report=None):
 
-        ds = require_dataset(dataset, check_installed=True, purpose='meta data query')
+        ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
         meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                             ignore_cache=False)
 
         # merge all info on datasets into a single dict per dataset
+        lgr.info('Next one is slow, but can be made faster by your contribution!')
+        # TODO load offline schema if necessary, cache document load requests
         meta = flatten_metadata_graph(meta)
+        lgr.info('Fast again...')
         # TODO cache this somewhere and reload the cache instead of repeating
         # the graph optimization to gain some speed
 
