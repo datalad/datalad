@@ -14,7 +14,6 @@ import logging
 
 from os import listdir
 from os.path import isdir
-from os.path import realpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -174,21 +173,27 @@ class Create(Interface):
 
         if add_to_super:
             sds = ds.get_superdataset()
-            if sds is None:
-                raise ValueError("No super dataset found for dataset %s" % ds)
 
-            return sds.create_subdataset(
-                ds.path,
-                force=force,
-                name=name,
-                description=description,
-                no_annex=no_annex,
-                annex_version=annex_version,
-                annex_backend=annex_backend,
-                native_metadata_type=native_metadata_type,
-                git_opts=git_opts,
-                annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts)
+            if sds is not None:
+                return sds.create_subdataset(
+                    ds.path,
+                    force=force,
+                    name=name,
+                    description=description,
+                    no_annex=no_annex,
+                    annex_version=annex_version,
+                    annex_backend=annex_backend,
+                    git_opts=git_opts,
+                    annex_opts=annex_opts,
+                    annex_init_opts=annex_init_opts)
+            else:
+                if isinstance(add_to_super, bool):
+                    raise ValueError("No super dataset found for dataset %s" % ds)
+                elif add_to_super == 'auto':
+                    pass  # we are cool to just make it happen without add_to_super
+                else:
+                    raise ValueError("Do not know how to handle add_to_super=%s"
+                                     % repr(add_to_super))
 
         if no_annex:
             if description:
