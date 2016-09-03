@@ -70,6 +70,7 @@ requires = {
     ],
     'metadata': [
         'simplejson',
+        'pyld',
     ]
 }
 requires['full'] = sum(list(requires.values()), [])
