@@ -141,6 +141,13 @@ def test_aggregation(path):
     assert_equal(
         meta[0]['dcterms:hasPart']['@id'],
         subds.id)
+    success = False
+    for m in meta:
+        p = m.get('dcterms:hasPart', {})
+        if p.get('@id', None) == subsubds.id:
+            assert_equal(opj('sub', 'subsub'), p.get('location', None))
+            success = True
+    assert_true(success)
 
     # save the toplevel dataset only (see below)
     ds.save('with aggregated meta data', auto_add_changes=True)

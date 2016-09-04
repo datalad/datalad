@@ -123,12 +123,34 @@ class AggregateMetaData(Interface):
             _store_json(metapath, native_metadata)
 
         for subds in subdss:
+            subds_relpath = relpath(subds.path, dataset.path)
             subds_meta = get_metadata(
                 subds, guess_type=guess_native_type, ignore_subdatasets=False,
                 ignore_cache=False)
-            subds_meta[0]['dcterms:isPartOf'] = dataset.id
+            # find implicit meta data for all contained subdatasets
+            for m in subds_meta:
+                # skip non-implicit
+                std_spec = m.get('dcterms:conformsTo', '')
+                if not (isinstance(std_spec, basestring)
+                        and std_spec.startswith('http://docs.datalad.org/metadata.html#v')):
+                    continue
+                if m.get('@id', None) == subds.id:
+                    # register relation to dataset being aggregated into
+                    m['dcterms:isPartOf'] = dataset.id
+                # prefix all subdataset location information with the relpath of this
+                # subdataset
+                if 'dcterms:hasPart' in m:
+                    parts = m['dcterms:hasPart']
+                    if not isinstance(parts, list):
+                        parts = [parts]
+                        for p in parts:
+                            if not 'location' in p:
+                                continue
+                            loc = p.get('location', subds_relpath)
+                            if loc != subds_relpath:
+                                p['location'] = opj(subds_relpath, loc)
             _store_json(
-                opj(metapath, relpath(subds.path, dataset.path)),
+                opj(metapath, subds_relpath),
                 subds_meta)
         if save and exists(opj(dataset.repo.path, metapath)):
             dataset.repo.add(metapath, git=True)
