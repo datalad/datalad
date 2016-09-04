@@ -63,6 +63,8 @@ def _get_base_dataset_metadata(ds_identifier):
         "@context": "http://schema.org/",
         "@id": ds_identifier,
         "type": "Dataset",
+        # increment when changes to meta data representation are done
+        "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
 
 

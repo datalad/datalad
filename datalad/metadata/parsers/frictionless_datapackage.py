@@ -84,6 +84,8 @@ def get_metadata(ds, ds_identifier):
     if 'licenses' in foreign:
         meta['license'] = [_compact_license(l) for l in foreign['licenses']]
 
-    meta['dcterms:conformsTo'] = 'http://specs.frictionlessdata.io/data-packages'
+    meta['dcterms:conformsTo'] = [
+        'http://specs.frictionlessdata.io/data-packages',
+        'http://docs.datalad.org/metadata.html#v0-1']
 
     return meta

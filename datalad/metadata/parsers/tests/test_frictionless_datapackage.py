@@ -65,7 +65,10 @@ def test_get_metadata(path):
   "contributors": [
     "Joe Bloggs <joe@example.com> (http://www.example.com)"
   ],
-  "dcterms:conformsTo": "http://specs.frictionlessdata.io/data-packages",
+  "dcterms:conformsTo": [
+    "http://specs.frictionlessdata.io/data-packages",
+    "http://docs.datalad.org/metadata.html#v0-1"
+  ],
   "description": "Annual Consumer Price Index (CPI) for most countries in the world. Reference year is 2005.",
   "keywords": [
     "CPI",

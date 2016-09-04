@@ -80,13 +80,14 @@ def test_get_multiple_metadata_types(path):
 def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
-    assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
+    assert_equal(sorted(meta[0].keys()),
+                 ['@context', '@id', 'dcterms:conformsTo', 'type'])
     ds.create(force=True)
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[0].keys()),
-        ['@context', '@id', 'availableFrom', 'dcterms:modified', 'type',
-         'version'])
+        ['@context', '@id', 'availableFrom', 'dcterms:conformsTo',
+         'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = Dataset(opj(path, 'sibling'))

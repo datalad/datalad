@@ -61,7 +61,10 @@ def test_get_metadata(path):
   "citation": [
     "http://studyforrest.org"
   ],
-  "dcterms:conformsTo": "BIDS 1.0.0-rc3",
+  "dcterms:conformsTo": [
+    "http://docs.datalad.org/metadata.html#v0-1",
+    "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf"
+  ],
   "description": "Some description",
   "foaf:fundedBy": "We got money from collecting plastic bottles",
   "license": "PDDL",
