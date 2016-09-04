@@ -52,6 +52,7 @@ class SearchDatasets(Interface):
             doc="""name of the property to report for any match.[CMD:  This
             option can be given multiple times. CMD] If none are given, all
             properties are reported."""),
+        # TODO --json  to output as json
     )
 
     @staticmethod
@@ -62,7 +63,6 @@ class SearchDatasets(Interface):
 
         meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                             ignore_cache=False)
-
         # merge all info on datasets into a single dict per dataset
         lgr.info('Next one is slow, but can be made faster by your contribution!')
         # TODO load offline schema if necessary, cache document load requests
@@ -78,7 +78,7 @@ class SearchDatasets(Interface):
         if not isinstance(meta, list):
             meta = [meta]
 
-        if not isinstance(report, list):
+        if report and not isinstance(report, list):
             report = [report]
 
         expr = re.compile(match)
@@ -100,11 +100,12 @@ class SearchDatasets(Interface):
                     v = unicode(v)
                 hit = hit or expr.match(v)
             if hit:
-                report_dict = {k: mds[k] for k in report if k in mds}
+                report_dict = {k: mds[k] for k in report if k in mds} if report else mds
                 if len(report_dict):
                     yield report_dict
                 else:
-                    lgr.warning('meta data match, but no to-be-reported properties found')
+                    lgr.warning('meta data match, but no to-be-reported properties found. '
+                                'Present properties: %s' % (", ".join(sorted(mds))))
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
