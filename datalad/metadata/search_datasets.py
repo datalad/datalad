@@ -19,6 +19,7 @@ from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
+from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph
 
@@ -53,12 +54,17 @@ class SearchDatasets(Interface):
             doc="""name of the property to report for any match.[CMD:  This
             option can be given multiple times. CMD] If none are given, all
             properties are reported."""),
-        # TODO --json  to output as json
+        # Theoretically they should be CMDLINE specific I guess?
+        format=Parameter(
+            args=('-f', '--format'),
+            constraints=EnsureChoice('custom', 'json', 'yaml'),
+            doc="""format for output."""
+        )
     )
 
     @staticmethod
     @datasetmethod(name='search_datasets')
-    def __call__(match, dataset, report=None):
+    def __call__(match, dataset, report=None, format='custom'):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
@@ -113,23 +119,34 @@ class SearchDatasets(Interface):
         from datalad.ui import ui
         if res is None:
             res = []
-        anything = False
-        if cmdlineargs.report is None or len(cmdlineargs.report) > 1:
-            # multiline if multiple were requested and we need to disambiguate
-            ichr = jchr = '\n'
-            fmt = ' {k}: {v}'
-        else:
-            jchr = ', '
-            ichr = ' '
-            fmt = '{v}'
-        for r in res:
-            # XXX Yarik thinks that Match should be replaced with actual path to the dataset
-            ui.message('Match:{}{}'.format(
-                ichr,
-                jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
-            anything = True
-        if not anything:
-            ui.message("Nothing to report")
+
+        format = cmdlineargs.format or 'custom'
+        if format =='custom':
+            if cmdlineargs.report is None or len(cmdlineargs.report) > 1:
+                # multiline if multiple were requested and we need to disambiguate
+                ichr = jchr = '\n'
+                fmt = ' {k}: {v}'
+            else:
+                jchr = ', '
+                ichr = ' '
+                fmt = '{v}'
+
+            anything = False
+            for r in res:
+                # XXX Yarik thinks that Match should be replaced with actual path to the dataset
+                ui.message('Match:{}{}'.format(
+                    ichr,
+                    jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
+                anything = True
+            if not anything:
+                ui.message("Nothing to report")
+        elif format == 'json':
+            import json
+            ui.message(json.dumps(list(res), indent=2))
+        elif format == 'yaml':
+            import yaml
+            lgr.warning("yaml output support is not yet polished")
+            ui.message(yaml.safe_dump(list(res), allow_unicode=True, encoding='utf-8'))
 
 def safe_str(s):
     try:

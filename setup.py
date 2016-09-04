@@ -71,6 +71,7 @@ requires = {
     'metadata': [
         'simplejson',
         'pyld',
+        'yaml',  # very optional
     ]
 }
 requires['full'] = sum(list(requires.values()), [])
