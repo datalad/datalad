@@ -13,11 +13,13 @@ __docformat__ = 'restructuredtext'
 
 
 import re
+from six import string_types
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
+from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph
 
@@ -52,17 +54,22 @@ class SearchDatasets(Interface):
             doc="""name of the property to report for any match.[CMD:  This
             option can be given multiple times. CMD] If none are given, all
             properties are reported."""),
+        # Theoretically they should be CMDLINE specific I guess?
+        format=Parameter(
+            args=('-f', '--format'),
+            constraints=EnsureChoice('custom', 'json', 'yaml'),
+            doc="""format for output."""
+        )
     )
 
     @staticmethod
     @datasetmethod(name='search_datasets')
-    def __call__(match, dataset, report=None):
+    def __call__(match, dataset, report=None, format='custom'):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
         meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                             ignore_cache=False)
-
         # merge all info on datasets into a single dict per dataset
         lgr.info('Next one is slow, but can be made faster by your contribution!')
         # TODO load offline schema if necessary, cache document load requests
@@ -78,7 +85,7 @@ class SearchDatasets(Interface):
         if not isinstance(meta, list):
             meta = [meta]
 
-        if not isinstance(report, list):
+        if report and not isinstance(report, list):
             report = [report]
 
         expr = re.compile(match)
@@ -100,21 +107,51 @@ class SearchDatasets(Interface):
                     v = unicode(v)
                 hit = hit or expr.match(v)
             if hit:
-                report_dict = {k: mds[k] for k in report if k in mds}
+                report_dict = {k: mds[k] for k in report if k in mds} if report else mds
                 if len(report_dict):
                     yield report_dict
                 else:
-                    lgr.warning('meta data match, but no to-be-reported properties found')
+                    lgr.warning('meta data match, but no to-be-reported properties found. '
+                                'Present properties: %s' % (", ".join(sorted(mds))))
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
         from datalad.ui import ui
         if res is None:
             res = []
-        anything = False
-        for r in res:
-            ui.message('Match: {}'.format(
-                ', '.join(['{}: {}'.format(k, str(r[k])) for k in r])))
-            anything = True
-        if not anything:
-            ui.message("Nothing to report")
+
+        format = cmdlineargs.format or 'custom'
+        if format =='custom':
+            if cmdlineargs.report is None or len(cmdlineargs.report) > 1:
+                # multiline if multiple were requested and we need to disambiguate
+                ichr = jchr = '\n'
+                fmt = ' {k}: {v}'
+            else:
+                jchr = ', '
+                ichr = ' '
+                fmt = '{v}'
+
+            anything = False
+            for r in res:
+                # XXX Yarik thinks that Match should be replaced with actual path to the dataset
+                ui.message('Match:{}{}'.format(
+                    ichr,
+                    jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
+                anything = True
+            if not anything:
+                ui.message("Nothing to report")
+        elif format == 'json':
+            import json
+            ui.message(json.dumps(list(res), indent=2))
+        elif format == 'yaml':
+            import yaml
+            lgr.warning("yaml output support is not yet polished")
+            ui.message(yaml.safe_dump(list(res), allow_unicode=True, encoding='utf-8'))
+
+def safe_str(s):
+    try:
+        return str(s)
+    except UnicodeEncodeError:
+        lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
+        # TODO: get current encoding
+        return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
