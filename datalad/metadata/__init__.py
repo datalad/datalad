@@ -9,6 +9,7 @@
 """Metadata handling (parsing, storing, querying)"""
 
 
+from six import string_types
 from os.path import join as opj, exists, relpath
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
@@ -146,6 +147,13 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     return meta
 
 
+def is_implicit_metadata(meta):
+    """Return whether a meta data set looks like our own implicit meta data"""
+    std_spec = meta.get('dcterms:conformsTo', '')
+    return isinstance(std_spec, string_types) \
+        and std_spec.startswith('http://docs.datalad.org/metadata.html#v')
+
+
 def _simplify_meta_data_structure(meta):
     # get a list of terms from any possible source
     if isinstance(meta, list) and len(meta) == 1:
@@ -165,6 +173,26 @@ def _simplify_meta_data_structure(meta):
         raise NotImplementedError(
             'got some unforseens meta data structure')
     return meta
+
+
+def _adjust_subdataset_location(meta, subds_relpath):
+    # find implicit meta data for all contained subdatasets
+    for m in meta:
+        # skip non-implicit
+        if not is_implicit_metadata(m):
+            continue
+        # prefix all subdataset location information with the relpath of this
+        # subdataset
+        if 'dcterms:hasPart' in m:
+            parts = m['dcterms:hasPart']
+            if not isinstance(parts, list):
+                parts = [parts]
+            for p in parts:
+                if not 'location' in p:
+                    continue
+                loc = p.get('location', subds_relpath)
+                if loc != subds_relpath:
+                    p['location'] = opj(subds_relpath, loc)
 
 
 # XXX might become its own command
@@ -220,10 +248,12 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         subds_path = relpath(subds.path, ds.path)
         if ignore_cache and subds.is_installed():
             # simply pull meta data from actual subdataset and go to next part
-            meta.extend(
-                get_metadata(subds, guess_type=guess_type,
-                             ignore_subdatasets=False,
-                             ignore_cache=True))
+            subds_meta = get_metadata(
+                subds, guess_type=guess_type,
+                ignore_subdatasets=False,
+                ignore_cache=True)
+            _adjust_subdataset_location(subds_meta, subds_path)
+            meta.extend(subds_meta)
             continue
 
         # we need to look for any aggregated meta data
@@ -242,6 +272,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         # compact/flatten at the end. However assuming a single context
         # we can cheat.
         subds_meta = _simplify_meta_data_structure(subds_meta)
+        _adjust_subdataset_location(subds_meta, subds_path)
 
         # make sure we have a meaningful @id for any subdataset in hasPart,
         # regardless of whether it is installed or not. This is needed to

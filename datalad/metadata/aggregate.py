@@ -22,10 +22,9 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
-    metadata_basepath
+    metadata_basepath, is_implicit_metadata
 from datalad.support.json_py import dump as jsondump
 from datalad.support.dsconfig import ConfigManager
-from six import string_types
 
 
 def _store_json(path, meta):
@@ -145,25 +144,11 @@ class AggregateMetaData(Interface):
             # find implicit meta data for all contained subdatasets
             for m in subds_meta:
                 # skip non-implicit
-                std_spec = m.get('dcterms:conformsTo', '')
-                if not (isinstance(std_spec, string_types)
-                        and std_spec.startswith('http://docs.datalad.org/metadata.html#v')):
+                if not is_implicit_metadata(m):
                     continue
                 if m.get('@id', None) == subds.id:
                     # register relation to dataset being aggregated into
                     m['dcterms:isPartOf'] = dataset.id
-                # prefix all subdataset location information with the relpath of this
-                # subdataset
-                if 'dcterms:hasPart' in m:
-                    parts = m['dcterms:hasPart']
-                    if not isinstance(parts, list):
-                        parts = [parts]
-                        for p in parts:
-                            if not 'location' in p:
-                                continue
-                            loc = p.get('location', subds_relpath)
-                            if loc != subds_relpath:
-                                p['location'] = opj(subds_relpath, loc)
             _store_json(
                 opj(metapath, subds_relpath),
                 subds_meta)
