@@ -24,6 +24,7 @@ from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath
 from datalad.support.json_py import dump as jsondump
+from datalad.support.dsconfig import ConfigManager
 
 
 def _store_json(path, meta):
@@ -104,6 +105,19 @@ class AggregateMetaData(Interface):
                 # stage potential changes in this submodule
                 dataset.repo.add(relpath(subds.path, dataset.path),
                                  git=True)
+
+        # check for OLD datasets without a configured ID, and save the current
+        # one it
+        dsonly_cfg = ConfigManager(dataset, dataset_only=True)
+        if not 'datalad.dataset.id' in dsonly_cfg:
+            dsonly_cfg.add(
+                'datalad.dataset.id',
+                dataset.id,
+                where='dataset',
+                reload=False)
+            dataset.repo.add(opj('.datalad', 'config'), git=True)
+            # TODO postpone actual save till unification of save behavior
+            # across all commands
 
         lgr.info('aggregating meta data for {}'.format(dataset))
         # root path
