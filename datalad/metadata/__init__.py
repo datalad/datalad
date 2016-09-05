@@ -16,7 +16,7 @@ if PY2:
 else:
     import pickle
 from hashlib import md5
-from urlparse import urlsplit
+from six.moves.urllib.parse import urlsplit
 from six import string_types
 from os.path import join as opj, exists, relpath
 from importlib import import_module
