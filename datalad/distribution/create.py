@@ -14,7 +14,6 @@ import logging
 
 from os import listdir
 from os.path import isdir
-from os.path import realpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -121,6 +120,14 @@ class Create(Interface):
             of datasets across platforms (especially those with limited
             path lengths)""",
             nargs=1),
+        native_metadata_type=Parameter(
+            args=('--native-metadata-type',),
+            metavar='LABEL',
+            action='append',
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""Metadata type label. Must match the name of the respective
+            parser implementation in Datalad (e.g. "bids").[CMD:  This option
+            can be given multiple times CMD]"""),
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
@@ -138,6 +145,7 @@ class Create(Interface):
             no_commit=False,
             annex_version=None,
             annex_backend='MD5E',
+            native_metadata_type=None,
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
@@ -214,13 +222,12 @@ class Create(Interface):
                             git_opts=git_opts,
                             annex_opts=annex_opts,
                             annex_init_opts=annex_init_opts)
-            # record the annex uuid of this repo for this afterlife
-            # to be able to track siblings and children
-            if 'datalad.annex.origin' in ds.config:
-                # make sure we reset this variable completely, in case of a re-create
-                ds.config.unset('datalad.annex.origin', where='dataset')
-            ds.config.add('datalad.annex.origin', vcs.uuid, where='dataset')
-            ds.repo.add('.datalad', git=True)
+
+        if native_metadata_type is not None:
+            if not isinstance(native_metadata_type, list):
+                native_metadata_type = [native_metadata_type]
+            for nt in native_metadata_type:
+                ds.config.add('datalad.metadata.nativetype', nt)
 
         # record the ID of this repo for the afterlife
         # to be able to track siblings and children

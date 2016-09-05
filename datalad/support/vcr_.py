@@ -86,6 +86,7 @@ def externals_use_cassette(name):
     but want to minimize their network traffic by using vcr.py
     """
     from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
+    cassette_path = realpath(_get_cassette_path(name))  # realpath OK
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': cassette_path}):
         yield
 

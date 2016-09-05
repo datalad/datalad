@@ -67,6 +67,11 @@ requires = {
         'mock',
         'nose>=1.3.4',
         'vcrpy',
+    ],
+    'metadata': [
+        'simplejson',
+        'pyld',
+        'PyYAML',  # very optional
     ]
 }
 requires['full'] = sum(list(requires.values()), [])
