@@ -9,6 +9,14 @@
 """Metadata handling (parsing, storing, querying)"""
 
 
+import os
+from six import PY2
+if PY2:
+    import cPickle as pickle
+else:
+    import pickle
+from hashlib import md5
+from urlparse import urlsplit
 from six import string_types
 from os.path import join as opj, exists, relpath
 from importlib import import_module
@@ -17,6 +25,8 @@ from datalad.utils import swallow_logs
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
+from datalad import cfg as dlcfg
+
 
 # common format
 metadata_filename = 'meta.json'
@@ -302,14 +312,41 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     return meta
 
 
+def _cached_load_document(url):
+    from pyld.jsonld import load_document
+    cache_dir = opj(
+        dlcfg.dirs.user_cache_dir,
+        'schema')
+    doc_fname = opj(
+        cache_dir,
+        '{}-{}'.format(
+            urlsplit(url).netloc,
+            md5(url).hexdigest()))
+
+    if os.path.exists(doc_fname):
+        lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
+        doc = pickle.load(open(doc_fname))
+    else:
+        doc = load_document(url)
+        if not exists(cache_dir):
+            os.makedirs(cache_dir)
+        # use pickle to store the entire request result dict
+        pickle.dump(doc, open(doc_fname, 'w'))
+        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+    return doc
+
+
 def flatten_metadata_graph(obj):
     from pyld import jsonld
     # simplify graph into a sequence of one dict per known dataset, even
     # if multiple meta data set from different sources exist for the same
     # dataset.
 
-    # TODO specify custom/caching document loader in options to speed
-    # up term resolution for subsequent calls
+    # cache schema requests; this also avoid the need for network access
+    # for previously "visited" schemas
+    jsonld.set_document_loader(_cached_load_document)
+    # TODO cache entire graphs to prevent repeated term resolution for
+    # subsequent calls
     return jsonld.flatten(obj, ctx={"@context": "http://schema.org/"})
 
 
