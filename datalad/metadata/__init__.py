@@ -321,7 +321,7 @@ def _cached_load_document(url):
         cache_dir,
         '{}-{}'.format(
             urlsplit(url).netloc,
-            md5(url).hexdigest()))
+            md5(url.encode('utf-8')).hexdigest()))
 
     if os.path.exists(doc_fname):
         lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
