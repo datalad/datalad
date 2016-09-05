@@ -18,6 +18,7 @@ from datalad.utils import chpwd
 import os
 from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
+from nose import SkipTest
 
 
 _dataset_hierarchy_template = {
@@ -196,4 +197,20 @@ def test_aggregation(path):
     subds.save(files=[opj(subds.path, 'subsub')])
     # redo aggregation exactly as above, but now save changes
     aggregate_metadata(ds, guess_native_type=True, recursive=True, save=True)
+
+    # query smoke test
+    try:
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest
+
+        import pyld
+        from datalad.api import search_datasets
+
+        res = list(clone.search_datasets('.*'))
+        assert_equal(len(res), 3)  # one per dataset
+        assert_equal(len(list(clone.search_datasets('grandchild.*'))), 1)
+
+    except ImportError:
+        raise SkipTest
+
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
