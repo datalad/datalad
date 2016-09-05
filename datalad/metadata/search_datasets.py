@@ -11,7 +11,8 @@
 
 __docformat__ = 'restructuredtext'
 
-
+import os
+from os.path import join as opj, exists
 import re
 from six import string_types
 from datalad.interface.base import Interface
@@ -21,7 +22,8 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
 from ..log import lgr
-from . import get_metadata, flatten_metadata_graph
+from . import get_metadata, flatten_metadata_graph, pickle
+from datalad import cfg as dlcfg
 
 
 class SearchDatasets(Interface):
@@ -68,22 +70,40 @@ class SearchDatasets(Interface):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
-        meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                            ignore_cache=False)
-        # merge all info on datasets into a single dict per dataset
-        lgr.info('Next one is slow, but can be made faster by your contribution!')
-        # TODO load offline schema if necessary, cache document load requests
-        meta = flatten_metadata_graph(meta)
-        lgr.info('Fast again...')
-        # TODO cache this somewhere and reload the cache instead of repeating
-        # the graph optimization to gain some speed
+        cache_dir = opj(dlcfg.dirs.user_cache_dir, 'metadata')
+        mcache_fname = opj(cache_dir, ds.id)
 
-        # extract graph, if any
-        meta = meta.get('@graph', meta)
+        meta = None
+        if os.path.exists(mcache_fname):
+            lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
+            meta, checksum = pickle.load(open(mcache_fname))
+            # TODO add more sophisticated tests to decide when the cache is no longer valid
+            if checksum != ds.repo.get_hexsha():
+                # errrr, try again below
+                meta = None
 
-        # build simple queriable representation
-        if not isinstance(meta, list):
-            meta = [meta]
+        # don't put in 'else', as yet to be written tests above might fail and require
+        # regenerating meta data
+        if meta is None:
+            if not exists(cache_dir):
+                os.makedirs(cache_dir)
+
+            meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
+                                ignore_cache=False)
+            # merge all info on datasets into a single dict per dataset
+            meta = flatten_metadata_graph(meta)
+            # extract graph, if any
+            meta = meta.get('@graph', meta)
+            # build simple queriable representation
+            if not isinstance(meta, list):
+                meta = [meta]
+
+            # use pickle to store the optimized graph in the cache
+            pickle.dump(
+                # graph plus checksum from what it was built
+                (meta, ds.repo.get_hexsha()),
+                open(mcache_fname, 'w'))
+            lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
         if report and not isinstance(report, list):
             report = [report]
