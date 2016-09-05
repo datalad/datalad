@@ -25,6 +25,7 @@ from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath
 from datalad.support.json_py import dump as jsondump
 from datalad.support.dsconfig import ConfigManager
+from six import string_types
 
 
 def _store_json(path, meta):
@@ -145,7 +146,7 @@ class AggregateMetaData(Interface):
             for m in subds_meta:
                 # skip non-implicit
                 std_spec = m.get('dcterms:conformsTo', '')
-                if not (isinstance(std_spec, basestring)
+                if not (isinstance(std_spec, string_types)
                         and std_spec.startswith('http://docs.datalad.org/metadata.html#v')):
                     continue
                 if m.get('@id', None) == subds.id:
