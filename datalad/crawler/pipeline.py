@@ -350,7 +350,8 @@ def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
         repo = GitRepo(path)
         repo.add(crawl_config_repo_path)
         if repo.dirty:
-            repo.commit("Initialized crawling configuration to use template %s" % template)
+            repo.commit("Initialized crawling configuration to use template %s" % template,
+                        _datalad_msg=True)
         else:
             lgr.debug("Repository is not dirty -- not committing")
 

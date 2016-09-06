@@ -13,6 +13,7 @@
 
 from ..support.s3 import get_versioned_url
 from .utils import use_cassette
+from .utils import ok_startswith
 
 from nose.tools import eq_, assert_raises
 from datalad.tests.utils import skip_if_no_network
@@ -21,7 +22,7 @@ from ..downloaders.tests.utils import get_test_providers
 skip_if_no_network()  # ATM we don't ship fixtures, so if no network -- no network!
 
 
-@use_cassette('s3_test0')
+@use_cassette('s3_test_version_url')
 def test_version_url():
     get_test_providers('s3://openfmri/tarballs')  # to verify having credentials to access openfmri via S3
     for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):
@@ -49,4 +50,4 @@ def test_version_url():
     eq_(len(set(urls)), len(urls))  # all unique
     for url in urls:
         # so we didn't grab other files along with the same prefix
-        assert(url.startswith('http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt?versionId='))
+        ok_startswith(url, 'http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt?versionId=')

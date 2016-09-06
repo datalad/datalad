@@ -14,6 +14,9 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
+from datalad.support.constraints import EnsureChoice
+from datalad.support.constraints import EnsureBool
+
 
 dataset_description = Parameter(
     args=("-D", "--description",),
@@ -34,8 +37,10 @@ recursion_limit = Parameter(
 
 add_to_superdataset = Parameter(
     args=("--add-to-super",),
-    doc="""add the new dataset as a component to a super dataset""",
-    action="store_true")
+    doc="""add the new dataset as a component to a super dataset. If 'auto',
+           adds to super-dataset if one is found.""",
+    constraints=EnsureChoice('auto') | EnsureBool(),
+)
 
 git_opts = Parameter(
     args=("--git-opts",),
@@ -72,3 +77,8 @@ annex_copy_opts = Parameter(
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex copy` calls""")
+
+allow_dirty = Parameter(
+    args=("--allow-dirty",),
+    action="store_true",
+    doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok""")

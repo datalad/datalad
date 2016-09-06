@@ -285,6 +285,7 @@ class Dataset(object):
                           no_annex=False,
                           annex_version=None,
                           annex_backend='MD5E',
+                          native_metadata_type=None,
                           git_opts=None,
                           annex_opts=None,
                           annex_init_opts=None):
@@ -310,6 +311,8 @@ class Dataset(object):
           version of annex repository to be used
         annex_backend: str
           backend to be used by annex for computing file keys
+        native_metadata_type : list(str), optional
+          meta data type labels
         git_opts: list of str
           cmdline options to be passed to the git executable
         annex_opts: list of str
@@ -325,7 +328,7 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        if not realpath(path).startswith(_with_sep(realpath(self.path))):
+        if not realpath(path).startswith(_with_sep(realpath(self.path))):  # realpath OK
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
@@ -336,6 +339,7 @@ class Dataset(object):
                      no_annex=no_annex,
                      annex_version=annex_version,
                      annex_backend=annex_backend,
+                     native_metadata_type=native_metadata_type,
                      git_opts=git_opts,
                      annex_opts=annex_opts,
                      annex_init_opts=annex_init_opts,
@@ -355,10 +359,11 @@ class Dataset(object):
         # TODO: clean that part and move it in here (Dataset)
         #       or call install to add the thing inplace
         from .install import _install_subds_inplace
-        from os.path import relpath
-        return _install_subds_inplace(ds=self, path=subds.path,
-                                      relativepath=relpath(subds.path, self.path),
-                                      name=name)
+        return _install_subds_inplace(
+            ds=self, path=subds.path,
+            relativepath=relpath(realpath(subds.path), realpath(self.path)),  # realpath OK
+            name=name
+        )
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
@@ -452,7 +457,6 @@ class Dataset(object):
             if not path.startswith(self.path):
                 # TODO: - have dedicated exception
                 raise ValueError("path {0} not in dataset {1}.".format(path, self))
-            from os.path import relpath
             path = relpath(path, self.path)
 
         for subds in self.get_subdatasets(recursive=True,

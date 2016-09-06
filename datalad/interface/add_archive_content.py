@@ -28,6 +28,7 @@ from os.path import dirname
 from os.path import normpath
 
 from .base import Interface
+from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
@@ -150,10 +151,7 @@ class AddArchiveContent(Interface):
             args=("--copy",),
             action="store_true",
             doc="""flag to copy the content of the archive instead of moving"""),
-        allow_dirty=Parameter(
-            args=("--allow-dirty",),
-            action="store_true",
-            doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok"""),
+        allow_dirty=allow_dirty,
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
@@ -468,7 +466,8 @@ class AddArchiveContent(Interface):
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
-                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full'))
+                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
+                    _datalad_msg=True
                 )
                 commit_stats.reset()
         finally:

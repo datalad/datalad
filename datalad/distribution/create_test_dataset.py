@@ -66,7 +66,7 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.add(fn, git=True, commit=True, msg="Added %s" % fn)
+    repo.add(fn, git=True, commit=True, msg="Added %s" % fn, _datalad_msg=True)
     if ds:
         rpath = os.path.relpath(path, ds.path)
         out = install(
@@ -76,9 +76,9 @@ def _makeds(path, levels, ds=None):
         )
         # TODO: The following is to be adapted when refactoring AnnexRepo/GitRepo to make it uniform
         if isinstance(ds.repo, AnnexRepo):
-            ds.repo.commit("subdataset %s installed." % rpath)
+            ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
         else:
-            ds.repo.commit("subdataset %s installed." % rpath)
+            ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
 
     if not levels:
         return
