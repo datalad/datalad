@@ -210,6 +210,9 @@ def pipeline(dataset_id, url=TOPURL):
                 [
                     # canonical tarball
                     a_href_match('.*/download/.*', min_count=1),
+                    # TODO:  in case of .zip files we must not use checksum backends
+                    #        since those are regenerated irreproducibly each time
+                    #        so we should use URL backend with those
                     annex,
                 ],
                 [

@@ -129,12 +129,14 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, 
                assign({'filename': 'changelog.txt'}),
                annex,
             ],
-            [  # README
-               # Somewhat sucks here since 'url' from above would be passed all the way to annex
-               # So such nodes as extract_readme should cleans the data so only relevant pieces are left
-               extract_readme,
-               annex,
-            ],
+            # Moving to proper meta-data descriptors, so no need to generate and possibly conflict
+            # with distributed one README
+            # [  # README
+            #    # Somewhat sucks here since 'url' from above would be passed all the way to annex
+            #    # So such nodes as extract_readme should cleans the data so only relevant pieces are left
+            #    extract_readme,
+            #    annex,
+            # ],
             [  # and collect all URLs pointing to tarballs
                 a_href_match('.*/%s.*\.(tgz|tar.*|zip)' % prefix, min_count=1),
                 # Since all content of openfmri is anyways available openly, no need atm
