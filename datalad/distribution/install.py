@@ -14,8 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, lexists, islink, sep, realpath
+from os.path import join as opj, abspath, relpath, pardir, isdir, \
+    exists, lexists, islink
 
 from six.moves.urllib.parse import quote as urlquote
 
