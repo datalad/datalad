@@ -269,18 +269,25 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                                                             datasets[current_dataset]):
                     continue
 
-                # check git version on remote end
-                if not CreatePublicationTargetSSHWebserver.remote_git_version(ssh):
-                    continue
-
+            # check git version on remote end
+            lgr.info("Adjusting remote git configuration")
+            remote_git_version = CreatePublicationTargetSSHWebserver.get_remote_git_version(ssh)
+            if remote_git_version and remote_git_version >= "2.4":
                 # allow for pushing to checked out branch
                 try:
                     ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
                          "updateInstead"])
                 except CommandError as e:
-                    lgr.warning("git config failed at remote location %s.\n"
-                                "You will not be able to push to checked out "
-                                "branch. Error: %s", path, exc_str(e))
+                    lgr.error("git config failed at remote location %s.\n"
+                              "You will not be able to push to checked out "
+                              "branch. Error: %s", path, exc_str(e))
+            else:
+                lgr.error("Git version >= 2.4 needed to configure remote."
+                          " Version detected on server: %s\nSkipping configuration"
+                          " of receive.denyCurrentBranch - you will not be able to"
+                          " publish updates to this repository. Upgrade your git"
+                          " and run with --existing=reconfigure"
+                          % remote_git_version)
 
             # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
@@ -348,25 +355,20 @@ class CreatePublicationTargetSSHWebserver(Interface):
         return True
 
     @staticmethod
-    def remote_git_version(ssh):
+    def get_remote_git_version(ssh):
         try:
             out, err = ssh(["git", "version"])
             assert out.strip().startswith("git version")
             git_version = out.strip().split()[2]
             lgr.debug("Detected git version on server: %s" % git_version)
-            if LooseVersion(git_version) < "2.4":
-                lgr.error("Git version >= 2.4 needed to configure remote."
-                          " Version detected on server: %s\nSkipping ..."
-                          % git_version)
-                return False
+            return LooseVersion(git_version)
 
         except CommandError as e:
             lgr.warning(
                 "Failed to determine git version on remote.\n"
                 "Error: {0}\nTrying to configure anyway "
                 "...".format(exc_str(e)))
-
-        return git_version or True
+        return None
 
     @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
