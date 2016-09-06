@@ -13,7 +13,7 @@
 import logging
 
 from os import curdir
-from os.path import isdir
+from os.path import isdir, join as opj, relpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -131,9 +131,9 @@ class Get(Interface):
                     msg="{0} belongs to subdataset {1}. To get its content use "
                         "option `recursive` or call get on the "
                         "subdataset.".format(p, p_ds))
-            if p_ds.path not in resolved_datasets:
-                resolved_datasets[p_ds.path] = []
-            resolved_datasets[p_ds.path].append(p)
+            resolved_datasets[p_ds.path] = \
+                resolved_datasets.get(p_ds.path, []) + [p]
+
             # TODO: Change behaviour of Dataset: Make subdatasets singletons to
             # always get the same object referencing a certain subdataset.
 
@@ -156,7 +156,7 @@ class Get(Interface):
                             resolved_datasets[subds_path].append(curdir)
 
         # the actual calls:
-        result = []
+        global_results = []
         for ds_path in resolved_datasets:
             cur_ds = Dataset(ds_path)
             # needs to be an annex:
@@ -164,16 +164,19 @@ class Get(Interface):
                 raise CommandNotAvailableError(
                     cmd="get", msg="Missing annex at {0}".format(ds))
 
-            result.extend(cur_ds.repo.get(resolved_datasets[ds_path],
-                                          options=['--from="%s"' % source]
-                                                  if source else []))
+            local_results = cur_ds.repo.get(resolved_datasets[ds_path],
+                                            options=['--from="%s"' % source]
+                                                    if source else [])
 
-        # TODO: evaluate results/improve reporting by AnnexRepo.get
-        #       - JSON vs. parsing stdout
-        #       - annex reports back only once, if several files are identical
-        #       - getting something already present is reported as failure
+            # if we recurse into subdatasets, adapt relative paths reported by
+            # annex to be relative to the toplevel dataset we operate on:
+            if recursive:
+                for i in range(len(local_results)):
+                    local_results[i]['file'] = \
+                        relpath(opj(ds_path, local_results[i]['file']), ds.path)
 
-        return result
+            global_results.extend(local_results)
+        return global_results
 
     @staticmethod
     def result_renderer_cmdline(res, args):

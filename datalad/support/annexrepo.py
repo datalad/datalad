@@ -397,56 +397,26 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def get(self, files, log_online=True, options=None):
+    def get(self, files, options=None):
         """Get the actual content of files
 
         Parameters
         ----------
         files: list of str
-            list of paths to get
+            paths to get
 
-        kwargs: options for the git annex get command.
-            For example `from='myremote'` translates to
-            annex option "--from=myremote".
+        options: list of str
+            commandline options for the git annex get command.
 
         Returns
         -------
         list of dict
-            result list;
-            Dictionary per file with keys 'file' (path) and 'success' (bool)
         """
         options = options[:] if options else []
 
-        # Note: For now, no JSON output is used, since this disables annex'
-        # progress bars.
-
-        # don't capture stderr, since it provides progress display
-        # but if no online logging, then log it
-        out, err = self._run_annex_command(
-            'get', annex_options=options + files,
-            log_stdout=True, log_stderr=not log_online,
-            log_online=log_online, expect_stderr=True)
-
-        out_lines = out.splitlines()
-        result = []
-
-        # parse annex' output:
-        for line_idx in range(len(out_lines)):
-            if out_lines[line_idx].startswith("get"):
-               result.append({'file': out_lines[line_idx].split()[1],
-                              # TODO: Incorrect. Sometimes it's the same line,
-                              # sometimes the next one:
-                              'success': out_lines[line_idx+1].endswith("ok")})
-        # add entries for missing files:
-        for f in files:
-            # TODO: This doesn't work, if an item in `files` is a directory.
-            # Just skip for now, but this needs refinement.
-            if isdir(f):
-                continue
-            if f not in [item['file'] for item in result]:
-                result.append({'file': f, 'success': False})
-
-        return result
+        results = self._run_annex_command_json('get',
+                                               args=options + files)
+        return [i for i in results]
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
