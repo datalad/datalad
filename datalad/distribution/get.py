@@ -193,7 +193,7 @@ class Get(Interface):
         msg = linesep.join([
             "{path} ... {suc}".format(
                 suc="ok." if item.get('success', False)
-                    else "failed.",
+                    else "failed. (%s)" % item.get('note', 'unknown reason'),
                 path=item.get('file'))
             for item in res])
         ui.message(msg)

@@ -36,6 +36,7 @@ from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
+from datalad.utils import swallow_logs
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -413,9 +414,14 @@ class AnnexRepo(GitRepo):
         list of dict
         """
         options = options[:] if options else []
+        from datalad.cmd import Runner
 
-        results = self._run_annex_command_json('get',
-                                               args=options + files)
+        # Note: Currently swallowing logs, due to the workaround to report files
+        # not found, but don't fail and report about other files and use JSON,
+        # which are contradicting conditions atm. (See _run_annex_command_json)
+        with swallow_logs(new_level=logging.DEBUG):
+            results = self._run_annex_command_json('get',
+                                                   args=options + files)
         return [i for i in results]
 
     @normalize_paths
@@ -923,12 +929,33 @@ class AnnexRepo(GitRepo):
                     annex_options=['--json'] + args,
                     **kwargs)
         except CommandError as e:
+            # Note: A call might result in several 'failures', that can be or
+            # cannot be handled here. Detection of something, we can deal with,
+            # doesn't mean there's nothing else to deal with.
+
+            # Workaround as long as annex doesn't report it within JSON response:
+            not_existing = [line.split()[1] for line in e.stderr.splitlines()
+                            if line.startswith('git-annex:') and
+                            line.endswith('not found')]
+            if not_existing:
+                out = e.stdout
+                if not out.endswith(linesep):
+                    out += linesep
+                out += linesep.join(
+                        ['{{"command":"{cmd}","file":"{path}","note":"{note}",'
+                         '"success":false}}'.format(cmd=command,
+                                                    path=f,
+                                                    note="not found")
+                         for f in not_existing])
+
             # if multiple files, whereis may technically fail,
             # but still returns correct response
-            if command == 'whereis' and e.code == 1 and e.stdout.startswith('{'):
+            elif command == 'whereis' and e.code == 1 and \
+                    e.stdout.startswith('{'):
                 out = e.stdout
             else:
                 raise e
+
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         return json_objects
