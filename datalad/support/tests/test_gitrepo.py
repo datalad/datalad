@@ -612,6 +612,44 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
+@with_tree(tree={
+    'd1': {'f1': 'content1',
+           'f2': 'content2'},
+    'file': 'content3',
+    'd2': {'f1': 'content1',
+           'f2': 'content2'},
+    'file2': 'content3'
+
+    })
+def test_GitRepo_get_files_history(path):
+
+    gr = GitRepo(path, create=True)
+    gr.add('d1')
+    gr.commit("commit d1")
+    #import pdb; pdb.set_trace()
+
+    gr.add(['d2', 'file'])
+    gr.commit("commit d2")
+
+    # commit containing files of d1
+    d1_commit = next(gr.get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd1', 'f1')]))
+    assert_equal(str(d1_commit.message), 'commit d1')
+
+    # commit containing files of d2
+    d2_commit_gen = gr.get_files_history([opj(path, 'd2', 'f1'), opj(path, 'd2', 'f1')])
+    assert_equal(str(next(d2_commit_gen).message), 'commit d2')
+    assert_raises(StopIteration, next, d2_commit_gen)  # no more commits with files of d2
+
+    # union of commits containing passed objects
+    commits_union = gr.get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd2', 'f1'), opj(path, 'file')])
+    assert_equal(str(next(commits_union).message), 'commit d2')
+    assert_equal(str(next(commits_union).message), 'commit d1')
+    assert_raises(StopIteration, next, commits_union)
+
+    # file2 not commited, so shouldn't exist in commit history
+    no_such_commits = gr.get_files_history([opj(path, 'file2')])
+    assert_raises(StopIteration, next, no_such_commits)
+
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 def test_GitRepo_get_toppath(repo, tempdir):
