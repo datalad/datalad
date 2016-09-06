@@ -203,10 +203,15 @@ def test_authenticate_external_portals():
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
           "datafiles/meta_data_files.tar.gz"
+    # seems to be gone
+    # yield check_download_external_url, \
+    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
+    #       "failed", \
+    #       "2000 1005 2000 3000"
     yield check_download_external_url, \
-          'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
+          'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv', \
           "failed", \
-          "2000 1005 2000 3000"
+          "'Scan','FilePath'"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 

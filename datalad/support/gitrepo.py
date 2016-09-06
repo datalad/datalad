@@ -143,7 +143,7 @@ def _normalize_path(base_dir, path):
     if not path:
         return path
 
-    base_dir = realpath(base_dir)
+    base_dir = realpath(base_dir)  # realpath OK
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
@@ -153,7 +153,7 @@ def _normalize_path(base_dir, path):
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))
+        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -163,7 +163,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = normpath(opj(realpath(getpwd()), path))
+         path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -538,7 +538,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -554,6 +554,9 @@ class GitRepo(object):
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
 
         # needs to be True - see docstring:
         assert(git)
@@ -592,7 +595,13 @@ class GitRepo(object):
         if commit:
             if msg is None:
                 msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg)
+            self.commit(msg=msg, _datalad_msg=_datalad_msg)
+
+        # Make sure return value from GitRepo is consistent with AnnexRepo
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in files]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
@@ -641,7 +650,12 @@ class GitRepo(object):
         # flush possibly cached in GitPython changes to index:
         self.repo.index.write()
 
-    def commit(self, msg=None, options=None):
+    @staticmethod
+    def _get_prefixed_commit_msg(msg):
+        DATALAD_PREFIX = "[DATALAD]"
+        return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
+
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """Commit changes to git.
 
         Parameters
@@ -650,7 +664,13 @@ class GitRepo(object):
           commit-message
         options: list of str
           cmdline options for git-commit
+        _datalad_msg: bool, optional
+          To signal that commit is automated commit by datalad, so
+          it would carry the [DATALAD] prefix
         """
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
 
         if not msg:
             if options:
@@ -1295,12 +1315,15 @@ class GitRepo(object):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
-    def get_submodules(self):
+    def get_submodules(self, sorted_=True):
         """Return a list of git.Submodule instances for all submodules"""
         # check whether we have anything in the repo. if not go home early
         if not self.repo.head.is_valid():
             return []
-        return self.repo.submodules
+        submodules = self.repo.submodules
+        if sorted_:
+            submodules = sorted(submodules, key=lambda x: x.path)
+        return submodules
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.

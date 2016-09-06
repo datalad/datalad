@@ -9,6 +9,8 @@
 """Adapters and decorators for keyrings
 """
 
+import os
+
 
 class Keyring(object):
     """Adapter to keyring module
@@ -42,7 +44,11 @@ class Keyring(object):
 
     # proxy few methods of interest explicitly, to be rebound to the module's
     def get(self, name, field):
-        return self._keyring.get_password(self._get_service_name(name), field)
+        # consult environment, might be provided there
+        val = self._keyring.get_password(self._get_service_name(name), field)
+        if val is None:
+            val = os.environ.get(('DATALAD_%s_%s' % (name, field)).replace('-', '_'), None)
+        return val
 
     def set(self, name, field, value):
         return self._keyring.set_password(self._get_service_name(name), field, value)

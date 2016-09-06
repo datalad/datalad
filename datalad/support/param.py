@@ -15,7 +15,7 @@ import textwrap
 import argparse
 from inspect import getargspec
 
-from .constraints import expand_contraint_spec
+from .constraints import expand_constraint_spec
 
 _whitespace_re = re.compile('\n\s+|^\s+')
 
@@ -30,7 +30,7 @@ class Parameter(object):
     _KNOWN_ARGS = getargspec(argparse.Action.__init__)[0] + ['action']
 
     def __init__(self, constraints=None, doc=None, args=None, **kwargs):
-        """Add contraints (validator) specifications and a docstring for
+        """Add constraints (validator) specifications and a docstring for
         a parameter.
 
         Parameters
@@ -68,7 +68,7 @@ class Parameter(object):
         ...                         EnsureRange(min=7.0, max=44.0)),
         ...             None))
         """
-        self.constraints = expand_contraint_spec(constraints)
+        self.constraints = expand_constraint_spec(constraints)
         self._doc = doc
         self.cmd_args = args
 
@@ -95,9 +95,12 @@ class Parameter(object):
         elif 'action' in self.cmd_kwargs \
                 and self.cmd_kwargs['action'] in ("store_true", "store_false"):
             sdoc = 'bool'
-        if not sdoc is None:
+        if sdoc is not None:
             if sdoc[0] == '(' and sdoc[-1] == ')':
                 sdoc = sdoc[1:-1]
+            if self.cmd_kwargs.get('nargs', None) == '?' \
+                    or self.cmd_kwargs.get('action', None) == 'append':
+                sdoc = 'list of {}'.format(sdoc)
             paramsdoc += " : %s" % sdoc
             if has_default:
                 paramsdoc += ", optional"
@@ -114,8 +117,8 @@ class Parameter(object):
             if cdoc[0] == '(' and cdoc[-1] == ')':
                 cdoc = cdoc[1:-1]
             addinfo = ''
-            if 'nargs' in self.cmd_kwargs \
-                    and not self.cmd_kwargs['nargs'] == '?':
+            if self.cmd_kwargs.get('nargs', None) == '?' \
+                    or self.cmd_kwargs.get('action', None) == 'append':
                 addinfo = 'list expected, each '
             doc += ' Constraints: %s%s.' % (addinfo, cdoc)
         if has_default:

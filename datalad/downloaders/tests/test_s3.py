@@ -86,3 +86,6 @@ def test_reuse_session(tempfile, mocked_auth):
     with swallow_outputs():
         providers2.download(url_2versions_nonversioned1_ver2, path=tempfile, overwrite=True)
     assert_equal(mocked_auth.call_count, 2)
+
+    Providers.reset_default_providers()  # necessary to avoid side-effects from having a vcr'ed connection
+    # leaking through default provider's bucket, e.g. breaking test_mtime if ran after this one

@@ -21,6 +21,7 @@ Dataset operations
 .. toctree::
    :maxdepth: 1
 
+   generated/man/datalad-add
    generated/man/datalad-add-sibling
    generated/man/datalad-create
    generated/man/datalad-create-publication-target-sshwebserver
@@ -31,6 +32,15 @@ Dataset operations
    generated/man/datalad-update
    generated/man/datalad-save
    generated/man/datalad-unlock
+
+Meta data handling
+==================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-search-datasets
+   generated/man/datalad-aggregate-metadata
 
 Miscellaneous commands
 ======================

@@ -14,6 +14,7 @@ Concepts and technologies
 
    background
    related
+   metadata
    usecases/index
    glossary
 

@@ -10,9 +10,6 @@
 
 """
 
-__docformat__ = 'restructuredtext'
-
-
 import logging
 
 from os.path import join as opj
@@ -32,8 +29,8 @@ from .dataset import EnsureDataset
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import require_dataset
-from .install import get_containing_subdataset
 
+__docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
@@ -152,7 +149,7 @@ class Publish(Interface):
                     expl_subs.add(p)
                 else:
                     try:
-                        d = get_containing_subdataset(ds, p)
+                        d = ds.get_containing_subdataset(p)
                     except ValueError as e:
                         # p is not in ds => skip:
                         lgr.warning(str(e) + " - Skipped.")
@@ -309,7 +306,7 @@ class Publish(Interface):
         return published, skipped
 
     @staticmethod
-    def result_renderer_cmdline(results):
+    def result_renderer_cmdline(results, args):
         from datalad.ui import ui
         for res, res_label in zip(results, ('published', 'skipped')):
             if not res:

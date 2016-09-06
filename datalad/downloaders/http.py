@@ -403,9 +403,14 @@ class HTTPDownloader(BaseDownloader):
     def get_downloader_session(self, url,
                               allow_redirects=True, use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
-        response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
+        # TODO: make it not this ugly -- but at the moment we are testing end-file size
+        # while can't know for sure if content was gunziped and either it all went ok.
+        # So safer option -- just request to not have it gzipped
+        headers = {'Accept-Encoding': ''}
+        response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
         check_response_status(response, session=self._session)
         headers = response.headers
+        lgr.debug("Establishing session for url %s, response headers: %s", url, headers)
         target_size = int(headers.get('Content-Length', '0').strip()) or None
         if use_redirected_url and response.url and response.url != url:
             lgr.debug("URL %s was redirected to %s and thus the later will be used"
@@ -416,7 +421,6 @@ class HTTPDownloader(BaseDownloader):
         url_filename = get_url_filename(url, headers=headers)
 
         headers['Url-Filename'] = url_filename
-
         return HTTPDownloaderSession(
             size=target_size,
             url=response.url,

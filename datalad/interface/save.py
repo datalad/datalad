@@ -87,11 +87,14 @@ class Save(Interface):
             ds.repo.add(absf)
             ds.repo.add(absf, git=True)
 
+        # anything should be staged by now
+        # now however, that staged submodule changes are not considered as
+        # `index`, hence `submodules` needs to be True too
         if ds.repo.repo.is_dirty(
                 index=True,
                 working_tree=False,
                 untracked_files=False,
-                submodules=False):
+                submodules=True):
             ds.repo.commit(message)
         else:
             lgr.info(
@@ -105,7 +108,7 @@ class Save(Interface):
         return ds.repo.repo.head.commit
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         ui.message('Saved state: "{0}" by {1} [{2}]'.format(
             res.message.splitlines()[0],

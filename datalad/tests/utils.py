@@ -218,9 +218,9 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True)
+        repo.add(file_repo_path, commit=True, _datalad_msg=True)
     else:
-        repo.add(file_repo_path, git=True)
+        repo.add(file_repo_path, git=True, _datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
@@ -342,11 +342,14 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n2,
                  msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
-def ok_file_has_content(path, content):
+def ok_file_has_content(path, content, strip=False):
     """Verify that file exists and has expected content"""
     assert(exists(path))
     with open(path, 'r') as f:
-        assert_equal(f.read(), content)
+        content_ = f.read()
+        if strip:
+            content_ = content_.strip()
+        assert_equal(content_, content)
 
 #
 # Decorators

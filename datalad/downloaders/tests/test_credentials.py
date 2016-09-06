@@ -8,14 +8,18 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for credentials"""
 
+from mock import patch
+
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true, assert_false
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import SkipTest
 from datalad.support.keyring_ import MemoryKeyring
+from datalad.support.keyring_ import Keyring
 from ..credentials import UserPassword
 from ..credentials import CompositeCredential
+from ..credentials import AWS_S3
 
 
 @with_testsui(responses=['user1', 'password1'])
@@ -91,3 +95,20 @@ def test_composite_credential1():
     # which would get reevaluated if requested
     assert_equal(keyring.entries, {'name:1': {}, 'name': {'user': 'user2', 'password': 'password2'}})
     assert_equal(cred(), {'user': 'user2_1', 'password': 'password2_2'})
+
+
+def test_credentials_from_env():
+    keyring = Keyring()
+    cred = AWS_S3("test-s3", keyring=keyring)
+    assert_false(cred.is_known)
+    assert_equal(cred.get('key_id'), None)
+    assert_equal(cred.get('secret_id'), None)
+
+    with patch.dict('os.environ', {'DATALAD_test_s3_key_id': '1'}):
+        assert_equal(cred.get('key_id'), '1')
+        assert_false(cred.is_known)
+        with patch.dict('os.environ', {'DATALAD_test_s3_secret_id': '2'}):
+            assert_equal(cred.get('key_id'), '1')
+            assert_equal(cred.get('secret_id'), '2')
+            assert_true(cred.is_known)
+        assert_false(cred.is_known)  # no memory of the past
