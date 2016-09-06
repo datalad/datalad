@@ -12,6 +12,9 @@
 
 import logging
 
+from os import curdir
+from os.path import isdir
+
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -22,12 +25,16 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import to_options
 from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import FileNotInRepositoryError
 
+from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import require_dataset
+from .dataset import resolve_path
+from .dataset import _with_sep
 
 __docformat__ = 'restructuredtext'
 
@@ -93,20 +100,98 @@ class Get(Interface):
             annex_opts=None,
             annex_get_opts=None):
 
+        # resolve dataset:
         ds = require_dataset(dataset, check_installed=True,
                              purpose='getting content')
 
-        # needs to be an annex:
-        if not isinstance(ds.repo, AnnexRepo):
-            raise CommandNotAvailableError("Missing annex at {0}".format(ds))
+        # check parameters:
+        if path is None:
+            raise InsufficientArgumentsError("insufficient information for "
+                                             "getting: requires at least a "
+                                             "path.")
+        # When called from cmdline `path` will be a list even if
+        # there is only one item.
+        # Make sure we deal with the same when called via python API:
+        if not isinstance(path, list):
+            path = [path]
 
-        # TODO: path with subdataset? (not recursive => fail)
-        # TODO: recursion into subdatasets
-        # Note: `path` may be a list, partially within subdatasets ...
+        # resolve path(s):
+        resolved_paths = [resolve_path(p, dataset) for p in path]
 
-        # return value + result renderer
+        # resolve associated datasets:
+        resolved_datasets = dict()
+        for p in resolved_paths:
+            p_ds = ds.get_containing_subdataset(p,
+                                                recursion_limit=recursion_limit)
+            if p_ds is None:
+                raise FileNotInRepositoryError(
+                    msg="{0} not in dataset.".format(p))
+            if not recursive and p_ds != ds:
+                raise FileNotInRepositoryError(
+                    msg="{0} belongs to subdataset {1}. To get its content use "
+                        "option `recursive` or call get on the "
+                        "subdataset.".format(p, p_ds))
+            if p_ds.path not in resolved_datasets:
+                resolved_datasets[p_ds.path] = []
+            resolved_datasets[p_ds.path].append(p)
+            # TODO: Change behaviour of Dataset: Make subdatasets singletons to
+            # always get the same object referencing a certain subdataset.
 
-        # Note: general call:
-        # ds.repo.get(path, options=['--from="{src}"'.format(src=source)])
+        if recursive:
+            # Find implicit subdatasets to call get on:
+            # If there are directories in resolved_paths (Note,
+            # that this includes '.' and '..'), check for subdatasets
+            # beneath them. These should be called recursively with '.'.
+            # Therefore add the subdatasets to resolved_datasets and
+            # corresponding '.' to resolved_paths, in order to generate the
+            # correct call.
+            for p in resolved_paths:
+                if isdir(p):
+                    for subds_path in \
+                      ds.get_subdatasets(absolute=True, recursive=True,
+                                         recursion_limit=recursion_limit):
+                        if subds_path.startswith(_with_sep(p)):
+                            if subds_path not in resolved_datasets:
+                                resolved_datasets[subds_path] = []
+                            resolved_datasets[subds_path].append(curdir)
 
-        raise NotImplementedError
+        # the actual calls:
+        result = []
+        for ds_path in resolved_datasets:
+            cur_ds = Dataset(ds_path)
+            # needs to be an annex:
+            if not isinstance(cur_ds.repo, AnnexRepo):
+                raise CommandNotAvailableError(
+                    cmd="get", msg="Missing annex at {0}".format(ds))
+
+            result.extend(cur_ds.repo.get(resolved_datasets[ds_path],
+                                          options=['--from="%s"' % source]
+                                                  if source else []))
+
+        # TODO: evaluate results/improve reporting by AnnexRepo.get
+        #       - JSON vs. parsing stdout
+        #       - annex reports back only once, if several files are identical
+        #       - getting something already present is reported as failure
+
+        return result
+
+    @staticmethod
+    def result_renderer_cmdline(res, args):
+        from datalad.ui import ui
+        from os import linesep
+        if res is None:
+            res = []
+        if not isinstance(res, list):
+            res = [res]
+        if not len(res):
+            ui.message("Nothing was added")
+            return
+
+        msg = linesep.join([
+            "{path} ... {suc}".format(
+                suc="ok." if item.get('success', False)
+                    else "failed.",
+                path=item.get('file'))
+            for item in res])
+        ui.message(msg)
+

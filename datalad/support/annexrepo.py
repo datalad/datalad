@@ -408,14 +408,45 @@ class AnnexRepo(GitRepo):
         kwargs: options for the git annex get command.
             For example `from='myremote'` translates to
             annex option "--from=myremote".
+
+        Returns
+        -------
+        list of dict
+            result list;
+            Dictionary per file with keys 'file' (path) and 'success' (bool)
         """
         options = options[:] if options else []
 
+        # Note: For now, no JSON output is used, since this disables annex'
+        # progress bars.
+
         # don't capture stderr, since it provides progress display
         # but if no online logging, then log it
-        self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=not log_online,
-                                log_online=log_online, expect_stderr=True)
+        out, err = self._run_annex_command(
+            'get', annex_options=options + files,
+            log_stdout=True, log_stderr=not log_online,
+            log_online=log_online, expect_stderr=True)
+
+        out_lines = out.splitlines()
+        result = []
+
+        # parse annex' output:
+        for line_idx in range(len(out_lines)):
+            if out_lines[line_idx].startswith("get"):
+               result.append({'file': out_lines[line_idx].split()[1],
+                              # TODO: Incorrect. Sometimes it's the same line,
+                              # sometimes the next one:
+                              'success': out_lines[line_idx+1].endswith("ok")})
+        # add entries for missing files:
+        for f in files:
+            # TODO: This doesn't work, if an item in `files` is a directory.
+            # Just skip for now, but this needs refinement.
+            if isdir(f):
+                continue
+            if f not in [item['file'] for item in result]:
+                result.append({'file': f, 'success': False})
+
+        return result
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,

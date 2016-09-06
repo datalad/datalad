@@ -83,7 +83,7 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        return self.path == other.path
+        return self.path == other.path  # TODO: realpath?
 
     @property
     def path(self):
