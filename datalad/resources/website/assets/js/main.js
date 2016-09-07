@@ -88,9 +88,9 @@ function update_param_or_path(next_url, type, current_state) {
   // if url = root path(wrt index.html) then append index.html to url
   // allows non-root dataset dirs to have index.html
   // ease constrain on non-datalad index.html presence in dataset
-  if (next_url === loc().pathname || next_url === '/' || !next_url) {
+  if (next_url === loc().pathname || next_url === '/' || !next_url)
     return false;
-  } else if (type === 'file' || type === 'link')
+  else if (type === 'file' || type === 'link')
     return false;
   else
     return true;
@@ -146,8 +146,8 @@ function metadata_locator(md5) {
     // and compute name of current nodes metadata hash
     var metadata_path = getParameterByName('dir')
           .replace(current_loc.replace(loc().pathname, ''), '')   // remove basepath to dir
-          .replace(/^\/?/, '')        // replace beginning '/'
-          .replace(/\/?$/, '');       // replace ending '/'
+          .replace(/^\/?/, '')                                    // replace beginning '/'
+          .replace(/\/?$/, '');                                   // replace ending '/'
     return current_loc + metadata_dir + md5(metadata_path);
   }
 }
