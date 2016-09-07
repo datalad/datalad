@@ -372,11 +372,19 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
     @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
+        # location of post-update hook file, logs folder on remote target
         hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
-        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'' + str(path)
-        to_log = '\';) &> /tmp/datalad-publish-metadata-refresh-$(date +%F).log'
-        json_command += to_log
+        logs_remote_target = opj(path, '.git', 'datalad', 'logs')
+
+        # create json command for current dataset
+        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'{}\';) &> "{}/{}"'
+        json_command = json_command.format(str(path), logs_remote_target, 'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
+
+        # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
+
+        # make datalad logs directory
+        ssh(['mkdir', '-p', logs_remote_target])
 
         with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
             ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
