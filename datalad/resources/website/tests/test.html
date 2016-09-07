@@ -4,18 +4,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <title>Datalad WebUI Test</title>
-    <link rel="stylesheet" href="qunit/qunit.css">
+    <link rel="stylesheet" href="qunit/qunit-2.0.1.css">
   </head>
   <body>
     <div id="qunit"></div>
     <div id="qunit-fixture"></div>
-    <script src="../assets/js/jquery-1.12.3.js"></script>
-    <script src="../assets/js/jquery.dataTables.js"></script>
-    <script src="../assets/js/md5.js"></script>
+    <script src="../assets/js/jquery-2.2.4.js"></script>
+    <script src="../assets/js/jquery.dataTables-1.10.12.js"></script>
+    <script src="../assets/js/md5-2.3.0.js"></script>
     <script src="../assets/js/main.js"></script>
-    <script src="qunit/sinon.js"></script>
-    <script src="qunit/sinon-qunit.js"></script>
-    <script src="qunit/qunit.js"></script>
+    <script src="qunit/sinon-1.17.5.js"></script>
+    <script src="qunit/sinon-qunit-1.0.0.js"></script>
+    <script src="qunit/qunit-2.0.1.js"></script>
     <script>
       QUnit.test("Parent URL", function(assert) {
 	  assert.equal(parent_url('root/child'), 'root/');
