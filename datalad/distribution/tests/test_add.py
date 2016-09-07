@@ -42,13 +42,8 @@ def test_add_insufficient_args(path):
 
     ds = Dataset(path)
     ds.create()
-    assert_raises(FileNotInRepositoryError, ds.add, opj(pardir, 'path', 'outside'))
-
-    # Note: CommandError raised from within
-    # AnnexRepo._run_annex_command_json('add' ...)
-    # => TODO: annex seems to currently report only success as JSON, while
-    #    failing is reported on stderr (+ non-zero exit)
-    assert_raises(CommandError, ds.add, opj('not', 'existing'))
+    assert_raises(FileNotInRepositoryError, ds.add,
+                  opj(pardir, 'path', 'outside'))
 
 
 tree_arg = dict(tree={'test.txt': 'some',
@@ -173,10 +168,11 @@ def test_add_source(path, url, ds_dir):
     eq_([urls[2]], reg_urls[0])
 
     # provide more paths than sources:
-    # fail on non-existing 'local4.dat':
-    with assert_raises(CommandError) as e:
-        ds.add(path=['local3.dat', 'local4.dat'], source=urls[4])
-        assert_in("local4.dat not found", str(e.exception))
+    # report failure on non-existing 'local4.dat':
+    result = ds.add(path=['local3.dat', 'local4.dat'], source=urls[4])
+    ok_(all([r['success'] is False and r['note'] == 'not found'
+             for r in result if r['file'] == 'local4.dat']))
+
     with open(opj(ds.path, 'local4.dat'), 'w') as f:
         f.write('local4 content')
 
