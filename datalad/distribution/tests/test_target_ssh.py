@@ -51,9 +51,9 @@ def _test_correct_publish(target_path, rootds=False):
     # not created dataset metatadata directory in dataset
     assert_false(exists(opj(target_path, ".git", "datalad", "metadata")))
 
-    # correct ls_json command in hook content
+    # correct ls_json command in hook content (path wrapped in quotes)
     ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -r --json file %s.*' % target_path[:-1],
+                        '.*datalad ls -r --json file \'%s\'.*' % target_path,
                         re_=True,
                         flags=re.DOTALL)
 
