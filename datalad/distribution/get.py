@@ -130,7 +130,7 @@ class Get(Interface):
                 # skip early:
                 # Note/TODO: This is to be changed, when implementing implicit
                 # install of subdatasets
-                lgr.warning("{0} not found. Ignored.")
+                lgr.warning("{0} not found. Ignored.".format(p))
                 continue
 
             p_ds = ds.get_containing_subdataset(p,
@@ -189,7 +189,7 @@ class Get(Interface):
                      "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
 
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
-                                            options=['--from="%s"' % source]
+                                            options=['--from=%s' % source]
                                                      if source else [])
 
             # if we recurse into subdatasets, adapt relative paths reported by
@@ -211,7 +211,7 @@ class Get(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was added")
+            ui.message("Nothing was getted")
             return
 
         msg = linesep.join([
