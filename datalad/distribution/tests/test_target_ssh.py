@@ -37,19 +37,24 @@ from datalad.utils import on_windows
 from datalad.utils import _path_
 
 
-def _test_correct_publish(target_path, rootds=False):
+def _test_correct_publish(target_path, rootds=False, flat=True):
 
-    paths = [_path_(".git/hooks/post-update")]
+    paths = [_path_(".git/hooks/post-update")]     # hooks enabled in all datasets
+    not_paths = [_path_(".git/datalad/metadata")]  # metadata only on publish
 
-    # pushed web-interface html to dataset
+    # web-interface html pushed to dataset root
+    web_paths = ['index.html', _path_(".git/datalad/web")]
     if rootds:
-        paths += ['index.html', _path_(".git/datalad/web")]
+        paths += web_paths
+    # and not to subdatasets
+    elif not flat:
+        not_paths += web_paths
 
     for path in paths:
         ok_exists(opj(target_path, path))
 
-    # not created dataset metatadata directory in dataset
-    assert_false(exists(opj(target_path, ".git", "datalad", "metadata")))
+    for path in not_paths:
+        assert_false(exists(opj(target_path, path)))
 
     # correct ls_json command in hook content (path wrapped in quotes)
     ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
@@ -185,12 +190,12 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
 
-            _test_correct_publish(target_dir, rootds=not suffix)
+            _test_correct_publish(target_dir, rootds=not suffix, flat=flat)
 
         for repo in [source.repo, sub1.repo, sub2.repo]:
             assert_not_in("local_target", repo.get_remotes())
 
         if flat:
-            raise SkipTest('TODO: Make it work for flat datasets, it currently breaks')
+            raise SkipTest('TODO: Make publish work for flat datasets, it currently breaks')
         # now, push should work:
         publish(dataset=source, to=remote_name)
