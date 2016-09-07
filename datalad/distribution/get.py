@@ -13,7 +13,10 @@
 import logging
 
 from os import curdir
-from os.path import isdir, join as opj, relpath
+from os.path import isdir
+from os.path import join as opj
+from os.path import relpath
+from os.path import lexists
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -27,7 +30,6 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileNotInRepositoryError
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -103,6 +105,7 @@ class Get(Interface):
         # resolve dataset:
         ds = require_dataset(dataset, check_installed=True,
                              purpose='getting content')
+        lgr.debug("Resolved dataset: %s" % ds)
 
         # check parameters:
         if path is None:
@@ -116,21 +119,31 @@ class Get(Interface):
             path = [path]
 
         # resolve path(s):
+        lgr.info("Resolving paths ...")
         resolved_paths = [resolve_path(p, dataset) for p in path]
 
         # resolve associated datasets:
+        lgr.info("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
         for p in resolved_paths:
+            if not lexists(p):
+                # skip early:
+                # Note/TODO: This is to be changed, when implementing implicit
+                # install of subdatasets
+                lgr.warning("{0} not found. Ignored.")
+                continue
+
             p_ds = ds.get_containing_subdataset(p,
                                                 recursion_limit=recursion_limit)
             if p_ds is None:
-                raise FileNotInRepositoryError(
-                    msg="{0} not in dataset.".format(p))
+                lgr.warning("{0} not in dataset. Ignored.".format(p))
+                continue
             if not recursive and p_ds != ds:
-                raise FileNotInRepositoryError(
-                    msg="{0} belongs to subdataset {1}. To get its content use "
-                        "option `recursive` or call get on the "
-                        "subdataset.".format(p, p_ds))
+                lgr.warning("{0} belongs to subdataset {1}. To get its content "
+                            "use option `recursive` or call get on the "
+                            "subdataset. Ignored.".format(p, p_ds))
+                continue
+
             resolved_datasets[p_ds.path] = \
                 resolved_datasets.get(p_ds.path, []) + [p]
 
@@ -152,8 +165,16 @@ class Get(Interface):
                                          recursion_limit=recursion_limit):
                         if subds_path.startswith(_with_sep(p)):
                             if subds_path not in resolved_datasets:
+                                lgr.debug("Added implicit subdataset {0} "
+                                          "from path {1}".format(subds_path, p))
                                 resolved_datasets[subds_path] = []
                             resolved_datasets[subds_path].append(curdir)
+        lgr.info("Found {0} datasets to "
+                 "operate on.".format(len(resolved_datasets)))
+        # TODO:
+        # git_opts
+        # annex_opts
+        # annex_get_opts
 
         # the actual calls:
         global_results = []
@@ -164,9 +185,12 @@ class Get(Interface):
                 raise CommandNotAvailableError(
                     cmd="get", msg="Missing annex at {0}".format(ds))
 
+            lgr.info("Getting {0} files of dataset "
+                     "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
+
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
                                             options=['--from="%s"' % source]
-                                                    if source else [])
+                                                     if source else [])
 
             # if we recurse into subdatasets, adapt relative paths reported by
             # annex to be relative to the toplevel dataset we operate on:
