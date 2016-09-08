@@ -176,6 +176,24 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_get_outofspace(annex_path):
+    ar = AnnexRepo(annex_path, create=True)
+
+    def raise_cmderror(*args, **kwargs):
+        raise CommandError(
+            cmd="whatever",
+            stderr="junk around not enough free space, need 905.6 MB more and after"
+        )
+
+    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+        assert_raises(OutOfSpaceError) as cme:
+        ar.get("file")
+    exc = cme.exception
+    assert_equal(exc.sizemore_msg, '905.6 MB')
+    assert_re_in(".*annex get. needs 905.6 MB more", str(exc))
+
+
 # 1 is enough to test file_has_content
 @with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
