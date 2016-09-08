@@ -47,6 +47,12 @@ matrix:
     # Eventually we will get there, but atm causes a good number of failures
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
+  - python: 2.7
+    # To make sure that operates correctly whenever dataset directories have symlinks
+    # in their path.
+    env:
+    # To make orthogonal test where it is not a symlink but a dir with spaces
+    - TMPDIR="/tmp/d i r"
   - python: 3.3
   - python: 3.4
   # Those aren't yet ready since lxml Ibelieve fails to install
@@ -88,9 +94,9 @@ install:
   # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
   - pip install sphinx
   - pip install sphinx_rtd_theme
-  # TMPDIR
-  - if [ ! -z "$TMPDIR" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-
+  # TMPDIRs
+  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
+  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
