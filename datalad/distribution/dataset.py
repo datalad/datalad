@@ -202,6 +202,8 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
+    # weakref
+    # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None):
 

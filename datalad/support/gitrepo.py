@@ -68,6 +68,7 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
+# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):

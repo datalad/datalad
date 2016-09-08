@@ -75,6 +75,7 @@ def test_get_invalid_call(path):
               "\"MysteriousRemote\"", ce.exception.stderr)
 
     # TODO: Don't know why cml.out is empty, while this works via cmdline ...
+    # set level!
     # with swallow_logs() as cml:
     #     ds.get("NotExistingFile.txt")
     #     assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
@@ -226,8 +227,7 @@ def test_get_recurse_subdatasets(path):
                      opj('subm 1', 'test-annex.dat'),
                      opj('subm 2', 'test-annex.dat')}
 
-    from glob import glob1
-    result = ds.get(glob1(ds.path, '*'), recursive=True)
+    result = ds.get('.', recursive=True)
 
     eq_(set([item.get('file') for item in result]), annexed_files)
     ok_(all(item.get('success', False) for item in result))

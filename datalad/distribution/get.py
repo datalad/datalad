@@ -90,6 +90,10 @@ class Get(Interface):
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts)
 
+    # Note: May be use 'git annex find --not --in here' to have a list of all
+    # files to actually get and give kind of a progress in terms of number
+    # files processed ...
+
     @staticmethod
     @datasetmethod(name='get')
     def __call__(

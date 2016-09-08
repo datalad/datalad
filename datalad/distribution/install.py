@@ -229,6 +229,10 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
 # TODO: check whether the following is done already:
 # install of existing submodule; recursive call; source should not be None!
 
+# TODO:  git_clone options
+# use --shared by default => option --no-shared
+
+
 class Install(Interface):
     """Install a dataset or subdataset.
 
@@ -287,6 +291,8 @@ class Install(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts)
+
+    # -d impliziert add_to_super? => no explicit dataset leads to not add it (without add_to_super)
 
     @staticmethod
     @datasetmethod(name='install')
