@@ -76,8 +76,11 @@ class Save(Interface):
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
 
+        _datalad_msg = False
         if not message:
-            message = 'Changes recorded by datalad'
+            message = 'Recorded existing changes'
+            _datalad_msg = True
+
         if auto_add_changes:
             files = [ds.path]
 
@@ -95,7 +98,7 @@ class Save(Interface):
                 working_tree=False,
                 untracked_files=False,
                 submodules=True):
-            ds.repo.commit(message)
+            ds.repo.commit(message, _datalad_msg=_datalad_msg)
         else:
             lgr.info(
                 'Nothing to save, consider auto-detection of changes, '
