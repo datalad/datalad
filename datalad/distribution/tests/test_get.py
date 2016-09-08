@@ -35,6 +35,7 @@ from datalad.utils import chpwd
 from datalad.utils import swallow_logs
 
 from ..dataset import Dataset
+from ..dataset import _with_sep
 
 
 @with_tempfile(mkdir=True)
@@ -84,7 +85,6 @@ def test_get_invalid_call(path):
     result = ds.get(opj(pardir, "doesntmatter.dat"))
     eq_(len(result), 0)
 
-
     # TODO: annex --json doesn't report anything when get fails to do get a
     # file from a specified source, where the file isn't available from.
     # File report for Joey (plus other failures like not existing when
@@ -95,13 +95,13 @@ def test_get_invalid_call(path):
 def test_get_single_file(path):
 
     ds = Dataset(path)
-    ok_(ds.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(ds.repo.file_has_content('test-annex.dat') is False)
     result = ds.get("test-annex.dat")
     eq_(len(result), 1)
     eq_(result[0]['file'], 'test-annex.dat')
     ok_(result[0]['success'] is True)
     eq_(result[0]['key'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat')[0] is True)
+    ok_(ds.repo.file_has_content('test-annex.dat') is True)
 
 
 @with_tree(tree={'file1.txt': 'whatever 1',
@@ -138,7 +138,7 @@ def test_get_multiple_files(path, url, ds_dir):
     eq_(set([item.get('file') for item in result]),
         {'file1.txt', 'file2.txt'})
     ok_(all([x['success'] is True
-             for x in result if x['file']]))
+             for x in result if x['file'] in ['file1.txt', 'file2.txt']]))
     ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
 
     # get all of them:
@@ -149,12 +149,91 @@ def test_get_multiple_files(path, url, ds_dir):
     ok_(all(ds.repo.file_has_content(file_list)))
 
 
-def test_get_recurse_dirs():
-    raise SkipTest("TODO")
+@with_tree(tree={'file1.txt': 'something',
+                 'subdir': {'file2.txt': 'something else',
+                            'subsubdir': {
+                                'file3.txt': 'something completely different',
+                                'file4.txt': 'something'
+                            }}})
+@with_tempfile(mkdir=True)
+def test_get_recurse_dirs(o_path, c_path):
+
+    # prepare source:
+    origin = Dataset(o_path).create(force=True)
+    origin.save("Initial", auto_add_changes=True)
+
+    # clone it: (TODO: use install here, once it is redone)
+    AnnexRepo(c_path, o_path, create=True)
+    ds = Dataset(c_path)
+
+    file_list = ['file1.txt',
+                 opj('subdir', 'file2.txt'),
+                 opj('subdir', 'subsubdir', 'file3.txt'),
+                 opj('subdir', 'subsubdir', 'file4.txt')]
+    files_in_sub = [f for f in file_list if f.startswith(_with_sep('subdir'))]
+
+    # no content present:
+    ok_(not any(ds.repo.file_has_content(file_list)))
+
+    result = ds.get('subdir')
+
+    # check result:
+    eq_(set([item.get('file') for item in result]),
+        set(files_in_sub))
+    ok_(all([x['success'] is True for x in result if x['file'] in files_in_sub]))
+    eq_(len(result), len(files_in_sub))
+
+    # got all files beneath subdir:
+    ok_(all(ds.repo.file_has_content(files_in_sub)))
+
+    # additionally got file1.txt silently, since it has the same content as
+    # subdir/subsubdir/file4.txt:
+    ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-def test_get_recurse_subdatasets():
-    raise SkipTest("TODO")
+@with_testrepos('submodule_annex', flavors='clone')
+def test_get_recurse_subdatasets(path):
+
+    # just cloned, not installed, so annex-init it:
+    # TODO: use install, once it has been fixed.
+    repo = AnnexRepo(path, init=True)
+    repo.update_submodule('subm 1', init=True)
+    repo.update_submodule('subm 2', init=True)
+
+    ds = Dataset(path)
+    subds1 = Dataset(opj(path, 'subm 1'))
+    subds2 = Dataset(opj(path, 'subm 2'))
+
+    # call with path in submodule, but without 'recursive':
+    # TODO: test log (there should be a warning)
+    result = ds.get(opj('subm 1', 'test-annex.dat'))
+    eq_(len(result), 0)
+
+    # now with recursive option:
+    result = ds.get(opj('subm 1', 'test-annex.dat'), recursive=True)
+
+    eq_(result[0].get('file'), opj('subm 1', 'test-annex.dat'))
+    ok_(result[0].get('success', False) is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
+
+    # drop it:
+    subds1.repo.drop('test-annex.dat')
+    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
+
+    # get everything:
+    # there are 3 files to get: test-annex.dat within each dataset:
+    annexed_files = {'test-annex.dat',
+                     opj('subm 1', 'test-annex.dat'),
+                     opj('subm 2', 'test-annex.dat')}
+
+    from glob import glob1
+    result = ds.get(glob1(ds.path, '*'), recursive=True)
+
+    eq_(set([item.get('file') for item in result]), annexed_files)
+    ok_(all(item.get('success', False) for item in result))
+    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
+    ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
 
 def test_get_install_missing_subdataset():
