@@ -342,18 +342,30 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n2,
                  msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
-def ok_file_has_content(path, content, strip=False):
+
+def ok_exists(path):
+    assert exists(path), 'path %s does not exist' % path
+
+
+def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
     """Verify that file exists and has expected content"""
-    assert(exists(path))
+    ok_exists(path)
     with open(path, 'r') as f:
         content_ = f.read()
+
         if strip:
             content_ = content_.strip()
-        assert_equal(content_, content)
+
+        if re_:
+            assert_re_in(content, content_, **kwargs)
+        else:
+            assert_equal(content, content_, **kwargs)
+
 
 #
 # Decorators
 #
+
 
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
