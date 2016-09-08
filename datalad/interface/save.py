@@ -94,7 +94,8 @@ class Save(Interface):
                 continue
 
             # test whether the potential submodule is scheduled for saving
-            if sum([realpath(utf_abspath).startswith(_with_sep(realpath(f)))
+            utf_realpath = realpath(utf_abspath)
+            if any([utf_realpath.startswith(_with_sep(realpath(f)))
                     for f in files]):
                 # matches at least one path -> turn into submodule
                 _install_subds_inplace(
