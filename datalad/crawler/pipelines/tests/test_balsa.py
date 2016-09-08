@@ -51,8 +51,7 @@ def test_smoke_pipelines():
     yield _test_smoke_pipelines, superdataset_pipeline, []
 
 
-@with_tree(tree={
-
+TEST_TREE1 = {
     'study': {
         'show': {
             'WG33': {
@@ -119,9 +118,9 @@ def test_smoke_pipelines():
         }
     },
 
-    },
-    archives_leading_dir=False
-)
+}
+
+@with_tree(tree=TEST_TREE1, archives_leading_dir=False)
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
