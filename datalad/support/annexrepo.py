@@ -52,6 +52,7 @@ from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
+from .exceptions import OutOfSpaceError
 from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
@@ -278,7 +279,6 @@ class AnnexRepo(GitRepo):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
-
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
 
@@ -940,17 +940,20 @@ class AnnexRepo(GitRepo):
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
             # doesn't mean there's nothing else to deal with.
-
+            out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
+            if out_of_space_re:
+                raise OutOfSpaceError(cmd="annex %s" % command, sizemore_msg=out_of_space_re.groups()[0])
             # Workaround as long as annex doesn't report it within JSON response:
             not_existing = [line.split()[1] for line in e.stderr.splitlines()
                             if line.startswith('git-annex:') and
                             line.endswith('not found')]
+
             if not_existing:
                 out = e.stdout
                 if not out.endswith(linesep):
                     out += linesep
                 out += linesep.join(
-                        ['{{"command":"{cmd}","file":"{path}","note":"{note}",'
+                        ['{{"command": "{cmd}", "file": "{path}", "note": "{note}",'
                          '"success":false}}'.format(cmd=command,
                                                     path=f,
                                                     note="not found")

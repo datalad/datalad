@@ -9,6 +9,8 @@
 """ datalad exceptions
 """
 
+from os import linesep
+
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
@@ -69,6 +71,21 @@ class FileNotInRepositoryError(FileNotInAnnexError):
 class InsufficientArgumentsError(ValueError):
     """To be raise instead of `ValueError` when use help output is desired"""
     pass
+
+
+class OutOfSpaceError(CommandError):
+    """To be raised whenever a command fails if we have no sufficient space
+
+    Example is  annex get command
+    """
+
+    def __init__(self, sizemore_msg=None, **kwargs):
+        super(OutOfSpaceError, self).__init__(**kwargs)
+        self.sizemore_msg = sizemore_msg
+
+    def __str__(self):
+        super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
+        return "%s needs %s more" % (super_str, self.sizemore_msg)
 
 #
 # Downloaders
