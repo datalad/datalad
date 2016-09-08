@@ -63,7 +63,7 @@ def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    cmd = 'echo Testing real run > %s' % tempfile
+    cmd = 'echo Testing real run > %r' % tempfile
     ret = runner.run(cmd)
     assert_true(os.path.exists(tempfile),
                 "Run of: %s resulted with non-existing file %s" %
