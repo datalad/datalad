@@ -55,7 +55,7 @@ matrix:
     - TMPDIR="/tmp/d i r"
   - python: 3.3
   - python: 3.4
-  # Those aren't yet ready since lxml Ibelieve fails to install
+  # Those aren't yet ready since lxml I believe fails to install
   #- python: pypy
   #- python: pypy3
 # not there -- don't try!
@@ -75,6 +75,8 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - sudo tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
+  # Install grunt-cli
+  - npm install grunt-cli
 
 install:
   # Install standalone build of git-annex for the recent enough version
@@ -97,12 +99,18 @@ install:
   # TMPDIRs
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
+  # Install grunt to test run javascript frontend tests
+  - npm install grunt
+  - npm install grunt-contrib-qunit
+
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
+  # Run javascript tests
+  - grunt test --verbose --force
 
 after_success:
   - coveralls
