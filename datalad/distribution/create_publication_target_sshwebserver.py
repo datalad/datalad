@@ -140,7 +140,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
                  existing='error', shared=False):
-
+        q = 1
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
             (needs at least a dataset and a SSH URL).""")
