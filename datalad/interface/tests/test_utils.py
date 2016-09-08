@@ -70,9 +70,7 @@ def test_dirty(path):
     subds = Dataset(opj(ds.path, 'subds')).create(add_to_super=False)
     _check_all_clean(subds, subds.repo.get_hexsha())
     orig_state = _check_auto_save(ds, orig_state)
-    # XXX surprisingly this is added as a submodule, but there is no .gitmodules
-    # which confused even Git itself (git submodule call now fails with
-    # "fatal: no submodule mapping found in .gitmodules for path 'subds'"
+    # subdataset must be added as a submodule!
     assert_equal(ds.get_subdatasets(), ['subds'])
     # tainted: submodule
     # MIH TODO: the next test can be killed once 'add_to_super' has been removed
