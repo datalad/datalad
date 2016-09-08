@@ -13,11 +13,14 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import join as opj, abspath, basename, relpath, normpath
+import datalad
+from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
+from jsmin import jsmin
+from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
-
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
@@ -30,6 +33,9 @@ from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 from datalad import ssh_manager
+from datalad.cmd import Runner
+from datalad.dochelpers import exc_str
+from datalad.utils import make_tempfile
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -111,13 +117,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 subdatasets of `dataset`""",),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error'),
+            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
             metavar='MODE',
             doc="""action to perform, if target directory exists already.
                 Dataset is skipped if 'skip'. 'replace' forces to (re-)init
                 the dataset, and to (re-)configure the dataset sibling,
-                i.e. its URL(s), in case it already exists. 'error' causes an
-                exception to be raised.""",),
+                i.e. its URL(s), in case it already exists. 'reconfigure'
+                updates metadata of the dataset sibling. 'error' causes
+                an exception to be raised.""",),
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -138,8 +145,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
             raise ValueError("""insufficient information for target creation
             (needs at least a dataset and a SSH URL).""")
 
-        if target is None and (target_url is not None
-                               or target_pushurl is not None):
+        if target is None and (target_url is not None or
+                               target_pushurl is not None):
             raise ValueError("""insufficient information for adding the target
             as a sibling (needs at least a name)""")
 
@@ -200,6 +207,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
         ssh = ssh_manager.get_connection(sshurl)
         ssh.open()
 
+        # flag to check if at dataset_root
+        at_root = True
+
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         for current_dataset in \
@@ -232,84 +242,79 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
                 if path_exists:
                     if existing == 'error':
-                        raise RuntimeError(
-                            "Target directory %s already exists." % path)
+                        raise RuntimeError("Target directory %s already exists." % path)
                     elif existing == 'skip':
                         continue
                     elif existing == 'replace':
+                        ssh(["chmod", "+r+w", "-R", path])  # enable write permissions to allow removing dir
+                        ssh(["rm", "-rf", path])            # remove target at path
+                        path_exists = False                 # if we succeeded in removing it
+                    elif existing == 'reconfigure':
                         pass
                     else:
-                        raise ValueError("Do not know how to hand existing=%s" % repr(existing))
+                        raise ValueError("Do not know how to handle existing=%s" % repr(existing))
 
+                if not path_exists:
+                    try:
+                        ssh(["mkdir", "-p", path])
+                    except CommandError as e:
+                        lgr.error("Remotely creating target directory failed at "
+                                  "%s.\nError: %s" % (path, exc_str(e)))
+                        continue
+
+            # don't (re-)initialize dataset if existing == reconfigure
+            if existing != 'reconfigure':
+                # init git repo
+                if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
+                                                                            datasets[current_dataset]):
+                    continue
+
+            # check git version on remote end
+            lgr.info("Adjusting remote git configuration")
+            remote_git_version = CreatePublicationTargetSSHWebserver.get_remote_git_version(ssh)
+            if remote_git_version and remote_git_version >= "2.4":
+                # allow for pushing to checked out branch
                 try:
-                    ssh(["mkdir", "-p", path])
+                    ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
+                         "updateInstead"])
                 except CommandError as e:
-                    lgr.error("Remotely creating target directory failed at "
-                              "%s.\nError: %s" % (path, exc_str(e)))
-                    continue
+                    lgr.error("git config failed at remote location %s.\n"
+                              "You will not be able to push to checked out "
+                              "branch. Error: %s", path, exc_str(e))
+            else:
+                lgr.error("Git version >= 2.4 needed to configure remote."
+                          " Version detected on server: %s\nSkipping configuration"
+                          " of receive.denyCurrentBranch - you will not be able to"
+                          " publish updates to this repository. Upgrade your git"
+                          " and run with --existing=reconfigure"
+                          % remote_git_version)
 
-            # init git repo
-            cmd = ["git", "-C", path, "init"]
-            if shared:
-                cmd.append("--shared=%s" % shared)
+            # enable metadata refresh on dataset updates to publication server
+            lgr.info("Enabling git post-update hook ...")
             try:
-                ssh(cmd)
+                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dataset])
             except CommandError as e:
-                lgr.error("Initialization of remote git repository failed at %s."
-                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
-                continue
+                lgr.error("Failed to add json creation command to post update hook.\n"
+                          "Error: %s" % exc_str(e))
 
-            if isinstance(datasets[current_dataset].repo, AnnexRepo):
-                # init remote git annex repo (part fix of #463)
+            # publish web-interface to root dataset on publication server
+            if at_root:
+                lgr.info("Uploading web interface to %s" % path)
+                at_root = False
                 try:
-                    ssh(["git", "-C", path, "annex", "init"])
+                    CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh, shared)
                 except CommandError as e:
-                    lgr.error("Initialization of remote git annex repository failed at %s."
-                              "\nError: %s\nSkipping ..." % (path, exc_str(e)))
-                    continue
+                    lgr.error("Failed to push web interface to the remote datalad repository.\n"
+                              "Error: %s" % exc_str(e))
 
-            # check git version on remote end:
-            try:
-                out, err = ssh(["git", "version"])
-                assert out.strip().startswith("git version")
-                git_version = out.strip().split()[2]
-                lgr.debug("Detected git version on server: %s" % git_version)
-                if LooseVersion(git_version) < "2.4":
-                    lgr.error("Git version >= 2.4 needed to configure remote."
-                              " Version detected on server: %s\nSkipping ..."
-                              % git_version)
-                    continue
-
-            except CommandError as e:
-                lgr.warning(
-                    "Failed to determine git version on remote.\n"
-                    "Error: {0}\nTrying to configure anyway "
-                    "...".format(e.message))
-
-            # allow for pushing to checked out branch
-            try:
-                ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
-                     "updateInstead"])
-            except CommandError as e:
-                lgr.warning("git config failed at remote location %s.\n"
-                            "You will not be able to push to checked out "
-                            "branch. Error: %s", path, exc_str(e))
-
-            # enable post-update hook:
-            try:
-                ssh(["mv",
-                     opj(path, ".git/hooks/post-update.sample"),
-                     opj(path, ".git/hooks/post-update")])
-            except CommandError as e:
-                lgr.error("Failed to enable post update hook.\n"
-                          "Error: %s" % e.message)
-
-            # initially update server info "manually":
-            try:
-                ssh(["git", "-C", path, "update-server-info"])
-            except CommandError as e:
-                lgr.error("Failed to update server info.\n"
-                          "Error: %s" % e.message)
+            # don't (re-)initialize dataset if existing == reconfigure
+            if existing != 'reconfigure':
+                # initially update server info "manually":
+                try:
+                    ssh(["git", "-C", path, "update-server-info"])
+                except CommandError as e:
+                    lgr.error("Failed to update server info.\n"
+                              "Error: %s" % exc_str(e))
 
         if target:
             # add the sibling(s):
@@ -317,12 +322,108 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 target_url = sshurl
             if target_pushurl is None:
                 target_pushurl = sshurl
-            result_adding = AddSibling()(dataset=ds,
-                                         name=target,
-                                         url=target_url,
-                                         pushurl=target_pushurl,
-                                         recursive=recursive,
-                                         force=existing in {'replace'})
+            AddSibling()(dataset=ds,
+                         name=target,
+                         url=target_url,
+                         pushurl=target_pushurl,
+                         recursive=recursive,
+                         force=existing in {'replace'})
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
+
+    @staticmethod
+    def init_remote_repo(path, ssh, shared, dataset):
+        cmd = ["git", "-C", path, "init"]
+        if shared:
+            cmd.append("--shared=%s" % shared)
+        try:
+            ssh(cmd)
+        except CommandError as e:
+            lgr.error("Initialization of remote git repository failed at %s."
+                      "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+            return False
+
+        if isinstance(dataset.repo, AnnexRepo):
+            # init remote git annex repo (part fix of #463)
+            try:
+                ssh(["git", "-C", path, "annex", "init"])
+            except CommandError as e:
+                lgr.error("Initialization of remote git annex repository failed at %s."
+                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+                return False
+        return True
+
+    @staticmethod
+    def get_remote_git_version(ssh):
+        try:
+            out, err = ssh(["git", "version"])
+            assert out.strip().startswith("git version")
+            git_version = out.strip().split()[2]
+            lgr.debug("Detected git version on server: %s" % git_version)
+            return LooseVersion(git_version)
+
+        except CommandError as e:
+            lgr.warning(
+                "Failed to determine git version on remote.\n"
+                "Error: {0}\nTrying to configure anyway "
+                "...".format(exc_str(e)))
+        return None
+
+    @staticmethod
+    def create_postupdate_hook(path, ssh, dataset):
+        # location of post-update hook file, logs folder on remote target
+        hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
+        logs_remote_target = opj(path, '.git', 'datalad', 'logs')
+
+        # create json command for current dataset
+        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'{}\';) &> "{}/{}"'
+        json_command = json_command.format(str(path), logs_remote_target, 'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
+
+        # collate content for post_update hook
+        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
+
+        # make datalad logs directory
+        ssh(['mkdir', '-p', logs_remote_target])
+
+        with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
+            ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
+        ssh(['chmod', '+x', hook_remote_target])            # and make it executable
+
+        # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
+        if isinstance(dataset.repo, AnnexRepo):
+            ssh(['git', '-C', path, 'annex', 'init', path])
+
+    @staticmethod
+    def upload_web_interface(path, ssh, shared):
+        # path to web interface resources on local
+        webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
+        # upload html to dataset
+        html = opj(webui_local, 'index.html')
+        ssh.copy(html, path)
+
+        # upload assets to the dataset
+        webresources_local = opj(webui_local, 'assets')
+        webresources_remote = opj(path, '.git', 'datalad', 'web')
+        ssh(['mkdir', '-p', webresources_remote])
+        ssh.copy(webresources_local, webresources_remote, recursive=True)
+
+        # minimize and upload js assets
+        for js_file in glob(opj(webresources_local, 'js', '*.js')):
+            with open(js_file) as asset:
+                minified = jsmin(asset.read())                          # minify asset
+                with make_tempfile(content=minified) as tempf:          # write minified to tempfile
+                    js_name = js_file.split('/')[-1]
+                    ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
+
+        # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
+        mode = None
+        if shared in (True, 'true', 'all', 'world', 'everybody'):
+            mode = 'a+rX'
+        elif shared == 'group':
+            mode = 'g+rX'
+        elif str(shared).startswith('0'):
+            mode = shared
+
+        if mode:
+            ssh(['chmod', mode, '-R', dirname(webresources_remote)])

@@ -162,7 +162,7 @@ class SSHConnection(object):
             else [source]
 
         # add destination path
-        scp_cmd += [self.host + ":" + destination]
+        scp_cmd += ['%s:"%s"' % (self.host, destination)]
         return self.runner.run(scp_cmd)
 
 
