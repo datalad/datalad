@@ -12,6 +12,7 @@
 import os
 import re
 from os.path import join as opj, abspath, basename, exists
+from os.path import relpath
 
 from git.exc import GitCommandError
 
@@ -33,6 +34,9 @@ from datalad.tests.utils import ok_exists
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_set_equal
+
 from datalad.utils import on_windows
 from datalad.utils import _path_
 
@@ -133,14 +137,16 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
-        create_publication_target_sshwebserver(dataset=source,
-                                               target="local_target",
-                                               sshurl="ssh://localhost",
-                                               target_dir=target_path,
-                                               target_url=target_path,
-                                               target_pushurl="ssh://localhost" +
-                                                              target_path,
-                                               existing='replace')
+        cpkwargs = dict(
+            dataset=source,
+            target="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path,
+            target_url=target_path,
+            target_pushurl="ssh://localhost" +
+                           target_path,
+        )
+        create_publication_target_sshwebserver(existing='replace', **cpkwargs)
         eq_(target_path,
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
@@ -150,6 +156,40 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         # now, push should work:
         publish(dataset=source, to="local_target")
+
+        # and we should be able to reconfigure
+        orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
+        import time; time.sleep(0.1)  # just so that mtimes change
+        create_publication_target_sshwebserver(existing='reconfigure', **cpkwargs)
+        digests, mtimes = get_mtimes_and_digests(target_path)
+
+        assert_dict_equal(orig_digests, digests)  # nothing should change in terms of content
+
+        # but some files should have been modified
+        modified_files = {k for k in mtimes if orig_mtimes.get(k, 0) != mtimes.get(k, 0)}
+        # collect which files were expected to be modified without incurring any changes
+        ok_modified_files = {_path_('.git/config'), _path_('.git/hooks/post-update'), 'index.html'}
+        ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
+        assert_set_equal(modified_files, ok_modified_files)
+
+
+def get_mtimes_and_digests(target_path):
+    """Return digests (md5) and mtimes for all the files under target_path"""
+    from datalad.utils import find_files
+    from datalad.support.digests import Digester
+    digester = Digester(['md5'])
+
+    # bother only with existing ones for this test, i.e. skip annexed files without content
+    target_files = [
+        f for f in find_files('.*', topdir=target_path, exclude_vcs=False, exclude_datalad=False)
+        if exists(f)
+    ]
+    # let's leave only relative paths for easier analysis
+    target_files_ = [relpath(f, target_path) for f in target_files]
+
+    digests = {frel: digester(f) for f, frel in zip(target_files, target_files_)}
+    mtimes = {frel: os.stat(f).st_mtime for f, frel in zip(target_files, target_files_)}
+    return digests, mtimes
 
 
 @skip_ssh

@@ -116,9 +116,7 @@ class AddSibling(Interface):
         # TODO: Check pushurl for template symbols too. Probably raise if only
         #       one of them uses such symbols
 
-        replicate_local_structure = False
-        if "%NAME" not in url:
-            replicate_local_structure = True
+        replicate_local_structure = "%NAME" not in url
 
         for repo in repos:
             if not replicate_local_structure:
