@@ -343,18 +343,7 @@ class Dataset(object):
                      native_metadata_type=native_metadata_type,
                      git_opts=git_opts,
                      annex_opts=annex_opts,
-                     annex_init_opts=annex_init_opts,
-                     # Note:
-                     # adding to the superdataset is what we are doing herein!
-                     # add_to_super=True would lead to calling ourselves again
-                     # and again
-                     # While this is somewhat ugly, the issue behind this is a
-                     # necessarily slightly different logic of `create` in
-                     # comparison to other toplevel functions, which operate on
-                     # an existing dataset and possibly on subdatasets.
-                     # With `create` we suddenly need to operate on a
-                     # superdataset, if add_to_super is True.
-                     add_to_super=False)
+                     annex_init_opts=annex_init_opts)
 
         # add it as a submodule
         # TODO: clean that part and move it in here (Dataset)

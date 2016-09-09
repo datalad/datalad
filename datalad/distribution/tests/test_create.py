@@ -32,8 +32,6 @@ from datalad.tests.utils import ok_clean_git
 def test_create_raises(path, outside_path):
 
     ds = Dataset(path)
-    # no superdataset to add to:
-    assert_raises(ValueError, ds.create, add_to_super=True)
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, no_annex=True, description='some')
     assert_raises(ValueError, ds.create, no_annex=True, annex_opts=['some'])
@@ -100,7 +98,7 @@ def test_create_sub(path):
     ds.create()
 
     # 1. create sub and add to super:
-    subds = Dataset(opj(path, "some/what/deeper")).create(add_to_super=True)
+    subds = ds.create_subdataset("some/what/deeper")
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     ok_clean_git(subds.path, annex=True)

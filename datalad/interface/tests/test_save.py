@@ -54,7 +54,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
-    subds = Dataset(opj(ds.path, 'subds')).create(add_to_super=True)
+    subds = ds.create_subdataset('subds')
     ok_(ds.repo.dirty)
     # auto save it
     ds.save(auto_add_changes=True)

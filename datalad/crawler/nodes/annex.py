@@ -145,8 +145,6 @@ class initiate_dataset(object):
         ds = create(
                 path=path,
                 force=False,
-                add_to_super='auto',
-                name=name,  # XXX may be not needed
                 # no_annex=False,  # TODO: add as an arg
                 no_commit=bool(backend),
                 # annex_version=None,

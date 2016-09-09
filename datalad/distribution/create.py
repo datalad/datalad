@@ -20,7 +20,6 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import dataset_description
-from datalad.interface.common_opts import add_to_superdataset
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureDType
@@ -86,14 +85,6 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=dataset_description,
-        add_to_super=add_to_superdataset,
-        name=Parameter(
-            args=("--name",),
-            metavar='NAME',
-            doc="""name of the dataset within the namespace of it's superdataset.
-            By default its path relative to the superdataset is used. Used only
-            together with `add_to_super`.""",
-            constraints=EnsureStr() | EnsureNone()),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
@@ -139,8 +130,6 @@ class Create(Interface):
             path=None,
             force=False,
             description=None,
-            add_to_super=False,
-            name=None,
             no_annex=False,
             no_commit=False,
             annex_version=None,
@@ -170,30 +159,6 @@ class Create(Interface):
             raise ValueError("Cannot create dataset in directory %s "
                              "(not empty). Use option 'force' in order to "
                              "ignore this and enforce creation." % ds.path)
-
-        if add_to_super:
-            sds = ds.get_superdataset()
-
-            if sds is not None:
-                return sds.create_subdataset(
-                    ds.path,
-                    force=force,
-                    name=name,
-                    description=description,
-                    no_annex=no_annex,
-                    annex_version=annex_version,
-                    annex_backend=annex_backend,
-                    git_opts=git_opts,
-                    annex_opts=annex_opts,
-                    annex_init_opts=annex_init_opts)
-            else:
-                if isinstance(add_to_super, bool):
-                    raise ValueError("No super dataset found for dataset %s" % ds)
-                elif add_to_super == 'auto':
-                    pass  # we are cool to just make it happen without add_to_super
-                else:
-                    raise ValueError("Do not know how to handle add_to_super=%s"
-                                     % repr(add_to_super))
 
         if no_annex:
             if description:
