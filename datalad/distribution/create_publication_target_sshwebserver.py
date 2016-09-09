@@ -20,7 +20,7 @@ from jsmin import jsmin
 from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
@@ -37,6 +37,7 @@ from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
 from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
+from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -228,6 +229,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                             start=ds.path)))
 
             lgr.info("Creating target dataset {0} at {1}".format(current_dataset, path))
+            # Must be set to True only if exists and existing='reconfigure'
+            # otherwise we might skip actions if we say existing='reconfigure'
+            # but it did not even exist before
+            only_reconfigure = False
             if path != '.':
                 # check if target exists
                 # TODO: Is this condition valid for != '.' only?
@@ -251,7 +256,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                         ssh(["rm", "-rf", path])            # remove target at path
                         path_exists = False                 # if we succeeded in removing it
                     elif existing == 'reconfigure':
-                        pass
+                        only_reconfigure = True
                     else:
                         raise ValueError("Do not know how to handle existing=%s" % repr(existing))
 
@@ -264,7 +269,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                         continue
 
             # don't (re-)initialize dataset if existing == reconfigure
-            if existing != 'reconfigure':
+            if not only_reconfigure:
                 # init git repo
                 if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
                                                                             datasets[current_dataset]):
@@ -276,8 +281,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if remote_git_version and remote_git_version >= "2.4":
                 # allow for pushing to checked out branch
                 try:
-                    ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
-                         "updateInstead"])
+                    ssh(["git", "-C", path] + GitRepo._GIT_COMMON_OPTIONS +
+                        ["config", "receive.denyCurrentBranch", "updateInstead"])
                 except CommandError as e:
                     lgr.error("git config failed at remote location %s.\n"
                               "You will not be able to push to checked out "
@@ -298,6 +303,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
 
+            if not only_reconfigure:
+                # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
+                if isinstance(datasets[current_dataset].repo, AnnexRepo):
+                    ssh(['git', '-C', path, 'annex', 'init', path])
+
             # publish web-interface to root dataset on publication server
             if at_root:
                 lgr.info("Uploading web interface to %s" % path)
@@ -308,14 +318,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
 
-            # don't (re-)initialize dataset if existing == reconfigure
-            if existing != 'reconfigure':
-                # initially update server info "manually":
-                try:
-                    ssh(["git", "-C", path, "update-server-info"])
-                except CommandError as e:
-                    lgr.error("Failed to update server info.\n"
-                              "Error: %s" % exc_str(e))
+            # Trigger the hook
+            try:
+                ssh(
+                    ["cd '" + _path_(path, ".git") + "' && hooks/post-update"],
+                    wrap_args=False  # we wrapped here manually
+                )
+            except CommandError as e:
+                lgr.error("Failed to run post-update hook. "
+                          "Error: %s" % exc_str(e))
 
         if target:
             # add the sibling(s):
@@ -358,7 +369,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
     @staticmethod
     def get_remote_git_version(ssh):
         try:
-            out, err = ssh(["git", "version"])
+            # options to disable all auto so we don't trigger them while testing
+            # for absent changes
+            out, err = ssh(["git"] + GitRepo._GIT_COMMON_OPTIONS + ["version"])
             assert out.strip().startswith("git version")
             git_version = out.strip().split()[2]
             lgr.debug("Detected git version on server: %s" % git_version)
@@ -392,10 +405,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
         with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
             ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
         ssh(['chmod', '+x', hook_remote_target])            # and make it executable
-
-        # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
-        if isinstance(dataset.repo, AnnexRepo):
-            ssh(['git', '-C', path, 'annex', 'init', path])
 
     @staticmethod
     def upload_web_interface(path, ssh, shared):

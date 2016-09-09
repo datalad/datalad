@@ -12,6 +12,7 @@
 import os
 import re
 from os.path import join as opj, abspath, basename, exists
+from os.path import relpath
 
 from git.exc import GitCommandError
 
@@ -21,7 +22,7 @@ from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_is_instance
+from nose.tools import eq_, assert_false, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
     with_testrepos, assert_not_in
 from datalad.tests.utils import SkipTest
@@ -33,9 +34,16 @@ from datalad.tests.utils import ok_exists
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_set_equal
+from datalad.tests.utils import assert_no_errors_logged
+from datalad.tests.utils import get_mtimes_and_digests
+from datalad.tests.utils import swallow_logs
+
 from datalad.utils import on_windows
 from datalad.utils import _path_
 
+import logging
 
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
@@ -63,6 +71,16 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
                         flags=re.DOTALL)
 
 
+# shortcut
+# but we can rely on it ATM only if "server" (i.e. localhost) has
+# recent enough git since then we expect an error msg to be spit out
+from datalad.support.external_versions import external_versions
+assert_create_sshwebserver = (
+    assert_no_errors_logged(create_publication_target_sshwebserver)
+    if external_versions['cmd:git'] >= '2.4'
+    else create_publication_target_sshwebserver
+)
+
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -73,15 +91,20 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     source = install(path=src_path, source=origin)
 
     target_path = opj(target_rootpath, "basic")
-    create_publication_target_sshwebserver(dataset=source,
-                                           target="local_target",
-                                           sshurl="ssh://localhost",
-                                           target_dir=target_path)
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        create_publication_target_sshwebserver(
+            dataset=source,
+            target="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path)
+        # is not actually happening on one of the two basic cases -- TODO figure it out
+        # assert_in('enableremote local_target failed', cml.out)
 
     GitRepo(target_path, create=False)  # raises if not a git repo
     assert_in("local_target", source.repo.get_remotes())
     eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
+    # TODO:  assumption is wrong if ~ does have .git! fix up!
     assert_raises(GitCommandError, publish, dataset=source, to="local_target")
 
     # Both must be annex or git repositories
@@ -97,10 +120,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # do it again without force:
     with assert_raises(RuntimeError) as cm:
-        create_publication_target_sshwebserver(dataset=source,
-                                               target="local_target",
-                                               sshurl="ssh://localhost",
-                                               target_dir=target_path)
+        assert_create_sshwebserver(
+            dataset=source,
+            target="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path)
     eq_("Target directory %s already exists." % target_path,
         str(cm.exception))
 
@@ -112,11 +136,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # add random file under target_path, to explicitly test existing=replace
         open(opj(target_path, 'random'), 'w').write('123')
 
-        create_publication_target_sshwebserver(dataset=source,
-                                               target="local_target",
-                                               sshurl="ssh://localhost" +
-                                                      target_path,
-                                               existing='replace')
+        assert_create_sshwebserver(
+            dataset=source,
+            target="local_target",
+            sshurl="ssh://localhost" + target_path,
+            existing='replace')
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
@@ -133,14 +157,16 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
-        create_publication_target_sshwebserver(dataset=source,
-                                               target="local_target",
-                                               sshurl="ssh://localhost",
-                                               target_dir=target_path,
-                                               target_url=target_path,
-                                               target_pushurl="ssh://localhost" +
-                                                              target_path,
-                                               existing='replace')
+        cpkwargs = dict(
+            dataset=source,
+            target="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path,
+            target_url=target_path,
+            target_pushurl="ssh://localhost" +
+                           target_path,
+        )
+        assert_create_sshwebserver(existing='replace', **cpkwargs)
         eq_(target_path,
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
@@ -150,6 +176,28 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         # now, push should work:
         publish(dataset=source, to="local_target")
+
+        # and we should be able to 'reconfigure'
+        orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
+        import time; time.sleep(0.1)  # just so that mtimes change
+        assert_create_sshwebserver(existing='reconfigure', **cpkwargs)
+        digests, mtimes = get_mtimes_and_digests(target_path)
+
+        assert_dict_equal(orig_digests, digests)  # nothing should change in terms of content
+
+        # but some files should have been modified
+        modified_files = {k for k in mtimes if orig_mtimes.get(k, 0) != mtimes.get(k, 0)}
+        # collect which files were expected to be modified without incurring any changes
+        ok_modified_files = {
+            _path_('.git/hooks/post-update'), 'index.html',
+            # files which hook would manage to generate
+            _path_('.git/info/refs'), '.git/objects/info/packs'
+        }
+        if external_versions['cmd:git'] >= '2.4':
+            # on elderly git we don't change receive setting
+            ok_modified_files.add(_path_('.git/config'))
+        ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
+        assert_set_equal(modified_files, ok_modified_files)
 
 
 @skip_ssh
@@ -178,11 +226,14 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         else:
             sep = os.path.sep
         remote_name = 'remote-' + str(flat)
-        create_publication_target_sshwebserver(target=remote_name,
-                                               dataset=source,
-                                               sshurl="ssh://localhost" + target_path_,
-                                               target_dir=target_dir_tpl,
-                                               recursive=True)
+        # TODO: there is f.ckup with paths so assert_create fails ATM
+        #assert_create_sshwebserver(
+        create_publication_target_sshwebserver(
+            target=remote_name,
+            dataset=source,
+            sshurl="ssh://localhost" + target_path_,
+            target_dir=target_dir_tpl,
+            recursive=True)
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:

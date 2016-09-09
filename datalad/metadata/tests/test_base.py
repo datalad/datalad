@@ -178,25 +178,12 @@ def test_aggregation(path):
 
     # now obtain a subdataset in the clone and the IDs should be updated
     clone.install('sub')
-    # only the uncached metadata
-    partial = get_metadata(clone, ignore_cache=True)
-    # two implicit sets for top and sub dataset
-    assert_equal(len(partial), 2)
+    partial = get_metadata(clone, guess_type=False, ignore_cache=True)
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
     assert_equal(partial[0]['dcterms:hasPart']['@id'],
                  partial[1]['@id'])
-
-    # try reaggrate metadata in top-level dataset, this time save changes
-    # will not do in dirty repo!
-    assert_raises(RuntimeError, aggregate_metadata, ds, recursive=True, save=True)
-    # hand clean
-    # XXX why does `save` does not interpret files relative to itself, but relative
-    # to CWD?
-    subds.save(files=[opj(subds.path, 'subsub')])
-    # redo aggregation exactly as above, but now save changes
-    aggregate_metadata(ds, guess_native_type=True, recursive=True, save=True)
 
     # query smoke test
     try:
