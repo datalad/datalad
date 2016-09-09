@@ -137,25 +137,35 @@ class Save(Interface):
 
         # now we should have a complete list of submodules to potentially
         # recurse into
-        if recursive and (recursion_limit is None or recursion_limit):
-            # we only want immediate subdatasets, higher depths will come via
-            # recursion
-            subdss = [Dataset(opj(ds.path, subds_path))
-                      for subds_path in ds.get_subdatasets(
-                          recursive=False)]
-            # skip anything that isn't installed
-            subdss = [d for d in subdss if d.is_installed()]
+        if recursive and (recursion_limit is None or recursion_limit > 0):
+            # what subdataset to touch?
+            subdss = []
+            if auto_add_changes:
+                # all installed 1st-level ones
+                # we only want immediate subdatasets, higher depths will come via
+                # recursion
+                subdss = [Dataset(opj(ds.path, subds_path))
+                          for subds_path in ds.get_subdatasets(
+                              recursive=False)]
+            elif files is not None:
+                # only subdatasets that contain any of the to-be-considered
+                # paths
+                subdss = [ds.get_containing_subdataset(
+                    p, recursion_limit=1) for p in files]
+            # skip anything that isn't installed, or this dataset
+            subdss = [d for d in subdss if d.is_installed() and d != ds]
+
+            prop_recursion_limit = \
+                None if recursion_limit is None else max(recursion_limit - 1, 0)
             for subds in subdss:
                 subds_modified = Save.__call__(
                     message=message,
-                    # TODO figure out which files to pass down
-                    # borrow logic from `add`
                     files=files,
                     dataset=subds,
                     auto_add_changes=auto_add_changes,
                     version_tag=version_tag,
-                    recursive=recursive,
-                    recursion_limit=None if recursion_limit is None else recursion_limit - 1,
+                    recursive=recursive and (prop_recursion_limit is None or prop_recursion_limit > 0),
+                    recursion_limit=None if recursion_limit is None else max(recursion_limit - 1, 0),
                 )
                 if subds_modified:
                     # stage changes in this submodule
@@ -164,10 +174,12 @@ class Save(Interface):
                     _modified_flag = True
 
         if files:  # could still be none without auto add changes
-            absf = [abspath(f) for f in files]
-            # XXX Is there a better way to handle files in mixed repos?
-            ds.repo.add(absf)
-            ds.repo.add(absf, git=True)
+            absf = [f for f in files
+                    if ds.get_containing_subdataset(f, recursion_limit=1) == ds]
+            if len(absf):
+                # XXX Is there a better way to handle files in mixed repos?
+                ds.repo.add(absf)
+                ds.repo.add(absf, git=True)
 
         _datalad_msg = False
         if not message:
