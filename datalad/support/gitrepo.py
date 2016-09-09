@@ -1036,8 +1036,8 @@ class GitRepo(object):
 
         Returns
         -------
-        Nothing yet.
-        TODO: Provide FetchInfo?
+        list
+            FetchInfo objects of the items fetched from remote
         """
         # TODO: options=> **kwargs):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
@@ -1133,6 +1133,10 @@ class GitRepo(object):
     def push(self, remote=None, refspec=None, progress=None, all_=False,
              **kwargs):
         """See fetch
+        Returns
+        -------
+        list
+            PushInfo objects of the items pushed to remote
         """
 
         if remote is None:
