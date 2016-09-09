@@ -160,7 +160,9 @@ class Save(Interface):
             for subds in subdss:
                 subds_modified = Save.__call__(
                     message=message,
-                    files=files,
+                    files=[f for f in files
+                           if ds.get_containing_subdataset(
+                               f, recursion_limit=1) == subds],
                     dataset=subds,
                     auto_add_changes=auto_add_changes,
                     version_tag=version_tag,
