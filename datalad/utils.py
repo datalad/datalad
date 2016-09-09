@@ -181,10 +181,10 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
       Matches to exclude
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
-      as regex to exclude those files (regex: %r)
+      as regex to exclude those files (regex: `%r`)
     exclude_datalad:
       If True, excludes files known to be datalad meta-data files (e.g. under
-      .datalad/ subdirectory) (regex: %r)
+      .datalad/ subdirectory) (regex: `%r`)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
