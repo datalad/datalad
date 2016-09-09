@@ -33,6 +33,7 @@ from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
+from os.path import relpath
 
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -994,6 +995,41 @@ def with_testsui(t, responses=None):
 
     return newfunc
 with_testsui.__test__ = False
+
+
+def assert_no_errors_logged(func):
+    """Decorator around function to assert that no errors logged during its execution"""
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        with swallow_logs(new_level=logging.ERROR) as cml:
+            out = func(*args, **kwargs)
+            if cml.out:
+                raise AssertionError("Expected no errors to be logged, but log output is %s"
+                                     % cml.out)
+        return out
+
+    return new_func
+
+
+def get_mtimes_and_digests(target_path):
+    """Return digests (md5) and mtimes for all the files under target_path"""
+    from datalad.utils import find_files
+    from datalad.support.digests import Digester
+    digester = Digester(['md5'])
+
+    # bother only with existing ones for this test, i.e. skip annexed files without content
+    target_files = [
+        f for f in find_files('.*', topdir=target_path, exclude_vcs=False, exclude_datalad=False)
+        if exists(f)
+    ]
+    # let's leave only relative paths for easier analysis
+    target_files_ = [relpath(f, target_path) for f in target_files]
+
+    digests = {frel: digester(f) for f, frel in zip(target_files, target_files_)}
+    mtimes = {frel: os.stat(f).st_mtime for f, frel in zip(target_files, target_files_)}
+    return digests, mtimes
+
+
 
 #
 # Context Managers

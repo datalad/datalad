@@ -36,6 +36,7 @@ from datalad import ssh_manager
 from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
+from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -316,14 +317,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
 
-            # don't (re-)initialize dataset if existing == reconfigure and it exists already
-            if not only_reconfigure:
-                # initially update server info "manually":
-                try:
-                    ssh(["git", "-C", path, "update-server-info"])
-                except CommandError as e:
-                    lgr.error("Failed to update server info.\n"
-                              "Error: %s" % exc_str(e))
+            # Trigger the hook
+            try:
+                ssh(
+                    ["cd '" + _path_(path, ".git") + "' && hooks/post-update"],
+                    wrap_args=False  # we wrapped here manually
+                )
+            except CommandError as e:
+                lgr.error("Failed to run post-update hook. "
+                          "Error: %s" % exc_str(e))
 
         if target:
             # add the sibling(s):
@@ -388,7 +390,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         logs_remote_target = opj(path, '.git', 'datalad', 'logs')
 
         # create json command for current dataset
-        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'{}\';) &> "{}/{}"'
+        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'{}\';) &> "{}/{}" || :'
         json_command = json_command.format(str(path), logs_remote_target, 'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
 
         # collate content for post_update hook
