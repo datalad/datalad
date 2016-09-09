@@ -122,7 +122,7 @@ class Save(Interface):
                 untracked_files=False,
                 submodules=True):
             ds.repo.commit(message, _datalad_msg=_datalad_msg)
-        else:
+        elif not auto_add_changes:
             lgr.info(
                 'Nothing to save, consider auto-detection of changes, '
                 'if this is unexpected.')
