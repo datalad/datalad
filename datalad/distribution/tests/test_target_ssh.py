@@ -189,10 +189,13 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         modified_files = {k for k in mtimes if orig_mtimes.get(k, 0) != mtimes.get(k, 0)}
         # collect which files were expected to be modified without incurring any changes
         ok_modified_files = {
-            _path_('.git/config'), _path_('.git/hooks/post-update'), 'index.html',
+            _path_('.git/hooks/post-update'), 'index.html',
             # files which hook would manage to generate
             _path_('.git/info/refs'), '.git/objects/info/packs'
         }
+        if external_versions['cmd:git'] >= '2.4':
+            # on elderly git we don't change receive setting
+            ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
         assert_set_equal(modified_files, ok_modified_files)
 
