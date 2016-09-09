@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import abspath
+from os.path import abspath, join as opj, isdir, realpath
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -22,6 +22,8 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import _with_sep
+from datalad.distribution.install import _install_subds_inplace
 
 from .base import Interface
 
@@ -80,6 +82,27 @@ class Save(Interface):
             message = 'Changes recorded by datalad'
         if auto_add_changes:
             files = [ds.path]
+
+        # treat special case of still untracked subdatasets.
+        # those need to become submodules now, as they are otherwise added
+        # without an entry in .gitmodules, and subsequently break Git's
+        # submodule functionality completely
+        for utf in ds.repo.repo.untracked_files:
+            utf_abspath = opj(ds.path, utf)
+            if not isdir(utf_abspath):
+                # this cannot be a repository
+                continue
+
+            # test whether the potential submodule is scheduled for saving
+            utf_realpath = realpath(utf_abspath)
+            if any([utf_realpath.startswith(_with_sep(realpath(f)))
+                    for f in files]):
+                # matches at least one path -> turn into submodule
+                _install_subds_inplace(
+                    ds=ds,
+                    path=utf_abspath,  # can be ignored, we don't need the return value
+                    relativepath=utf,
+                    name=None)
 
         if files:  # could still be none without auto add changes
             absf = [abspath(f) for f in files]

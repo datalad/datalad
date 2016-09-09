@@ -82,3 +82,12 @@ allow_dirty = Parameter(
     args=("--allow-dirty",),
     action="store_true",
     doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok""")
+
+if_dirty_opt = Parameter(
+    args=("--if-dirty",),
+    choices=('fail', 'save-before', 'ignore'),
+    doc="""desired behavior if a dataset with unsaved changes is discovered:
+    'fail' will trigger an error and further processing is aborted;
+    'save-before' will save all changes prior any further action;
+    'ignore' let's datalad proceed as if the dataset would not have unsaved
+    changes.""")
