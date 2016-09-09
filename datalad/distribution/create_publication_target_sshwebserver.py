@@ -36,6 +36,7 @@ from datalad import ssh_manager
 from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
+from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -376,7 +377,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
 
         # post-update hook should create its log directory if doesn't exist
-        logs_remote_target = opj(path, '.git', 'datalad', 'logs')
+        logs_remote_target = opj(path, WEB_META_LOG)
         make_log_dir = 'mkdir -p "{}"'.format(logs_remote_target)
 
         # create json command for current dataset
@@ -406,7 +407,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
-        webresources_remote = opj(path, '.git', 'datalad', 'web')
+        webresources_remote = opj(path, WEB_HTML_DIR)
         ssh(['mkdir', '-p', webresources_remote])
         ssh.copy(webresources_local, webresources_remote, recursive=True)
 
