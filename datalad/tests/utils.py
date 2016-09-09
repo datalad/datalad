@@ -39,6 +39,7 @@ from nose.tools import \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
     raises, ok_, eq_, make_decorator
 
+from nose.tools import assert_set_equal
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -851,6 +852,33 @@ def assert_re_in(regex, c, flags=0, match=True, msg=None):
     raise AssertionError(
         msg or "Not a single entry matched %r in %r" % (regex, c)
     )
+
+
+def assert_dict_equal(d1, d2):
+    msgs = []
+    if set(d1).difference(d2):
+        msgs.append(" keys in the first dict but not in the second: %s"
+                    % list(set(d1).difference(d2)))
+    if set(d2).difference(d1):
+        msgs.append(" keys in the second dict but not in the first: %s"
+                    % list(set(d2).difference(d1)))
+    for k in set(d1).intersection(d2):
+        same = True
+        try:
+            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+        except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
+            same = False
+
+        if not same:
+            msgs.append(" [%r] differs: %r != %r" % (k, d1[k], d2[k]))
+
+        if len(msgs) > 10:
+            msgs.append("and more")
+            break
+    if msgs:
+        raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
+    # do generic comparison just in case we screwed up to detect difference correctly above
+    eq_(d1, d2)
 
 
 def ignore_nose_capturing_stdout(func):
