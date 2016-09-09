@@ -189,7 +189,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % (_VCS_REGEX, _DATALAD_REGEX)
+    """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -204,6 +204,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
             if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
+find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
 
 
 def expandpath(path, force_absolute=True):
