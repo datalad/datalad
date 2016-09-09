@@ -137,11 +137,15 @@ class Get(Interface):
                 lgr.warning("{0} not found. Ignored.".format(p))
                 continue
 
-            p_ds = ds.get_containing_subdataset(p,
-                                                recursion_limit=recursion_limit)
-            if p_ds is None:
-                lgr.warning("{0} not in dataset. Ignored.".format(p))
+            try:
+                p_ds = \
+                    ds.get_containing_subdataset(p,
+                                                 recursion_limit=recursion_limit)
+            except ValueError as e:
+                # p outside repo:
+                lgr.warning(e.message)
                 continue
+
             if not recursive and p_ds != ds:
                 lgr.warning("{0} belongs to subdataset {1}. To get its content "
                             "use option `recursive` or call get on the "

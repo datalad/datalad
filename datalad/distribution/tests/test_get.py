@@ -9,6 +9,9 @@
 
 """
 
+
+import logging
+
 from os import curdir
 from os import pardir
 from os.path import join as opj
@@ -39,7 +42,8 @@ from ..dataset import _with_sep
 
 
 @with_tempfile(mkdir=True)
-def test_get_invalid_call(path):
+@with_tempfile(content="doesntmatter")
+def test_get_invalid_call(path, file_outside):
 
     # no argument at all:
     assert_raises(InsufficientArgumentsError, get)
@@ -74,17 +78,27 @@ def test_get_invalid_call(path):
     assert_in("git-annex: there is no available git remote named "
               "\"MysteriousRemote\"", ce.exception.stderr)
 
-    # TODO: Don't know why cml.out is empty, while this works via cmdline ...
-    # set level!
-    # with swallow_logs() as cml:
-    #     ds.get("NotExistingFile.txt")
-    #     assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
+    # warning on not existing file:
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        result = ds.get("NotExistingFile.txt")
+        eq_(len(result), 0)
+        assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
 
-    # TODO: Same test for a file in subdataset without recursive
+    # path in subdataset, but not called with recursive=True:
+    subds = ds.create_subdataset('sub')
+    with open(opj(subds.path, 'newfile.dat'), "w") as f:
+        f.write("something")
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        result = ds.get(opj('sub', 'newfile.dat'))
+        eq_(len(result), 0)
+        assert_in("newfile.dat belongs to subdataset %s" % subds, cml.out)
 
     # path outside repo:
-    result = ds.get(opj(pardir, "doesntmatter.dat"))
-    eq_(len(result), 0)
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        result = ds.get(file_outside)
+        eq_(len(result), 0)
+        assert_in("path {0} not in dataset {1}".format(file_outside, ds),
+                  cml.out)
 
     # TODO: annex --json doesn't report anything when get fails to do get a
     # file from a specified source, where the file isn't available from.
@@ -206,9 +220,11 @@ def test_get_recurse_subdatasets(path):
     subds2 = Dataset(opj(path, 'subm 2'))
 
     # call with path in submodule, but without 'recursive':
-    # TODO: test log (there should be a warning)
-    result = ds.get(opj('subm 1', 'test-annex.dat'))
-    eq_(len(result), 0)
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        result = ds.get(opj('subm 1', 'test-annex.dat'))
+        eq_(len(result), 0)
+        assert_in("{0} belongs to subdataset {1}".format(
+            opj('subm 1', 'test-annex.dat'), subds1), cml.out)
 
     # now with recursive option:
     result = ds.get(opj('subm 1', 'test-annex.dat'), recursive=True)
