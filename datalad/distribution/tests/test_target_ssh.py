@@ -72,7 +72,14 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 
 
 # shortcut
-assert_create_sshwebserver = assert_no_errors_logged(create_publication_target_sshwebserver)
+# but we can rely on it ATM only if "server" (i.e. localhost) has
+# recent enough git since then we expect an error msg to be spit out
+from datalad.support.external_versions import external_versions
+assert_create_sshwebserver = (
+    assert_no_errors_logged(create_publication_target_sshwebserver)
+    if external_versions['cmd:git'] >= '2.4'
+    else create_publication_target_sshwebserver
+)
 
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
@@ -90,7 +97,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target="local_target",
             sshurl="ssh://localhost",
             target_dir=target_path)
-        # is not actually happening on both basic cases -- TODO figure it out
+        # is not actually happening on one of the two basic cases -- TODO figure it out
         # assert_in('enableremote local_target failed', cml.out)
 
     GitRepo(target_path, create=False)  # raises if not a git repo
