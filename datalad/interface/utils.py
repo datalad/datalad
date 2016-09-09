@@ -13,7 +13,8 @@
 __docformat__ = 'restructuredtext'
 
 
-from datalad.api import save
+# avoid import from API to not get into circular imports
+from datalad.interface.save import Save
 
 
 def handle_dirty_dataset(ds, mode, msg=None):
@@ -48,6 +49,6 @@ def handle_dirty_dataset(ds, mode, msg=None):
     elif mode == 'save-before':
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
-        ds.save(message=msg, auto_add_changes=True)
+        Save.__call__(dataset=ds, message=msg, auto_add_changes=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
