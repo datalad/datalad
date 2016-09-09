@@ -304,7 +304,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
             if not only_reconfigure:
                 # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
-                if isinstance(dataset.repo, AnnexRepo):
+                if isinstance(datasets[current_dataset].repo, AnnexRepo):
                     ssh(['git', '-C', path, 'annex', 'init', path])
 
             # publish web-interface to root dataset on publication server
