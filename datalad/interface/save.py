@@ -167,7 +167,7 @@ class Save(Interface):
                     auto_add_changes=auto_add_changes,
                     version_tag=version_tag,
                     recursive=recursive and (prop_recursion_limit is None or prop_recursion_limit > 0),
-                    recursion_limit=None if recursion_limit is None else max(recursion_limit - 1, 0),
+                    recursion_limit=prop_recursion_limit,
                 )
                 if subds_modified:
                     # stage changes in this submodule
