@@ -23,6 +23,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import _with_sep
 from datalad.distribution.install import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
@@ -107,6 +108,16 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
+        # XXX path resolution needs to come before dataset resolution!
+        # otherwise we will not be able to figure out, whether there was an
+        # explicit dataset provided, or just a matching one resolved
+        # automatically.
+        # if files are provided but no dataset, we interpret them as
+        # CWD-related
+        if not auto_add_changes and files is not None:
+            # make sure we apply the usual path interpretation logic
+            files = [resolve_path(p, dataset) for p in files]
+
         # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
