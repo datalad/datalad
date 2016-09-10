@@ -47,6 +47,9 @@ override_dh_auto_install:
 	# Generating argcomplete helper for bash_completion.d
 	register-python-argcomplete datalad > debian/datalad/etc/bash_completion.d/datalad
 
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGELOG.md
+
 # make orig tarball from repository content
 get-orig-source:
 	# orig tarball, turn directory into something nicer

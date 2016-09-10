@@ -1,3 +1,13 @@
+datalad (0.2.3+git843-g18c597d-1) experimental; urgency=medium
+
+  * New upstream snapshot from 0.2.3-843-g18c597d
+  * debian/control
+    - new build-depends and depends/recommends:
+      python-{pyld,requests,simplejson,iso8601,jsmin,requests-ftp,yaml}
+    - testtools removed from *depends - not used ATM
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 10 Sep 2016 13:35:04 -0400
+
 datalad (0.2.3-1) unstable; urgency=medium
 
   * Fresh upstream release
