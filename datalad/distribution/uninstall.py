@@ -12,74 +12,84 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 import logging
-import glob
 
-from os.path import join as opj, exists, isabs, relpath, pardir, isdir
-from os.path import islink
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
+from os.path import relpath
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, resolve_path, require_dataset
-from datalad.distribution.install import get_git_dir
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
-from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_dataset
-from datalad.utils import assure_dir
+from datalad.utils import rmtree
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
-def _move_gitdir(ds, relativepath):
-    """Move .git directory of submodule `relativepath` into .git/modules of `ds`
+def _uninstall(ds, paths, check, force, remove_data, remove_handles,
+               recursive):
+    # all input paths are assumed to belong to the given dataset,
+    # and in particular not to any subdataset
 
-    After moving, this will create a .git file in the submodule instead.
+    # recode paths to be relative to the root of the dataset
+    paths = [relpath(p, start=ds.path) for p in paths]
 
-    Parameters
-    ds: Dataset
-    relativepath: str
+    if os.curdir in paths:
+        # we can take a shortcut if the entire thing goes away
+        paths = [os.curdir]
 
-    """
+    results = []
 
-    # relativepath is expected to point to a submodule of ds:
-    assert(relativepath in ds.get_subdatasets())
+    # at this point we can only have two things:
+    # 1. files and directories in the current dataset
+    # 2. the entire dataset
 
-    path = opj(ds.path, relativepath)
-    src_dotgit = get_git_dir(path)
+    # alway drop data first
+    if remove_data:
+        if hasattr(ds.repo, 'drop'):
+            opts = ['--force'] if not check else []
+            results.extend(ds.repo.drop(paths, options=opts))
+        else:
+            lgr.warning("cannot uninstall data only, not an annex dataset")
 
-    # expect the actual git dir to be within submodule:
-    assert(src_dotgit == '.git')
+    if not remove_handles:
+        # we are done here
+        return results
 
-    # get actual path to the .git to be moved:
-    src_git_dir = opj(path, src_dotgit)
+    if os.curdir in paths:
+        if not force:
+            raise RuntimeError("will not remove an entire dataset unless forced")
+        # special mode that makes everything disappear, including subdatasets
+        for subds in ds.get_subdatasets(
+                fulfilled=True, recursive=True, recursion_limit=1):
+            if not recursive:
+                raise RuntimeError(
+                    "will not remove subdatasets without the recursive flag")
 
-    # move .git to superrepo's .git/modules, remove .git, create
-    # .git-file/symlink
+            results.extend(
+                _uninstall(
+                    Dataset(subds),
+                    [subds],
+                    check=check,
+                    force=force,
+                    remove_data=True,
+                    # we always want everything to go at this point
+                    remove_handles=True,
+                    recursive=recursive))
 
-    ds_git_dir = get_git_dir(ds.path)
-    moved_git_dir = opj(ds.path, ds_git_dir, "modules", relativepath)
-    assure_dir(moved_git_dir)
-    from os import rename, listdir, rmdir
-    for dot_git_entry in listdir(src_git_dir):
-        rename(opj(src_git_dir, dot_git_entry),
-               opj(moved_git_dir, dot_git_entry))
-    assert not listdir(src_git_dir)
-    rmdir(src_git_dir)
+        results.append(ds)
+        rmtree(ds.path)
+        return results
 
-    # write .git file
-    # Note: Annex would need a symlink instead to not break sub-submodules. But
-    #       as of version 2.7.0 git itself doesn't deal correctly with
-    #       .git-symlinks when deinitializing a submodule. Instead, it will
-    #       still complain about a .git dir present in the submodule.
-    #       Since by now this is about deinitializing only, we go for the .git
-    #       file and don't care for possible sub-annexes.
-    target_path = relpath(moved_git_dir, start=path)
-    with open(opj(path, ".git"), "w") as f:
-        f.write("gitdir: {moved}\n".format(moved=target_path))
+    # and now make the handles disappear
+    # always recurse into directories
+    results.extend(ds.repo.remove(paths, r=True))
+
+    return results
 
 
 class Uninstall(Interface):
@@ -102,17 +112,24 @@ class Uninstall(Interface):
             doc="path/name of the component to be uninstalled",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        data_only=Parameter(
-            args=("--data-only",),
-            doc="if set, only data is uninstalled, but the handles are kept",
+        remove_data=Parameter(
+            args=("--dont-remove-data",),
+            doc="""""",
+            action="store_false",
+            dest='remove_data'),
+        remove_handles=Parameter(
+            args=("--remove-handles",),
+            doc="""""",
             action="store_true"),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit,
-        fast=Parameter(
-            args=("--fast",),
-            doc="when uninstalling (sub-)datasets, don't try uninstalling its "
-                "data first. Warning: This will silently ignore any issue "
-                "regarding the uninstallation of contained data.",
+        check=Parameter(
+            args=("--nocheck",),
+            doc="""""",
+            action="store_false",
+            dest='check'),
+        force=Parameter(
+            args=("--force",),
+            doc="""""",
             action="store_true",),
         if_dirty=if_dirty_opt,
     )
@@ -122,10 +139,11 @@ class Uninstall(Interface):
     def __call__(
             path=None,
             dataset=None,
-            data_only=False,
+            remove_data=True,
+            remove_handles=False,
             recursive=False,
-            recursion_limit=None,
-            fast=False,
+            check=True,
+            force=False,
             if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
@@ -147,213 +165,47 @@ class Uninstall(Interface):
         #   try to have annex do that without expensive check if desired
         # - subsequently delete/unregister as necessary
 
-        # deal with multiple paths
-        # TODO batch properly
-        if isinstance(path, list):
-            if not len(path):
-                # simplify logic further down
-                path = None
-            else:
-                for p in path:
-                    r = Uninstall.__call__(
-                        dataset=dataset,
-                        path=p,
-                        data_only=data_only,
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        fast=fast,
-                        if_dirty=if_dirty)
-                    if r:
-                        if isinstance(r, list):
-                            results.extend(r)
-                        else:
-                            results.append(r)
-                return results
-
         ds = require_dataset(
             dataset, check_installed=True, purpose='uninstall')
 
-        # resolve the target location against the provided dataset
+        if isinstance(path, list):
+            if not len(path):
+                path = None
+        else:
+            path = [path]
         if path is None:
             # AKA "everything"
-            path = ds.path
-        else:
-            # XXX Important to resolve against `dataset` input argument, and
-            # not against the `ds` resolved dataset
-            path = resolve_path(path, dataset)
-            lgr.debug("Resolved uninstallation target: {0}".format(path))
+            path = [ds.path]
+
+        # XXX Important to resolve against `dataset` input argument, and
+        # not against the `ds` resolved dataset
+        path = [resolve_path(p, dataset) for p in path]
 
         # make sure we get to an expected state
         handle_dirty_dataset(ds, if_dirty)
 
-        # needed by the logic below
-        assert(isabs(path))
+        # sort paths into the respective datasets that contain them
+        # considering 1st-level subdatasets at most
+        whocares = {}
+        for p in path:
+            containerds = ds.get_containing_subdataset(p, recursion_limit=1)
+            ps = whocares.get(containerds.path, [])
+            ps.append(p)
+            whocares[containerds.path] = ps
 
-        # express the destination path relative to the root of this dataset
-        relativepath = relpath(path, start=ds.path)
-        if path.startswith(pardir):
-            raise ValueError("uninstallation path outside dataset")
+        if ds.path in whocares:
+            # start with the content of this dataset
+            results.extend(
+                _uninstall(
+                    ds,
+                    whocares[ds.path],
+                    check=check,
+                    force=force,
+                    remove_data=remove_data,
+                    remove_handles=remove_handles,
+                    recursive=recursive))
 
-        lgr.debug(
-            "Resolved uninstallation target relative to dataset {0}: {1}".format(
-                ds, relativepath))
-
-        # figure out, what path actually is pointing to:
-        if not exists(path) and not islink(path):
-            # nothing there, nothing to uninstall
-            lgr.info("Nothing found to uninstall at %s" % path)
-            return
-
-        # pre-compute how far we want to go down still
-        prop_recursion_limit = \
-            None if recursion_limit is None else max(recursion_limit - 1, 0)
-
-        if relativepath in ds.get_subdatasets(recursive=True):
-            # we want to uninstall a subdataset
-            subds = Dataset(opj(ds.path, relativepath))
-            if not subds.is_installed():
-                # TODO not quite true: maybe we want to "unregister" a
-                # subdataset? why would we require to have it installed?
-                raise ValueError("%s is not installed. Can't uninstall." %
-                                 subds.path)
-
-            if data_only or not fast:
-                # uninstall data of subds
-                if isinstance(subds.repo, AnnexRepo):
-                    results.extend(subds.repo.drop(glob.glob1(subds.path, '*')))
-                    if data_only and not recursive:
-                        # all done
-                        return results
-                else:
-                    # can't do anything
-                    if recursive:
-                        lgr.warning("Can't uninstall data of %s. No annex." %
-                                    subds.path)
-                    elif data_only:
-                        raise ValueError("Can't uninstall data of %s. "
-                                         "No annex." % subds.path)
-                    else:
-                        # we want to uninstall the subds and have a meaningless
-                        # 'not fast' => just ignore
-                        pass
-
-            if recursive:
-                for r_sub in subds.get_subdatasets():
-                    lgr.debug("Uninstalling subdataset %s ..." % r_sub)
-                    try:
-                        res = Uninstall.__call__(
-                            dataset=subds,
-                            path=r_sub,
-                            data_only=data_only,
-                            recursive=True,
-                            recursion_limit=prop_recursion_limit,
-                            fast=fast)
-                    except ValueError as e:
-                        if "is not installed" in str(e):
-                            # ignore not installed subdatasets in recursion
-                            lgr.debug("Subdataset %s not installed. Skipped." %
-                                      r_sub)
-                            continue
-                        else:
-                            raise
-                    if res:
-                        if isinstance(res, list):
-                            results.extend(res)
-                        else:
-                            results.append(res)
-
-            if not data_only:
-                # uninstall subds itself
-                # currently this is interpreted as deinitializing the
-                # submodule
-                # TODO: figure out when to completely remove it
-                #       (another command, an additional option?)
-
-                # Note: submodule deinit will fail, if the submodule has a
-                # .git dir. Since this is what we expect, we need to move
-                # it to git's default place within the superproject's
-                # .git/modules dir, in order to cleanly deinit and be able to
-                # reinit again later on.
-                lgr.debug("Move .git directory of %s into .git/modules of %s." %
-                          (relativepath, ds))
-                _move_gitdir(ds, relativepath)
-
-                lgr.debug("Deinit submodule %s in %s" % (relativepath, ds))
-                # TODO: Move to GitRepo and provide proper return value
-                ds.repo._git_custom_command(relativepath,
-                                            ['git', 'submodule', 'deinit'])
-                results.append(subds)
-
-            return results
-
-        if isdir(path):
-            if data_only:
-                if isinstance(ds.repo, AnnexRepo):
-                    return ds.repo.drop(relativepath)
-                else:
-                    raise ValueError("%s is not in annex. Removing its "
-                                 "data only doesn't make sense." % path)
-            else:
-                # git rm -r
-                return ds.repo.remove(relativepath, r=True)
-
-        # we know, it's an existing file
-        if isinstance(ds.repo, AnnexRepo):
-            try:
-                if ds.repo.get_file_key(relativepath):
-                    # it's an annexed file
-                    if data_only:
-                        # drop content
-                        return ds.repo.drop([relativepath])
-                    else:
-                        # remove from repo
-                        ds.repo.remove(relativepath)
-                        return path
-
-            except FileInGitError:
-                # file directly in git
-                _file_in_git = True
-
-            except FileNotInAnnexError:
-                # either an untracked file in this dataset, or something that
-                # also actually exists in the file system but could be part of
-                # a subdataset
-                _untracked_or_within_submodule = True
-
-        else:
-            # plain git repo
-            if relativepath in ds.repo.get_indexed_files():
-                # file directly in git
-                _file_in_git = True
-            else:
-                # either an untracked file in this dataset, or something that
-                # also actually exists in the file system but could be part of
-                # a subdataset
-                _untracked_or_within_submodule = True
-
-        if _file_in_git:
-            if data_only:
-                raise ValueError("%s is not a file handle. Removing its "
-                                 "data only doesn't make sense." % path)
-            else:
-                ds.repo.remove([relativepath])
-                return [relativepath]
-
-        elif _untracked_or_within_submodule:
-            subds = ds.get_containing_subdataset(relativepath)
-            if ds.path != subds.path:
-                # target path belongs to a subdataset, hand uninstallation
-                # over to it
-                return subds.uninstall(
-                    path=relpath(path, start=subds.path),
-                    data_only=data_only,
-                    recursive=recursive,
-                    recursion_limit=prop_recursion_limit,
-                    fast=fast)
-
-            # this must be an untracked/existing something
-            # it wasn't installed, so we cannot uninstall it
-            raise ValueError("Cannot uninstall %s" % path)
+        return results
 
     @staticmethod
     def result_renderer_cmdline(res, args):

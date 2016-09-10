@@ -30,9 +30,7 @@ from ..dataset import Dataset
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
-
-    res = uninstall(dataset=Dataset(path), path='not_existent')
-    ok_(res is None)
+    assert_raises(Exception, uninstall, dataset=Dataset(path), path='not_existent')
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -44,7 +42,7 @@ def test_uninstall_annex_file(path):
     ok_(ds.repo.file_has_content('test-annex.dat'))
 
     # remove file's content:
-    res = ds.uninstall(path='test-annex.dat', data_only=True)
+    res = ds.uninstall(path='test-annex.dat')
     # test it happened:
     ok_(not ds.repo.file_has_content('test-annex.dat'))
     ok_file_under_git(path, 'test-annex.dat', annexed=True)
@@ -54,7 +52,7 @@ def test_uninstall_annex_file(path):
     ds.repo.get('test-annex.dat')
 
     # remove file:
-    ds.uninstall(path='test-annex.dat')
+    ds.uninstall(path='test-annex.dat', remove_handles=True)
     assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
                   annexed=True)
     assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
@@ -70,10 +68,11 @@ def test_uninstall_git_file(path):
     ok_file_under_git(path, 'INFO.txt')
 
     # uninstalling data only doesn't make sense:
-    assert_raises(ValueError, ds.uninstall, path='INFO.txt', data_only=True)
+    # this will only get a warning now
+    #assert_raises(ValueError, ds.uninstall, path='INFO.txt', data_only=True)
 
     # uninstall removes the file:
-    res = ds.uninstall(path='INFO.txt')
+    res = ds.uninstall(path='INFO.txt', remove_handles=True)
     assert_raises(AssertionError, ok_file_under_git, path, 'INFO.txt')
     ok_(not exists(opj(path, 'INFO.txt')))
     eq_(res, ['INFO.txt'])
@@ -93,7 +92,7 @@ def test_uninstall_subdataset(src, dst):
         subds.repo.get(annexed_files)
 
         # uninstall data of subds:
-        res = ds.uninstall(path=subds_path, data_only=True)
+        res = ds.uninstall(path=subds_path)
         ok_(all([f in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
 
