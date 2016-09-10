@@ -110,10 +110,13 @@ def test_uninstall_subdataset(src, dst):
         eq_(listdir(subds.path), [])
 
 
+def test_uninstall_multiple_paths():
+    raise SkipTest("TODO")
+
+
 def test_uninstall_dataset():
     raise SkipTest("TODO")
 
 
 def test_uninstall_recursive():
     raise SkipTest("TODO")
-

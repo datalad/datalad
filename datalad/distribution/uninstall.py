@@ -139,7 +139,7 @@ class Uninstall(Interface):
         if isinstance(path, list):
             for p in path:
                 r = Uninstall.__call__(
-                        dataset=ds,
+                        dataset=dataset,
                         path=p,
                         data_only=data_only,
                         recursive=recursive,
