@@ -161,29 +161,13 @@ class Uninstall(Interface):
             # XXX Important to resolve against `dataset` input argument, and
             # not against the `ds` resolved dataset
             path = resolve_path(path, dataset)
+            lgr.debug("Resolved uninstallation target: {0}".format(path))
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='uninstall')
-        lgr.debug("Resolved target dataset for uninstallation: {0}".format(ds))
 
         # make sure we get to an expected state
         handle_dirty_dataset(ds, if_dirty)
-
-        lgr.debug("Resolved uninstallation target: {0}".format(path))
-
-        if not ds.is_installed():
-            if not path or path == ds.path:
-                # we want to uninstall the dataset itself, which is not
-                # installed => nothing to do
-                # TODO: consider `data` option! is_installed currently only
-                # checks for a repository
-                lgr.info("Dataset {0} not installed. Nothing to "
-                         "do.".format(ds.path))
-                return
-            else:
-                # we want to uninstall something from a not installed dataset
-                # Doesn't make sense, does it? => fail
-                raise ValueError("Dataset {0} is not installed.".format(ds.path))
 
         assert(ds.repo is not None)
 
