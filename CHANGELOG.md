@@ -4,10 +4,19 @@
     | |_| | | (_| | | |_  | (_| | | |___  | (_| | | (_| |
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                Change Log
-                                                      
+
 This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
+
+## 0.3 (???)
+
+Lots of everything, including but not limited to
+
+- enhanced index viewer, as the one on http://datasets.datalad.org
+- initial new data providers support: [Kaggle], [BALSA], [NDA], [NITRC]
+- initial [meta-data support and management]
+- new and/or improved crawler pipelines for [BALSA], [CRCNS], [OpenfMRI]
 
 ### 0.2.3 (Jun 28, 2016) -- busy OHBM
 
@@ -37,3 +46,15 @@ Major RFing to switch from relying on rdf to git native submodules etc
 
 Release primarily focusing on interface functionality including initial
 publishing
+
+
+[Kaggle]: https://www.kaggle.com
+[BALSA]: http://balsa.wustl.edu
+[NDA]: http://data-archive.nimh.nih.gov
+[NITRC]: https://www.nitrc.org
+[CRCNS]: http://crcns.org
+[FCON1000]: http://fcon_1000.projects.nitrc.org
+[OpenfMRI]: http://openfmri.org
+
+[meta-data support and management]: http://datalad.readthedocs.io/en/latest/cmdline.html#meta-data-handling
+
