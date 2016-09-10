@@ -30,7 +30,7 @@ from datalad.utils import rmtree
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
-def _uninstall(ds, paths, check, force, remove_data, remove_handles,
+def _uninstall(ds, paths, check, remove_history, remove_data, remove_handles,
                recursive):
     # all input paths are assumed to belong to the given dataset,
     # and in particular not to any subdataset
@@ -40,6 +40,7 @@ def _uninstall(ds, paths, check, force, remove_data, remove_handles,
 
     if os.curdir in paths:
         # we can take a shortcut if the entire thing goes away
+        lgr.debug('uninstall entire content in {}'.format(ds))
         paths = [os.curdir]
 
     results = []
@@ -61,8 +62,9 @@ def _uninstall(ds, paths, check, force, remove_data, remove_handles,
         return results
 
     if os.curdir in paths:
-        if not force:
-            raise RuntimeError("will not remove an entire dataset unless forced")
+        if not remove_history:
+            raise RuntimeError(
+                "will not remove the entire dataset (with history) unless forced")
         # special mode that makes everything disappear, including subdatasets
         for subds in ds.get_subdatasets(
                 fulfilled=True, recursive=True, recursion_limit=1):
@@ -75,7 +77,7 @@ def _uninstall(ds, paths, check, force, remove_data, remove_handles,
                     Dataset(subds),
                     [subds],
                     check=check,
-                    force=force,
+                    remove_history=remove_history,
                     remove_data=True,
                     # we always want everything to go at this point
                     remove_handles=True,
@@ -127,8 +129,8 @@ class Uninstall(Interface):
             doc="""""",
             action="store_false",
             dest='check'),
-        force=Parameter(
-            args=("--force",),
+        remove_history=Parameter(
+            args=("--remove-history",),
             doc="""""",
             action="store_true",),
         if_dirty=if_dirty_opt,
@@ -142,8 +144,8 @@ class Uninstall(Interface):
             remove_data=True,
             remove_handles=False,
             recursive=False,
+            remove_history=False,
             check=True,
-            force=False,
             if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
@@ -189,18 +191,33 @@ class Uninstall(Interface):
         whocares = {}
         for p in path:
             containerds = ds.get_containing_subdataset(p, recursion_limit=1)
-            ps = whocares.get(containerds.path, [])
+            ps = whocares.get(containerds, [])
             ps.append(p)
-            whocares[containerds.path] = ps
+            whocares[containerds] = ps
 
-        if ds.path in whocares:
-            # start with the content of this dataset
+        if ds in whocares:
+            # start with the content of this dataset, as any somewhat
+            # total recursive removal here would have most impact
+            lgr.debug("Uninstall content in {}".format(ds))
             results.extend(
                 _uninstall(
                     ds,
-                    whocares[ds.path],
+                    whocares[ds],
                     check=check,
-                    force=force,
+                    remove_history=remove_history,
+                    remove_data=remove_data,
+                    remove_handles=remove_handles,
+                    recursive=recursive))
+        # now deal with any other subdataset
+        for subds in whocares:
+            if subds == ds:
+                continue
+            results.extend(
+                _uninstall(
+                    subds,
+                    whocares[subds],
+                    check=check,
+                    remove_history=remove_history,
                     remove_data=remove_data,
                     remove_handles=remove_handles,
                     recursive=recursive))

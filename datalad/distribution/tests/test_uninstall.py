@@ -30,7 +30,12 @@ from ..dataset import Dataset
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
-    assert_raises(Exception, uninstall, dataset=Dataset(path), path='not_existent')
+    ds = Dataset(path)
+    # TODO make these two cases uniform
+    if hasattr(ds.repo, 'drop'):
+        assert_raises(Exception, uninstall, dataset=ds, path='not_existent')
+    else:
+        eq_(uninstall(dataset=ds, path='not_existent'), [])
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -98,11 +103,11 @@ def test_uninstall_subdataset(src, dst):
 
     for subds_path in ds.get_subdatasets():
         # uninstall subds itself:
-        res = ds.uninstall(path=subds_path)
+        res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True)
         subds = Dataset(opj(ds.path, subds_path))
         eq_(res[0], subds)
         ok_(not subds.is_installed())
-        eq_(listdir(subds.path), [])
+        ok_(not exists(subds.path))
 
 
 def test_uninstall_multiple_paths():
