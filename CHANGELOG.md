@@ -1,0 +1,39 @@
+     ____            _             _                   _ 
+    |  _ \    __ _  | |_    __ _  | |       __ _    __| |
+    | | | |  / _` | | __|  / _` | | |      / _` |  / _` |
+    | |_| | | (_| | | |_  | (_| | | |___  | (_| | | (_| |
+    |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
+                                               Change Log
+                                                      
+This is a very high level and scarce summary of the changes between releases.
+We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
+for more details ATM.
+
+### 0.2.3 (Jun 28, 2016) -- busy OHBM
+
+New features and bugfix release
+
+- support of /// urls to point to http://datasets.datalad.org
+- variety of fixes and enhancements throughout
+
+### 0.2.2 (Jun 20, 2016) -- OHBM we are coming!
+
+New feature and bugfix release
+
+- greately improved documentation
+- publish command API RFing allows for custom options to annex, and uses
+  --to REMOTE for consistent with annex invocation
+- variety of fixes and enhancements throughout
+
+### 0.2.1 (Jun 10, 2016)
+
+- variety of fixes and enhancements throughout
+
+## 0.2 (May 20, 2016)
+
+Major RFing to switch from relying on rdf to git native submodules etc
+
+## 0.1 (Oct 14, 2015)
+
+Release primarily focusing on interface functionality including initial
+publishing
