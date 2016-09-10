@@ -10,7 +10,7 @@ Last-Update: 2016-05-20
 
 --- a/setup.py
 +++ b/setup.py
-@@ -42,6 +45,11 @@ if dist[0] == 'debian' and dist[1].split
+@@ -40,6 +40,11 @@ if dist[0] == 'debian' and dist[1].split
      keyring_requires = ['keyring<8.0']
      pbar_requires = ['progressbar']
  
