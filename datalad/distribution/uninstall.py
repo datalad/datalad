@@ -15,9 +15,8 @@ __docformat__ = 'restructuredtext'
 import logging
 import glob
 
-from os.path import join as opj, abspath, exists, isabs, relpath, pardir, isdir
+from os.path import join as opj, exists, isabs, relpath, pardir, isdir
 from os.path import islink
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -28,6 +27,7 @@ from datalad.distribution.dataset import Dataset, EnsureDataset, \
 from datalad.distribution.install import get_git_dir
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.utils import assure_dir
 
@@ -106,11 +106,8 @@ class Uninstall(Interface):
             args=("--data-only",),
             doc="if set, only data is uninstalled, but the handles are kept",
             action="store_true"),
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            doc="""if set, uninstall recursively, including all subdatasets.
-            The value of `data` is used for recursive uninstallation, too""",
-            action="store_true"),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
         fast=Parameter(
             args=("--fast",),
             doc="when uninstalling (sub-)datasets, don't try uninstalling its "
@@ -122,8 +119,14 @@ class Uninstall(Interface):
 
     @staticmethod
     @datasetmethod(name='uninstall')
-    def __call__(path=None, dataset=None, data_only=False, recursive=False,
-                 fast=False, if_dirty='save-before'):
+    def __call__(
+            path=None,
+            dataset=None,
+            data_only=False,
+            recursive=False,
+            recursion_limit=None,
+            fast=False,
+            if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
         if dataset is None and not path:
@@ -143,12 +146,13 @@ class Uninstall(Interface):
             else:
                 for p in path:
                     r = Uninstall.__call__(
-                            dataset=dataset,
-                            path=p,
-                            data_only=data_only,
-                            recursive=recursive,
-                            fast=fast,
-                            if_dirty=if_dirty)
+                        dataset=dataset,
+                        path=p,
+                        data_only=data_only,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        fast=fast,
+                        if_dirty=if_dirty)
                     if r:
                         if isinstance(r, list):
                             results.extend(r)
@@ -190,6 +194,10 @@ class Uninstall(Interface):
             lgr.info("Nothing found to uninstall at %s" % path)
             return
 
+        # pre-compute how far we want to go down still
+        prop_recursion_limit = \
+            None if recursion_limit is None else max(recursion_limit - 1, 0)
+
         if relativepath in ds.get_subdatasets(recursive=True):
             # we want to uninstall a subdataset
             subds = Dataset(opj(ds.path, relativepath))
@@ -222,11 +230,12 @@ class Uninstall(Interface):
                     lgr.debug("Uninstalling subdataset %s ..." % r_sub)
                     try:
                         res = Uninstall.__call__(
-                                dataset=subds,
-                                path=r_sub,
-                                data_only=data_only,
-                                recursive=True,
-                                fast=fast)
+                            dataset=subds,
+                            path=r_sub,
+                            data_only=data_only,
+                            recursive=True,
+                            recursion_limit=prop_recursion_limit,
+                            fast=fast)
                     except ValueError as e:
                         if "is not installed" in str(e):
                             # ignore not installed subdatasets in recursion
@@ -327,6 +336,7 @@ class Uninstall(Interface):
                     path=relpath(path, start=subds.path),
                     data_only=data_only,
                     recursive=recursive,
+                    recursion_limit=prop_recursion_limit,
                     fast=fast)
 
             # this must be an untracked/existing something
