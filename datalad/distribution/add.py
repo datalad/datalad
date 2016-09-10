@@ -141,10 +141,6 @@ class Add(Interface):
         if source and not isinstance(source, list):
             source = [source]
 
-        # resolve dataset:
-        dataset = require_dataset(dataset, check_installed=True,
-                                  purpose='adding')
-
         # TODO: Q: are the list operations in the following 3 blocks (resolving
         #          paths, sources and datasets) guaranteed to be stable
         #          regarding order?
@@ -154,6 +150,11 @@ class Add(Interface):
         resolved_paths = []
         if path:
             resolved_paths = [resolve_path(p, dataset) for p in path]
+
+        # must come after resolve_path()!!
+        # resolve dataset:
+        dataset = require_dataset(dataset, check_installed=True,
+                                  purpose='adding')
 
         # resolve source(s):
         resolved_sources = []
