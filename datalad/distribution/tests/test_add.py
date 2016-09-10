@@ -125,6 +125,13 @@ def test_add_recursive(path):
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
 
 
+@with_tree(**tree_arg)
+def test_relpath_add(path):
+    Dataset(path).create(force=True)
+    with chpwd(opj(path, 'dir')):
+        eq_(add('testindir')[0]['file'], opj('dir', 'testindir'))
+
+
 @with_tree(tree={'file1.txt': 'whatever 1',
                  'file2.txt': 'whatever 2',
                  'file3.txt': 'whatever 3',
