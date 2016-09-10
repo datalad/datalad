@@ -17,9 +17,11 @@ from os.path import isdir
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
+from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -110,6 +112,7 @@ class Add(Interface):
             transport"""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        save=nosave_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts)
@@ -121,6 +124,7 @@ class Add(Interface):
             source=None,
             dataset=None,
             to_git=False,
+            save=True,
             recursive=False,
             recursion_limit=None,
             git_opts=None,
@@ -285,6 +289,15 @@ class Add(Interface):
                                                 git_options=git_opts,
                                                 annex_options=annex_opts,
                                                 batch=True))
+
+        if save and len(return_values):
+            # we got something added -> save
+            # everything we care about at this point should be staged already
+            Save.__call__(
+                message='[DATALAD] added content',
+                dataset=ds,
+                auto_add_changes=False,
+                recursive=False)
 
         return return_values
 

@@ -91,3 +91,10 @@ if_dirty_opt = Parameter(
     'save-before' will save all changes prior any further action;
     'ignore' let's datalad proceed as if the dataset would not have unsaved
     changes.""")
+
+nosave_opt = Parameter(
+    args=("--nosave",),
+    dest='save',
+    action="store_false",
+    doc="""by default all modifications to a dataset are immediately saved. Given
+    this option will disable this behavior.""")
