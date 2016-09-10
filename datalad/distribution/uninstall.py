@@ -22,12 +22,14 @@ from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
-    datasetmethod, resolve_path
+    datasetmethod, resolve_path, require_dataset
 from datalad.distribution.install import get_git_dir
 from datalad.interface.base import Interface
-from datalad.utils import assure_dir, on_windows
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.utils import handle_dirty_dataset
+from datalad.utils import assure_dir
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -114,35 +116,35 @@ class Uninstall(Interface):
             doc="when uninstalling (sub-)datasets, don't try uninstalling its "
                 "data first. Warning: This will silently ignore any issue "
                 "regarding the uninstallation of contained data.",
-            action="store_true",))
+            action="store_true",),
+        if_dirty=if_dirty_opt,
+    )
 
     @staticmethod
     @datasetmethod(name='uninstall')
     def __call__(path=None, dataset=None, data_only=False, recursive=False,
-                 fast=False):
+                 fast=False, if_dirty='save-before'):
 
-        # Note: copy logic from install to resolve dataset and path:
-        # shortcut
-        ds = dataset
+        # upfront check prior any resolution attempt to avoid disaster
+        if dataset is None and path is None:
+            raise InsufficientArgumentsError(
+                "insufficient information for uninstallation (needs at "
+                "least a dataset or a path. To uninstall an entire dataset, "
+                "it needs to be given explicitly.")
+
         results = []
 
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-
-        if not path:
-            if ds is None:
-                # no dataset, no target location, nothing to do
-                raise InsufficientArgumentsError(
-                    "insufficient information for uninstallation (needs at "
-                    "least a dataset or a path")
-        elif isinstance(path, list):
+        # deal with multiple paths
+        # TODO batch properly
+        if isinstance(path, list):
             for p in path:
                 r = Uninstall.__call__(
                         dataset=ds,
                         path=p,
                         data_only=data_only,
                         recursive=recursive,
-                        fast=fast)
+                        fast=fast,
+                        if_dirty=if_dirty)
                 if r:
                     if isinstance(r, list):
                         results.extend(r)
@@ -152,24 +154,18 @@ class Uninstall(Interface):
 
         # resolve the target location against the provided dataset
         if path is not None:
-            path = resolve_path(path, ds)
+            # XXX Important to resolve against `dataset` input argument, and
+            # not against the `ds` resolved dataset
+            path = resolve_path(path, dataset)
+
+        ds = require_dataset(
+            dataset, check_installed=True, purpose='uninstall')
+        lgr.debug("Resolved target dataset for uninstallation: {0}".format(ds))
+
+        # make sure we get to an expected state
+        handle_dirty_dataset(ds, if_dirty)
 
         lgr.debug("Resolved uninstallation target: {0}".format(path))
-
-        # if we have no dataset given, figure out which one we need to operate
-        # on, based on the resolved target location (that is now guaranteed to
-        # be specified
-        if ds is None:
-            # try to find a dataset at or above the uninstallation target
-            dspath = GitRepo.get_toppath(abspath(path))
-            if dspath is None:
-                # no top-level dataset found, nothing to uninstall from
-                raise ValueError("No dataset found to uninstall %s from." %
-                                 path)
-            ds = Dataset(dspath)
-        assert(ds is not None)
-
-        lgr.debug("Resolved target dataset for uninstallation: {0}".format(ds))
 
         if not ds.is_installed():
             if not path or path == ds.path:

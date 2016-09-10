@@ -29,7 +29,6 @@ from ..dataset import Dataset
 
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
-
     assert_raises(InsufficientArgumentsError, uninstall)
 
     res = uninstall(dataset=Dataset(path), path='not_existent')
