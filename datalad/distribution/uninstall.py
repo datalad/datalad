@@ -137,20 +137,24 @@ class Uninstall(Interface):
         # deal with multiple paths
         # TODO batch properly
         if isinstance(path, list):
-            for p in path:
-                r = Uninstall.__call__(
-                        dataset=dataset,
-                        path=p,
-                        data_only=data_only,
-                        recursive=recursive,
-                        fast=fast,
-                        if_dirty=if_dirty)
-                if r:
-                    if isinstance(r, list):
-                        results.extend(r)
-                    else:
-                        results.append(r)
-            return results
+            if not len(path):
+                # simplify logic further down
+                path = None
+            else:
+                for p in path:
+                    r = Uninstall.__call__(
+                            dataset=dataset,
+                            path=p,
+                            data_only=data_only,
+                            recursive=recursive,
+                            fast=fast,
+                            if_dirty=if_dirty)
+                    if r:
+                        if isinstance(r, list):
+                            results.extend(r)
+                        else:
+                            results.append(r)
+                return results
 
         # resolve the target location against the provided dataset
         if path is not None:
