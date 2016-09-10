@@ -137,6 +137,16 @@ class Uninstall(Interface):
 
         results = []
 
+        # general RF TODO:
+        # - sort files into the respective subdatasets
+        # - fail if recursive is needed and not given
+        # - start removing from the top (i.e. not individual files
+        #   in some subdatasets that might get removed completely
+        #   in the end
+        # - always drop data-content first (if annexed)
+        #   try to have annex do that without expensive check if desired
+        # - subsequently delete/unregister as necessary
+
         # deal with multiple paths
         # TODO batch properly
         if isinstance(path, list):
@@ -202,6 +212,8 @@ class Uninstall(Interface):
             # we want to uninstall a subdataset
             subds = Dataset(opj(ds.path, relativepath))
             if not subds.is_installed():
+                # TODO not quite true: maybe we want to "unregister" a
+                # subdataset? why would we require to have it installed?
                 raise ValueError("%s is not installed. Can't uninstall." %
                                  subds.path)
 
