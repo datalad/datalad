@@ -15,9 +15,11 @@ from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import find_files
+from ..nodes.misc import sub
 from ..nodes.misc import skip_if
 from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
+from ...support.strings import get_replacement_dict
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -28,7 +30,7 @@ lgr = getLogger("datalad.crawler.pipelines.crcns")
 def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
-    annex = Annexificator()
+    annex = Annexificator(no_annex=True)
     return [
         crawl_url("http://crcns.org/data-sets",
             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
@@ -44,7 +46,7 @@ def superdataset_pipeline():
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc
-            existing='adjust',
+            existing='skip',
             # further any additional options
         )
     ]
@@ -61,8 +63,22 @@ def extract_readme(data):
     yield {'filename': "README.txt"}
 
 
-def pipeline(dataset, dataset_category, versioned_urls=False):
+# we might need to explicitly specify for some datasets to use_current_dir since
+# archives are already carrying the leading directory anyways...
+# actually probably wouldn't scale since within the same dataset we might need
+# some tarballs extracted one way, some other... so we might better rely on
+# stripping dirs in general BUT need to provide some sophistication, e.g. strip
+# iff directory matches archive name (without archive suffix)
+# hc-3 dataset is a good example of a mix etc... or may be just a parameter for
+# how many to strip (currently 2), but then we need to take care bout converting
+# if provided as a str from config
+def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
+             data_origin='checksums', use_current_dir=False,
+             leading_dirs_depth=2, rename=None):
     """Pipeline to crawl/annex an crcns dataset"""
+
+    if not isinstance(leading_dirs_depth, int):
+        leading_dirs_depth = int(leading_dirs_depth)
 
     dataset_url = 'http://crcns.org/data-sets/{dataset_category}/{dataset}'.format(**locals())
     lgr.info("Creating a pipeline for the crcns dataset %s" % dataset)
@@ -81,6 +97,30 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
     )
 
     crawler = crawl_url(dataset_url)
+    if data_origin == 'checksums':
+        urls_pipe = [   # Download from NERSC
+            # don't even bother finding the link (some times only in about, some times also on the main page
+            # just use https://portal.nersc.gov/project/crcns/download/<dataset_id>
+            # actually to not mess with crawling a custom index let's just go by checksums.md5
+            crawl_url("https://portal.nersc.gov/project/crcns/download/{dataset}/checksums.md5".format(**locals())),
+            parse_checksums(digest='md5'),
+            # they all contain filelist and checksums.md5 which we can make use of without explicit crawling
+            # no longer valid
+            # TODO:  do not download checksums.md (annex would do it) and filelist.txt (includes download
+            #   instructions which might confuse, not help)
+            skip_if({'url': '(checksums.md5|filelist.txt)$'}, re=True),
+        ]
+    elif data_origin == 'urls':
+        urls_pipe = [ # Download all the archives found on the project page
+            crawler,
+            a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
+        ]
+    else:
+        raise ValueError(data_origin)
+
+    if rename:
+        urls_pipe += [sub({'filename': get_replacement_dict(rename)})]
+
     return [
         annex.switch_branch('incoming'),
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
@@ -94,37 +134,29 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
             #     extract_readme,
             #     annex,
             # ],
-            [   # Download from NERSC
-                # don't even bother finding the link (some times only in about, some times also on the main page
-                # just use https://portal.nersc.gov/project/crcns/download/<dataset_id>
-                # actually to not mess with crawling a custom index let's just go by checksums.md5
-                crawl_url("https://portal.nersc.gov/project/crcns/download/{dataset}/checksums.md5".format(**locals())),
-                parse_checksums(digest='md5'),
-                # they all contain filelist and checksums.md5 which we can make use of without explicit crawling
-                # no longer valid
-                # TODO:  do not download checksums.md (annex would do it) and filelist.txt (includes download
-                #   instructions which might confuse, not help)
-                skip_if({'url': '(checksums.md5|filelist.txt)$'}, re=True),
+            urls_pipe + [
                 annex,
             ],
         ],
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            annex.merge_branch('incoming', strategy='theirs', commit=False),
+            annex.merge_branch('incoming', strategy='theirs', commit=False),  #, skip_no_changes=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=tarballs),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
                     strip_leading_dirs=True,
                     delete=True,
                     leading_dirs_consider=['crcns.*', dataset],
-                    leading_dirs_depth=2,
+                    leading_dirs_depth=leading_dirs_depth,
+                    use_current_dir=use_current_dir,
+                    rename=rename,
                     exclude='.*__MACOSX.*',  # some junk penetrates
                 ),
             ],
         ],
         annex.switch_branch('master'),
-        annex.merge_branch('incoming-processed'),
+        annex.merge_branch('incoming-processed', allow_unrelated=True),
         annex.finalize(cleanup=True),
     ]

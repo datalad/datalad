@@ -58,6 +58,10 @@ try:
         else:
             return _use_cassette(path, **kwargs)  # just a straight one
 
+    # shush vcr
+    vcr_lgr = logging.getLogger('vcr')
+    if lgr.getEffectiveLevel() > logging.DEBUG:
+        vcr_lgr.setLevel(logging.WARN)
 except Exception as exc:
     if not isinstance(exc, ImportError):
         # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
@@ -82,6 +86,7 @@ def externals_use_cassette(name):
     but want to minimize their network traffic by using vcr.py
     """
     from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
+    cassette_path = realpath(_get_cassette_path(name))  # realpath OK
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': cassette_path}):
         yield
 

@@ -27,17 +27,21 @@ demo_doc = """\
     ping pong ping pong ping pong. Ping pong ping pong ping pong ping pong. Ping
     pong ping pong ping pong ping pong.
 
-    || Command line use only >>
-    Something for the cmdline only CMDONLY
+    || CMDLINE >>
+    || REFLOW >>
+    Something for the cmdline only
     Multiline!
-    << Command line use only ||
+    << REFLOW ||
+    << CMDLINE ||
 
-    || Python use only >>
+    || PYTHON >>
 
-    Some Python-only bits PYONLY
+    || REFLOW >>
+    Some Python-only bits
     Multiline!
+    << REFLOW ||
 
-    << Python use only ||
+    << PYTHON ||
 
     And an example for in-line markup: [PY: just for Python PY] and
     the other one [CMD: just for the command line CMD]. End of demo.
@@ -53,10 +57,8 @@ demo_paramdoc = """\
     Parameters
     ----------
     dataset : Dataset or None, optional
-      specify the dataset to perform the install operation on. If no
+      something [PY: python only PY] inbetween [CMD: cmdline only CMD] appended [PY: more python PY]
       dataset is given, an attempt is made to identify the dataset based
-      on the current working directory and/or the `path` given.
-      Constraints: Value must be a Dataset or a valid identifier of a
       Dataset (e.g. a path), or value must be `None`. [Default: None]
 """
 
@@ -82,7 +84,15 @@ def test_alter_interface_docs_for_api():
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('CMD', alt)
-    assert_not_in('Command line', alt)
+    assert_not_in('PY', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Some Python-only bits Multiline!", alt)
+
+    altpd = alter_interface_docs_for_api(demo_paramdoc)
+    assert_in('python', altpd)
+    assert_in('inbetween', altpd)
+    assert_in('appended', altpd)
+    assert_not_in('cmdline', altpd)
 
 
 def test_alter_interface_docs_for_cmdline():
@@ -92,7 +102,9 @@ def test_alter_interface_docs_for_cmdline():
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('PY', alt)
-    assert_not_in('Python', alt)
+    assert_not_in('CMD', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Something for the cmdline only Multiline!", alt)
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
     # RST role markup
@@ -105,3 +117,9 @@ def test_alter_interface_docs_for_cmdline():
     eq_(alter_interface_docs_for_cmdline(
         ':term:`one` bla bla :term:`two` bla'),
         'one bla bla two bla')
+
+    altpd = alter_interface_docs_for_cmdline(demo_paramdoc)
+    assert_not_in('python', altpd)
+    assert_in('inbetween', altpd)
+    assert_in('appended', altpd)
+    assert_in('cmdline', altpd)

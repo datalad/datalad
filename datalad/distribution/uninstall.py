@@ -25,7 +25,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, resolve_path
-from datalad.distribution.install import get_containing_subdataset, get_git_dir
+from datalad.distribution.install import get_git_dir
 from datalad.interface.base import Interface
 from datalad.utils import assure_dir, on_windows
 
@@ -118,7 +118,7 @@ class Uninstall(Interface):
 
     @staticmethod
     @datasetmethod(name='uninstall')
-    def __call__(dataset=None, path=None, data_only=False, recursive=False,
+    def __call__(path=None, dataset=None, data_only=False, recursive=False,
                  fast=False):
 
         # Note: copy logic from install to resolve dataset and path:
@@ -307,11 +307,7 @@ class Uninstall(Interface):
                                  "data only doesn't make sense." % path)
             else:
                 # git rm -r
-                # TODO: Move to GitRepo and integrate with remove()
-                std_out, std_err = ds.repo._git_custom_command(
-                    relativepath, ['git', 'rm', '-r'])
-                return [line.split()[1][1:-1] for line in std_out.splitlines()
-                        if line.startswith('rm')]
+                return ds.repo.remove(relativepath, r=True)
 
         # we know, it's an existing file
         if isinstance(ds.repo, AnnexRepo):
@@ -356,7 +352,7 @@ class Uninstall(Interface):
                 return [relativepath]
 
         elif _untracked_or_within_submodule:
-            subds = get_containing_subdataset(ds, relativepath)
+            subds = ds.get_containing_subdataset(relativepath)
             if ds.path != subds.path:
                 # target path belongs to a subdataset, hand uninstallation
                 # over to it
@@ -371,7 +367,7 @@ class Uninstall(Interface):
             raise ValueError("Cannot uninstall %s" % path)
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if not res:
             ui.message("Nothing was uninstalled")

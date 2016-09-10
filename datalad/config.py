@@ -129,7 +129,7 @@ class ConfigManager(SafeConfigParserWithIncludes, object):
             cfg_file_candidates.append(opj(home_cfg_base_path, 'datalad.cfg'))
 
         # current dir config
-        cfg_file_candidates.append(opj('.datalad', 'config'))
+        cfg_file_candidates.append('datalad.cfg')
         return cfg_file_candidates
 
     def _get_file_candidates(self):

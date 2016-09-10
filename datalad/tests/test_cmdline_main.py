@@ -66,8 +66,7 @@ def test_version():
 
 
 def test_help_np():
-    with patch.dict('os.environ', {'DATALAD_HELP2MAN': '1'}):
-        stdout, stderr = run_main(['--help-np'])
+    stdout, stderr = run_main(['--help-np'])
 
     # Let's extract section titles:
     # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
@@ -79,6 +78,7 @@ def test_help_np():
     # thus testing sets
     assert_equal(set(sections),
                  {'Commands for dataset operations',
+                  'Commands for meta data handling',
                   'Miscellaneous commands',
                   'General information',
                   'Global options'})

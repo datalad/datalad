@@ -32,7 +32,9 @@ if lexists(opj(projdir, '.git')):
         line = git.stdout.readlines()[0]
         _ = git.stderr.readlines()
         # Just take describe and replace initial '-' with .dev to be more "pythonish"
-        __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1)
+        # Encoding simply because distutils' LooseVersion compares only StringType
+        # and thus misses in __cmp__ necessary wrapping for unicode strings
+        __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
         # To follow PEP440 we can't have all the git fanciness
         __version__ = __full_version__.split('-')[0]
     except:

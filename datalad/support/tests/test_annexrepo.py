@@ -10,6 +10,9 @@
 
 """
 
+from functools import partial
+from os import mkdir
+
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
@@ -33,7 +36,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
-    with swallow_logs() as cm:
+    with swallow_logs(new_level=logging.WARN) as cm:
         assert_raises(GitCommandError, AnnexRepo, dst, src)
         if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)
@@ -99,6 +102,24 @@ def test_AnnexRepo_is_direct_mode(path):
         assert_false(dm)
 
 
+@with_tempfile()
+def test_AnnexRepo_is_direct_mode_gitrepo(path):
+    repo = GitRepo(path, create=True)
+    # artificially make .git/annex so no annex section gets initialized
+    # in .git/config.  We did manage somehow to make this happen (via publish)
+    # but didn't reproduce yet, so just creating manually
+    mkdir(opj(repo.path, '.git', 'annex'))
+    ar = AnnexRepo(path, init=False, create=False)
+    # It is unlikely though that annex would be in direct mode (requires explicit)
+    # annex magic, without having annex section under .git/config
+    dm = ar.is_direct_mode()
+
+    if ar.is_crippled_fs() or on_windows:
+        assert_true(dm)
+    else:
+        assert_false(dm)
+
+
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
 @with_tempfile
@@ -124,6 +145,14 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
     ar.set_direct_mode(True)
     ok_clean_git_annex_proxy(path=annex_path)
 
+    # annex proxy raises in indirect mode:
+    try:
+        ar.set_direct_mode(False)
+        assert_raises(CommandNotAvailableError, ar.proxy, ['git', 'status'])
+    except CommandNotAvailableError:
+        # we can't switch to indirect
+        pass
+
 
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
@@ -148,22 +177,24 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
 
 # 1 is enough to test file_has_content
+@with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_file_has_content(src, annex_path):
-    ar = AnnexRepo(annex_path, src)
+def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
+    ar = AnnexRepo(annex_path, src, direct=direct)
     testfiles = ["test-annex.dat", "test.dat"]
+
     assert_equal(ar.file_has_content(testfiles), [False, False])
 
     ok_annex_get(ar, "test-annex.dat")
-    assert_equal(ar.file_has_content(testfiles), [True, False])
-    assert_equal(ar.file_has_content(testfiles[:1]), [True])
+    assert_equal(ar.file_has_content(testfiles, batch=batch), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1], batch=batch), [True])
 
-    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
+    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"], batch=batch),
                  [True, False, False])
 
-    assert_false(ar.file_has_content("bogus.txt"))
-    assert_true(ar.file_has_content("test-annex.dat"))
+    assert_false(ar.file_has_content("bogus.txt", batch=batch))
+    assert_true(ar.file_has_content("test-annex.dat", batch=batch))
 
 
 # 1 is enough to test
@@ -191,17 +222,6 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
 
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     assert_true(ar.is_under_annex("test-annex.dat", batch=batch))
-
-
-def test_AnnexRepo_options_decorator():
-
-    @kwargs_to_options
-    def decorated(self, whatever, options=[]):
-        return options
-
-    # Order is not guaranteed so use sets
-    assert_equal(set(decorated(1, 2, someoption='first', someotheroption='second')),
-                 {' --someoption=first', ' --someotheroption=second'})
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
@@ -241,20 +261,25 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     ldesc = ar.whereis(testfile, output='descriptions')
     assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))
 
-    # info
-    info = ar.info(testfile)
-    assert_equal(info['size'], 14)
-    assert(info['key'])  # that it is there
-    info_batched = ar.info(testfile, batch=True)
-    assert_equal(info, info_batched)
-    # while at it ;)
-    assert_equal(ar.info('nonexistent', batch=False), None)
-    assert_equal(ar.info('nonexistent', batch=True), None)
+    # info w/ and w/o fast mode
+    for fast in [True, False]:
+        info = ar.info(testfile, fast=fast)
+        assert_equal(info['size'], 14)
+        assert(info['key'])  # that it is there
+        info_batched = ar.info(testfile, batch=True, fast=fast)
+        assert_equal(info, info_batched)
+        # while at it ;)
+        assert_equal(ar.info('nonexistent', batch=False), None)
+        assert_equal(ar.info('nonexistent', batch=True), None)
 
     # annex repo info
-    repo_info = ar.repo_info()
+    repo_info = ar.repo_info(fast=False)
     assert_equal(repo_info['local annex size'], 14)
     assert_equal(repo_info['backend usage'], {'SHA256E': 1})
+    # annex repo info in fast mode
+    repo_info_fast = ar.repo_info(fast=True)
+    # doesn't give much testable info, so just comparing a subset for match with repo_info info
+    assert_equal(repo_info_fast['semitrusted repositories'], repo_info['semitrusted repositories'])
     #import pprint; pprint.pprint(repo_info)
 
     # remove the remote
@@ -340,7 +365,6 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         # Should maintain original relative file names
         assert_equal(set(info2_), set(testfiles))
         assert_equal(info2_[cur_subfile]['size'], 10)
-
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
@@ -550,9 +574,7 @@ def test_AnnexRepo_commit(src, path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    # TODO: Ths wrong now, since add will annex_add in that case
-    # => assertions insufficient!
-    ds.add(filename)
+    ds.add(filename, git=True)
 
     if ds.is_direct_mode():
         assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
@@ -928,6 +950,39 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     ok_(exists(socket_2))
 
 
+@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile(mkdir=True)
+def test_annex_remove(path1, path2):
+    ar1 = AnnexRepo(path1, create=False)
+    ar2 = AnnexRepo(path2, path1, create=True, direct=True)
+
+    for repo in (ar1, ar2):
+        file_list = repo.get_annexed_files()
+        assert len(file_list) >= 1
+        # remove a single file
+        out = repo.remove(file_list[0])
+        assert_not_in(file_list[0], repo.get_annexed_files())
+        eq_(out[0], file_list[0])
+
+        with open(opj(repo.path, "rm-test.dat"), "w") as f:
+            f.write("whatever")
+
+        # add it
+        repo.add("rm-test.dat")
+
+        # remove without '--force' should fail, due to staged changes:
+        if repo.is_direct_mode():
+            assert_raises(CommandError, repo.remove, "rm-test.dat")
+        else:
+            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+        assert_in("rm-test.dat", repo.get_annexed_files())
+
+        # now force:
+        out = repo.remove("rm-test.dat", force=True)
+        assert_not_in("rm-test.dat", repo.get_annexed_files())
+        eq_(out[0], "rm-test.dat")
+
+
 @with_tempfile
 def test_repo_version(path):
     annex = AnnexRepo(path, create=True, version=6)
@@ -990,6 +1045,7 @@ def test_annex_drop(src, dst):
     # too much arguments:
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
 
+
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_annex_remove(path1, path2):
@@ -1022,3 +1078,73 @@ def test_annex_remove(path1, path2):
         assert_not_in("rm-test.dat", repo.get_annexed_files())
         eq_(out[0], "rm-test.dat")
 
+
+@with_batch_direct
+@with_testrepos('basic_annex', flavors=['clone'], count=1)
+def test_is_available(batch, direct, p):
+    annex = AnnexRepo(p)
+
+    # bkw = {'batch': batch}
+    if batch:
+        is_available = partial(annex.is_available, batch=batch)
+    else:
+        is_available = annex.is_available
+
+    fname = 'test-annex.dat'
+    key = annex.get_file_key(fname)
+
+    # explicit is to verify data type etc
+    assert is_available(key, key=True) is True
+    assert is_available(fname) is True
+
+    # known remote but doesn't have it
+    assert is_available(fname, remote='origin') is False
+    # it is on the 'web'
+    assert is_available(fname, remote='web') is True
+    # not effective somehow :-/  may be the process already running or smth
+    #with swallow_logs(), swallow_outputs():  # it will complain!
+    assert is_available(fname, remote='unknown') is False
+    assert_false(is_available("boguskey", key=True))
+
+    # remove url
+    urls = annex.get_urls(fname) #, **bkw)
+    assert(len(urls) == 1)
+    annex.rm_url(fname, urls[0])
+
+    assert is_available(key, key=True) is False
+    assert is_available(fname) is False
+    assert is_available(fname, remote='web') is False
+
+
+@with_tempfile(mkdir=True)
+def test_annex_add_no_dotfiles(path):
+    ar = AnnexRepo(path, create=True)
+    print(ar.path)
+    assert_true(os.path.exists(ar.path))
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    os.makedirs(opj(ar.path, '.datalad'))
+    # we don't care about empty directories
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
+        f.write('some content')
+    # make sure the repo is considered dirty now
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # no file is being added, as dotfiles/directories are ignored by default
+    ar.add('.', git=False)
+    # double check, still dirty
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # now add to git, and it should work
+    ar.add('.', git=True)
+    # all in index
+    assert_false(ar.repo.is_dirty(
+        index=False, working_tree=True, untracked_files=True, submodules=True))
+    ar.commit(msg="some")
+    # all committed
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    # not known to annex
+    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))

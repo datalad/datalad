@@ -23,6 +23,7 @@ _group_dataset = (
         # src module can be relative, but has to be relative to the main 'datalad' package
         ('datalad.distribution.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
+        ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall'),
         # N/I ATM
@@ -38,17 +39,27 @@ _group_dataset = (
         ('datalad.interface.save', 'Save', 'save'),
     ])
 
+_group_metadata = (
+    'Commands for meta data handling',
+    [
+        ('datalad.metadata.search_datasets', 'SearchDatasets',
+         'search-datasets', 'search_datasets'),
+        ('datalad.metadata.aggregate', 'AggregateMetaData',
+         'aggregate-metadata', 'aggregate_metadata'),
+    ])
+
 _group_misc = (
     'Miscellaneous commands',
     [
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.crawl', 'Crawl'),
+        ('datalad.interface.crawl_init', 'CrawlInit', 'crawl-init'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         # very optional ones
-        ('datalad.distribution.tests.create_test_dataset', 'CreateTestDataset',
+        ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
     ])

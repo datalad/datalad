@@ -6,3 +6,6 @@
 
 # -- Optional for Testing
 nose-timer
+# necessary for accessing SecretStorage keyring (system wide Gnome keyring)
+# and nice to have under tox for that
+# dbus-python

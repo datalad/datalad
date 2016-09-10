@@ -10,13 +10,17 @@
 """
 
 import os
-from os.path import exists, join as opj
+from os.path import exists, isdir, getmtime, join as opj
 
 from nose.tools import ok_, assert_is_instance
 
 from datalad.support.sshconnector import SSHConnection, SSHManager
 from datalad.tests.utils import assert_raises, eq_
-from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import skip_ssh, with_tempfile, get_most_obscure_supported_name
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_in
+
+import logging
 
 
 @skip_ssh
@@ -41,7 +45,9 @@ def test_ssh_get_connection():
 
 
 @skip_ssh
-def test_ssh_open_close():
+@with_tempfile(suffix=" \"`suffix:;& ", # get_most_obscure_supported_name(),
+               content="1")
+def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
     c1 = manager.get_connection('ssh://localhost')
@@ -55,6 +61,11 @@ def test_ssh_open_close():
     remote_ls = [entry for entry in out.splitlines() if entry != '.' and entry != '..']
     local_ls = os.listdir(os.path.expanduser('~'))
     eq_(set(remote_ls), set(local_ls))
+
+    # now test for arguments containing spaces and other pleasant symbols
+    out, err = c1(['ls', '-l', tfile1])
+    assert_in(tfile1, out)
+    eq_(err, '')
 
     c1.close()
     # control master doesn't exist anymore:
@@ -74,3 +85,60 @@ def test_ssh_manager_close():
 
     ok_(not exists(opj(manager.socket_dir, 'localhost')))
     ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+
+
+def test_ssh_manager_close_no_throw():
+    manager = SSHManager()
+    class bogus:
+        def close(self):
+            raise Exception("oh I am so bad")
+
+    manager._connections['bogus'] = bogus()
+    assert_raises(Exception, manager.close)
+    assert_raises(Exception, manager.close)
+
+    # but should proceed just fine if allow_fail=False
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        manager.close(allow_fail=False)
+        assert_in('Failed to close a connection: oh I am so bad', cml.out)
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile(content="one")
+@with_tempfile(content="two")
+def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
+
+    remote_url = 'ssh://localhost'
+    manager = SSHManager()
+    ssh = manager.get_connection(remote_url)
+    ssh.open()
+
+    # write to obscurely named file in sourcedir
+    obscure_file = opj(sourcedir, get_most_obscure_supported_name())
+    with open(obscure_file, 'w') as f:
+        f.write("three")
+
+    # copy tempfile list to remote_url:sourcedir
+    sourcefiles = [sourcefile1, sourcefile2, obscure_file]
+    ssh.copy(sourcefiles, opj(remote_url, sourcedir))
+
+    # recursive copy tempdir to remote_url:targetdir
+    targetdir = sourcedir + '.c opy'
+    ssh.copy(sourcedir, opj(remote_url, targetdir), recursive=True, preserve_attrs=True)
+
+    # check if sourcedir copied to remote_url:targetdir
+    ok_(isdir(targetdir))
+    # check if scp preserved source directory attributes
+    # if source_mtime=1.12s, scp -p sets target_mtime = 1.0s, test that
+    eq_(getmtime(targetdir), int(getmtime(sourcedir)) + 0.0)
+
+    # check if targetfiles(and its content) exist in remote_url:targetdir,
+    # this implies file(s) and recursive directory copying pass
+    for targetfile, content in zip(sourcefiles, ["one", "two", "three"]):
+        targetpath = opj(targetdir, targetfile)
+        ok_(exists(targetpath))
+        with open(targetpath, 'r') as fp:
+            eq_(content, fp.read())
+
+    ssh.close()

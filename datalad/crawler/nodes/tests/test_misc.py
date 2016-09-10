@@ -13,12 +13,15 @@ from os import chmod
 from os.path import join as opj
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 from six import next
+from collections import OrderedDict
+
 from ..misc import get_disposition_filename
 from ..misc import fix_permissions
 from ..misc import get_url_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import skip_if
+from ..misc import continue_if
 from ..misc import func_to_node
 from ..misc import sub
 from ..misc import find_files
@@ -26,6 +29,7 @@ from ..misc import switch
 from ..misc import assign
 from ..misc import _act_if
 from ..misc import rename
+from ..misc import debug
 from ..misc import Sink
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
@@ -35,9 +39,14 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_false
+from datalad.tests.utils import swallow_logs
 
+import logging
+
+from mock import patch
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
 
@@ -171,7 +180,7 @@ def test__act_if():
 
     # matched = true
     gen = _act_if(values)
-    assert_raises(NotImplementedError, list, gen(datamatch))
+    eq_(list(gen(datamatch)), [datamatch])
 
     # matched = false
     genfal = _act_if(values, re=True, negate=False)
@@ -224,6 +233,23 @@ def test_skip_if():
 
     eq_(list(skip_if({'v1': 'ye.$'})(tdict)), [tdict])
     eq_(list(skip_if({'v1': 'ye.$'}, re=True)(tdict)), [])
+
+
+def test_continue_if():
+    d = {'v1': 'done'}
+    n = continue_if(d)
+    #eq_(list(n(d)), [d])
+    eq_(list(n(dict(v1='not done'))), [])
+    eq_(list(n(dict(v1='done', someother=123))), [dict(v1='done', someother=123)])
+
+    tdict = dict(v1='not yet', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [])
+    eq_(list(continue_if(tdict)(tdict)), [tdict])
+
+    # regexp
+    eq_(list(continue_if({'v1': '^(?P<negate>not +)yet$'}, re=True)(tdict)),
+        [updated(tdict, {'negate': 'not '})])
 
 
 def test_skip_if_negate():
@@ -351,6 +377,10 @@ def test_switch():
 
     # if there is a value mapping doesn't exist for, by default would fail
     data_missing = {'f1': 3, 'f2': 'x_'}
+    with assert_raises(KeyError) as cme:
+        list(switch_node(data_missing))
+    assert_in('Found no matches for f1 == 3 among', str(cme.exception))
+
     assert_raises(KeyError, list, switch_node(data_missing))
     switch_node.missing = 'skip'
     assert_equal(list(switch_node(data_missing)), [data_missing])
@@ -365,3 +395,78 @@ def test_switch():
     switch_node.mapping[2].insert(0, {'output': 'outputs'})
     out = list(switch_node({'f1': 2, 'f2': 'x_'}))
     assert_equal(out, _out([{'f1': 2, 'f2': 'x_0'}, {'f1': 2, 'f2': 'x_1'}]))
+
+
+def test_switch_re():
+    ran = []
+
+    def n2(data):
+        for i in range(2):
+            ran.append(len(ran))
+            yield updated(data, {'f2': 'x_%d' % i})
+
+    switch_node = switch(
+        'f1',
+        OrderedDict([
+            ('m[13]', sub({'f2': {'_': '1'}})),
+            # should be able to consume nodes and pipelines
+            ('m[23]', [n2]),
+            ('emp.*', None), # just return input
+        ]),
+        re=True
+    )
+    out = list(switch_node({'f1': 'm123', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'm123', 'f2': 'x1'}])
+    assert_equal(ran, [])
+
+    # if there is a value mapping doesn't exist for, by default would fail
+    data_missing = {'f1': 'xxxxx', 'f2': 'x_'}
+    with assert_raises(KeyError) as cme:
+        list(switch_node(data_missing))
+    assert_re_in('Found no matches for f1 == .xxxxx. matching one of',
+                 cme.exception.args)
+
+    # but in the 2nd case, the thing is a sub-pipeline so it behaves as such without spitting
+    # out its output
+    out = list(switch_node({'f1': 'm2', 'f2': 'x_'}))
+    assert_equal(out, _out([{'f1': 'm2', 'f2': 'x_'}]))
+    assert_equal(ran, [0, 1])  # but does execute just fine
+
+    # and if matches both -- we need to get all outputs
+    for i in range(len(ran)):
+        ran.remove(i)
+    out = list(switch_node({'f1': 'm3', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'm3', 'f2': 'x1'}] +
+                       _out([{'f1': 'm3', 'f2': 'x_'}]))
+    assert_equal(ran, [0, 1])  # and does execute just as fine
+
+    # empty match
+    out = list(switch_node({'f1': 'empty', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'empty', 'f2': 'x_'}])
+
+
+def _test_debug(msg, args=()):
+    if 'empty' in args:
+        def node(d):
+            # just so Python marks it as a generator
+            if False:
+                yield d  # pragma: no cover
+            else:
+                return
+    else:
+        def node(d):
+            yield updated(d, {'debugged': True})
+
+    d1 = debug(node, *args)
+    data = {'data': 1}
+    with patch('pdb.set_trace') as set_trace:
+        with swallow_logs(new_level=logging.INFO) as cml:
+            list(d1(data))
+            set_trace.assert_called_once_with()
+            assert_re_in(msg, cml.out)
+
+
+def test_debug():
+    yield _test_debug, "About to run"
+    yield _test_debug, "Ran node .* which yielded 1 times", ('after',)
+    yield _test_debug, "Ran node .* which yielded 0 times", ('empty',)

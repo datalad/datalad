@@ -12,7 +12,10 @@ __docformat__ = 'restructuredtext'
 
 import re
 import textwrap
-from .constraints import expand_contraint_spec
+import argparse
+from inspect import getargspec
+
+from .constraints import expand_constraint_spec
 
 _whitespace_re = re.compile('\n\s+|^\s+')
 
@@ -21,8 +24,13 @@ class Parameter(object):
     """This class shall serve as a representation of a parameter.
     """
 
+    # Known keyword arguments which we want to allow to pass over into
+    # argparser.add_argument . Mentioned explicitly, since otherwise
+    # are not verified while working in Python-only API
+    _KNOWN_ARGS = getargspec(argparse.Action.__init__)[0] + ['action']
+
     def __init__(self, constraints=None, doc=None, args=None, **kwargs):
-        """Add contraints (validator) specifications and a docstring for
+        """Add constraints (validator) specifications and a docstring for
         a parameter.
 
         Parameters
@@ -57,12 +65,20 @@ class Parameter(object):
         >>> C = Parameter(
         ...         AltConstraints(
         ...             Constraints(EnsureFloat(),
-        ...                         EnsureRange(min=7.0,max=44.0)),
+        ...                         EnsureRange(min=7.0, max=44.0)),
         ...             None))
         """
-        self.constraints = expand_contraint_spec(constraints)
+        self.constraints = expand_constraint_spec(constraints)
         self._doc = doc
         self.cmd_args = args
+
+        # Verify that no mistyped kwargs present
+        unknown_args = set(kwargs).difference(self._KNOWN_ARGS)
+        if unknown_args:
+            raise ValueError(
+                "Detected unknown argument(s) for the Parameter: %s.  Known are: %s"
+                % (', '.join(unknown_args), ', '.join(self._KNOWN_ARGS))
+            )
         self.cmd_kwargs = kwargs
 
     def get_autodoc(self, name, indent="  ", width=70, default=None, has_default=False):
@@ -73,14 +89,21 @@ class Parameter(object):
         string or list of strings (if indent is None)
         """
         paramsdoc = '%s' % name
-        if not self.constraints is None:
+        sdoc = None
+        if self.constraints is not None:
             sdoc = self.constraints.short_description()
-            if not sdoc is None:
-                if sdoc[0] == '(' and sdoc[-1] == ')':
-                    sdoc = sdoc[1:-1]
-                paramsdoc += " : %s" % sdoc
-                if has_default:
-                    paramsdoc += ", optional"
+        elif 'action' in self.cmd_kwargs \
+                and self.cmd_kwargs['action'] in ("store_true", "store_false"):
+            sdoc = 'bool'
+        if sdoc is not None:
+            if sdoc[0] == '(' and sdoc[-1] == ')':
+                sdoc = sdoc[1:-1]
+            if self.cmd_kwargs.get('nargs', None) == '?' \
+                    or self.cmd_kwargs.get('action', None) == 'append':
+                sdoc = 'list of {}'.format(sdoc)
+            paramsdoc += " : %s" % sdoc
+            if has_default:
+                paramsdoc += ", optional"
         paramsdoc = [paramsdoc]
 
         doc = self._doc
@@ -93,7 +116,11 @@ class Parameter(object):
             cdoc = self.constraints.long_description()
             if cdoc[0] == '(' and cdoc[-1] == ')':
                 cdoc = cdoc[1:-1]
-            doc += ' Constraints: %s.' % cdoc
+            addinfo = ''
+            if self.cmd_kwargs.get('nargs', None) == '?' \
+                    or self.cmd_kwargs.get('action', None) == 'append':
+                addinfo = 'list expected, each '
+            doc += ' Constraints: %s%s.' % (addinfo, cdoc)
         if has_default:
             doc += " [Default: %r]" % (default,)
         # Explicitly deal with multiple spaces, for some reason

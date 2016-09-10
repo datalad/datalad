@@ -54,7 +54,7 @@ class Unlock(Interface):
 
     @staticmethod
     @datasetmethod(name='unlock')
-    def __call__(dataset=None, path=None):
+    def __call__(path=None, dataset=None):
         # shortcut
         ds = dataset
 
@@ -126,7 +126,7 @@ class Unlock(Interface):
                 if line.strip().endswith('ok')]
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             res = []
