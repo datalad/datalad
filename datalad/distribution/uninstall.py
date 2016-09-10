@@ -126,7 +126,7 @@ class Uninstall(Interface):
                  fast=False, if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
-        if dataset is None and path is None:
+        if dataset is None and not path:
             raise InsufficientArgumentsError(
                 "insufficient information for uninstallation (needs at "
                 "least a dataset or a path. To uninstall an entire dataset, "
