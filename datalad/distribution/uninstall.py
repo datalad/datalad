@@ -156,38 +156,21 @@ class Uninstall(Interface):
                             results.append(r)
                 return results
 
+        ds = require_dataset(
+            dataset, check_installed=True, purpose='uninstall')
+
         # resolve the target location against the provided dataset
-        if path is not None:
+        if path is None:
+            # AKA "everything"
+            path = ds.path
+        else:
             # XXX Important to resolve against `dataset` input argument, and
             # not against the `ds` resolved dataset
             path = resolve_path(path, dataset)
             lgr.debug("Resolved uninstallation target: {0}".format(path))
 
-        ds = require_dataset(
-            dataset, check_installed=True, purpose='uninstall')
-
         # make sure we get to an expected state
         handle_dirty_dataset(ds, if_dirty)
-
-        assert(ds.repo is not None)
-
-        if not path or path == ds.path:
-            # uninstall the dataset `ds`
-            # we install things INTO a dataset and therefore we can uninstall
-            # FROM a dataset only
-            # => need to find a dataset  to uninstall this one from:
-            dspath = GitRepo.get_toppath(abspath(opj(ds.path, pardir)))
-            if dspath is None:
-                # ds is not part of another dataset
-                # TODO: Do we want to just rm -rf instead of raising?
-                #       Or do it with --force or sth?
-                raise ValueError("No dataset found to uninstall %s from." %
-                                 ds.path)
-            return Uninstall.__call__(dataset=Dataset(dspath),
-                                      path=relpath(ds.path, start=dspath),
-                                      data_only=data_only,
-                                      recursive=recursive,
-                                      fast=fast)
 
         # needed by the logic below
         assert(isabs(path))

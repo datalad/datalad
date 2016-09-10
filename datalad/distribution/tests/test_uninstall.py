@@ -34,10 +34,6 @@ def test_uninstall_invalid(path):
     res = uninstall(dataset=Dataset(path), path='not_existent')
     ok_(res is None)
 
-    with assert_raises(ValueError) as cme:
-        uninstall(dataset=Dataset(path))
-        eq_("No dataset found to uninstall %s from." % path, str(cme))
-
 
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_uninstall_annex_file(path):
