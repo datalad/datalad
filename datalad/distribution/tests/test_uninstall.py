@@ -42,6 +42,12 @@ def test_safetynet(path):
 
 
 @with_tempfile()
+def test_uninstall_nonexisting(path):
+    ds = Dataset(path)
+    assert_raises(ValueError, uninstall, dataset=ds)
+
+
+@with_tempfile()
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create_subdataset('one')
