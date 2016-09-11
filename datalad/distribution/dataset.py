@@ -18,6 +18,7 @@ from os.path import realpath
 from os.path import relpath
 from os.path import commonprefix
 from os.path import sep
+from os.path import exists
 from six import string_types
 from six import PY2
 from functools import wraps
@@ -407,7 +408,10 @@ class Dataset(object):
         -------
         bool
         """
-        return self.path is not None and self.repo is not None
+        return \
+            self.path is not None \
+            and self.repo is not None \
+            and exists(self.repo.repo.git_dir)
 
     def get_superdataset(self):
         """Get the dataset's superdataset
