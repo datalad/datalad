@@ -236,6 +236,17 @@ class Uninstall(Interface):
                     remove_data=remove_data,
                     remove_handles=remove_handles,
                     recursive=recursive))
+            # TODO: should be
+            #if not subds.is_installed():
+            # but gh-802
+            if not os.path.exists(subds.path):
+                # clean divorce, if we lost the subds in the process
+                # TODO: this still leaves traces in .gitmodules, ignore?
+                ds.repo._git_custom_command(
+                    relpath(subds.path, start=ds.path),
+                    ['git', 'submodule', 'deinit'])
+                # `deinit` brings back the directory
+                os.rmdir(subds.path)
 
         return results
 

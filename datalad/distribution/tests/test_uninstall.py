@@ -40,6 +40,21 @@ def test_safetynet(path):
                 assert_raises(ValueError, uninstall, path=target, remove_handles=True)
 
 
+@with_tempfile()
+def test_clean_subds_removal(path):
+    ds = Dataset(path).create()
+    ds.create_subdataset('one')
+    ds.create_subdataset('two')
+    ds.save(auto_add_changes=True)
+    eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
+    # now kill one
+    ds.uninstall('one', remove_handles=True, remove_history=True)
+    # TODO: save should happen inside!!
+    ds.save(auto_add_changes=True)
+    # two must remain
+    eq_(ds.get_subdatasets(), ['two'])
+
+
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
