@@ -23,6 +23,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.utils import chpwd
 
@@ -43,16 +44,18 @@ def test_safetynet(path):
 @with_tempfile()
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
-    ds.create_subdataset('one')
+    subds1 = ds.create_subdataset('one')
     ds.create_subdataset('two')
     ds.save(auto_add_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
+    ok_clean_git(ds.path)
     # now kill one
     ds.uninstall('one', remove_handles=True, remove_history=True)
-    # TODO: save should happen inside!!
-    ds.save(auto_add_changes=True)
+    ok_clean_git(ds.path)
     # two must remain
     eq_(ds.get_subdatasets(), ['two'])
+    # one is gone
+    assert(not exists(subds1.path))
 
 
 @with_testrepos('.*basic.*', flavors=['local'])

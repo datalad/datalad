@@ -15,13 +15,14 @@ __docformat__ = 'restructuredtext'
 import os
 import logging
 
-from os.path import relpath, abspath, split as psplit
+from os.path import relpath, split as psplit
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, resolve_path, require_dataset
 from datalad.interface.base import Interface
+from datalad.interface.save import Save
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_dataset
@@ -60,7 +61,7 @@ def _uninstall(ds, paths, check, remove_history, remove_data, remove_handles,
 
     if not remove_handles:
         # we are done here
-        return results
+        return results, False
 
     if os.curdir in paths:
         if not remove_history:
@@ -77,26 +78,25 @@ def _uninstall(ds, paths, check, remove_history, remove_data, remove_handles,
                     "will not remove subdatasets without the recursive flag")
             subds = Dataset(subds)
             lgr.warning("removing subdataset {} from {}".format(subds, ds))
-            results.extend(
-                _uninstall(
-                    subds,
-                    [subds.path],
-                    check=check,
-                    remove_history=remove_history,
-                    remove_data=True,
-                    # we always want everything to go at this point
-                    remove_handles=True,
-                    recursive=recursive))
+            res, gone = _uninstall(
+                subds,
+                [subds.path],
+                check=check,
+                remove_history=remove_history,
+                remove_data=True,
+                # we always want everything to go at this point
+                remove_handles=True,
+                recursive=recursive)
+            results.extend(res)
 
         results.append(ds)
-        rmtree(ds.path)
-        return results
+        return results, True
 
     # and now make the handles disappear
     # always recurse into directories
     results.extend(ds.repo.remove(paths, r=True))
 
-    return results
+    return results, False
 
 
 class Uninstall(Interface):
@@ -210,43 +210,64 @@ class Uninstall(Interface):
             ps.append(p)
             whocares[containerds] = ps
 
+        ds_gonealready = False
         if ds in whocares:
             # start with the content of this dataset, as any somewhat
             # total recursive removal here would have most impact
             lgr.debug("Uninstall content in {}".format(ds))
-            results.extend(
-                _uninstall(
-                    ds,
-                    whocares[ds],
-                    check=check,
-                    remove_history=remove_history,
-                    remove_data=remove_data,
-                    remove_handles=remove_handles,
-                    recursive=recursive))
-        # now deal with any other subdataset
+            res, ds_gonealready = _uninstall(
+                ds,
+                whocares[ds],
+                check=check,
+                remove_history=remove_history,
+                remove_data=remove_data,
+                remove_handles=remove_handles,
+                recursive=recursive)
+            results.extend(res)
+
+        if ds_gonealready:
+            rmtree(ds.path)
+            return results
+
+        # otherwise deal with any other subdataset
         for subds in whocares:
             if subds == ds:
                 continue
-            results.extend(
-                _uninstall(
-                    subds,
-                    whocares[subds],
-                    check=check,
-                    remove_history=remove_history,
-                    remove_data=remove_data,
-                    remove_handles=remove_handles,
-                    recursive=recursive))
-            # TODO: should be
-            #if not subds.is_installed():
-            # but gh-802
-            if not os.path.exists(subds.path):
+            res, subds_gone = _uninstall(
+                subds,
+                whocares[subds],
+                check=check,
+                remove_history=remove_history,
+                remove_data=remove_data,
+                remove_handles=remove_handles,
+                recursive=recursive)
+            results.extend(res)
+
+            if subds_gone:
                 # clean divorce, if we lost the subds in the process
-                # TODO: this still leaves traces in .gitmodules, ignore?
-                ds.repo._git_custom_command(
-                    relpath(subds.path, start=ds.path),
-                    ['git', 'submodule', 'deinit'])
-                # `deinit` brings back the directory
-                os.rmdir(subds.path)
+                # find the submodule that matches the patch
+                # regular access goes by name, but we cannot trust
+                # our own consistency, yet
+                submodule = [sm for sm in ds.repo.repo.submodules
+                             if sm.path == relpath(
+                                 subds.path, start=ds.path)][0]
+                submodule.remove()
+            elif remove_handles:
+                # we could have removed handles -> save
+                Save.__call__(
+                    message='[DATALAD] uninstalled content',
+                    dataset=subds,
+                    auto_add_changes=False,
+                    recursive=False)
+
+        # something of the original dataset is left at this point
+        # and all subdatasets have been saved already
+        # -> save changes
+        Save.__call__(
+            message='[DATALAD] uninstalled content',
+            dataset=ds,
+            auto_add_changes=False,
+            recursive=False)
 
         return results
 
