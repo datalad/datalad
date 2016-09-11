@@ -9,7 +9,7 @@
 
 """
 
-from os import listdir
+import os
 from os.path import join as opj
 from os.path import exists
 
@@ -21,10 +21,23 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import with_tempfile
+from datalad.utils import chpwd
 
 from ..dataset import Dataset
+
+
+@with_tempfile()
+def test_safetynet(path):
+    ds = Dataset(path).create()
+    os.makedirs(opj(ds.path, 'deep', 'down'))
+    for p in (ds.path, opj(ds.path, 'deep'), opj(ds.path, 'deep', 'down')):
+        with chpwd(p):
+            # will never remove PWD, or anything outside the dataset
+            for target in (ds.path, os.curdir, os.pardir, opj(os.pardir, os.pardir)):
+                assert_raises(ValueError, uninstall, path=target, remove_handles=True)
 
 
 @with_testrepos('.*basic.*', flavors=['local'])
@@ -100,6 +113,8 @@ def test_uninstall_subdataset(src, dst):
         res = ds.uninstall(path=subds_path)
         ok_(all([f in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
+        # subdataset is still known
+        assert_in(subds_path, ds.get_subdatasets())
 
     for subds_path in ds.get_subdatasets():
         # uninstall subds itself:

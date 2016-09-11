@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import os
 import logging
 
-from os.path import relpath
+from os.path import relpath, abspath, split as psplit
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -26,6 +26,7 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.utils import rmtree
+from datalad.utils import getpwd
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -63,19 +64,23 @@ def _uninstall(ds, paths, check, remove_history, remove_data, remove_handles,
 
     if os.curdir in paths:
         if not remove_history:
-            raise RuntimeError(
+            raise ValueError(
                 "will not remove the entire dataset (with history) unless forced")
         # special mode that makes everything disappear, including subdatasets
         for subds in ds.get_subdatasets(
-                fulfilled=True, recursive=True, recursion_limit=1):
+                absolute=True,
+                fulfilled=True,
+                recursive=True,
+                recursion_limit=1):
             if not recursive:
-                raise RuntimeError(
+                raise ValueError(
                     "will not remove subdatasets without the recursive flag")
-
+            subds = Dataset(subds)
+            lgr.warning("removing subdataset {} from {}".format(subds, ds))
             results.extend(
                 _uninstall(
-                    Dataset(subds),
-                    [subds],
+                    subds,
+                    [subds.path],
                     check=check,
                     remove_history=remove_history,
                     remove_data=True,
@@ -175,6 +180,7 @@ class Uninstall(Interface):
                 path = None
         else:
             path = [path]
+
         if path is None:
             # AKA "everything"
             path = [ds.path]
@@ -189,7 +195,16 @@ class Uninstall(Interface):
         # sort paths into the respective datasets that contain them
         # considering 1st-level subdatasets at most
         whocares = {}
+        pwd = getpwd()
         for p in path:
+            if remove_handles:
+                # behave like `rm -r` and refuse to remove where we are
+                rpath = relpath(p, start=pwd)
+                if rpath == os.curdir \
+                        or rpath == os.pardir \
+                        or set(psplit(rpath)) == {os.pardir}:
+                    raise ValueError(
+                        "refusing to remove current or parent directory")
             containerds = ds.get_containing_subdataset(p, recursion_limit=1)
             ps = whocares.get(containerds, [])
             ps.append(p)
