@@ -108,7 +108,24 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
-        # XXX path resolution needs to come before dataset resolution!
+        # shortcut
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='saving')
+
+        if not ds.repo.repo.is_dirty(
+                index=True,
+                working_tree=True,
+                untracked_files=True,
+                submodules=True):
+            # if we cannot see anything dirty at all, the only things we could
+            # do is tag
+            if version_tag:
+                ds.repo.tag(version_tag)
+            # take the easy one out
+            return False
+
+        # XXX path resolution needs to happen on the input argument, not the
+        # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
         # explicit dataset provided, or just a matching one resolved
         # automatically.
@@ -117,10 +134,6 @@ class Save(Interface):
         if not auto_add_changes and files is not None:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # shortcut
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='saving')
 
         # use the dataset's base path to indiciate that everything
         # should be saved
