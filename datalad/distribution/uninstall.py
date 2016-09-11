@@ -162,16 +162,6 @@ class Uninstall(Interface):
 
         results = []
 
-        # general RF TODO:
-        # - sort files into the respective subdatasets
-        # - fail if recursive is needed and not given
-        # - start removing from the top (i.e. not individual files
-        #   in some subdatasets that might get removed completely
-        #   in the end
-        # - always drop data-content first (if annexed)
-        #   try to have annex do that without expensive check if desired
-        # - subsequently delete/unregister as necessary
-
         ds = require_dataset(
             dataset, check_installed=True, purpose='uninstall')
 
@@ -194,7 +184,10 @@ class Uninstall(Interface):
 
         # sort paths into the respective datasets that contain them
         # considering 1st-level subdatasets at most
-        whocares = {}
+        # NOTE: little dance with two dicts is necessary, because ATM our
+        # Datasets are not hashable enough for PY3
+        whocares_paths = {}
+        whocares_ds = {}
         pwd = getpwd()
         for p in path:
             if remove_handles:
@@ -206,18 +199,19 @@ class Uninstall(Interface):
                     raise ValueError(
                         "refusing to remove current or parent directory")
             containerds = ds.get_containing_subdataset(p, recursion_limit=1)
-            ps = whocares.get(containerds, [])
+            ps = whocares_paths.get(containerds.path, [])
             ps.append(p)
-            whocares[containerds] = ps
+            whocares_paths[containerds.path] = ps
+            whocares_ds[containerds.path] = containerds
 
         ds_gonealready = False
-        if ds in whocares:
+        if ds.path in whocares_paths:
             # start with the content of this dataset, as any somewhat
             # total recursive removal here would have most impact
             lgr.debug("Uninstall content in {}".format(ds))
             res, ds_gonealready = _uninstall(
-                ds,
-                whocares[ds],
+                whocares_ds[ds.path],
+                whocares_paths[ds.path],
                 check=check,
                 remove_history=remove_history,
                 remove_data=remove_data,
@@ -230,12 +224,13 @@ class Uninstall(Interface):
             return results
 
         # otherwise deal with any other subdataset
-        for subds in whocares:
+        for subdspath in whocares_paths:
+            subds = whocares_ds[subdspath]
             if subds == ds:
                 continue
             res, subds_gone = _uninstall(
                 subds,
-                whocares[subds],
+                whocares_paths[subdspath],
                 check=check,
                 remove_history=remove_history,
                 remove_data=remove_data,
@@ -250,7 +245,7 @@ class Uninstall(Interface):
                 # our own consistency, yet
                 submodule = [sm for sm in ds.repo.repo.submodules
                              if sm.path == relpath(
-                                 subds.path, start=ds.path)][0]
+                                 subdspath, start=ds.path)][0]
                 submodule.remove()
             elif remove_handles:
                 # we could have removed handles -> save
