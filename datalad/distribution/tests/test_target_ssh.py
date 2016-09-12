@@ -178,10 +178,28 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         publish(dataset=source, to="local_target")
 
         # and we should be able to 'reconfigure'
+        def process_digests_mtimes(digests, mtimes):
+            if external_versions['cmd:git'] >= '2.4':
+                # it should have triggered a hook, which would have created log and metadata files
+                for part in 'metadata', 'logs':
+                    metafiles = [k for k in digests if k.startswith(_path_('.git/datalad/%s/' % part))]
+                    assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
+                    for f in metafiles:
+                        digests.pop(f)
+                        mtimes.pop(f)
+            # and just pop some leftovers from annex
+            for f in list(digests):
+                if f.startswith('.git/annex/mergedrefs'):
+                    digests.pop(f)
+                    mtimes.pop(f)
+
         orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
+        process_digests_mtimes(orig_digests, orig_mtimes)
+
         import time; time.sleep(0.1)  # just so that mtimes change
         assert_create_sshwebserver(existing='reconfigure', **cpkwargs)
         digests, mtimes = get_mtimes_and_digests(target_path)
+        process_digests_mtimes(digests, mtimes)
 
         assert_dict_equal(orig_digests, digests)  # nothing should change in terms of content
 
