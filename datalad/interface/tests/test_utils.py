@@ -67,7 +67,7 @@ def test_dirty(path):
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!
-    subds = ds.create_subdataset('subds')
+    subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
     orig_state = _check_auto_save(ds, orig_state)
     # subdataset must be added as a submodule!

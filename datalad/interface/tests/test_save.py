@@ -54,7 +54,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
-    subds = ds.create_subdataset('subds')
+    subds = ds.create('subds')
     ok_(ds.repo.dirty)
     # auto save it
     ds.save(auto_add_changes=True)
@@ -75,10 +75,10 @@ def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
     assert_false(ds.save())
-    subds = ds.create_subdataset('sub')
+    subds = ds.create('sub')
     # saves subdataset presence, because it was staged
     assert_true(ds.save())
-    subsubds = subds.create_subdataset('subsub')
+    subsubds = subds.create('subsub')
     # does not save anything in the topdataset
     assert_false(ds.save())
     # even with auto-add

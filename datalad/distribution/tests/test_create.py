@@ -44,12 +44,12 @@ def test_create_raises(path, outside_path):
     # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
-    assert_raises(ValueError, ds.create_subdataset, outside_path)
+    assert_raises(ValueError, ds.create, outside_path)
 
     # create a sub:
-    ds.create_subdataset('sub')
+    ds.create('sub')
     # fail when doing it again without `force`:
-    assert_raises(ValueError, ds.create_subdataset, 'sub')
+    assert_raises(ValueError, ds.create, 'sub')
 
 
 @with_tempfile
@@ -98,7 +98,7 @@ def test_create_sub(path):
     ds.create()
 
     # 1. create sub and add to super:
-    subds = ds.create_subdataset("some/what/deeper")
+    subds = ds.create("some/what/deeper")
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     ok_clean_git(subds.path, annex=True)
@@ -121,7 +121,7 @@ def test_create_sub(path):
     assert_not_in("someother", ds.get_subdatasets())
 
     # 3. create sub via super:
-    subds3 = ds.create_subdataset("third", no_annex=True)
+    subds3 = ds.create("third", no_annex=True)
     ok_(isinstance(subds3, Dataset))
     ok_(subds3.is_installed())
     ok_clean_git(subds3.path, annex=False)

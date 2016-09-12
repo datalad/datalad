@@ -108,7 +108,7 @@ def test_add_files(path):
 def test_add_recursive(path):
     ds = Dataset(path)
     ds.create(force=True)
-    ds.create_subdataset('dir', force=True)
+    ds.create('dir', force=True)
     ds.save("Submodule added.")
 
     # TODO: CommandError to something meaningful
