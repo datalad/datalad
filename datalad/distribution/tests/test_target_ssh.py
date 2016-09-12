@@ -227,13 +227,14 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             sep = os.path.sep
         remote_name = 'remote-' + str(flat)
         # TODO: there is f.ckup with paths so assert_create fails ATM
-        #assert_create_sshwebserver(
-        create_publication_target_sshwebserver(
-            target=remote_name,
-            dataset=source,
-            sshurl="ssh://localhost" + target_path_,
-            target_dir=target_dir_tpl,
-            recursive=True)
+        # And let's test without explicit dataset being provided
+        with chpwd(source.path):
+            #assert_create_sshwebserver(
+            create_publication_target_sshwebserver(
+                target=remote_name,
+                sshurl="ssh://localhost" + target_path_,
+                target_dir=target_dir_tpl,
+                recursive=True)
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
