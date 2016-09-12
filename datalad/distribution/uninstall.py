@@ -265,14 +265,15 @@ class Uninstall(Interface):
                 # one go below
                 ds.repo.add(subdsrelpath, git=True)
 
-        # something of the original dataset is left at this point
-        # and all subdatasets have been saved already
-        # -> save changes
-        Save.__call__(
-            message='[DATALAD] uninstalled content',
-            dataset=ds,
-            auto_add_changes=False,
-            recursive=False)
+        if remove_handles:
+            # something of the original dataset is left at this point
+            # and all subdatasets have been saved already
+            # -> save changes
+            Save.__call__(
+                message='[DATALAD] uninstalled content',
+                dataset=ds,
+                auto_add_changes=False,
+                recursive=False)
 
         return results
 
