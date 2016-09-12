@@ -16,10 +16,14 @@ from os import listdir
 from os.path import isdir, realpath, relpath
 
 from datalad.interface.base import Interface
+from datalad.interface.save import Save
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureDType
@@ -98,10 +102,8 @@ class Create(Interface):
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
-        no_commit=Parameter(
-            args=("--no-commit",),
-            doc="""if set, do not commit automatically""",
-            action='store_true'),
+        save=nosave_opt,
+        if_dirty=if_dirty_opt,
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -140,10 +142,11 @@ class Create(Interface):
             description=None,
             dataset=None,
             no_annex=False,
-            no_commit=False,
+            save=True,
             annex_version=None,
             annex_backend='MD5E',
             native_metadata_type=None,
+            if_dirty='save-before',
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
@@ -189,10 +192,13 @@ class Create(Interface):
 
         # check for sane subdataset path
         real_targetpath = _with_sep(realpath(path))  # realpath OK
-        if dataset is not None \
-                and not real_targetpath.startswith(  # realpath OK
+        if dataset is not None:
+            # make sure we get to an expected state
+            if dataset.is_installed():
+                handle_dirty_dataset(dataset, if_dirty)
+            if not real_targetpath.startswith(  # realpath OK
                     _with_sep(realpath(dataset.path))):  # realpath OK
-            raise ValueError("path {} outside {}".format(path, dataset))
+                raise ValueError("path {} outside {}".format(path, dataset))
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
@@ -206,18 +212,24 @@ class Create(Interface):
 
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
-            vcs = GitRepo(tbds.path, url=None, create=True,
-                          git_opts=git_opts)
+            GitRepo(
+                tbds.path,
+                url=None,
+                create=True,
+                git_opts=git_opts)
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", tbds.path)
-            vcs = AnnexRepo(tbds.path, url=None, create=True,
-                            backend=annex_backend,
-                            version=annex_version,
-                            description=description,
-                            git_opts=git_opts,
-                            annex_opts=annex_opts,
-                            annex_init_opts=annex_init_opts)
+            AnnexRepo(
+                tbds.path,
+                url=None,
+                create=True,
+                backend=annex_backend,
+                version=annex_version,
+                description=description,
+                git_opts=git_opts,
+                annex_opts=annex_opts,
+                annex_init_opts=annex_init_opts)
 
         if native_metadata_type is not None:
             if not isinstance(native_metadata_type, list):
@@ -236,18 +248,27 @@ class Create(Interface):
         # save everthing
         tbds.repo.add('.datalad', git=True)
 
-        if not no_commit:
-            vcs.commit(msg="Initial commit",
-                       options=to_options(allow_empty=True),
-                       _datalad_msg=True)
+        if save:
+            Save.__call__(
+                message='[DATALAD] new dataset',
+                dataset=tbds,
+                auto_add_changes=False,
+                recursive=False)
 
         if dataset is not None and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
             from .install import _install_subds_inplace
-            return _install_subds_inplace(
-                ds=dataset, path=tbds.path,
-                relativepath=relpath(realpath(tbds.path), realpath(dataset.path)))  # realpath OK
+            subdsrelpath = relpath(realpath(tbds.path), realpath(dataset.path))  # realpath OK
+            _install_subds_inplace(ds=dataset, path=tbds.path,
+                                   relativepath=subdsrelpath)
+            # this will have staged the changes in the superdataset already
+            if save:
+                Save.__call__(
+                    message='[DATALAD] added subdataset',
+                    dataset=dataset,
+                    auto_add_changes=False,
+                    recursive=False)
 
         return tbds
 

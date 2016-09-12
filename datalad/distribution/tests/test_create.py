@@ -105,8 +105,8 @@ def test_create_sub(path):
 
     # subdataset is known to superdataset:
     assert_in("some/what/deeper", ds.get_subdatasets())
-    # but wasn't committed:
-    ok_(ds.repo.dirty)
+    # and was committed:
+    ok_clean_git(ds.path)
 
     # subds finds superdataset
     ok_(subds.get_superdataset() == ds)

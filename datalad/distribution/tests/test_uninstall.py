@@ -171,8 +171,8 @@ def test_uninstall_subdataset(src, dst):
     'keep': 'keep2',
     'kill': 'kill2'})
 def test_uninstall_multiple_paths(path):
-    ds = Dataset(path).create(force=True)
-    subds = ds.create('deep', force=True)
+    ds = Dataset(path).create(force=True, save=False)
+    subds = ds.create('deep', force=True, if_dirty='ignore')
     subds.add('.', recursive=True)
     ds.add('.', recursive=True)
     ds.save(auto_add_changes=True)
@@ -241,8 +241,8 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True)
-    subds = ds.create('deep', force=True)
+    ds = Dataset(path).create(force=True, save=False)
+    subds = ds.create('deep', force=True, if_dirty='ignore')
     # we add one file
     eq_(len(subds.add('.')), 1)
     # save all -> all clean
