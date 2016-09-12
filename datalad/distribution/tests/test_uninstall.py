@@ -12,6 +12,7 @@
 import os
 from os.path import join as opj
 from os.path import exists
+from os.path import realpath
 
 from datalad.api import uninstall
 from datalad.api import install
@@ -25,6 +26,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
 
 from ..dataset import Dataset
@@ -57,6 +59,7 @@ def test_clean_subds_removal(path):
     ok_clean_git(ds.path)
     # now kill one
     ds.uninstall('one', remove_handles=True, remove_history=True)
+    ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
     eq_(ds.get_subdatasets(), ['two'])
@@ -169,6 +172,27 @@ def test_uninstall_dataset(path):
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
+
+
+@with_tree({'one': 'test', 'two': 'test'})
+def test_remove_file_handle_only(path):
+    ds = Dataset(path).create(force=True)
+    ds.add(os.curdir)
+    ok_clean_git(ds.path)
+    # make sure there is any key
+    ok_(len(ds.repo.get_file_key('one')))
+    # both files link to the same key
+    eq_(ds.repo.get_file_key('one'),
+        ds.repo.get_file_key('two'))
+    rpath_one = realpath(opj(ds.path, 'one'))
+    eq_(rpath_one, realpath(opj(ds.path, 'two')))
+    path_two = opj(ds.path, 'two')
+    ok_(exists(path_two))
+    # remove one handle, should not affect the other
+    ds.uninstall('two', remove_data=False, remove_handles=True)
+    eq_(rpath_one, realpath(opj(ds.path, 'one')))
+    ok_(exists(rpath_one))
+    ok_(not exists(path_two))
 
 
 def test_uninstall_recursive():
