@@ -1,0 +1,96 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+# Helper to generate a Docker instance mapping user uder docker into your USER/UID/GID
+# and allowing to run tox within that clean automatically generated according to
+# README.md's apt-get lines environment
+#
+set -e
+export PS4=+
+#set -x
+set -u
+
+DL_DIST=${1:-jessie}
+
+topdir=$(realpath `dirname $0`)
+cd `dirname $0`
+dockerfile=$topdir/start_website_in_docker-Dockerfile
+# echo "D: $DL_APT"
+sed -e "s,DL_DIST,$DL_DIST,g" \
+    -e "s,DL_USER,$USER,g" \
+    -e "s,DL_UID,`id -u`,g" \
+    -e "s,DL_GID,`id -g`,g" \
+    -e "s,DL_GIT_USER_EMAIL,`git config --get user.email`,g" \
+    -e "s,DL_GIT_USER_NAME,`git config --get user.name`,g" \
+    $dockerfile.in >| $dockerfile
+
+#DL_APT=$(grep '^\(apt-get\|pip\)' ./../../README.md)
+
+{
+    # grep '^apt-get ' $topdir/../../README.md | sed -e 's|python-{|python{,3}-{|g'; \
+    echo "eatmydata apt-get install -q -y datalad python-pip python-virtualenv;"
+    echo "eatmydata apt-get install -q -y libffi-dev libssl-dev;"
+    # Install dependencies and remove system wide datalad
+    echo "eatmydata dpkg --purge datalad python-datalad;"
+} | while read aptline; do
+    sed -i -e "s|\(\(.*\)DL_APT\(.*\)\)|\2$aptline\3\n\1|g" $dockerfile
+    :
+done
+sed -e '/DL_APT/d' -i $dockerfile
+
+echo "I: copy authorized keys so they become avail inside"
+cp ~/.ssh/authorized_keys $topdir/conf/
+
+tag=datalad:website_${USER}_$DL_DIST
+echo "I: tag $tag"
+if docker images | grep -q datalad.*test_README.*$DL_DIST; then
+    echo "I: tag already exists -- skipping rebuilding"
+else
+    docker build -t $tag -f $dockerfile . #&& rm Dockerfile
+    #docker build --no-cache=True -t $tag -f $dockerfile . #&& rm Dockerfile
+fi
+
+topgitdir=`realpath ${topdir}/../..`
+echo "I: top git dir $topgitdir"
+
+#set -x
+docker_id=`docker ps | awk "/\\<$tag\\>/{print \\$1}"`
+echo "D: looking for a docker with tag '$tag': $docker_id"
+if [ -z "$docker_id" ]; then
+    echo "I: Starting new container with apache running"
+    docker_id=`docker run -d \
+     -v $topgitdir:/home/$USER/datalad \
+     -p 127.0.0.1:8081:80 \
+     -p 127.0.0.1:2221:22 \
+     $tag`
+    echo "Started container $docker_id"
+    echo "I: installing datalad inside (in development mode)"
+
+    # crap -- in sid image finishes witgh
+    #  Segmentation fault (core dumped)
+    # yoh@8c3178bd7ea7:~/datalad$ echo $?
+    # 139
+    docker exec $docker_id bash -c "cd datalad; pip install -e.[full]"
+else:
+    echo "Using running container $docker_id"
+fi
+
+cat <<EOF
+-------------------------
+You now should be able to upload to this host under ssh://localhost:2221:/var/www/html,
+which should then be made available under http://localhost:8081 .
+It is recommended to create ~/.ssh/config entry
+
+Host dataladlocalhost
+ Port 2221
+ Hostname localhost
+ StrictHostKeyChecking no
+
+EOF
