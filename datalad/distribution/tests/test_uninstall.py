@@ -62,7 +62,9 @@ def test_clean_subds_removal(path):
     # now kill one
     assert_raises(ValueError, ds.uninstall, 'one', remove_handles=True,
                   remove_history=True)
-    ds.uninstall('one', remove_handles=True, remove_history=True, recursive=True)
+    res = ds.uninstall('one', remove_handles=True, remove_history=True,
+                       recursive=True)
+    eq_(res, [subds1])
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
