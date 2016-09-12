@@ -213,6 +213,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
+        # But we need to run post-update hook in depth-first fashion, so
+        # would only collect first and then run (see gh #790)
+        remote_repos_to_run_hook_for = []
         for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
@@ -321,6 +324,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
 
+            remote_repos_to_run_hook_for.append(path)
+
+        # in reverse order would be depth first
+        for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
             try:
                 ssh(
@@ -328,8 +335,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     wrap_args=False  # we wrapped here manually
                 )
             except CommandError as e:
-                lgr.error("Failed to run post-update hook. "
-                          "Error: %s" % exc_str(e))
+                lgr.error("Failed to run post-update hook under path %s. "
+                          "Error: %s" % (path, exc_str(e)))
 
         if target:
             # add the sibling(s):
