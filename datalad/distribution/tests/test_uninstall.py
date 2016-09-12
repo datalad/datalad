@@ -10,7 +10,7 @@
 """
 
 import os
-from os.path import join as opj
+from os.path import join as opj, split as psplit
 from os.path import exists, lexists
 from os.path import realpath
 from os.path import isdir
@@ -177,23 +177,25 @@ def test_uninstall_multiple_paths(path):
     ds.add('.', recursive=True)
     ds.save(auto_add_changes=True)
     ok_clean_git(ds.path)
-    # use a tuple not a list! should also work
-    assert_raises(ValueError, ds.uninstall, ['kill', opj('deep', 'dir', 'kill')], check=False)
     # drop content of all 'kill' files
-    ds.uninstall(('kill', opj('deep', 'dir', 'kill')), recursive=True, check=False)
+    # must not work without recursive
+    topfile = 'kill'
+    deepfile = opj('deep', 'dir', 'kill')
+    assert_raises(ValueError, ds.uninstall, [topfile, deepfile], check=False)
+    # use a tuple not a list! should also work
+    ds.uninstall((topfile, deepfile), recursive=True, check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
-    #import pdb; pdb.set_trace()
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
-    ok_(all([f.endswith('kill') for f in files_left
-             if not exists(f) and not isdir(f)]))
+    ok_(not ds.repo.file_has_content(topfile))
+    ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
     # drop handles for all 'kill' files
-    ds.uninstall(['kill', opj('deep', 'dir', 'kill')], recursive=True, check=False,
+    ds.uninstall([topfile, deepfile], recursive=True, check=False,
                  remove_handles=True)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
-    ok_(not any([f.endswith('kill') for f in files_left]))
+    ok_(not any([f.endswith(topfile) for f in files_left]))
 
 
 @with_tempfile()
