@@ -158,11 +158,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             ds = Dataset(ds)
         if ds is None:
             # try to find a dataset at or above CWD
-            dspath = GitRepo.get_toppath(abspath(getpwd()))
-            if dspath is None:
+            current_dspath = GitRepo.get_toppath(abspath(getpwd()))
+            if current_dspath is None:
                 raise ValueError("""No dataset found
                                  at or above {0}.""".format(getpwd()))
-            ds = Dataset(dspath)
+            ds = Dataset(current_dspath)
             lgr.debug("Resolved dataset for target creation: {0}".format(ds))
         assert(ds is not None and sshurl is not None)
 
@@ -213,21 +213,25 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
-        for current_dataset in \
+        for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
+            current_ds = datasets[current_dspath]
+            if not current_ds.is_installed():
+                lgr.info("Skipping %s since not installed locally", current_dspath)
+                continue
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
-                                          current_dataset.replace("/", "-"))
+                                          current_dspath.replace("/", "-"))
             else:
                 # TODO: opj depends on local platform, not the remote one.
                 # check how to deal with it. Does windows ssh server accept
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
                 path = normpath(opj(target_dir,
-                                    relpath(datasets[current_dataset].path,
+                                    relpath(datasets[current_dspath].path,
                                             start=ds.path)))
 
-            lgr.info("Creating target dataset {0} at {1}".format(current_dataset, path))
+            lgr.info("Creating target dataset {0} at {1}".format(current_dspath, path))
             # Must be set to True only if exists and existing='reconfigure'
             # otherwise we might skip actions if we say existing='reconfigure'
             # but it did not even exist before
@@ -271,7 +275,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if not only_reconfigure:
                 # init git repo
                 if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
-                                                                            datasets[current_dataset]):
+                                                                            datasets[current_dspath]):
                     continue
 
             # check git version on remote end
@@ -297,14 +301,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dataset])
+                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dspath])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
 
             if not only_reconfigure:
-                # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
-                if isinstance(datasets[current_dataset].repo, AnnexRepo):
+                # Initialize annex repo on remote copy if current_dspath is an AnnexRepo
+                if isinstance(datasets[current_dspath].repo, AnnexRepo):
                     ssh(['git', '-C', path, 'annex', 'init', path])
 
             # publish web-interface to root dataset on publication server
