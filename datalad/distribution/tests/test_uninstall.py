@@ -165,6 +165,8 @@ def test_uninstall_dataset(path):
     ok_clean_git(ds.path)
     # would only drop data
     ds.uninstall()
+    # actually same as this, for cmdline compat reasons
+    ds.uninstall(path=[])
     ok_clean_git(ds.path)
     # removing all handles equal removal of entire dataset, needs safety switch
     assert_raises(ValueError, ds.uninstall, remove_handles=True)
