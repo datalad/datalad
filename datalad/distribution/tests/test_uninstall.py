@@ -58,7 +58,9 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
-    ds.uninstall('one', remove_handles=True, remove_history=True)
+    assert_raises(ValueError, ds.uninstall, 'one', remove_handles=True,
+                  remove_history=True)
+    ds.uninstall('one', remove_handles=True, remove_history=True, recursive=True)
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
@@ -137,7 +139,8 @@ def test_uninstall_subdataset(src, dst):
         subds.repo.get(annexed_files)
 
         # uninstall data of subds:
-        res = ds.uninstall(path=subds_path)
+        assert_raises(ValueError, ds.uninstall, path=subds_path)
+        res = ds.uninstall(path=subds_path, recursive=True)
         ok_(all([f in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
         # subdataset is still known
@@ -145,7 +148,10 @@ def test_uninstall_subdataset(src, dst):
 
     for subds_path in ds.get_subdatasets():
         # uninstall subds itself:
-        res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True)
+        assert_raises(ValueError, ds.uninstall,
+                      path=subds_path, remove_handles=True, remove_history=True)
+        res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True,
+                           recursive=True)
         subds = Dataset(opj(ds.path, subds_path))
         eq_(res[0], subds)
         ok_(not subds.is_installed())
