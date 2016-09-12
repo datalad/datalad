@@ -19,7 +19,7 @@ RUN apt-get update
 RUN apt-get install -y -q eatmydata
 RUN bash -c "DL_APT"
 # Some rudimentary tools if we need to do anything within docker
-RUN bash -c "eatmydata apt-get install -y -q vim less"
+RUN bash -c "eatmydata apt-get install -y -q vim less man-db"
 RUN apt-get clean
 
 # Let's setup user matching user
@@ -31,7 +31,7 @@ RUN eatmydata apt-get update && eatmydata apt-get install -y --force-yes apache2
 # Install and configure openssh server
 RUN eatmydata apt-get install -q -y openssh-server
 
-RUN chown DL_USER /var/www
+RUN chown DL_USER -R /var/www/html
 
 USER DL_USER
 
