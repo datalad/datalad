@@ -130,6 +130,19 @@ from datalad.support.annexrepo import GitRepo
 
 
 @auto_repr
+class AbsentRepoModel(object):
+    """Just a base for those where repo wasn't installed yet"""
+
+    def __init__(self, path):
+        self.path = path
+        self.repo = None
+
+    @property
+    def type(self):
+        return "N/A"
+
+
+@auto_repr
 class GitModel(object):
     """A base class for models which have some .repo available"""
 
@@ -157,6 +170,10 @@ class GitModel(object):
             except:
                 return None
         return self._branch
+
+    @property
+    def clean(self):
+        return not self.repo.dirty
 
     @property
     def describe(self):
@@ -199,10 +216,6 @@ class AnnexModel(GitModel):
     def __init__(self, *args, **kwargs):
         super(AnnexModel, self).__init__(*args, **kwargs)
         self._info = None
-
-    @property
-    def clean(self):
-        return not self.repo.dirty
 
     @property
     def info(self):
@@ -377,11 +390,23 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = [topds.repo] + (
-        [Dataset(opj(loc, sm)).repo
+    dss = [topds] + (
+        [Dataset(opj(loc, sm))
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(AnnexModel, dss))
+
+    dsms = []
+    for ds in dss:
+        if not ds.is_installed():
+            dsm = AbsentRepoModel(ds.path)
+        elif isinstance(ds.repo, AnnexRepo):
+            dsm = AnnexModel(ds.repo)
+        elif isinstance(ds.repo, GitRepo):
+            dsm = GitModel(ds.repo)
+        else:
+            raise RuntimeError("Got some dataset which don't know how to handle %s"
+                               % ds)
+        dsms.append(dsm)
 
     # adjust path strings
     for ds_model in dsms:
@@ -397,8 +422,14 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or all:
         full_fmt += u"  {ds.clean!X}"
+
+    fmts = {
+        AbsentRepoModel: pathtype_fmt,
+        GitModel: full_fmt,
+        AnnexModel: full_fmt
+    }
     if all:
-        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+        fmts[AnnexModel] += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
@@ -407,7 +438,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     #         for dsm in dss):
     #     print(out)
     for dsm in dsms:
-        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
+        fmt = fmts[dsm.__class__]
+        ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
         print(ds_str)
 
 
@@ -648,8 +680,9 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['nodes'][0]['size'] = fs['size']  # update self's updated size in nodes sublist too!
 
     # add dataset specific entries to its dict
-    fs['tags'] = AnnexModel(rootds.repo).describe
-    fs['branch'] = AnnexModel(rootds.repo).branch
+    rootds_model = GitModel(rootds.repo)
+    fs['tags'] = rootds_model.describe
+    fs['branch'] = rootds_model.branch
     fs['index-mtime'] = time.strftime(u"%Y-%m-%d %H:%M:%S",
                                       time.localtime(getmtime(opj(rootds.path, '.git', 'index'))))
 
