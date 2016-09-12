@@ -78,8 +78,16 @@ if [ -z "$docker_id" ]; then
     # yoh@8c3178bd7ea7:~/datalad$ echo $?
     # 139
     docker exec $docker_id bash -c "cd datalad; pip install -e.[full]"
-else:
+else
     echo "Using running container $docker_id"
+fi
+
+docker_git_version=`docker exec $docker_id git --version 2>&1 | cut -d ' ' -f 3`
+if dpkg --compare-versions $docker_git_version lt 2.4; then
+    echo "I: too old of a git, let's symlink the one from git-annex-standalone"
+    for f in git git-receive-pack git-upload-pack; do
+        docker exec $docker_id ln -sf /usr/lib/git-annex.linux/$f /usr/local/bin/$f
+    done
 fi
 
 cat <<EOF
