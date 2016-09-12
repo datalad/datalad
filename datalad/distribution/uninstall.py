@@ -121,22 +121,28 @@ class Uninstall(Interface):
             constraints=EnsureStr() | EnsureNone()),
         remove_data=Parameter(
             args=("--dont-remove-data",),
-            doc="""""",
+            doc="""whether to drop data associated with matching file handles during
+            uninstallation.[CMD:  This option prevents data from being dropped CMD]""",
             action="store_false",
             dest='remove_data'),
         remove_handles=Parameter(
             args=("--remove-handles",),
-            doc="""""",
+            doc="""if given, matching file handles are removed. This flag is required
+            for deleting entire datasets""",
             action="store_true"),
         recursive=recursion_flag,
         check=Parameter(
             args=("--nocheck",),
-            doc="""""",
+            doc="""whether to perform checks to assure the configured minimum number
+            (remote) source for data to be uninstalled.[CMD:  Give this option to skip
+            checks CMD]""",
             action="store_false",
             dest='check'),
         remove_history=Parameter(
             args=("--remove-history",),
-            doc="""""",
+            doc="""whether to permit operations that remove recorded dataset history,
+            for example when removing entire datasets completely. Such changes are not
+            recoverable, use with care""",
             action="store_true",),
         if_dirty=if_dirty_opt,
     )
@@ -162,6 +168,9 @@ class Uninstall(Interface):
 
         if remove_history and not remove_handles:
             raise ValueError("`remove_history` flag, requires `remove_handles` flag")
+
+        if not remove_data and not remove_handles:
+            raise ValueError("instructured to neither drop data, nor remove handles: cannot perform")
 
         results = []
 

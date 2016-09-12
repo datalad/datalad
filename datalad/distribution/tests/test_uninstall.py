@@ -74,6 +74,8 @@ def test_clean_subds_removal(path):
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
+    # makes no sense to call uninstall, but ask it to do nothing
+    assert_raises(ValueError, uninstall, remove_handles=False, remove_data=False)
     ds = Dataset(path)
     # TODO make these two cases uniform
     if hasattr(ds.repo, 'drop'):
