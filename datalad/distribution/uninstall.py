@@ -160,6 +160,9 @@ class Uninstall(Interface):
                 "least a dataset or a path. To uninstall an entire dataset "
                 "it needs to be given explicitly.")
 
+        if remove_history and not remove_handles:
+            raise ValueError("`remove_history` flag, requires `remove_handles` flag")
+
         results = []
 
         ds = require_dataset(

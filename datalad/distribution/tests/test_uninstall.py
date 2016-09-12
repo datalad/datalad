@@ -269,3 +269,19 @@ def test_uninstall_recursive(path):
     ok_(not exists(lname) and not lexists(lname))
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
+
+
+@with_tempfile()
+def test_remove_dataset_hierarchy(path):
+    ds = Dataset(path).create()
+    ds.create_subdataset('deep')
+    ds.save(auto_add_changes=True)
+    ok_clean_git(ds.path)
+    # fail on missing `remove_handles`, always needs to come with `remove_handles`
+    assert_raises(ValueError, ds.uninstall, remove_history=True)
+    # fail on missing --recursive because subdataset is present
+    assert_raises(ValueError, ds.uninstall, remove_handles=True, remove_history=True)
+    ds.uninstall(remove_history=True, remove_handles=True, recursive=True)
+    # completely gone
+    ok_(not ds.is_installed())
+    ok_(not exists(ds.path))
