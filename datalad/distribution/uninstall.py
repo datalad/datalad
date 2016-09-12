@@ -157,7 +157,7 @@ class Uninstall(Interface):
         if dataset is None and not path:
             raise InsufficientArgumentsError(
                 "insufficient information for uninstallation (needs at "
-                "least a dataset or a path. To uninstall an entire dataset, "
+                "least a dataset or a path. To uninstall an entire dataset "
                 "it needs to be given explicitly.")
 
         results = []
