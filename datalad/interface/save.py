@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import abspath, join as opj, isdir, realpath, relpath
+from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -68,6 +68,13 @@ class Save(Interface):
     Optionally, an additional tag, such as a version, can be assigned to the
     saved state. Such tag enables straightforward retrieval of past versions
     at a later point in time.
+
+    || PYTHON >>
+    Returns
+    -------
+    commit or None
+      `None` if nothing was saved, the resulting commit otherwise.
+    << PYTHON ||
     """
 
     _params_ = dict(
@@ -122,7 +129,7 @@ class Save(Interface):
             if version_tag:
                 ds.repo.tag(version_tag)
             # take the easy one out
-            return False
+            return
 
         # XXX path resolution needs to happen on the input argument, not the
         # resolved dataset!
@@ -220,7 +227,7 @@ class Save(Interface):
         if version_tag:
             ds.repo.tag(version_tag)
 
-        return ds.repo.repo.head.commit if _modified_flag else False
+        return ds.repo.repo.head.commit if _modified_flag else None
 
     @staticmethod
     def result_renderer_cmdline(res, args):
