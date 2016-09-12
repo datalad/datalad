@@ -169,7 +169,7 @@ class Uninstall(Interface):
             # AKA "everything"
             path = [ds.path]
 
-        if isinstance(path, list):
+        if isinstance(path, (list, tuple)):
             if not len(path):
                 # empty list comes from cmdline, if not specified
                 path = [ds.path]
