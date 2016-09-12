@@ -11,12 +11,12 @@
 
 import os
 from os.path import join as opj
-from os.path import exists
+from os.path import exists, lexists
 from os.path import realpath
 
 from datalad.api import uninstall
 from datalad.api import install
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import InsufficientArgumentsError, CommandError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_testrepos
@@ -197,5 +197,37 @@ def test_remove_file_handle_only(path):
     ok_(not exists(path_two))
 
 
-def test_uninstall_recursive():
-    raise SkipTest("TODO")
+@with_tree({'deep': {'dir': {'test': 'testcontent'}}})
+def test_uninstall_recursive(path):
+    ds = Dataset(path).create(force=True)
+    subds = ds.create_subdataset('deep', force=True)
+    # we add one file
+    eq_(len(subds.add('.')), 1)
+    # save all -> all clean
+    ds.save(auto_add_changes=True, recursive=True)
+    ok_clean_git(subds.path)
+    ok_clean_git(ds.path)
+    # now uninstall in subdataset through superdataset
+    target_fname = opj('deep', 'dir', 'test')
+    # sane starting point
+    ok_(exists(opj(ds.path, target_fname)))
+    # uninstallation fails without --recursive
+    assert_raises(ValueError, ds.uninstall, target_fname)
+    # doesn't have the minimum number of copies for a safe drop
+    # TODO: better exception
+    assert_raises(CommandError, ds.uninstall, target_fname, recursive=True)
+    # this should do it
+    ds.uninstall(target_fname, check=False, recursive=True)
+    # link is dead
+    lname = opj(ds.path, target_fname)
+    ok_(not exists(lname))
+    # entire hierarchy saved
+    ok_clean_git(subds.path)
+    ok_clean_git(ds.path)
+    # now same with actual handle removal
+    assert_raises(ValueError, ds.uninstall, target_fname, remove_handles=True)
+    # content is dropped already, so no checks in place anyway
+    ds.uninstall(target_fname, check=True, remove_handles=True, recursive=True)
+    ok_(not exists(lname) and not lexists(lname))
+    ok_clean_git(subds.path)
+    ok_clean_git(ds.path)

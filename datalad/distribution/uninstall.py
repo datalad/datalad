@@ -200,6 +200,9 @@ class Uninstall(Interface):
                     raise ValueError(
                         "refusing to remove current or parent directory")
             containerds = ds.get_containing_subdataset(p, recursion_limit=1)
+            if not recursive and containerds.path != ds.path:
+                raise ValueError(
+                    "will not uninstall content in subdatasets without the recursive flag")
             ps = whocares_paths.get(containerds.path, [])
             ps.append(p)
             whocares_paths[containerds.path] = ps
@@ -230,6 +233,7 @@ class Uninstall(Interface):
         # otherwise deal with any other subdataset
         for subdspath in whocares_paths:
             subds = whocares_ds[subdspath]
+            subdsrelpath = relpath(subdspath, start=ds.path)
             if subds == ds:
                 continue
             res, subds_gone = _uninstall(
@@ -248,8 +252,7 @@ class Uninstall(Interface):
                 # regular access goes by name, but we cannot trust
                 # our own consistency, yet
                 submodule = [sm for sm in ds.repo.repo.submodules
-                             if sm.path == relpath(
-                                 subdspath, start=ds.path)][0]
+                             if sm.path == subdsrelpath][0]
                 submodule.remove()
             elif remove_handles:
                 # we could have removed handles -> save
@@ -258,6 +261,9 @@ class Uninstall(Interface):
                     dataset=subds,
                     auto_add_changes=False,
                     recursive=False)
+                # add this change to the parent, but don't save, will do in
+                # one go below
+                ds.repo.add(subdsrelpath, git=True)
 
         # something of the original dataset is left at this point
         # and all subdatasets have been saved already
