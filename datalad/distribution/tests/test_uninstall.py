@@ -153,8 +153,22 @@ def test_uninstall_multiple_paths():
     raise SkipTest("TODO")
 
 
-def test_uninstall_dataset():
-    raise SkipTest("TODO")
+@with_tempfile()
+def test_uninstall_dataset(path):
+    ds = Dataset(path)
+    ok_(not ds.is_installed())
+    ds.create()
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path)
+    # would only drop data
+    ds.uninstall()
+    ok_clean_git(ds.path)
+    # removing all handles equal removal of entire dataset, needs safety switch
+    assert_raises(ValueError, ds.uninstall, remove_handles=True)
+    ds.uninstall(remove_handles=True, remove_history=True)
+    # completely gone
+    ok_(not ds.is_installed())
+    ok_(not exists(ds.path))
 
 
 def test_uninstall_recursive():

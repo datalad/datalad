@@ -165,15 +165,16 @@ class Uninstall(Interface):
         ds = require_dataset(
             dataset, check_installed=True, purpose='uninstall')
 
-        if isinstance(path, list):
-            if not len(path):
-                path = None
-        else:
-            path = [path]
-
         if path is None:
             # AKA "everything"
             path = [ds.path]
+
+        if isinstance(path, list):
+            if not len(path):
+                # empty list comes from cmdline, if not specified
+                path = [ds.path]
+        else:
+            path = [path]
 
         # XXX Important to resolve against `dataset` input argument, and
         # not against the `ds` resolved dataset
@@ -221,6 +222,9 @@ class Uninstall(Interface):
 
         if ds_gonealready:
             rmtree(ds.path)
+            # the underlying repo is gone, the assert makes sure that the Dataset
+            # instance becomes aware of that
+            assert(not ds.is_installed())
             return results
 
         # otherwise deal with any other subdataset

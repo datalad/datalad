@@ -408,10 +408,14 @@ class Dataset(object):
         -------
         bool
         """
-        return \
-            self.path is not None \
-            and self.repo is not None \
-            and exists(self.repo.repo.git_dir)
+        was_once_installed = self.path is not None and self.repo is not None
+
+        if was_once_installed and not exists(self.repo.repo.git_dir):
+            # repo gone now, reset
+            self._repo = None
+            return False
+        else:
+            return was_once_installed
 
     def get_superdataset(self):
         """Get the dataset's superdataset
