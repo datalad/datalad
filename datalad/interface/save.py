@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import abspath, join as opj, isdir, realpath, relpath
+from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -68,6 +68,13 @@ class Save(Interface):
     Optionally, an additional tag, such as a version, can be assigned to the
     saved state. Such tag enables straightforward retrieval of past versions
     at a later point in time.
+
+    || PYTHON >>
+    Returns
+    -------
+    commit or None
+      `None` if nothing was saved, the resulting commit otherwise.
+    << PYTHON ||
     """
 
     _params_ = dict(
@@ -108,7 +115,26 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
-        # XXX path resolution needs to come before dataset resolution!
+        # import locally to avoid circularity in API
+        from datalad.distribution.add import Add
+        # shortcut
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='saving')
+
+        if not ds.repo.repo.is_dirty(
+                index=True,
+                working_tree=True,
+                untracked_files=True,
+                submodules=True):
+            # if we cannot see anything dirty at all, the only things we could
+            # do is tag
+            if version_tag:
+                ds.repo.tag(version_tag)
+            # take the easy one out
+            return
+
+        # XXX path resolution needs to happen on the input argument, not the
+        # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
         # explicit dataset provided, or just a matching one resolved
         # automatically.
@@ -117,10 +143,6 @@ class Save(Interface):
         if not auto_add_changes and files is not None:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # shortcut
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='saving')
 
         # use the dataset's base path to indiciate that everything
         # should be saved
@@ -180,8 +202,10 @@ class Save(Interface):
                     if ds.get_containing_subdataset(f, recursion_limit=1) == ds]
             if len(absf):
                 # XXX Is there a better way to handle files in mixed repos?
-                ds.repo.add(absf)
-                ds.repo.add(absf, git=True)
+                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
+                             to_git=False)
+                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
+                             to_git=True)
 
         _datalad_msg = False
         if not message:
@@ -207,7 +231,7 @@ class Save(Interface):
         if version_tag:
             ds.repo.tag(version_tag)
 
-        return ds.repo.repo.head.commit if _modified_flag else False
+        return ds.repo.repo.head.commit if _modified_flag else None
 
     @staticmethod
     def result_renderer_cmdline(res, args):
