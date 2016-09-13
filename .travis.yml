@@ -1,10 +1,8 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
-
 cache:
   - apt
-
 matrix:
   include:
   - python: 2.7
