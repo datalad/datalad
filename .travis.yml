@@ -2,11 +2,6 @@
 # travis-ci.org definition for DataLad build
 language: python
 python:
-  - "2.7"
-  #  - "3.2"
-  - "3.3"
-  - "3.4"
-  - "3.5"
 cache:
   - apt
 
@@ -15,6 +10,10 @@ env:
 
 matrix:
   include:
+  - python: 2.7
+  - python: 3.3
+  - python: 3.4
+  - python: 3.5
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
