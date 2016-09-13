@@ -15,8 +15,10 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
+from datalad.tests.utils import ok_clean_git
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.distribution.dataset import Dataset
+from datalad.api import save
 
 _dirty_modes = ('fail', 'ignore', 'save-before')
 
@@ -69,6 +71,6 @@ def test_dirty(path):
     # not added to super on purpose!
     subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
-    orig_state = _check_auto_save(ds, orig_state)
+    ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.get_subdatasets(), ['subds'])

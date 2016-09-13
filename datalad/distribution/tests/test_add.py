@@ -107,8 +107,8 @@ def test_add_files(path):
 @with_tree(**tree_arg)
 def test_add_recursive(path):
     ds = Dataset(path)
-    ds.create(force=True)
-    ds.create('dir', force=True)
+    ds.create(force=True, save=False)
+    ds.create('dir', force=True, if_dirty='ignore')
     ds.save("Submodule added.")
 
     # TODO: CommandError to something meaningful

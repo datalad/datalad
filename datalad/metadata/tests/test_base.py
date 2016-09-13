@@ -83,12 +83,15 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()),
                  ['@context', '@id', 'dcterms:conformsTo', 'type'])
-    ds.create(force=True)
+    ds.create(force=True, save=False)
+    # with subdataset
+    sub = ds.create('sub', force=True, if_dirty='ignore')
+    ds.save()
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[0].keys()),
         ['@context', '@id', 'availableFrom', 'dcterms:conformsTo',
-         'dcterms:modified', 'type', 'version'])
+         'dcterms:hasPart', 'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = Dataset(opj(path, 'sibling'))
@@ -100,8 +103,6 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal([m['@id'] for m in meta[0]['availableFrom']],
                  [m['@id'] for m in sibling_meta[0]['availableFrom']])
-    # with subdataset
-    sub = ds.create('sub', force=True)
     meta = get_metadata(ds, guess_type=True)
     assert_equal(meta[0]['dcterms:hasPart'],
                  {'@id': sub.id,
@@ -115,8 +116,8 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
-    subds = ds.create('sub', force=True)
-    subsubds = subds.create('subsub', force=True)
+    subds = ds.create('sub', force=True, if_dirty='ignore')
+    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second natiev set for the topmost dataset
