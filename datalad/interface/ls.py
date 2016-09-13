@@ -683,8 +683,10 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     rootds_model = GitModel(rootds.repo)
     fs['tags'] = rootds_model.describe
     fs['branch'] = rootds_model.branch
+    index_file = opj(rootds.path, '.git', 'index')
     fs['index-mtime'] = time.strftime(u"%Y-%m-%d %H:%M:%S",
-                                      time.localtime(getmtime(opj(rootds.path, '.git', 'index'))))
+                                      time.localtime(getmtime(index_file))) \
+                        if exists(index_file) else ''
 
     # append children datasets info to current dataset
     fs['nodes'].extend(children)
