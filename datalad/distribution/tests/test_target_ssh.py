@@ -181,27 +181,26 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         # and we should be able to 'reconfigure'
         def process_digests_mtimes(digests, mtimes):
-            if external_versions['cmd:git'] >= '2.4':
-                # it should have triggered a hook, which would have created log and metadata files
-                check_metadata = False
-                for part in 'logs', 'metadata':
-                    metafiles = [k for k in digests if k.startswith(_path_('.git/datalad/%s/' % part))]
-                    # This is in effect ONLY if we have "compatible" datalad installed on remote
-                    # end. ATM we don't have easy way to guarantee that AFAIK (yoh),
-                    # so let's not check/enforce (TODO)
-                    # assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
-                    # Let's actually do it to some degree
-                    if part == 'logs':
-                        # always should have those:
-                        assert (len(metafiles) >= 1)
-                        with open(opj(target_path, metafiles[0])) as f:
-                            if 'no datalad found' not in f.read():
-                                check_metadata = True
-                    if part == 'metadata':
-                        eq_(len(metafiles), bool(check_metadata))
-                    for f in metafiles:
-                        digests.pop(f)
-                        mtimes.pop(f)
+            # it should have triggered a hook, which would have created log and metadata files
+            check_metadata = False
+            for part in 'logs', 'metadata':
+                metafiles = [k for k in digests if k.startswith(_path_('.git/datalad/%s/' % part))]
+                # This is in effect ONLY if we have "compatible" datalad installed on remote
+                # end. ATM we don't have easy way to guarantee that AFAIK (yoh),
+                # so let's not check/enforce (TODO)
+                # assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
+                # Let's actually do it to some degree
+                if part == 'logs':
+                    # always should have those:
+                    assert (len(metafiles) >= 1)
+                    with open(opj(target_path, metafiles[0])) as f:
+                        if 'no datalad found' not in f.read():
+                            check_metadata = True
+                if part == 'metadata':
+                    eq_(len(metafiles), bool(check_metadata))
+                for f in metafiles:
+                    digests.pop(f)
+                    mtimes.pop(f)
             # and just pop some leftovers from annex
             for f in list(digests):
                 if f.startswith('.git/annex/mergedrefs'):
