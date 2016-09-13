@@ -21,6 +21,8 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -113,6 +115,7 @@ class Add(Interface):
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         save=nosave_opt,
+        if_dirty=if_dirty_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts)
@@ -127,6 +130,7 @@ class Add(Interface):
             save=True,
             recursive=False,
             recursion_limit=None,
+            if_dirty='save-before',
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
@@ -159,6 +163,7 @@ class Add(Interface):
         # resolve dataset:
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='adding')
+        handle_dirty_dataset(dataset, if_dirty)
 
         # resolve source(s):
         resolved_sources = []

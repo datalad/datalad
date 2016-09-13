@@ -241,10 +241,10 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True, save=False)
+    ds = Dataset(path).create(force=True, if_dirty='ignore')
     subds = ds.create('deep', force=True, if_dirty='ignore')
     # we add one file
-    eq_(len(subds.add('.')), 1)
+    eq_(len(subds.add('.', if_dirty='ignore')), 1)
     # save all -> all clean
     ds.save(auto_add_changes=True, recursive=True)
     ok_clean_git(subds.path)
