@@ -902,7 +902,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     """
     if time_ is None:
         time_ = time.time()
-    return time.strftime(prefix + TIMESTAMP_FMT, time.localtime(time_))
+    return time.strftime(prefix + TIMESTAMP_FMT, time.gmtime(time_))
 
 
 def get_logfilename(dspath, cmd='datalad'):
