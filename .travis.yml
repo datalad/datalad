@@ -2,18 +2,19 @@
 # travis-ci.org definition for DataLad build
 language: python
 python:
+  - 2.7
+  - 3.3
+  - 3.4
+  - 3.5
 cache:
   - apt
 
 env:
-  - BOTO_CONFIG=/tmp/nowhere DATALAD_TESTS_SSH=1
+  - DATALAD_TESTS_SSH=1
 
 matrix:
   include:
-  - python: 2.7
-  - python: 3.3
-  - python: 3.4
-  - python: 3.5
+  # Additional custom ones
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
