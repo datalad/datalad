@@ -20,7 +20,7 @@ from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
 from datalad.support.stats import ActivityStats
 from datalad.utils import assure_dir
-from datalad.utils import get_logfilename
+from datalad import utils
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
@@ -157,7 +157,7 @@ class Crawl(Interface):
                 # explicit, that some sub-datasets might not need to be crawled, so they get
                 # skipped explicitly?
                 for ds_ in subdatasets:
-                    ds_logfile = get_logfilename(ds_, 'crawl')
+                    ds_logfile = utils.get_logfilename(ds_, 'crawl')
                     try:
                         # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
                         with swallow_logs(file_=ds_logfile) as cml:
