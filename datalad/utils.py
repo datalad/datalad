@@ -673,6 +673,9 @@ def swallow_logs(new_level=None, file_=None):
                 rmtemp(out_name)
 
     adapter = StringIOAdapter()
+    # TODO: it does store messages but without any formatting, i.e. even without
+    # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
+    # set
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
@@ -684,6 +687,8 @@ def swallow_logs(new_level=None, file_=None):
 
     try:
         yield adapter
+        # TODO: if file_ and there was an exception -- most probably worth logging it?
+        # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
         lgr.handlers, lgr.level = old_handlers, old_level
         adapter.cleanup()
