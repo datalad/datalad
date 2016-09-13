@@ -1036,8 +1036,8 @@ class GitRepo(object):
 
         Returns
         -------
-        Nothing yet.
-        TODO: Provide FetchInfo?
+        list
+            FetchInfo objects of the items fetched from remote
         """
         # TODO: options=> **kwargs):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
@@ -1049,7 +1049,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
@@ -1087,6 +1087,7 @@ class GitRepo(object):
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+        return fi_list
 
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """See fetch
@@ -1097,7 +1098,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
             tb = self.repo.active_branch.tracking_branch().name
@@ -1123,8 +1124,7 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                return remote.pull(refspec=refspec, progress=progress,
-                                      **kwargs)
+                return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
@@ -1133,6 +1133,10 @@ class GitRepo(object):
     def push(self, remote=None, refspec=None, progress=None, all_=False,
              **kwargs):
         """See fetch
+        Returns
+        -------
+        list
+            PushInfo objects of the items pushed to remote
         """
 
         if remote is None:
@@ -1141,7 +1145,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_push = self.repo.remotes
             else:
@@ -1172,12 +1176,12 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list += rm.push(refspec=refspec, progress=progress,
-                                   **kwargs)
+                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
+        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.

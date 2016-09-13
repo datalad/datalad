@@ -78,6 +78,22 @@ function getParameterByName(name, url) {
 }
 
 /**
+ * Create Breadcrumbs to current location in dataset
+ * @return {array} html linkified breadcrumbs array
+ */
+function bread2crumbs() {
+  var raw_crumbs = loc().href.split('/');
+  var crumbs = [];
+  for (var index = 2; index < raw_crumbs.length() - 1; index++) {
+    if (raw_crumbs[index] !== '?dir=')
+      continue;
+    var crumb_link = raw_crumbs.slice(0, index).join('/');
+    crumbs.append('<a href=' + crumb_link + '>' + raw_crumbs[index] + '</a>');
+  }
+  return crumbs;
+}
+
+/**
  * update url parameter or url ?
  * @param {string} next_url next url to traverse to
  * @param {string} type type of clicked node
