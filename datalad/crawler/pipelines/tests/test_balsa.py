@@ -220,7 +220,7 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     commits = {b: list(repo.get_branch_commits(b)) for b in branches}
     eq_(len(commits['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
-    eq_(len(commits['master']), 4)  # all commits out there -- init + 2*(incoming, processed, merge)
+    eq_(len(commits['master']), 5)  # all commits out there -- init ds + init crawler + 1*(incoming, processed, merge)
 
     with chpwd(outd):
         eq_(set(glob('*')), {'dir1', 'file1.nii'})

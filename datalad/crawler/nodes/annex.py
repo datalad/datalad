@@ -75,6 +75,7 @@ class initiate_dataset(object):
     def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
                  template_func=None, template_kwargs=None,
+                 add_to_super='auto',
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -98,6 +99,8 @@ class initiate_dataset(object):
           Supported by git-annex backend.  By default (if None specified),
           it is MD5E backend to improve compatibility with filesystems
           having a relatively small limit for a maximum path size
+        add_to_super : bool or 'auto', optional
+          Add to super-dataset
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the dataset crawling options -- would be passed into the corresponding
@@ -122,6 +125,7 @@ class initiate_dataset(object):
         self.branch = branch
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
         self.backend = backend
+        self.add_to_super = add_to_super
 
     def _initiate_dataset(self, path, name):
         lgr.info("Initiating dataset %s" % name)
@@ -146,21 +150,30 @@ class initiate_dataset(object):
                 path=path,
                 force=False,
                 # no_annex=False,  # TODO: add as an arg
-                save=not bool(backend),
+                # Passing save arg based on backend was that we need to save only if
+                #  custom backend was specified, but now with dataset id -- should always save
+                # save=not bool(backend),
                 # annex_version=None,
                 annex_backend=backend,
                 #git_opts=None,
                 #annex_opts=None,
                 #annex_init_opts=None
         )
-        # place hack from 'add-to-super' times here
-        sds = ds.get_superdataset()
-        if sds is not None:
-            from datalad.distribution.install import _install_subds_inplace
-            subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
-            _install_subds_inplace(ds=sds, path=ds.path,
-                                   relativepath=subdsrelpath)
-            # this leaves the subdataset staged in the parent
+        if self.add_to_super:
+            # place hack from 'add-to-super' times here
+            sds = ds.get_superdataset()
+            if sds is not None:
+                from datalad.distribution.install import _install_subds_inplace
+                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
+                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
+                _install_subds_inplace(ds=sds, path=ds.path,
+                                       relativepath=subdsrelpath)
+                # this leaves the subdataset staged in the parent
+            elif str(self.add_to_super) != 'auto':
+                raise ValueError(
+                    "Was instructed to add to super dataset but no super dataset "
+                    "was found for %s" % ds
+                )
 
         # create/AnnexRepo specification of backend does it non-persistently in .git/config
         if backend:
