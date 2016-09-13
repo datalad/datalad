@@ -223,7 +223,7 @@ def test_get_containing_subdataset(path):
     ds = create(path, force=True)
     ds.install(path='test.txt')
     ds.save("Initial commit")
-    subds = ds.create_subdataset("sub")
+    subds = ds.create("sub")
 
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)

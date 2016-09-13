@@ -34,11 +34,15 @@ lgr = logging.getLogger('datalad.interface.commit')
 
 
 def untracked_subdatasets_to_submodules(ds, consider_paths):
-    _modified_flag = False
     # treat special case of still untracked subdatasets.
     # those need to become submodules now, as they are otherwise added
     # without an entry in .gitmodules, and subsequently break Git's
     # submodule functionality completely
+    _modified_flag = False
+    if not consider_paths:
+        # nothing to test
+        return False
+
     for utf in ds.repo.repo.untracked_files:
         utf_abspath = opj(ds.path, utf)
         if not isdir(utf_abspath):
