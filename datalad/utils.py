@@ -645,7 +645,8 @@ def swallow_logs(new_level=None, file_=None):
                 out_file = tempfile.mktemp(**kw)
             else:
                 out_file = file_
-            self._out = open(out_file, 'wa')
+            # PY3 requires clearly one or another.  race condition possible
+            self._out = open(out_file, 'a')
 
         def _read(self, h):
             with open(h.name) as f:
@@ -900,9 +901,12 @@ def get_timestamp_suffix(time_=None, prefix='-'):
 
     primarily to be used for generation of log files names
     """
-    if time_ is None:
-        time_ = time.time()
-    return time.strftime(prefix + TIMESTAMP_FMT, time.gmtime(time_))
+    args = []
+    if time_ is not None:
+        if isinstance(time_, int):
+            time_ = time.gmtime(time_)
+        args.append(time_)
+    return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
 def get_logfilename(dspath, cmd='datalad'):
