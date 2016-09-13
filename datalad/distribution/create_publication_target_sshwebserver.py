@@ -36,6 +36,7 @@ from datalad import ssh_manager
 from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
+from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
 from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
@@ -399,17 +400,19 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
-        logs_remote_dir = opj(path, '.git', 'datalad', 'logs')
+        # post-update hook should create its log directory if doesn't exist
+        logs_remote_dir = opj(path, WEB_META_LOG)
+
+        make_log_dir = 'mkdir -p "{}"'.format(logs_remote_dir)
 
         # create json command for current dataset
-        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file \'{}\';) &> "{}/{}" || :'
-        json_command = json_command.format(str(path), logs_remote_dir, 'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
+        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git \
+        datalad ls -r --json file \'{}\';) &> "{}/{}"'.format(str(path),
+                                                              logs_remote_dir,
+                                                              'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
 
         # collate content for post_update hook
-        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
-
-        # make datalad logs directory
-        ssh(['mkdir', '-p', logs_remote_dir, hooks_remote_dir])
+        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
 
         with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
             ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
@@ -425,7 +428,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
-        webresources_remote = opj(path, '.git', 'datalad', 'web')
+        webresources_remote = opj(path, WEB_HTML_DIR)
         ssh(['mkdir', '-p', webresources_remote])
         ssh.copy(webresources_local, webresources_remote, recursive=True)
 
