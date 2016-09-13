@@ -13,6 +13,7 @@ import six.moves.builtins as __builtin__
 import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
+from os.path import isdir
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 from six import text_type, binary_type
 
@@ -620,7 +621,7 @@ def swallow_outputs():
 
 
 @contextmanager
-def swallow_logs(new_level=None):
+def swallow_logs(new_level=None, file_=None):
     """Context manager to consume all logs.
 
     """
@@ -638,10 +639,13 @@ def swallow_logs(new_level=None):
         And to stay consistent with how swallow_outputs behaves
         """
         def __init__(self):
-            kw = dict()
-            get_tempfile_kwargs(kw, prefix="logs")
-
-            self._out = open(tempfile.mktemp(**kw), 'w')
+            if file_ is None:
+                kw = dict()
+                get_tempfile_kwargs(kw, prefix="logs")
+                out_file = tempfile.mktemp(**kw)
+            else:
+                out_file = file_
+            self._out = open(out_file, 'wa')
 
         def _read(self, h):
             with open(h.name) as f:
@@ -665,9 +669,13 @@ def swallow_logs(new_level=None):
             out_name = self._out.name
             del self._out
             gc.collect()
-            rmtemp(out_name)
+            if not file_:
+                rmtemp(out_name)
 
     adapter = StringIOAdapter()
+    # TODO: it does store messages but without any formatting, i.e. even without
+    # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
+    # set
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
@@ -679,6 +687,8 @@ def swallow_logs(new_level=None):
 
     try:
         yield adapter
+        # TODO: if file_ and there was an exception -- most probably worth logging it?
+        # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
         lgr.handlers, lgr.level = old_handlers, old_level
         adapter.cleanup()
@@ -883,5 +893,26 @@ def _path_(*p):
     else:
         # Assume that all others as POSIX compliant so nothing to be done
         return opj(*p)
+
+def get_timestamp_suffix(time_=None, prefix='-'):
+    """Return a time stamp (full date and time up to second)
+
+    primarily to be used for generation of log files names
+    """
+    if time_ is None:
+        time_ = time.time()
+    return time.strftime(prefix + "%Y%m%d%H%M%S", time.localtime(time_))
+
+def get_logfilename(dspath, cmd='datalad'):
+    """Return a filename to use for logging under a dataset/repository
+
+    directory would be created if doesn't exist, but dspath must exist
+    and be a directory
+    """
+    assert(exists(dspath))
+    assert(isdir(dspath))
+    ds_logdir = assure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
+    return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
+
 
 lgr.log(5, "Done importing datalad.utils")
