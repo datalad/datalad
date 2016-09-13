@@ -11,13 +11,16 @@
 __docformat__ = 'restructuredtext'
 
 
-from os.path import exists, isdir
+from os.path import exists
+from os.path import join as opj
 from .base import Interface
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
 from datalad.support.stats import ActivityStats
+from datalad.utils import assure_dir
+from datalad.utils import get_logfilename
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
@@ -156,7 +159,7 @@ class Crawl(Interface):
                 for ds_ in subdatasets:
                     try:
                         # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
-                        with swallow_logs() as cml:
+                        with swallow_logs(file_=get_logfilename(ds_, 'crawl')) as cml:
                             output_, stats_ = crawl(chdir=ds_)
                             stats_total += stats_
                             output.append(output_)

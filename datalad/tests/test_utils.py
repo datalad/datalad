@@ -40,6 +40,8 @@ from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
 from ..utils import _path_
+from ..utils import get_timestamp_suffix
+
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -100,7 +102,8 @@ def test_swallow_outputs():
         eq_(cm.err, 'out error')  # the same value if multiple times
 
 
-def test_swallow_logs():
+@with_tempfile
+def test_swallow_logs(logfile):
     lgr = logging.getLogger('datalad')
     with swallow_logs(new_level=9) as cm:
         eq_(cm.out, '')
@@ -110,6 +113,11 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n')  # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+    with swallow_logs(new_level=9, file_=logfile) as cm:
+        eq_(cm.out, '')
+        lgr.info("next info")
+    from datalad.tests.utils import ok_file_has_content
+    ok_file_has_content(logfile, "next info", strip=True)
 
 
 def _check_setup_exceptionhook(interactive):
@@ -421,3 +429,10 @@ def test_path_():
         p = 'a/b/c'
         assert(_path_(p) is p)  # nothing is done to it whatsoever
         eq_(_path_(p, 'd'), 'a/b/c/d')
+
+def test_get_timestamp_suffix():
+    assert_equal(get_timestamp_suffix(0), '-19691231190000')  # skynet DOB
+    assert_equal(get_timestamp_suffix(0, prefix="+"), '+19691231190000')
+    import time
+    with patch.object(time, 'time', lambda: 1):
+        assert_equal(get_timestamp_suffix(), '-19691231190001')  # skynet is 1 sec old
