@@ -181,15 +181,15 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
       Matches to exclude
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
-      as regex to exclude those files (regex: %r)
+      as regex to exclude those files (regex: `%r`)
     exclude_datalad:
       If True, excludes files known to be datalad meta-data files (e.g. under
-      .datalad/ subdirectory) (regex: %r)
+      .datalad/ subdirectory) (regex: `%r`)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % (_VCS_REGEX, _DATALAD_REGEX)
+    """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -204,6 +204,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
             if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
+find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
 
 
 def expandpath(path, force_absolute=True):
@@ -875,12 +876,12 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
                 pass
 
 
-def _path_(p):
+def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
     if on_windows:
-        return opj(p.split('/'))
+        return opj(*map(lambda x: x.split('/'), p))
     else:
         # Assume that all others as POSIX compliant so nothing to be done
-        return p
+        return opj(*p)
 
 lgr.log(5, "Done importing datalad.utils")

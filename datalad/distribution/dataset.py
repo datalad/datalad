@@ -18,6 +18,7 @@ from os.path import realpath
 from os.path import relpath
 from os.path import commonprefix
 from os.path import sep
+from os.path import exists
 from six import string_types
 from six import PY2
 from functools import wraps
@@ -409,7 +410,14 @@ class Dataset(object):
         -------
         bool
         """
-        return self.path is not None and self.repo is not None
+        was_once_installed = self.path is not None and self.repo is not None
+
+        if was_once_installed and not exists(self.repo.repo.git_dir):
+            # repo gone now, reset
+            self._repo = None
+            return False
+        else:
+            return was_once_installed
 
     def get_superdataset(self):
         """Get the dataset's superdataset
@@ -581,7 +589,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 
     assert(dataset is not None)
     lgr.debug("Resolved dataset{0}: {1}".format(
-        'for {}'.format(purpose) if purpose else '',
+        ' for {}'.format(purpose) if purpose else '',
         dataset))
 
     if check_installed and not dataset.is_installed():

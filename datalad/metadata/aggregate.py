@@ -14,8 +14,9 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj, exists, relpath
 from datalad.interface.base import Interface
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.interface.common_opts import allow_dirty
+from datalad.interface.common_opts import if_dirty_opt
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     Dataset, require_dataset
 from ..support.param import Parameter
@@ -51,35 +52,37 @@ class AggregateMetaData(Interface):
             doc="""guess native meta data type of datasets, if none is
             configured. With a configured, or auto-detected meta data type,
             no native meta data will be aggregated."""),
-        save=Parameter(
-            args=('--save',),
-            action='store_true',
-            doc="""save aggregated meta data in the dataset(s). If a dataset has
-            unsaved changes, setting this flag will cause an error to avoid
-            accidentally saving arbitrary changes."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        allow_dirty=allow_dirty,
+        if_dirty=if_dirty_opt,
     )
 
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
-    def __call__(dataset, guess_native_type=False, save=False, recursive=False,
-                 recursion_limit=None, allow_dirty=False):
+    def __call__(dataset, guess_native_type=False, recursive=False,
+                 recursion_limit=None, if_dirty='save-before'):
         dataset = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
 
-        # it is important to check this prior diving into subdatasets
-        # because we might also modify them
-        if save and \
-            not allow_dirty and \
-                dataset.repo.repo.is_dirty(
-                    index=True,
-                    working_tree=False,
-                    submodules=True):
-            raise RuntimeError(
-                "not aggregating meta data in {}, saving requested, but unsaved changes are already present".format(
-                    dataset))
+        # make sure we get to an expected state
+        handle_dirty_dataset(dataset, if_dirty)
+
+        # track whether we modified anything during aggregation, so it becomes
+        # possible to decide what to save one level up
+        _modified_flag = False
+
+        # check for OLD datasets without a configured ID, and save the current
+        # one it
+        dsonly_cfg = ConfigManager(dataset, dataset_only=True)
+        if not 'datalad.dataset.id' in dsonly_cfg:
+            dsonly_cfg.add(
+                'datalad.dataset.id',
+                dataset.id,
+                where='dataset',
+                reload=False)
+            dataset.repo.add(opj('.datalad', 'config'), git=True)
+            dataset.save(message="[DATALAD] record generated dataset ID")
+            _modified_flag = True
 
         # use one set of subdataset instances to ensure consistent IDs even
         # when none is configured
@@ -94,30 +97,18 @@ class AggregateMetaData(Interface):
         # recursive, depth first
         if recursive and (recursion_limit is None or recursion_limit):
             for subds in subdss:
-                AggregateMetaData.__call__(
+                subds_modified = AggregateMetaData.__call__(
                     subds,
                     guess_native_type=guess_native_type,
-                    save=save,
                     recursive=recursive,
                     recursion_limit=None if recursion_limit is None else recursion_limit - 1,
-                    allow_dirty=allow_dirty
+                    if_dirty=if_dirty
                 )
-                # stage potential changes in this submodule
-                dataset.repo.add(relpath(subds.path, dataset.path),
-                                 git=True)
-
-        # check for OLD datasets without a configured ID, and save the current
-        # one it
-        dsonly_cfg = ConfigManager(dataset, dataset_only=True)
-        if not 'datalad.dataset.id' in dsonly_cfg:
-            dsonly_cfg.add(
-                'datalad.dataset.id',
-                dataset.id,
-                where='dataset',
-                reload=False)
-            dataset.repo.add(opj('.datalad', 'config'), git=True)
-            # TODO postpone actual save till unification of save behavior
-            # across all commands
+                if subds_modified:
+                    # stage potential changes in this submodule
+                    dataset.repo.add(relpath(subds.path, dataset.path),
+                                     git=True)
+                    _modified_flag = True
 
         lgr.info('aggregating meta data for {}'.format(dataset))
         # root path
@@ -135,6 +126,7 @@ class AggregateMetaData(Interface):
         if native_metadata:
             # avoid practically empty files
             _store_json(metapath, native_metadata)
+            _modified_flag = True
 
         for subds in subdss:
             subds_relpath = relpath(subds.path, dataset.path)
@@ -152,10 +144,16 @@ class AggregateMetaData(Interface):
             _store_json(
                 opj(metapath, subds_relpath),
                 subds_meta)
-        if save and exists(opj(dataset.repo.path, metapath)):
+            _modified_flag = True
+
+        # double check might be redundant now, but it is also rather cheap
+        if _modified_flag and exists(opj(dataset.repo.path, metapath)):
             dataset.repo.add(metapath, git=True)
             if dataset.repo.repo.is_dirty(
                     index=True,
                     working_tree=False,
                     submodules=True):
-                dataset.save(message="[DATALAD] save aggregated meta data")
+                dataset.save(message="[DATALAD] aggregated meta data")
+
+        # report modifications, e.g. to the superdataset aggregate call
+        return _modified_flag

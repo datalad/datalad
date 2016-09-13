@@ -68,7 +68,7 @@ class SSHConnection(object):
         self.port = port
         self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
-    def __call__(self, cmd):
+    def __call__(self, cmd, wrap_args=True):
         """Executes a command on the remote.
 
         Parameters
@@ -91,7 +91,8 @@ class SSHConnection(object):
         # entire argument into "" while escaping possibly present " inside.
         # I guess for the ` & and other symbols used in the shell -- yet to figure out
         # how to escape it reliably.
-        cmd_list = list(map(_wrap_str, cmd_list))
+        if wrap_args:
+            cmd_list = list(map(_wrap_str, cmd_list))
         ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd_list
 
         # TODO: pass expect parameters from above?
@@ -162,7 +163,7 @@ class SSHConnection(object):
             else [source]
 
         # add destination path
-        scp_cmd += [self.host + ":" + destination]
+        scp_cmd += ['%s:"%s"' % (self.host, destination)]
         return self.runner.run(scp_cmd)
 
 

@@ -287,13 +287,12 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
                                                  commits_l['incoming-processed'][1].hexsha))
 
     with chpwd(outd):
-        eq_(set(glob('*')), {'changelog.txt', 'README.txt', 'sub-1'})
+        eq_(set(glob('*')), {'changelog.txt', 'sub-1'})
         all_files = sorted(find_files('.'))
 
     t1w_fpath = opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat')
     ok_file_has_content(t1w_fpath, "mighty load 1.0.1")
     ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
-    ok_file_under_git(opj(outd, 'README.txt'), annexed=False)
     ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {
@@ -303,10 +302,10 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         # './.datalad/config.ttl', './.datalad/datalad.ttl',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/crawl/versions/incoming.json',
-        './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
+        './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
     target_incoming_files = {
         '.gitattributes',  # we marked default backend right in the incoming
-        'README.txt', 'changelog.txt',
+        'changelog.txt',
         'ds666.tar.gz',
         'ds666-beh_R1.0.1.tar.gz', 'ds666_R1.0.0.tar.gz', 'ds666_R1.0.1.tar.gz', 'ds666_R2.0.0.tar.gz',
         '.datalad/crawl/statuses/incoming.json',
@@ -328,7 +327,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     # actually we do manage to add_git 1 (README) since it is generated committed directly to git
     # BUT now fixed -- if not committed (was the same), should be marked as skipped
     # Nothing was committed so stats leaked all the way up
-    eq_(out[0]['datalad_stats'], ActivityStats(files=6, skipped=6, urls=5))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=5, skipped=5, urls=5))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     # rerun pipeline when new content is available
@@ -358,7 +357,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     # but for some reason downloaded_size fluctuates.... why? probably archiving...?
     total_stats.downloaded_size = 0
     eq_(total_stats,
-        ActivityStats(files=9, skipped=6, downloaded=1, renamed=1, urls=6,
+        ActivityStats(files=8, skipped=5, downloaded=1, renamed=1, urls=6,
                       add_annex=2,  # add_git=1, # README
                       versions=['2.0.0'],
                       merges=[['incoming', 'incoming-processed']]))
@@ -475,7 +474,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    eq_(out[0]['datalad_stats'], ActivityStats(files=3, skipped=3, urls=2))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=2, skipped=2, urls=2))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     os.rename(opj(ind, 'ds666', 'ds666_R2.0.0.tar.gz'), opj(ind, 'ds666', 'ds666.tar.gz'))
@@ -487,7 +486,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     stats_total = out[0]['datalad_stats'].get_total()
     stats_total.downloaded_size = 0
     eq_(stats_total,
-        ActivityStats(files=5, overwritten=1, skipped=2, downloaded=1,
+        ActivityStats(files=4, overwritten=1, skipped=1, downloaded=1,
                       merges=[['incoming', 'incoming-processed']],
                       versions=['1.0.0'],
                       renamed=1, urls=2, add_annex=2))
