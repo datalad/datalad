@@ -110,7 +110,7 @@ script:
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
-  - grunt test --verbose --force
+  - grunt test --verbose
 
 after_success:
   - codecov
