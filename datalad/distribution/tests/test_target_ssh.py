@@ -48,7 +48,9 @@ import logging
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
     paths = [_path_(".git/hooks/post-update")]     # hooks enabled in all datasets
-    not_paths = [_path_(".git/datalad/metadata")]  # metadata only on publish
+    not_paths = []  # _path_(".git/datalad/metadata")]  # metadata only on publish
+                    # ATM we run post-update hook also upon create since it might
+                    # be a reconfiguration (TODO: I guess could be conditioned)
 
     # web-interface html pushed to dataset root
     web_paths = ['index.html', _path_(".git/datalad/web")]
@@ -181,9 +183,22 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         def process_digests_mtimes(digests, mtimes):
             if external_versions['cmd:git'] >= '2.4':
                 # it should have triggered a hook, which would have created log and metadata files
-                for part in 'metadata', 'logs':
+                check_metadata = False
+                for part in 'logs', 'metadata':
                     metafiles = [k for k in digests if k.startswith(_path_('.git/datalad/%s/' % part))]
-                    assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
+                    # This is in effect ONLY if we have "compatible" datalad installed on remote
+                    # end. ATM we don't have easy way to guarantee that AFAIK (yoh),
+                    # so let's not check/enforce (TODO)
+                    # assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
+                    # Let's actually do it to some degree
+                    if part == 'logs':
+                        # always should have those:
+                        assert (len(metafiles) >= 1)
+                        with open(opj(target_path, metafiles[0])) as f:
+                            if 'no datalad found' not in f.read():
+                                check_metadata = True
+                    if part == 'metadata':
+                        eq_(len(metafiles), bool(check_metadata))
                     for f in metafiles:
                         digests.pop(f)
                         mtimes.pop(f)

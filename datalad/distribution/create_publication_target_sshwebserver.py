@@ -37,6 +37,7 @@ from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
 from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
+from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
@@ -406,10 +407,16 @@ class CreatePublicationTargetSSHWebserver(Interface):
         make_log_dir = 'mkdir -p "{}"'.format(logs_remote_dir)
 
         # create json command for current dataset
-        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git \
-        datalad ls -r --json file \'{}\';) &> "{}/{}"'.format(str(path),
-                                                              logs_remote_dir,
-                                                              'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
+        json_command = r'''
+( which datalad > /dev/null \
+  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
+  || echo "no datalad found - skipping generation of indexes for web frontend"; \
+) &> "{}/{}"
+'''.format(
+            str(path),
+            logs_remote_dir,
+            'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
+        )
 
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
