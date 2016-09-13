@@ -19,11 +19,13 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - DATALAD_LOGLEVEL=INFO
+    - DATALAD_TESTS_SSH=1
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOGLEVEL=2
     - DATALAD_LOGTARGET=/dev/null
+    - DATALAD_TESTS_SSH=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -47,12 +49,14 @@ matrix:
     # Eventually we will get there, but atm causes a good number of failures
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
+    - DATALAD_TESTS_SSH=1
   - python: 2.7
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
+    - DATALAD_TESTS_SSH=1
 
 
 
