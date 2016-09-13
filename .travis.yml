@@ -7,10 +7,12 @@ cache:
 
 env:
  global:
-  - BOTO_CONFIG=/tmp/nowhere
-  - DATALAD_TESTS_SSH=1
+  - BOTO_CONFIG=/tmp/nowhere DATALAD_TESTS_SSH=1
 
 matrix:
+  exclude:
+  # exclude the non-specified one? ;)
+  - python:
   include:
   - python: 2.7
   # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
