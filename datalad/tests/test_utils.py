@@ -430,9 +430,10 @@ def test_path_():
         assert(_path_(p) is p)  # nothing is done to it whatsoever
         eq_(_path_(p, 'd'), 'a/b/c/d')
 
+
 def test_get_timestamp_suffix():
-    assert_equal(get_timestamp_suffix(0), '-19691231190000')  # skynet DOB
-    assert_equal(get_timestamp_suffix(0, prefix="+"), '+19691231190000')
+    assert_equal(get_timestamp_suffix(0), '-1969-12-31T19:00:00+0000')  # skynet DOB
+    assert_equal(get_timestamp_suffix(0, prefix="+"), '+1969-12-31T19:00:00+0000')
     import time
     with patch.object(time, 'time', lambda: 1):
-        assert_equal(get_timestamp_suffix(), '-19691231190001')  # skynet is 1 sec old
+        assert_equal(get_timestamp_suffix(), '-1969-12-31T19:00:01+0000')  # skynet is 1 sec old

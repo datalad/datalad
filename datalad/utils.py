@@ -30,7 +30,8 @@ import glob
 from functools import wraps
 from time import sleep
 from inspect import getargspec
-from datalad.dochelpers import get_docstring_split
+# from datalad.dochelpers import get_docstring_split
+from datalad.consts import TIMESTAMP_FMT
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -894,6 +895,7 @@ def _path_(*p):
         # Assume that all others as POSIX compliant so nothing to be done
         return opj(*p)
 
+
 def get_timestamp_suffix(time_=None, prefix='-'):
     """Return a time stamp (full date and time up to second)
 
@@ -901,7 +903,8 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     """
     if time_ is None:
         time_ = time.time()
-    return time.strftime(prefix + "%Y%m%d%H%M%S", time.localtime(time_))
+    return time.strftime(prefix + TIMESTAMP_FMT, time.localtime(time_))
+
 
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
