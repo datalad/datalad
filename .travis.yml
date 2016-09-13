@@ -1,7 +1,12 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
-
+python:
+  - "2.7"
+  #  - "3.2"
+  - "3.3"
+  - "3.4"
+  - "3.5"
 cache:
   - apt
 
@@ -10,9 +15,6 @@ env:
   - BOTO_CONFIG=/tmp/nowhere DATALAD_TESTS_SSH=1
 
 matrix:
-  exclude:
-  # exclude the non-specified one? ;)
-  - python:
   include:
   - python: 2.7
   # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
@@ -57,8 +59,8 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
-  - python: 3.3
   - python: 3.4
+  - python: 3.5
   # Those aren't yet ready since lxml I believe fails to install
   #- python: pypy
   #- python: pypy3
