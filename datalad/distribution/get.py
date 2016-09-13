@@ -106,11 +106,6 @@ class Get(Interface):
             annex_opts=None,
             annex_get_opts=None):
 
-        # resolve dataset:
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='getting content')
-        lgr.debug("Resolved dataset: %s" % ds)
-
         # check parameters:
         if path is None:
             raise InsufficientArgumentsError("insufficient information for "
@@ -126,7 +121,12 @@ class Get(Interface):
         lgr.info("Resolving paths ...")
         resolved_paths = [resolve_path(p, dataset) for p in path]
 
-        # resolve associated datasets:
+        # resolve base dataset:
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='getting content')
+        lgr.debug("Resolved dataset: %s" % ds)
+
+        # resolve possible subdatasets:
         lgr.info("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
         for p in resolved_paths:
