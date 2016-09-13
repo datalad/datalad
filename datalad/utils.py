@@ -641,8 +641,7 @@ def swallow_logs(new_level=None, file_=None):
         """
         def __init__(self):
             if file_ is None:
-                kw = dict()
-                get_tempfile_kwargs(kw, prefix="logs")
+                kw = get_tempfile_kwargs({}, prefix="logs")
                 out_file = tempfile.mktemp(**kw)
             else:
                 out_file = file_
