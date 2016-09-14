@@ -442,6 +442,9 @@ class GitRepo(object):
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
             try:
+
+                # TODO: Seems to be an error in the original code already: `self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from ...`
+                #       Also check for self.repo at 'else' in line 477
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
                 self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
                                       odbt=default_git_odbt)
