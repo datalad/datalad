@@ -21,6 +21,8 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -113,6 +115,7 @@ class Add(Interface):
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         save=nosave_opt,
+        if_dirty=if_dirty_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts)
@@ -127,6 +130,7 @@ class Add(Interface):
             save=True,
             recursive=False,
             recursion_limit=None,
+            if_dirty='ignore',
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
@@ -159,6 +163,7 @@ class Add(Interface):
         # resolve dataset:
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='adding')
+        handle_dirty_dataset(dataset, if_dirty)
 
         # resolve source(s):
         resolved_sources = []
@@ -192,8 +197,8 @@ class Add(Interface):
             for p in resolved_paths:
                 if isdir(p):
                     for subds_path in \
-                      dataset.get_subdatasets(absolute=True, recursive=True,
-                                              recursion_limit=recursion_limit):
+                        dataset.get_subdatasets(absolute=True, recursive=True,
+                                                recursion_limit=recursion_limit):
                         if subds_path.startswith(_with_sep(p)):
                             resolved_datasets.append(Dataset(subds_path))
                             resolved_paths.append(curdir)
@@ -216,15 +221,15 @@ class Add(Interface):
         param_tuples = [(d if d is not None else dataset, p, s)
                         for d, p, s in param_tuples]
 
-        calls = {d.path: { # list of paths to 'git-add':
-                           'g_add': [],
-                           # list of paths to 'git-annex-add':
-                           'a_add': [],
-                           # list of sources to 'git-annex-addurl':
-                           'addurl_s': [],
-                           # list of (path, source) to
-                           # 'git-annex-addurl --file':
-                           'addurl_f': []
+        calls = {d.path: {  # list of paths to 'git-add':
+                            'g_add': [],
+                            # list of paths to 'git-annex-add':
+                            'a_add': [],
+                            # list of sources to 'git-annex-addurl':
+                            'addurl_s': [],
+                            # list of (path, source) to
+                            # 'git-annex-addurl --file':
+                            'addurl_f': []
                          } for d in [i for i, p, s in param_tuples]}
 
         for ds, p, s in param_tuples:
@@ -239,9 +244,15 @@ class Add(Interface):
                     calls[ds.path]['a_add'].append(p)
             elif not p:
                 # we have a source only
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_s'].append(s)
             else:
                 # we have a path and a source
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_f'].append((p, s))
 
         # now do the actual add operations:
@@ -286,9 +297,6 @@ class Add(Interface):
             # TODO: AnnexRepo.add_urls' return value doesn't contain the created
             #       file name but the url
             if calls[ds.path]['addurl_s']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
                 if _is_annex:
                     return_values.extend(
                         ds.repo.add_urls(calls[ds.path]['addurl_s'],
@@ -309,9 +317,6 @@ class Add(Interface):
                     )
 
             if calls[ds.path]['addurl_f']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
                 if _is_annex:
                     for f, u in calls[ds.path]['addurl_f']:
                         return_values.append(

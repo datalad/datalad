@@ -119,8 +119,6 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
-        # import locally to avoid circularity in API
-        from datalad.distribution.add import Add
         # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
@@ -206,10 +204,8 @@ class Save(Interface):
                     if ds.get_containing_subdataset(f, recursion_limit=1) == ds]
             if len(absf):
                 # XXX Is there a better way to handle files in mixed repos?
-                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
-                             to_git=False)
-                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
-                             to_git=True)
+                ds.repo.add(absf)
+                ds.repo.add(absf, git=True)
 
         _datalad_msg = False
         if not message:
