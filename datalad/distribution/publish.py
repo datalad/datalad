@@ -14,12 +14,10 @@ import logging
 
 from os.path import join as opj
 
-from six import string_types
 from datalad.interface.base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
@@ -300,8 +298,8 @@ class Publish(Interface):
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
                 published += ds.repo.copy_to(files=publish_files,
-                                           remote=dest_resolved,
-                                           options=annex_copy_opts)
+                                             remote=dest_resolved,
+                                             options=annex_copy_opts)
 
         return published, skipped
 
