@@ -1,20 +1,22 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
-
+python:
+  - 2.7
+  - 3.3
+  - 3.4
+  - 3.5
 cache:
   - apt
 
+env:
+ global:
+  - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
+  - DATALAD_TESTS_SSH=1
+
 matrix:
   include:
-  - python: 2.7
-    env:
-    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
-    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
-  # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
-  #- python: 2.7
-  #  env:
-  #  - NOSE_WRAPPER="tools/eval_under_testloopfs"
+  # Additional custom ones
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
@@ -53,71 +55,8 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
-  - python: 3.3
-  - python: 3.4
-  # Those aren't yet ready since lxml I believe fails to install
-  #- python: pypy
-  #- python: pypy3
-# not there -- don't try!
-# - python: 3.5
-# can't since coverage doesn't support it yet: https://bitbucket.org/ned/coveragepy/issues/391/getargspec-was-finally-removed-will-not-be
-# - python: nightly
 
-env:
-  # to overcome problem with system-wide installed boto on travis
-  # see https://github.com/travis-ci/travis-ci/issues/5246
-  - BOTO_CONFIG=/tmp/nowhere
-  - DATALAD_TESTS_SSH=1
-
-before_install:
-  # The ultimate one-liner setup for NeuroDebian repository
-  - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-  - travis_retry sudo apt-get update -qq
-  - sudo tools/ci/prep-travis-forssh-sudo.sh
-  - tools/ci/prep-travis-forssh.sh
-  # Install grunt-cli
-  - npm install grunt-cli
-
-install:
-  # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo apt-get install git-annex-standalone zip
-  # For Python3 compatibility needs never-released master
-  - pip install https://github.com/niltonvolpato/python-progressbar/archive/master.zip
-  - git config --global user.email "test@travis.land"
-  - git config --global user.name "Travis Almighty"
-  - git submodule update --init --recursive
-  - cd ..; pip install -q codecov; cd -
-  - pip install -r requirements.txt
-  # Verify that setup.py build doesn't puke
-  - python setup.py build
-  - pip install -e .
-  # So we could test under sudo -E with PATH pointing to installed location
-  - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
-  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
-  - pip install sphinx
-  - pip install sphinx_rtd_theme
-  # TMPDIRs
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
-  # Install grunt to test run javascript frontend tests
-  - npm install grunt
-  - npm install grunt-contrib-qunit
 
 script:
-  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
-  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  # Generate documentation and run doctests
-  - PYTHONPATH=$PWD make -C docs html doctest
-  # Run javascript tests
-  - grunt test --verbose
-
-after_success:
-  - codecov
-
-# makes it only more difficult to comprehend the failing output.  Enable only when necessary
-# for a particular debugging
-#after_failure:
-#  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-#  - DATALAD_LOGLEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=DEBUG
-#  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
+  - export | grep DATALAD
+  - export
