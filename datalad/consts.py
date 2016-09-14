@@ -31,3 +31,7 @@ DATASETS_TOPURL = "http://datasets.datalad.org/"
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
 WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
+
+# Format to use for time stamps
+TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
+

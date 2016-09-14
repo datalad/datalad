@@ -37,6 +37,7 @@ from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
 from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
+from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
@@ -159,11 +160,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             ds = Dataset(ds)
         if ds is None:
             # try to find a dataset at or above CWD
-            dspath = GitRepo.get_toppath(abspath(getpwd()))
-            if dspath is None:
+            current_dspath = GitRepo.get_toppath(abspath(getpwd()))
+            if current_dspath is None:
                 raise ValueError("""No dataset found
                                  at or above {0}.""".format(getpwd()))
-            ds = Dataset(dspath)
+            ds = Dataset(current_dspath)
             lgr.debug("Resolved dataset for target creation: {0}".format(ds))
         assert(ds is not None and sshurl is not None)
 
@@ -214,21 +215,28 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
-        for current_dataset in \
+        # But we need to run post-update hook in depth-first fashion, so
+        # would only collect first and then run (see gh #790)
+        remote_repos_to_run_hook_for = []
+        for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
+            current_ds = datasets[current_dspath]
+            if not current_ds.is_installed():
+                lgr.info("Skipping %s since not installed locally", current_dspath)
+                continue
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
-                                          current_dataset.replace("/", "-"))
+                                          current_dspath.replace("/", "-"))
             else:
                 # TODO: opj depends on local platform, not the remote one.
                 # check how to deal with it. Does windows ssh server accept
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
                 path = normpath(opj(target_dir,
-                                    relpath(datasets[current_dataset].path,
+                                    relpath(datasets[current_dspath].path,
                                             start=ds.path)))
 
-            lgr.info("Creating target dataset {0} at {1}".format(current_dataset, path))
+            lgr.info("Creating target dataset {0} at {1}".format(current_dspath, path))
             # Must be set to True only if exists and existing='reconfigure'
             # otherwise we might skip actions if we say existing='reconfigure'
             # but it did not even exist before
@@ -272,7 +280,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if not only_reconfigure:
                 # init git repo
                 if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
-                                                                            datasets[current_dataset]):
+                                                                            datasets[current_dspath]):
                     continue
 
             # check git version on remote end
@@ -298,14 +306,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dataset])
+                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dspath])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
 
             if not only_reconfigure:
-                # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
-                if isinstance(datasets[current_dataset].repo, AnnexRepo):
+                # Initialize annex repo on remote copy if current_dspath is an AnnexRepo
+                if isinstance(datasets[current_dspath].repo, AnnexRepo):
                     ssh(['git', '-C', path, 'annex', 'init', path])
 
             # publish web-interface to root dataset on publication server
@@ -318,6 +326,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
 
+            remote_repos_to_run_hook_for.append(path)
+
+        # in reverse order would be depth first
+        for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
             try:
                 ssh(
@@ -325,8 +337,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     wrap_args=False  # we wrapped here manually
                 )
             except CommandError as e:
-                lgr.error("Failed to run post-update hook. "
-                          "Error: %s" % exc_str(e))
+                lgr.error("Failed to run post-update hook under path %s. "
+                          "Error: %s" % (path, exc_str(e)))
 
         if target:
             # add the sibling(s):
@@ -387,17 +399,24 @@ class CreatePublicationTargetSSHWebserver(Interface):
     @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
         # location of post-update hook file, logs folder on remote target
-        hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
-
+        hooks_remote_dir = opj(path, '.git', 'hooks')
+        hook_remote_target = opj(hooks_remote_dir, 'post-update')
         # post-update hook should create its log directory if doesn't exist
-        logs_remote_target = opj(path, WEB_META_LOG)
-        make_log_dir = 'mkdir -p "{}"'.format(logs_remote_target)
+        logs_remote_dir = opj(path, WEB_META_LOG)
+
+        make_log_dir = 'mkdir -p "{}"'.format(logs_remote_dir)
 
         # create json command for current dataset
-        json_command = 'which datalad > /dev/null && (cd ..; GIT_DIR=$PWD/.git \
-        datalad ls -r --json file \'{}\';) &> "{}/{}"'.format(str(path),
-                                                              logs_remote_target,
-                                                              'datalad-publish-hook-$(date +%Y-%m-%dT%H:%M:%S%z).log')
+        json_command = r'''
+( which datalad > /dev/null \
+  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
+  || echo "no datalad found - skipping generation of indexes for web frontend"; \
+) &> "{}/{}"
+'''.format(
+            str(path),
+            logs_remote_dir,
+            'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
+        )
 
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
@@ -438,4 +457,4 @@ class CreatePublicationTargetSSHWebserver(Interface):
             mode = shared
 
         if mode:
-            ssh(['chmod', mode, '-R', dirname(webresources_remote)])
+            ssh(['chmod', mode, '-R', dirname(webresources_remote), opj(path, 'index.html')])

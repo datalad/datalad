@@ -11,13 +11,16 @@
 __docformat__ = 'restructuredtext'
 
 
-from os.path import exists, isdir
+from os.path import exists
+from os.path import join as opj
 from .base import Interface
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
 from datalad.support.stats import ActivityStats
+from datalad.utils import assure_dir
+from datalad import utils
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
@@ -154,19 +157,20 @@ class Crawl(Interface):
                 # explicit, that some sub-datasets might not need to be crawled, so they get
                 # skipped explicitly?
                 for ds_ in subdatasets:
+                    ds_logfile = utils.get_logfilename(ds_, 'crawl')
                     try:
                         # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
-                        with swallow_logs() as cml:
+                        with swallow_logs(file_=ds_logfile) as cml:
                             output_, stats_ = crawl(chdir=ds_)
                             stats_total += stats_
                             output.append(output_)
-                        lgr.info("Crawled %s: %s", ds_, stats_.as_str(mode='line'))
+                        lgr.info("Crawled %s: %s (log: %s)", ds_, stats_.as_str(mode='line'), ds_logfile)
                     except Exception as exc:
                         stats_total.datasets_crawl_failed += 1
                         stats_total.datasets_crawled += 1
                         output += [None]
-                        lgr.warning("Crawling of %s has failed: %s.",  #  Log output: %s",
-                                    ds_, exc_str(exc))  #, cml.out)
+                        lgr.warning("Crawling of %s has failed (more in %s): %s.",  #  Log output: %s",
+                                    ds_, ds_logfile, exc_str(exc))  #, cml.out)
 
             lgr.info("Total stats: %s", stats_total.as_str(mode='line'))
 
