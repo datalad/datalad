@@ -6,7 +6,6 @@ python:
   - 2.7
   - 3.3
   - 3.4
-  - 3.5
 
 cache:
   - apt
@@ -60,6 +59,10 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
+  - python: 3.5
+    # we would need to migrate to boto3 to test it fully, but SSH should work
+    env:
+    -  DATALAD_TESTS_SSH=1
 
 before_install:
   # The ultimate one-liner setup for NeuroDebian repository
@@ -97,6 +100,7 @@ install:
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
+  - echo "I: Running tests"
   - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Generate documentation and run doctests
