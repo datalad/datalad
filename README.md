@@ -61,7 +61,7 @@ You can navigate datasets you have installed in your terminal or browser,
 while fetching necessary files or installing new sub-datasets using the
 same `datalad install [FILENAMES]` command.
 
-You can find more documentation at http://datalad.readthedocs.io .
+You can find more documentation at http://docs.datalad.org .
 
 
 # Contributing

@@ -56,5 +56,5 @@ publishing
 [FCON1000]: http://fcon_1000.projects.nitrc.org
 [OpenfMRI]: http://openfmri.org
 
-[meta-data support and management]: http://datalad.readthedocs.io/en/latest/cmdline.html#meta-data-handling
+[meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 
