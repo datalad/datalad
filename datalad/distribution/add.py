@@ -244,9 +244,15 @@ class Add(Interface):
                     calls[ds.path]['a_add'].append(p)
             elif not p:
                 # we have a source only
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_s'].append(s)
             else:
                 # we have a path and a source
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_f'].append((p, s))
 
         # now do the actual add operations:
@@ -291,9 +297,6 @@ class Add(Interface):
             # TODO: AnnexRepo.add_urls' return value doesn't contain the created
             #       file name but the url
             if calls[ds.path]['addurl_s']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
                 if _is_annex:
                     return_values.extend(
                         ds.repo.add_urls(calls[ds.path]['addurl_s'],
@@ -314,9 +317,6 @@ class Add(Interface):
                     )
 
             if calls[ds.path]['addurl_f']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
                 if _is_annex:
                     for f, u in calls[ds.path]['addurl_f']:
                         return_values.append(
