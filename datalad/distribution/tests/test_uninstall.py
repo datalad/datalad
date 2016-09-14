@@ -54,8 +54,8 @@ def test_uninstall_nonexisting(path):
 @with_tempfile()
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
-    subds1 = ds.create_subdataset('one')
-    ds.create_subdataset('two')
+    subds1 = ds.create('one')
+    ds.create('two')
     ds.save(auto_add_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
@@ -171,10 +171,8 @@ def test_uninstall_subdataset(src, dst):
     'keep': 'keep2',
     'kill': 'kill2'})
 def test_uninstall_multiple_paths(path):
-    ds = Dataset(path).create(force=True)
-    # XXX with auto-save in mind it is inconsistent that `create_subdataset`
-    # doesn't save
-    subds = ds.create_subdataset('deep', force=True)
+    ds = Dataset(path).create(force=True, save=False)
+    subds = ds.create('deep', force=True, if_dirty='ignore')
     subds.add('.', recursive=True)
     ds.add('.', recursive=True)
     ds.save(auto_add_changes=True)
@@ -243,8 +241,8 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True)
-    subds = ds.create_subdataset('deep', force=True)
+    ds = Dataset(path).create(force=True, save=False)
+    subds = ds.create('deep', force=True, if_dirty='ignore')
     # we add one file
     eq_(len(subds.add('.')), 1)
     # save all -> all clean
@@ -280,7 +278,7 @@ def test_uninstall_recursive(path):
 @with_tempfile()
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
-    ds.create_subdataset('deep')
+    ds.create('deep')
     ds.save(auto_add_changes=True)
     ok_clean_git(ds.path)
     # fail on missing `remove_handles`, always needs to come with `remove_handles`

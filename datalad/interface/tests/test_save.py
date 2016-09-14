@@ -54,10 +54,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
-    subds = Dataset(opj(ds.path, 'subds')).create(add_to_super=True)
-    ok_(ds.repo.dirty)
-    # auto save it
-    ds.save(auto_add_changes=True)
+    subds = ds.create('subds')
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
     # modify subds
     with open(opj(subds.path, "some_file.tst"), "w") as f:
@@ -75,15 +72,17 @@ def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
     assert_false(ds.save())
-    subds = ds.create_subdataset('sub')
-    # saves subdataset presence, because it was staged
-    assert_true(ds.save())
-    subsubds = subds.create_subdataset('subsub')
+    subds = ds.create('sub')
+    # subdataset presence already saved
+    ok_clean_git(ds.path)
+    subsubds = subds.create('subsub')
+    with open(opj(subsubds.path, 'test'), 'w') as f:
+        f.write('some')
     # does not save anything in the topdataset
     assert_false(ds.save())
-    # even with auto-add
-    assert_false(ds.save(auto_add_changes=True))
-    # but it will when going recursive
+    # auto-add will save addition of subsubds to subds
+    assert_true(ds.save(auto_add_changes=True))
+    # with recursive it will add the file in subsubds
     assert_true(ds.save(auto_add_changes=True, recursive=True))
     # add content to subsub and try saving
     testfname = opj('sub', 'subsub', 'saveme')

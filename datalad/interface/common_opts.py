@@ -35,13 +35,6 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
-add_to_superdataset = Parameter(
-    args=("--add-to-super",),
-    doc="""add the new dataset as a component to a super dataset. If 'auto',
-           adds to super-dataset if one is found.""",
-    constraints=EnsureChoice('auto') | EnsureBool(),
-)
-
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',

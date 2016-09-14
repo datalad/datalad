@@ -48,7 +48,9 @@ import logging
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
     paths = [_path_(".git/hooks/post-update")]     # hooks enabled in all datasets
-    not_paths = [_path_(".git/datalad/metadata")]  # metadata only on publish
+    not_paths = []  # _path_(".git/datalad/metadata")]  # metadata only on publish
+                    # ATM we run post-update hook also upon create since it might
+                    # be a reconfiguration (TODO: I guess could be conditioned)
 
     # web-interface html pushed to dataset root
     web_paths = ['index.html', _path_(".git/datalad/web")]
@@ -178,10 +180,40 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         publish(dataset=source, to="local_target")
 
         # and we should be able to 'reconfigure'
+        def process_digests_mtimes(digests, mtimes):
+            # it should have triggered a hook, which would have created log and metadata files
+            check_metadata = False
+            for part in 'logs', 'metadata':
+                metafiles = [k for k in digests if k.startswith(_path_('.git/datalad/%s/' % part))]
+                # This is in effect ONLY if we have "compatible" datalad installed on remote
+                # end. ATM we don't have easy way to guarantee that AFAIK (yoh),
+                # so let's not check/enforce (TODO)
+                # assert(len(metafiles) >= 1)  # we might have 2 logs if timestamps do not collide ;)
+                # Let's actually do it to some degree
+                if part == 'logs':
+                    # always should have those:
+                    assert (len(metafiles) >= 1)
+                    with open(opj(target_path, metafiles[0])) as f:
+                        if 'no datalad found' not in f.read():
+                            check_metadata = True
+                if part == 'metadata':
+                    eq_(len(metafiles), bool(check_metadata))
+                for f in metafiles:
+                    digests.pop(f)
+                    mtimes.pop(f)
+            # and just pop some leftovers from annex
+            for f in list(digests):
+                if f.startswith('.git/annex/mergedrefs'):
+                    digests.pop(f)
+                    mtimes.pop(f)
+
         orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
+        process_digests_mtimes(orig_digests, orig_mtimes)
+
         import time; time.sleep(0.1)  # just so that mtimes change
         assert_create_sshwebserver(existing='reconfigure', **cpkwargs)
         digests, mtimes = get_mtimes_and_digests(target_path)
+        process_digests_mtimes(digests, mtimes)
 
         assert_dict_equal(orig_digests, digests)  # nothing should change in terms of content
 
@@ -227,13 +259,14 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             sep = os.path.sep
         remote_name = 'remote-' + str(flat)
         # TODO: there is f.ckup with paths so assert_create fails ATM
-        #assert_create_sshwebserver(
-        create_publication_target_sshwebserver(
-            target=remote_name,
-            dataset=source,
-            sshurl="ssh://localhost" + target_path_,
-            target_dir=target_dir_tpl,
-            recursive=True)
+        # And let's test without explicit dataset being provided
+        with chpwd(source.path):
+            #assert_create_sshwebserver(
+            create_publication_target_sshwebserver(
+                target=remote_name,
+                sshurl="ssh://localhost" + target_path_,
+                target_dir=target_dir_tpl,
+                recursive=True)
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:

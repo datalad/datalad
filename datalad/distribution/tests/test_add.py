@@ -102,8 +102,8 @@ def test_add_files(path):
 @with_tree(**tree_arg)
 def test_add_recursive(path):
     ds = Dataset(path)
-    ds.create(force=True)
-    ds.create_subdataset('dir', force=True)
+    ds.create(force=True, save=False)
+    ds.create('dir', force=True, if_dirty='ignore')
     ds.save("Submodule added.")
 
     # TODO: CommandError to something meaningful
@@ -118,6 +118,14 @@ def test_add_recursive(path):
 
     ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+
+    subds = ds.create('git-sub', no_annex=True)
+    with open(opj(subds.path, 'somefile.txt'), "w") as f:
+        f.write("bla bla")
+    result = ds.add(opj('git-sub', 'somefile.txt'), recursive=True, to_git=False)
+    eq_(result, [{'file': opj(subds.path, 'somefile.txt'),
+                  'note': "no annex at %s" % subds.path,
+                  'success': False}])
 
 
 @with_tree(**tree_arg)

@@ -103,11 +103,16 @@ class AddSibling(Interface):
             ds_basename: {'repo': ds.repo}
         }
         if recursive:
-            for subds in ds.get_subdatasets(recursive=True):
-                sub_path = opj(ds.path, subds)
-                repos[ds_basename + '/' + subds] = {
-#                repos[subds] = {
-                    'repo': GitRepo(sub_path, create=False)
+            for subds_name in ds.get_subdatasets(recursive=True):
+                subds_path = opj(ds.path, subds_name)
+                subds = Dataset(subds_path)
+                if not subds.is_installed():
+                    lgr.info("Skipping adding sibling for %s since it is not installed",
+                             subds)
+                    continue
+                repos[ds_basename + '/' + subds_name] = {
+#                repos[subds_name] = {
+                    'repo': GitRepo(subds_path, create=False)
                 }
 
         # Note: This is copied from create_publication_target_sshwebserver

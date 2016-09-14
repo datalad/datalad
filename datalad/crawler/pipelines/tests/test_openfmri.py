@@ -262,14 +262,14 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     eq_(len(commits_l['incoming']), 3)
     eq_(len(commits['incoming-processed']), 6)
     eq_(len(commits_l['incoming-processed']), 4)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 10)  # all commits out there -- init + 3*(incoming, processed, merge)
-    eq_(len(commits_l['master']), 4)
+    eq_(len(commits['master']), 11)  # all commits out there -- dataset init, crawler init + 3*(incoming, processed, merge)
+    eq_(len(commits_l['master']), 5)
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
     # +1 because original "release" was assumed to be 1.0.0
     eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1', '1.0.1'])
-    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][-2].hexsha)  # next to the last one
+    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][-3].hexsha)  # next to the last one
     eq_(repo.repo.tags[-1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
 
     def hexsha(l):
@@ -464,8 +464,9 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(len(commits_l['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
     eq_(len(commits_l['incoming-processed']), 2)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 4)  # all commits out there, init, incoming, incoming-processed, merge
-    eq_(len(commits_l['master']), 2)  #  init, merge
+    # to avoid 'dataset init' commit create() needs save=False
+    eq_(len(commits['master']), 5)  # all commits out there, dataset init, crawler, init, incoming, incoming-processed, merge
+    eq_(len(commits_l['master']), 3)  # dataset init, init, merge
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):

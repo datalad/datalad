@@ -250,19 +250,38 @@ class Add(Interface):
         return_values = []
         for dspath in calls:
             ds = Dataset(dspath)
-            if calls[dspath]['g_add']:
+
+            lgr.info("Processing dataset %s ..." % ds)
+
+            # check every (sub-)dataset for annex once, since we can't add or
+            # addurl anything, if there is no annex:
+            # TODO: Q: Alternatively, just call git-annex-init if there's no
+            # annex yet and we have an annex-add/annex-addurl request?
+            _is_annex = isinstance(ds.repo, AnnexRepo)
+
+            if calls[ds.path]['g_add']:
                 return_values.extend(ds.repo.add(calls[dspath]['g_add'],
                                                  git=True,
                                                  git_options=git_opts))
             if calls[ds.path]['a_add']:
-                # TODO: annex required or call git-annex-init if there's no annex yet?
-                assert isinstance(ds.repo, AnnexRepo)
-                return_values.extend(
-                    ds.repo.add(calls[dspath]['a_add'],
-                                git=False,
-                                git_options=git_opts,
-                                annex_options=annex_opts,
-                                options=annex_add_opts))
+                if _is_annex:
+                    return_values.extend(
+                        ds.repo.add(calls[dspath]['a_add'],
+                                    git=False,
+                                    git_options=git_opts,
+                                    annex_options=annex_opts,
+                                    options=annex_add_opts
+                                    )
+                    )
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-add' for "
+                              "files {1}".format(ds, calls[dspath]['a_add']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['a_add']]
+                    )
 
             # TODO: AnnexRepo.add_urls' return value doesn't contain the created
             #       file name but the url
@@ -270,25 +289,46 @@ class Add(Interface):
                 if to_git:
                     raise NotImplementedError("Can't add a remote source "
                                               "directly to git.")
-                assert isinstance(ds.repo, AnnexRepo)
-                return_values.extend(
-                    ds.repo.add_urls(calls[ds.path]['addurl_s'],
-                                     options=annex_add_opts,
-                                     # TODO: extra parameter for addurl?
-                                     git_options=git_opts,
-                                     annex_options=annex_opts))
+                if _is_annex:
+                    return_values.extend(
+                        ds.repo.add_urls(calls[ds.path]['addurl_s'],
+                                         options=annex_add_opts,
+                                         # TODO: extra parameter for addurl?
+                                         git_options=git_opts,
+                                         annex_options=annex_opts
+                                         )
+                    )
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
+                              "files {1}".format(ds, calls[dspath]['addurl_s']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['addurl_s']]
+                    )
+
             if calls[ds.path]['addurl_f']:
                 if to_git:
                     raise NotImplementedError("Can't add a remote source "
                                               "directly to git.")
-                assert isinstance(ds.repo, AnnexRepo)
-                for f, u in calls[ds.path]['addurl_f']:
-                    return_values.append(
-                        ds.repo.add_url_to_file(f, u,
-                                                options=annex_add_opts,  # TODO: see above
-                                                git_options=git_opts,
-                                                annex_options=annex_opts,
-                                                batch=True))
+                if _is_annex:
+                    for f, u in calls[ds.path]['addurl_f']:
+                        return_values.append(
+                            ds.repo.add_url_to_file(f, u,
+                                                    options=annex_add_opts,  # TODO: see above
+                                                    git_options=git_opts,
+                                                    annex_options=annex_opts,
+                                                    batch=True))
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
+                              "files {1}".format(ds, calls[dspath]['addurl_f']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['addurl_f']]
+                    )
 
         if save and len(return_values):
             # we got something added -> save
