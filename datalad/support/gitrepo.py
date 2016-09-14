@@ -13,6 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import logging
+import re
 import shlex
 from os import linesep
 from os.path import join as opj
@@ -440,25 +441,7 @@ class GitRepo(object):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
-            try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
-                lgr.debug("Git clone completed")
-                # TODO: more arguments possible: ObjectDB etc.
-            except GitCommandError as e:
-                # log here but let caller decide what to do
-                lgr.error(str(e))
-                raise
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                   "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython/issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
+            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -479,6 +462,51 @@ class GitRepo(object):
                     InvalidGitRepositoryError) as e:
                 lgr.error("%s: %s" % (type(e), str(e)))
                 raise
+
+    def clone(self, url, path):
+        """Clone url into path
+
+        Provides workarounds for known issues (e.g.
+        https://github.com/datalad/datalad/issues/785)
+
+        Parameters
+        ----------
+        url : str
+        path : str
+        """
+        ntries = 5  # r is not enough for robust workaround
+        for trial in range(ntries):
+            try:
+                lgr.warning("Git clone from {0} to {1}".format(url, path))
+                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                      odbt=default_git_odbt)
+                lgr.debug("Git clone completed")
+                break
+                # TODO: more arguments possible: ObjectDB etc.
+            except GitCommandError as e:
+                # log here but let caller decide what to do
+                e_str = str(e)
+                # see https://github.com/datalad/datalad/issues/785
+                if re.search("Request for .*aborted.*Unable to find", str(e),
+                             re.DOTALL) \
+                        and trial < ntries - 1:
+                    lgr.info(
+                        "Hit a known issue with Git (see GH#785). Trial #%d, "
+                        "retrying",
+                        trial)
+                    continue
+                lgr.error(e_str)
+                raise
+            except ValueError as e:
+                if gitpy.__version__ == '1.0.2' and \
+                                "I/O operation on closed file" in str(e):
+                    # bug https://github.com/gitpython-developers/GitPython
+                    # /issues/383
+                    raise GitCommandError(
+                        "clone has failed, telling ya",
+                        999,  # good number
+                        stdout="%s already exists" if exists(path) else "")
+                raise  # reraise original
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
