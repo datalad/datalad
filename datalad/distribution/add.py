@@ -130,7 +130,7 @@ class Add(Interface):
             save=True,
             recursive=False,
             recursion_limit=None,
-            if_dirty='save-before',
+            if_dirty='ignore',
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
