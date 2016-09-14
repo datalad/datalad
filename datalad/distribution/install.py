@@ -35,7 +35,7 @@ from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag, recursion_limit, \
     dataset_description, add_to_superdataset, git_opts, annex_opts, \
-    annex_init_opts
+    annex_init_opts, git_clone_opts
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
 from datalad.support.network import RI, URL
@@ -262,6 +262,9 @@ class Install(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
+            # TODO: this probably changes to install into the dataset (add_to_super)
+            # and to install the thing 'just there' without operating 'on' a dataset.
+            # Adapt doc.
             doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             in a parent directory of the current working directory and/or the
@@ -274,7 +277,7 @@ class Install(Interface):
             interpreted as the source URL of a dataset and a destination
             path will be derived from the URL similar to :command:`git
             clone`""",
-            nargs="*",
+            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
@@ -287,418 +290,319 @@ class Install(Interface):
         description=dataset_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        add_to_super=add_to_superdataset,
         git_opts=git_opts,
+        git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts)
-
-    # -d impliziert add_to_super? => no explicit dataset leads to not add it (without add_to_super)
 
     @staticmethod
     @datasetmethod(name='install')
     def __call__(
-            dataset=None,
             path=None,
             source=None,
+            dataset=None,
             get_data=False,
             description=None,
             recursive=False,
             recursion_limit=None,
-            add_to_super=False,
             git_opts=None,
+            git_clone_opts=None,
             annex_opts=None,
             annex_init_opts=None):
 
         lgr.debug(
             "Installation attempt started. path=%r, source=%r, dataset=%r, "
             "get_data=%r, description=%r, recursive=%r, recursion_limit=%r, "
-            "add_to_super=%r, git_opts=%r, annex_opts=%r, annex_init_opt=%r",
+            "git_opts=%r, git_clone_opts=%r, annex_opts=%r, annex_init_opt=%r",
             path, source, dataset, get_data, description, recursive,
-            recursion_limit, add_to_super, git_opts, annex_opts, annex_init_opts)
+            recursion_limit, git_opts, git_clone_opts, annex_opts,
+            annex_init_opts)
 
         # shortcut
         ds = dataset
 
+        # did we explicitly get a dataset to install into?
+        _install_into_ds = ds is not None
+
+        # if we got a dataset, path will be resolved against it.
+        # Otherwise path will be resolved first.
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
-
-        if isinstance(path, list):
-            if not len(path):
-                # normalize value to expected state when nothing was provided
-                path = None
-            elif len(path) == 1:
-                # we can simply continue with the function as called with a
-                # single argument
-                path = path[0]
-            else:
-                lgr.debug("Installation of multiple targets was requested: {0}".format(path))
-                return [Install.__call__(
-                        dataset=ds,
-                        path=p,
-                        source=source,
-                        recursive=recursive) for p in path]
+            if not ds.is_installed():
+                # TODO: possible magic: ds.install() for known subdataset 'ds'
+                raise ValueError("{0} needs to be installed in order to "
+                                 "install something into it.".format(ds))
 
         # resolve the target location (if local) against the provided dataset
+        # or CWD:
         if path is not None:
-            if isinstance(path, Dataset):
-                # just because it is a mess ATM and Germans will fix it all up to a candy
-                path = path.path
+            # Should work out just fine for regular paths, so no additional
+            # conditioning is necessary
+            path_ri = RI(path)
+            try:
+                # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                path = resolve_path(path_ri.localpath, ds)
+                # any `path` argument that point to something local now
+                # resolved and is no longer a URL
+            except ValueError:
+                # URL doesn't point to a local something
+                # so we have an actual URL in `path`. Since this is valid as a
+                # single positional argument, `source` has to be None at this
+                # point.
+
+                if is_datalad_compat_ri(path) and source is None:
+                    # we have an actual URL -> this should be the source
+                    lgr.debug(
+                        "Single argument given to install, that doesn't seem to "
+                        "be a local path. "
+                        "Assuming the argument identifies a source location.")
+                    source = path
+                    path = None
+
+                else:
+                    # `path` is neither a valid source nor a local path.
+                    # TODO: The only thing left is a known subdataset with a
+                    # name, that is not a path; Once we correctly distinguish
+                    # between path and name of a submodule, we need to consider
+                    # this.
+                    # For now: Just raise
+                    raise ValueError("Invalid path argument {0}".format(path))
+
+        # `path` resolved, if there was any.
+
+        # we need a source to install from. Either we have one in `source` or
+        # it is implicit, since `path` is an already known subdataset or an
+        # existing subdataset, that should be installed into the given dataset
+        # inplace.
+        # Note: For now, we do not consider a subdataset beneath a not yet
+        # installed level, since we do not know, whether this even is something
+        # to install (an actual Dataset) the only thing we know would be,
+        # that it is some path beneath it.
+        _install_sub = False
+
+        if _install_into_ds and source is None and path is not None:
+            # Check for `path` being a known subdataset:
+            if path in [opj(ds.path, sub)
+                        for sub in ds.get_subdatasets(recursive=True)]:
+                _install_sub = True
+                lgr.debug("Identified {0} as subdataset to "
+                          "install.".format(path))
             else:
-                # Should work out just fine for regular paths, so no additional
-                # conditioning is necessary
-                path_ri = RI(path)
-                try:
-                    # Wouldn't work for SSHRI ATM, see TODO within SSHRI
-                    path = resolve_path(path_ri.localpath, ds)
-                except ValueError:
-                    # URL doesn't point to a local something
-                    pass
+                # the only option left is an existing repo to be added inplace:
+                if exists(path) and GitRepo.is_valid_repo(path):
+                    lgr.debug("No source given, but path points to an existing "
+                              "repository and a dataset to install into was "
+                              "given. Assuming we want to install {0} "
+                              "inplace into {1}.".format(path, ds))
+                    source = path
 
-        # any `path` argument that point to something local now resolved and
-        # is no longer a URL
+        if source is None and not _install_sub:
+            raise InsufficientArgumentsError("Got no source to install from.")
 
-        # if we have no dataset given, figure out which one we need to operate
-        # on, based on the resolved target location (that is now guaranteed to
-        # be specified, but only if path isn't a URL (anymore) -> special case,
-        # handles below
-        if ds is None and path is not None and not is_datalad_compat_ri(path):
-            # try to find a dataset at or above the installation target
-            dspath = GitRepo.get_toppath(abspath(path))
-            if dspath is None:
-                # no top-level dataset found, use path as such
-                dspath = path
-            ds = Dataset(dspath)
-
-        if ds is None and source is None and path is not None:
-            # no dataset, no source
-            # this could be a shortcut install call, where the first
-            # arg identifies the source
-            if is_datalad_compat_ri(path) or os.path.exists(path):
-                # we have an actual URL -> this should be the source
-                # OR
-                # it is not a URL, but it exists locally
-                lgr.debug(
-                    "Single argument given to install and no dataset found. "
-                    "Assuming the argument identifies a source location.")
-                source = path
-                path = None
-
-        lgr.debug("Resolved installation target: {0}".format(path))
+        _install_inplace = False
+        if source == path:  # TODO: does it make sense to use realpath here?
+            if _install_into_ds:
+                _install_inplace = True
+            else:
+                raise InsufficientArgumentsError(
+                    "Source and target are the same ({0}). This doesn't make "
+                    "sense without a dataset to install into.".format(path))
 
         # Possibly do conversion from source into a git-friendly url
         source_url = _get_git_url_from_source(source)
 
-        if ds is None and path is None and source_url is not None:
+        # derive target from source url:
+        if path is None and source_url is not None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source_url and continue
             lgr.debug(
-                "Neither dataset not target installation path provided. "
+                "Neither dataset nor target installation path provided. "
                 "Assuming installation of a remote dataset. "
                 "Deriving destination path from given source {0}".format(
                     source_url))
-            ds = Dataset(_get_installationpath_from_url(source_url))
+            path = _get_installationpath_from_url(source_url)
+            # since this is a relative `path`, resolve it:
+            path = resolve_path(path, ds)
 
-        if not path and ds is None:
-            # no dataset, no target location, nothing to do
-            raise InsufficientArgumentsError(
-                "insufficient information for installation (needs at "
-                "least a dataset or an installation path")
+        if path is None:
+            # still no target => fail
+            raise InsufficientArgumentsError("Got no target to install to.")
 
-        assert(ds is not None)
+        lgr.debug("Resolved installation target: {0}".format(path))
+        if _install_into_ds:
+            # express the destination path relative to the root of
+            # the dataset
+            relativepath = relpath(path, start=ds.path)
+            if path.startswith(pardir):
+                raise ValueError("installation path outside dataset")
+            lgr.debug("Resolved installation target relative to dataset "
+                      "{0}: {1}".format(ds, relativepath))
 
+        ###########
+        # we should know everything necessary by now
+        # actual installation starts
+        ###########
         lgr.info("Installing {0}{1}".format(
-            path if path else ds,
-            " from %s" % source_url if source_url else ""
+            path, " from %s" % source_url if source_url else ""
         ))
 
-        vcs = ds.repo
-        if vcs is None:
-            # TODO check that a "ds.path" actually points to a TOPDIR
-            # should be the case already, but maybe nevertheless check
-            existed = ds.path and exists(ds.path)
+        # FLOW GUIDE:
+        # four cases:
+        # 1. install into a dataset
+        #   1.1. we install a known subdataset
+        #        => git submodule update --init
+        #   1.2. we install an existing repo as a subdataset inplace
+        #        => git submodule add + magic
+        #   1.3. we install a new subdataset from an explicit source
+        #        => git submodule add
+        # 2. we "just" install from an explicit source
+        #    => git clone
 
+        if _install_into_ds:
+            # FLOW GUIDE: 1.
+            if _install_sub:
+                # FLOW_GUIDE: 1.1.
+                # def _install_subds_from_flexible ?????
+
+
+                #Snippet:
+                # OR this is a submodule of this dataset
+            # submodule = [sm for sm in ds.repo.get_submodules()
+            #              if sm.path == relativepath]
+            # if not len(submodule):
+            #     # FLOW GUIDE EXIT POINT
+            #     # this is a file in Git and no submodule, just return its path
+            #     lgr.debug("Don't act, data already present in Git")
+            #     return path
+            # elif len(submodule) > 1:
+            #     raise RuntimeError(
+            #         "more than one submodule registered at the same path?")
+            # submodule = submodule[0]
+            #
+            # # FLOW GUIDE EXIT POINT
+            # # we are dealing with a known submodule (i.e. `source`
+            # # doesn't matter) -> check it out
+            # lgr.debug("Install subdataset at: {0}".format(submodule.path))
+            # subds = _install_subds_from_flexible_source(
+            #     ds, submodule.path, submodule.url, recursive=recursive)
+            # return subds
+
+                # Snippet 2:
+            # few sanity checks
+            # if source and abspath(source) != path:
+            #     if exists(path):
+            #         raise ValueError(
+            #             "installation target already exists, but `source` points to "
+            #             "another location (source: '{0}', target: '{1}'".format(
+            #                 source, path))
+            #     # install a submodule from that source
+            #     return _install_subds_from_flexible_source(
+            #          ds, relativepath, source, recursive=recursive)
+
+
+                # Snippet 3:
+
+            #                 source_path = expandpath(source)
+            # if exists(source_path):
+            #     # FLOW GUIDE EXIT POINT
+            #     # this could be
+            #     # - local file
+            #     # - local directory
+            #     # - repository outside the dataset
+            #     # we only want to support the last case of locally cloning
+            #     # a repo -- fail otherwise
+            #     if exists(opj(source_path, '.git')):
+            #         return _install_subds_from_flexible_source(
+            #             ds, relativepath, source_path, recursive)
+
+
+
+
+
+
+
+
+
+
+                pass
+
+            elif _install_inplace:
+                # FLOW GUIDE: 1.2.
+                subds = _install_subds_inplace(ds, path, relpath(path, ds.path))
+                # TODO: Some success checks?
+            else:
+                # FLOW_GUIDE 1.3.
+                # def _install_subds_from_flexible ?????
+                pass
+
+        else:
+            # FLOW GUIDE: 2.
+
+            # Currently assuming there is nothing at the target to deal with
+            # and rely on failures raising from the git call ...
+
+            target = Dataset(path)
+
+            assert(target.repo is None)
+
+            # should not be the case, but we need to distiguish between failure
+            # of git-clone, due to existing target and an unsuccessful clone
+            # attempt. See below.
+            existed = target.path and exists(target.path)
+
+            vcs = None
             # We possibly need to consider /.git URL
             candidate_source_urls = [source_url]
             if source_url and not source_url.rstrip('/').endswith('/.git'):
-                candidate_source_urls.append('{0}/.git'.format(source_url.rstrip('/')))
+                candidate_source_urls.append(
+                    '{0}/.git'.format(source_url.rstrip('/')))
 
             for source_url_ in candidate_source_urls:
                 try:
-                    lgr.debug("Retrieving a dataset from URL: {0}".format(source_url_))
+                    lgr.debug("Retrieving a dataset from URL: "
+                              "{0}".format(source_url_))
                     with swallow_logs():
-                        vcs = Install._get_new_vcs(ds, source_url_)
+                        vcs = Install._get_new_vcs(target, source_url_)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError:
-                    lgr.debug("Failed to retrieve from URL: {0}".format(source_url_))
-                    if not existed and ds.path and exists(ds.path):
-                        lgr.debug("Wiping out unsuccessful clone attempt at {}".format(ds.path))
-                        rmtree(ds.path)
+                    lgr.debug("Failed to retrieve from URL: "
+                              "{0}".format(source_url_))
+                    if not existed and target.path and exists(target.path):
+                        lgr.debug("Wiping out unsuccessful clone attempt at "
+                                  "{}".format(target.path))
+                        rmtree(target.path)
                     if source_url_ == candidate_source_urls[-1]:
                         # Re-raise if failed even with the last candidate
-                        lgr.debug("Unable to establish repository instance at {0} from {1}"
-                                  "".format(ds.path, candidate_source_urls))
+                        lgr.debug("Unable to establish repository instance at "
+                                  "{0} from {1}"
+                                  "".format(target.path, candidate_source_urls))
                         raise
 
-        assert(ds.repo)  # is automagically re-evaluated in the .repo property
+            # is automagically re-evaluated in the .repo property:
+            assert(target.repo)
+            # cloning done
 
-        runner = Runner()
+        # FLOW GUIDE: All four cases done.
+        lgr.debug("Installation of {0} done.".format()) ##TODO: installed DS
 
-        if path is None or path == ds.path:
-            # if the goal was to install this dataset, we are done,
-            # except for 'recursive'.
+        # TODO: Now recursive calls:
+        if recursive:
+            pass
+        ## Snippet:
+        # # TODO: For now 'recursive' means just submodules.
+        #     # See --with-data vs. -- recursive and figure it out
+        #     if recursive:
+        #         if recursive == "data" and isinstance(ds.repo, AnnexRepo):
+        #             ds.repo.get('.')
+        #         for sm in ds.repo.get_submodules():
+        #             _install_subds_from_flexible_source(
+        #                 ds, sm.path, sm.url, recursive=recursive)
+        #     return ds
 
-            # TODO: For now 'recursive' means just submodules.
-            # See --with-data vs. -- recursive and figure it out
-            if recursive:
-                if recursive == "data" and isinstance(ds.repo, AnnexRepo):
-                    ds.repo.get('.')
-                for sm in ds.repo.get_submodules():
-                    _install_subds_from_flexible_source(
-                        ds, sm.path, sm.url, recursive=recursive)
-            return ds
+        # TODO: do we want to get the content?
+        if get_data:
+            pass
 
-        # at this point this dataset is "installed", now we can test whether to
-        # install something into the dataset
-
-        # needed by the logic below
-       # assert(isabs(path))  # Gergana swears this piece of code is not that important
-
-        # express the destination path relative to the root of this dataset
-        relativepath = relpath(path, start=ds.path)
-        if path.startswith(pardir):
-            raise ValueError("installation path outside dataset")
-
-        lgr.debug(
-            "Resolved installation target relative to dataset {0}: {1}".format(
-                ds, relativepath))
-
-        # this dataset must already know everything necessary
-        ###################################################
-        # FLOW GUIDE
-        #
-        # at this point we know nothing about the
-        # installation target
-        ###################################################
-        #import pdb;
-        #pdb.set_trace()
-        try:
-            # it is simplest to let annex tell us what we are dealing with
-            lgr.debug("Checking %r for belonging to git or annex", relativepath)
-            try:
-                if isinstance(vcs, AnnexRepo) and lexists(path) and vcs.get_file_key(relativepath):
-                    lgr.debug("Trying to 'get' file %s using annex", relativepath)
-                    # FLOW GUIDE
-                    # this is an annex'ed file -> get it
-                    # TODO implement `copy --from` using `source`
-                    # TODO fail if `source` is something strange
-                    vcs.get(relativepath)
-                    # return the absolute path to the installed file
-                    return path
-            except FileNotInAnnexError as exc:
-                lgr.debug("File is not under annex, let's see if under git at all")
-
-            if relativepath in vcs.get_indexed_files():
-                # relativepath is in git
-                raise FileInGitError("We need to handle it as known to git")
-            else:
-                raise FileNotInRepositoryError("Not in repository at all")
-        except FileInGitError:
-            ###################################################
-            # FLOW GUIDE
-            #
-            # `path` is either
-            # - a  file already checked into Git
-            # - known submodule
-            ###################################################
-            lgr.log(5, "FileInGitError logic")
-            if source is not None:
-                raise FileInGitError("File %s is already in git. Specifying source (%s) makes no sense"
-                                     % (path, source))
-            # file is checked into git directly -> nothing to do
-            # OR this is a submodule of this dataset
-            submodule = [sm for sm in ds.repo.get_submodules()
-                         if sm.path == relativepath]
-            if not len(submodule):
-                # FLOW GUIDE EXIT POINT
-                # this is a file in Git and no submodule, just return its path
-                lgr.debug("Don't act, data already present in Git")
-                return path
-            elif len(submodule) > 1:
-                raise RuntimeError(
-                    "more than one submodule registered at the same path?")
-            submodule = submodule[0]
-
-            # FLOW GUIDE EXIT POINT
-            # we are dealing with a known submodule (i.e. `source`
-            # doesn't matter) -> check it out
-            lgr.debug("Install subdataset at: {0}".format(submodule.path))
-            subds = _install_subds_from_flexible_source(
-                ds, submodule.path, submodule.url, recursive=recursive)
-            return subds
-
-        except FileNotInRepositoryError:
-            ###################################################
-            # FLOW GUIDE
-            #
-            # `path` is either
-            # - content of a subdataset
-            # - an untracked file in this dataset
-            # - an entire untracked/unknown existing subdataset
-            ###################################################
-            lgr.log(5, "FileNotInRepositoryError logic")
-            lgr.log(5, "FileNotInAnnexError logic")
-            subds = ds.get_containing_subdataset(relativepath)
-            if ds.path != subds.path:
-                # FLOW GUIDE EXIT POINT
-                # target path belongs to a known subdataset, hand
-                # installation over to it
-                # But first make sure subds is installed
-                ds.install(
-                    subds,
-                    recursive=recursive,
-                    add_data_to_git=add_data_to_git)
-                return subds.install(
-                    path=relpath(path, start=subds.path),
-                    source=source,
-                    recursive=recursive,
-                    add_data_to_git=add_data_to_git)
-
-            # FLOW GUIDE
-            # this must be an untracked/existing something, so either
-            # - a file
-            # - a directory
-            # - an entire repository
-            if exists(opj(path, '.git')):
-                # FLOW GUIDE EXIT POINT
-                # this is an existing repo and must be in-place turned into
-                # a submodule of this dataset
-                return _install_subds_inplace(
-                    ds, path, relativepath)
-
-            # FLOW GUIDE EXIT POINT
-            # - untracked file or directory in this dataset
-            if isdir(path) and not recursive:
-                # this is a directory and we want --recursive for it
-                raise ValueError(
-                    "installation of a directory requires the `recursive` flag")
-
-            # few sanity checks
-            if source and abspath(source) != path:
-                if exists(path):
-                    raise ValueError(
-                        "installation target already exists, but `source` points to "
-                        "another location (source: '{0}', target: '{1}'".format(
-                            source, path))
-                # install a submodule from that source
-                return _install_subds_from_flexible_source(
-                     ds, relativepath, source, recursive=recursive)
-
-            if not add_data_to_git and not (isinstance(vcs, AnnexRepo)):
-                raise RuntimeError(
-                    "Trying to install file(s) into a dataset "
-                    "with a plain Git repository. First initialize annex, or "
-                    "provide override flag.")
-
-            # switch `add` procedure between Git and Git-annex according to flag
-            if add_data_to_git:
-                vcs.add(relativepath, git=True)
-                added_files = resolve_path(relativepath, ds)
-            else:
-                # do a blunt `annex add`
-                added_files = vcs.add(relativepath)
-                # return just the paths of the installed components
-                if isinstance(added_files, list):
-                    added_files = [resolve_path(i['file'], ds) for i in added_files]
-                else:
-                    added_files = resolve_path(added_files['file'], ds)
-            if added_files:
-                return added_files
-            else:
-                return None
-
-        except IOError as exc:
-            ###################################################
-            # FLOW GUIDE
-            #
-            # more complicated special cases -- `path` is either
-            # - a file/subdataset in a not yet initialized but known
-            #   submodule
-            # - an entire untracked/unknown existing subdataset
-            # - non-existing content that should be installed from `source`
-            ###################################################
-            lgr.log(5, "IOError logic: %s", exc_str(exc))
-            # we can end up here in two cases ATM
-            if (exists(path) or islink(path)) or source is None:
-                # FLOW GUIDE
-                # - target exists but this dataset's VCS rejects it,
-                #   so it should be part of a subdataset
-                # or
-                # - target doesn't exist, but no source is given, so
-                #   it could be a handle that is actually contained in
-                #   a not yet installed subdataset
-                subds = ds.get_containing_subdataset(relativepath)
-                if ds.path != subds.path:
-                    # FLOW GUIDE
-                    # target path belongs to a subdataset, hand installation
-                    # over to it
-                    if not subds.is_installed():
-                        # FLOW GUIDE
-                        # we are dealing with a target in a not yet
-                        # available but known subdataset -> install it first
-                        ds.install(subds.path, recursive=recursive)
-                    return subds.install(
-                        path=relpath(path, start=subds.path),
-                        source=source,
-                        recursive=recursive,
-                        add_data_to_git=add_data_to_git)
-
-                # FLOW GUIDE EXIT POINT
-                raise InsufficientArgumentsError(
-                    "insufficient information for installation: the "
-                    "installation target {0} doesn't exists, isn't a "
-                    "known part of dataset {1}, and no `source` "
-                    "information was provided.".format(path, ds))
-
-            if not source:
-                # FLOW GUIDE EXIT POINT
-                raise InsufficientArgumentsError(
-                    "insufficient information for installation: the "
-                    "installation target {0} doesn't exists, isn't a "
-                    "known part of dataset {1}, and no `source` "
-                    "information was provided.".format(path, ds))
-
-            source_path = expandpath(source)
-            if exists(source_path):
-                # FLOW GUIDE EXIT POINT
-                # this could be
-                # - local file
-                # - local directory
-                # - repository outside the dataset
-                # we only want to support the last case of locally cloning
-                # a repo -- fail otherwise
-                if exists(opj(source_path, '.git')):
-                    return _install_subds_from_flexible_source(
-                        ds, relativepath, source_path, recursive)
-
-                raise ValueError(
-                    "installing individual local files or directories is not "
-                    "supported, copy/move them into the dataset first")
-
-            # FLOW GUIDE
-            # `source` is non-local, it could be:
-            #   - repository
-            #   - file
-            # we have no further evidence, hence we need to try
-            try:
-                # FLOW GUIDE EXIT POINT
-                # assume it is a dataset
-                return _install_subds_from_flexible_source(
-                    ds, relativepath, source, recursive)
-            except CommandError:
-                # FLOW GUIDE EXIT POINT
-                # apaarently not a repo, assume it is a file url
-                vcs.add_url_to_file(relativepath, source)
-                return path
 
     @staticmethod
     def _get_new_vcs(ds, source):
