@@ -30,6 +30,7 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import is_datalad_compat_ri
+from datalad.utils import assure_list
 
 
 from .dataset import EnsureDataset
@@ -144,10 +145,9 @@ class Add(Interface):
         # When called from cmdline `path` and `source` will be a list even if
         # there is only one item.
         # Make sure we deal with the same when called via python API:
-        if path is not None and not isinstance(path, list):
-            path = [path]
-        if source and not isinstance(source, list):
-            source = [source]
+        # always yields list; empty if None
+        path = assure_list(path)
+        source = assure_list(source)
 
         # TODO: Q: are the list operations in the following 3 blocks (resolving
         #          paths, sources and datasets) guaranteed to be stable
@@ -155,9 +155,7 @@ class Add(Interface):
 
         # resolve path(s):
         # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
-        resolved_paths = []
-        if path:
-            resolved_paths = [resolve_path(p, dataset) for p in path]
+        resolved_paths = [resolve_path(p, dataset) for p in path]
 
         # must come after resolve_path()!!
         # resolve dataset:
@@ -167,11 +165,10 @@ class Add(Interface):
 
         # resolve source(s):
         resolved_sources = []
-        if source:
-            for s in source:
-                if not is_datalad_compat_ri(s):
-                    raise ValueError("invalid source parameter: %s" % s)
-                resolved_sources.append(_get_git_url_from_source(s))
+        for s in source:
+            if not is_datalad_compat_ri(s):
+                raise ValueError("invalid source parameter: %s" % s)
+            resolved_sources.append(_get_git_url_from_source(s))
 
         # find (sub-)datasets to add things to (and fail on invalid paths):
         if recursive:

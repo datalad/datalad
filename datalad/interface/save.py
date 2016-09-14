@@ -27,6 +27,7 @@ from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import _with_sep
 from datalad.distribution.install import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.utils import assure_list
 
 from .base import Interface
 
@@ -135,6 +136,9 @@ class Save(Interface):
             # take the easy one out
             return
 
+        # always yields list; empty if None
+        files = assure_list(files)
+
         # XXX path resolution needs to happen on the input argument, not the
         # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
@@ -142,14 +146,14 @@ class Save(Interface):
         # automatically.
         # if files are provided but no dataset, we interpret them as
         # CWD-related
-        if not auto_add_changes and files is not None:
+
+        if auto_add_changes:
+            # use the dataset's base path to indiciate that everything
+            # should be saved
+            files = [ds.path]
+        else:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # use the dataset's base path to indiciate that everything
-        # should be saved
-        if auto_add_changes:
-            files = [ds.path]
 
         # track whether we modified anything, so it becomes
         # possible to decide when/what to save further down
