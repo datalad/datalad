@@ -62,7 +62,8 @@ matrix:
   - python: 3.5
     # we would need to migrate to boto3 to test it fully, but SSH should work
     env:
-    -  DATALAD_TESTS_SSH=1
+    - DATALAD_TESTS_SSH=1
+    - UNSET_S3_SECRETS=1
 
 before_install:
   # The ultimate one-liner setup for NeuroDebian repository
@@ -94,6 +95,8 @@ install:
   # TMPDIRs
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
+  # S3
+  - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit
