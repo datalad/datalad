@@ -197,8 +197,8 @@ class Add(Interface):
             for p in resolved_paths:
                 if isdir(p):
                     for subds_path in \
-                      dataset.get_subdatasets(absolute=True, recursive=True,
-                                              recursion_limit=recursion_limit):
+                        dataset.get_subdatasets(absolute=True, recursive=True,
+                                                recursion_limit=recursion_limit):
                         if subds_path.startswith(_with_sep(p)):
                             resolved_datasets.append(Dataset(subds_path))
                             resolved_paths.append(curdir)
@@ -221,15 +221,15 @@ class Add(Interface):
         param_tuples = [(d if d is not None else dataset, p, s)
                         for d, p, s in param_tuples]
 
-        calls = {d.path: { # list of paths to 'git-add':
-                           'g_add': [],
-                           # list of paths to 'git-annex-add':
-                           'a_add': [],
-                           # list of sources to 'git-annex-addurl':
-                           'addurl_s': [],
-                           # list of (path, source) to
-                           # 'git-annex-addurl --file':
-                           'addurl_f': []
+        calls = {d.path: {  # list of paths to 'git-add':
+                            'g_add': [],
+                            # list of paths to 'git-annex-add':
+                            'a_add': [],
+                            # list of sources to 'git-annex-addurl':
+                            'addurl_s': [],
+                            # list of (path, source) to
+                            # 'git-annex-addurl --file':
+                            'addurl_f': []
                          } for d in [i for i, p, s in param_tuples]}
 
         for ds, p, s in param_tuples:
