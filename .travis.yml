@@ -37,7 +37,7 @@ matrix:
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
-    - unset -v DATALAD_TESTS_SSH
+    - DATALAD_TESTS_SSH=
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
