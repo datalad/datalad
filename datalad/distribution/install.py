@@ -340,18 +340,21 @@ class Install(Interface):
             # could be a single positional argument, that points to a known
             # subdataset.
             # So, test for that last remaining option:
-            from dataset import require_dataset
-            try:
-                # TODO: meaningful purpose= Parameter?
-                ds_found = require_dataset(dataset, check_installed=True)
-            except InsufficientArgumentsError:
-                ds_found = None
 
-            if ds_found and path in ds_found.get_subdatasets(absolute=True):
-                # found a match, so let's try to install the thing:
+            # if `path` was a known subdataset to be installed, let's assume
+            # it would be one:
+            assume_ds = Dataset(path)
+            candidate_super_ds = assume_ds.get_superdataset()
+
+            if candidate_super_ds and candidate_super_ds != assume_ds and \
+                assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
+
+                # `path` has a potential superdataset and is known to this
+                # candidate
                 _install_sub = True
                 _install_into_ds = True
-                ds = ds_found
+                ds = candidate_super_ds
+
             else:
                 # no match, we can't deal with that `path` argument
                 # without a `source`:
