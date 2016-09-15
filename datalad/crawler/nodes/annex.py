@@ -1072,13 +1072,28 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False, remove_unversioned=False, exclude=None):
+    def remove_other_versions(self, name=None, db=None,
+                              overlay=None, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
 
         Parameters
         ----------
+        name : str, optional
+          Name of the SingleVersionDB to consult (e.g., original name of the branch)
+        db : SingleVersionDB, optional
+          If provided, `name` must be None.
+        overlay : int or callable, optional
+          Overlay files of the next version to only replace files from the
+          previous version.  If specified as `int`, value will determine how
+          many leading levels of .-separated (e.g., of major.minor.patch)
+          semantic version format will be used to identify "unique"
+          non-overlayable version. E.g. overlay=2, would overlay all .patch
+          levels, while starting without overlay for any new major.minor version.
+          If a callable, it would be used to augment versions before identifying
+          non-overlayable version component.  So in other words `overlay=2`
+          should be identical to `overlay=lambda v: '.'.join(v.split('.')[:2])`
         remove_unversioned: bool, optional
           If there is a version defined now, remove those files which are unversioned
           i.e. not listed associated with any version
@@ -1088,12 +1103,26 @@ class Annexificator(object):
           could have been generated in `incoming` branch
         """
 
-        def _remove_other_versions(data):
-            if overlay:
-                raise NotImplementedError(overlay)
+        if overlay is None:
+            overlay_version_func = lambda x: x
+        elif isinstance(overlay, int) and not isinstance(overlay, bool):
+            overlay_version_func = lambda v: '.'.join(v.split('.')[:overlay])
+        elif hasattr(overlay, '__call__'):
+            overlay_version_func = overlay
+        else:
+            raise TypeError("overlay  must be an int or a callable. Got %s"
+                            % repr(overlay))
 
+        if db is not None and name is not None:
+            raise ValueError(
+                "Must have specified either name or version_db, not both"
+            )
+
+        def _remove_other_versions(data):
             stats = data.get('datalad_stats', None)
-            versions_db = SingleVersionDB(self.repo, name=name)
+            versions_db = SingleVersionDB(self.repo, name=name) \
+                if db is None \
+                else db
 
             current_version = versions_db.version
 
@@ -1102,16 +1131,50 @@ class Annexificator(object):
                 yield data
                 return
 
+            current_overlay_version = overlay_version_func(current_version)
+            prev_version = None
+            tracked_files = {}  # track files in case of overlaying
             for version, fpaths in iteritems(versions_db.versions):
-                # we do not care about non-versioned or current version
-                if version is None or current_version == version:
-                    continue  # skip current version
-                for fpath, vfpath in iteritems(fpaths):
+                # sanity check since we now will have assumption that versions
+                # are sorted
+                if prev_version is not None:
+                    assert(prev_version < version)
+                prev_version = LooseVersion(version)
+                overlay_version = overlay_version_func(version)
+                # we do not care about non-versioned or current "overlay" version
+                #import pdb; pdb.set_trace()
+                if version is None:
+                    continue
+
+                files_to_remove = []
+                if current_overlay_version == overlay_version and \
+                    LooseVersion(version) <= current_version:
+                    # the same overlay but before current version
+                    # we need to track the last known within overlay and if
+                    # current updates, remove older version
+                    for fpath, vfpath in fpaths.items():
+                        if fpath in tracked_files:
+                            files_to_remove.append(tracked_files[fpath])
+                        tracked_files[fpath] = vfpath  # replace with current one
+                    if version == current_version:
+                        # just clean out those tracked_files with the most recent versions
+                        # and remove nothing
+                        tracked_files = {}
+                else:
+                    files_to_remove = fpaths.values()
+
+                for vfpath in files_to_remove:
                     vfpathfull = opj(self.repo.path, vfpath)
-                    if lexists(vfpathfull):
-                        lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
+                    if os.path.lexists(vfpathfull):
+                        lgr.debug(
+                            "Removing %s of version %s (overlay %s). "
+                            "Current one %s (overlay %s)",
+                            vfpathfull, version, overlay_version,
+                            current_version, current_overlay_version
+                        )
                         os.unlink(vfpathfull)
 
+            assert not tracked_files, "we must not end up having tracked files"
             if remove_unversioned:
                 # it might be that we haven't 'recorded' unversioned ones at all
                 # and now got an explicit version, so we would just need to remove them all

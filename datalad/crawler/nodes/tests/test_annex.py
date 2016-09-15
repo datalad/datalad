@@ -8,8 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os import listdir
-from os.path import join as opj, exists, lexists
+from os.path import join as opj, exists, lexists, basename
+from collections import OrderedDict
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
+from mock import patch
 
 from ..annex import initiate_dataset
 from ..annex import Annexificator
@@ -251,9 +253,97 @@ def test_add_dir_file(repo_path, p, topurl):
     list(annex.finalize()({}))  # so it gets committed
     ok_file_under_git(path1, annexed=True)
 
+
 def test_commit_versions():
     raise SkipTest("TODO: is tested only as a part of test_openfmri.py")
 
 
-def test_remove_other_versions():
-    raise SkipTest("TODO: is tested only as a part of test_openfmri.py")
+@with_tempfile(mkdir=True)
+def test_remove_other_versions(repo_path):
+    annex = Annexificator(path=repo_path, create=True)
+
+    class version_db:
+        version = '1.0.0'
+        versions = OrderedDict([
+            ('10.0.0', {}),  # wrong order -- will fail and we will pop it
+            ('1.0.0', {'a': 'a_1.0.0'}),
+            ('2.0.0', {'b': 'b_2.0.0', 'c': 'c_2.0.0'}),
+            ('2.0.1', {'c': 'c_2.0.1'}),  # if no overlay, b is gone, overlay=2 should keep b
+            ('2.1.1', {'c': 'c_2.1.1'}),  # b should disappear if overlay=2, but stay if
+            ('3', {'d': 'd_3'}),
+        ])
+
+    assert_raises(ValueError,
+                  annex.remove_other_versions,
+                  'name', db=version_db)
+
+    data = {'datalad_stats': ActivityStats()}
+    rov = annex.remove_other_versions(db=version_db)  # generator
+
+    # we have that incorrectly ordered version inside
+    assert_raises(AssertionError, next, rov(data))
+    version_db.versions.pop('10.0.0')  # remove the abuser
+
+    class Unlinker(object):
+
+        def __init__(self):
+            self.unlinked = []
+            self.allfiles = set()
+            # Let's also record all present files
+            for vfs in version_db.versions.values():
+                self.allfiles.update(vfs.values())
+            self._remaining = self.allfiles.copy()
+
+        def __call__(self, s):
+            bs = basename(s)
+            assert(bs in self._remaining)
+            self.unlinked.append(bs)
+            self._remaining.remove(bs)
+
+        @property
+        def remaining(self):
+            # strip the repopath
+            return self._remaining
+
+
+    def check(version, remaining=None, unlinked=None, **kwargs):
+        """Helper - for a given version and kwargs for remove_ - what to expect"""
+        version_db.version = version
+        data = {'datalad_stats': ActivityStats()}
+        rov = annex.remove_other_versions(db=version_db, **kwargs)  # generator
+        with patch('os.unlink', new_callable=Unlinker) as cmunlink, \
+                patch('os.path.lexists', return_value=True):
+            out = list(rov(data))
+        assert(len(out), 1)
+        eq_(out[0]['datalad_stats'].versions, [version])
+        if remaining is not None:
+            eq_(cmunlink.remaining, remaining)
+        if unlinked is not None:
+            eq_(cmunlink.unlinked, unlinked)
+        eq_(cmunlink.remaining.union(cmunlink.unlinked), cmunlink.allfiles)
+
+    check('1.0.0', remaining={'a_1.0.0'})
+    # even though due to overlay=0 all versions are identical, there were no
+    # version before 1.0.0, and all later are removed regardless or overlay
+    check('1.0.0', remaining={'a_1.0.0'}, overlay=0)
+
+    check('2.0.0', remaining={'b_2.0.0', 'c_2.0.0'})
+    check('2.0.0', remaining={'b_2.0.0', 'c_2.0.0'}, overlay=1)
+    check('2.0.0', remaining={'b_2.0.0', 'c_2.0.0'}, overlay=lambda x: x[:1])
+    # but with overlay=0 we would also get files from 1
+    check('2.0.0', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.0.0'}, overlay=0)
+
+    check('2.0.1', remaining={'c_2.0.1'})
+    check('2.0.1', remaining={'b_2.0.0', 'c_2.0.1'}, overlay=1)
+    check('2.0.1', remaining={'b_2.0.0', 'c_2.0.1'}, overlay=2)
+    check('2.0.1', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.0.1'}, overlay=0)
+
+    check('2.1.1', remaining={'c_2.1.1'})
+    check('2.1.1', remaining={'c_2.1.1'}, overlay=2)
+    check('2.1.1', remaining={'b_2.0.0', 'c_2.1.1'}, overlay=1)
+    check('2.1.1', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.1.1'}, overlay=0)
+
+    check('3', remaining={'d_3'})
+    check('3', remaining={'d_3'}, overlay=1)
+    check('3', remaining={'d_3'}, overlay=2)
+    check('3', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.1.1', 'd_3'}, overlay=0)
