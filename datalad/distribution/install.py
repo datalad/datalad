@@ -43,7 +43,7 @@ from datalad.utils import rmtree
 lgr = logging.getLogger('datalad.distribution.install')
 
 
-def _get_git_url_from_source(source):
+def _get_git_url_from_source(source, none_ok=False):
     """Return URL for cloning associated with a source specification
 
     For now just resolves DataLadRIs
@@ -52,7 +52,8 @@ def _get_git_url_from_source(source):
     # by subclasses or sth. like that
 
     if source is None:  # TODO: why does this even happen?
-        lgr.warning("received 'None' as 'source'.")
+        if not none_ok:
+            lgr.warning("received 'None' as 'source'.")
         return source
 
     if not isinstance(source, RI):
@@ -346,7 +347,7 @@ class Install(Interface):
         lgr.debug("Resolved installation target: {0}".format(path))
 
         # Possibly do conversion from source into a git-friendly url
-        source_url = _get_git_url_from_source(source)
+        source_url = _get_git_url_from_source(source, none_ok=True)
 
         if ds is None and path is None and source_url is not None:
             # we got nothing but a source. do something similar to git clone
