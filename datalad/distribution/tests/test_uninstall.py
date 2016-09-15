@@ -289,3 +289,22 @@ def test_remove_dataset_hierarchy(path):
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
+
+
+@with_tempfile()
+def test_careless_subdataset_uninstall(path):
+    # nested datasets
+    ds = Dataset(path).create()
+    subds1 = ds.create('deep1')
+    subds2 = ds.create('deep2')
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    ok_clean_git(ds.path)
+    # now we kill the sub without the parent knowing
+    subds1.uninstall(remove_history=True, remove_handles=True)
+    ok_(not exists(subds1.path))
+    ok_(ds.repo.dirty)
+    # parent still knows the sub
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    # save the parent later on
+    ds.save(auto_add_changes=True)
+    eq_(ds.get_subdatasets(), ['deep2'])
