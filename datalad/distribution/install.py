@@ -143,8 +143,8 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         lgr.debug("Attempt clone of subdataset from: {0}".format(clone_url))
         try:
             subds = Install.__call__(
-                dataset=subds, path=None, source=clone_url,
-                recursive=recursive, add_data_to_git=False)
+                path=subds.path, source=clone_url,
+                recursive=recursive)
         except GitCommandError:
             # TODO: failed clone might leave something behind that causes the
             # next attempt to fail as well. Implement safe way to remove clone
@@ -349,9 +349,10 @@ class Install(Interface):
             except InsufficientArgumentsError:
                 ds_found = None
 
-            if ds_found and path in ds.get_subdatasets():
+            if ds_found and path in ds_found.get_subdatasets(absolute=True):
                 # found a match, so let's try to install the thing:
                 _install_sub = True
+                _install_into_ds = True
                 ds = ds_found
             else:
                 raise InsufficientArgumentsError(
@@ -426,9 +427,11 @@ class Install(Interface):
             lgr.info("Install subdataset at: {0}".format(path))
             if _install_sub:
                 # FLOW_GUIDE: 1.1.
+                submodule = [sm for sm in ds.repo.get_submodules()
+                             if sm.path == relativepath][0]
 
-                #_install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
-                ds.repo.update_submodule(relativepath, init=True)
+                _install_subds_from_flexible_source(ds, submodule.path, submodule.url, recursive=False)
+                #ds.repo.update_submodule(relativepath, init=True)
 
                 # TODO: use _install_subds_from_flexible instead?
                 # it calls install again, but this is based on old install.
@@ -441,8 +444,8 @@ class Install(Interface):
                 # TODO: Some success checks?
             else:
                 # FLOW_GUIDE 1.3.
-                #_install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
-                ds.repo.add_submodule(relativepath, url=source_url)
+                _install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
+                #ds.repo.add_submodule(relativepath, url=source_url)
         else:
             # FLOW GUIDE: 2.
             lgr.info("Install dataset at: {0}".format(path))
