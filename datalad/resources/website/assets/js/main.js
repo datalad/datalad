@@ -169,6 +169,30 @@ function metadata_locator(md5) {
 }
 
 /**
+ * render size of row entry based on size's present and their values
+ * @param {object} size json object containing size info of current row entry
+ * @return {string} return html string to be rendered in size column of current row entry
+*/
+function size_renderer(size) {
+  // if both ondisk and total size present
+  if (size.ondisk && size.total)
+    // don't show, if ondisk size = 0 Bytes
+    if (size.ondisk === '0 Bytes')
+      return "-/" + size.total;
+    // show only one size, if both present and identical
+    else if (size.ondisk === size.total)
+      return size.total;
+    // else show "ondisk size" / "total size"
+    else
+      return size.ondisk + "/" + size.total;
+  // else if only total size present, show "total size"
+  else if (size.total)
+    return "-/" + size.total;
+  else
+    return "-/-";
+}
+
+/**
  * render the datatable interface based on current node metadata
  * @param {object} jQuery jQuery library object
  * @param {object} md5 md5 library object
@@ -201,15 +225,10 @@ function directory(jQuery, md5) {
     createdRow: function(row, data, index) {
       if (data.name === '..')
         parent = true;
-      // show size = "ondisk size" / "total size"
-      if (data.size.ondisk && data.size.ondisk === '0 Bytes')
-        jQuery('td', row).eq(2).html("-/" + data.size.total);
-      else if (data.size.ondisk)
-        jQuery('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);
-      else if (data.size.total)
-        jQuery('td', row).eq(2).html("-/" + data.size.total);
-      else
-        jQuery('td', row).eq(2).html("-/-");
+
+      // size rendering logic
+      jQuery('td', row).eq(2).html(size_renderer(data.size));
+
       // if row is a directory append '/' to name cell
       if (data.type === 'dir' || data.type === 'git' || data.type === 'annex')
         jQuery('td', row).eq(0).html('<a>' + jQuery('td', row).eq(0).html() + '/</a>');
