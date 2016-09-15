@@ -9,35 +9,32 @@
 """High-level interface for dataset (component) installation
 
 """
+from datalad.distribution.utils import _install_subds_inplace, \
+    _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
 
 import logging
-from os import curdir
-from os.path import join as opj, abspath, relpath, pardir, isdir, \
-    exists, lexists, islink
+from os import curdir, linesep
+from os.path import join as opj, relpath, pardir, exists
 
 from six.moves.urllib.parse import quote as urlquote
 
-from datalad.dochelpers import exc_str
-from datalad.cmd import CommandError
-from datalad.cmd import Runner
-from datalad.distribution.dataset import Dataset, datasetmethod, \
+from .dataset import Dataset, datasetmethod, \
     resolve_path, EnsureDataset
+
 from datalad.interface.base import Interface
-from datalad.support.annexrepo import AnnexRepo, FileInGitError
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
-    EnsureBool
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileNotInAnnexError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.gitrepo import GitRepo, GitCommandError
-from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag, recursion_limit, \
     dataset_description, git_opts, annex_opts, \
-    annex_init_opts, git_clone_opts
-from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows, swallow_logs
+    annex_init_opts, git_clone_opts, if_dirty_opt, nosave_opt
+from datalad.interface.utils import handle_dirty_dataset
+
+from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.gitrepo import GitRepo, GitCommandError
+from datalad.support.param import Parameter
+from datalad.utils import knows_annex, swallow_logs
 from datalad.support.network import RI, URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url, is_datalad_compat_ri
@@ -86,42 +83,6 @@ def _get_installationpath_from_url(url):
     if path.endswith('.git'):
         path = path[:-4]
     return path
-
-
-def get_git_dir(path):
-    """figure out a repo's gitdir
-
-    '.git' might be a  directory, a symlink or a file
-
-    Parameter
-    ---------
-    path: str
-      currently expected to be the repos base dir
-
-    Returns
-    -------
-    str
-      relative path to the repo's git dir; So, default would be ".git"
-    """
-
-    from os.path import isfile
-    from os import readlink
-
-    dot_git = opj(path, ".git")
-    if not exists(dot_git):
-        raise RuntimeError("Missing .git in %s." % path)
-    elif islink(dot_git):
-        git_dir = readlink(dot_git)
-    elif isdir(dot_git):
-        git_dir = ".git"
-    elif isfile(dot_git):
-        with open(dot_git) as f:
-            git_dir = f.readline()
-            if git_dir.startswith("gitdir:"):
-                git_dir = git_dir[7:]
-            git_dir = git_dir.strip()
-
-    return git_dir
 
 
 def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
@@ -199,33 +160,6 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         return subds
 
 
-def _install_subds_inplace(ds, path, relativepath, name=None):
-    """Register an existing repository in the repo tree as a submodule"""
-    # FLOW GUIDE EXIT POINT
-    # this is an existing repo and must be in-place turned into
-    # a submodule of this dataset
-    ds.repo.add_submodule(relativepath, url=None, name=name)
-    _fixup_submodule_dotgit_setup(ds, relativepath)
-    # return newly added submodule as a dataset
-    return Dataset(path)
-
-
-def _fixup_submodule_dotgit_setup(ds, relativepath):
-    """Implementation of our current of .git in a subdataset
-
-    Each subdataset/module has its own .git directory where a standalone
-    repository would have it. No gitdir files, no symlinks.
-    """
-    # move .git to superrepo's .git/modules, remove .git, create
-    # .git-file
-    path = opj(ds.path, relativepath)
-    src_dotgit = get_git_dir(path)
-
-    # at this point install always yields the desired result
-    # just make sure
-    assert(src_dotgit == '.git')
-
-
 # TODO: check whether the following is done already:
 # install of existing submodule; recursive call; source should not be None!
 
@@ -290,6 +224,8 @@ class Install(Interface):
         description=dataset_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        if_dirty=if_dirty_opt,
+        save=nosave_opt,
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
@@ -305,6 +241,8 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
+            if_dirty='save-before',
+            save=True,
             git_opts=None,
             git_clone_opts=None,
             annex_opts=None,
@@ -332,6 +270,7 @@ class Install(Interface):
                 # TODO: possible magic: ds.install() for known subdataset 'ds'
                 raise ValueError("{0} needs to be installed in order to "
                                  "install something into it.".format(ds))
+            handle_dirty_dataset(ds, if_dirty)
 
         # resolve the target location (if local) against the provided dataset
         # or CWD:
@@ -550,15 +489,29 @@ class Install(Interface):
                         Install.__call__(path=subds.path,
                                          dataset=current_dataset,
                                          recursive=True,
-                                         recursion_limit=recursion_limit - 1 if recursion_limit else None)
+                                         recursion_limit=recursion_limit - 1
+                                         if recursion_limit else None)
                     )
 
         # get the content of installed (sub-)datasets:
         if get_data:
             for d in installed_items:
+                lgr.info("Getting data of {0}".format(d))
                 if isinstance(d.repo, AnnexRepo):
                     d.get(curdir)
-            pass
+
+        # everything done => save changes:
+        if save and _install_into_ds:
+            # Note: The only possible changes are installed subdatasets.
+            # This means: We have something to save only, if we installed into
+            # a dataset.
+            lgr.info("Saving changes to {0}".format(ds))
+            ds.save(
+                message='[DATALAD] installed subdataset{0}:{1}'.format(
+                    "s" if len(installed_items) > 1 else "",
+                    linesep + linesep.join([str(i) for i in installed_items])),
+                auto_add_changes=False,
+                recursive=False)
 
         return installed_items
 

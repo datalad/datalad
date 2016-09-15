@@ -163,7 +163,7 @@ class initiate_dataset(object):
             # place hack from 'add-to-super' times here
             sds = ds.get_superdataset()
             if sds is not None:
-                from datalad.distribution.install import _install_subds_inplace
+                from datalad.distribution.utils import _install_subds_inplace
                 subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
                 lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
                 _install_subds_inplace(ds=sds, path=ds.path,

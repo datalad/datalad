@@ -25,7 +25,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import _with_sep
-from datalad.distribution.install import _install_subds_inplace
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 
 from .base import Interface
