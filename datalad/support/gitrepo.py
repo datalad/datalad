@@ -1493,7 +1493,12 @@ class GitRepo(object):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_deleted_files(self):
+        """return a list of paths with deleted files (deletion not yet commited)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
+                if f.split('\t')[0] == 'D']
+
 # TODO
 # remove submodule
 # status?
-
