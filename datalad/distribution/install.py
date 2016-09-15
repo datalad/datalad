@@ -259,13 +259,15 @@ class Install(Interface):
         # shortcut
         ds = dataset
 
+        _install_into_ds = False  # default
         # did we explicitly get a dataset to install into?
-        _install_into_ds = ds is not None
-
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
+
+        if ds is not None:
+            _install_into_ds = True
+            if not isinstance(ds, Dataset):
+                ds = Dataset(ds)
             if not ds.is_installed():
                 # TODO: possible magic: ds.install() for known subdataset 'ds'
                 raise ValueError("{0} needs to be installed in order to "
@@ -336,7 +338,24 @@ class Install(Interface):
                     source = path
 
         if source is None and not _install_sub:
-            raise InsufficientArgumentsError("Got no source to install from.")
+            # we have no source and don't have a dataset to install into.
+            # could be a single positional argument, that points to a known
+            # subdataset.
+            # So, test for that last option:
+            from dataset import require_dataset
+            # TODO: meaningful purpose= Parameter?
+            try:
+                ds_found = require_dataset(dataset, check_installed=True)
+            except InsufficientArgumentsError:
+                ds_found = None
+
+            if ds_found and path in ds.get_subdatasets():
+                # found a match, so let's try to install the thing:
+                _install_sub = True
+                ds = ds_found
+            else:
+                raise InsufficientArgumentsError(
+                    "Got no source to install from.")
 
         _install_inplace = False
         if source == path:  # TODO: does it make sense to use realpath here?
@@ -407,6 +426,8 @@ class Install(Interface):
             lgr.info("Install subdataset at: {0}".format(path))
             if _install_sub:
                 # FLOW_GUIDE: 1.1.
+
+                #_install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
                 ds.repo.update_submodule(relativepath, init=True)
 
                 # TODO: use _install_subds_from_flexible instead?
@@ -420,6 +441,7 @@ class Install(Interface):
                 # TODO: Some success checks?
             else:
                 # FLOW_GUIDE 1.3.
+                #_install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
                 ds.repo.add_submodule(relativepath, url=source_url)
         else:
             # FLOW GUIDE: 2.
