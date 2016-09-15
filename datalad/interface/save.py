@@ -65,6 +65,16 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
     return _modified_flag
 
 
+def deinit_deleted_submodules(ds):
+    # helper to inspect a repo and `deinit` all submodules that are reported
+    # as present, but the mountpoint doesn't exist
+    deleted = ds.repo.get_deleted_files()
+    for subdspath in ds.get_subdatasets(absolute=False, recursive=False):
+        if subdspath in deleted:
+            lgr.debug('deinit deleted subdataset {} in {}'.format(subdspath, ds))
+            ds.repo.deinit_submodule(subdspath)
+
+
 class Save(Interface):
     """Save the current state of a dataset
 
@@ -139,6 +149,11 @@ class Save(Interface):
         # always yields list; empty if None
         files = assure_list(files)
 
+        # before anything, let's deal with missing submodules that may have
+        # been rm'ed by the user
+        # this will not alter/amend the history of the dataset
+        deinit_deleted_submodules(ds)
+
         # XXX path resolution needs to happen on the input argument, not the
         # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
@@ -161,7 +176,7 @@ class Save(Interface):
         _modified_flag = False
 
         _modified_flag = untracked_subdatasets_to_submodules(
-            ds, files)
+            ds, files) or _modified_flag
 
         # now we should have a complete list of submodules to potentially
         # recurse into

@@ -900,3 +900,19 @@ def test_GitRepo_count_objects(repo_path):
     empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
                    'size': 0, 'size-garbage': 0, 'size-pack': 0}
     eq_(empty_count, repo.count_objects)
+
+
+@with_tempfile
+def test_get_deleted(path):
+    repo = GitRepo(path, create=True)
+    os.makedirs(opj(path, 'deep'))
+    with open(opj(path, 'test1'), 'w') as f:
+        f.write('some')
+    with open(opj(path, 'deep', 'test2'), 'w') as f:
+        f.write('some more')
+    repo.add('.', commit=True)
+    ok_clean_git(path, annex=False)
+    os.unlink(opj(path, 'test1'))
+    eq_(repo.get_deleted_files(), ['test1'])
+    rmtree(opj(path, 'deep'))
+    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
