@@ -43,7 +43,7 @@ from datalad.utils import rmtree
 lgr = logging.getLogger('datalad.distribution.install')
 
 
-def _get_git_url_from_source(source):
+def _get_git_url_from_source(source, none_ok=False):
     """Return URL for cloning associated with a source specification
 
     For now just resolves DataLadRIs
@@ -52,7 +52,8 @@ def _get_git_url_from_source(source):
     # by subclasses or sth. like that
 
     if source is None:
-        lgr.warning("received 'None' as 'source'.")
+        if not none_ok:
+            lgr.warning("received 'None' as 'source'.")
         return source
 
     if not isinstance(source, RI):
@@ -160,11 +161,8 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         return subds
 
 
-# TODO: check whether the following is done already:
-# install of existing submodule; recursive call; source should not be None!
-
 # TODO:  git_clone options
-# use --shared by default => option --no-shared
+# use --shared by default? => option --no-shared
 
 
 class Install(Interface):
@@ -370,7 +368,7 @@ class Install(Interface):
                     "sense without a dataset to install into.".format(path))
 
         # Possibly do conversion from source into a git-friendly url
-        source_url = _get_git_url_from_source(source)
+        source_url = _get_git_url_from_source(source, none_ok=True)
 
         # derive target from source url:
         if path is None and source_url is not None:

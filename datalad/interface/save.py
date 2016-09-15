@@ -27,6 +27,7 @@ from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import _with_sep
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.utils import assure_list
 
 from .base import Interface
 
@@ -62,6 +63,16 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
             _modified_flag = True
 
     return _modified_flag
+
+
+def deinit_deleted_submodules(ds):
+    # helper to inspect a repo and `deinit` all submodules that are reported
+    # as present, but the mountpoint doesn't exist
+    deleted = ds.repo.get_deleted_files()
+    for subdspath in ds.get_subdatasets(absolute=False, recursive=False):
+        if subdspath in deleted:
+            lgr.debug('deinit deleted subdataset {} in {}'.format(subdspath, ds))
+            ds.repo.deinit_submodule(subdspath)
 
 
 class Save(Interface):
@@ -119,8 +130,6 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
-        # import locally to avoid circularity in API
-        from datalad.distribution.add import Add
         # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
@@ -137,6 +146,14 @@ class Save(Interface):
             # take the easy one out
             return
 
+        # always yields list; empty if None
+        files = assure_list(files)
+
+        # before anything, let's deal with missing submodules that may have
+        # been rm'ed by the user
+        # this will not alter/amend the history of the dataset
+        deinit_deleted_submodules(ds)
+
         # XXX path resolution needs to happen on the input argument, not the
         # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
@@ -144,14 +161,14 @@ class Save(Interface):
         # automatically.
         # if files are provided but no dataset, we interpret them as
         # CWD-related
-        if not auto_add_changes and files is not None:
+
+        if auto_add_changes:
+            # use the dataset's base path to indiciate that everything
+            # should be saved
+            files = [ds.path]
+        else:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # use the dataset's base path to indiciate that everything
-        # should be saved
-        if auto_add_changes:
-            files = [ds.path]
 
         # track whether we modified anything, so it becomes
         # possible to decide when/what to save further down
@@ -159,7 +176,7 @@ class Save(Interface):
         _modified_flag = False
 
         _modified_flag = untracked_subdatasets_to_submodules(
-            ds, files)
+            ds, files) or _modified_flag
 
         # now we should have a complete list of submodules to potentially
         # recurse into
@@ -206,10 +223,8 @@ class Save(Interface):
                     if ds.get_containing_subdataset(f, recursion_limit=1) == ds]
             if len(absf):
                 # XXX Is there a better way to handle files in mixed repos?
-                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
-                             to_git=False)
-                Add.__call__(dataset=ds, path=absf, recursive=False, save=False,
-                             to_git=True)
+                ds.repo.add(absf)
+                ds.repo.add(absf, git=True)
 
         _datalad_msg = False
         if not message:

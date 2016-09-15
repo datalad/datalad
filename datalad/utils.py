@@ -381,6 +381,8 @@ def assure_list(s):
 
     if isinstance(s, list):
         return s
+    elif isinstance(s, tuple):
+        return list(s)
     elif s is None:
         return []
     else:

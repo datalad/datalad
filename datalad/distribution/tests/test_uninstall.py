@@ -241,10 +241,10 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True, save=False)
+    ds = Dataset(path).create(force=True, if_dirty='ignore')
     subds = ds.create('deep', force=True, if_dirty='ignore')
     # we add one file
-    eq_(len(subds.add('.')), 1)
+    eq_(len(subds.add('.', if_dirty='ignore')), 1)
     # save all -> all clean
     ds.save(auto_add_changes=True, recursive=True)
     ok_clean_git(subds.path)
@@ -289,3 +289,28 @@ def test_remove_dataset_hierarchy(path):
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
+
+
+@with_tempfile()
+def test_careless_subdataset_uninstall(path):
+    # nested datasets
+    ds = Dataset(path).create()
+    subds1 = ds.create('deep1')
+    ds.create('deep2')
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    ok_clean_git(ds.path)
+    # now we kill the sub without the parent knowing
+    subds1.uninstall(remove_history=True, remove_handles=True)
+    ok_(not exists(subds1.path))
+    ok_(ds.repo.dirty)
+    # parent still knows the sub
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    # save the parent later on
+    ds.save(auto_add_changes=True)
+    # subds still gone
+    # subdataset appearance is normalized to an empty directory
+    ok_(exists(subds1.path))
+    # parent still knows the sub
+    eq_(ds.get_subdatasets(), ['deep1', 'deep2'])
+    # and they lived happily ever after
+    ok_clean_git(ds.path)

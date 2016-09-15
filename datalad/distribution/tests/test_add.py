@@ -73,9 +73,9 @@ def test_add_files(path):
                 (test_list_4, False)]:
         # special case 4: give the dir:
         if arg[0] == test_list_4:
-            result = ds.add('dir', to_git=arg[1], save=False)
+            result = ds.add('dir', to_git=arg[1], save=False, if_dirty='ignore')
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False)
+            result = ds.add(arg[0], to_git=arg[1], save=False, if_dirty='ignore')
         # TODO eq_(result, arg[0])
         # added, but not committed:
         ok_(ds.repo.dirty)
@@ -132,7 +132,8 @@ def test_add_recursive(path):
 def test_relpath_add(path):
     ds = Dataset(path).create(force=True)
     with chpwd(opj(path, 'dir')):
-        eq_(add('testindir')[0]['file'], opj('dir', 'testindir'))
+        eq_(add('testindir', if_dirty='ignore')[0]['file'],
+            opj('dir', 'testindir'))
         # and now add all
         add('..')
     # auto-save enabled

@@ -28,6 +28,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.utils import rmtree
 from datalad.utils import getpwd
+from datalad.utils import assure_list
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -177,16 +178,11 @@ class Uninstall(Interface):
         ds = require_dataset(
             dataset, check_installed=True, purpose='uninstall')
 
-        if path is None:
+        # always yields list; empty if None
+        path = assure_list(path)
+        if not len(path):
             # AKA "everything"
-            path = [ds.path]
-
-        if isinstance(path, (list, tuple)):
-            if not len(path):
-                # empty list comes from cmdline, if not specified
-                path = [ds.path]
-        else:
-            path = [path]
+            path.append(ds.path)
 
         # XXX Important to resolve against `dataset` input argument, and
         # not against the `ds` resolved dataset
