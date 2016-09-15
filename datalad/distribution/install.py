@@ -335,7 +335,7 @@ class Install(Interface):
                               "inplace into {1}.".format(path, ds))
                     source = path
 
-        if source is None and not _install_sub:
+        if source is None and not _install_sub and path is not None:
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
             # subdataset.

@@ -277,11 +277,18 @@ def test_install_recursive(src, path_nr, path_r):
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
-    ds = install(path=path, source=src, recursive=True, get_data=True)
-    ok_(ds.is_installed())
-    if isinstance(ds.repo, AnnexRepo):
-        ok_(all(ds.repo.file_has_content(ds.repo.get_annexed_files())))
-    for sub in ds.get_subdatasets(recursive=True):
+    ds_list = install(path=path, source=src, recursive=True, get_data=True)
+    # installed a dataset and two subdatasets:
+    eq_(len(ds_list), 3)
+    ok_(all([isinstance(i, Dataset) for i in ds_list]))
+    # we recurse top down during installation, so toplevel should appear at
+    # first position in returned list
+    eq_(ds_list[0].path, path)
+    top_ds = ds_list[0]
+    ok_(top_ds.is_installed())
+    if isinstance(top_ds.repo, AnnexRepo):
+        ok_(all(top_ds.repo.file_has_content(top_ds.repo.get_annexed_files())))
+    for sub in top_ds.get_subdatasets(recursive=True):
         subds = Dataset(opj(path, sub))
         ok_(subds.is_installed(), "Not installed: %s" % opj(path, sub))
         if isinstance(subds.repo, AnnexRepo):
@@ -293,9 +300,8 @@ def test_install_recursive_with_data(src, path):
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
-    import logging
-    logging.getLogger('datalad.test').error("DEBUG: source: %s" % source)
-    subds = ds.install(path="sub", source=source)
+
+    subds = ds.install(path="sub", source=source, save=False)
     if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
         ok_(exists(opj(subds.path, '.git')))
     else:
