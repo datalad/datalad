@@ -1362,6 +1362,7 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
@@ -1378,6 +1379,7 @@ class GitRepo(object):
         kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
+        # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
@@ -1409,6 +1411,7 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def tag(self, tag):
         """Assign a tag to current commit

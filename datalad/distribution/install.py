@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-import os
+from os import curdir
 from os.path import join as opj, abspath, relpath, pardir, isdir, \
     exists, lexists, islink
 
@@ -34,7 +34,7 @@ from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag, recursion_limit, \
-    dataset_description, add_to_superdataset, git_opts, annex_opts, \
+    dataset_description, git_opts, annex_opts, \
     annex_init_opts, git_clone_opts
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
@@ -54,7 +54,7 @@ def _get_git_url_from_source(source):
     # TODO: Probably RF this into RI.as_git_url(), that would be overridden
     # by subclasses or sth. like that
 
-    if source is None:  # TODO: why does this even happen?
+    if source is None:
         lgr.warning("received 'None' as 'source'.")
         return source
 
@@ -438,6 +438,10 @@ class Install(Interface):
             lgr.debug("Resolved installation target relative to dataset "
                       "{0}: {1}".format(ds, relativepath))
 
+
+        # TODO: expandpath()?
+        # more checks, whether something exists and what it actually is?
+
         ###########
         # we should know everything necessary by now
         # actual installation starts
@@ -446,6 +450,7 @@ class Install(Interface):
             path, " from %s" % source_url if source_url else ""
         ))
 
+        installed_items = []
         # FLOW GUIDE:
         # four cases:
         # 1. install into a dataset
@@ -460,71 +465,15 @@ class Install(Interface):
 
         if _install_into_ds:
             # FLOW GUIDE: 1.
+            lgr.info("Install subdataset at: {0}".format(path))
             if _install_sub:
                 # FLOW_GUIDE: 1.1.
-                # def _install_subds_from_flexible ?????
+                ds.repo.update_submodule(relativepath, init=True)
 
-
-                #Snippet:
-                # OR this is a submodule of this dataset
-            # submodule = [sm for sm in ds.repo.get_submodules()
-            #              if sm.path == relativepath]
-            # if not len(submodule):
-            #     # FLOW GUIDE EXIT POINT
-            #     # this is a file in Git and no submodule, just return its path
-            #     lgr.debug("Don't act, data already present in Git")
-            #     return path
-            # elif len(submodule) > 1:
-            #     raise RuntimeError(
-            #         "more than one submodule registered at the same path?")
-            # submodule = submodule[0]
-            #
-            # # FLOW GUIDE EXIT POINT
-            # # we are dealing with a known submodule (i.e. `source`
-            # # doesn't matter) -> check it out
-            # lgr.debug("Install subdataset at: {0}".format(submodule.path))
-            # subds = _install_subds_from_flexible_source(
-            #     ds, submodule.path, submodule.url, recursive=recursive)
-            # return subds
-
-                # Snippet 2:
-            # few sanity checks
-            # if source and abspath(source) != path:
-            #     if exists(path):
-            #         raise ValueError(
-            #             "installation target already exists, but `source` points to "
-            #             "another location (source: '{0}', target: '{1}'".format(
-            #                 source, path))
-            #     # install a submodule from that source
-            #     return _install_subds_from_flexible_source(
-            #          ds, relativepath, source, recursive=recursive)
-
-
-                # Snippet 3:
-
-            #                 source_path = expandpath(source)
-            # if exists(source_path):
-            #     # FLOW GUIDE EXIT POINT
-            #     # this could be
-            #     # - local file
-            #     # - local directory
-            #     # - repository outside the dataset
-            #     # we only want to support the last case of locally cloning
-            #     # a repo -- fail otherwise
-            #     if exists(opj(source_path, '.git')):
-            #         return _install_subds_from_flexible_source(
-            #             ds, relativepath, source_path, recursive)
-
-
-
-
-
-
-
-
-
-
-                pass
+                # TODO: use _install_subds_from_flexible instead?
+                # it calls install again, but this is based on old install.
+                # So, need to figure it out
+                # Additional note: - does always git clone + add inplace
 
             elif _install_inplace:
                 # FLOW GUIDE: 1.2.
@@ -532,17 +481,17 @@ class Install(Interface):
                 # TODO: Some success checks?
             else:
                 # FLOW_GUIDE 1.3.
-                # def _install_subds_from_flexible ?????
-                pass
-
+                ds.repo.add_submodule(relativepath, url=source_url)
         else:
             # FLOW GUIDE: 2.
+            lgr.info("Install dataset at: {0}".format(path))
 
             # Currently assuming there is nothing at the target to deal with
             # and rely on failures raising from the git call ...
 
             target = Dataset(path)
 
+            # TODO
             assert(target.repo is None)
 
             # should not be the case, but we need to distiguish between failure
@@ -583,26 +532,35 @@ class Install(Interface):
             # cloning done
 
         # FLOW GUIDE: All four cases done.
-        lgr.debug("Installation of {0} done.".format()) ##TODO: installed DS
+        lgr.debug("Installation of {0} done.".format(path)) ##TODO: installed DS instead of `path`
+        current_dataset = Dataset(path)
+        installed_items.append(current_dataset)
 
-        # TODO: Now recursive calls:
+        # Now, recursive calls:
         if recursive:
-            pass
-        ## Snippet:
-        # # TODO: For now 'recursive' means just submodules.
-        #     # See --with-data vs. -- recursive and figure it out
-        #     if recursive:
-        #         if recursive == "data" and isinstance(ds.repo, AnnexRepo):
-        #             ds.repo.get('.')
-        #         for sm in ds.repo.get_submodules():
-        #             _install_subds_from_flexible_source(
-        #                 ds, sm.path, sm.url, recursive=recursive)
-        #     return ds
+            subs = [Dataset(p) for p in
+                    current_dataset.get_subdatasets(recursive=True,
+                                                    recursion_limit=1,
+                                                    absolute=True)]
+            for subds in subs:
+                if subds.is_installed():
+                    lgr.debug("subdataset {0} already installed. Skipped.".format(subds))
+                else:
+                    installed_items.extend(
+                        Install.__call__(path=subds.path,
+                                         dataset=current_dataset,
+                                         recursive=True,
+                                         recursion_limit=recursion_limit - 1 if recursion_limit else None)
+                    )
 
-        # TODO: do we want to get the content?
+        # get the content of installed (sub-)datasets:
         if get_data:
+            for d in installed_items:
+                if isinstance(d.repo, AnnexRepo):
+                    d.get(curdir)
             pass
 
+        return installed_items
 
     @staticmethod
     def _get_new_vcs(ds, source):
