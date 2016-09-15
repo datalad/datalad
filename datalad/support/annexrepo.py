@@ -940,31 +940,53 @@ class AnnexRepo(GitRepo):
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
             # doesn't mean there's nothing else to deal with.
+
+            # Note for OutOfSpaceError:
+            # doesn't depend on anything in stdout. Therefore check this before
+            # messing with stdout
             out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
             if out_of_space_re:
                 raise OutOfSpaceError(cmd="annex %s" % command, sizemore_msg=out_of_space_re.groups()[0])
-            # Workaround as long as annex doesn't report it within JSON response:
+
+            # Note: A try to approach the covering of potential annex failures
+            # in a more general way:
+            # first check stdout:
+            if all([line.startswith('{') and line.endswith('}')
+                    for line in e.stdout.splitlines()]):
+                # we have the usual json output on stdout. Therefore we can
+                # probably return and don't need to raise; so get stdout
+                # for json loading:
+                out = e.stdout
+            else:
+                out = None
+            # Note: Workaround for not existing files as long as annex doesn't
+            # report it within JSON response:
             not_existing = [line.split()[1] for line in e.stderr.splitlines()
                             if line.startswith('git-annex:') and
                             line.endswith('not found')]
-
             if not_existing:
-                out = e.stdout
+                if out is None:
+                    # we create the error reporting herein. If all files were
+                    # not found, there is nothing on stdout and we don't need
+                    # anything
+                    out = ""
                 if not out.endswith(linesep):
                     out += linesep
                 out += linesep.join(
-                        ['{{"command": "{cmd}", "file": "{path}", "note": "{note}",'
+                        ['{{"command": "{cmd}", "file": "{path}", '
+                         '"note": "{note}",'
                          '"success":false}}'.format(cmd=command,
                                                     path=f,
                                                     note="not found")
                          for f in not_existing])
 
-            # if multiple files, whereis may technically fail,
-            # but still returns correct response
-            elif command == 'whereis' and e.code == 1 and \
-                    e.stdout.startswith('{'):
-                out = e.stdout
-            else:
+            # Note: insert additional code here to analyse failure and possibly
+            # raise a custom exception
+
+            # if we didn't raise before, just depend on whether or not we seem
+            # to have some json to return. It should contain information on
+            # failure in keys 'success' and 'note'
+            if out is None:
                 raise e
 
         json_objects = (json.loads(line)
