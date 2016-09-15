@@ -296,7 +296,7 @@ def test_careless_subdataset_uninstall(path):
     # nested datasets
     ds = Dataset(path).create()
     subds1 = ds.create('deep1')
-    subds2 = ds.create('deep2')
+    ds.create('deep2')
     eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
     ok_clean_git(ds.path)
     # now we kill the sub without the parent knowing
@@ -307,4 +307,10 @@ def test_careless_subdataset_uninstall(path):
     eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
     # save the parent later on
     ds.save(auto_add_changes=True)
-    eq_(ds.get_subdatasets(), ['deep2'])
+    # subds still gone
+    # subdataset appearance is normalized to an empty directory
+    ok_(exists(subds1.path))
+    # parent still knows the sub
+    eq_(ds.get_subdatasets(), ['deep1', 'deep2'])
+    # and they lived happily ever after
+    ok_clean_git(ds.path)
