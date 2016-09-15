@@ -471,12 +471,21 @@ class Install(Interface):
             # cloning done
 
         # FLOW GUIDE: All four cases done.
+
+        # in any case check whether we need to annex init the installed thing:
+        if knows_annex(path):
+            # init annex when traces of a remote annex can be detected
+            lgr.info("Initializing annex repo at %s", path)
+            AnnexRepo(path, init=True)
+
         lgr.debug("Installation of {0} done.".format(path)) ##TODO: installed DS instead of `path`
         current_dataset = Dataset(path)
         installed_items.append(current_dataset)
 
         # Now, recursive calls:
         if recursive:
+            if description:
+                lgr.warning("Description can't be assigned recursively.")
             subs = [Dataset(p) for p in
                     current_dataset.get_subdatasets(recursive=True,
                                                     recursion_limit=1,
@@ -485,13 +494,22 @@ class Install(Interface):
                 if subds.is_installed():
                     lgr.debug("subdataset {0} already installed. Skipped.".format(subds))
                 else:
-                    installed_items.extend(
-                        Install.__call__(path=subds.path,
-                                         dataset=current_dataset,
-                                         recursive=True,
-                                         recursion_limit=recursion_limit - 1
-                                         if recursion_limit else None)
-                    )
+                    rec_installed = Install.__call__(
+                        path=subds.path,
+                        dataset=current_dataset,
+                        recursive=True,
+                        recursion_limit=recursion_limit - 1
+                        if recursion_limit else None,
+                        if_dirty=if_dirty,
+                        save=save,
+                        git_opts=git_opts,
+                        git_clone_opts=git_clone_opts,
+                        annex_opts=annex_opts,
+                        annex_init_opts=annex_init_opts)
+                    if isinstance(rec_installed, list):
+                        installed_items.extend(rec_installed)
+                    else:
+                        installed_items.append(rec_installed)
 
         # get the content of installed (sub-)datasets:
         if get_data:
@@ -513,7 +531,10 @@ class Install(Interface):
                 auto_add_changes=False,
                 recursive=False)
 
-        return installed_items
+        if len(installed_items) == 1:
+            return installed_items[0]
+        else:
+            return installed_items
 
     @staticmethod
     def _get_new_vcs(ds, source):
