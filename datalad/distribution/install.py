@@ -313,8 +313,8 @@ class Install(Interface):
 
         # we need a source to install from. Either we have one in `source` or
         # it is implicit, since `path` is an already known subdataset or an
-        # existing subdataset, that should be installed into the given dataset
-        # inplace.
+        # existing dataset, that should be installed into the given dataset as a
+        # subdataset inplace.
         # Note: For now, we do not consider a subdataset beneath a not yet
         # installed level, since we do not know, whether this even is something
         # to install (an actual Dataset) the only thing we know would be,
@@ -341,10 +341,10 @@ class Install(Interface):
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
             # subdataset.
-            # So, test for that last option:
+            # So, test for that last remaining option:
             from dataset import require_dataset
-            # TODO: meaningful purpose= Parameter?
             try:
+                # TODO: meaningful purpose= Parameter?
                 ds_found = require_dataset(dataset, check_installed=True)
             except InsufficientArgumentsError:
                 ds_found = None
@@ -355,6 +355,8 @@ class Install(Interface):
                 _install_into_ds = True
                 ds = ds_found
             else:
+                # no match, we can't deal with that `path` argument
+                # without a `source`:
                 raise InsufficientArgumentsError(
                     "Got no source to install from.")
 
@@ -388,15 +390,6 @@ class Install(Interface):
             raise InsufficientArgumentsError("Got no target to install to.")
 
         lgr.debug("Resolved installation target: {0}".format(path))
-        if _install_into_ds:
-            # express the destination path relative to the root of
-            # the dataset
-            relativepath = relpath(path, start=ds.path)
-            if path.startswith(pardir):
-                raise ValueError("installation path outside dataset")
-            lgr.debug("Resolved installation target relative to dataset "
-                      "{0}: {1}".format(ds, relativepath))
-
 
         # TODO: expandpath()?
         # more checks, whether something exists and what it actually is?
@@ -425,12 +418,26 @@ class Install(Interface):
         if _install_into_ds:
             # FLOW GUIDE: 1.
             lgr.info("Install subdataset at: {0}".format(path))
+
+            # express the destination path relative to the root of
+            # the dataset
+            relativepath = relpath(path, start=ds.path)
+            if relativepath.startswith(pardir):
+                raise ValueError("installation path outside dataset "
+                                 "({0})".format(path))
+            lgr.debug("Resolved installation target relative to dataset "
+                      "{0}: {1}".format(ds, relativepath))
+
             if _install_sub:
                 # FLOW_GUIDE: 1.1.
                 submodule = [sm for sm in ds.repo.get_submodules()
                              if sm.path == relativepath][0]
 
-                _install_subds_from_flexible_source(ds, submodule.path, submodule.url, recursive=False)
+                _install_subds_from_flexible_source(
+                    ds,
+                    submodule.path,
+                    submodule.url,
+                    recursive=False)
                 #ds.repo.update_submodule(relativepath, init=True)
 
                 # TODO: use _install_subds_from_flexible instead?
@@ -440,11 +447,13 @@ class Install(Interface):
 
             elif _install_inplace:
                 # FLOW GUIDE: 1.2.
-                subds = _install_subds_inplace(ds, path, relpath(path, ds.path))
+                _install_subds_inplace(ds, path, relpath(path, ds.path))
                 # TODO: Some success checks?
             else:
                 # FLOW_GUIDE 1.3.
-                _install_subds_from_flexible_source(ds, relativepath, source_url, recursive=False)
+                _install_subds_from_flexible_source(
+                    ds, relativepath,
+                    source_url, recursive=False)
                 #ds.repo.add_submodule(relativepath, url=source_url)
         else:
             # FLOW GUIDE: 2.
@@ -458,7 +467,7 @@ class Install(Interface):
             # TODO
             assert(target.repo is None)
 
-            # should not be the case, but we need to distiguish between failure
+            # should not be the case, but we need to distinguish between failure
             # of git-clone, due to existing target and an unsuccessful clone
             # attempt. See below.
             existed = target.path and exists(target.path)

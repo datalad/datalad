@@ -123,7 +123,7 @@ def test_guess_dot_git():
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
-    assert_raises(InsufficientArgumentsError, install, [])
+    assert_raises(TypeError, install, [])
     assert_raises(InsufficientArgumentsError, install, description="some")
 
 
@@ -156,7 +156,9 @@ def test_install_simple_local(src, path):
     ds = install(path=path, source=src)
     eq_(ds.path, path)
     ok_(ds.is_installed())
-    if isinstance(origin.repo, GitRepo):
+    if not isinstance(origin.repo, AnnexRepo):
+        # this means it is a GitRepo
+        ok_(isinstance(origin.repo, GitRepo))
         # stays plain Git repo
         ok_(isinstance(ds.repo, GitRepo))
         ok_(not isinstance(ds.repo, AnnexRepo))
@@ -241,9 +243,25 @@ def test_install_recursive(src, path_nr, path_r):
         {'subm 1', 'subm 2'})
 
     # now recursively:
-    ds = install(path=path_r, source=src, recursive=True)
-    ok_(ds.is_installed())
-    for sub in ds.get_subdatasets(recursive=True):
+    ds_list = install(path=path_r, source=src, recursive=True)
+    # installed a dataset and two subdatasets:
+    eq_(len(ds_list), 3)
+    ok_(all([isinstance(i, Dataset) for i in ds_list]))
+    # we recurse top down during installation, so toplevel should appear at
+    # first position in returned list
+    eq_(ds_list[0].path, path_r)
+    top_ds = ds_list[0]
+    ok_(top_ds.is_installed())
+
+    # the subdatasets are contained in returned list:
+    # (Note: Until we provide proper (singleton) instances for Datasets,
+    # need to check for their paths)
+    assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
+    assert_in(opj(top_ds.path, 'subm 2'), [i.path for i in ds_list])
+
+    eq_(len(top_ds.get_subdatasets(recursive=True)), 2)
+
+    for sub in top_ds.get_subdatasets(recursive=True):
         subds = Dataset(opj(path_r, sub))
         ok_(subds.is_installed(),
             "Not installed: %s" % opj(path_r, sub))
@@ -251,7 +269,7 @@ def test_install_recursive(src, path_nr, path_r):
         ok_(not any(subds.repo.file_has_content(
             subds.repo.get_annexed_files())))
     # no unfulfilled subdatasets:
-    ok_(ds.get_subdatasets(recursive=True, fulfilled=False) is [])
+    ok_(top_ds.get_subdatasets(recursive=True, fulfilled=False) == [])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -275,6 +293,8 @@ def test_install_recursive_with_data(src, path):
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
+    import logging
+    logging.getLogger('datalad.test').error("DEBUG: source: %s" % source)
     subds = ds.install(path="sub", source=source)
     if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
         ok_(exists(opj(subds.path, '.git')))
@@ -301,8 +321,8 @@ def test_install_known_subdataset(src, path):
     # subdataset not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    assert_in('subm 1', subds.get_subdatasets(fulfilled=False))
-
+    assert_in('subm 1', ds.get_subdatasets(fulfilled=False))
+    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=True))
     # install it:
     ds.install('subm 1')
     ok_(subds.is_installed())
@@ -311,10 +331,6 @@ def test_install_known_subdataset(src, path):
     # new repository initiated
     assert_equal(set(subds.repo.get_indexed_files()),
                  {'test.dat', 'INFO.txt', 'test-annex.dat'})
-
-
-#
-# def test_install_list():
-#     raise SkipTest("TODO")
-#
+    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
+    assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
 
