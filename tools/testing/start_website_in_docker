@@ -19,7 +19,7 @@ set -u
 
 DL_DIST=${1:-jessie}
 
-topdir=$(realpath `dirname $0`)
+topdir=$(readlink -f `dirname $0`)
 cd `dirname $0`
 dockerfile=$topdir/start_website_in_docker-Dockerfile
 # echo "D: $DL_APT"
@@ -57,7 +57,7 @@ else
     #docker build --no-cache=True -t $tag -f $dockerfile . #&& rm Dockerfile
 fi
 
-topgitdir=`realpath ${topdir}/../..`
+topgitdir=`readlink -f ${topdir}/../..`
 echo "I: top git dir $topgitdir"
 
 #set -x
