@@ -1178,12 +1178,21 @@ class Annexificator(object):
             if remove_unversioned:
                 # it might be that we haven't 'recorded' unversioned ones at all
                 # and now got an explicit version, so we would just need to remove them all
-                # For that we need to get all files which left, and remove them unless they are part
-                # of the current version
-                current_version_files = set(versions_db.versions[current_version].values())
-                for fpath in find_files('.*', exclude=exclude, exclude_datalad=True, exclude_vcs=True):
-                    fpath = relpath(fpath, '.')  # ./bla -> bla
-                    if fpath in current_version_files:
+                # For that we need to get all files which left, and remove them unless they
+                # were a versioned file (considered above) for any version
+                all_versioned_files = set()
+                for versioned_files_ in versions_db.versions.values():
+                    all_versioned_files.update(versioned_files_.values())
+                for fpath in find_files(
+                        '.*',
+                        topdir=self.repo.path,
+                        exclude=exclude, exclude_datalad=True, exclude_vcs=True
+                    ):
+                    fpath = relpath(fpath, self.repo.path)  # ./bla -> bla
+                    if fpath in all_versioned_files:
+                        lgr.log(
+                            5, "Not removing %s file since it was versioned",
+                            fpath)
                         continue
                     lgr.log(5, "Removing unversioned %s file", fpath)
                     os.unlink(fpath)

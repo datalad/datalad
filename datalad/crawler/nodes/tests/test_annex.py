@@ -294,6 +294,14 @@ def test_remove_other_versions(repo_path):
                 self.allfiles.update(vfs.values())
             self._remaining = self.allfiles.copy()
 
+        def Find_files(self):
+            """To provide another mock callable"""
+            def find_files(*args, **kwargs):
+                assert_equal(kwargs.get('topdir'), repo_path)
+                # return full path
+                return [opj(repo_path, x) for x in self._remaining]
+            return find_files
+
         def __call__(self, s):
             bs = basename(s)
             assert(bs in self._remaining)
@@ -306,13 +314,14 @@ def test_remove_other_versions(repo_path):
             return self._remaining
 
 
-    def check(version, remaining=None, unlinked=None, **kwargs):
+    def _check(version, remaining=None, unlinked=None, **kwargs):
         """Helper - for a given version and kwargs for remove_ - what to expect"""
         version_db.version = version
         data = {'datalad_stats': ActivityStats()}
         rov = annex.remove_other_versions(db=version_db, **kwargs)  # generator
         with patch('os.unlink', new_callable=Unlinker) as cmunlink, \
-                patch('os.path.lexists', return_value=True):
+                patch('os.path.lexists', return_value=True),\
+                patch('datalad.crawler.nodes.annex.find_files', new_callable=cmunlink.Find_files):
             out = list(rov(data))
         assert(len(out), 1)
         eq_(out[0]['datalad_stats'].versions, [version])
@@ -321,6 +330,13 @@ def test_remove_other_versions(repo_path):
         if unlinked is not None:
             eq_(cmunlink.unlinked, unlinked)
         eq_(cmunlink.remaining.union(cmunlink.unlinked), cmunlink.allfiles)
+
+    def check(*args, **kwargs):
+        _check(*args, **kwargs)
+        kwargs = kwargs.copy()   # without remove unversioned
+        # in our test results should be the same
+        kwargs['remove_unversioned'] = True
+        _check(*args, **kwargs)  # remove_unversioned=True
 
     check('1.0.0', remaining={'a_1.0.0'})
     # even though due to overlay=0 all versions are identical, there were no
