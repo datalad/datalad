@@ -765,7 +765,8 @@ def test_AnnexRepo_get(src, dst):
 #def enable_remote(self, name):
 
 @with_testrepos('basic_annex$', flavors=['clone'])
-def _test_AnnexRepo_get_contentlocation(batch, path):
+@with_tempfile
+def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
     annex = AnnexRepo(path, create=False, init=False)
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
@@ -780,8 +781,15 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
 
-    # TODO: test how it would look if done under a subdir
-    with chpwd('subdir', mkdir=True):
+    # test how it would look if done under a subdir of the annex:
+    with chpwd(opj(annex.path, 'subdir'), mkdir=True):
+        key_location = annex.get_contentlocation(key, batch=batch)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
+
+    # test how it would look if done under a dir outside of the annex:
+    with chpwd(work_dir_outside, mkdir=True):
         key_location = annex.get_contentlocation(key, batch=batch)
         # they both should point to the same location eventually
         eq_(os.path.realpath(opj(annex.path, fname)),
