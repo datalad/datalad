@@ -10,7 +10,7 @@
 
 """
 
-__docformat__ = 'restructuredtext'
+__docformat__ = 'numpy'
 
 
 import random
@@ -53,6 +53,28 @@ def _parse_spec(spec):
 
 
 def _makeds(path, levels, ds=None):
+    """Create a hierarchy of datasets
+
+    Used recursively, with current invocation generating datasets for the
+    first level, and delegating sub-levels to recursive invocation
+
+    Parameters
+    ----------
+    path : str
+      Path to the top directory under which dataset will be created.
+      If relative -- relative to current directory
+    levels : list of list
+      List of specifications for :func:`random.randint` call per each level.
+    ds : Dataset, optional
+      Super-dataset which would contain a new dataset (thus its path whould be
+      a parent of path.
+
+    Yields
+    ------
+    str
+       Path to the generated dataset(s)
+
+    """
     # we apparently can't import api functionality within api
     from datalad.api import install
     # To simplify managing all the file paths etc
