@@ -475,7 +475,8 @@ class GitRepo(object):
         url : str
         path : str
         """
-        ntries = 5  # r is not enough for robust workaround
+
+        ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 # TODO: Seems to be an inefficiency to not assign to self.repo
