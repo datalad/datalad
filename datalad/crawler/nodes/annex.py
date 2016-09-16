@@ -1138,7 +1138,7 @@ class Annexificator(object):
                 # sanity check since we now will have assumption that versions
                 # are sorted
                 if prev_version is not None:
-                    assert(prev_version < version)
+                    assert(prev_version < LooseVersion(version))
                 prev_version = LooseVersion(version)
                 overlay_version = overlay_version_func(version)
                 # we do not care about non-versioned or current "overlay" version
@@ -1148,7 +1148,7 @@ class Annexificator(object):
 
                 files_to_remove = []
                 if current_overlay_version == overlay_version and \
-                    LooseVersion(version) <= current_version:
+                    LooseVersion(version) <= LooseVersion(current_version):
                     # the same overlay but before current version
                     # we need to track the last known within overlay and if
                     # current updates, remove older version
