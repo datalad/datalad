@@ -956,6 +956,15 @@ class AnnexRepo(GitRepo):
                 raise RemoteNotAvailableError(cmd="annex %s" % command,
                                               remote=remote_na_re.groups()[0])
 
+            # TEMP: Workaround for git-annex bug, where it reports success=True
+            # for annex add, while simultanously complaining, that it is in
+            # a submodule:
+            # TODO: For now just reraise. But independently on this bug, it
+            # makes sense to have an exception for that case
+            in_subm_re = re.search("fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr)
+            if in_subm_re:
+                raise e
+
             # Note: A try to approach the covering of potential annex failures
             # in a more general way:
             # first check stdout:
