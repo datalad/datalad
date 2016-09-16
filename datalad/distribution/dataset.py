@@ -18,6 +18,7 @@ from os.path import realpath
 from os.path import relpath
 from os.path import commonprefix
 from os.path import sep
+from os.path import exists
 from six import string_types
 from six import PY2
 from functools import wraps
@@ -278,87 +279,6 @@ class Dataset(object):
         else:
             return submodules
 
-    def create_subdataset(self, path,
-                          name=None,
-                          force=False,
-                          description=None,
-                          no_annex=False,
-                          annex_version=None,
-                          annex_backend='MD5E',
-                          git_opts=None,
-                          annex_opts=None,
-                          annex_init_opts=None):
-        """Create a subdataset within this dataset
-
-        Creates a new dataset at `path` and adds it as a subdataset to `self`.
-        `path` is required to point to a location inside the dataset `self`.
-
-        Parameters
-        ----------
-        path: str
-          path to the subdataset to be created
-        name: str
-          name of the subdataset
-        force: bool
-          enforce creation of a subdataset in a non-empty directory
-        description: str
-          a human-readable description of the dataset, that helps to identify it.
-          Note: Doesn't work with `no_annex`
-        no_annex: bool
-          whether or not to create a pure git repository
-        annex_version: str
-          version of annex repository to be used
-        annex_backend: str
-          backend to be used by annex for computing file keys
-        git_opts: list of str
-          cmdline options to be passed to the git executable
-        annex_opts: list of str
-          cmdline options to be passed to git-annex
-        annex_init_opts: list of str
-          cmdline options to be passed to git-annex-init
-
-        Returns
-        -------
-        Dataset
-          the newly created dataset
-        """
-
-        # get absolute path (considering explicit vs relative):
-        path = resolve_path(path, self)
-        if not realpath(path).startswith(_with_sep(realpath(self.path))):
-            raise ValueError("path %s outside dataset %s" % (path, self))
-
-        subds = Dataset(path)
-
-        # create the dataset
-        subds.create(force=force,
-                     description=description,
-                     no_annex=no_annex,
-                     annex_version=annex_version,
-                     annex_backend=annex_backend,
-                     git_opts=git_opts,
-                     annex_opts=annex_opts,
-                     annex_init_opts=annex_init_opts,
-                     # Note:
-                     # adding to the superdataset is what we are doing herein!
-                     # add_to_super=True would lead to calling ourselves again
-                     # and again
-                     # While this is somewhat ugly, the issue behind this is a
-                     # necessarily slightly different logic of `create` in
-                     # comparison to other toplevel functions, which operate on
-                     # an existing dataset and possibly on subdatasets.
-                     # With `create` we suddenly need to operate on a
-                     # superdataset, if add_to_super is True.
-                     add_to_super=False)
-
-        # add it as a submodule
-        # TODO: clean that part and move it in here (Dataset)
-        #       or call install to add the thing inplace
-        from .install import _install_subds_inplace
-        return _install_subds_inplace(ds=self, path=subds.path,
-                                      relativepath=relpath(subds.path, self.path),
-                                      name=name)
-
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
 #        name pattern.
@@ -401,7 +321,14 @@ class Dataset(object):
         -------
         bool
         """
-        return self.path is not None and self.repo is not None
+        was_once_installed = self.path is not None and self.repo is not None
+
+        if was_once_installed and not exists(self.repo.repo.git_dir):
+            # repo gone now, reset
+            self._repo = None
+            return False
+        else:
+            return was_once_installed
 
     def get_superdataset(self):
         """Get the dataset's superdataset
@@ -573,7 +500,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 
     assert(dataset is not None)
     lgr.debug("Resolved dataset{0}: {1}".format(
-        'for {}'.format(purpose) if purpose else '',
+        ' for {}'.format(purpose) if purpose else '',
         dataset))
 
     if check_installed and not dataset.is_installed():

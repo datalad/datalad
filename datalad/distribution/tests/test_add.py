@@ -21,8 +21,8 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.utils import chpwd
@@ -78,9 +78,9 @@ def test_add_files(path):
                 (test_list_4, False)]:
         # special case 4: give the dir:
         if arg[0] == test_list_4:
-            result = ds.add('dir', to_git=arg[1])
+            result = ds.add('dir', to_git=arg[1], save=False, if_dirty='ignore')
         else:
-            result = ds.add(arg[0], to_git=arg[1])
+            result = ds.add(arg[0], to_git=arg[1], save=False, if_dirty='ignore')
         # TODO eq_(result, arg[0])
         # added, but not committed:
         ok_(ds.repo.dirty)
@@ -107,8 +107,8 @@ def test_add_files(path):
 @with_tree(**tree_arg)
 def test_add_recursive(path):
     ds = Dataset(path)
-    ds.create(force=True)
-    ds.create_subdataset('dir', force=True)
+    ds.create(force=True, save=False)
+    ds.create('dir', force=True, if_dirty='ignore')
     ds.save("Submodule added.")
 
     # TODO: CommandError to something meaningful
@@ -123,6 +123,26 @@ def test_add_recursive(path):
 
     ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+
+    subds = ds.create('git-sub', no_annex=True)
+    with open(opj(subds.path, 'somefile.txt'), "w") as f:
+        f.write("bla bla")
+    result = ds.add(opj('git-sub', 'somefile.txt'), recursive=True, to_git=False)
+    eq_(result, [{'file': opj(subds.path, 'somefile.txt'),
+                  'note': "no annex at %s" % subds.path,
+                  'success': False}])
+
+
+@with_tree(**tree_arg)
+def test_relpath_add(path):
+    ds = Dataset(path).create(force=True)
+    with chpwd(opj(path, 'dir')):
+        eq_(add('testindir', if_dirty='ignore')[0]['file'],
+            opj('dir', 'testindir'))
+        # and now add all
+        add('..')
+    # auto-save enabled
+    assert_false(ds.repo.dirty)
 
 
 @with_tree(tree={'file1.txt': 'whatever 1',
@@ -210,6 +230,3 @@ def test_add_source(path, url, ds_dir):
     eq_(len(annexed), len(urls))
     # all files annexed (-2 for '.git' and '.datalad'):
     eq_(len(annexed), len(listdir(ds.path)) - 2)
-
-
-

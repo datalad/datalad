@@ -10,13 +10,27 @@ import platform
 
 from glob import glob
 from os.path import sep as pathsep
+from os.path import join as opj
+from os.path import splitext
 
+from setuptools import findall
 from setuptools import setup, find_packages
 
 # manpage build imports
 from distutils.command.build_py import build_py
 from setup_support import BuildManPage, BuildRSTExamplesFromScripts
 from setup_support import get_version
+
+
+def findsome(subdir, extensions):
+    """Find files under subdir having speified extensions
+
+    Leading directory (datalad) gets stripped
+    """
+    return [
+        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
+        if splitext(f)[-1].lstrip('.') in extensions
+    ]
 
 # datalad version to be installed
 version = get_version()
@@ -56,10 +70,13 @@ requires = {
         'requests>=1.2',
     ] + keyring_requires,
     'downloaders-extra': [
-       'requests_ftp',
+        'requests_ftp',
     ],
     'crawl': [
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
+    ],
+    'publish': [
+        'jsmin',
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -67,6 +84,11 @@ requires = {
         'mock',
         'nose>=1.3.4',
         'vcrpy',
+    ],
+    'metadata': [
+        'simplejson',
+        'pyld',
+        'PyYAML',  # very optional
     ]
 }
 requires['full'] = sum(list(requires.values()), [])
@@ -92,7 +114,7 @@ setup(
     version=version,
     description="data distribution geared toward scientific datasets",
     packages=datalad_pkgs,
-    install_requires=requires['core'] + requires['downloaders'],
+    install_requires=requires['core'] + requires['downloaders'] + requires['publish'],
     extras_require=requires,
     entry_points={
         'console_scripts': [
@@ -103,11 +125,8 @@ setup(
     },
     cmdclass=cmdclass,
     package_data={
-        'datalad': [
-            'resources/git_ssh.sh',
-            'resources/sshserver_cleanup_after_publish.sh',
-            'resources/sshserver_prepare_for_publish.sh',
-        ] +
-        [p.split(pathsep, 1)[1] for p in glob('datalad/downloaders/configs/*.cfg')]
+        'datalad':
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
+            findsome('downloaders/configs', {'cfg'})
     }
 )

@@ -15,7 +15,7 @@ from os.path import join as opj, abspath, normpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
-from datalad.utils import chpwd, getpwd
+from datalad.utils import chpwd, getpwd, rmtree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -140,6 +140,9 @@ def test_is_installed(src, path):
     with chpwd(path):
         install('subm 1')
     ok_(subds.is_installed())
+    # wipe it out
+    rmtree(ds.path)
+    assert_false(ds.is_installed())
 
 
 @with_tempfile(mkdir=True)
@@ -220,7 +223,7 @@ def test_get_containing_subdataset(path):
     ds = create(path, force=True)
     ds.install(path='test.txt')
     ds.save("Initial commit")
-    subds = ds.create_subdataset("sub")
+    subds = ds.create("sub")
 
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)

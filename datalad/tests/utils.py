@@ -33,12 +33,14 @@ from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
+from os.path import relpath
 
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
     raises, ok_, eq_, make_decorator
 
+from nose.tools import assert_set_equal
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -342,18 +344,30 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n2,
                  msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
-def ok_file_has_content(path, content, strip=False):
+
+def ok_exists(path):
+    assert exists(path), 'path %s does not exist' % path
+
+
+def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
     """Verify that file exists and has expected content"""
-    assert(exists(path))
+    ok_exists(path)
     with open(path, 'r') as f:
         content_ = f.read()
+
         if strip:
             content_ = content_.strip()
-        assert_equal(content_, content)
+
+        if re_:
+            assert_re_in(content, content_, **kwargs)
+        else:
+            assert_equal(content, content_, **kwargs)
+
 
 #
 # Decorators
 #
+
 
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
@@ -841,6 +855,33 @@ def assert_re_in(regex, c, flags=0, match=True, msg=None):
     )
 
 
+def assert_dict_equal(d1, d2):
+    msgs = []
+    if set(d1).difference(d2):
+        msgs.append(" keys in the first dict but not in the second: %s"
+                    % list(set(d1).difference(d2)))
+    if set(d2).difference(d1):
+        msgs.append(" keys in the second dict but not in the first: %s"
+                    % list(set(d2).difference(d1)))
+    for k in set(d1).intersection(d2):
+        same = True
+        try:
+            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+        except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
+            same = False
+
+        if not same:
+            msgs.append(" [%r] differs: %r != %r" % (k, d1[k], d2[k]))
+
+        if len(msgs) > 10:
+            msgs.append("and more")
+            break
+    if msgs:
+        raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
+    # do generic comparison just in case we screwed up to detect difference correctly above
+    eq_(d1, d2)
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
@@ -954,6 +995,41 @@ def with_testsui(t, responses=None):
 
     return newfunc
 with_testsui.__test__ = False
+
+
+def assert_no_errors_logged(func):
+    """Decorator around function to assert that no errors logged during its execution"""
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        with swallow_logs(new_level=logging.ERROR) as cml:
+            out = func(*args, **kwargs)
+            if cml.out:
+                raise AssertionError("Expected no errors to be logged, but log output is %s"
+                                     % cml.out)
+        return out
+
+    return new_func
+
+
+def get_mtimes_and_digests(target_path):
+    """Return digests (md5) and mtimes for all the files under target_path"""
+    from datalad.utils import find_files
+    from datalad.support.digests import Digester
+    digester = Digester(['md5'])
+
+    # bother only with existing ones for this test, i.e. skip annexed files without content
+    target_files = [
+        f for f in find_files('.*', topdir=target_path, exclude_vcs=False, exclude_datalad=False)
+        if exists(f)
+    ]
+    # let's leave only relative paths for easier analysis
+    target_files_ = [relpath(f, target_path) for f in target_files]
+
+    digests = {frel: digester(f) for f, frel in zip(target_files, target_files_)}
+    mtimes = {frel: os.stat(f).st_mtime for f, frel in zip(target_files, target_files_)}
+    return digests, mtimes
+
+
 
 #
 # Context Managers

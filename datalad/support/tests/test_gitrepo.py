@@ -397,7 +397,10 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.add(filename)
     origin.commit("new file added.")
 
-    clone.fetch(remote='origin')
+    fetched = clone.fetch(remote='origin')
+    # test FetchInfo list returned by fetch
+    eq_([u'origin/master', u'origin/new_branch'],
+        [commit.name for commit in fetched])
 
     ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
@@ -420,7 +423,8 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     # we don't know any branches of the remote:
     eq_([], repo.get_remote_branches())
 
-    repo.fetch(remote="ssh-remote")
+    fetched = repo.fetch(remote="ssh-remote")
+    assert_in('ssh-remote/master', [commit.name for commit in fetched])
     ok_clean_git(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
@@ -490,7 +494,9 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
 
     # push changes:
-    repo.push(remote="ssh-remote", refspec="ssh-test")
+    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
+    # test PushInfo object for
+    assert_in("ssh-remote/ssh-test", [commit.remote_ref.name for commit in pushed])
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
@@ -894,3 +900,19 @@ def test_GitRepo_count_objects(repo_path):
     empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
                    'size': 0, 'size-garbage': 0, 'size-pack': 0}
     eq_(empty_count, repo.count_objects)
+
+
+@with_tempfile
+def test_get_deleted(path):
+    repo = GitRepo(path, create=True)
+    os.makedirs(opj(path, 'deep'))
+    with open(opj(path, 'test1'), 'w') as f:
+        f.write('some')
+    with open(opj(path, 'deep', 'test2'), 'w') as f:
+        f.write('some more')
+    repo.add('.', commit=True)
+    ok_clean_git(path, annex=False)
+    os.unlink(opj(path, 'test1'))
+    eq_(repo.get_deleted_files(), ['test1'])
+    rmtree(opj(path, 'deep'))
+    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])

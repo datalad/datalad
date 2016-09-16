@@ -13,6 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import logging
+import re
 import shlex
 from os import linesep
 from os.path import join as opj
@@ -143,7 +144,7 @@ def _normalize_path(base_dir, path):
     if not path:
         return path
 
-    base_dir = realpath(base_dir)
+    base_dir = realpath(base_dir)  # realpath OK
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
@@ -153,7 +154,7 @@ def _normalize_path(base_dir, path):
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))
+        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -163,7 +164,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = normpath(opj(realpath(getpwd()), path))
+         path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -440,25 +441,7 @@ class GitRepo(object):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
-            try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
-                lgr.debug("Git clone completed")
-                # TODO: more arguments possible: ObjectDB etc.
-            except GitCommandError as e:
-                # log here but let caller decide what to do
-                lgr.error(str(e))
-                raise
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                   "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython/issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
+            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -479,6 +462,51 @@ class GitRepo(object):
                     InvalidGitRepositoryError) as e:
                 lgr.error("%s: %s" % (type(e), str(e)))
                 raise
+
+    def clone(self, url, path):
+        """Clone url into path
+
+        Provides workarounds for known issues (e.g.
+        https://github.com/datalad/datalad/issues/785)
+
+        Parameters
+        ----------
+        url : str
+        path : str
+        """
+        ntries = 5  # r is not enough for robust workaround
+        for trial in range(ntries):
+            try:
+                lgr.warning("Git clone from {0} to {1}".format(url, path))
+                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                      odbt=default_git_odbt)
+                lgr.debug("Git clone completed")
+                break
+                # TODO: more arguments possible: ObjectDB etc.
+            except GitCommandError as e:
+                # log here but let caller decide what to do
+                e_str = str(e)
+                # see https://github.com/datalad/datalad/issues/785
+                if re.search("Request for .*aborted.*Unable to find", str(e),
+                             re.DOTALL) \
+                        and trial < ntries - 1:
+                    lgr.info(
+                        "Hit a known issue with Git (see GH#785). Trial #%d, "
+                        "retrying",
+                        trial)
+                    continue
+                lgr.error(e_str)
+                raise
+            except ValueError as e:
+                if gitpy.__version__ == '1.0.2' and \
+                                "I/O operation on closed file" in str(e):
+                    # bug https://github.com/gitpython-developers/GitPython
+                    # /issues/383
+                    raise GitCommandError(
+                        "clone has failed, telling ya",
+                        999,  # good number
+                        stdout="%s already exists" if exists(path) else "")
+                raise  # reraise original
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -1036,8 +1064,8 @@ class GitRepo(object):
 
         Returns
         -------
-        Nothing yet.
-        TODO: Provide FetchInfo?
+        list
+            FetchInfo objects of the items fetched from remote
         """
         # TODO: options=> **kwargs):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
@@ -1049,7 +1077,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
@@ -1087,6 +1115,7 @@ class GitRepo(object):
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+        return fi_list
 
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """See fetch
@@ -1097,7 +1126,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
             tb = self.repo.active_branch.tracking_branch().name
@@ -1123,8 +1152,7 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                return remote.pull(refspec=refspec, progress=progress,
-                                      **kwargs)
+                return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
@@ -1133,6 +1161,10 @@ class GitRepo(object):
     def push(self, remote=None, refspec=None, progress=None, all_=False,
              **kwargs):
         """See fetch
+        Returns
+        -------
+        list
+            PushInfo objects of the items pushed to remote
         """
 
         if remote is None:
@@ -1141,7 +1173,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_push = self.repo.remotes
             else:
@@ -1172,12 +1204,12 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list += rm.push(refspec=refspec, progress=progress,
-                                   **kwargs)
+                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
+        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
@@ -1461,7 +1493,12 @@ class GitRepo(object):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_deleted_files(self):
+        """return a list of paths with deleted files (deletion not yet commited)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
+                if f.split('\t')[0] == 'D']
+
 # TODO
 # remove submodule
 # status?
-

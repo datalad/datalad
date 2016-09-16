@@ -41,6 +41,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
 from .utils import ok_generator
+from .utils import assert_dict_equal
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
@@ -101,6 +102,7 @@ def test_nested_with_tempfile_parametrized_surrounded():
 @with_tempfile(content="testtest")
 def test_with_tempfile_content(f):
     ok_file_has_content(f, "testtest")
+    ok_file_has_content(f, "test*", re_=True)
 
 
 def test_with_tempfile_content_raises_on_mkdir():
@@ -510,3 +512,19 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
+
+
+def test_assert_dict_equal():
+    assert_dict_equal({}, {})
+    assert_dict_equal({"a": 3}, {"a": 3})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {1: 4})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4, 1: 3})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4, 1: 'a'})
+    try:
+        import numpy as np
+    except:
+        raise SkipTest("need numpy for this tiny one")
+    # one is scalar another one array
+    assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
+    assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
