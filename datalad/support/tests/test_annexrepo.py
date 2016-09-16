@@ -194,7 +194,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
     assert_re_in(".*annex get. needs 905.6 MB more", str(exc))
 
 
-@with_testrepos('basic_annex')
+@with_testrepos('basic_annex', flavors=['local'])
 def test_AnnexRepo_get_remote_na(path):
     ar = AnnexRepo(path)
 

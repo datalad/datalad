@@ -52,6 +52,7 @@ from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import is_ssh
+from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -425,6 +426,11 @@ class GitRepo(object):
         if git_opts:
             lgr.warning("TODO: options passed to git are currently ignored.\n"
                         "options received: %s" % git_opts)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
 
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)

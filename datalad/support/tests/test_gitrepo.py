@@ -23,6 +23,15 @@ from ..gitrepo import _normalize_path
 from ..exceptions import FileNotInRepositoryError
 
 
+@with_tempfile(mkdir=True)
+def test_GitRepo_invalid_path(path):
+    with chpwd(path):
+        assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
+        ok_(not exists(opj(path, "git:")))
+        assert_raises(ValueError, GitRepo, path="file://some/relative/path", create=True)
+        ok_(not exists(opj(path, "file:")))
+
+
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
