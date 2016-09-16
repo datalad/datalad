@@ -174,22 +174,19 @@ function metadata_locator(md5) {
  * @return {string} return html string to be rendered in size column of current row entry
 */
 function size_renderer(size) {
-  // if both ondisk and total size present
-  if (size.ondisk && size.total)
-    // don't show, if ondisk size = 0 Bytes
-    if (size.ondisk === '0 Bytes')
-      return "-/" + size.total;
-    // show only one size, if both present and identical
-    else if (size.ondisk === size.total)
-      return size.total;
-    // else show "ondisk size" / "total size"
-    else
-      return size.ondisk + "/" + size.total;
-  // else if only total size present, show "total size"
-  else if (size.total)
-    return "-/" + size.total;
+  // set ondisk_size = '-' if ondisk doesn't exist or = 0
+  if (!size.ondisk || size.ondisk === '0 Bytes')
+    size.ondisk = '-';
+  // set total_size = '-' if total doesn't exist or = 0
+  if (!size.total || size.total === '0 Bytes')
+    size.total = '-';
+
+  // show only one size, if both sizes present and identical
+  if (size.ondisk === size.total)
+    return size.total;
+  // else show "ondisk size" / "total size"
   else
-    return "-/-";
+    return size.ondisk + "/" + size.total;
 }
 
 /**
