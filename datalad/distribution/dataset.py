@@ -25,15 +25,18 @@ from functools import wraps
 import uuid
 
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import Constraint
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.dsconfig import ConfigManager
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
-from datalad.support.dsconfig import ConfigManager
+
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -84,7 +87,7 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        return self.path == other.path  # TODO: realpath?
+        return realpath(self.path) == realpath(other.path)
 
     @property
     def path(self):
@@ -378,8 +381,7 @@ class Dataset(object):
         if is_explicit_path(path):
             path = resolve_path(path, self)
             if not path.startswith(self.path):
-                # TODO: - have dedicated exception
-                raise ValueError("path {0} not in dataset {1}.".format(path, self))
+                raise PathOutsideRepositoryError(file_=path, repo=self)
             path = relpath(path, self.path)
 
         for subds in self.get_subdatasets(recursive=True,

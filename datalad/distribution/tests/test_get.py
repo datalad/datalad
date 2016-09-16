@@ -97,7 +97,7 @@ def test_get_invalid_call(path, file_outside):
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(file_outside)
         eq_(len(result), 0)
-        assert_in("path {0} not in dataset {1}".format(file_outside, ds),
+        assert_in("path {0} not within repository {1}".format(file_outside, ds),
                   cml.out)
 
     # TODO: annex --json doesn't report anything when get fails to do get a

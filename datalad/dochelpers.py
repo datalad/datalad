@@ -302,6 +302,7 @@ import os
 import sys
 import traceback
 # TODO: make limit respect config/environment parameter
+# TODO: document, what limit even is about ;-)
 def exc_str(exc=None, limit=None):
     """Enhanced str for exceptions.  Should include original location
 

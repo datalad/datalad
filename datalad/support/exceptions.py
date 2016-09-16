@@ -63,9 +63,22 @@ class FileInGitError(FileNotInAnnexError):
 
 
 class FileNotInRepositoryError(FileNotInAnnexError):
-    """Thrown if a file is not in the repository at all.
+    """Thrown if a file is not under control of the repository at all.
     """
     pass
+
+
+class PathOutsideRepositoryError(Exception):
+    """Thrown if a path points outside the repository that was requested to
+    deal with that path."""
+
+    # TODO: use it in GitRepo/AnnexRepo!
+    def __init__(self, file_, repo):
+        self.file_ = file_
+        self.repo = repo
+
+    def __str__(self):
+        return "path {0} not within repository {1}".format(self.file_, self.repo)
 
 
 class InsufficientArgumentsError(ValueError):

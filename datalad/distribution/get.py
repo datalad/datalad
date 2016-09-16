@@ -13,6 +13,7 @@
 import logging
 
 from os import curdir
+from os import linesep
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
@@ -30,6 +31,8 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.dochelpers import exc_str
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -141,9 +144,8 @@ class Get(Interface):
                 p_ds = \
                     ds.get_containing_subdataset(p,
                                                  recursion_limit=recursion_limit)
-            except ValueError as e:
-                # p outside repo:
-                lgr.warning(e.message)
+            except PathOutsideRepositoryError as e:
+                lgr.warning(exc_str(e) + linesep + "Ignored.")
                 continue
 
             if not recursive and p_ds != ds:
