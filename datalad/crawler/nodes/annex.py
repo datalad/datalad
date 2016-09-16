@@ -1237,7 +1237,7 @@ class Annexificator(object):
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False, existing_tag=None, cleanup=False):
+    def finalize(self, tag=False, existing_tag=None, cleanup=False, aggregate=False):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -1254,6 +1254,8 @@ class Annexificator(object):
           +0, +1, +2 ... are tried until available one is found.
         cleanup: bool, optional
           Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
+        aggregate: bool, optional
+          Aggregate meta-data (ATM no recursion, guessing the type)
         """
 
         def _finalize(data):
@@ -1314,6 +1316,10 @@ class Annexificator(object):
                         lgr.info("No git house-keeping performed as instructed by config")
                 else:
                     lgr.info("No git house-keeping performed as no notable changes to git")
+
+            if aggregate:
+                from datalad.api import aggregate_metadata
+                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
 
             self._states = set()
             yield data
