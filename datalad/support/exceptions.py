@@ -87,6 +87,44 @@ class OutOfSpaceError(CommandError):
         super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
         return "%s needs %s more" % (super_str, self.sizemore_msg)
 
+
+class RemoteNotAvailableError(CommandError):
+    """To be raised whenever a required remote is not available
+
+    Example is "annex get somefile --from=MyRemote",
+    where 'MyRemote' doesn't exist.
+    """
+
+    # TODO: Raise this from GitRepo. Currently depends on method:
+    # Either it's a direct git call
+    #   => CommandError and stderr:
+    #       fatal: 'notthere' does not appear to be a git repository
+    #       fatal: Could not read from remote repository.
+    # or it's a GitPython call
+    #   => ValueError "Remote named 'NotExistingRemote' didn't exist"
+
+    def __init__(self, remote, **kwargs):
+        """
+
+        Parameters
+        ----------
+        remote: str
+          name of the remote
+        kwargs:
+          arguments from CommandError
+        """
+        super(RemoteNotAvailableError, self).__init__(**kwargs)
+        self.remote = remote
+
+    def __str__(self):
+        super_str = super(RemoteNotAvailableError, self).__str__()
+        return "Remote '{0}' is not available. Command failed:{1}{2}" \
+               "".format(self.remote, linesep, super_str)
+
+# TODO:
+# PathOutsideRepositoryError
+# test_annexrepo.py:763
+
 #
 # Downloaders
 #

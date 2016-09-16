@@ -194,6 +194,15 @@ def test_AnnexRepo_get_outofspace(annex_path):
     assert_re_in(".*annex get. needs 905.6 MB more", str(exc))
 
 
+@with_testrepos('basic_annex')
+def test_AnnexRepo_get_remote_na(path):
+    ar = AnnexRepo(path)
+
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
+    eq_(cme.exception.remote, "NotExistingRemote")
+
+
 # 1 is enough to test file_has_content
 @with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)

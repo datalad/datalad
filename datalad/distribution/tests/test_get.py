@@ -25,6 +25,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
@@ -73,10 +74,9 @@ def test_get_invalid_call(path, file_outside):
     eq_(len(result), 0)
 
     # invalid source:
-    with assert_raises(CommandError) as ce:
+    with assert_raises(RemoteNotAvailableError) as ce:
         ds.get("some.txt", source='MysteriousRemote')
-    assert_in("git-annex: there is no available git remote named "
-              "\"MysteriousRemote\"", ce.exception.stderr)
+    eq_("MysteriousRemote", ce.exception.remote)
 
     # warning on not existing file:
     with swallow_logs(new_level=logging.WARNING) as cml:
@@ -85,7 +85,7 @@ def test_get_invalid_call(path, file_outside):
         assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
 
     # path in subdataset, but not called with recursive=True:
-    subds = ds.create_subdataset('sub')
+    subds = ds.create('sub')
     with open(opj(subds.path, 'newfile.dat'), "w") as f:
         f.write("something")
     with swallow_logs(new_level=logging.WARNING) as cml:

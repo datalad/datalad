@@ -53,6 +53,7 @@ from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
+from .exceptions import RemoteNotAvailableError
 from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
@@ -941,12 +942,19 @@ class AnnexRepo(GitRepo):
             # cannot be handled here. Detection of something, we can deal with,
             # doesn't mean there's nothing else to deal with.
 
-            # Note for OutOfSpaceError:
+            # OutOfSpaceError:
+            # Note:
             # doesn't depend on anything in stdout. Therefore check this before
-            # messing with stdout
+            # dealing with stdout
             out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
             if out_of_space_re:
-                raise OutOfSpaceError(cmd="annex %s" % command, sizemore_msg=out_of_space_re.groups()[0])
+                raise OutOfSpaceError(cmd="annex %s" % command,
+                                      sizemore_msg=out_of_space_re.groups()[0])
+            # RemoteNotAvailableError:
+            remote_na_re = re.search("there is no available git remote named \"(.*)\"", e.stderr)
+            if remote_na_re:
+                raise RemoteNotAvailableError(cmd="annex %s" % command,
+                                              remote=remote_na_re.groups()[0])
 
             # Note: A try to approach the covering of potential annex failures
             # in a more general way:
@@ -959,6 +967,7 @@ class AnnexRepo(GitRepo):
                 out = e.stdout
             else:
                 out = None
+
             # Note: Workaround for not existing files as long as annex doesn't
             # report it within JSON response:
             not_existing = [line.split()[1] for line in e.stderr.splitlines()
