@@ -1272,6 +1272,10 @@ class Annexificator(object):
             else:
                 lgr.info("Found branch non-dirty -- nothing was committed")
 
+            if aggregate:
+                from datalad.api import aggregate_metadata
+                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
+
             if tag and stats:
                 # versions survive only in total_stats
                 total_stats = stats.get_total()
@@ -1316,10 +1320,6 @@ class Annexificator(object):
                         lgr.info("No git house-keeping performed as instructed by config")
                 else:
                     lgr.info("No git house-keeping performed as no notable changes to git")
-
-            if aggregate:
-                from datalad.api import aggregate_metadata
-                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
 
             self._states = set()
             yield data
