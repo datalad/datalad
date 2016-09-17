@@ -330,11 +330,11 @@ class Install(Interface):
                 dspath = path
             ds = Dataset(dspath)
 
-        if ds is None and source is None and path is not None:
+        if source is None and path is not None:
             # no dataset, no source
             # this could be a shortcut install call, where the first
             # arg identifies the source
-            if is_datalad_compat_ri(path) or os.path.exists(path):
+            if is_datalad_compat_ri(path) or (ds is None and os.path.exists(path)):
                 # we have an actual URL -> this should be the source
                 # OR
                 # it is not a URL, but it exists locally
@@ -349,7 +349,7 @@ class Install(Interface):
         # Possibly do conversion from source into a git-friendly url
         source_url = _get_git_url_from_source(source, none_ok=True)
 
-        if ds is None and path is None and source_url is not None:
+        if path is None and source_url is not None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source_url and continue
             lgr.debug(
@@ -357,7 +357,12 @@ class Install(Interface):
                 "Assuming installation of a remote dataset. "
                 "Deriving destination path from given source {0}".format(
                     source_url))
-            ds = Dataset(_get_installationpath_from_url(source_url))
+            new_ds = Dataset(_get_installationpath_from_url(source_url))
+            if ds is not None:
+                # install/register/add that new dataset to original dataset
+                new_ds_ = ds.install(new_ds.path, source=source_url)
+                assert(new_ds_ == new_ds)
+            ds = new_ds
 
         if not path and ds is None:
             # no dataset, no target location, nothing to do
