@@ -15,6 +15,7 @@ from datalad.metadata import get_metadata_type, get_metadata
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
+from datalad.dochelpers import exc_str
 import os
 from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -194,21 +195,36 @@ def test_aggregation(path):
         assert_equal(len(list(clone.search('mother'))), 1)
         assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
 
+        assert_equal(len(list(clone.search('child'))), 2)
+        assert_equal(len(list(clone.search(['child']))), 2)
+        assert_equal(len(list(clone.search(['child', 'bids']))), 2)
+        assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
+        assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
+
         res = list(clone.search('.*', regex=True))  # with regex
         assert_equal(len(res), 3)  # one per dataset
 
-        assert_equal(len(list(clone.search('grandchild.*', regex=True))), 1)
+        # we do search, not match
+        assert_equal(len(list(clone.search('randchild', regex=True))), 1)
+        assert_equal(len(list(clone.search(['gr.nd', 'ch.ld'], regex=True))), 1)
+        assert_equal(len(list(clone.search('randchil.', regex=True))), 1)
+        assert_equal(len(list(clone.search('^randchild.*', regex=True))), 0)
+        assert_equal(len(list(clone.search('^grandchild.*', regex=True))), 1)
         assert_equal(len(list(clone.search('grandchild'))), 1)
 
     # do here to prevent pyld from being needed
     except SkipTest:
         raise SkipTest
-    except ImportError:
-        raise SkipTest
-    except pyld.jsonld.JsonLdError as e:
+    except ImportError as exc:
+        raise SkipTest(exc_str(exc))
+    except pyld.jsonld.JsonLdError as exc:
         if PY2:
-            raise e
-        # pyld code is not ready for Python 3.5 it seems (see: #756)
+            raise
+        #
+        raise SkipTest(
+            "pyld code is not ready for Python 3.5 it seems (see: #756): %s"
+            % exc_str(exc)
+        )
         pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe

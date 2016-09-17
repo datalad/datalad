@@ -12,9 +12,11 @@
 __docformat__ = 'restructuredtext'
 
 import os
+import re
+
 from os.path import join as opj, exists
-import re as re_mod
 from six import string_types
+from six import iteritems
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
@@ -24,6 +26,7 @@ from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 from datalad import cfg as dlcfg
+from datalad.utils import assure_list
 
 
 class Search(Interface):
@@ -40,9 +43,11 @@ class Search(Interface):
         match=Parameter(
             args=("match",),
             metavar='STRING',
+            nargs="+",
             doc="a string (or a regular expression if "
                 "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
-                "in all meta data values"),
+                "in all meta data values. If multiple provided, all must have "
+                "a match among some fields of a dataset"),
         #match=Parameter(
         #    args=('-m', '--match',),
         #    metavar='REGEX',
@@ -115,14 +120,26 @@ class Search(Interface):
         if report and not isinstance(report, list):
             report = [report]
 
-        match_lower = match.lower()
-        matcher = re_mod.compile(match).match \
-            if regex \
-            else lambda s: match_lower in s.lower()
+        match = assure_list(match)
+
+        def get_in_matcher(m):
+            """Function generator to provide closure for a specific value of m"""
+            mlower = m.lower()
+            def matcher(s):
+                return mlower in s.lower()
+            return matcher
+
+        matchers = [
+            re.compile(match_).search
+                if regex
+                else get_in_matcher(match_)
+            for match_ in match
+        ]
 
         # for every meta data set
         for mds in meta:
             hit = False
+            hits = [False] * len(matchers)
             if not mds.get('type', None) == 'Dataset':
                 # we are presently only dealing with datasets
                 continue
@@ -131,11 +148,19 @@ class Search(Interface):
             # as possible
             if not isinstance(mds, dict):
                 raise NotImplementedError("nested meta data is not yet supported")
+
             # manual loop for now
-            for k, v in mds.iteritems():
+            for k, v in iteritems(mds):
                 if isinstance(v, dict) or isinstance(v, list):
                     v = unicode(v)
-                hit = hit or matcher(v)
+                for imatcher, matcher in enumerate(matchers):
+                    if matcher(v):
+                        hits[imatcher] = True
+                if all(hits):
+                    # no need to do it longer than necessary
+                    hit = True
+                    break
+
             if hit:
                 report_dict = {k: mds[k] for k in report if k in mds} if report else mds
                 if len(report_dict):
