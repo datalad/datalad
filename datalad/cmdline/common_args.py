@@ -39,8 +39,8 @@ log_level = (
          choices=_log_level_names + [str(x) for x in range(1, 10)],
          metavar="LEVEL",
          default='warning',
-         help="""level of verbosity.  Choose among %s.  Also you can specify an
-         integer <10 to provide even more debugging information"""
+         help="""set logging verbosity level.  Choose among %s.  Also you can
+         specify an integer <10 to provide even more debugging information"""
               % ', '.join(_log_level_names))
 )
 
