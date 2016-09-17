@@ -37,7 +37,9 @@ lgr = getLogger('datalad.api.ls')
 
 
 class Ls(Interface):
-    """List meta-information associated with URLs (e.g. s3://) and dataset(s)
+    """List summary information about URLs and dataset(s)
+
+    ATM only s3:// URLs and datasets are supported
 
     Examples
     --------

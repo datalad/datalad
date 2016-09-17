@@ -44,10 +44,10 @@ lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebse
 
 
 class CreatePublicationTargetSSHWebserver(Interface):
-    """Create empty dataset(s) on a web server via SSH.
+    """Create dataset(s) on a web server via SSH.
 
-    They can then serve as a target for the `publish` command, once added as a
-    sibling.
+    Those (empty) datasets can then serve as a target for the `publish` command, once
+    added as a sibling.
     """
 
     _params_ = dict(
