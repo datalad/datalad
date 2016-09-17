@@ -189,11 +189,11 @@ def test_aggregation(path):
             raise SkipTest
 
         import pyld
-        from datalad.api import search_datasets
+        from datalad.api import search
 
-        res = list(clone.search_datasets('.*'))
+        res = list(clone.search('.*'))
         assert_equal(len(res), 3)  # one per dataset
-        assert_equal(len(list(clone.search_datasets('grandchild.*'))), 1)
+        assert_equal(len(list(clone.search('grandchild.*'))), 1)
 
     # do here to prevent pyld from being needed
     except SkipTest:

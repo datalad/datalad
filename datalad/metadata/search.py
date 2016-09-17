@@ -26,8 +26,8 @@ from . import get_metadata, flatten_metadata_graph, pickle
 from datalad import cfg as dlcfg
 
 
-class SearchDatasets(Interface):
-    """
+class Search(Interface):
+    """Search within available in datasets' meta data
     """
 
     _params_ = dict(
@@ -65,7 +65,7 @@ class SearchDatasets(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='search_datasets')
+    @datasetmethod(name='search')
     def __call__(match, dataset, report=None, format='custom'):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')

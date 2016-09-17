@@ -39,7 +39,7 @@ Meta data handling
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-search-datasets
+   generated/man/datalad-search
    generated/man/datalad-aggregate
 
 Miscellaneous commands

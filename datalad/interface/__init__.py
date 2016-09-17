@@ -42,8 +42,8 @@ _group_dataset = (
 _group_metadata = (
     'Commands for meta data handling',
     [
-        ('datalad.metadata.search_datasets', 'SearchDatasets',
-         'search-datasets', 'search_datasets'),
+        ('datalad.metadata.search', 'Search',
+         'search', 'search'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate', 'aggregate'),
     ])
