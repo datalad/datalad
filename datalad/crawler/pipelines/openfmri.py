@@ -67,7 +67,9 @@ def extract_readme(data):
            }
 
 
-def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, prefix=''):
+def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
+             versions_overlay_level=2,
+             leading_dirs_depth=1, prefix=''):
     """Pipeline to crawl/annex an openfmri dataset
 
     Parameters
@@ -86,6 +88,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, 
     skip_no_changes = True    # to redo incoming-processed, would finish dirty in incoming-processed
                               # when commit would fail since nothing to commit
     leading_dirs_depth = int(leading_dirs_depth)
+    versions_overlay_level = int(versions_overlay_level)
     dataset_url = '%s%s/' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
@@ -174,6 +177,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, 
             # still we would have all the versions present -- we need to restrict only to the current one!
             annex.remove_other_versions('incoming',
                                         remove_unversioned=True,
+                                        overlay=versions_overlay_level,  # use major.minor to define overlays
                                         exclude='(README|changelog).*'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
@@ -189,8 +193,8 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, 
             ],
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True, allow_unrelated=True),
-            annex.finalize(tag=True),
+            annex.finalize(tag=True, aggregate=True),
         ],
         annex.switch_branch('master'),
-        annex.finalize(cleanup=True),
+        annex.finalize(cleanup=True, aggregate=True),
     ]
