@@ -181,6 +181,9 @@ def setup_parser(
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
+            # yoh would prefer smth like '  %-20s  %s' to be more inline with
+            # git --help and jst imho better but some commands are still way
+            # too long!
             cmd_summary.append('  - %s:  %s'
                                % (cd[0],
                                   textwrap.fill(
