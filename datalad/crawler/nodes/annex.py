@@ -1273,8 +1273,8 @@ class Annexificator(object):
                 lgr.info("Found branch non-dirty -- nothing was committed")
 
             if aggregate:
-                from datalad.api import aggregate_metadata
-                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
+                from datalad.api import aggregate as aggregate_cmd
+                aggregate_cmd(dataset=self.repo.path, guess_native_type=True)
 
             if tag and stats:
                 # versions survive only in total_stats

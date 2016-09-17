@@ -40,7 +40,7 @@ Meta data handling
    :maxdepth: 1
 
    generated/man/datalad-search-datasets
-   generated/man/datalad-aggregate-metadata
+   generated/man/datalad-aggregate
 
 Miscellaneous commands
 ======================
