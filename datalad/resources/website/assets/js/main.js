@@ -15,7 +15,7 @@ function url_exists(url) {
 /**
  * construct parent path to current url
  * @param {string} url current url
- * @param {string} node_name clicked node name
+ * @param {string} node_name clicked node name(not required)
  * @return {string} url to parent of current url
  */
 function parent_url(url, node_name) {
@@ -142,11 +142,17 @@ function click_handler(data, url) {
 /**
  * construct path to metadata json of node to be rendered
  * @param {object} md5 the md5 library object, used to compute metadata hash name of current node
+ * @param {bool} parent if parent, find metadata json of parent directory
  * @return {string} path to the current node's metadata json
  */
-function metadata_locator(md5) {
+function metadata_locator(md5, parent) {
   var metadata_dir = '.git/datalad/metadata/';
   var current_loc = absolute_url(getParameterByName('dir')).replace(/\/?$/, '');
+
+  // if parent find metadata json of parent directory
+  var parent_ = typeof parent !== 'undefined' ? parent : false;
+  if (parent_)
+    current_loc = parent_url(current_loc).replace(/\/?$/, '');
 
   // if current node is a parent dataset
   if (url_exists(current_loc + '/' + metadata_dir))
@@ -166,6 +172,19 @@ function metadata_locator(md5) {
           .replace(/\/?$/, '');                                   // replace ending '/'
     return current_loc + metadata_dir + md5(metadata_path);
   }
+}
+
+/**
+ * Retrieve metadata json of parent if exists
+ * @param {string} jQuery jQuery library object
+ * @param {string} path path of current dataset
+ * @return {object} return metadata json object of parent if parent exists
+ */
+function parent_json(jQuery, md5) {
+  var parent_metadata = metadata_locator(md5, true);
+  if (url_exists(parent_metadata))
+    return jQuery.getJSON(parent_metadata, function(data) { return data; });
+  return -1;
 }
 
 /**
