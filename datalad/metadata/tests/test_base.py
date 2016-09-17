@@ -191,9 +191,14 @@ def test_aggregation(path):
         import pyld
         from datalad.api import search
 
-        res = list(clone.search('.*'))
+        assert_equal(len(list(clone.search('mother'))), 1)
+        assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
+
+        res = list(clone.search('.*', regex=True))  # with regex
         assert_equal(len(res), 3)  # one per dataset
-        assert_equal(len(list(clone.search('grandchild.*'))), 1)
+
+        assert_equal(len(list(clone.search('grandchild.*', regex=True))), 1)
+        assert_equal(len(list(clone.search('grandchild'))), 1)
 
     # do here to prevent pyld from being needed
     except SkipTest:

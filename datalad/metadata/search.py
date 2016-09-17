@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj, exists
-import re
+import re as re_mod
 from six import string_types
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
@@ -39,8 +39,10 @@ class Search(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         match=Parameter(
             args=("match",),
-            metavar='REGEX',
-            doc="expression to match against all meta data values"),
+            metavar='STRING',
+            doc="a string (or a regular expression if "
+                "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
+                "in all meta data values"),
         #match=Parameter(
         #    args=('-m', '--match',),
         #    metavar='REGEX',
@@ -61,12 +63,17 @@ class Search(Interface):
             args=('-f', '--format'),
             constraints=EnsureChoice('custom', 'json', 'yaml'),
             doc="""format for output."""
-        )
+        ),
+        regex=Parameter(
+            args=("--regex",),
+            action="store_true",
+            doc="flag for STRING to be used as a (Python) regular expression "
+                "which should match the value"),
     )
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match, dataset, report=None, format='custom'):
+    def __call__(match, dataset, report=None, format='custom', regex=False):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
@@ -108,7 +115,10 @@ class Search(Interface):
         if report and not isinstance(report, list):
             report = [report]
 
-        expr = re.compile(match)
+        match_lower = match.lower()
+        matcher = re_mod.compile(match).match \
+            if regex \
+            else lambda s: match_lower in s.lower()
 
         # for every meta data set
         for mds in meta:
@@ -125,7 +135,7 @@ class Search(Interface):
             for k, v in mds.iteritems():
                 if isinstance(v, dict) or isinstance(v, list):
                     v = unicode(v)
-                hit = hit or expr.match(v)
+                hit = hit or matcher(v)
             if hit:
                 report_dict = {k: mds[k] for k in report if k in mds} if report else mds
                 if len(report_dict):
