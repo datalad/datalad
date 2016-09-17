@@ -32,7 +32,7 @@ lgr = logging.getLogger('datalad.distribution.add_publication_target')
 
 
 class AddSibling(Interface):
-    """Adds a sibling to a dataset.
+    """Add a sibling to a dataset.
 
     """
 
