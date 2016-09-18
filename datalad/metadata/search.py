@@ -31,6 +31,14 @@ from datalad.utils import assure_list
 
 class Search(Interface):
     """Search within available in datasets' meta data
+
+    Yields
+    ------
+    location : str
+        (relative) path to the dataset
+    report : dict
+        fields which were requested by `report` option
+
     """
 
     _params_ = dict(
@@ -164,7 +172,7 @@ class Search(Interface):
             if hit:
                 report_dict = {k: mds[k] for k in report if k in mds} if report else mds
                 if len(report_dict):
-                    yield report_dict
+                    yield mds.get('location', '.'), report_dict
                 else:
                     lgr.warning('meta data match, but no to-be-reported properties found. '
                                 'Present properties: %s' % (", ".join(sorted(mds))))
@@ -187,9 +195,10 @@ class Search(Interface):
                 fmt = '{v}'
 
             anything = False
-            for r in res:
+            for location, r in res:
                 # XXX Yarik thinks that Match should be replaced with actual path to the dataset
-                ui.message('Match:{}{}'.format(
+                ui.message('{}:{}{}'.format(
+                    location,
                     ichr,
                     jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
                 anything = True

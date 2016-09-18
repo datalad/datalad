@@ -9,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
+from operator import itemgetter
 from six import PY2
 from datalad.api import Dataset, aggregate
 from datalad.metadata import get_metadata_type, get_metadata
@@ -195,8 +196,21 @@ def test_aggregation(path):
         assert_equal(len(list(clone.search('mother'))), 1)
         assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
 
-        assert_equal(len(list(clone.search('child'))), 2)
-        assert_equal(len(list(clone.search(['child']))), 2)
+        child_res = list(clone.search('child'))
+        assert_equal(len(child_res), 2)
+        # should yield (location, report) tuples
+        assert_equal(list(map(itemgetter(0), child_res)), ['sub', 'sub/subsub'])
+
+        # more tests on returned paths:
+        assert_equal(list(map(itemgetter(0),
+                              clone.search('datalad'))),
+                     ['.', 'sub', 'sub/subsub'])
+        # if we clone subdataset and query for value present in it and its kid
+        assert_equal(list(map(itemgetter(0),
+                              clone.install('sub').search('datalad'))),
+                     ['.', 'subsub'])
+
+        # Test 'and' for multiple search entries
         assert_equal(len(list(clone.search(['child', 'bids']))), 2)
         assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
         assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
