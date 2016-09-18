@@ -201,6 +201,22 @@ def test_aggregation(path):
         # should yield (location, report) tuples
         assert_equal(list(map(itemgetter(0), child_res)), ['sub', 'sub/subsub'])
 
+        # without report_matched, we are getting all the fields by default
+        assert(all([len(x) >= 9 for x in map(itemgetter(1), child_res)]))
+        # but we would get only the matching name if we ask for report_matched
+        assert_equal(
+            set(map(lambda x: tuple(x[1].keys()),
+                    clone.search('child', report_matched=True))),
+            set([('name',)])
+        )
+        # and the additional field we might have asked with report
+        assert_equal(
+            set(map(lambda x: tuple(sorted(x[1].keys())),
+                    clone.search('child', report_matched=True,
+                                 report=['type']))),
+            set([('name', 'type')])
+        )
+
         # more tests on returned paths:
         assert_equal(list(map(itemgetter(0),
                               clone.search('datalad'))),

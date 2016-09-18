@@ -73,6 +73,12 @@ class Search(Interface):
             doc="""name of the property to report for any match.[CMD:  This
             option can be given multiple times. CMD] If none are given, all
             properties are reported."""),
+        report_matched=Parameter(
+            args=('--report-matched',),
+            action="store_true",
+            doc="""flag to report those fields which have matches. If `report`
+             option values are provided, union of matched and those in `report`
+             will be output"""),
         # Theoretically they should be CMDLINE specific I guess?
         format=Parameter(
             args=('-f', '--format'),
@@ -88,7 +94,7 @@ class Search(Interface):
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match, dataset, report=None, format='custom', regex=False):
+    def __call__(match, dataset, report=None, report_matched=False, format='custom', regex=False):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
@@ -150,6 +156,7 @@ class Search(Interface):
         for mds in meta:
             hit = False
             hits = [False] * len(matchers)
+            matched_fields = set()
             if not mds.get('type', None) == 'Dataset':
                 # we are presently only dealing with datasets
                 continue
@@ -166,18 +173,23 @@ class Search(Interface):
                 for imatcher, matcher in enumerate(matchers):
                     if matcher(v):
                         hits[imatcher] = True
+                        matched_fields.add(k)
                 if all(hits):
-                    # no need to do it longer than necessary
                     hit = True
-                    break
+                    # no need to do it longer than necessary
+                    if not report_matched:
+                        break
 
             if hit:
-                report_dict = {k: mds[k] for k in report if k in mds} if report else mds
+                report_ = matched_fields.union(report if report else {}) \
+                    if report_matched else report
+                report_dict = {k: mds[k] for k in report_ if k in mds} if report_ else mds
                 if len(report_dict):
                     yield mds.get('location', '.'), report_dict
                 else:
-                    lgr.warning('meta data match, but no to-be-reported properties found. '
-                                'Present properties: %s' % (", ".join(sorted(mds))))
+                    lgr.warning(
+                        'meta data match, but no to-be-reported properties found.'
+                        ' Present properties: %s' % (", ".join(sorted(mds))))
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
@@ -187,7 +199,10 @@ class Search(Interface):
 
         format = cmdlineargs.format or 'custom'
         if format =='custom':
-            if cmdlineargs.report is None or len(cmdlineargs.report) > 1:
+
+            if cmdlineargs.report is None \
+                    or cmdlineargs.report_matched \
+                    or len(cmdlineargs.report) > 1:
                 # multiline if multiple were requested and we need to disambiguate
                 ichr = jchr = '\n'
                 fmt = ' {k}: {v}'
