@@ -291,7 +291,6 @@ class Interface(object):
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
-            print argnames
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
         try:
             return cls.__call__(**kwargs)

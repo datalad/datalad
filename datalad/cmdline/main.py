@@ -236,13 +236,13 @@ def main(args=None):
     if 'export' in check_args:
         # there is a non-zero chance that we will call the 'export' command
         # call the parser in the most permissive way
-        cmdlineargs, exporter_args = parser.parse_known_args(args)
+        cmdlineargs, unparsed_args = parser.parse_known_args(args)
         if cmdlineargs.func.__self__.__name__ != 'Export':
             # we guessed wrong, and need to redo parsing in strict mode
             cmdlineargs = parser.parse_args(args)
         else:
             # store all unparsed arguments
-            cmdlineargs.exporter_args = exporter_args
+            cmdlineargs.datalad_unparsed_args = unparsed_args
     else:
         # no chance the we need special argument handling
         cmdlineargs = parser.parse_args(args)
