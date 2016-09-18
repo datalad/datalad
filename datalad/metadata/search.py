@@ -14,8 +14,10 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 
+from operator import itemgetter
 from os.path import join as opj, exists
 from six import string_types
+from six import text_type
 from six import iteritems
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
@@ -200,22 +202,32 @@ class Search(Interface):
                 ui.message('{}:{}{}'.format(
                     location,
                     ichr,
-                    jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
+                    jchr.join([fmt.format(k=k, v=pretty_str(r[k])) for k in sorted(r)])))
                 anything = True
             if not anything:
                 ui.message("Nothing to report")
         elif format == 'json':
             import json
-            ui.message(json.dumps(list(res), indent=2))
+            ui.message(json.dumps(list(map(itemgetter(1), res)), indent=2))
         elif format == 'yaml':
             import yaml
             lgr.warning("yaml output support is not yet polished")
-            ui.message(yaml.safe_dump(list(res), allow_unicode=True, encoding='utf-8'))
+            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)), allow_unicode=True, encoding='utf-8'))
 
-def safe_str(s):
-    try:
+
+def pretty_str(s):
+    """Helper to provide sensible rendering for lists, dicts, and unicode"""
+    if isinstance(s, list):
+        return ", ".join(map(pretty_str, s))
+    elif isinstance(s, dict):
+        return pretty_str(["%s=%s" % (pretty_str(k), pretty_str(v))
+                           for k, v in s.items()])
+    elif isinstance(s, text_type):
+        try:
+            return s.encode('utf-8')
+        except UnicodeEncodeError:
+            lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
+            # TODO: get current encoding
+            return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
+    else:
         return str(s)
-    except UnicodeEncodeError:
-        lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
-        # TODO: get current encoding
-        return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
