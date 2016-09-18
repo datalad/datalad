@@ -216,6 +216,13 @@ def test_aggregation(path):
                                  report=['type']))),
             set([('name', 'type')])
         )
+        # and if we ask report to be 'empty', we should get no fields
+        child_res_empty = list(clone.search('child', report=''))
+        assert_equal(len(child_res_empty), 2)
+        assert_equal(
+            set(map(lambda x: tuple(x[1].keys()), child_res_empty)),
+            set([tuple()])
+        )
 
         # more tests on returned paths:
         assert_equal(list(map(itemgetter(0),

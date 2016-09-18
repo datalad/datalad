@@ -72,7 +72,8 @@ class Search(Interface):
             # could also be regex
             doc="""name of the property to report for any match.[CMD:  This
             option can be given multiple times. CMD] If none are given, all
-            properties are reported."""),
+            properties are reported. Empty value would cause to report none
+            of the properties."""),
         report_matched=Parameter(
             args=('--report-matched',),
             action="store_true",
@@ -133,7 +134,9 @@ class Search(Interface):
                 open(mcache_fname, 'w'))
             lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
-        if report and not isinstance(report, list):
+        if report in ('', ['']):
+            report = []
+        elif report and not isinstance(report, list):
             report = [report]
 
         match = assure_list(match)
@@ -181,15 +184,26 @@ class Search(Interface):
                         break
 
             if hit:
+                location = mds.get('location', '.')
                 report_ = matched_fields.union(report if report else {}) \
                     if report_matched else report
-                report_dict = {k: mds[k] for k in report_ if k in mds} if report_ else mds
-                if len(report_dict):
-                    yield mds.get('location', '.'), report_dict
+                if report_ is None:
+                    report_dict = mds
+                elif report_:
+                    report_dict = {k: mds[k] for k in report_ if k in mds}
+                    if report_ and not report_dict:
+                        lgr.warning(
+                            'meta data match for %s, but no to-be-reported '
+                            'properties (%s) found. Present properties: %s'
+                            % (location,
+                               ", ".join(report_),
+                               ", ".join(sorted(mds)))
+                        )
                 else:
-                    lgr.warning(
-                        'meta data match, but no to-be-reported properties found.'
-                        ' Present properties: %s' % (", ".join(sorted(mds))))
+                    report_dict = {}  # it was empty but not None -- asked to
+                    # not report any specific field
+                yield location, report_dict
+
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
@@ -214,8 +228,9 @@ class Search(Interface):
             anything = False
             for location, r in res:
                 # XXX Yarik thinks that Match should be replaced with actual path to the dataset
-                ui.message('{}:{}{}'.format(
+                ui.message('{}{}{}{}'.format(
                     location,
+                    ':' if r else '',
                     ichr,
                     jchr.join([fmt.format(k=k, v=pretty_str(r[k])) for k in sorted(r)])))
                 anything = True
