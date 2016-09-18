@@ -19,7 +19,6 @@ from importlib import import_module
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
-from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
@@ -62,7 +61,7 @@ class Export(Interface):
 
     @staticmethod
     @datasetmethod(name='export')
-    def __call__(dataset, astype, getcmdhelp=False, **kwargs):
+    def __call__(astype, dataset, getcmdhelp=False, **kwargs):
         # get a handle on the relevant plugin module
         import datalad.export as export_mod
         exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
