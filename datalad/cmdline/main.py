@@ -228,7 +228,25 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs = parser.parse_args(args)
+    check_args = args if args else sys.argv
+    # make a cheap, but educated guess whether we might face arguments that
+    # are valid, but unknown to the configured parser
+    # ATM only the 'export' command has an extensible plugin mechanism that
+    # could get us into this situation
+    if 'export' in check_args:
+        # there is a non-zero chance that we will call the 'export' command
+        # call the parser in the most permissive way
+        cmdlineargs, exporter_args = parser.parse_known_args(args)
+        if cmdlineargs.func.__self__.__name__ != 'Export':
+            # we guessed wrong, and need to redo parsing in strict mode
+            cmdlineargs = parser.parse_args(args)
+        else:
+            # store all unparsed arguments
+            cmdlineargs.exporter_args = exporter_args
+    else:
+        # no chance the we need special argument handling
+        cmdlineargs = parser.parse_args(args)
+
     if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)
