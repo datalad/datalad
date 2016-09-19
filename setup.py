@@ -23,7 +23,7 @@ from setup_support import get_version
 
 
 def findsome(subdir, extensions):
-    """Find files under subdir having speified extensions
+    """Find files under subdir having specified extensions
 
     Leading directory (datalad) gets stripped
     """
