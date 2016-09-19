@@ -270,7 +270,7 @@ datalad install result.txt
 # Fake an SSH server on this machine for the purpose of this demo
 SERVER_URL="localhost:$(readlink -f $(mktemp --tmpdir -u -d datalad_demo_testpub.XXXX))"
 # this generated sibling for the dataset and all subdatasets
-datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
+datalad create-sibling --recursive $SERVER_URL public
 
 #%
 # Once the remote sibling is created and registered under the name "public",

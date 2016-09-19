@@ -84,10 +84,10 @@ def test_help_np():
                   'Global options'})
 
     # none of the lines must be longer than 80 chars
-    # TODO: decide on   create-publication-target-sshwebserver and possibly
+    # TODO: decide on   create-sibling and possibly
     # modify-subdataset-urls
     long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
-                  if len(l) > 80 and "create-pub" not in l]
+                  if len(l) > 80]
     if long_lines:
         raise AssertionError(
             "Following lines in --help output were longer than 80 chars:\n%s"

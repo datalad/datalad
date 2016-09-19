@@ -115,7 +115,7 @@ class AddSibling(Interface):
                     'repo': GitRepo(subds_path, create=False)
                 }
 
-        # Note: This is copied from create_publication_target_sshwebserver
+        # Note: This is copied from create_sibling
         # as it is the same logic as for its target_dir.
         # TODO: centralize and generalize template symbol handling
         # TODO: Check pushurl for template symbols too. Probably raise if only

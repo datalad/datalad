@@ -24,7 +24,7 @@ Dataset operations
    generated/man/datalad-add
    generated/man/datalad-add-sibling
    generated/man/datalad-create
-   generated/man/datalad-create-publication-target-sshwebserver
+   generated/man/datalad-create-sibling
    generated/man/datalad-install
    generated/man/datalad-modify-subdataset-urls
    generated/man/datalad-publish

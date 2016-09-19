@@ -29,9 +29,9 @@ _group_dataset = (
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
-        ('datalad.distribution.create_publication_target_sshwebserver',
-         'CreatePublicationTargetSSHWebserver',
-         'create-publication-target-sshwebserver'),
+        ('datalad.distribution.create_sibling',
+         'CreateSibling',
+         'create-sibling'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
         ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
          'modify-subdataset-urls'),
