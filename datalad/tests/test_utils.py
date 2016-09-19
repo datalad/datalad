@@ -58,9 +58,9 @@ from .utils import skip_if_no_module
 
 
 def test_get_func_kwargs_doc():
-    from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
-    eq_(get_func_kwargs_doc(pipeline), output)
+    def some_func(arg1, kwarg1=None, kwarg2="bu"):
+        return
+    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
 
 
 @with_tempfile(mkdir=True)

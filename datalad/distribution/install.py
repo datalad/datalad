@@ -142,15 +142,24 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     subds = Dataset(opj(ds.path, sm_path))
     for clone_url in clone_urls:
         lgr.debug("Attempt clone of subdataset from: {0}".format(clone_url))
-        try:
-            subds = Install.__call__(
-                path=subds.path, source=clone_url,
-                recursive=recursive)
-        except GitCommandError:
-            # TODO: failed clone might leave something behind that causes the
-            # next attempt to fail as well. Implement safe way to remove clone
-            # attempt left-overs.
-            continue
+
+        # Note: Condition is a special case handling for now, where install
+        # is called to install an existing ds in place. Here it calls install
+        # again, without a dataset to install it into, since the call is about
+        # the cloning only, which isn't necessary in this case and the addition
+        # is done afterwards.
+        # TODO: RF this helper function; currently its logic is somewhat
+        # conflicting with new install API
+        if not subds.is_installed():
+            try:
+                subds = Install.__call__(
+                    path=subds.path, source=clone_url,
+                    recursive=recursive)
+            except GitCommandError:
+                # TODO: failed clone might leave something behind that causes the
+                # next attempt to fail as well. Implement safe way to remove clone
+                # attempt left-overs.
+                continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
             ds.repo.update_submodule(sm_path, init=True)
@@ -362,7 +371,13 @@ class Install(Interface):
                     "Got no source to install from.")
 
         _install_inplace = False
-        if source == path:  # TODO: does it make sense to use realpath here?
+        from os.path import realpath
+        # TODO: does it make sense to use realpath here or just normpath for
+        #       comparison?
+        #       Consider: If normpath wouldn't be equal, but realpath would -
+        #       is there any use case, where such a setup would be benefitial
+        #       instead of being troublesome?
+        if source and path and realpath(source) == realpath(path):
             if _install_into_ds:
                 _install_inplace = True
             else:

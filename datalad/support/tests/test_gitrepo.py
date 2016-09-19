@@ -12,6 +12,7 @@
 
 from nose.tools import assert_is_instance
 
+import os
 from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -925,3 +926,33 @@ def test_get_deleted(path):
     eq_(repo.get_deleted_files(), ['test1'])
     rmtree(opj(path, 'deep'))
     eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
+
+
+@with_tempfile
+def test_optimized_cloning(path):
+    # make test repo with one fiel and one commit
+    originpath = opj(path, 'origin')
+    repo = GitRepo(originpath, create=True)
+    with open(opj(originpath, 'test'), 'w') as f:
+        f.write('some')
+    repo.add('test')
+    repo.commit('init')
+    ok_clean_git(originpath, annex=False)
+    from glob import glob
+
+    def _get_inodes(repo):
+        return dict(
+            [(os.path.join(*o.split(os.sep)[-2:]),
+              os.stat(o).st_ino)
+             for o in glob(os.path.join(repo.repo.git_dir,
+                                        'objects', '*', '*'))])
+
+    origin_inodes = _get_inodes(repo)
+    # now clone it in different ways and see what happens to the object storage
+    from datalad.support.network import get_local_file_url
+    clonepath = opj(path, 'clone')
+    for src in (originpath, get_local_file_url(originpath)):
+        clone = GitRepo(clonepath, url=src, create=True)
+        clone_inodes = _get_inodes(clone)
+        eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
+        rmtree(clonepath)

@@ -765,7 +765,8 @@ def skip_ssh(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
-        if not os.environ.get('DATALAD_TESTS_SSH'):
+        test_ssh = os.environ.get('DATALAD_TESTS_SSH', '').lower()
+        if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc

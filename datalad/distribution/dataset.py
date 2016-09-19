@@ -65,6 +65,7 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
+    # TODO: normpath?!
     if is_explicit_path(path):
         return abspath(path)
     if ds is None:

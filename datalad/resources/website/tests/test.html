@@ -91,6 +91,14 @@
 	  assert.deepEqual(click_handler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
 	  assert.deepEqual(click_handler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
       });
+      QUnit.test("Size Rendering", function(assert) {
+	assert.equal(size_renderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
+	assert.equal(size_renderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
+	assert.equal(size_renderer({}), "-", "no sizes in sizes json");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
+      });
+
     </script>
   </body>
 </html>
