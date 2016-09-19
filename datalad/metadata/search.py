@@ -114,6 +114,7 @@ class Search(Interface):
         # don't put in 'else', as yet to be written tests above might fail and require
         # regenerating meta data
         if meta is None:
+            lgr.info("Loading and caching local meta-data... might take a few seconds")
             if not exists(cache_dir):
                 os.makedirs(cache_dir)
 
@@ -126,6 +127,10 @@ class Search(Interface):
             # build simple queriable representation
             if not isinstance(meta, list):
                 meta = [meta]
+
+            # sort entries by location (if present)
+            sort_keys = ('location', 'description', 'id')
+            meta = sorted(meta, key=lambda m: tuple(m.get(x) for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(
