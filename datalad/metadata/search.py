@@ -74,7 +74,7 @@ class Search(Interface):
             option can be given multiple times. CMD] If '*' is given, all
             properties are reported."""),
         report_matched=Parameter(
-            args=('--report-matched',),
+            args=('-R', '--report-matched',),
             action="store_true",
             doc="""flag to report those fields which have matches. If `report`
              option values are provided, union of matched and those in `report`
@@ -196,12 +196,10 @@ class Search(Interface):
                 elif report_:
                     report_dict = {k: mds[k] for k in report_ if k in mds}
                     if report_ and not report_dict:
-                        lgr.warning(
+                        lgr.debug(
                             'meta data match for %s, but no to-be-reported '
-                            'properties (%s) found. Present properties: %s'
-                            % (location,
-                               ", ".join(report_),
-                               ", ".join(sorted(mds)))
+                            'properties (%s) found. Present properties: %s',
+                            location, ", ".join(report_), ", ".join(sorted(mds))
                         )
                 else:
                     report_dict = {}  # it was empty but not None -- asked to
