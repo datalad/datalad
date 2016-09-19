@@ -36,7 +36,7 @@ def _store_json(path, meta):
 
 
 class AggregateMetaData(Interface):
-    """Aggregate meta data of a (super)dataset for later query.
+    """Aggregate meta data of a dataset for later query.
     """
 
     _params_ = dict(

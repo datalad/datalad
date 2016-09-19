@@ -181,16 +181,13 @@ def setup_parser(
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            # yoh would prefer smth like '  %-20s  %s' to be more inline with
-            # git --help and jst imho better but some commands are still way
-            # too long!
-            cmd_summary.append('  - %s:  %s'
-                               % (cd[0],
+            cmd_summary.append('  - %-20s %s'
+                               % ((cd[0] + ':',
                                   textwrap.fill(
                                       cd[1].rstrip(' .'),
                                       75,
                                       #initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 8)))
+                                      subsequent_indent=' ' * 8))))
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')

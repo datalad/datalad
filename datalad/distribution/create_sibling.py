@@ -44,7 +44,7 @@ lgr = logging.getLogger('datalad.distribution.create_sibling')
 
 
 class CreateSibling(Interface):
-    """Create dataset(s)'s sibling (e.g., on a web server via SSH).
+    """Create dataset(s)'s sibling (e.g., on a web server).
 
     Those (empty) datasets can then serve as a target for the `publish` command.
     """
