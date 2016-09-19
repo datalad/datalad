@@ -71,9 +71,8 @@ class Search(Interface):
             action='append',
             # could also be regex
             doc="""name of the property to report for any match.[CMD:  This
-            option can be given multiple times. CMD] If none are given, all
-            properties are reported. Empty value would cause to report none
-            of the properties."""),
+            option can be given multiple times. CMD] If '*' is given, all
+            properties are reported."""),
         report_matched=Parameter(
             args=('--report-matched',),
             action="store_true",
@@ -192,7 +191,7 @@ class Search(Interface):
                 location = mds.get('location', '.')
                 report_ = matched_fields.union(report if report else {}) \
                     if report_matched else report
-                if report_ is None:
+                if report_ == ['*']:
                     report_dict = mds
                 elif report_:
                     report_dict = {k: mds[k] for k in report_ if k in mds}
@@ -219,9 +218,10 @@ class Search(Interface):
         format = cmdlineargs.format or 'custom'
         if format =='custom':
 
-            if cmdlineargs.report is None \
+            if cmdlineargs.report in ('*', ['*']) \
                     or cmdlineargs.report_matched \
-                    or len(cmdlineargs.report) > 1:
+                    or (cmdlineargs.report is not None
+                        and len(cmdlineargs.report) > 1):
                 # multiline if multiple were requested and we need to disambiguate
                 ichr = jchr = '\n'
                 fmt = ' {k}: {v}'
