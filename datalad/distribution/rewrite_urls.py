@@ -23,7 +23,7 @@ from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, require_dataset
 
-lgr = logging.getLogger('datalad.distribution.modify_subdataset_urls')
+lgr = logging.getLogger('datalad.distribution.rewrite_urls')
 
 
 def get_module_parser(repo):
@@ -37,8 +37,8 @@ def get_module_parser(repo):
     return parser
 
 
-class ModifySubdatasetURLs(Interface):
-    """Modify the URLs of sub-datasets of a dataset
+class RewriteURLs(Interface):
+    """Rewrite the URLs of sub-datasets of a dataset
     """
 
     _params_ = dict(
@@ -70,7 +70,7 @@ class ModifySubdatasetURLs(Interface):
     #     constraints=EnsureChoice(["all", "ask"]),)
 
     @staticmethod
-    @datasetmethod(name='modify_subdataset_urls')
+    @datasetmethod(name='rewrite_urls')
     def __call__(url, dataset=None, recursive=False):
 
         # shortcut

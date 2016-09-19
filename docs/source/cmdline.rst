@@ -26,7 +26,7 @@ Dataset operations
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-install
-   generated/man/datalad-modify-subdataset-urls
+   generated/man/datalad-rewrite-urls
    generated/man/datalad-publish
    generated/man/datalad-uninstall
    generated/man/datalad-update

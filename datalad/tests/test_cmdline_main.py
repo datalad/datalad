@@ -85,7 +85,7 @@ def test_help_np():
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
-    # modify-subdataset-urls
+    # rewrite-urls
     long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
                   if len(l) > 80]
     if long_lines:

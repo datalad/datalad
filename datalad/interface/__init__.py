@@ -33,8 +33,8 @@ _group_dataset = (
          'CreateSibling',
          'create-sibling'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
-         'modify-subdataset-urls'),
+        ('datalad.distribution.rewrite_urls', 'RewriteURLs',
+         'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
     ])
