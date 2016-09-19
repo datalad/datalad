@@ -9,36 +9,52 @@
 """High-level interface for dataset (component) installation
 
 """
-from datalad.distribution.utils import _install_subds_inplace, \
-    _fixup_submodule_dotgit_setup
 
-__docformat__ = 'restructuredtext'
 
 import logging
-from os import curdir, linesep
-from os.path import join as opj, relpath, pardir, exists
+from os import curdir
+from os import linesep
+from os.path import join as opj
+from os.path import relpath
+from os.path import pardir
+from os.path import exists
 
 from six.moves.urllib.parse import quote as urlquote
 
-from .dataset import Dataset, datasetmethod, \
-    resolve_path, EnsureDataset
-
 from datalad.interface.base import Interface
-from datalad.interface.common_opts import recursion_flag, recursion_limit, \
-    dataset_description, git_opts, annex_opts, \
-    annex_init_opts, git_clone_opts, if_dirty_opt, nosave_opt
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import git_opts
+from datalad.interface.common_opts import git_clone_opts
+from datalad.interface.common_opts import annex_opts
+from datalad.interface.common_opts import annex_init_opts
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.common_opts import nosave_opt
 from datalad.interface.utils import handle_dirty_dataset
-
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.gitrepo import GitRepo, GitCommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
-from datalad.utils import knows_annex, swallow_logs
-from datalad.support.network import RI, URL
+from datalad.support.network import RI
+from datalad.support.network import URL
 from datalad.support.network import DataLadRI
-from datalad.support.network import is_url, is_datalad_compat_ri
+from datalad.support.network import is_url
+from datalad.support.network import is_datalad_compat_ri
+from datalad.utils import knows_annex, swallow_logs
 from datalad.utils import rmtree
+
+from .dataset import Dataset
+from .dataset import datasetmethod
+from .dataset import resolve_path
+from .dataset import EnsureDataset
+from .utils import _install_subds_inplace
+from .utils import _fixup_submodule_dotgit_setup
+
+__docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.install')
 
@@ -620,3 +636,4 @@ class Install(Interface):
             n=len(res),
             items=items)
         ui.message(msg)
+

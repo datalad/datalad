@@ -13,18 +13,12 @@
 import logging
 
 from os import curdir
-from os import pardir
 from os.path import join as opj
 
-from datalad.api import create
 from datalad.api import get
-from datalad.api import add
-from datalad.api import save
 from datalad.api import install
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
@@ -36,7 +30,6 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
-from datalad.utils import chpwd
 from datalad.utils import swallow_logs
 
 from ..dataset import Dataset
@@ -276,3 +269,4 @@ def test_get_install_missing_subdataset(src, path):
     ds.get(file)
     ok_(subs[0].is_installed())
     ok_(subs[0].repo.file_has_content('test-annex.dat') is True)
+

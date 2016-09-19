@@ -9,54 +9,49 @@
 
 """
 
-import os
-import shutil
-from os.path import join as opj, abspath, isdir
+from os.path import join as opj
+from os.path import isdir
 from os.path import exists
 from os.path import realpath
 
 from mock import patch
 
-from ..dataset import Dataset
 from datalad.api import create
 from datalad.api import install
 from datalad.consts import DATASETS_TOPURL
-from datalad.distribution.install import _get_installationpath_from_url
-from datalad.distribution.install import _get_git_url_from_source
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileInGitError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
-from datalad.cmd import Runner
-
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-
-from nose.tools import ok_, eq_, assert_false
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_equal, assert_true
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import eq_
+from datalad.tests.utils import ok_
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.utils import _path_
 
+from ..dataset import Dataset
+from ..install import _get_installationpath_from_url
+from ..install import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
+
 
 def test_installationpath_from_url():
     for p in ('lastbit',
@@ -67,7 +62,7 @@ def test_installationpath_from_url():
               'http://example.com/lastbit',
               'http://example.com/lastbit.git',
               ):
-        assert_equal(_get_installationpath_from_url(p), 'lastbit')
+        eq_(_get_installationpath_from_url(p), 'lastbit')
 
 
 def test_get_git_url_from_source():
@@ -90,6 +85,7 @@ def test_get_git_url_from_source():
         'ssh://somewhe.re/else')
     eq_(_get_git_url_from_source('git://github.com/datalad/testrepo--basic--r1'),
         'git://github.com/datalad/testrepo--basic--r1')
+
 
 @with_tree(tree={'file.txt': '123'})
 @serve_path_via_http
@@ -340,8 +336,9 @@ def test_install_known_subdataset(src, path):
     ok_(AnnexRepo.is_valid_repo(subds.path, allow_noninitialized=False))
     # Verify that it is the correct submodule installed and not
     # new repository initiated
-    assert_equal(set(subds.repo.get_indexed_files()),
-                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
+    eq_(set(subds.repo.get_indexed_files()),
+        {'test.dat', 'INFO.txt', 'test-annex.dat'})
     assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
     assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
+
 
