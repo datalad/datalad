@@ -366,7 +366,7 @@ class Dataset(object):
         ----------
         path : str
           Path to determine the containing (sub-)dataset for
-        recursion_limit: int
+        recursion_limit: int or None
           limit the subdatasets to take into account to the given number of
           hierarchy levels
 

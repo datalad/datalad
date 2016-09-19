@@ -20,6 +20,7 @@ from datalad.api import create
 from datalad.api import get
 from datalad.api import add
 from datalad.api import save
+from datalad.api import install
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileNotInRepositoryError
@@ -84,15 +85,6 @@ def test_get_invalid_call(path, file_outside):
         eq_(len(result), 0)
         assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
 
-    # path in subdataset, but not called with recursive=True:
-    subds = ds.create('sub')
-    with open(opj(subds.path, 'newfile.dat'), "w") as f:
-        f.write("something")
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(opj('sub', 'newfile.dat'))
-        eq_(len(result), 0)
-        assert_in("newfile.dat belongs to subdataset %s" % subds, cml.out)
-
     # path outside repo:
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(file_outside)
@@ -139,9 +131,7 @@ def test_get_multiple_files(path, url, ds_dir):
     origin.add(file_list)
     origin.save("initial")
 
-    # clone it: (TODO: use install here, once it is redone)
-    AnnexRepo(ds_dir, path, create=True)
-    ds = Dataset(ds_dir)
+    ds = install(ds_dir, source=path)
 
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))
@@ -177,9 +167,7 @@ def test_get_recurse_dirs(o_path, c_path):
     origin = Dataset(o_path).create(force=True)
     origin.save("Initial", auto_add_changes=True)
 
-    # clone it: (TODO: use install here, once it is redone)
-    AnnexRepo(c_path, o_path, create=True)
-    ds = Dataset(c_path)
+    ds = install(c_path, source=o_path)
 
     file_list = ['file1.txt',
                  opj('subdir', 'file2.txt'),
@@ -206,30 +194,29 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
-@with_testrepos('submodule_annex', flavors='clone')
-def test_get_recurse_subdatasets(path):
+@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
+def test_get_recurse_subdatasets(src, path):
 
-    # just cloned, not installed, so annex-init it:
-    # TODO: use install, once it has been fixed.
-    repo = AnnexRepo(path, init=True)
-    repo.update_submodule('subm 1', init=True)
-    repo.update_submodule('subm 2', init=True)
+    ds, subds1, subds2 = install(path=path, source=src, recursive=True)
 
-    ds = Dataset(path)
-    subds1 = Dataset(opj(path, 'subm 1'))
-    subds2 = Dataset(opj(path, 'subm 2'))
+    # there are 3 files to get: test-annex.dat within each dataset:
+    from os.path import basename
+    rel_path_sub1 = opj(basename(subds1.path), 'test-annex.dat')
+    rel_path_sub2 = opj(basename(subds2.path), 'test-annex.dat')
+    annexed_files = {'test-annex.dat',
+                     rel_path_sub1,
+                     rel_path_sub2}
 
-    # call with path in submodule, but without 'recursive':
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(opj('subm 1', 'test-annex.dat'))
-        eq_(len(result), 0)
-        assert_in("{0} belongs to subdataset {1}".format(
-            opj('subm 1', 'test-annex.dat'), subds1), cml.out)
+    # None of them is currently present:
+    ok_(ds.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
-    # now with recursive option:
-    result = ds.get(opj('subm 1', 'test-annex.dat'), recursive=True)
+    # explicitly given path in subdataset => implicit recursion:
+    result = ds.get(rel_path_sub1)
 
-    eq_(result[0].get('file'), opj('subm 1', 'test-annex.dat'))
+    eq_(result[0].get('file'), rel_path_sub1)
     ok_(result[0].get('success', False) is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
 
@@ -237,12 +224,9 @@ def test_get_recurse_subdatasets(path):
     subds1.repo.drop('test-annex.dat')
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
 
+    # now, with a path not explicitly pointing within a
+    # subdataset, but recursive option:
     # get everything:
-    # there are 3 files to get: test-annex.dat within each dataset:
-    annexed_files = {'test-annex.dat',
-                     opj('subm 1', 'test-annex.dat'),
-                     opj('subm 2', 'test-annex.dat')}
-
     result = ds.get('.', recursive=True)
 
     eq_(set([item.get('file') for item in result]), annexed_files)
@@ -251,6 +235,44 @@ def test_get_recurse_subdatasets(path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
+    # drop them:
+    ds.repo.drop('test-annex.dat')
+    subds1.repo.drop('test-annex.dat')
+    subds2.repo.drop('test-annex.dat')
+    ok_(ds.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
-def test_get_install_missing_subdataset():
-    raise SkipTest("TODO")
+    # now, the very same call, but without recursive:
+    result = ds.get('.', recursive=False)
+    eq_(len(result), 1)
+    eq_(result[0]['file'], 'test-annex.dat')
+    ok_(result[0]['success'] is True)
+    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
+
+
+@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
+def test_get_install_missing_subdataset(src, path):
+
+    ds = install(path=path, source=src)
+    subs = [Dataset(s_path) for s_path in ds.get_subdatasets(absolute=True)]
+    ok_(all([not sub.is_installed() for sub in subs]))
+
+    # we don't install anything, if no explicitly given path points into a
+    # not yet installed subdataset:
+    ds.get(curdir)
+    ok_(all([not sub.is_installed() for sub in subs]))
+
+    # with no such paths, we also don't install when recursive is used - it just
+    # means to recursively include subdatasets in the get operation:
+    ds.get(curdir, recursive=True)
+    ok_(all([not sub.is_installed() for sub in subs]))
+
+    # but we do, whenever a given path is contained in such a subdataset:
+    file = opj(subs[0].path, 'test-annex.dat')
+    ds.get(file)
+    ok_(subs[0].is_installed())
+    ok_(subs[0].repo.file_has_content('test-annex.dat') is True)

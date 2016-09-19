@@ -57,7 +57,11 @@ class Get(Interface):
     across potential subdatasets, i.e. if a directory is provided, all files in
     the directory are obtained. Recursion into subdatasets is supported too. If
     enabled, potential subdatasets are detected and installed sequentially, in
-    order to fulfill a request.
+    order to fulfill a request. However, this implicit installation of
+    subdatasets is done only, if an explicitly specified path belongs to such a
+    subdataset and for that purpose `recursion_limit` is ignored. Otherwise get
+    recurses into already installed subdatasets only and the depth of this
+    recursion can be limited by `recursion_limit`.
 
     .. note::
       Power-user info: This command used :command:`git annex get` to fulfill
@@ -133,27 +137,74 @@ class Get(Interface):
         lgr.info("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
         for p in resolved_paths:
-            if not lexists(p):
-                # skip early:
-                # Note/TODO: This is to be changed, when implementing implicit
-                # install of subdatasets
-                lgr.warning("{0} not found. Ignored.".format(p))
-                continue
-
+            # Note: For explicitly given paths we do consider
+            # (possibly to be installed) subdatasets without `recursion_limit`.
+            # It is applied only for implicit recursion into subdatasets -
+            # see below under "if recursive"-block.
             try:
-                p_ds = \
-                    ds.get_containing_subdataset(p,
-                                                 recursion_limit=recursion_limit)
+                p_ds = ds.get_containing_subdataset(p, recursion_limit=None)
             except PathOutsideRepositoryError as e:
                 lgr.warning(exc_str(e) + linesep + "Ignored.")
                 continue
 
-            if not recursive and p_ds != ds:
-                lgr.warning("{0} belongs to subdataset {1}. To get its content "
-                            "use option `recursive` or call get on the "
-                            "subdataset. Ignored.".format(p, p_ds))
+            # Note: A not yet existing thing might need several levels of
+            # subdataset installation until we can actually get it.
+            if not p_ds.is_installed():
+                # this is expected to be ensured by require_dataset:
+                assert p_ds != ds
+
+                # we try to install subdatasets as long as there is anything to
+                # install in between the last one installed and the actual thing
+                # to get (which is `p`):
+                cur_subds = p_ds
+                cur_par_ds = p_ds.get_superdataset()
+                assert cur_par_ds is not None
+                _install_success = False
+                while not cur_subds.is_installed():
+                    lgr.info("Installing subdataset {0} in order to get "
+                             "{1}".format(cur_subds, p))
+                    try:
+                        cur_par_ds.install(cur_subds.path)
+                        _install_success = True
+                    except Exception as e:
+                        lgr.warning("Installation of subdataset {0} failed. {1}"
+                                    " ignored.".format(cur_subds, p))
+                        lgr.debug("Installation attempt failed with exception:"
+                                  "{0}{1}".format(linesep, exc_str(e)))
+                        _install_success = False
+                        # TODO: Should we try to clean up here and remove
+                        # anything we installed along the way? (Currently needs
+                        # to wait for being clear about uninstall)
+                        # Another approach: Record what went wrong and have a
+                        # dedicated 'datalad clean' or sth
+                        break
+                    cur_par_ds = cur_subds
+
+                    # Note: PathOutsideRepositoryError should not happen here.
+                    # If so, there went something fundamentally wrong, so:
+                    # raise instead of just log a warning.
+                    cur_subds = \
+                        p_ds.get_containing_subdataset(p, recursion_limit=None)
+
+                if not _install_success:
+                    # skip p, if we didn't manage to install its containing
+                    # subdataset
+                    continue
+
+                # assign the last one installed to p_ds to associate it with p:
+                p_ds = cur_subds
+
+            if not lexists(p):
+                # Note: Skipping non-existing paths currently.
+                # We could also include them in the call to AnnexRepo and get
+                # it reported with success=False and the reason in 'note'.
+                # But not even invoking annex at all is faster, so we skip
+                # it early:
+                lgr.warning("{0} not found. Ignored.".format(p))
                 continue
 
+            # collect all paths belonging to a certain (sub-)datasets in order
+            # to have one call to git-annex per repo:
             resolved_datasets[p_ds.path] = \
                 resolved_datasets.get(p_ds.path, []) + [p]
 
@@ -172,7 +223,8 @@ class Get(Interface):
                 if isdir(p):
                     for subds_path in \
                       ds.get_subdatasets(absolute=True, recursive=True,
-                                         recursion_limit=recursion_limit):
+                                         recursion_limit=recursion_limit,
+                                         fulfilled=True):
                         if subds_path.startswith(_with_sep(p)):
                             if subds_path not in resolved_datasets:
                                 lgr.debug("Added implicit subdataset {0} "
@@ -204,7 +256,7 @@ class Get(Interface):
 
             # if we recurse into subdatasets, adapt relative paths reported by
             # annex to be relative to the toplevel dataset we operate on:
-            if recursive:
+            if cur_ds != ds:
                 for i in range(len(local_results)):
                     local_results[i]['file'] = \
                         relpath(opj(ds_path, local_results[i]['file']), ds.path)

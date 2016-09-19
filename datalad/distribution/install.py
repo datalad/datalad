@@ -226,8 +226,8 @@ class Install(Interface):
             constraints=EnsureStr() | EnsureNone()),
         get_data=Parameter(
             args=("-g", "--get-data",),
-            action="store_true",
-            doc="""if given, obtain all data content too"""),
+            doc="""if given, obtain all data content too""",
+            action="store_true"),
         description=dataset_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
