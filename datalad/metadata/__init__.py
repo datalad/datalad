@@ -198,7 +198,7 @@ def _adjust_subdataset_location(meta, subds_relpath):
             if not isinstance(parts, list):
                 parts = [parts]
             for p in parts:
-                if not 'location' in p:
+                if 'location' not in p:
                     continue
                 loc = p.get('location', subds_relpath)
                 if loc != subds_relpath:
