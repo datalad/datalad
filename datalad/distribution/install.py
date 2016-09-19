@@ -206,7 +206,7 @@ class Install(Interface):
     user and machine name, plus path will be generated.
 
     When only partial dataset content shall be obtained, it is recommended to
-    use this command without the :option:`get-data` flag, followed by a
+    use this command without the `get-data` flag, followed by a
     :func:`~datalad.api.get` operation to obtain the desired data.
 
     .. note::
