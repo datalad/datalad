@@ -58,7 +58,7 @@ class AggregateMetaData(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='aggregate')
+    @datasetmethod(name='aggregate_metadata')
     def __call__(dataset, guess_native_type=False, recursive=False,
                  recursion_limit=None, if_dirty='save-before'):
         dataset = require_dataset(

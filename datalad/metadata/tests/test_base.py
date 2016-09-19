@@ -11,7 +11,7 @@
 
 from operator import itemgetter
 from six import PY2
-from datalad.api import Dataset, aggregate
+from datalad.api import Dataset, aggregate_metadata
 from datalad.metadata import get_metadata_type, get_metadata
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
@@ -115,7 +115,7 @@ def test_basic_metadata(path):
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
-        assert_raises(InsufficientArgumentsError, aggregate, None)
+        assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True, if_dirty='ignore')
@@ -123,7 +123,7 @@ def test_aggregation(path):
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second natiev set for the topmost dataset
-    aggregate(ds, guess_native_type=True, recursive=True)
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)

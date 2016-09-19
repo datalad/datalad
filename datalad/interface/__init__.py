@@ -45,7 +45,7 @@ _group_metadata = (
         ('datalad.metadata.search', 'Search',
          'search', 'search'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
-         'aggregate', 'aggregate'),
+         'aggregate-metadata', 'aggregate_metadata'),
     ])
 
 _group_misc = (
