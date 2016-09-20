@@ -70,6 +70,12 @@ class InsufficientArgumentsError(ValueError):
     """To be raise instead of `ValueError` when use help output is desired"""
     pass
 
+
+class NoDatasetArgumentFound(InsufficientArgumentsError):
+    """To be raised when expecting having a dataset but none was provided"""
+    pass
+
+
 #
 # Downloaders
 #

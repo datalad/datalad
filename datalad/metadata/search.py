@@ -13,12 +13,14 @@ __docformat__ = 'restructuredtext'
 
 import os
 import re
+import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
 from six import string_types
 from six import text_type
 from six import iteritems
+from six import reraise
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
@@ -29,6 +31,8 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 from datalad import cfg as dlcfg
 from datalad.utils import assure_list
+from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.ui import ui
 
 
 class Search(Interface):
@@ -96,7 +100,33 @@ class Search(Interface):
     @datasetmethod(name='search')
     def __call__(match, dataset, report=None, report_matched=False, format='custom', regex=False):
 
-        ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+        lgr.debug("Initiating search for match=%r and dataset %r",
+                  match, dataset)
+        try:
+            ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+        except NoDatasetArgumentFound:
+            exc_info = sys.exc_info()
+            if dataset is None:
+                # none was provided so we could ask user either he possibly wants
+                # to install our beautiful mega-duper-super-dataset?
+                if ui.yesno(
+                    title="No DataLad dataset found at current location",
+                    text="Would you like to install stock DataLad meta-dataset?"
+                ):
+                    from datalad.api import install
+                    installed = install('///')
+                    ui.message(
+                        "Dataset installed under %s.  "
+                        "Perform further operations using that dataset"
+                        % installed.path)
+                    for r in installed.search(
+                            match, report=report, format=format, regex=regex):
+                        yield r
+                    return
+                else:
+                    reraise(*exc_info)
+            else:
+                raise
 
         cache_dir = opj(dlcfg.dirs.user_cache_dir, 'metadata')
         mcache_fname = opj(cache_dir, ds.id)
