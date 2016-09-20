@@ -120,7 +120,9 @@ class Search(Interface):
                         "Perform further operations using that dataset"
                         % installed.path)
                     for r in installed.search(
-                            match, report=report, format=format, regex=regex):
+                            match,
+                            report=report, report_matched=report_matched,
+                            format=format, regex=regex):
                         yield r
                     return
                 else:
