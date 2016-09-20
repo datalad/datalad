@@ -12,9 +12,13 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import join as opj, exists
 import re
+
+from operator import itemgetter
+from os.path import join as opj, exists
 from six import string_types
+from six import text_type
+from six import iteritems
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
@@ -24,10 +28,19 @@ from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 from datalad import cfg as dlcfg
+from datalad.utils import assure_list
 
 
-class SearchDatasets(Interface):
-    """
+class Search(Interface):
+    """Search within available in datasets' meta data
+
+    Yields
+    ------
+    location : str
+        (relative) path to the dataset
+    report : dict
+        fields which were requested by `report` option
+
     """
 
     _params_ = dict(
@@ -39,8 +52,12 @@ class SearchDatasets(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         match=Parameter(
             args=("match",),
-            metavar='REGEX',
-            doc="expression to match against all meta data values"),
+            metavar='STRING',
+            nargs="+",
+            doc="a string (or a regular expression if "
+                "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
+                "in all meta data values. If multiple provided, all must have "
+                "a match among some fields of a dataset"),
         #match=Parameter(
         #    args=('-m', '--match',),
         #    metavar='REGEX',
@@ -54,19 +71,30 @@ class SearchDatasets(Interface):
             action='append',
             # could also be regex
             doc="""name of the property to report for any match.[CMD:  This
-            option can be given multiple times. CMD] If none are given, all
+            option can be given multiple times. CMD] If '*' is given, all
             properties are reported."""),
+        report_matched=Parameter(
+            args=('-R', '--report-matched',),
+            action="store_true",
+            doc="""flag to report those fields which have matches. If `report`
+             option values are provided, union of matched and those in `report`
+             will be output"""),
         # Theoretically they should be CMDLINE specific I guess?
         format=Parameter(
             args=('-f', '--format'),
             constraints=EnsureChoice('custom', 'json', 'yaml'),
             doc="""format for output."""
-        )
+        ),
+        regex=Parameter(
+            args=("--regex",),
+            action="store_true",
+            doc="flag for STRING to be used as a (Python) regular expression "
+                "which should match the value"),
     )
 
     @staticmethod
-    @datasetmethod(name='search_datasets')
-    def __call__(match, dataset, report=None, format='custom'):
+    @datasetmethod(name='search')
+    def __call__(match, dataset, report=None, report_matched=False, format='custom', regex=False):
 
         ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
 
@@ -85,6 +113,7 @@ class SearchDatasets(Interface):
         # don't put in 'else', as yet to be written tests above might fail and require
         # regenerating meta data
         if meta is None:
+            lgr.info("Loading and caching local meta-data... might take a few seconds")
             if not exists(cache_dir):
                 os.makedirs(cache_dir)
 
@@ -98,6 +127,10 @@ class SearchDatasets(Interface):
             if not isinstance(meta, list):
                 meta = [meta]
 
+            # sort entries by location (if present)
+            sort_keys = ('location', 'description', 'id')
+            meta = sorted(meta, key=lambda m: tuple(m.get(x) for x in sort_keys))
+
             # use pickle to store the optimized graph in the cache
             pickle.dump(
                 # graph plus checksum from what it was built
@@ -105,14 +138,32 @@ class SearchDatasets(Interface):
                 open(mcache_fname, 'w'))
             lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
-        if report and not isinstance(report, list):
+        if report in ('', ['']):
+            report = []
+        elif report and not isinstance(report, list):
             report = [report]
 
-        expr = re.compile(match)
+        match = assure_list(match)
+
+        def get_in_matcher(m):
+            """Function generator to provide closure for a specific value of m"""
+            mlower = m.lower()
+            def matcher(s):
+                return mlower in s.lower()
+            return matcher
+
+        matchers = [
+            re.compile(match_).search
+                if regex
+                else get_in_matcher(match_)
+            for match_ in match
+        ]
 
         # for every meta data set
         for mds in meta:
             hit = False
+            hits = [False] * len(matchers)
+            matched_fields = set()
             if not mds.get('type', None) == 'Dataset':
                 # we are presently only dealing with datasets
                 continue
@@ -121,18 +172,40 @@ class SearchDatasets(Interface):
             # as possible
             if not isinstance(mds, dict):
                 raise NotImplementedError("nested meta data is not yet supported")
+
             # manual loop for now
-            for k, v in mds.iteritems():
+            for k, v in iteritems(mds):
                 if isinstance(v, dict) or isinstance(v, list):
                     v = unicode(v)
-                hit = hit or expr.match(v)
+                for imatcher, matcher in enumerate(matchers):
+                    if matcher(v):
+                        hits[imatcher] = True
+                        matched_fields.add(k)
+                if all(hits):
+                    hit = True
+                    # no need to do it longer than necessary
+                    if not report_matched:
+                        break
+
             if hit:
-                report_dict = {k: mds[k] for k in report if k in mds} if report else mds
-                if len(report_dict):
-                    yield report_dict
+                location = mds.get('location', '.')
+                report_ = matched_fields.union(report if report else {}) \
+                    if report_matched else report
+                if report_ == ['*']:
+                    report_dict = mds
+                elif report_:
+                    report_dict = {k: mds[k] for k in report_ if k in mds}
+                    if report_ and not report_dict:
+                        lgr.debug(
+                            'meta data match for %s, but no to-be-reported '
+                            'properties (%s) found. Present properties: %s',
+                            location, ", ".join(report_), ", ".join(sorted(mds))
+                        )
                 else:
-                    lgr.warning('meta data match, but no to-be-reported properties found. '
-                                'Present properties: %s' % (", ".join(sorted(mds))))
+                    report_dict = {}  # it was empty but not None -- asked to
+                    # not report any specific field
+                yield location, report_dict
+
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
@@ -142,7 +215,11 @@ class SearchDatasets(Interface):
 
         format = cmdlineargs.format or 'custom'
         if format =='custom':
-            if cmdlineargs.report is None or len(cmdlineargs.report) > 1:
+
+            if cmdlineargs.report in ('*', ['*']) \
+                    or cmdlineargs.report_matched \
+                    or (cmdlineargs.report is not None
+                        and len(cmdlineargs.report) > 1):
                 # multiline if multiple were requested and we need to disambiguate
                 ichr = jchr = '\n'
                 fmt = ' {k}: {v}'
@@ -152,26 +229,38 @@ class SearchDatasets(Interface):
                 fmt = '{v}'
 
             anything = False
-            for r in res:
+            for location, r in res:
                 # XXX Yarik thinks that Match should be replaced with actual path to the dataset
-                ui.message('Match:{}{}'.format(
+                ui.message('{}{}{}{}'.format(
+                    location,
+                    ':' if r else '',
                     ichr,
-                    jchr.join([fmt.format(k=k, v=safe_str(r[k])) for k in sorted(r)])))
+                    jchr.join([fmt.format(k=k, v=pretty_str(r[k])) for k in sorted(r)])))
                 anything = True
             if not anything:
                 ui.message("Nothing to report")
         elif format == 'json':
             import json
-            ui.message(json.dumps(list(res), indent=2))
+            ui.message(json.dumps(list(map(itemgetter(1), res)), indent=2))
         elif format == 'yaml':
             import yaml
             lgr.warning("yaml output support is not yet polished")
-            ui.message(yaml.safe_dump(list(res), allow_unicode=True, encoding='utf-8'))
+            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)), allow_unicode=True, encoding='utf-8'))
 
-def safe_str(s):
-    try:
+
+def pretty_str(s):
+    """Helper to provide sensible rendering for lists, dicts, and unicode"""
+    if isinstance(s, list):
+        return ", ".join(map(pretty_str, s))
+    elif isinstance(s, dict):
+        return pretty_str(["%s=%s" % (pretty_str(k), pretty_str(v))
+                           for k, v in s.items()])
+    elif isinstance(s, text_type):
+        try:
+            return s.encode('utf-8')
+        except UnicodeEncodeError:
+            lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
+            # TODO: get current encoding
+            return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
+    else:
         return str(s)
-    except UnicodeEncodeError:
-        lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
-        # TODO: get current encoding
-        return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"

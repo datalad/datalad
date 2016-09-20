@@ -36,7 +36,7 @@ def _store_json(path, meta):
 
 
 class AggregateMetaData(Interface):
-    """Aggregate meta data of a (super)dataset for later query.
+    """Aggregate meta data of a dataset for later query.
     """
 
     _params_ = dict(
@@ -74,7 +74,7 @@ class AggregateMetaData(Interface):
         # check for OLD datasets without a configured ID, and save the current
         # one it
         dsonly_cfg = ConfigManager(dataset, dataset_only=True)
-        if not 'datalad.dataset.id' in dsonly_cfg:
+        if 'datalad.dataset.id' not in dsonly_cfg:
             dsonly_cfg.add(
                 'datalad.dataset.id',
                 dataset.id,

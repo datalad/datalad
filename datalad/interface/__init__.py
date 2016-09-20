@@ -29,12 +29,12 @@ _group_dataset = (
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
-        ('datalad.distribution.create_publication_target_sshwebserver',
-         'CreatePublicationTargetSSHWebserver',
-         'create-publication-target-sshwebserver'),
+        ('datalad.distribution.create_sibling',
+         'CreateSibling',
+         'create-sibling'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
-         'modify-subdataset-urls'),
+        ('datalad.distribution.rewrite_urls', 'RewriteURLs',
+         'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
     ])
@@ -42,8 +42,8 @@ _group_dataset = (
 _group_metadata = (
     'Commands for meta data handling',
     [
-        ('datalad.metadata.search_datasets', 'SearchDatasets',
-         'search-datasets', 'search_datasets'),
+        ('datalad.metadata.search', 'Search',
+         'search', 'search'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
     ])
