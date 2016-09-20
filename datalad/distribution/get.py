@@ -33,6 +33,7 @@ from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import single_or_plural
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -247,7 +248,7 @@ class Get(Interface):
                 raise CommandNotAvailableError(
                     cmd="get", msg="Missing annex at {0}".format(ds))
 
-            lgr.info("Getting {0} files of dataset "
+            lgr.info("Getting {0} file/dir(s) of dataset "
                      "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
 
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
@@ -273,15 +274,27 @@ class Get(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was getted")
+            ui.message("Got nothing (we have it all already)")
             return
 
-        msg = linesep.join([
-            "{path} ... {suc}".format(
-                suc="ok." if item.get('success', False)
-                    else "failed. (%s)" % item.get('note', 'unknown reason'),
-                path=item.get('file'))
-            for item in res])
+        # provide summary
+        nsuccess = sum(item.get('success', False) for item in res)
+        nfailure = len(res) - nsuccess
+        msg = "Requested %d %s." % (len(res), single_or_plural("file", "files", len(res)))
+        if nsuccess:
+            msg += " Got %d. " % nsuccess
+        if nfailure:
+            msg += " Failed to get %d." % (nfailure,)
         ui.message(msg)
+
+        # if just a few or less than initially explicitly requested
+        if len(res) < 10 or len(res) <= len(args.path):
+            msg = linesep.join([
+                "{path} ... {suc}".format(
+                    suc="ok." if item.get('success', False)
+                        else "failed. (%s)" % item.get('note', 'unknown reason'),
+                    path=item.get('file'))
+                for item in res])
+            ui.message(msg)
 
 
