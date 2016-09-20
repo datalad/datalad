@@ -501,7 +501,7 @@ class GitRepo(object):
                 # times.
                 # `self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from ...`
 
-                lgr.warning("Git clone from {0} to {1}".format(url, path))
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
                 self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
                                       odbt=default_git_odbt)
                 lgr.debug("Git clone completed")

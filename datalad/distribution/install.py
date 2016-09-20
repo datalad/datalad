@@ -46,6 +46,7 @@ from datalad.support.network import is_url
 from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import knows_annex, swallow_logs
 from datalad.utils import rmtree
+from datalad.dochelpers import exc_str
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -104,6 +105,7 @@ def _get_installationpath_from_url(url):
 
 def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     """Tries to obtain a given subdataset from several meaningful locations"""
+
     # shortcut
     vcs = ds.repo
     repo = vcs.repo
@@ -168,13 +170,21 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         # conflicting with new install API
         if not subds.is_installed():
             try:
-                subds = Install.__call__(
-                    path=subds.path, source=clone_url,
-                    recursive=recursive)
-            except GitCommandError:
+                GitRepo(path=subds.path, url=clone_url, create=True)
+
+                # Note for RF'ing: The following was originally used and would
+                # currently lead to doing several things twice, like annex init,
+                # analyzing what to install where, etc. Additionally, atm
+                # recursion is done outside anyway
+                # subds = Install.__call__(
+                #     path=subds.path, source=clone_url,
+                #     recursive=recursive)
+            except GitCommandError as e:
+                lgr.debug("clone attempt failed:{0}{1}".format(linesep, exc_str(e)))
                 # TODO: failed clone might leave something behind that causes the
                 # next attempt to fail as well. Implement safe way to remove clone
                 # attempt left-overs.
+                # Note: Do in GitRepo.clone()!
                 continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
@@ -342,13 +352,13 @@ class Install(Interface):
         # installed level, since we do not know, whether this even is something
         # to install (an actual Dataset) the only thing we know would be,
         # that it is some path beneath it.
-        _install_sub = False
+        _install_known_sub = False
 
         if _install_into_ds and source is None and path is not None:
             # Check for `path` being a known subdataset:
             if path in [opj(ds.path, sub)
                         for sub in ds.get_subdatasets(recursive=True)]:
-                _install_sub = True
+                _install_known_sub = True
                 lgr.debug("Identified {0} as subdataset to "
                           "install.".format(path))
             else:
@@ -360,7 +370,7 @@ class Install(Interface):
                               "inplace into {1}.".format(path, ds))
                     source = path
 
-        if source is None and not _install_sub and path is not None:
+        if source is None and not _install_known_sub and path is not None:
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
             # subdataset.
@@ -376,7 +386,7 @@ class Install(Interface):
 
                 # `path` has a potential superdataset and is known to this
                 # candidate
-                _install_sub = True
+                _install_known_sub = True
                 _install_into_ds = True
                 ds = candidate_super_ds
 
@@ -403,6 +413,9 @@ class Install(Interface):
 
         # Possibly do conversion from source into a git-friendly url
         source_url = _get_git_url_from_source(source, none_ok=True)
+        lgr.debug("Resolved source: {0}".format(source_url))
+        # TODO: we probably need to resolve source_url, if it is a local path;
+        # expandpath, normpath, ... Where exactly is the point to do it?
 
         # derive target from source url:
         if path is None and source_url is not None:
@@ -422,17 +435,12 @@ class Install(Interface):
             raise InsufficientArgumentsError("Got no target to install to.")
 
         lgr.debug("Resolved installation target: {0}".format(path))
-
-        # TODO: expandpath()?
-        # more checks, whether something exists and what it actually is?
+        current_dataset = Dataset(path)
 
         ###########
         # we should know everything necessary by now
         # actual installation starts
         ###########
-        lgr.info("Installing {0}{1}".format(
-            path, " from %s" % source_url if source_url else ""
-        ))
 
         installed_items = []
         # FLOW GUIDE:
@@ -449,7 +457,7 @@ class Install(Interface):
 
         if _install_into_ds:
             # FLOW GUIDE: 1.
-            lgr.info("Install subdataset at: {0}".format(path))
+            lgr.info("Installing subdataset at: {0}".format(path))
 
             # express the destination path relative to the root of
             # the dataset
@@ -460,49 +468,42 @@ class Install(Interface):
             lgr.debug("Resolved installation target relative to dataset "
                       "{0}: {1}".format(ds, relativepath))
 
-            if _install_sub:
+            if _install_known_sub:
                 # FLOW_GUIDE: 1.1.
                 submodule = [sm for sm in ds.repo.get_submodules()
                              if sm.path == relativepath][0]
 
-                _install_subds_from_flexible_source(
+                current_dataset = _install_subds_from_flexible_source(
                     ds,
                     submodule.path,
                     submodule.url,
                     recursive=False)
-                #ds.repo.update_submodule(relativepath, init=True)
-
-                # TODO: use _install_subds_from_flexible instead?
-                # it calls install again, but this is based on old install.
-                # So, need to figure it out
-                # Additional note: - does always git clone + add inplace
 
             elif _install_inplace:
                 # FLOW GUIDE: 1.2.
-                _install_subds_inplace(ds, path, relpath(path, ds.path))
-                # TODO: Some success checks?
+                current_dataset = _install_subds_inplace(
+                    ds,
+                    path,
+                    relpath(path, ds.path),
+                    recursive=False)
             else:
                 # FLOW_GUIDE 1.3.
-                _install_subds_from_flexible_source(
-                    ds, relativepath,
-                    source_url, recursive=False)
-                #ds.repo.add_submodule(relativepath, url=source_url)
+                current_dataset = _install_subds_from_flexible_source(
+                    ds,
+                    relativepath,
+                    source_url,
+                    recursive=False)
         else:
             # FLOW GUIDE: 2.
-            lgr.info("Install dataset at: {0}".format(path))
+            lgr.info("Installing dataset at: {0}".format(path))
 
             # Currently assuming there is nothing at the target to deal with
             # and rely on failures raising from the git call ...
 
-            target = Dataset(path)
-
-            # TODO
-            assert(target.repo is None)
-
             # should not be the case, but we need to distinguish between failure
             # of git-clone, due to existing target and an unsuccessful clone
             # attempt. See below.
-            existed = target.path and exists(target.path)
+            existed = current_dataset.path and exists(current_dataset.path)
 
             vcs = None
             # We possibly need to consider /.git URL
@@ -516,40 +517,48 @@ class Install(Interface):
                     lgr.debug("Retrieving a dataset from URL: "
                               "{0}".format(source_url_))
                     with swallow_logs():
-                        vcs = Install._get_new_vcs(target, source_url_)
+                        vcs = Install._get_new_vcs(current_dataset, source_url_)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError:
                     lgr.debug("Failed to retrieve from URL: "
                               "{0}".format(source_url_))
-                    if not existed and target.path and exists(target.path):
+                    if not existed and current_dataset.path \
+                            and exists(current_dataset.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at "
-                                  "{}".format(target.path))
-                        rmtree(target.path)
+                                  "{}".format(current_dataset.path))
+                        rmtree(current_dataset.path)
                     if source_url_ == candidate_source_urls[-1]:
                         # Re-raise if failed even with the last candidate
                         lgr.debug("Unable to establish repository instance at "
                                   "{0} from {1}"
-                                  "".format(target.path, candidate_source_urls))
+                                  "".format(current_dataset.path,
+                                            candidate_source_urls))
                         raise
 
-            # is automagically re-evaluated in the .repo property:
-            assert(target.repo)
             # cloning done
 
         # FLOW GUIDE: All four cases done.
 
-        # in any case check whether we need to annex init the installed thing:
-        if knows_annex(path):
+        # in any case check whether we need to annex-init the installed thing:
+        if knows_annex(current_dataset.path):
             # init annex when traces of a remote annex can be detected
-            lgr.info("Initializing annex repo at %s", path)
-            AnnexRepo(path, init=True)
+            lgr.info("Initializing annex repo at %s", current_dataset.path)
+            AnnexRepo(current_dataset.path, init=True)
 
-        lgr.debug("Installation of {0} done.".format(path)) ##TODO: installed DS instead of `path`
-        current_dataset = Dataset(path)
-        installed_items.append(current_dataset)
+        lgr.debug("Installation of {0} done.".format(current_dataset))
+
+        if not current_dataset.is_installed():
+            # log error and don't report as installed item, but don't raise,
+            # since we might be in a process of recursive installation where
+            # a lot of other datasets can still be installed successfully.
+            lgr.error("Installation of {0} failed.".format(current_dataset))
+        else:
+            installed_items.append(current_dataset)
 
         # Now, recursive calls:
-        if recursive:
+        if recursive and \
+                (recursion_limit is None
+                 or (recursion_limit and recursion_limit > 0)):
             if description:
                 lgr.warning("Description can't be assigned recursively.")
             subs = [Dataset(p) for p in
@@ -558,7 +567,8 @@ class Install(Interface):
                                                     absolute=True)]
             for subds in subs:
                 if subds.is_installed():
-                    lgr.debug("subdataset {0} already installed. Skipped.".format(subds))
+                    lgr.debug("subdataset {0} already installed."
+                              " Skipped.".format(subds))
                 else:
                     rec_installed = Install.__call__(
                         path=subds.path,
@@ -585,10 +595,9 @@ class Install(Interface):
                     d.get(curdir)
 
         # everything done => save changes:
-        if save and _install_into_ds:
-            # Note: The only possible changes are installed subdatasets.
-            # This means: We have something to save only, if we installed into
-            # a dataset.
+        if save and _install_into_ds and not _install_known_sub:
+            # Note: The only possible changes are installed subdatasets, we
+            # didn't know before.
             lgr.info("Saving changes to {0}".format(ds))
             ds.save(
                 message='[DATALAD] installed subdataset{0}:{1}'.format(
