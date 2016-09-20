@@ -123,9 +123,7 @@ class Ls(Interface):
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content,
                           **kw)
-        elif lexists(loc):
-            if not Dataset(loc).is_installed():
-                raise ValueError("No dataset at %s" % loc)
+        elif lexists(loc) and Dataset(loc).is_installed():
             return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
         else:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
