@@ -231,6 +231,11 @@ class Get(Interface):
                                           "from path {1}".format(subds_path, p))
                                 resolved_datasets[subds_path] = []
                             resolved_datasets[subds_path].append(curdir)
+        # Note: While the following is not very telling in terms of progress,
+        # it remains at info level atm to have at least some idea, what `get` is
+        # doing (in combination with "Getting x files of Dataset y") until we
+        # have a working solution for showing progress. Then it should go to
+        # debug level.
         lgr.info("Found {0} datasets to "
                  "operate on.".format(len(resolved_datasets)))
         # TODO:
@@ -238,15 +243,18 @@ class Get(Interface):
         # annex_opts
         # annex_get_opts
 
-        # the actual calls:
+        # now we are ready to actually get the stuff
+
+        found_an_annex = False
         global_results = []
+        # the actual calls:
         for ds_path in resolved_datasets:
             cur_ds = Dataset(ds_path)
             # needs to be an annex:
             if not isinstance(cur_ds.repo, AnnexRepo):
-                raise CommandNotAvailableError(
-                    cmd="get", msg="Missing annex at {0}".format(ds))
-
+                lgr.debug("Found no annex at {0}. Skipped.".format(cur_ds))
+                continue
+            found_an_annex = True
             lgr.info("Getting {0} files of dataset "
                      "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
 
@@ -262,6 +270,9 @@ class Get(Interface):
                         relpath(opj(ds_path, local_results[i]['file']), ds.path)
 
             global_results.extend(local_results)
+
+        if not found_an_annex:
+            lgr.warning("Found no annex. Could not perform any get operation.")
         return global_results
 
     @staticmethod

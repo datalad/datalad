@@ -591,8 +591,9 @@ class Install(Interface):
         if get_data:
             for d in installed_items:
                 lgr.debug("Getting data of {0}".format(d))
-                if isinstance(d.repo, AnnexRepo):
-                    d.get(curdir)
+                d.get(curdir,
+                      recursive=recursive,
+                      recursion_limit=recursion_limit)
 
         # everything done => save changes:
         if save and _install_into_ds and not _install_known_sub:
