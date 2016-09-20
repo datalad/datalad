@@ -30,7 +30,7 @@ lgr = getLogger('datalad.api.download-url')
 
 
 class DownloadURL(Interface):
-    """Download a content using DataLad's downloader
+    """Download content
 
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication detail maintained by
