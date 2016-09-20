@@ -27,8 +27,9 @@ CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 
 
 class CrawlInit(Interface):
-    """
-    Allows user to specify template and function to generate a pipeline
+    """Initialize crawling configuration
+
+    Allows to specify template and function to generate a crawling pipeline
 
     Examples:
 

@@ -9,12 +9,14 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
+from operator import itemgetter
 from six import PY2
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
+from datalad.dochelpers import exc_str
 import os
 from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -187,21 +189,81 @@ def test_aggregation(path):
             raise SkipTest
 
         import pyld
-        from datalad.api import search_datasets
+        from datalad.api import search
 
-        res = list(clone.search_datasets('.*'))
+        assert_equal(len(list(clone.search('mother'))), 1)
+        assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
+
+        child_res = list(clone.search('child'))
+        assert_equal(len(child_res), 2)
+        # should yield (location, report) tuples
+        assert_equal(list(map(itemgetter(0), child_res)), ['sub', 'sub/subsub'])
+
+        # without report_matched, we are getting none of the fields
+        assert(all([not x for x in map(itemgetter(1), child_res)]))
+        # but we would get all if asking for '*'
+        assert(all([len(x) >= 9
+                    for x in map(itemgetter(1),
+                                 list(clone.search('child', report='*')))]))
+        # but we would get only the matching name if we ask for report_matched
+        assert_equal(
+            set(map(lambda x: tuple(x[1].keys()),
+                    clone.search('child', report_matched=True))),
+            set([('name',)])
+        )
+        # and the additional field we might have asked with report
+        assert_equal(
+            set(map(lambda x: tuple(sorted(x[1].keys())),
+                    clone.search('child', report_matched=True,
+                                 report=['type']))),
+            set([('name', 'type')])
+        )
+        # and if we ask report to be 'empty', we should get no fields
+        child_res_empty = list(clone.search('child', report=''))
+        assert_equal(len(child_res_empty), 2)
+        assert_equal(
+            set(map(lambda x: tuple(x[1].keys()), child_res_empty)),
+            set([tuple()])
+        )
+
+        # more tests on returned paths:
+        assert_equal(list(map(itemgetter(0),
+                              clone.search('datalad'))),
+                     ['.', 'sub', 'sub/subsub'])
+        # if we clone subdataset and query for value present in it and its kid
+        assert_equal(list(map(itemgetter(0),
+                              clone.install('sub').search('datalad'))),
+                     ['.', 'subsub'])
+
+        # Test 'and' for multiple search entries
+        assert_equal(len(list(clone.search(['child', 'bids']))), 2)
+        assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
+        assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
+
+        res = list(clone.search('.*', regex=True))  # with regex
         assert_equal(len(res), 3)  # one per dataset
-        assert_equal(len(list(clone.search_datasets('grandchild.*'))), 1)
+
+        # we do search, not match
+        assert_equal(len(list(clone.search('randchild', regex=True))), 1)
+        assert_equal(len(list(clone.search(['gr.nd', 'ch.ld'], regex=True))), 1)
+        assert_equal(len(list(clone.search('randchil.', regex=True))), 1)
+        assert_equal(len(list(clone.search('^randchild.*', regex=True))), 0)
+        assert_equal(len(list(clone.search('^grandchild.*', regex=True))), 1)
+        assert_equal(len(list(clone.search('grandchild'))), 1)
 
     # do here to prevent pyld from being needed
     except SkipTest:
         raise SkipTest
-    except ImportError:
-        raise SkipTest
-    except pyld.jsonld.JsonLdError as e:
+    except ImportError as exc:
+        raise SkipTest(exc_str(exc))
+    except pyld.jsonld.JsonLdError as exc:
         if PY2:
-            raise e
-        # pyld code is not ready for Python 3.5 it seems (see: #756)
+            raise
+        #
+        raise SkipTest(
+            "pyld code is not ready for Python 3.5 it seems (see: #756): %s"
+            % exc_str(exc)
+        )
         pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe

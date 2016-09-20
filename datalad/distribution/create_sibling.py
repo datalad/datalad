@@ -40,14 +40,13 @@ from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
 
-lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
+lgr = logging.getLogger('datalad.distribution.create_sibling')
 
 
-class CreatePublicationTargetSSHWebserver(Interface):
-    """Create empty dataset(s) on a web server via SSH.
+class CreateSibling(Interface):
+    """Create dataset(s)'s sibling (e.g., on a web server).
 
-    They can then serve as a target for the `publish` command, once added as a
-    sibling.
+    Those (empty) datasets can then serve as a target for the `publish` command.
     """
 
     _params_ = dict(
@@ -138,7 +137,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureStr() | EnsureBool()),)
 
     @staticmethod
-    @datasetmethod(name='create_publication_target_sshwebserver')
+    @datasetmethod(name='create_sibling')
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
@@ -279,13 +278,13 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # don't (re-)initialize dataset if existing == reconfigure
             if not only_reconfigure:
                 # init git repo
-                if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
+                if not CreateSibling.init_remote_repo(path, ssh, shared,
                                                                             datasets[current_dspath]):
                     continue
 
             # check git version on remote end
             lgr.info("Adjusting remote git configuration")
-            remote_git_version = CreatePublicationTargetSSHWebserver.get_remote_git_version(ssh)
+            remote_git_version = CreateSibling.get_remote_git_version(ssh)
             if remote_git_version and remote_git_version >= "2.4":
                 # allow for pushing to checked out branch
                 try:
@@ -306,7 +305,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dspath])
+                CreateSibling.create_postupdate_hook(path, ssh, datasets[current_dspath])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
@@ -321,7 +320,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.info("Uploading web interface to %s" % path)
                 at_root = False
                 try:
-                    CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh, shared)
+                    CreateSibling.upload_web_interface(path, ssh, shared)
                 except CommandError as e:
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))

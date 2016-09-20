@@ -17,7 +17,7 @@ from os.path import relpath
 from git.exc import GitCommandError
 
 from ..dataset import Dataset
-from datalad.api import publish, install, create_publication_target_sshwebserver
+from datalad.api import publish, install, create_sibling
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -78,9 +78,9 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 # recent enough git since then we expect an error msg to be spit out
 from datalad.support.external_versions import external_versions
 assert_create_sshwebserver = (
-    assert_no_errors_logged(create_publication_target_sshwebserver)
+    assert_no_errors_logged(create_sibling)
     if external_versions['cmd:git'] >= '2.4'
-    else create_publication_target_sshwebserver
+    else create_sibling
 )
 
 @skip_ssh
@@ -94,7 +94,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     target_path = opj(target_rootpath, "basic")
     with swallow_logs(new_level=logging.ERROR) as cml:
-        create_publication_target_sshwebserver(
+        create_sibling(
             dataset=source,
             target="local_target",
             sshurl="ssh://localhost",
@@ -257,7 +257,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         # And let's test without explicit dataset being provided
         with chpwd(source.path):
             #assert_create_sshwebserver(
-            create_publication_target_sshwebserver(
+            create_sibling(
                 target=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
