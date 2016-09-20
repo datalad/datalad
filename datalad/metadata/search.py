@@ -119,11 +119,12 @@ class Search(Interface):
                         "Dataset installed under %s.  "
                         "Perform further operations using that dataset"
                         % installed.path)
-                    for r in installed.search(
+                    for loc, r in installed.search(
                             match,
                             report=report, report_matched=report_matched,
                             format=format, regex=regex):
-                        yield r
+                        full_loc = opj(installed.path, loc)
+                        yield full_loc, r
                     return
                 else:
                     reraise(*exc_info)
