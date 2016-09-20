@@ -63,15 +63,17 @@ def _rst_underline(text, markup):
     return text + '\n' + markup * len(text)
 
 
-def single_or_plural(single, plural, n):
+def single_or_plural(single, plural, n, include_count=False):
     """Little helper to spit out single or plural version of a word.
     """
     ni = int(n)
+    msg = "%d " % ni if include_count else ""
     if ni > 1 or ni == 0:
         # 1 forest, 2 forests, 0 forests
-        return plural
+        return msg + plural
     else:
-        return single
+        return msg + single
+
 
 def handle_docstring(text, polite=True):
     """Take care of empty and non existing doc strings."""
