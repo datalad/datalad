@@ -25,6 +25,7 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
+from datalad.interface.common_opts import verbose
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -33,6 +34,7 @@ from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import single_or_plural
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -95,7 +97,8 @@ class Get(Interface):
         recursion_limit=recursion_limit,
         git_opts=git_opts,
         annex_opts=annex_opts,
-        annex_get_opts=annex_get_opts)
+        annex_get_opts=annex_get_opts,
+        verbose=verbose)
 
     # Note: May be use 'git annex find --not --in here' to have a list of all
     # files to actually get and give kind of a progress in terms of number
@@ -111,7 +114,8 @@ class Get(Interface):
             recursion_limit=None,
             git_opts=None,
             annex_opts=None,
-            annex_get_opts=None):
+            annex_get_opts=None,
+            verbose=False):
 
         # check parameters:
         if path is None:
@@ -255,7 +259,7 @@ class Get(Interface):
                 lgr.debug("Found no annex at {0}. Skipped.".format(cur_ds))
                 continue
             found_an_annex = True
-            lgr.info("Getting {0} files of dataset "
+            lgr.info("Getting {0} file/dir(s) of dataset "
                      "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
 
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
@@ -284,15 +288,27 @@ class Get(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was getted")
+            ui.message("Got nothing")
             return
 
-        msg = linesep.join([
-            "{path} ... {suc}".format(
-                suc="ok." if item.get('success', False)
-                    else "failed. (%s)" % item.get('note', 'unknown reason'),
-                path=item.get('file'))
-            for item in res])
+        # provide summary
+        nsuccess = sum(item.get('success', False) for item in res)
+        nfailure = len(res) - nsuccess
+        msg = "Tried to get %d %s." % (len(res), single_or_plural("file", "files", len(res)))
+        if nsuccess:
+            msg += " Got %d. " % nsuccess
+        if nfailure:
+            msg += " Failed to get %d." % (nfailure,)
         ui.message(msg)
+
+        # if just a few or less than initially explicitly requested
+        if len(res) < 10 or args.verbose:
+            msg = linesep.join([
+                "{path} ... {suc}".format(
+                    suc="ok." if item.get('success', False)
+                        else "failed. (%s)" % item.get('note', 'unknown reason'),
+                    path=item.get('file'))
+                for item in res])
+            ui.message(msg)
 
 

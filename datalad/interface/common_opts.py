@@ -97,3 +97,8 @@ nosave_opt = Parameter(
     action="store_false",
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
+
+verbose = Parameter(
+    args=("-v", "--verbose",),
+    action="store_true",
+    doc="""print out more detailed information while executing a command""")
