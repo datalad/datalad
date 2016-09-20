@@ -125,7 +125,7 @@ class Get(Interface):
             path = [path]
 
         # resolve path(s):
-        lgr.info("Resolving paths ...")
+        lgr.debug("Resolving paths ...")
         resolved_paths = [resolve_path(p, dataset) for p in path]
 
         # resolve base dataset:
@@ -134,7 +134,7 @@ class Get(Interface):
         lgr.debug("Resolved dataset: %s" % ds)
 
         # resolve possible subdatasets:
-        lgr.info("Resolving (sub-)datasets ...")
+        lgr.debug("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
         for p in resolved_paths:
             # Note: For explicitly given paths we do consider

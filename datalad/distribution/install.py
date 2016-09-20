@@ -590,7 +590,7 @@ class Install(Interface):
         # get the content of installed (sub-)datasets:
         if get_data:
             for d in installed_items:
-                lgr.info("Getting data of {0}".format(d))
+                lgr.debug("Getting data of {0}".format(d))
                 if isinstance(d.repo, AnnexRepo):
                     d.get(curdir)
 
