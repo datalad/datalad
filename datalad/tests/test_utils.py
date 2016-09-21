@@ -129,6 +129,13 @@ def test_swallow_logs_assert():
         cm.assert_logged("something")
         cm.assert_logged(level="INFO")
         cm.assert_logged("something", level="INFO")
+
+        # even with regex = False should match above
+        cm.assert_logged("something", regex=False)
+        cm.assert_logged(level="INFO", regex=False)
+        cm.assert_logged("something", level="INFO", regex=False)
+
+        # different level
         assert_raises(AssertionError,
                       cm.assert_logged, "something", level="DEBUG")
         assert_raises(AssertionError, cm.assert_logged, "else")

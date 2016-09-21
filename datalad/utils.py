@@ -682,7 +682,7 @@ def swallow_logs(new_level=None, file_=None):
             if not file_:
                 rmtemp(out_name)
 
-        def assert_logged(self, msg=None, level=None, **kwargs):
+        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
             """Provide assertion on either a msg was logged at a given level
 
             If neither `msg` nor `level` provided, checks if anything was logged
@@ -691,20 +691,28 @@ def swallow_logs(new_level=None, file_=None):
             Parameters
             ----------
             msg: str, optional
-              Message (as a regular expression) to be searched.
+              Message (as a regular expression, if `regex`) to be searched.
               If no msg provided, checks if anything was logged at a given level.
             level: str, optional
               String representing the level to be logged
+            regex: bool, optional
+              If False, regular `assert_in` is used
             **kwargs: str, optional
-              Passed to `assert_re_in`
+              Passed to `assert_re_in` or `assert_in`
             """
             from datalad.tests.utils import assert_re_in
-            regex = '\[%s\] ' % level if level else "\[\S+\] "
-            if msg:
-                regex += msg
+            from datalad.tests.utils import assert_in
 
             if regex:
-                assert_re_in(regex, self.out, **kwargs)
+                match = '\[%s\] ' % level if level else "\[\S+\] "
+            else:
+                match = '[%s] ' % level if level else ''
+
+            if msg:
+                match += msg
+
+            if match:
+                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
             else:
                 assert not kwargs, "no kwargs to be passed anywhere"
                 assert self.out, "Nothing was logged!?"
