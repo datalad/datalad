@@ -679,9 +679,14 @@ def swallow_logs(new_level=None, file_=None):
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
     # set
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    swallow_handler = logging.StreamHandler(adapter.handle)
+    # we want to log levelname so we could test against it
+    swallow_handler.setFormatter(
+        logging.Formatter('%(levelname)s: %(message)s'))
+    lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
+
     if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
