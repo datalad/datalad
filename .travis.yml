@@ -55,6 +55,11 @@ matrix:
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
   - python: 2.7
+    # apparently moving symlink outside has different effects on abspath
+    # see  https://github.com/datalad/datalad/issues/878
+    env:
+    - TMPDIR="/var/tmp/sym link"
+  - python: 2.7
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
@@ -96,7 +101,7 @@ install:
   - pip install sphinx
   - pip install sphinx_rtd_theme
   # TMPDIRs
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
+  - if [ ! -z "$TMPDIR" ] && [[ $TMPDIR =~ ".*/sym link" ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
