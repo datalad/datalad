@@ -50,7 +50,7 @@ lgr = logging.getLogger('datalad.distribution.get')
 
 
 class Get(Interface):
-    """Get data content for files and/or directories of a dataset.
+    """Get data content for files/directories of a dataset.
 
     Known data locations for each requested file are evaluated and data are
     obtained from the best/fastest/cheapest location, unless a dedicated
