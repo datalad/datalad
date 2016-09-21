@@ -161,6 +161,9 @@ def test_install_datasets_root(tdir):
             eq_(result, ds)
 
         # and a third time into an existing something, that is not a dataset:
+        with open(opj(tdir, 'sub', 'a_file.txt'), 'w') as f:
+            f.write("something")
+
         with swallow_logs(new_level=logging.WARNING) as cml:
             result = install(path="sub", source="///")
             assert_in("already exists and is not an installed dataset", cml.out)

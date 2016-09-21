@@ -551,34 +551,41 @@ class Install(Interface):
                 except GitCommandError as e:
                     lgr.debug("Failed to retrieve from URL: "
                               "{0}".format(source_url_))
-
-                    # TODO: We may want to introduce a --force option to
-                    # overwrite the target.
-                    # TODO: Currently assuming if `existed` and there is a
-                    # GitCommandError means that these both things are connected.
-                    # Need newer GitPython to get stderr from GitCommandError
-                    # (already fixed within GitPython.)
-                    if existed:
-                        # rudimentary check for an installed dataset at target:
-                        # (TODO: eventually check for being the one, that this
-                        # is about)
-                        if current_dataset.is_installed():
-                            lgr.info("{0} appears to be installed already.")
-                            break
-                        else:
-                            lgr.warning("Target {0} already exists and is not an "
-                                        "installed dataset. Skipped.")
-                            # Keep original in debug output:
-                            lgr.debug("Original failure:{0}"
-                                      "{1}".format(linesep, exc_str(e)))
-                            return None
-
                     if not existed and current_dataset.path \
                             and exists(current_dataset.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at "
                                   "{}".format(current_dataset.path))
                         rmtree(current_dataset.path)
                     if source_url_ == candidate_source_urls[-1]:
+
+                        # Note: The following block is evaluated whenever we
+                        # fail even with the last try. Not nice, but currently
+                        # necessary until we get a more precise exception:
+                        ####################################
+                        # TODO: We may want to introduce a --force option to
+                        # overwrite the target.
+                        # TODO: Currently assuming if `existed` and there is a
+                        # GitCommandError means that these both things are connected.
+                        # Need newer GitPython to get stderr from GitCommandError
+                        # (already fixed within GitPython.)
+                        if existed:
+                            # rudimentary check for an installed dataset at target:
+                            # (TODO: eventually check for being the one, that this
+                            # is about)
+                            if current_dataset.is_installed():
+                                lgr.info("{0} appears to be installed already."
+                                         "".format(current_dataset))
+                                break
+                            else:
+                                lgr.warning("Target {0} already exists and is not "
+                                            "an installed dataset. Skipped."
+                                            "".format(current_dataset))
+                                # Keep original in debug output:
+                                lgr.debug("Original failure:{0}"
+                                          "{1}".format(linesep, exc_str(e)))
+                                return None
+                        ##################
+
                         # Re-raise if failed even with the last candidate
                         lgr.debug("Unable to establish repository instance at "
                                   "{0} from {1}"
@@ -645,9 +652,7 @@ class Install(Interface):
         if get_data:
             for d in installed_items:
                 lgr.debug("Getting data of {0}".format(d))
-                d.get(curdir,
-                      recursive=recursive,
-                      recursion_limit=recursion_limit)
+                d.get(curdir)
 
         # everything done => save changes:
         if save and _install_into_ds and not _install_known_sub:
