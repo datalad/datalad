@@ -140,6 +140,10 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     if sm_url.startswith('/') or is_url(sm_url):
         # this seems to be an absolute location -> take as is
         clone_urls.append(sm_url)
+        # additionally try to consider .git:
+        if not sm_url.rstrip('/').endswith('/.git'):
+            clone_urls.append(
+                '{0}/.git'.format(sm_url.rstrip('/')))
     else:
         # need to resolve relative URL
         if not remote_url:
@@ -565,6 +569,9 @@ class Install(Interface):
             # cloning done
 
         # FLOW GUIDE: All four cases done.
+        if current_dataset is None:
+            lgr.error("Installation failed.")
+            return None
 
         # in any case check whether we need to annex-init the installed thing:
         if knows_annex(current_dataset.path):

@@ -509,7 +509,7 @@ class GitRepo(object):
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
-                e_str = str(e)
+                e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
                 if re.search("Request for .*aborted.*Unable to find", str(e),
                              re.DOTALL) \

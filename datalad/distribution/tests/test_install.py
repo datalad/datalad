@@ -128,13 +128,20 @@ def test_insufficient_args():
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
-def test_install_crcns(tdir):
+@with_tempfile(mkdir=True)
+def test_install_crcns(tdir, ds_path):
     with chpwd(tdir):
         install("all-nonrecursive", source="///")
         # should not hang in infinite recursion
         install(_path_("all-nonrecursive/crcns"))
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
 
+    # again, but into existing dataset:
+    ds = create(ds_path)
+    crcns = ds.install("///crcns")
+    ok_(crcns.is_installed())
+    eq_(crcns.path, opj(ds_path, "crcns"))
+    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 @skip_if_no_network
 @use_cassette('test_install_crcns')
