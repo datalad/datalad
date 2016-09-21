@@ -42,6 +42,7 @@ from .dataset import datasetmethod
 from .dataset import require_dataset
 from .dataset import resolve_path
 from .dataset import _with_sep
+from .utils import install_necessary_subdatasets
 
 __docformat__ = 'restructuredtext'
 
@@ -141,62 +142,20 @@ class Get(Interface):
         lgr.debug("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
         for p in resolved_paths:
-            # Note: For explicitly given paths we do consider
-            # (possibly to be installed) subdatasets without `recursion_limit`.
-            # It is applied only for implicit recursion into subdatasets -
-            # see below under "if recursive"-block.
+
             try:
-                p_ds = ds.get_containing_subdataset(p, recursion_limit=None)
+                p_ds = install_necessary_subdatasets(ds, p)
             except PathOutsideRepositoryError as e:
                 lgr.warning(exc_str(e) + linesep + "Ignored.")
                 continue
-
-            # Note: A not yet existing thing might need several levels of
-            # subdataset installation until we can actually get it.
-            if not p_ds.is_installed():
-                # this is expected to be ensured by require_dataset:
-                assert p_ds != ds
-
-                # we try to install subdatasets as long as there is anything to
-                # install in between the last one installed and the actual thing
-                # to get (which is `p`):
-                cur_subds = p_ds
-                cur_par_ds = p_ds.get_superdataset()
-                assert cur_par_ds is not None
-                _install_success = False
-                while not cur_subds.is_installed():
-                    lgr.info("Installing subdataset {0} in order to get "
-                             "{1}".format(cur_subds, p))
-                    try:
-                        cur_par_ds.install(cur_subds.path)
-                        _install_success = True
-                    except Exception as e:
-                        lgr.warning("Installation of subdataset {0} failed. {1}"
-                                    " ignored.".format(cur_subds, p))
-                        lgr.debug("Installation attempt failed with exception:"
-                                  "{0}{1}".format(linesep, exc_str(e)))
-                        _install_success = False
-                        # TODO: Should we try to clean up here and remove
-                        # anything we installed along the way? (Currently needs
-                        # to wait for being clear about uninstall)
-                        # Another approach: Record what went wrong and have a
-                        # dedicated 'datalad clean' or sth
-                        break
-                    cur_par_ds = cur_subds
-
-                    # Note: PathOutsideRepositoryError should not happen here.
-                    # If so, there went something fundamentally wrong, so:
-                    # raise instead of just log a warning.
-                    cur_subds = \
-                        p_ds.get_containing_subdataset(p, recursion_limit=None)
-
-                if not _install_success:
-                    # skip p, if we didn't manage to install its containing
-                    # subdataset
-                    continue
-
-                # assign the last one installed to p_ds to associate it with p:
-                p_ds = cur_subds
+            except Exception as e:
+                # skip p, if we didn't manage to install its containing
+                # subdataset
+                lgr.warning("Installation of necessary subdatasets for {0} "
+                            "failed. Skipped.".format(p))
+                lgr.debug("Installation attempt failed with exception:"
+                          "{0}{1}".format(linesep, exc_str(e)))
+                continue
 
             if not lexists(p):
                 # Note: Skipping non-existing paths currently.

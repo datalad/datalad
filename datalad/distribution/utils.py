@@ -9,10 +9,21 @@
 """Distribution utility functions
 
 """
-from genericpath import exists, isdir
-from os.path import join as opj, islink
 
-from datalad.distribution.dataset import Dataset
+import logging
+from os import linesep
+from os.path import exists
+from os.path import lexists
+from os.path import isdir
+from os.path import join as opj
+from os.path import islink
+
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.dochelpers import exc_str
+
+from .dataset import Dataset
+
+lgr = logging.getLogger('datalad.distribution.utils')
 
 
 def _install_subds_inplace(ds, path, relativepath, name=None):
@@ -76,3 +87,63 @@ def get_git_dir(path):
             git_dir = git_dir.strip()
 
     return git_dir
+
+
+# TODO: evolved to sth similar to get_containing_subdataset. Therefore probably
+# should move into this one as an option. But: consider circular imports!
+def install_necessary_subdatasets(ds, path):
+    """Installs subdatasets of `ds`, that are necessary to obtain in order
+    to have access to `path`.
+
+    Gets the subdataset containing `path` regardless of whether or not it was
+    already installed. While doing so, installs everything necessary in between
+    the uppermost installed one and `path`.
+
+    Note: `ds` itself has to be installed.
+
+    Parameters
+    ----------
+    ds: Dataset
+    path: str
+
+    Returns
+    -------
+    Dataset
+      the last (deepest) subdataset, that was installed
+    """
+
+    assert ds.is_installed()
+
+    # figuring out what dataset to start with:
+    start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
+
+    if start_ds.is_installed():
+        return start_ds
+
+    # we try to install subdatasets as long as there is anything to
+    # install in between the last one installed and the actual thing
+    # to get (which is `path`):
+    cur_subds = start_ds
+
+    # Note, this is not necessarily `ds`:
+    cur_par_ds = start_ds.get_superdataset()
+    assert cur_par_ds is not None
+
+    while not cur_subds.is_installed():
+        lgr.info("Installing subdataset {0} in order to get "
+                 "{1}".format(cur_subds, path))
+        cur_par_ds.install(cur_subds.path)
+        cur_par_ds = cur_subds
+
+        # Note: PathOutsideRepositoryError should not happen here.
+        # If so, there went something fundamentally wrong, so raise something
+        # different, to not let the caller mix it up with a "regular"
+        # PathOutsideRepositoryError from above. (Although it could be
+        # detected via its `repo` attribute)
+        try:
+            cur_subds = \
+                cur_subds.get_containing_subdataset(path, recursion_limit=None)
+        except PathOutsideRepositoryError as e:
+            raise RuntimeError("Unexpected failure: {0}".format(exc_str(e)))
+
+    return cur_subds
