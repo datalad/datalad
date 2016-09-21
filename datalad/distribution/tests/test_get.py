@@ -11,6 +11,7 @@
 
 
 import logging
+import re
 
 from os import curdir
 from os.path import join as opj
@@ -30,6 +31,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import assert_re_in
 from datalad.utils import swallow_logs
 
 from ..dataset import Dataset
@@ -58,7 +60,12 @@ def test_get_invalid_call(path, file_outside):
                   source="some", path=None)
 
     # get on a plain git:
-    assert_raises(CommandNotAvailableError, ds.get, "some.txt")
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        # but we don't fail if not annex -- just inform
+        out = ds.get(curdir)
+        assert_in('Found no annex. Could not perform any get operation.',
+                  cml.out)
+        eq_(out, [])
 
     # make it an annex:
     AnnexRepo(path, init=True, create=True)
@@ -270,3 +277,33 @@ def test_get_install_missing_subdataset(src, path):
     ok_(subs[0].is_installed())
     ok_(subs[0].repo.file_has_content('test-annex.dat') is True)
 
+
+# @with_tree(tree={'file_in_git.txt': 'no idea',
+#                  'subds': {'file_in_annex.txt': 'content'}})
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_mixed_hierarchy(src, path):
+
+    origin = Dataset(src).create(no_annex=True)
+    origin_sub = origin.create('subds')
+    with open(opj(origin.path, 'file_in_git.txt'), "w") as f:
+        f.write('no idea')
+    with open(opj(origin_sub.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content')
+    origin.add('file_in_git.txt', to_git=True)
+    origin_sub.add('file_in_annex.txt')
+    origin.save(auto_add_changes=True)
+
+    # now, install that thing:
+    ds, subds = install(path=path, source=src, recursive=True)
+    ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
+
+    # and get:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        result = ds.get(curdir, recursive=True)
+        assert_re_in('.*Found no annex at {0}. Skipped.'.format(ds),
+                     cml.out, flags=re.DOTALL)
+        eq_(len(result), 1)
+        eq_(result[0]['file'], opj("subds", "file_in_annex.txt"))
+        ok_(result[0]['success'] is True)
+        ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
