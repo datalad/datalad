@@ -536,7 +536,6 @@ class Install(Interface):
             # attempt. See below.
             existed = current_dataset.path and exists(current_dataset.path)
 
-            vcs = None
             # We possibly need to consider /.git URL
             candidate_source_urls = [source_url]
             if source_url and not source_url.rstrip('/').endswith('/.git'):
@@ -547,12 +546,33 @@ class Install(Interface):
                 try:
                     lgr.debug("Retrieving a dataset from URL: "
                               "{0}".format(source_url_))
-                    with swallow_logs():
-                        vcs = Install._get_new_vcs(current_dataset, source_url_)
+                    GitRepo(current_dataset.path, url=source_url_, create=True)
                     break  # do not bother with other sources if succeeded
-                except GitCommandError:
+                except GitCommandError as e:
                     lgr.debug("Failed to retrieve from URL: "
                               "{0}".format(source_url_))
+
+                    # TODO: We may want to introduce a --force option to
+                    # overwrite the target.
+                    # TODO: Currently assuming if `existed` and there is a
+                    # GitCommandError means that these both things are connected.
+                    # Need newer GitPython to get stderr from GitCommandError
+                    # (already fixed within GitPython.)
+                    if existed:
+                        # rudimentary check for an installed dataset at target:
+                        # (TODO: eventually check for being the one, that this
+                        # is about)
+                        if current_dataset.is_installed():
+                            lgr.info("{0} appears to be installed already.")
+                            break
+                        else:
+                            lgr.warning("Target {0} already exists and is not an "
+                                        "installed dataset. Skipped.")
+                            # Keep original in debug output:
+                            lgr.debug("Original failure:{0}"
+                                      "{1}".format(linesep, exc_str(e)))
+                            return None
+
                     if not existed and current_dataset.path \
                             and exists(current_dataset.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at "

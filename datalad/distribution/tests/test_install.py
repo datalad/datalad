@@ -9,6 +9,8 @@
 
 """
 
+import logging
+
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -145,11 +147,24 @@ def test_install_crcns(tdir, ds_path):
 
 @skip_if_no_network
 @use_cassette('test_install_crcns')
-@with_tempfile(mkdir=True)
+@with_tree(tree={'sub':{}})
 def test_install_datasets_root(tdir):
     with chpwd(tdir):
-        install("///")
-        ok_(exists('datasets.datalad.org'))
+        ds = install("///")
+        ok_(ds.is_installed())
+        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+
+        # do it a second time:
+        with swallow_logs(new_level=logging.INFO) as cml:
+            result = install("///")
+            assert_in("appears to be installed already.", cml.out)
+            eq_(result, ds)
+
+        # and a third time into an existing something, that is not a dataset:
+        with swallow_logs(new_level=logging.WARNING) as cml:
+            result = install(path="sub", source="///")
+            assert_in("already exists and is not an installed dataset", cml.out)
+            ok_(result is None)
 
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
