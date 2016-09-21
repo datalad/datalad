@@ -22,6 +22,7 @@ from six import text_type
 from six import iteritems
 from six import reraise
 from datalad.interface.base import Interface
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from ..support.param import Parameter
@@ -29,6 +30,8 @@ from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
+
+from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad import cfg as dlcfg
 from datalad.utils import assure_list
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -109,25 +112,43 @@ class Search(Interface):
             if dataset is None:
                 # none was provided so we could ask user either he possibly wants
                 # to install our beautiful mega-duper-super-dataset?
-                if ui.yesno(
-                    title="No DataLad dataset found at current location",
-                    text="Would you like to install stock DataLad meta-dataset?"
-                ):
+                # TODO: following logic could possibly benefit other actions.
+                if exists(LOCAL_CENTRAL_PATH):
+                    central_ds = Dataset(LOCAL_CENTRAL_PATH)
+                    if central_ds.is_installed():
+                        if ui.yesno(
+                            title="No DataLad dataset found at current location",
+                            text="Would you like to search within DataLad "
+                                 "meta-dataset under % r and search within it?"
+                                  % LOCAL_CENTRAL_PATH):
+                            pass
+                    else:
+                        raise NoDatasetArgumentFound(
+                            "No DataLad dataset found at current location and "
+                            "%r already exists but does not contain installed "
+                            "dataset." % LOCAL_CENTRAL_PATH)
+                elif ui.yesno(
+                       title="No DataLad dataset found at current location",
+                       text="Would you like to install stock DataLad "
+                            "meta-dataset under %r?"
+                            % LOCAL_CENTRAL_PATH
+                       ):
                     from datalad.api import install
-                    installed = install('///')
-                    ui.message(
-                        "Dataset installed under %s.  "
-                        "Perform further operations using that dataset"
-                        % installed.path)
-                    for loc, r in installed.search(
-                            match,
-                            report=report, report_matched=report_matched,
-                            format=format, regex=regex):
-                        full_loc = opj(installed.path, loc)
-                        yield full_loc, r
-                    return
+                    central_ds = install(LOCAL_CENTRAL_PATH, source='///')
                 else:
                     reraise(*exc_info)
+
+                ui.message(
+                    "Performing search using central dataset %r"
+                    % central_ds.path
+                )
+                for loc, r in central_ds.search(
+                        match,
+                        report=report, report_matched=report_matched,
+                        format=format, regex=regex):
+                    full_loc = opj(central_ds.path, loc)
+                    yield full_loc, r
+                return
             else:
                 raise
 
