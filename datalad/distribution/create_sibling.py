@@ -134,14 +134,18 @@ class CreateSibling(Interface):
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
-            constraints=EnsureStr() | EnsureBool()),)
+            constraints=EnsureStr() | EnsureBool()),
+        ui=Parameter(
+            args=("--ui",),
+            action="store_true",
+            doc="""publish a web interface for the dataset""",),)
 
     @staticmethod
     @datasetmethod(name='create_sibling')
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 existing='error', shared=False):
+                 existing='error', shared=False, ui=False):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -316,7 +320,7 @@ class CreateSibling(Interface):
                     ssh(['git', '-C', path, 'annex', 'init', path])
 
             # publish web-interface to root dataset on publication server
-            if at_root:
+            if at_root and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 at_root = False
                 try:
