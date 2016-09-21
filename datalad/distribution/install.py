@@ -175,7 +175,8 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         # conflicting with new install API
         if not subds.is_installed():
             try:
-                GitRepo(path=subds.path, url=clone_url, create=True)
+                with swallow_logs():
+                    GitRepo(path=subds.path, url=clone_url, create=True)
 
                 # Note for RF'ing: The following was originally used and would
                 # currently lead to doing several things twice, like annex init,
@@ -538,6 +539,8 @@ class Install(Interface):
 
             # We possibly need to consider /.git URL
             candidate_source_urls = [source_url]
+            # TODO: isn't this a duplicate of above logic/implementation
+            # in _install_subds_from_flexible_source????
             if source_url and not source_url.rstrip('/').endswith('/.git'):
                 candidate_source_urls.append(
                     '{0}/.git'.format(source_url.rstrip('/')))
@@ -546,7 +549,8 @@ class Install(Interface):
                 try:
                     lgr.debug("Retrieving a dataset from URL: "
                               "{0}".format(source_url_))
-                    GitRepo(current_dataset.path, url=source_url_, create=True)
+                    with swallow_logs():
+                        GitRepo(current_dataset.path, url=source_url_, create=True)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError as e:
                     lgr.debug("Failed to retrieve from URL: "
