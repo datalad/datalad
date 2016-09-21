@@ -278,8 +278,10 @@ def test_url_samples():
         weired_str = 'weired://'
         weired_url = RI(weired_str)
         repr(weired_url)
-        assert_re_in('Parsed version of SSHRI .weired:/. differs from original .weired://.',
-                     cml.out)
+        cml.assert_logged(
+            'Parsed version of SSHRI .weired:/. '
+            'differs from original .weired://.'
+        )
         # but we store original str
         eq_(str(weired_url), weired_str)
         neq_(weired_url.as_str(), weired_str)
