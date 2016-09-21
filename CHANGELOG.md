@@ -9,7 +9,7 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.3 (???)
+## 0.3 (Sep 22, 2016) -- winter is coming
 
 Lots of everything, including but not limited to
 
@@ -17,6 +17,8 @@ Lots of everything, including but not limited to
 - initial new data providers support: [Kaggle], [BALSA], [NDA], [NITRC]
 - initial [meta-data support and management]
 - new and/or improved crawler pipelines for [BALSA], [CRCNS], [OpenfMRI]
+- refactored [install] command, now with separate [get]
+- some other commands renaming/refactoring (e.g., [create-sibling])
 
 ### 0.2.3 (Jun 28, 2016) -- busy OHBM
 
@@ -57,4 +59,7 @@ publishing
 [OpenfMRI]: http://openfmri.org
 
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
+[install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
+[get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
+[create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 
