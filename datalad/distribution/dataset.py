@@ -25,15 +25,18 @@ from functools import wraps
 import uuid
 
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import Constraint
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.dsconfig import ConfigManager
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
-from datalad.support.dsconfig import ConfigManager
+
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -62,13 +65,13 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
+    # TODO: normpath?!
     if is_explicit_path(path):
         return abspath(path)
-    if ds is None:
-        # no dataset given, use CWD as reference
-        return abspath(path)
-    else:
-        return normpath(opj(ds.path, path))
+    # no dataset given, use CWD as reference
+    # note: abspath would disregard symlink in CWD
+    top_path = getpwd() if ds is None else ds.path
+    return normpath(opj(top_path, path))
 
 
 class Dataset(object):
@@ -84,7 +87,7 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        return self.path == other.path
+        return realpath(self.path) == realpath(other.path)
 
     @property
     def path(self):
@@ -203,6 +206,8 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
+    # weakref
+    # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None):
 
@@ -360,7 +365,7 @@ class Dataset(object):
         ----------
         path : str
           Path to determine the containing (sub-)dataset for
-        recursion_limit: int
+        recursion_limit: int or None
           limit the subdatasets to take into account to the given number of
           hierarchy levels
 
@@ -376,16 +381,18 @@ class Dataset(object):
         if is_explicit_path(path):
             path = resolve_path(path, self)
             if not path.startswith(self.path):
-                # TODO: - have dedicated exception
-                raise ValueError("path {0} not in dataset {1}.".format(path, self))
+                raise PathOutsideRepositoryError(file_=path, repo=self)
             path = relpath(path, self.path)
 
+        candidates = []
         for subds in self.get_subdatasets(recursive=True,
                                           recursion_limit=recursion_limit,
                                           absolute=False):
             common = commonprefix((_with_sep(subds), _with_sep(path)))
             if common.endswith(sep) and common == _with_sep(subds):
-                return Dataset(path=opj(self.path, common))
+                candidates.append(common)
+        if candidates:
+            return Dataset(path=opj(self.path, max(candidates, key=len)))
         return self
 
 

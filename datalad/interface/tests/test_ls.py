@@ -168,7 +168,7 @@ def test_ls_json(topdir):
     ds = Dataset(topdir)
     # create some file and commit it
     open(opj(ds.path, 'subdsfile.txt'), 'w').write('123')
-    ds.install(path='subdsfile.txt')
+    ds.add(path='subdsfile.txt')
     ds.save("Hello!", version_tag=1)
     # add a subdataset
     ds.install('subds', source=topdir)

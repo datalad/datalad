@@ -358,7 +358,8 @@ class Add(Interface):
         msg = linesep.join([
             "{suc} {path}".format(
                 suc="Added" if item.get('success', False)
-                    else "Failed to add",
+                    else "Failed to add. (%s)" % item.get('note',
+                                                          'unknown reason'),
                 path=item.get('file'))
             for item in res])
         ui.message(msg)

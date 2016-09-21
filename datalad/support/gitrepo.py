@@ -53,6 +53,7 @@ from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import RI
 from .network import is_ssh
+from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -70,6 +71,7 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
+# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -426,6 +428,11 @@ class GitRepo(object):
             lgr.warning("TODO: options passed to git are currently ignored.\n"
                         "options received: %s" % git_opts)
 
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+
         # try to get a local path from `url`:
         if url is not None:
             try:
@@ -485,10 +492,16 @@ class GitRepo(object):
         url : str
         path : str
         """
-        ntries = 5  # r is not enough for robust workaround
+
+        ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                lgr.warning("Git clone from {0} to {1}".format(url, path))
+                # TODO: Seems to be an inefficiency to not assign to self.repo
+                # See __init__: We probably are instantiating that Repo several
+                # times.
+                # `self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from ...`
+
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
                 self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
                                       odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
@@ -496,7 +509,7 @@ class GitRepo(object):
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
-                e_str = str(e)
+                e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
                 if re.search("Request for .*aborted.*Unable to find", str(e),
                              re.DOTALL) \
@@ -1397,6 +1410,7 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
@@ -1413,6 +1427,7 @@ class GitRepo(object):
         kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
+        # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
@@ -1444,6 +1459,7 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def tag(self, tag):
         """Assign a tag to current commit
