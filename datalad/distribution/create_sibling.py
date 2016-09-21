@@ -137,8 +137,11 @@ class CreateSibling(Interface):
             constraints=EnsureStr() | EnsureBool()),
         ui=Parameter(
             args=("--ui",),
-            action="store_true",
-            doc="""publish a web interface for the dataset""",),)
+            metavar='false|true|html_filename',
+            doc="""publish a web interface for the dataset with an
+            optional user-specified name for the html at publication
+            target. defaults to `index.html` at dataset root""",
+            constraints=EnsureBool() | EnsureStr()),)
 
     @staticmethod
     @datasetmethod(name='create_sibling')
@@ -282,8 +285,7 @@ class CreateSibling(Interface):
             # don't (re-)initialize dataset if existing == reconfigure
             if not only_reconfigure:
                 # init git repo
-                if not CreateSibling.init_remote_repo(path, ssh, shared,
-                                                                            datasets[current_dspath]):
+                if not CreateSibling.init_remote_repo(path, ssh, shared, datasets[current_dspath]):
                     continue
 
             # check git version on remote end
@@ -324,7 +326,7 @@ class CreateSibling(Interface):
                 lgr.info("Uploading web interface to %s" % path)
                 at_root = False
                 try:
-                    CreateSibling.upload_web_interface(path, ssh, shared)
+                    CreateSibling.upload_web_interface(path, ssh, shared, ui)
                 except CommandError as e:
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
@@ -411,15 +413,13 @@ class CreateSibling(Interface):
 
         # create json command for current dataset
         json_command = r'''
-( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
-  || echo "no datalad found - skipping generation of indexes for web frontend"; \
-) &> "{}/{}"
-'''.format(
-            str(path),
-            logs_remote_dir,
-            'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
-        )
+        ( which datalad > /dev/null \
+        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
+        || echo "no datalad found - skipping generation of indexes for web frontend"; \
+        ) &> "{}/{}"
+        '''.format(str(path),
+                   logs_remote_dir,
+                   'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT)
 
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
@@ -429,12 +429,18 @@ class CreateSibling(Interface):
         ssh(['chmod', '+x', hook_remote_target])            # and make it executable
 
     @staticmethod
-    def upload_web_interface(path, ssh, shared):
+    def upload_web_interface(path, ssh, shared, ui):
         # path to web interface resources on local
         webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
-        # upload html to dataset
-        html = opj(webui_local, 'index.html')
-        ssh.copy(html, path)
+        # local html to dataset
+        html_local = opj(webui_local, "index.html")
+
+        # name and location of web-interface html on target
+        html_targetname = {True: ui, False: "index.html"}[isinstance(ui, str)]
+        html_target = opj(path, html_targetname)
+
+        # upload ui html to target
+        ssh.copy(html_local, html_target)
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
