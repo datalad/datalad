@@ -43,6 +43,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.utils import _path_
+from datalad.utils import rmtree
 
 from ..dataset import Dataset
 from ..install import _get_installationpath_from_url
@@ -340,5 +341,59 @@ def test_install_known_subdataset(src, path):
         {'test.dat', 'INFO.txt', 'test-annex.dat'})
     assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
     assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_implicit_install(src, dst):
+
+    origin_top = create(src)
+    origin_sub = origin_top.create("sub")
+    origin_subsub = origin_sub.create("subsub")
+    with open(opj(origin_top.path, "file1.txt"), "w") as f:
+        f.write("content1")
+    origin_top.add("file1.txt")
+    with open(opj(origin_sub.path, "file2.txt"), "w") as f:
+        f.write("content2")
+    origin_sub.add("file2.txt")
+    with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
+        f.write("content3")
+    origin_subsub.add("file3.txt")
+    origin_top.save(auto_add_changes=True)
+
+    # first, install toplevel:
+    ds = install(path=dst, source=src)
+    ok_(ds.is_installed())
+
+    sub = Dataset(opj(ds.path, "sub"))
+    ok_(not sub.is_installed())
+    subsub = Dataset(opj(sub.path, "subsub"))
+    ok_(not subsub.is_installed())
+
+    # install 3rd level and therefore implicitly the 2nd:
+    result = ds.install(path=opj("sub", "subsub"))
+    ok_(sub.is_installed())
+    ok_(subsub.is_installed())
+    eq_(result, subsub)
+
+    # clean up:
+    rmtree(dst, chmod_files=True)
+    ok_(not exists(dst))
+
+    # again first toplevel:
+    ds = install(path=dst, source=src)
+    ok_(ds.is_installed())
+    sub = Dataset(opj(ds.path, "sub"))
+    ok_(not sub.is_installed())
+    subsub = Dataset(opj(sub.path, "subsub"))
+    ok_(not subsub.is_installed())
+
+    # now implicit but wihtout an explicit dataset to install into
+    # (deriving from CWD):
+    with chpwd(dst):
+        result = install(path=opj("sub", "subsub"))
+        ok_(sub.is_installed())
+        ok_(subsub.is_installed())
+        eq_(result, subsub)
 
 

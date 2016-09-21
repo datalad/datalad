@@ -18,6 +18,7 @@ from os.path import join as opj
 from os.path import relpath
 from os.path import pardir
 from os.path import exists
+from os.path import lexists
 
 from six.moves.urllib.parse import quote as urlquote
 
@@ -348,11 +349,8 @@ class Install(Interface):
         # it is implicit, since `path` is an already known subdataset or an
         # existing dataset, that should be installed into the given dataset as a
         # subdataset inplace.
-        # Note: For now, we do not consider a subdataset beneath a not yet
-        # installed level, since we do not know, whether this even is something
-        # to install (an actual Dataset) the only thing we know would be,
-        # that it is some path beneath it.
         _install_known_sub = False
+        _try_implicit = False
 
         if _install_into_ds and source is None and path is not None:
             # Check for `path` being a known subdataset:
@@ -361,19 +359,29 @@ class Install(Interface):
                 _install_known_sub = True
                 lgr.debug("Identified {0} as subdataset to "
                           "install.".format(path))
-            else:
+            elif not lexists(path):
+                # it's not a known subdataset and it doesn't exist in the
+                # filesystem => path possibly points to a subdataset beneath a
+                # not yet installed one
+                _try_implicit = True
+            elif exists(path) and GitRepo.is_valid_repo(path):
                 # the only option left is an existing repo to be added inplace:
-                if exists(path) and GitRepo.is_valid_repo(path):
-                    lgr.debug("No source given, but path points to an existing "
-                              "repository and a dataset to install into was "
-                              "given. Assuming we want to install {0} "
-                              "inplace into {1}.".format(path, ds))
-                    source = path
+                lgr.debug("No source given, but path points to an existing "
+                          "repository and a dataset to install into was "
+                          "given. Assuming we want to install {0} "
+                          "inplace into {1}.".format(path, ds))
+                source = path
 
-        if source is None and not _install_known_sub and path is not None:
+
+        # and not try_implict? => nope. Same logic as known:
+        if source is None and \
+                not _install_known_sub and \
+                not _try_implicit and \
+                        path is not None:
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
-            # subdataset.
+            # subdataset or a subdataset beneath a known but not yet installed
+            # one
             # So, test for that last remaining option:
 
             # if `path` was a known subdataset to be installed, let's assume
@@ -381,15 +389,20 @@ class Install(Interface):
             assume_ds = Dataset(path)
             candidate_super_ds = assume_ds.get_superdataset()
 
-            if candidate_super_ds and candidate_super_ds != assume_ds and \
-                assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
-
-                # `path` has a potential superdataset and is known to this
-                # candidate
-                _install_known_sub = True
-                _install_into_ds = True
-                ds = candidate_super_ds
-
+            if candidate_super_ds and candidate_super_ds != assume_ds:
+                # `path` has a potential superdataset
+                if assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
+                    # candidate knows it, so we have the case of a
+                    # known subdataset:
+                    _install_known_sub = True
+                    _install_into_ds = True
+                    ds = candidate_super_ds
+                else:
+                    # it is not (yet) known to the candidate. May be there's is
+                    # a not yet installed one in between. Let's try:
+                    _try_implicit = True
+                    _install_into_ds = True
+                    ds = candidate_super_ds
             else:
                 # no match, we can't deal with that `path` argument
                 # without a `source`:
@@ -450,7 +463,9 @@ class Install(Interface):
         #        => git submodule update --init
         #   1.2. we install an existing repo as a subdataset inplace
         #        => git submodule add + magic
-        #   1.3. we install a new subdataset from an explicit source
+        #   1.3. we (recursively) try to install implicit subdatasets between
+        #        ds and path
+        #   1.4. we install a new subdataset from an explicit source
         #        => git submodule add
         # 2. we "just" install from an explicit source
         #    => git clone
@@ -486,8 +501,20 @@ class Install(Interface):
                     path,
                     relpath(path, ds.path),
                     recursive=False)
+
+            elif _try_implicit:
+                # FLOW GUIDE: 1.3.
+                from .utils import install_necessary_subdatasets
+                # TODO: due to current implementation of
+                # install_necessary_subdatasets we get only the last one returned
+                try:
+                    current_dataset = install_necessary_subdatasets(ds, path)
+                except Exception as e:
+                    lgr.error("Installation attempt for target {0} failed:"
+                              "{1}{2}".format(path, linesep, exc_str(e)))
+                    return None
             else:
-                # FLOW_GUIDE 1.3.
+                # FLOW_GUIDE 1.4.
                 current_dataset = _install_subds_from_flexible_source(
                     ds,
                     relativepath,
