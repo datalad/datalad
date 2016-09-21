@@ -145,9 +145,10 @@ def test_install_crcns(tdir, ds_path):
     eq_(crcns.path, opj(ds_path, "crcns"))
     assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
+
 @skip_if_no_network
 @use_cassette('test_install_crcns')
-@with_tree(tree={'sub':{}})
+@with_tree(tree={'sub': {}})
 def test_install_datasets_root(tdir):
     with chpwd(tdir):
         ds = install("///")

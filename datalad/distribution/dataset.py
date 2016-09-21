@@ -68,11 +68,10 @@ def resolve_path(path, ds=None):
     # TODO: normpath?!
     if is_explicit_path(path):
         return abspath(path)
-    if ds is None:
-        # no dataset given, use CWD as reference
-        return abspath(path)
-    else:
-        return normpath(opj(ds.path, path))
+    # no dataset given, use CWD as reference
+    # note: abspath would disregard symlink in CWD
+    top_path = getpwd() if ds is None else ds.path
+    return normpath(opj(top_path, path))
 
 
 class Dataset(object):
