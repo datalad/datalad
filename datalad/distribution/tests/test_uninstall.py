@@ -314,3 +314,20 @@ def test_careless_subdataset_uninstall(path):
     eq_(ds.get_subdatasets(), ['deep1', 'deep2'])
     # and they lived happily ever after
     ok_clean_git(ds.path)
+
+
+@with_tempfile()
+def test_kill(path):
+    # nested datasets with load
+    ds = Dataset(path).create()
+    with open(opj(ds.path, "file.dat"), 'w') as f:
+        f.write("load")
+    ds.repo.add("file.dat")
+    subds1 = ds.create('deep1')
+    eq_(sorted(ds.get_subdatasets()), ['deep1'])
+    ok_clean_git(ds.path)
+
+    # and we fail to uninstall since content can't be dropped
+    assert_raises(CommandError, ds.uninstall)
+    eq_(ds.uninstall(kill=True), [path])
+    ok_(not exists(path))
