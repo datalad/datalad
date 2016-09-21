@@ -110,14 +110,14 @@ def test_swallow_logs(logfile):
         lgr.log(8, "very heavy debug")
         eq_(cm.out, '')  # not even visible at level 9
         lgr.log(9, "debug1")
-        eq_(cm.out, 'debug1\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')  # not even visible at level 9
     with swallow_logs(new_level=9, file_=logfile) as cm:
         eq_(cm.out, '')
         lgr.info("next info")
     from datalad.tests.utils import ok_file_has_content
-    ok_file_has_content(logfile, "next info", strip=True)
+    ok_file_has_content(logfile, "[INFO] next info", strip=True)
 
 
 def test_swallow_logs_assert():
