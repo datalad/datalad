@@ -120,6 +120,29 @@ def test_swallow_logs(logfile):
     ok_file_has_content(logfile, "next info", strip=True)
 
 
+def test_swallow_logs_assert():
+    lgr = logging.getLogger('datalad.tests')
+    with swallow_logs(new_level=9) as cm:
+        # nothing was logged so should fail
+        assert_raises(AssertionError, cm.assert_logged)
+        lgr.info("something")
+        cm.assert_logged("something")
+        cm.assert_logged(level="INFO")
+        cm.assert_logged("something", level="INFO")
+        assert_raises(AssertionError,
+                      cm.assert_logged, "something", level="DEBUG")
+        assert_raises(AssertionError, cm.assert_logged, "else")
+
+        cm.assert_logged("some.hing", level="INFO")  # regex ;-)
+        # does match
+        assert_raises(AssertionError,
+                      cm.assert_logged, "ome.hing", level="INFO")
+        # but we can change it
+        cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we can continue doing checks after we left the cm block
+    cm.assert_logged("some.hing", level="INFO", match=False)
+
+
 def _check_setup_exceptionhook(interactive):
     old_exceptionhook = sys.excepthook
 
