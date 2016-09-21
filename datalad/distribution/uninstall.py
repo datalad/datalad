@@ -145,6 +145,14 @@ class Uninstall(Interface):
             for example when removing entire datasets completely. Such changes are not
             recoverable, use with care""",
             action="store_true",),
+        kill=Parameter(
+            args=("--kill",),
+            action="store_true",
+            doc="""**WARNING -- extremely dangerous**. It will simply force remove,
+            without consideration of being a dataset, a file, or a directory or
+            any other option given to uninstall.  To be used only with full
+            awareness of its consequences"""
+        ),
         if_dirty=if_dirty_opt,
     )
 
@@ -158,6 +166,7 @@ class Uninstall(Interface):
             recursive=False,
             remove_history=False,
             check=True,
+            kill=False,
             if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
@@ -171,7 +180,7 @@ class Uninstall(Interface):
             raise ValueError("`remove_history` flag, requires `remove_handles` flag")
 
         if not remove_data and not remove_handles:
-            raise ValueError("instructured to neither drop data, nor remove handles: cannot perform")
+            raise ValueError("instructed to neither drop data, nor remove handles: cannot perform")
 
         results = []
 
@@ -187,6 +196,13 @@ class Uninstall(Interface):
         # XXX Important to resolve against `dataset` input argument, and
         # not against the `ds` resolved dataset
         path = [resolve_path(p, dataset) for p in path]
+
+        if kill:
+            lgr.warning("Force-removing %d paths", len(path))
+            for p in path:
+                rmtree(p)
+                results.append(p)
+            return results
 
         # make sure we get to an expected state
         handle_dirty_dataset(ds, if_dirty)
