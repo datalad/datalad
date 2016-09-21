@@ -226,7 +226,9 @@ def test_get_containing_subdataset(path):
     ds.add(path='test.txt')
     ds.save("Initial commit")
     subds = ds.create("sub")
+    subsubds = subds.create("subsub")
 
+    eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still

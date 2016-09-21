@@ -385,12 +385,15 @@ class Dataset(object):
                 raise PathOutsideRepositoryError(file_=path, repo=self)
             path = relpath(path, self.path)
 
+        candidates = []
         for subds in self.get_subdatasets(recursive=True,
                                           recursion_limit=recursion_limit,
                                           absolute=False):
             common = commonprefix((_with_sep(subds), _with_sep(path)))
             if common.endswith(sep) and common == _with_sep(subds):
-                return Dataset(path=opj(self.path, common))
+                candidates.append(common)
+        if candidates:
+            return Dataset(path=opj(self.path, max(candidates, key=len)))
         return self
 
 
