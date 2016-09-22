@@ -37,6 +37,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import InstallFailedError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
@@ -163,6 +164,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
                 break
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
+    success = False
     for clone_url in clone_urls:
         lgr.debug("Attempt clone of subdataset from: {0}".format(clone_url))
 
@@ -177,7 +179,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             try:
                 with swallow_logs():
                     GitRepo(path=subds.path, url=clone_url, create=True)
-
+                success = True
                 # Note for RF'ing: The following was originally used and would
                 # currently lead to doing several things twice, like annex init,
                 # analyzing what to install where, etc. Additionally, atm
@@ -200,6 +202,8 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             ds.repo.add_submodule(sm_path, url=clone_url)
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
+    if not success:
+        raise InstallFailedError("Failed to install dataset %s" % ds)
 
 
 # TODO:  git_clone options
@@ -551,7 +555,7 @@ class Install(Interface):
                 except Exception as e:
                     lgr.error("Installation attempt for target {0} failed:"
                               "{1}{2}".format(path, linesep, exc_str(e)))
-                    return None
+                    raise
             else:
                 # FLOW_GUIDE 1.4.
                 current_dataset = _install_subds_from_flexible_source(
