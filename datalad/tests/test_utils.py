@@ -148,6 +148,8 @@ def test_swallow_logs_assert():
         cm.assert_logged("some.hing", level="INFO", match=False)
     # and we can continue doing checks after we left the cm block
     cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we indeed logged something
+    cm.assert_logged(match=False)
 
 
 def _check_setup_exceptionhook(interactive):
