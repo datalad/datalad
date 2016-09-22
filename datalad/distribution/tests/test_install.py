@@ -23,6 +23,7 @@ from datalad.api import install
 from datalad.consts import DATASETS_TOPURL
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import InstallFailedError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
@@ -431,3 +432,10 @@ def test_implicit_install(src, dst):
         eq_(result, subsub)
 
 
+@with_tempfile(mkdir=True)
+def test_failed_install(dspath):
+    ds = create(dspath)
+    assert_raises(InstallFailedError,
+                  ds.install,
+                  path="sub",
+                  source="http://nonexistingreallyanything.somewhere/bla")
