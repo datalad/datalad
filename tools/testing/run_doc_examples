@@ -16,7 +16,8 @@ topdir=$(dirname `which $0 | xargs readlink -f `)/../..
 cd $topdir
 
 export DATALAD_RUN_CMDLINE_TESTS=1
+export PS4=+
 grep -l DATALAD_RUN_CMDLINE_TESTS docs/examples/* 2>/dev/null \
 | while read t; do
-    bash $t
+    bash -x $t
 done
