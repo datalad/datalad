@@ -124,7 +124,6 @@ def test_guess_dot_git():
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
-    assert_raises(TypeError, install, [])
     assert_raises(InsufficientArgumentsError, install, description="some")
 
 
@@ -439,3 +438,30 @@ def test_failed_install(dspath):
                   ds.install,
                   path="sub",
                   source="http://nonexistingreallyanything.somewhere/bla")
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_list(path, top_path):
+
+    # we want to be able to install several things, if these are known
+    # (no 'source' allowed). Therefore first toplevel:
+    ds = install(path=top_path, source=path, recursive=False)
+    ok_(ds.is_installed())
+    sub1 = Dataset(opj(top_path, 'subm 1'))
+    sub2 = Dataset(opj(top_path, 'subm 2'))
+    ok_(not sub1.is_installed())
+    ok_(not sub2.is_installed())
+
+    # fails, when `source` is passed:
+    assert_raises(ValueError, ds.install,
+                  path=['subm 1', 'subm 2'],
+                  source='something')
+
+    # now should work:
+    result = ds.install(path=['subm 1', 'subm 2'])
+    ok_(sub1.is_installed())
+    ok_(sub2.is_installed())
+    eq_(set([i.path for i in result]), {sub1.path, sub2.path})
+
+

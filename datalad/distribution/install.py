@@ -46,7 +46,9 @@ from datalad.support.network import URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
 from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import knows_annex, swallow_logs
+from datalad.utils import knows_annex
+from datalad.utils import swallow_logs
+from datalad.utils import assure_list
 from datalad.utils import rmtree
 from datalad.dochelpers import exc_str
 
@@ -249,12 +251,13 @@ class Install(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
+            metavar='PATH',
             doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
             path will be derived from the URL similar to :command:`git
             clone`""",
-            nargs="?",
+            nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
@@ -291,14 +294,44 @@ class Install(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
-        lgr.debug(
-            "Installation attempt started. path=%r, source=%r, dataset=%r, "
-            "get_data=%r, description=%r, recursive=%r, recursion_limit=%r, "
-            "git_opts=%r, git_clone_opts=%r, annex_opts=%r, annex_init_opt=%r",
-            path, source, dataset, get_data, description, recursive,
-            recursion_limit, git_opts, git_clone_opts, annex_opts,
-            annex_init_opts)
+        # normalize path argument to be equal when called from cmdline and
+        # python and nothing was passed into `path`
+        if path == []:
+            path = None
 
+        installed_items = []
+
+        # handle calls with multiple paths first:
+        if path and isinstance(path, list):
+            if len(path) > 1 and source is not None:
+                raise ValueError("source argument not valid when "
+                                 "installing multiple datasets.")
+            else:
+                for p in path:
+                    result = Install.__call__(
+                        path=p,
+                        source=None,
+                        dataset=dataset,
+                        get_data=get_data,
+                        description=description,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        save=save,
+                        if_dirty=if_dirty,
+                        git_opts=git_opts,
+                        git_clone_opts=git_clone_opts,
+                        annex_opts=annex_opts,
+                        annex_init_opts=annex_init_opts
+                    )
+
+                    installed_items += assure_list(result)
+
+                if len(installed_items) == 1:
+                    return installed_items[0]
+                else:
+                    return installed_items
+
+        # now the 'usual' flow with single `path`argument:
         # shortcut
         ds = dataset
 
@@ -381,8 +414,6 @@ class Install(Interface):
                           "inplace into {1}.".format(path, ds))
                 source = path
 
-
-        # and not try_implict? => nope. Same logic as known:
         if source is None and \
                 not _install_known_sub and \
                 not _try_implicit and \
@@ -390,7 +421,11 @@ class Install(Interface):
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
             # subdataset or a subdataset beneath a known but not yet installed
-            # one
+            # one or it is an existing and installed dataset, that is requested
+            # to be installed again (but with recursive or get-data)
+
+
+
             # So, test for that last remaining option:
 
             # if `path` was a known subdataset to be installed, let's assume
@@ -464,7 +499,6 @@ class Install(Interface):
         # actual installation starts
         ###########
 
-        installed_items = []
         # FLOW GUIDE:
         # four cases:
         # 1. install into a dataset
@@ -508,8 +542,7 @@ class Install(Interface):
                 current_dataset = _install_subds_inplace(
                     ds,
                     path,
-                    relpath(path, ds.path),
-                    recursive=False)
+                    relpath(path, ds.path))
 
             elif _try_implicit:
                 # FLOW GUIDE: 1.3.
