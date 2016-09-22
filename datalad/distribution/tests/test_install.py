@@ -124,7 +124,6 @@ def test_guess_dot_git():
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
-    assert_raises(TypeError, install, [])
     assert_raises(InsufficientArgumentsError, install, description="some")
 
 
