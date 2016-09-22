@@ -455,6 +455,8 @@ class GitRepo(object):
 
         # TODO: somehow do more extensive checks that url and path don't point
         #       to the same location
+
+        self.repo = None
         if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
@@ -472,14 +474,15 @@ class GitRepo(object):
                 lgr.error(exc_str(e))
                 raise
         else:
-            try:
-                self.repo = self.cmd_call_wrapper(Repo, path)
-                lgr.debug("Using existing Git repository at {0}".format(path))
-            except (GitCommandError,
-                    NoSuchPathError,
-                    InvalidGitRepositoryError) as e:
-                lgr.error("%s: %s" % (type(e), str(e)))
-                raise
+            if self.repo is None:
+                try:
+                    self.repo = self.cmd_call_wrapper(Repo, path)
+                    lgr.debug("Using existing Git repository at {0}".format(path))
+                except (GitCommandError,
+                        NoSuchPathError,
+                        InvalidGitRepositoryError) as e:
+                    lgr.error("%s: %s" % (type(e), str(e)))
+                    raise
 
     def clone(self, url, path):
         """Clone url into path
@@ -496,14 +499,9 @@ class GitRepo(object):
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                # TODO: Seems to be an inefficiency to not assign to self.repo
-                # See __init__: We probably are instantiating that Repo several
-                # times.
-                # `self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from ...`
-
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                                  odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
                 # TODO: more arguments possible: ObjectDB etc.

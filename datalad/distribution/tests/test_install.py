@@ -23,6 +23,7 @@ from datalad.api import install
 from datalad.consts import DATASETS_TOPURL
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import InstallFailedError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
@@ -123,7 +124,6 @@ def test_guess_dot_git():
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
-    assert_raises(TypeError, install, [])
     assert_raises(InsufficientArgumentsError, install, description="some")
 
 
@@ -133,7 +133,15 @@ def test_insufficient_args():
 @with_tempfile(mkdir=True)
 def test_install_crcns(tdir, ds_path):
     with chpwd(tdir):
-        install("all-nonrecursive", source="///")
+        with swallow_logs(new_level=logging.INFO) as cml:
+            install("all-nonrecursive", source="///")
+            # since we didn't log decorations such as log level atm while
+            # swallowing so lets check if exit code is returned or not
+            # I will test both
+            assert_not_in('ERROR', cml.out)
+            # below one must not fail alone! ;)
+            assert_not_in('with exit code', cml.out)
+
         # should not hang in infinite recursion
         install(_path_("all-nonrecursive/crcns"))
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
@@ -421,5 +429,39 @@ def test_implicit_install(src, dst):
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
         eq_(result, subsub)
+
+
+@with_tempfile(mkdir=True)
+def test_failed_install(dspath):
+    ds = create(dspath)
+    assert_raises(InstallFailedError,
+                  ds.install,
+                  path="sub",
+                  source="http://nonexistingreallyanything.somewhere/bla")
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_list(path, top_path):
+
+    # we want to be able to install several things, if these are known
+    # (no 'source' allowed). Therefore first toplevel:
+    ds = install(path=top_path, source=path, recursive=False)
+    ok_(ds.is_installed())
+    sub1 = Dataset(opj(top_path, 'subm 1'))
+    sub2 = Dataset(opj(top_path, 'subm 2'))
+    ok_(not sub1.is_installed())
+    ok_(not sub2.is_installed())
+
+    # fails, when `source` is passed:
+    assert_raises(ValueError, ds.install,
+                  path=['subm 1', 'subm 2'],
+                  source='something')
+
+    # now should work:
+    result = ds.install(path=['subm 1', 'subm 2'])
+    ok_(sub1.is_installed())
+    ok_(sub2.is_installed())
+    eq_(set([i.path for i in result]), {sub1.path, sub2.path})
 
 

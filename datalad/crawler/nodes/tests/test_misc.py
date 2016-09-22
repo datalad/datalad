@@ -465,7 +465,7 @@ def _test_debug(msg, args=()):
         with swallow_logs(new_level=logging.INFO) as cml:
             list(d1(data))
             set_trace.assert_called_once_with()
-            assert_re_in(msg, cml.out)
+            cml.assert_logged(msg, level='INFO')
 
 
 def test_debug():

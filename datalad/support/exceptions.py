@@ -139,6 +139,11 @@ class RemoteNotAvailableError(CommandError):
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
 
+
+class InstallFailedError(CommandError):
+    """Generic exception to raise whenever `install` command fails"""
+    pass
+
 # TODO:
 # PathOutsideRepositoryError
 # test_annexrepo.py:763

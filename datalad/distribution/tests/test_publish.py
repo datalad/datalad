@@ -9,6 +9,7 @@
 
 """
 
+import logging
 import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
@@ -29,6 +30,8 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_not_in
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -109,7 +112,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
     sub1_target.checkout("TMP", ["-b"])
-    sub2_target = GitRepo(sub2_pub, create=True)
+    sub2_target = AnnexRepo(sub2_pub, create=True)
     sub2_target.checkout("TMP", ["-b"])
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
     sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
@@ -117,7 +120,12 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2.add_remote("target", sub2_pub)
 
     # publish recursively
-    res = publish(dataset=source, to="target", recursive=True)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res = publish(dataset=source, to="target", recursive=True)
+        assert_not_in(
+            'forced update', cml.out,
+            "we probably haven't merged git-annex before pushing"
+        )
 
     # testing result list
     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
