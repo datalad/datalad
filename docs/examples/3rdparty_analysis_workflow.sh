@@ -52,13 +52,25 @@ cd myanalysis
 # work with structural MRI data from the `studyforrest project`_, a public
 # brain imaging data resource. These data are made available through GitHub_,
 # so Bob can simply install the relevant dataset from this service and into
-# his own dataset.
+# his own dataset:
 #
 # .. _studyforrest project: http://studyforrest.org
 # .. _github: https://github.com
 #%
 
 datalad install -d . --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+
+#%
+# and see that the forrest_structural was registered as a git submodule, which
+# is a :term:`subdataset` of his myanalysis dataset, but no data was fetched
+# (``datalad ls -L`` provides size_installed/total_size column):
+#%
+
+# mostly for a test
+grep src/forrest_structural .gitmodules
+# to demonstrate ls
+datalad ls -r -L .
+
 
 #%
 # Bob has decided to collect all data inputs for his project in a subdirectory
@@ -102,7 +114,7 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 #%
 
 mkdir code
-echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "nib-ls src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # In order to definitively document which data file his analysis needs at this
@@ -200,7 +212,7 @@ datalad get result.txt
 # She can modify Bob's code to help him with his analysis...
 #%
 
-echo "file -L src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # ... and execute it.
