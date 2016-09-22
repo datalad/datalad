@@ -375,7 +375,8 @@ class Dataset(object):
         """
 
         if recursion_limit is not None and (recursion_limit < 1):
-            lgr.warning("recursion limit < 1 (%s) always results in self.")
+            lgr.warning("recursion limit < 1 (%s) always results in self.",
+                        recursion_limit)
             return self
 
         if is_explicit_path(path):
