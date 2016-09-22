@@ -133,7 +133,15 @@ def test_insufficient_args():
 @with_tempfile(mkdir=True)
 def test_install_crcns(tdir, ds_path):
     with chpwd(tdir):
-        install("all-nonrecursive", source="///")
+        with swallow_logs(new_level=logging.INFO) as cml:
+            install("all-nonrecursive", source="///")
+            # since we didn't log decorations such as log level atm while
+            # swallowing so lets check if exit code is returned or not
+            # I will test both
+            assert_not_in('ERROR', cml.out)
+            # below one must not fail alone! ;)
+            assert_not_in('with exit code', cml.out)
+
         # should not hang in infinite recursion
         install(_path_("all-nonrecursive/crcns"))
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
