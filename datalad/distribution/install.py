@@ -295,6 +295,40 @@ class Install(Interface):
             recursion_limit, git_opts, git_clone_opts, annex_opts,
             annex_init_opts)
 
+        # handle calls with multiple paths first:
+        already_done = []
+        if path:
+            if isinstance(path, list):
+                _cnt = len(path)
+                if _cnt == 0 :
+                    path = None
+                elif _cnt == 1:
+                    path = path[0]
+                else:
+                    if source is not None:
+                        raise ValueError("source argument not valid when "
+                                         "installing multiple datasets.")
+                    for p in path:
+                        result = Install.__call__(
+                            path=p,
+                            source=None,
+                            dataset=dataset,
+                            get_data=get_data,
+                            description=description,
+                            recursive=recursive,
+                            recursion_limit=recursion_limit,
+                            save=save,
+                            if_dirty=if_dirty,
+                            git_opts=git_opts,
+                            git_clone_opts=git_clone_opts,
+                            annex_opts=annex_opts,
+                            annex_init_opts=annex_init_opts
+                        )
+                        if isinstance(result, list):
+                            already_done.extend(result)
+                        else:
+                            already_done.append(result)
+
         # shortcut
         ds = dataset
 
@@ -669,6 +703,9 @@ class Install(Interface):
                     linesep + linesep.join([str(i) for i in installed_items])),
                 auto_add_changes=False,
                 recursive=False)
+
+        # add results from list handling at the very beginning:
+        installed_items.extend(already_done)
 
         if len(installed_items) == 1:
             return installed_items[0]
