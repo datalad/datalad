@@ -208,6 +208,25 @@ def test_install_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
 
+    # installing it again, shouldn't matter:
+    with swallow_logs(new_level=logging.INFO) as cml1:
+        ds = install(path=path, source=src)
+        assert_in("{0} appears to be installed already.".format(ds), cml1.out)
+        ok_(ds.is_installed())
+
+    # neither should installing just the installed one (without source):
+    with swallow_logs(new_level=logging.INFO) as cml2:
+        ds = install(path=path)
+        ok_(False, "DEBUG:\n%s" % cml2.out)
+        assert_in("{0} appears to be installed already.".format(ds), cml.out)
+        ok_(ds.is_installed())
+
+    # but we can apply additional action:
+    ds = install(path=path, get_data=True)
+    if isinstance(origin.repo, AnnexRepo):
+        ok_(ds.repo.file_has_content('test-annex.dat') is True)
+
+
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
