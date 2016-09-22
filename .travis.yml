@@ -100,6 +100,8 @@ install:
   # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
   - pip install sphinx
   - pip install sphinx_rtd_theme
+  # Specifically needed for tests here (e.g. example scripts testing)
+  - pip install nibabel
   # TMPDIRs
   - if [ ! -z "$TMPDIR" ] && [[ $TMPDIR =~ ".*/sym link" ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
