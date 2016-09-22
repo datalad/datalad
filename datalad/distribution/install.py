@@ -46,7 +46,9 @@ from datalad.support.network import URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
 from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import knows_annex, swallow_logs
+from datalad.utils import knows_annex
+from datalad.utils import swallow_logs
+from datalad.utils import assure_list
 from datalad.utils import rmtree
 from datalad.dochelpers import exc_str
 
@@ -254,7 +256,7 @@ class Install(Interface):
             interpreted as the source URL of a dataset and a destination
             path will be derived from the URL similar to :command:`git
             clone`""",
-            nargs="?",
+            nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
@@ -299,40 +301,39 @@ class Install(Interface):
             recursion_limit, git_opts, git_clone_opts, annex_opts,
             annex_init_opts)
 
-        # handle calls with multiple paths first:
-        already_done = []
-        if path:
-            if isinstance(path, list):
-                _cnt = len(path)
-                if _cnt == 0 :
-                    path = None
-                elif _cnt == 1:
-                    path = path[0]
-                else:
-                    if source is not None:
-                        raise ValueError("source argument not valid when "
-                                         "installing multiple datasets.")
-                    for p in path:
-                        result = Install.__call__(
-                            path=p,
-                            source=None,
-                            dataset=dataset,
-                            get_data=get_data,
-                            description=description,
-                            recursive=recursive,
-                            recursion_limit=recursion_limit,
-                            save=save,
-                            if_dirty=if_dirty,
-                            git_opts=git_opts,
-                            git_clone_opts=git_clone_opts,
-                            annex_opts=annex_opts,
-                            annex_init_opts=annex_init_opts
-                        )
-                        if isinstance(result, list):
-                            already_done.extend(result)
-                        else:
-                            already_done.append(result)
+        installed_items = []
 
+        # handle calls with multiple paths first:
+        if path and isinstance(path, list):
+            if len(path) > 1 and source is not None:
+                raise ValueError("source argument not valid when "
+                                 "installing multiple datasets.")
+            else:
+                for p in path:
+                    result = Install.__call__(
+                        path=p,
+                        source=None,
+                        dataset=dataset,
+                        get_data=get_data,
+                        description=description,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        save=save,
+                        if_dirty=if_dirty,
+                        git_opts=git_opts,
+                        git_clone_opts=git_clone_opts,
+                        annex_opts=annex_opts,
+                        annex_init_opts=annex_init_opts
+                    )
+
+                    installed_items += assure_list(result)
+
+                if len(installed_items) == 1:
+                    return installed_items[0]
+                else:
+                    return installed_items
+
+        # now the 'usual' flow with single `path`argument:
         # shortcut
         ds = dataset
 
@@ -415,8 +416,6 @@ class Install(Interface):
                           "inplace into {1}.".format(path, ds))
                 source = path
 
-
-        # and not try_implict? => nope. Same logic as known:
         if source is None and \
                 not _install_known_sub and \
                 not _try_implicit and \
@@ -498,7 +497,6 @@ class Install(Interface):
         # actual installation starts
         ###########
 
-        installed_items = []
         # FLOW GUIDE:
         # four cases:
         # 1. install into a dataset
@@ -542,8 +540,7 @@ class Install(Interface):
                 current_dataset = _install_subds_inplace(
                     ds,
                     path,
-                    relpath(path, ds.path),
-                    recursive=False)
+                    relpath(path, ds.path))
 
             elif _try_implicit:
                 # FLOW GUIDE: 1.3.
@@ -707,9 +704,6 @@ class Install(Interface):
                     linesep + linesep.join([str(i) for i in installed_items])),
                 auto_add_changes=False,
                 recursive=False)
-
-        # add results from list handling at the very beginning:
-        installed_items.extend(already_done)
 
         if len(installed_items) == 1:
             return installed_items[0]
