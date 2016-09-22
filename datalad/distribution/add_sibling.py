@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from collections import OrderedDict
 from os.path import join as opj, abspath, basename
 
 from datalad.dochelpers import exc_str
@@ -99,19 +100,21 @@ class AddSibling(Interface):
         assert(ds.repo is not None)
 
         ds_basename = basename(ds.path)
-        repos = {
-            ds_basename: {'repo': ds.repo}
-        }
+        repos = OrderedDict()
+        repos[ds_basename] = {'repo': ds.repo}
+
         if recursive:
             for subds_name in ds.get_subdatasets(recursive=True):
                 subds_path = opj(ds.path, subds_name)
                 subds = Dataset(subds_path)
+                lgr.debug("Adding sub-dataset %s for adding a sibling",
+                          subds_path)
                 if not subds.is_installed():
-                    lgr.info("Skipping adding sibling for %s since it is not installed",
-                             subds)
+                    lgr.info("Skipping adding sibling for %s since it "
+                             "is not installed", subds)
                     continue
                 repos[ds_basename + '/' + subds_name] = {
-#                repos[subds_name] = {
+                    #                repos[subds_name] = {
                     'repo': GitRepo(subds_path, create=False)
                 }
 
@@ -184,13 +187,14 @@ class AddSibling(Interface):
                 cmd = ["git", "remote", "set-url", "--push", name,
                        repos[repo]['pushurl']]
                 runner.run(cmd, cwd=repos[repo]['repo'].path)
-            if isinstance(ds.repo, AnnexRepo):
+            if isinstance(repo, AnnexRepo):
                 # we need to check if added sibling an annex, and try to enable it
                 # another part of the fix for #463 and #432
                 try:
-                    ds.repo.enable_remote(name)
+                    repo.enable_remote(name)
                 except CommandError as exc:
-                    lgr.info("Failed to enable annex remote %s, could be a pure git" % name)
+                    lgr.info("Failed to enable annex remote %s, "
+                             "could be a pure git" % name)
                     lgr.debug("Exception was: %s" % exc_str(exc))
             successfully_added.append(repo)
 
