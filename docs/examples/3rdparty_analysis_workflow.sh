@@ -4,11 +4,11 @@ set -e
 
 # BOILERPLATE
 
-BOBS_HOME=$(readlink -f $(mktemp -d datalad_demo_bob.XXXX))
-ALICES_HOME=$(readlink -f $(mktemp -d datalad_demo_alice.XXXX))
+BOBS_HOME=$(readlink -f "$(mktemp --tmpdir -d datalad_demo_bob.XXXX)")
+ALICES_HOME=$(readlink -f "$(mktemp --tmpdir -d datalad_demo_alice.XXXX)")
 
 # Fake an SSH server on this machine for the purpose of this demo
-SERVER_URL=localhost:$(readlink -f "$(mktemp -u -d datalad_demo_testpub.XXXX)")
+SERVER_URL=localhost:$(readlink -f "$(mktemp --tmpdir -u -d datalad_demo_testpub.XXXX)")
 
 #% EXAMPLE START
 #
@@ -32,7 +32,7 @@ SERVER_URL=localhost:$(readlink -f "$(mktemp -u -d datalad_demo_testpub.XXXX)")
 #%
 
 # enter Bob's home directory
-HOME=$BOBS_HOME
+HOME="$BOBS_HOME"
 cd ~
 git config --global --add user.name Bob
 git config --global --add user.email bob@example.com
@@ -159,7 +159,7 @@ datalad save -m "First analysis results"
 # as Bob.
 #% 
 
-HOME=$ALICES_HOME
+HOME="$ALICES_HOME"
 cd
 git config --global --add user.name Alice
 git config --global --add user.email alice@example.com
@@ -172,7 +172,7 @@ git config --global --add user.email alice@example.com
 # :term:`subdataset` he had:
 #%
 # TODO: needs to get --description to avoid confusion
-datalad install -r --source $BOBS_HOME/myanalysis bobs_analysis
+datalad install -r --source "$BOBS_HOME/myanalysis" bobs_analysis
 cd bobs_analysis
 
 #%
@@ -240,7 +240,7 @@ datalad save -a -m "Alice always helps"
 
 HOME=$BOBS_HOME
 cd ~/myanalysis
-datalad add-sibling alice $ALICES_HOME/bobs_analysis
+datalad add-sibling alice "$ALICES_HOME/bobs_analysis"
 
 #%
 # Once registered, Bob can update his dataset based on Alice's version, and merge
