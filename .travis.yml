@@ -116,6 +116,8 @@ script:
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
+  # Run doc examples "tests"
+  - tools/testing/run_doc_examples
 
 after_success:
   - codecov
