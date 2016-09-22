@@ -117,6 +117,9 @@ script:
   # Run javascript tests
   - grunt test --verbose
   # Run doc examples "tests"
+  # but for that we need first to install the beast and minimal installation
+  # must be sufficient
+  - pip install .
   - tools/testing/run_doc_examples
 
 after_success:
