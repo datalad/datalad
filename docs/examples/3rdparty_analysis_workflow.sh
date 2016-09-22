@@ -249,7 +249,7 @@ datalad save -a -m "Alice always helps"
 # dataset via an http URL, or an SSH login and path.
 #%
 
-HOME=$BOBS_HOME
+HOME="$BOBS_HOME"
 cd ~/myanalysis
 datalad add-sibling alice "$ALICES_HOME/bobs_analysis"
 
@@ -279,7 +279,7 @@ datalad get result.txt
 #%
 
 # this generated sibling for the dataset and all subdatasets
-datalad create-sibling --recursive $SERVER_URL public
+datalad create-sibling --recursive "$SERVER_URL" public
 
 #%
 # Once the remote sibling is created and registered under the name "public",
