@@ -123,7 +123,8 @@ script:
   # but for that we need first to install the beast and minimal installation
   # must be sufficient
   - pip install .
-  - tools/testing/run_doc_examples
+  # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
+  - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
   - codecov
