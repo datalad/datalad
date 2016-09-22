@@ -130,8 +130,7 @@ datalad add --to-git code
 # At this point, datalad is aware of all changes that were made to the dataset
 # and all the changes Bob made were automatically recorded, as you could easily
 # check with ``git log`` command.
-
-#%
+#
 # As Bob's analysis is completely scripted, he can now run it in full:
 #%
 
