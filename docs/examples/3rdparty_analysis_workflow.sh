@@ -7,6 +7,9 @@ set -e
 BOBS_HOME=$(readlink -f $(mktemp -d datalad_demo_bob.XXXX))
 ALICES_HOME=$(readlink -f $(mktemp -d datalad_demo_alice.XXXX))
 
+# Fake an SSH server on this machine for the purpose of this demo
+SERVER_URL=localhost:$(readlink -f "$(mktemp -u -d datalad_demo_testpub.XXXX)")
+
 #% EXAMPLE START
 #
 # A typical data management workflow
@@ -264,8 +267,6 @@ datalad get result.txt
 # to which the dataset can by published (repeatedly).
 #%
 
-# Fake an SSH server on this machine for the purpose of this demo
-SERVER_URL=localhost:$(readlink -f "$(mktemp --tmpdir -u -d datalad_demo_testpub.XXXX)")
 # this generated sibling for the dataset and all subdatasets
 datalad create-sibling --recursive $SERVER_URL public
 
