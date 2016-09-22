@@ -251,6 +251,7 @@ class Install(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
+            metavar='PATH',
             doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
@@ -293,13 +294,10 @@ class Install(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
-        lgr.debug(
-            "Installation attempt started. path=%r, source=%r, dataset=%r, "
-            "get_data=%r, description=%r, recursive=%r, recursion_limit=%r, "
-            "git_opts=%r, git_clone_opts=%r, annex_opts=%r, annex_init_opt=%r",
-            path, source, dataset, get_data, description, recursive,
-            recursion_limit, git_opts, git_clone_opts, annex_opts,
-            annex_init_opts)
+        # normalize path argument to be equal when called from cmdline and
+        # python and nothing was passed into `path`
+        if path == []:
+            path = None
 
         installed_items = []
 
@@ -423,7 +421,11 @@ class Install(Interface):
             # we have no source and don't have a dataset to install into.
             # could be a single positional argument, that points to a known
             # subdataset or a subdataset beneath a known but not yet installed
-            # one
+            # one or it is an existing and installed dataset, that is requested
+            # to be installed again (but with recursive or get-data)
+
+
+
             # So, test for that last remaining option:
 
             # if `path` was a known subdataset to be installed, let's assume
