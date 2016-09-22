@@ -99,7 +99,7 @@ class CreateSibling(Interface):
             args=('--target-url',),
             metavar='URL',
             doc=""""public" access URL of the to-be-created target dataset(s)
-                (default: `sshurl`). Accessiblity of this URL determines the
+                (default: `sshurl`). Accessibility of this URL determines the
                 access permissions of potential consumers of the dataset.
                 As with `target_dir`, templates (same set of placeholders)
                 are supported.\n""",
@@ -355,6 +355,7 @@ class CreateSibling(Interface):
                          url=target_url,
                          pushurl=target_pushurl,
                          recursive=recursive,
+                         fetch=True,
                          force=existing in {'replace'})
 
         # TODO: Return value!?

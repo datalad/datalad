@@ -76,6 +76,10 @@ class AddSibling(Interface):
             action="store_true",
             doc="""recursively add the sibling `name` to all subdatasets of
                 `dataset`""",),
+        fetch=Parameter(
+            args=("--fetch",),
+            action="store_true",
+            doc="""fetch the sibling after adding"""),
         force=Parameter(
             args=("--force", "-f",),
             action="store_true",
@@ -85,7 +89,7 @@ class AddSibling(Interface):
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(name=None, url=None, dataset=None,
-                 pushurl=None, recursive=False, force=False):
+                 pushurl=None, recursive=False, fetch=False, force=False):
 
         # TODO: Detect malformed URL and fail?
 
@@ -126,43 +130,45 @@ class AddSibling(Interface):
 
         replicate_local_structure = "%NAME" not in url
 
-        for repo in repos:
+        for repo_name in repos:
+            repo = repos[repo_name]
             if not replicate_local_structure:
-                repos[repo]['url'] = url.replace("%NAME",
-                                                 repo.replace("/", "-"))
+                repo['url'] = url.replace("%NAME",
+                                           repo_name.replace("/", "-"))
                 if pushurl:
-                    repos[repo]['pushurl'] = pushurl.replace("%NAME",
-                                                             repo.replace("/",
+                    repo['pushurl'] = pushurl.replace("%NAME",
+                                                       repo_name.replace("/",
                                                                           "-"))
             else:
-                repos[repo]['url'] = url
+                repo['url'] = url
                 if pushurl:
-                    repos[repo]['pushurl'] = pushurl
+                    repo['pushurl'] = pushurl
 
-                if repo != ds_basename:
-                    repos[repo]['url'] = _urljoin(repos[repo]['url'], repo[len(ds_basename)+1:])
+                if repo_name != ds_basename:
+                    repo['url'] = _urljoin(repo['url'], repo_name[len(ds_basename) + 1:])
                     if pushurl:
-                        repos[repo]['pushurl'] = _urljoin(repos[repo]['pushurl'], repo[len(ds_basename)+1:])
+                        repo['pushurl'] = _urljoin(repo['pushurl'], repo_name[len(ds_basename) + 1:])
 
         # collect existing remotes:
         already_existing = list()
         conflicting = list()
-        for repo in repos:
-            if name in repos[repo]['repo'].get_remotes():
-                already_existing.append(repo)
+        for repo_name in repos:
+            repo = repos[repo_name]['repo']
+            if name in repo.get_remotes():
+                already_existing.append(repo_name)
                 lgr.debug("""Remote '{0}' already exists
-                          in '{1}'.""".format(name, repo))
+                          in '{1}'.""".format(name, repo_name))
 
-                existing_url = repos[repo]['repo'].get_remote_url(name)
+                existing_url = repo.get_remote_url(name)
                 existing_pushurl = \
-                    repos[repo]['repo'].get_remote_url(name, push=True)
+                    repo.get_remote_url(name, push=True)
 
-                if repos[repo]['url'].rstrip('/') != existing_url.rstrip('/') \
+                if repos[repo_name]['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and
-                            repos[repo]['pushurl'].rstrip('/') !=
+                            repos[repo_name]['pushurl'].rstrip('/') !=
                                     existing_pushurl.rstrip('/')) \
                         or (pushurl and not existing_pushurl):
-                    conflicting.append(repo)
+                    conflicting.append(repo_name)
 
         if not force and conflicting:
             raise RuntimeError("Sibling '{0}' already exists with conflicting"
@@ -171,22 +177,29 @@ class AddSibling(Interface):
 
         runner = Runner()
         successfully_added = list()
-        for repo in repos:
-            if repo in already_existing:
-                if repo not in conflicting:
-                    lgr.debug("Skipping {0}. Nothing to do.".format(repo))
+        for repo_name in repos:
+            repo = repos[repo_name]['repo']
+            if repo_name in already_existing:
+                if repo_name not in conflicting:
+                    lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
-                cmd = ["git", "remote", "set-url", name, repos[repo]['url']]
-                runner.run(cmd, cwd=repos[repo]['repo'].path)
+                cmd = ["git", "remote", "set-url", name, repos[repo_name]['url']]
             else:
                 # add the remote
-                cmd = ["git", "remote", "add", name, repos[repo]['url']]
-                runner.run(cmd, cwd=repos[repo]['repo'].path)
+                cmd = ["git", "remote", "add", name, repos[repo_name]['url']]
+            runner.run(cmd, cwd=repo.path)
             if pushurl:
                 cmd = ["git", "remote", "set-url", "--push", name,
-                       repos[repo]['pushurl']]
-                runner.run(cmd, cwd=repos[repo]['repo'].path)
+                       repos[repo_name]['pushurl']]
+                runner.run(cmd, cwd=repo.path)
+
+            if fetch:
+                # fetch the remote so we are up to date
+                lgr.debug("Fetching sibling %s of %s", name, repo_name)
+                repo.fetch(name)
+
+            assert isinstance(repo, GitRepo)  # just against silly code
             if isinstance(repo, AnnexRepo):
                 # we need to check if added sibling an annex, and try to enable it
                 # another part of the fix for #463 and #432
@@ -196,7 +209,7 @@ class AddSibling(Interface):
                     lgr.info("Failed to enable annex remote %s, "
                              "could be a pure git" % name)
                     lgr.debug("Exception was: %s" % exc_str(exc))
-            successfully_added.append(repo)
+            successfully_added.append(repo_name)
 
         return successfully_added
 
