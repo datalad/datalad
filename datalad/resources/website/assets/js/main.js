@@ -205,8 +205,9 @@ function directory(jQuery, md5) {
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {
       var api = this.api();
-      // all tables should have ../ parent path
-      if (!parent)
+      // all tables should have ../ parent path except webinterface root
+      var current_loc = absolute_url(getParameterByName('dir')).replace(/\/?$/, '') + '/';
+      if (!parent && loc().pathname !== current_loc)
         api.row.add({name: "..", repo: "", date: "", path: "", type: "annex", size: ""}).draw();
       // add click handlers
       api.$('tr').click(function() {
