@@ -1,11 +1,13 @@
-datalad (0.3~rc1+git39-g3bf92d5-1) experimental; urgency=medium
+datalad (0.3-1) unstable; urgency=medium
 
-  * New upstream rc snapshot from 0.3rc1-38-g7a5b4da
+  * New upstream release
+    - should resolve FTBFS due to incompatibilities with new git version
+      (Closes: #835525)
   * Install bash completions under /usr/share/bash-completion/completions
     (TODO: deploy them for zsh)
   * debian/copyright - updated to reflect added components
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 23 Sep 2016 00:17:28 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 23 Sep 2016 09:22:01 -0400
 
 datalad (0.2.3+git843-g18c597d-1) UNRELEASED; urgency=medium
 
