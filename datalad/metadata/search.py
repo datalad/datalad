@@ -101,7 +101,7 @@ class Search(Interface):
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match, dataset, report=None, report_matched=False, format='custom', regex=False):
+    def __call__(match, dataset=None, report=None, report_matched=False, format='custom', regex=False):
 
         lgr.debug("Initiating search for match=%r and dataset %r",
                   match, dataset)
@@ -110,10 +110,17 @@ class Search(Interface):
         except NoDatasetArgumentFound:
             exc_info = sys.exc_info()
             if dataset is None:
+                if not ui.is_interactive:
+                    raise NoDatasetArgumentFound(
+                        "No DataLad dataset found at current location and "
+                        "current UI is not interactive to assist in installing "
+                        "one.  Please run `search` command interactively or "
+                        "under an existing DataLad dataset"
+                    )
                 # none was provided so we could ask user either he possibly wants
                 # to install our beautiful mega-duper-super-dataset?
                 # TODO: following logic could possibly benefit other actions.
-                if exists(LOCAL_CENTRAL_PATH):
+                if os.path.exists(LOCAL_CENTRAL_PATH):
                     central_ds = Dataset(LOCAL_CENTRAL_PATH)
                     if central_ds.is_installed():
                         if ui.yesno(
@@ -125,8 +132,8 @@ class Search(Interface):
                     else:
                         raise NoDatasetArgumentFound(
                             "No DataLad dataset found at current location and "
-                            "%r already exists but does not contain installed "
-                            "dataset." % LOCAL_CENTRAL_PATH)
+                            "%r already exists but does not contain an "
+                            "installed dataset." % LOCAL_CENTRAL_PATH)
                 elif ui.yesno(
                        title="No DataLad dataset found at current location",
                        text="Would you like to install stock DataLad "

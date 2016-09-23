@@ -101,6 +101,10 @@ class ConsoleLog(object):
             pbar = progressbars[backend]
         return pbar(*args, out=self.out, **kwargs)
 
+    @property
+    def is_interactive(self):
+        return isinstance(self, InteractiveUI)
+
 
 def getpass_echo(prompt='Password: ', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
