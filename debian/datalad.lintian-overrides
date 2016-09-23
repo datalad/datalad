@@ -1,6 +1,6 @@
 # this package depends on the corresponding python-datalad package built form
 # the same source package. This pulls in the necessary python version with all
 # its dependencies
-datalad: python-script-but-no-python-dep usr/bin/datalad
-# indeed contains 1 compressed line - but it is as much of source of it as we have
-datalad: source-is-missing datalad/resources/website/tests/qunit/sinon-*
+datalad binary: python-script-but-no-python-dep usr/bin/datalad
+# unlikely to be ever created since are not intended for direct use by users
+datalad binary: binary-without-manpage usr/bin/git-annex-remote-*

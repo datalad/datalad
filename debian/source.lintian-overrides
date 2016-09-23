@@ -1,0 +1,2 @@
+# indeed contains 1 compressed line - but it is as much of source of it as we have
+datalad source: source-is-missing datalad/resources/website/tests/qunit/sinon-*

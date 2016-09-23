@@ -45,7 +45,7 @@ override_dh_auto_install:
 	# Building manpages. Overcoming #532 which creates some config file
 	HOME=$(CURDIR)/build python setup.py build_manpage
 	# Generating argcomplete helper for bash_completion.d
-	register-python-argcomplete datalad > debian/datalad/etc/bash_completion.d/datalad
+	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
