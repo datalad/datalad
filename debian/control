@@ -49,21 +49,19 @@ Depends:
  ${python:Depends}
 Description: data files crawler and data distribution
  DataLad is a data distribution providing access to a wide range of
- data resources already available online (initially aiming for
+ data resources already available online (initially aiming at
  neuroscience domain). Using git-annex as its backend for data
  logistics it provides following facilities
  .
-  - crawling of web sites to automatically prepare or update git-annex
+  - crawling of web sites to automatically prepare and update git-annex
     repositories with content from online websites, S3, etc
-  - command line interface for manipulation of datasets
-    (search, install, uninstall, upgrade, etc.)
+  - command line interface for manipulation of collections of datasets
+    (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get), as well as search within
+	aggregated meta-data
  .
  This package provides the command line tool.  Install without
  Recommends if you need only core functionality.
- .
- DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
- for regular user consumption.  Primarily intended for demonstrations
- and development.
 
 Package: python-datalad
 Architecture: all
@@ -101,19 +99,17 @@ Suggests:
  python-bs4
 Description: data files crawler and data distribution (Python 2)
  DataLad is a data distribution providing access to a wide range of
- data resources already available online (initially aiming for
+ data resources already available online (initially aiming at
  neuroscience domain). Using git-annex as its backend for data
  logistics it provides following facilities
  .
-  - crawling of web sites to automatically prepare or update git-annex
+  - crawling of web sites to automatically prepare and update git-annex
     repositories with content from online websites, S3, etc
-  - command line interface for manipulation of datasets
-    (search, install, uninstall, upgrade, etc.)
+  - command line interface for manipulation of collections of datasets
+    (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get), as well as search within
+	aggregated meta-data
  .
  This package installs the module for Python 2, and Recommends install
- all dependencies necessary for crawling and testing.
+ all dependencies necessary for crawling, publishing, and testing.
  If you need base functionality, install without Recommends.
- .
- DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
- for regular user consumption.  Primarily intended for demonstrations
- and development.
