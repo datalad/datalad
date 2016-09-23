@@ -10,28 +10,20 @@
 """Some additional tests for search command (some are within test_base)"""
 
 from mock import patch
-from operator import itemgetter
-from six import PY2
 from datalad.api import Dataset, aggregate_metadata, install
-from datalad.metadata import get_metadata_type, get_metadata
-from nose.tools import assert_true, assert_equal, assert_raises
+from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
 from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testsui
 from datalad.support.exceptions import NoDatasetArgumentFound
 
-from datalad.dochelpers import exc_str
-import os
 from os.path import join as opj
-from datalad.support.exceptions import InsufficientArgumentsError
-from nose import SkipTest
 
 from datalad.api import search
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.metadata import search as search_mod
+
 
 @with_testsui(interactive=False)
 @with_tempfile(mkdir=True)
