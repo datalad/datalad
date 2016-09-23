@@ -36,12 +36,7 @@ from datalad.tests.utils import ok_clean_git
 def test_add_sibling(origin, repo_path):
 
     # prepare src
-    source = install(path=repo_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(repo_path, subds), init=True,
-                  create=True).checkout("master")
+    source = install(path=repo_path, source=origin, recursive=True)[0]
 
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")

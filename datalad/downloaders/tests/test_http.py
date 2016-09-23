@@ -57,6 +57,7 @@ from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
 from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
+from ...support.network import get_url_disposition_filename
 
 
 def test_docstring():
@@ -260,11 +261,18 @@ def test_get_status_from_headers():
     assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
                  FileStatus(size=123))
 
+    filename = 'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip'
+    headers_content_disposition = {
+        'Content-Disposition':
+            'Attachment;Filename="%s"' % filename, }
     assert_equal(
-        HTTPDownloader.get_status_from_headers({
-            'Content-Disposition': 'Attachment;Filename="Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip"',
-        }).filename,
-        'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip')
+        HTTPDownloader.get_status_from_headers(headers_content_disposition).filename,
+        filename)
+
+    # since we are providing full headers -- irrelevant
+    assert_equal(get_url_disposition_filename("http://irrelevant", headers_content_disposition),
+                 filename)
+
 
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url

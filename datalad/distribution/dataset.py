@@ -18,21 +18,26 @@ from os.path import realpath
 from os.path import relpath
 from os.path import commonprefix
 from os.path import sep
+from os.path import exists
 from six import string_types
 from six import PY2
 from functools import wraps
 import uuid
 
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import Constraint
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.dsconfig import ConfigManager
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.dochelpers import exc_str
-from datalad.support.dsconfig import ConfigManager
+
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -61,13 +66,13 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
+    # TODO: normpath?!
     if is_explicit_path(path):
         return abspath(path)
-    if ds is None:
-        # no dataset given, use CWD as reference
-        return abspath(path)
-    else:
-        return normpath(opj(ds.path, path))
+    # no dataset given, use CWD as reference
+    # note: abspath would disregard symlink in CWD
+    top_path = getpwd() if ds is None else ds.path
+    return normpath(opj(top_path, path))
 
 
 class Dataset(object):
@@ -83,7 +88,7 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        return self.path == other.path
+        return realpath(self.path) == realpath(other.path)
 
     @property
     def path(self):
@@ -202,6 +207,8 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
+    # weakref
+    # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None):
 
@@ -278,93 +285,6 @@ class Dataset(object):
         else:
             return submodules
 
-    def create_subdataset(self, path,
-                          name=None,
-                          force=False,
-                          description=None,
-                          no_annex=False,
-                          annex_version=None,
-                          annex_backend='MD5E',
-                          native_metadata_type=None,
-                          git_opts=None,
-                          annex_opts=None,
-                          annex_init_opts=None):
-        """Create a subdataset within this dataset
-
-        Creates a new dataset at `path` and adds it as a subdataset to `self`.
-        `path` is required to point to a location inside the dataset `self`.
-
-        Parameters
-        ----------
-        path: str
-          path to the subdataset to be created
-        name: str
-          name of the subdataset
-        force: bool
-          enforce creation of a subdataset in a non-empty directory
-        description: str
-          a human-readable description of the dataset, that helps to identify it.
-          Note: Doesn't work with `no_annex`
-        no_annex: bool
-          whether or not to create a pure git repository
-        annex_version: str
-          version of annex repository to be used
-        annex_backend: str
-          backend to be used by annex for computing file keys
-        native_metadata_type : list(str), optional
-          meta data type labels
-        git_opts: list of str
-          cmdline options to be passed to the git executable
-        annex_opts: list of str
-          cmdline options to be passed to git-annex
-        annex_init_opts: list of str
-          cmdline options to be passed to git-annex-init
-
-        Returns
-        -------
-        Dataset
-          the newly created dataset
-        """
-
-        # get absolute path (considering explicit vs relative):
-        path = resolve_path(path, self)
-        if not realpath(path).startswith(_with_sep(realpath(self.path))):  # realpath OK
-            raise ValueError("path %s outside dataset %s" % (path, self))
-
-        subds = Dataset(path)
-
-        # create the dataset
-        subds.create(force=force,
-                     description=description,
-                     no_annex=no_annex,
-                     annex_version=annex_version,
-                     annex_backend=annex_backend,
-                     native_metadata_type=native_metadata_type,
-                     git_opts=git_opts,
-                     annex_opts=annex_opts,
-                     annex_init_opts=annex_init_opts,
-                     # Note:
-                     # adding to the superdataset is what we are doing herein!
-                     # add_to_super=True would lead to calling ourselves again
-                     # and again
-                     # While this is somewhat ugly, the issue behind this is a
-                     # necessarily slightly different logic of `create` in
-                     # comparison to other toplevel functions, which operate on
-                     # an existing dataset and possibly on subdatasets.
-                     # With `create` we suddenly need to operate on a
-                     # superdataset, if add_to_super is True.
-                     add_to_super=False)
-
-        # add it as a submodule
-        # TODO: clean that part and move it in here (Dataset)
-        #       or call install to add the thing inplace
-        from .install import _install_subds_inplace
-        return _install_subds_inplace(
-            ds=self, path=subds.path,
-            relativepath=relpath(realpath(subds.path), realpath(self.path)),  # realpath OK
-            name=name
-        )
-
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
 #        name pattern.
@@ -407,7 +327,14 @@ class Dataset(object):
         -------
         bool
         """
-        return self.path is not None and self.repo is not None
+        was_once_installed = self.path is not None and self.repo is not None
+
+        if was_once_installed and not exists(self.repo.repo.git_dir):
+            # repo gone now, reset
+            self._repo = None
+            return False
+        else:
+            return was_once_installed
 
     def get_superdataset(self):
         """Get the dataset's superdataset
@@ -439,7 +366,7 @@ class Dataset(object):
         ----------
         path : str
           Path to determine the containing (sub-)dataset for
-        recursion_limit: int
+        recursion_limit: int or None
           limit the subdatasets to take into account to the given number of
           hierarchy levels
 
@@ -449,22 +376,25 @@ class Dataset(object):
         """
 
         if recursion_limit is not None and (recursion_limit < 1):
-            lgr.warning("recursion limit < 1 (%s) always results in self.")
+            lgr.warning("recursion limit < 1 (%s) always results in self.",
+                        recursion_limit)
             return self
 
         if is_explicit_path(path):
             path = resolve_path(path, self)
             if not path.startswith(self.path):
-                # TODO: - have dedicated exception
-                raise ValueError("path {0} not in dataset {1}.".format(path, self))
+                raise PathOutsideRepositoryError(file_=path, repo=self)
             path = relpath(path, self.path)
 
+        candidates = []
         for subds in self.get_subdatasets(recursive=True,
                                           recursion_limit=recursion_limit,
                                           absolute=False):
             common = commonprefix((_with_sep(subds), _with_sep(path)))
             if common.endswith(sep) and common == _with_sep(subds):
-                return Dataset(path=opj(self.path, common))
+                candidates.append(common)
+        if candidates:
+            return Dataset(path=opj(self.path, max(candidates, key=len)))
         return self
 
 
@@ -574,12 +504,12 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     if dataset is None:  # possible scenario of cmdline calls
         dspath = GitRepo.get_toppath(getpwd())
         if not dspath:
-            raise InsufficientArgumentsError("No dataset found")
+            raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
     lgr.debug("Resolved dataset{0}: {1}".format(
-        'for {}'.format(purpose) if purpose else '',
+        ' for {}'.format(purpose) if purpose else '',
         dataset))
 
     if check_installed and not dataset.is_installed():

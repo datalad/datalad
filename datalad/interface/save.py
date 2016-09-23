@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import abspath, join as opj, isdir, realpath, relpath
+from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -25,8 +25,9 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import _with_sep
-from datalad.distribution.install import _install_subds_inplace
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.utils import assure_list
 
 from .base import Interface
 
@@ -34,11 +35,15 @@ lgr = logging.getLogger('datalad.interface.commit')
 
 
 def untracked_subdatasets_to_submodules(ds, consider_paths):
-    _modified_flag = False
     # treat special case of still untracked subdatasets.
     # those need to become submodules now, as they are otherwise added
     # without an entry in .gitmodules, and subsequently break Git's
     # submodule functionality completely
+    _modified_flag = False
+    if not consider_paths:
+        # nothing to test
+        return False
+
     for utf in ds.repo.repo.untracked_files:
         utf_abspath = opj(ds.path, utf)
         if not isdir(utf_abspath):
@@ -60,6 +65,16 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
     return _modified_flag
 
 
+def deinit_deleted_submodules(ds):
+    # helper to inspect a repo and `deinit` all submodules that are reported
+    # as present, but the mountpoint doesn't exist
+    deleted = ds.repo.get_deleted_files()
+    for subdspath in ds.get_subdatasets(absolute=False, recursive=False):
+        if subdspath in deleted:
+            lgr.debug('deinit deleted subdataset {} in {}'.format(subdspath, ds))
+            ds.repo.deinit_submodule(subdspath)
+
+
 class Save(Interface):
     """Save the current state of a dataset
 
@@ -68,6 +83,13 @@ class Save(Interface):
     Optionally, an additional tag, such as a version, can be assigned to the
     saved state. Such tag enables straightforward retrieval of past versions
     at a later point in time.
+
+    || PYTHON >>
+    Returns
+    -------
+    commit or None
+      `None` if nothing was saved, the resulting commit otherwise.
+    << PYTHON ||
     """
 
     _params_ = dict(
@@ -108,24 +130,45 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None):
-        # XXX path resolution needs to come before dataset resolution!
+        # shortcut
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='saving')
+
+        if not ds.repo.repo.is_dirty(
+                index=True,
+                working_tree=True,
+                untracked_files=True,
+                submodules=True):
+            # if we cannot see anything dirty at all, the only things we could
+            # do is tag
+            if version_tag:
+                ds.repo.tag(version_tag)
+            # take the easy one out
+            return
+
+        # always yields list; empty if None
+        files = assure_list(files)
+
+        # before anything, let's deal with missing submodules that may have
+        # been rm'ed by the user
+        # this will not alter/amend the history of the dataset
+        deinit_deleted_submodules(ds)
+
+        # XXX path resolution needs to happen on the input argument, not the
+        # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
         # explicit dataset provided, or just a matching one resolved
         # automatically.
         # if files are provided but no dataset, we interpret them as
         # CWD-related
-        if not auto_add_changes and files is not None:
+
+        if auto_add_changes:
+            # use the dataset's base path to indiciate that everything
+            # should be saved
+            files = [ds.path]
+        else:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # shortcut
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='saving')
-
-        # use the dataset's base path to indiciate that everything
-        # should be saved
-        if auto_add_changes:
-            files = [ds.path]
 
         # track whether we modified anything, so it becomes
         # possible to decide when/what to save further down
@@ -133,7 +176,7 @@ class Save(Interface):
         _modified_flag = False
 
         _modified_flag = untracked_subdatasets_to_submodules(
-            ds, files)
+            ds, files) or _modified_flag
 
         # now we should have a complete list of submodules to potentially
         # recurse into
@@ -207,7 +250,7 @@ class Save(Interface):
         if version_tag:
             ds.repo.tag(version_tag)
 
-        return ds.repo.repo.head.commit if _modified_flag else False
+        return ds.repo.repo.head.commit if _modified_flag else None
 
     @staticmethod
     def result_renderer_cmdline(res, args):

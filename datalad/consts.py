@@ -10,6 +10,7 @@
 """
 
 from os.path import join
+from os.path import expanduser
 
 # directory containing prepared metadata of a dataset repository:
 HANDLE_META_DIR = ".datalad"
@@ -22,7 +23,19 @@ CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
+DATALAD_GIT_DIR = join('.git', 'datalad')
 
-ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')
+ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 
 DATASETS_TOPURL = "http://datasets.datalad.org/"
+
+# Centralized deployment
+LOCAL_CENTRAL_PATH = join(expanduser('~'), 'datalad')
+
+WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
+WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
+WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
+
+# Format to use for time stamps
+TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
+

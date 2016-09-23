@@ -41,6 +41,7 @@ from nose.tools import \
     raises, ok_, eq_, make_decorator
 
 from nose.tools import assert_set_equal
+from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -294,6 +295,7 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+
 def ok_git_config_not_empty(ar):
     """Helper to verify that nothing rewritten the config file"""
     # TODO: we don't support bare -- do we?
@@ -305,13 +307,13 @@ def ok_annex_get(ar, files, network=True):
 
     get passes through stderr from the ar to the user, which pollutes
     screen while running tests
+
+    Note: Currently not true anymore, since usage of --json disables
+    progressbars
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.get(files)
-        if network:
-            # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -320,8 +322,13 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+
 def ok_generator(gen):
     assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+
+assert_is_generator = ok_generator  # just an alias
+
 
 def ok_archives_caches(repopath, n=1, persistent=None):
     """Given a path to repository verify number of archives
@@ -764,7 +771,8 @@ def skip_ssh(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
-        if not os.environ.get('DATALAD_TESTS_SSH'):
+        test_ssh = os.environ.get('DATALAD_TESTS_SSH', '').lower()
+        if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
@@ -974,7 +982,7 @@ def get_most_obscure_supported_name(tdir):
 
 
 @optional_args
-def with_testsui(t, responses=None):
+def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
@@ -982,7 +990,7 @@ def with_testsui(t, responses=None):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
-            ui.set_backend('tests')
+            ui.set_backend('tests' if interactive else 'tests-noninteractive')
             if responses:
                 ui.add_responses(responses)
             ret = t(*args, **kwargs)
@@ -993,7 +1001,11 @@ def with_testsui(t, responses=None):
         finally:
             ui.set_backend(old_backend)
 
+    if not interactive and responses is not None:
+        raise ValueError("Non-interactive UI cannot provide responses")
+
     return newfunc
+
 with_testsui.__test__ = False
 
 

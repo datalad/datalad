@@ -13,6 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import logging
+import re
 import shlex
 from os import linesep
 from os.path import join as opj
@@ -50,7 +51,9 @@ from datalad.utils import updated
 from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .network import RI
 from .network import is_ssh
+from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -68,6 +71,7 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
+# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -424,6 +428,21 @@ class GitRepo(object):
             lgr.warning("TODO: options passed to git are currently ignored.\n"
                         "options received: %s" % git_opts)
 
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+
+        # try to get a local path from `url`:
+        if url is not None:
+            try:
+                if not isinstance(url, RI):
+                    url = RI(url).localpath
+                else:
+                    url = url.localpath
+            except ValueError:
+                pass
+
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
@@ -436,29 +455,13 @@ class GitRepo(object):
 
         # TODO: somehow do more extensive checks that url and path don't point
         #       to the same location
+
+        self.repo = None
         if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
-            try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
-                lgr.debug("Git clone completed")
-                # TODO: more arguments possible: ObjectDB etc.
-            except GitCommandError as e:
-                # log here but let caller decide what to do
-                lgr.error(str(e))
-                raise
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                   "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython/issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
+            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -471,14 +474,61 @@ class GitRepo(object):
                 lgr.error(exc_str(e))
                 raise
         else:
+            if self.repo is None:
+                try:
+                    self.repo = self.cmd_call_wrapper(Repo, path)
+                    lgr.debug("Using existing Git repository at {0}".format(path))
+                except (GitCommandError,
+                        NoSuchPathError,
+                        InvalidGitRepositoryError) as e:
+                    lgr.error("%s: %s" % (type(e), str(e)))
+                    raise
+
+    def clone(self, url, path):
+        """Clone url into path
+
+        Provides workarounds for known issues (e.g.
+        https://github.com/datalad/datalad/issues/785)
+
+        Parameters
+        ----------
+        url : str
+        path : str
+        """
+
+        ntries = 5  # 3 is not enough for robust workaround
+        for trial in range(ntries):
             try:
-                self.repo = self.cmd_call_wrapper(Repo, path)
-                lgr.debug("Using existing Git repository at {0}".format(path))
-            except (GitCommandError,
-                    NoSuchPathError,
-                    InvalidGitRepositoryError) as e:
-                lgr.error("%s: %s" % (type(e), str(e)))
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                                  odbt=default_git_odbt)
+                lgr.debug("Git clone completed")
+                break
+                # TODO: more arguments possible: ObjectDB etc.
+            except GitCommandError as e:
+                # log here but let caller decide what to do
+                e_str = exc_str(e)
+                # see https://github.com/datalad/datalad/issues/785
+                if re.search("Request for .*aborted.*Unable to find", str(e),
+                             re.DOTALL) \
+                        and trial < ntries - 1:
+                    lgr.info(
+                        "Hit a known issue with Git (see GH#785). Trial #%d, "
+                        "retrying",
+                        trial)
+                    continue
+                lgr.error(e_str)
                 raise
+            except ValueError as e:
+                if gitpy.__version__ == '1.0.2' and \
+                                "I/O operation on closed file" in str(e):
+                    # bug https://github.com/gitpython-developers/GitPython
+                    # /issues/383
+                    raise GitCommandError(
+                        "clone has failed, telling ya",
+                        999,  # good number
+                        stdout="%s already exists" if exists(path) else "")
+                raise  # reraise original
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -1036,8 +1086,8 @@ class GitRepo(object):
 
         Returns
         -------
-        Nothing yet.
-        TODO: Provide FetchInfo?
+        list
+            FetchInfo objects of the items fetched from remote
         """
         # TODO: options=> **kwargs):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
@@ -1049,7 +1099,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
@@ -1087,6 +1137,7 @@ class GitRepo(object):
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+        return fi_list
 
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """See fetch
@@ -1097,7 +1148,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
             tb = self.repo.active_branch.tracking_branch().name
@@ -1123,8 +1174,7 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                return remote.pull(refspec=refspec, progress=progress,
-                                      **kwargs)
+                return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
@@ -1133,6 +1183,10 @@ class GitRepo(object):
     def push(self, remote=None, refspec=None, progress=None, all_=False,
              **kwargs):
         """See fetch
+        Returns
+        -------
+        list
+            PushInfo objects of the items pushed to remote
         """
 
         if remote is None:
@@ -1141,7 +1195,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_push = self.repo.remotes
             else:
@@ -1172,12 +1226,12 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list += rm.push(refspec=refspec, progress=progress,
-                                   **kwargs)
+                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
+        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
@@ -1354,6 +1408,7 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
@@ -1370,6 +1425,7 @@ class GitRepo(object):
         kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
+        # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
@@ -1401,6 +1457,7 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def tag(self, tag):
         """Assign a tag to current commit
@@ -1461,7 +1518,12 @@ class GitRepo(object):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_deleted_files(self):
+        """return a list of paths with deleted files (deletion not yet commited)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
+                if f.split('\t')[0] == 'D']
+
 # TODO
 # remove submodule
 # status?
-

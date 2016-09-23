@@ -17,15 +17,20 @@ from os.path import isdir
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
+from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.utils import handle_dirty_dataset
+from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import is_datalad_compat_ri
+from datalad.utils import assure_list
 
 
 from .dataset import EnsureDataset
@@ -110,6 +115,8 @@ class Add(Interface):
             transport"""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        save=nosave_opt,
+        if_dirty=if_dirty_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts)
@@ -121,8 +128,10 @@ class Add(Interface):
             source=None,
             dataset=None,
             to_git=False,
+            save=True,
             recursive=False,
             recursion_limit=None,
+            if_dirty='ignore',
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
@@ -136,10 +145,9 @@ class Add(Interface):
         # When called from cmdline `path` and `source` will be a list even if
         # there is only one item.
         # Make sure we deal with the same when called via python API:
-        if path is not None and not isinstance(path, list):
-            path = [path]
-        if source and not isinstance(source, list):
-            source = [source]
+        # always yields list; empty if None
+        path = assure_list(path)
+        source = assure_list(source)
 
         # TODO: Q: are the list operations in the following 3 blocks (resolving
         #          paths, sources and datasets) guaranteed to be stable
@@ -147,22 +155,20 @@ class Add(Interface):
 
         # resolve path(s):
         # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
-        resolved_paths = []
-        if path:
-            resolved_paths = [resolve_path(p, dataset) for p in path]
+        resolved_paths = [resolve_path(p, dataset) for p in path]
 
         # must come after resolve_path()!!
         # resolve dataset:
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='adding')
+        handle_dirty_dataset(dataset, if_dirty)
 
         # resolve source(s):
         resolved_sources = []
-        if source:
-            for s in source:
-                if not is_datalad_compat_ri(s):
-                    raise ValueError("invalid source parameter: %s" % s)
-                resolved_sources.append(_get_git_url_from_source(s))
+        for s in source:
+            if not is_datalad_compat_ri(s):
+                raise ValueError("invalid source parameter: %s" % s)
+            resolved_sources.append(_get_git_url_from_source(s))
 
         # find (sub-)datasets to add things to (and fail on invalid paths):
         if recursive:
@@ -188,8 +194,8 @@ class Add(Interface):
             for p in resolved_paths:
                 if isdir(p):
                     for subds_path in \
-                      dataset.get_subdatasets(absolute=True, recursive=True,
-                                              recursion_limit=recursion_limit):
+                        dataset.get_subdatasets(absolute=True, recursive=True,
+                                                recursion_limit=recursion_limit):
                         if subds_path.startswith(_with_sep(p)):
                             resolved_datasets.append(Dataset(subds_path))
                             resolved_paths.append(curdir)
@@ -212,15 +218,15 @@ class Add(Interface):
         param_tuples = [(d if d is not None else dataset, p, s)
                         for d, p, s in param_tuples]
 
-        calls = {d.path: { # list of paths to 'git-add':
-                           'g_add': [],
-                           # list of paths to 'git-annex-add':
-                           'a_add': [],
-                           # list of sources to 'git-annex-addurl':
-                           'addurl_s': [],
-                           # list of (path, source) to
-                           # 'git-annex-addurl --file':
-                           'addurl_f': []
+        calls = {d.path: {  # list of paths to 'git-add':
+                            'g_add': [],
+                            # list of paths to 'git-annex-add':
+                            'a_add': [],
+                            # list of sources to 'git-annex-addurl':
+                            'addurl_s': [],
+                            # list of (path, source) to
+                            # 'git-annex-addurl --file':
+                            'addurl_f': []
                          } for d in [i for i, p, s in param_tuples]}
 
         for ds, p, s in param_tuples:
@@ -235,9 +241,15 @@ class Add(Interface):
                     calls[ds.path]['a_add'].append(p)
             elif not p:
                 # we have a source only
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_s'].append(s)
             else:
                 # we have a path and a source
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 calls[ds.path]['addurl_f'].append((p, s))
 
         # now do the actual add operations:
@@ -246,45 +258,88 @@ class Add(Interface):
         return_values = []
         for dspath in calls:
             ds = Dataset(dspath)
-            if calls[dspath]['g_add']:
+
+            lgr.info("Processing dataset %s ..." % ds)
+
+            # check every (sub-)dataset for annex once, since we can't add or
+            # addurl anything, if there is no annex:
+            # TODO: Q: Alternatively, just call git-annex-init if there's no
+            # annex yet and we have an annex-add/annex-addurl request?
+            _is_annex = isinstance(ds.repo, AnnexRepo)
+
+            if calls[ds.path]['g_add']:
                 return_values.extend(ds.repo.add(calls[dspath]['g_add'],
                                                  git=True,
                                                  git_options=git_opts))
             if calls[ds.path]['a_add']:
-                # TODO: annex required or call git-annex-init if there's no annex yet?
-                assert isinstance(ds.repo, AnnexRepo)
-                return_values.extend(
-                    ds.repo.add(calls[dspath]['a_add'],
-                                git=False,
-                                git_options=git_opts,
-                                annex_options=annex_opts,
-                                options=annex_add_opts))
+                if _is_annex:
+                    return_values.extend(
+                        ds.repo.add(calls[dspath]['a_add'],
+                                    git=False,
+                                    git_options=git_opts,
+                                    annex_options=annex_opts,
+                                    options=annex_add_opts
+                                    )
+                    )
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-add' for "
+                              "files {1}".format(ds, calls[dspath]['a_add']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['a_add']]
+                    )
 
             # TODO: AnnexRepo.add_urls' return value doesn't contain the created
             #       file name but the url
             if calls[ds.path]['addurl_s']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
-                assert isinstance(ds.repo, AnnexRepo)
-                return_values.extend(
-                    ds.repo.add_urls(calls[ds.path]['addurl_s'],
-                                     options=annex_add_opts,
-                                     # TODO: extra parameter for addurl?
-                                     git_options=git_opts,
-                                     annex_options=annex_opts))
+                if _is_annex:
+                    return_values.extend(
+                        ds.repo.add_urls(calls[ds.path]['addurl_s'],
+                                         options=annex_add_opts,
+                                         # TODO: extra parameter for addurl?
+                                         git_options=git_opts,
+                                         annex_options=annex_opts
+                                         )
+                    )
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
+                              "files {1}".format(ds, calls[dspath]['addurl_s']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['addurl_s']]
+                    )
+
             if calls[ds.path]['addurl_f']:
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
-                assert isinstance(ds.repo, AnnexRepo)
-                for f, u in calls[ds.path]['addurl_f']:
-                    return_values.append(
-                        ds.repo.add_url_to_file(f, u,
-                                                options=annex_add_opts,  # TODO: see above
-                                                git_options=git_opts,
-                                                annex_options=annex_opts,
-                                                batch=True))
+                if _is_annex:
+                    for f, u in calls[ds.path]['addurl_f']:
+                        return_values.append(
+                            ds.repo.add_url_to_file(f, u,
+                                                    options=annex_add_opts,  # TODO: see above
+                                                    git_options=git_opts,
+                                                    annex_options=annex_opts,
+                                                    batch=True))
+                else:
+                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
+                              "files {1}".format(ds, calls[dspath]['addurl_f']))
+                    return_values.extend(
+                        [{'file': f,
+                          'success': False,
+                          'note': "no annex at %s" % ds.path}
+                         for f in calls[dspath]['addurl_f']]
+                    )
+
+        if save and len(return_values):
+            # we got something added -> save
+            # everything we care about at this point should be staged already
+            Save.__call__(
+                message='[DATALAD] added content',
+                dataset=ds,
+                auto_add_changes=False,
+                recursive=False)
 
         return return_values
 
@@ -303,7 +358,8 @@ class Add(Interface):
         msg = linesep.join([
             "{suc} {path}".format(
                 suc="Added" if item.get('success', False)
-                    else "Failed to add",
+                    else "Failed to add. (%s)" % item.get('note',
+                                                          'unknown reason'),
                 path=item.get('file'))
             for item in res])
         ui.message(msg)

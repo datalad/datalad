@@ -10,13 +10,27 @@ import platform
 
 from glob import glob
 from os.path import sep as pathsep
+from os.path import join as opj
+from os.path import splitext
 
+from setuptools import findall
 from setuptools import setup, find_packages
 
 # manpage build imports
 from distutils.command.build_py import build_py
 from setup_support import BuildManPage, BuildRSTExamplesFromScripts
 from setup_support import get_version
+
+
+def findsome(subdir, extensions):
+    """Find files under subdir having specified extensions
+
+    Leading directory (datalad) gets stripped
+    """
+    return [
+        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
+        if splitext(f)[-1].lstrip('.') in extensions
+    ]
 
 # datalad version to be installed
 version = get_version()
@@ -43,7 +57,7 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.0.3',
+        'GitPython>=2.0.8',
         'iso8601',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
@@ -111,11 +125,8 @@ setup(
     },
     cmdclass=cmdclass,
     package_data={
-        'datalad': [
-            'resources/git_ssh.sh',
-            'resources/sshserver_cleanup_after_publish.sh',
-            'resources/sshserver_prepare_for_publish.sh',
-        ] +
-        [p.split(pathsep, 1)[1] for p in glob('datalad/downloaders/configs/*.cfg')]
+        'datalad':
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
+            findsome('downloaders/configs', {'cfg'})
     }
 )

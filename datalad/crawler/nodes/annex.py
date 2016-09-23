@@ -75,6 +75,7 @@ class initiate_dataset(object):
     def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
                  template_func=None, template_kwargs=None,
+                 add_to_super='auto',
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -98,6 +99,8 @@ class initiate_dataset(object):
           Supported by git-annex backend.  By default (if None specified),
           it is MD5E backend to improve compatibility with filesystems
           having a relatively small limit for a maximum path size
+        add_to_super : bool or 'auto', optional
+          Add to super-dataset
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the dataset crawling options -- would be passed into the corresponding
@@ -122,6 +125,7 @@ class initiate_dataset(object):
         self.branch = branch
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
         self.backend = backend
+        self.add_to_super = add_to_super
 
     def _initiate_dataset(self, path, name):
         lgr.info("Initiating dataset %s" % name)
@@ -145,16 +149,31 @@ class initiate_dataset(object):
         ds = create(
                 path=path,
                 force=False,
-                add_to_super='auto',
-                name=name,  # XXX may be not needed
                 # no_annex=False,  # TODO: add as an arg
-                no_commit=bool(backend),
+                # Passing save arg based on backend was that we need to save only if
+                #  custom backend was specified, but now with dataset id -- should always save
+                # save=not bool(backend),
                 # annex_version=None,
                 annex_backend=backend,
                 #git_opts=None,
                 #annex_opts=None,
                 #annex_init_opts=None
         )
+        if self.add_to_super:
+            # place hack from 'add-to-super' times here
+            sds = ds.get_superdataset()
+            if sds is not None:
+                from datalad.distribution.utils import _install_subds_inplace
+                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
+                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
+                _install_subds_inplace(ds=sds, path=ds.path,
+                                       relativepath=subdsrelpath)
+                # this leaves the subdataset staged in the parent
+            elif str(self.add_to_super) != 'auto':
+                raise ValueError(
+                    "Was instructed to add to super dataset but no super dataset "
+                    "was found for %s" % ds
+                )
 
         # create/AnnexRepo specification of backend does it non-persistently in .git/config
         if backend:
@@ -1053,13 +1072,28 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False, remove_unversioned=False, exclude=None):
+    def remove_other_versions(self, name=None, db=None,
+                              overlay=None, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
 
         Parameters
         ----------
+        name : str, optional
+          Name of the SingleVersionDB to consult (e.g., original name of the branch)
+        db : SingleVersionDB, optional
+          If provided, `name` must be None.
+        overlay : int or callable, optional
+          Overlay files of the next version to only replace files from the
+          previous version.  If specified as `int`, value will determine how
+          many leading levels of .-separated (e.g., of major.minor.patch)
+          semantic version format will be used to identify "unique"
+          non-overlayable version. E.g. overlay=2, would overlay all .patch
+          levels, while starting without overlay for any new major.minor version.
+          If a callable, it would be used to augment versions before identifying
+          non-overlayable version component.  So in other words `overlay=2`
+          should be identical to `overlay=lambda v: '.'.join(v.split('.')[:2])`
         remove_unversioned: bool, optional
           If there is a version defined now, remove those files which are unversioned
           i.e. not listed associated with any version
@@ -1069,12 +1103,26 @@ class Annexificator(object):
           could have been generated in `incoming` branch
         """
 
-        def _remove_other_versions(data):
-            if overlay:
-                raise NotImplementedError(overlay)
+        if overlay is None:
+            overlay_version_func = lambda x: x
+        elif isinstance(overlay, int) and not isinstance(overlay, bool):
+            overlay_version_func = lambda v: '.'.join(v.split('.')[:overlay])
+        elif hasattr(overlay, '__call__'):
+            overlay_version_func = overlay
+        else:
+            raise TypeError("overlay  must be an int or a callable. Got %s"
+                            % repr(overlay))
 
+        if db is not None and name is not None:
+            raise ValueError(
+                "Must have specified either name or version_db, not both"
+            )
+
+        def _remove_other_versions(data):
             stats = data.get('datalad_stats', None)
-            versions_db = SingleVersionDB(self.repo, name=name)
+            versions_db = SingleVersionDB(self.repo, name=name) \
+                if db is None \
+                else db
 
             current_version = versions_db.version
 
@@ -1083,25 +1131,68 @@ class Annexificator(object):
                 yield data
                 return
 
+            current_overlay_version = overlay_version_func(current_version)
+            prev_version = None
+            tracked_files = {}  # track files in case of overlaying
             for version, fpaths in iteritems(versions_db.versions):
-                # we do not care about non-versioned or current version
-                if version is None or current_version == version:
-                    continue  # skip current version
-                for fpath, vfpath in iteritems(fpaths):
+                # sanity check since we now will have assumption that versions
+                # are sorted
+                if prev_version is not None:
+                    assert(prev_version < LooseVersion(version))
+                prev_version = LooseVersion(version)
+                overlay_version = overlay_version_func(version)
+                # we do not care about non-versioned or current "overlay" version
+                #import pdb; pdb.set_trace()
+                if version is None:
+                    continue
+
+                files_to_remove = []
+                if current_overlay_version == overlay_version and \
+                    LooseVersion(version) <= LooseVersion(current_version):
+                    # the same overlay but before current version
+                    # we need to track the last known within overlay and if
+                    # current updates, remove older version
+                    for fpath, vfpath in fpaths.items():
+                        if fpath in tracked_files:
+                            files_to_remove.append(tracked_files[fpath])
+                        tracked_files[fpath] = vfpath  # replace with current one
+                    if version == current_version:
+                        # just clean out those tracked_files with the most recent versions
+                        # and remove nothing
+                        tracked_files = {}
+                else:
+                    files_to_remove = fpaths.values()
+
+                for vfpath in files_to_remove:
                     vfpathfull = opj(self.repo.path, vfpath)
-                    if lexists(vfpathfull):
-                        lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
+                    if os.path.lexists(vfpathfull):
+                        lgr.debug(
+                            "Removing %s of version %s (overlay %s). "
+                            "Current one %s (overlay %s)",
+                            vfpathfull, version, overlay_version,
+                            current_version, current_overlay_version
+                        )
                         os.unlink(vfpathfull)
 
+            assert not tracked_files, "we must not end up having tracked files"
             if remove_unversioned:
                 # it might be that we haven't 'recorded' unversioned ones at all
                 # and now got an explicit version, so we would just need to remove them all
-                # For that we need to get all files which left, and remove them unless they are part
-                # of the current version
-                current_version_files = set(versions_db.versions[current_version].values())
-                for fpath in find_files('.*', exclude=exclude, exclude_datalad=True, exclude_vcs=True):
-                    fpath = relpath(fpath, '.')  # ./bla -> bla
-                    if fpath in current_version_files:
+                # For that we need to get all files which left, and remove them unless they
+                # were a versioned file (considered above) for any version
+                all_versioned_files = set()
+                for versioned_files_ in versions_db.versions.values():
+                    all_versioned_files.update(versioned_files_.values())
+                for fpath in find_files(
+                        '.*',
+                        topdir=self.repo.path,
+                        exclude=exclude, exclude_datalad=True, exclude_vcs=True
+                    ):
+                    fpath = relpath(fpath, self.repo.path)  # ./bla -> bla
+                    if fpath in all_versioned_files:
+                        lgr.log(
+                            5, "Not removing %s file since it was versioned",
+                            fpath)
                         continue
                     lgr.log(5, "Removing unversioned %s file", fpath)
                     os.unlink(fpath)
@@ -1146,7 +1237,7 @@ class Annexificator(object):
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False, existing_tag=None, cleanup=False):
+    def finalize(self, tag=False, existing_tag=None, cleanup=False, aggregate=False):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -1163,6 +1254,8 @@ class Annexificator(object):
           +0, +1, +2 ... are tried until available one is found.
         cleanup: bool, optional
           Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
+        aggregate: bool, optional
+          Aggregate meta-data (ATM no recursion, guessing the type)
         """
 
         def _finalize(data):
@@ -1178,6 +1271,10 @@ class Annexificator(object):
                     _call(stats.reset)
             else:
                 lgr.info("Found branch non-dirty -- nothing was committed")
+
+            if aggregate:
+                from datalad.api import aggregate_metadata
+                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
 
             if tag and stats:
                 # versions survive only in total_stats

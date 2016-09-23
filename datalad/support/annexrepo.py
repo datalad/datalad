@@ -36,6 +36,7 @@ from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
+from datalad.utils import swallow_logs
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -51,6 +52,8 @@ from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
+from .exceptions import OutOfSpaceError
+from .exceptions import RemoteNotAvailableError
 from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
@@ -277,7 +280,6 @@ class AnnexRepo(GitRepo):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
-
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
 
@@ -397,25 +399,31 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def get(self, files, log_online=True, options=None):
+    def get(self, files, options=None):
         """Get the actual content of files
 
         Parameters
         ----------
         files: list of str
-            list of paths to get
+            paths to get
 
-        kwargs: options for the git annex get command.
-            For example `from='myremote'` translates to
-            annex option "--from=myremote".
+        options: list of str
+            commandline options for the git annex get command.
+
+        Returns
+        -------
+        list of dict
         """
         options = options[:] if options else []
+        from datalad.cmd import Runner
 
-        # don't capture stderr, since it provides progress display
-        # but if no online logging, then log it
-        self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=not log_online,
-                                log_online=log_online, expect_stderr=True)
+        # Note: Currently swallowing logs, due to the workaround to report files
+        # not found, but don't fail and report about other files and use JSON,
+        # which are contradicting conditions atm. (See _run_annex_command_json)
+        with swallow_logs(new_level=logging.DEBUG):
+            results = self._run_annex_command_json('get',
+                                                   args=options + files)
+        return [i for i in results]
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
@@ -632,7 +640,11 @@ class AnnexRepo(GitRepo):
                     # find abspath of node pointed to by symlink
                     target_path = realpath(filepath)  # realpath OK
                     # TODO: checks for being not outside of this repository
-                    out.append(exists(target_path) and '.git/annex/objects' in target_path)
+                    # Note: ben removed '.git/' from '.git/annex/objects',
+                    # since it is not true for submodules, whose '.git' is a
+                    # symlink and being resolved to some
+                    # '.git/modules/.../annex/objects'
+                    out.append(exists(target_path) and 'annex/objects' in target_path)
                 else:
                     out.append(False)
             return out
@@ -667,9 +679,13 @@ class AnnexRepo(GitRepo):
             for f in files:
                 filepath = opj(self.path, f)
                 # todo checks for being not outside of this repository
+                # Note: ben removed '.git/' from '.git/annex/objects',
+                # since it is not true for submodules, whose '.git' is a
+                # symlink and being resolved to some
+                # '.git/modules/.../annex/objects'
                 out.append(
                     islink(filepath)
-                    and '.git/annex/objects' in realpath(filepath)  # realpath OK
+                    and 'annex/objects' in realpath(filepath)  # realpath OK
                 )
             return out
 
@@ -695,6 +711,20 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('enableremote', annex_options=[name])
+
+    def merge_annex(self, remote=None):
+        """Call git annex merge to merge git-annex branch
+
+        Parameters
+        ----------
+        remote: str, optional
+          Name of a remote to be "merged". Not used ATM since git-annex merge
+          doesn't support yet.  But is available in place so uses could specify
+          expected remote to be merged
+        """
+        # TODO: wait for support of remote
+        self._run_annex_command('merge')
+
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
@@ -922,12 +952,75 @@ class AnnexRepo(GitRepo):
                     annex_options=['--json'] + args,
                     **kwargs)
         except CommandError as e:
-            # if multiple files, whereis may technically fail,
-            # but still returns correct response
-            if command == 'whereis' and e.code == 1 and e.stdout.startswith('{'):
+            # Note: A call might result in several 'failures', that can be or
+            # cannot be handled here. Detection of something, we can deal with,
+            # doesn't mean there's nothing else to deal with.
+
+            # OutOfSpaceError:
+            # Note:
+            # doesn't depend on anything in stdout. Therefore check this before
+            # dealing with stdout
+            out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
+            if out_of_space_re:
+                raise OutOfSpaceError(cmd="annex %s" % command,
+                                      sizemore_msg=out_of_space_re.groups()[0])
+            # RemoteNotAvailableError:
+            remote_na_re = re.search("there is no available git remote named \"(.*)\"", e.stderr)
+            if remote_na_re:
+                raise RemoteNotAvailableError(cmd="annex %s" % command,
+                                              remote=remote_na_re.groups()[0])
+
+            # TEMP: Workaround for git-annex bug, where it reports success=True
+            # for annex add, while simultanously complaining, that it is in
+            # a submodule:
+            # TODO: For now just reraise. But independently on this bug, it
+            # makes sense to have an exception for that case
+            in_subm_re = re.search("fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr)
+            if in_subm_re:
+                raise e
+
+            # Note: A try to approach the covering of potential annex failures
+            # in a more general way:
+            # first check stdout:
+            if all([line.startswith('{') and line.endswith('}')
+                    for line in e.stdout.splitlines()]):
+                # we have the usual json output on stdout. Therefore we can
+                # probably return and don't need to raise; so get stdout
+                # for json loading:
                 out = e.stdout
             else:
+                out = None
+
+            # Note: Workaround for not existing files as long as annex doesn't
+            # report it within JSON response:
+            not_existing = [line.split()[1] for line in e.stderr.splitlines()
+                            if line.startswith('git-annex:') and
+                            line.endswith('not found')]
+            if not_existing:
+                if out is None:
+                    # we create the error reporting herein. If all files were
+                    # not found, there is nothing on stdout and we don't need
+                    # anything
+                    out = ""
+                if not out.endswith(linesep):
+                    out += linesep
+                out += linesep.join(
+                        ['{{"command": "{cmd}", "file": "{path}", '
+                         '"note": "{note}",'
+                         '"success":false}}'.format(cmd=command,
+                                                    path=f,
+                                                    note="not found")
+                         for f in not_existing])
+
+            # Note: insert additional code here to analyse failure and possibly
+            # raise a custom exception
+
+            # if we didn't raise before, just depend on whether or not we seem
+            # to have some json to return. It should contain information on
+            # failure in keys 'success' and 'note'
+            if out is None:
                 raise e
+
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         return json_objects

@@ -40,6 +40,8 @@ from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
 from ..utils import _path_
+from ..utils import get_timestamp_suffix
+
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -56,9 +58,9 @@ from .utils import skip_if_no_module
 
 
 def test_get_func_kwargs_doc():
-    from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
-    eq_(get_func_kwargs_doc(pipeline), output)
+    def some_func(arg1, kwarg1=None, kwarg2="bu"):
+        return
+    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
 
 
 @with_tempfile(mkdir=True)
@@ -100,16 +102,54 @@ def test_swallow_outputs():
         eq_(cm.err, 'out error')  # the same value if multiple times
 
 
-def test_swallow_logs():
+@with_tempfile
+def test_swallow_logs(logfile):
     lgr = logging.getLogger('datalad')
     with swallow_logs(new_level=9) as cm:
         eq_(cm.out, '')
         lgr.log(8, "very heavy debug")
         eq_(cm.out, '')  # not even visible at level 9
         lgr.log(9, "debug1")
-        eq_(cm.out, 'debug1\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')  # not even visible at level 9
+    with swallow_logs(new_level=9, file_=logfile) as cm:
+        eq_(cm.out, '')
+        lgr.info("next info")
+    from datalad.tests.utils import ok_file_has_content
+    ok_file_has_content(logfile, "[INFO] next info", strip=True)
+
+
+def test_swallow_logs_assert():
+    lgr = logging.getLogger('datalad.tests')
+    with swallow_logs(new_level=9) as cm:
+        # nothing was logged so should fail
+        assert_raises(AssertionError, cm.assert_logged)
+        lgr.info("something")
+        cm.assert_logged("something")
+        cm.assert_logged(level="INFO")
+        cm.assert_logged("something", level="INFO")
+
+        # even with regex = False should match above
+        cm.assert_logged("something", regex=False)
+        cm.assert_logged(level="INFO", regex=False)
+        cm.assert_logged("something", level="INFO", regex=False)
+
+        # different level
+        assert_raises(AssertionError,
+                      cm.assert_logged, "something", level="DEBUG")
+        assert_raises(AssertionError, cm.assert_logged, "else")
+
+        cm.assert_logged("some.hing", level="INFO")  # regex ;-)
+        # does match
+        assert_raises(AssertionError,
+                      cm.assert_logged, "ome.hing", level="INFO")
+        # but we can change it
+        cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we can continue doing checks after we left the cm block
+    cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we indeed logged something
+    cm.assert_logged(match=False)
 
 
 def _check_setup_exceptionhook(interactive):
@@ -421,3 +461,21 @@ def test_path_():
         p = 'a/b/c'
         assert(_path_(p) is p)  # nothing is done to it whatsoever
         eq_(_path_(p, 'd'), 'a/b/c/d')
+
+
+def test_get_timestamp_suffix():
+    # we need to patch temporarily TZ
+    import time
+    try:
+        with patch.dict('os.environ', {'TZ': 'GMT'}):
+            time.tzset()
+            assert_equal(get_timestamp_suffix(0), '-1970-01-01T00:00:00+0000')  # skynet DOB
+            assert_equal(get_timestamp_suffix(0, prefix="+"), '+1970-01-01T00:00:00+0000')
+            # yoh found no way to mock things out and didn't want to provide
+            # explicit call to anything to get current time with the timezone, so disabling
+            # this test for now besides that it should return smth sensible ;)
+            #with patch.object(time, 'localtime', lambda: 1):
+            #    assert_equal(get_timestamp_suffix(), '-1970-01-01T00:00:01+0000')  # skynet is 1 sec old
+            assert(get_timestamp_suffix().startswith('-'))
+    finally:
+        time.tzset()

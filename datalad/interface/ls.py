@@ -37,7 +37,9 @@ lgr = getLogger('datalad.api.ls')
 
 
 class Ls(Interface):
-    """List meta-information associated with URLs (e.g. s3://) and dataset(s)
+    """List summary information about URLs and dataset(s)
+
+    ATM only s3:// URLs and datasets are supported
 
     Examples
     --------
@@ -66,7 +68,14 @@ class Ls(Interface):
         all=Parameter(
             args=("-a", "--all"),
             action="store_true",
-            doc="list all entries, not e.g. only latest entries in case of S3",
+            doc="list all (versions of) entries, not e.g. only latest entries "
+                "in case of S3",
+        ),
+        long=Parameter(
+            args=("-L", "--long"),
+            action="store_true",
+            doc="list more information on entries (e.g. acl, urls in s3, annex "
+                "sizes etc)",
         ),
         config_file=Parameter(
             doc="""path to config file which could help the 'ls'.  E.g. for s3://
@@ -91,14 +100,16 @@ class Ls(Interface):
     )
 
     @staticmethod
-    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False, json=None):
+    def __call__(loc, recursive=False, fast=False, all=False, long=False,
+                 config_file=None, list_content=False, json=None):
         if isinstance(loc, list) and not len(loc):
             # nothing given, CWD assumed -- just like regular ls
             loc = '.'
 
-        kw = dict(fast=fast, recursive=recursive, all=all)
+        kw = dict(fast=fast, recursive=recursive, all=all, long=long)
         if isinstance(loc, list):
-            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, json=json, **kw)
+            return [Ls.__call__(loc_, config_file=config_file,
+                                list_content=list_content, json=json, **kw)
                     for loc_ in loc]
 
         # TODO: do some clever handling of kwargs as to remember what were defaults
@@ -106,11 +117,13 @@ class Ls(Interface):
         # warning if some custom value/option was specified which doesn't apply to the
         # given url
 
+        # rename to not angry Python gods who took all good words
+        kw['all_'] = kw.pop('all')
+        kw['long_'] = kw.pop('long')
         if loc.startswith('s3://'):
-            return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
-        elif lexists(loc):
-            if not Dataset(loc).is_installed():
-                raise ValueError("No dataset at %s" % loc)
+            return _ls_s3(loc, config_file=config_file, list_content=list_content,
+                          **kw)
+        elif lexists(loc) and Dataset(loc).is_installed():
             return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
         else:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
@@ -127,6 +140,19 @@ class Ls(Interface):
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import GitRepo
+
+
+@auto_repr
+class AbsentRepoModel(object):
+    """Just a base for those where repo wasn't installed yet"""
+
+    def __init__(self, path):
+        self.path = path
+        self.repo = None
+
+    @property
+    def type(self):
+        return "N/A"
 
 
 @auto_repr
@@ -157,6 +183,10 @@ class GitModel(object):
             except:
                 return None
         return self._branch
+
+    @property
+    def clean(self):
+        return not self.repo.dirty
 
     @property
     def describe(self):
@@ -199,10 +229,6 @@ class AnnexModel(GitModel):
     def __init__(self, *args, **kwargs):
         super(AnnexModel, self).__init__(*args, **kwargs)
         self._info = None
-
-    @property
-    def clean(self):
-        return not self.repo.dirty
 
     @property
     def info(self):
@@ -372,16 +398,29 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 
 # from joblib import Parallel, delayed
 
-def _ls_dataset(loc, fast=False, recursive=False, all=False):
+
+def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = [topds.repo] + (
-        [Dataset(opj(loc, sm)).repo
+    dss = [topds] + (
+        [Dataset(opj(loc, sm))
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(AnnexModel, dss))
+
+    dsms = []
+    for ds in dss:
+        if not ds.is_installed():
+            dsm = AbsentRepoModel(ds.path)
+        elif isinstance(ds.repo, AnnexRepo):
+            dsm = AnnexModel(ds.repo)
+        elif isinstance(ds.repo, GitRepo):
+            dsm = GitModel(ds.repo)
+        else:
+            raise RuntimeError("Got some dataset which don't know how to handle %s"
+                               % ds)
+        dsms.append(dsm)
 
     # adjust path strings
     for ds_model in dsms:
@@ -395,10 +434,16 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
     pathtype_fmt = path_fmt + u"  [{ds.type}]"
     full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
-    if (not fast) or all:
+    if (not fast) or long_:
         full_fmt += u"  {ds.clean!X}"
-    if all:
-        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+
+    fmts = {
+        AbsentRepoModel: pathtype_fmt,
+        GitModel: full_fmt,
+        AnnexModel: full_fmt
+    }
+    if long_:
+        fmts[AnnexModel] += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
@@ -407,7 +452,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     #         for dsm in dss):
     #     print(out)
     for dsm in dsms:
-        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
+        fmt = fmts[dsm.__class__]
+        ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
         print(ds_str)
 
 
@@ -588,7 +634,8 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     return fs
 
 
-def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
+def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
+                long_=False):
     """Hierarchical dataset traverser
 
     Parameters
@@ -599,7 +646,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
       Parent dataset of the current rootds
     recursive: bool
        Recurse into subdirectories of the current dataset
-    all: bool
+    all_: bool
        Recurse into subdatasets of the root dataset
 
     Returns
@@ -618,7 +665,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     # (recursively) traverse each subdataset
     children = []
     for subds_path in rootds.get_subdatasets():
-        if all:
+        if all_:
             subds = Dataset(opj(rootds.path, subds_path))
             subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
             subfs.pop('nodes', None)
@@ -648,10 +695,13 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['nodes'][0]['size'] = fs['size']  # update self's updated size in nodes sublist too!
 
     # add dataset specific entries to its dict
-    fs['tags'] = AnnexModel(rootds.repo).describe
-    fs['branch'] = AnnexModel(rootds.repo).branch
+    rootds_model = GitModel(rootds.repo)
+    fs['tags'] = rootds_model.describe
+    fs['branch'] = rootds_model.branch
+    index_file = opj(rootds.path, '.git', 'index')
     fs['index-mtime'] = time.strftime(u"%Y-%m-%d %H:%M:%S",
-                                      time.localtime(getmtime(opj(rootds.path, '.git', 'index'))))
+                                      time.localtime(getmtime(index_file))) \
+                        if exists(index_file) else ''
 
     # append children datasets info to current dataset
     fs['nodes'].extend(children)
@@ -670,7 +720,8 @@ def _ls_json(loc, fast=False, **kwargs):
 #
 # S3 listing
 #
-def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_content=False):
+def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
+           config_file=None, list_content=False):
     """List S3 bucket content"""
     if loc.startswith('s3://'):
         bucket_prefix = loc[5:]
@@ -768,13 +819,13 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         if isinstance(e, Prefix):
             ui.message("%s" % (e.name, ),)
             continue
-        ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
+
+        base_msg = ("%%-%ds %%s" % max_length) % (e.name, e.last_modified)
         if isinstance(e, Key):
-            ui.message(" %%%dd" % max_size_length % e.size, cr=' ')
-            if not (e.is_latest or all):
+            if not (e.is_latest or all_):
                 # Skip this one
-                ui.message("")
                 continue
+            ui.message(base_msg + " %%%dd" % max_size_length % e.size, cr=' ')
             # OPT: delayed import
             from ..support.s3 import get_key_url
             url = get_key_url(e, schema='http')
@@ -810,7 +861,9 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                     content = err.message
                 finally:
                     content = " " + content
-
-            ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
+            if long_:
+                ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
+            else:
+                ui.message('')
         else:
-            ui.message(str(type(e)).split('.')[-1].rstrip("\"'>"))
+            ui.message(base_msg + " " + str(type(e)).split('.')[-1].rstrip("\"'>"))

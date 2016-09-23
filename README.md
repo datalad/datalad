@@ -19,12 +19,11 @@ management, however, remains with the original data providers.
 
 # Status
 
-DataLad is under rapid development to establish core functionality.  While
-the code base is still growing the focus is increasingly shifting towards
-robust and safe operation with a sensible API. There has been no major public
-release yet, as organization and configuration are still subject of
-considerable reorganization and standardization. However, DataLad is, in fact,
-usable today and user feedback is always welcome.
+DataLad is under rapid development.  While the code base is still growing,
+the focus is increasingly shifting towards robust and safe operation 
+with a sensible API. Organization and configuration are still subject of 
+considerable reorganization and standardization.  However, DataLad is, 
+in fact, usable today and user feedback is always welcome.
 
 # DataLad 101
 
@@ -32,14 +31,14 @@ A growing number of datasets is made available from http://datasets.datalad.org 
 Those datasets are just regular git/git-annex repositories organized into
 a hierarchy using git submodules mechanism.  So you can use regular
 git/git-annex commands to work with them, but might need `datalad` to be
-installed to provide additional necessary functionality (e.g. fetching from
+installed to provide additional functionality (e.g., fetching from
 portals requiring authentication such as CRCNS, HCP; or accessing data
 originally distributed in tarballs).  But datalad aims to provide higher
 level interface on top of git/git-annex to simplify consumption and sharing
 of new or derived datasets.  To that end, you can install **all** of
 those datasets using
 
-    datalad install -r datasets ///
+    datalad install -r ///
 
 which will `git clone` all of those datasets under `datasets.datalad.org`
 sub-directory. This command will not fetch any large data files, but will
@@ -59,9 +58,17 @@ or install top level dataset by omitting `-r datasets` option and then calling
 
 You can navigate datasets you have installed in your terminal or browser,
 while fetching necessary files or installing new sub-datasets using the
-same `datalad install [FILENAMES]` command.
+`datalad get [FILE|DIR]` command.  DataLad will take care about
+downloading, extracting, and possibly authenticating (would ask you for
+credentials) in a uniform fashion regardless of the original data location
+or distribution serialization (e.g., a tarball).  Since it is using git
+and git-annex underneath, you can be assured that you are getting **exact**
+correct version of the data.
 
-You can find more documentation at http://datalad.readthedocs.io .
+Use-cases DataLad covers are not limited to "consumption" of data.
+DataLad aims also to help publishing original or derived data, thus facilitating
+more efficient data management when collaborating or simply sharing your data.
+You can find more documentation at http://docs.datalad.org .
 
 
 # Contributing

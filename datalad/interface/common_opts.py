@@ -35,18 +35,17 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
-add_to_superdataset = Parameter(
-    args=("--add-to-super",),
-    doc="""add the new dataset as a component to a super dataset. If 'auto',
-           adds to super-dataset if one is found.""",
-    constraints=EnsureChoice('auto') | EnsureBool(),
-)
-
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git` calls""")
+
+git_clone_opts = Parameter(
+    args=("--git-clone-opts",),
+    metavar='STRING',
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :command:`git clone` calls""")
 
 annex_opts = Parameter(
     args=("--annex-opts",),
@@ -91,3 +90,15 @@ if_dirty_opt = Parameter(
     'save-before' will save all changes prior any further action;
     'ignore' let's datalad proceed as if the dataset would not have unsaved
     changes.""")
+
+nosave_opt = Parameter(
+    args=("--nosave",),
+    dest='save',
+    action="store_false",
+    doc="""by default all modifications to a dataset are immediately saved. Given
+    this option will disable this behavior.""")
+
+verbose = Parameter(
+    args=("-v", "--verbose",),
+    action="store_true",
+    doc="""print out more detailed information while executing a command""")

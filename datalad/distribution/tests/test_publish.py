@@ -9,6 +9,7 @@
 
 """
 
+import logging
 import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
@@ -29,6 +30,8 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_not_in
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -37,11 +40,7 @@ from datalad.tests.utils import ok_clean_git
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
@@ -98,11 +97,7 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -117,7 +112,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
     sub1_target.checkout("TMP", ["-b"])
-    sub2_target = GitRepo(sub2_pub, create=True)
+    sub2_target = AnnexRepo(sub2_pub, create=True)
     sub2_target.checkout("TMP", ["-b"])
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
     sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
@@ -125,7 +120,12 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2.add_remote("target", sub2_pub)
 
     # publish recursively
-    res = publish(dataset=source, to="target", recursive=True)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res = publish(dataset=source, to="target", recursive=True)
+        assert_not_in(
+            'forced update', cml.out,
+            "we probably haven't merged git-annex before pushing"
+        )
 
     # testing result list
     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
@@ -182,11 +182,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
