@@ -10,6 +10,7 @@
 """
 
 from os.path import join
+from os.path import expanduser
 
 # directory containing prepared metadata of a dataset repository:
 HANDLE_META_DIR = ".datalad"
@@ -27,6 +28,9 @@ DATALAD_GIT_DIR = join('.git', 'datalad')
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 
 DATASETS_TOPURL = "http://datasets.datalad.org/"
+
+# Centralized deployment
+LOCAL_CENTRAL_PATH = join(expanduser('~'), 'datalad')
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')

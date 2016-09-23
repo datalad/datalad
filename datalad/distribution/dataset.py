@@ -35,6 +35,7 @@ from datalad.support.dsconfig import ConfigManager
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd
+from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.dochelpers import exc_str
 
 
@@ -503,7 +504,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     if dataset is None:  # possible scenario of cmdline calls
         dspath = GitRepo.get_toppath(getpwd())
         if not dspath:
-            raise InsufficientArgumentsError("No dataset found")
+            raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
 
     assert(dataset is not None)

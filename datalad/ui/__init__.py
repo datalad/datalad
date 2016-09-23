@@ -48,6 +48,7 @@ class _UI_Switcher(object):
                 'dialog': DialogUI,
                 'annex': UnderAnnexUI,
                 'tests': UnderTestsUI,
+                'tests-noninteractive': ConsoleLog,
             }[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend

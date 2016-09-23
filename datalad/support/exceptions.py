@@ -86,6 +86,11 @@ class InsufficientArgumentsError(ValueError):
     pass
 
 
+class NoDatasetArgumentFound(InsufficientArgumentsError):
+    """To be raised when expecting having a dataset but none was provided"""
+    pass
+
+
 class OutOfSpaceError(CommandError):
     """To be raised whenever a command fails if we have no sufficient space
 
@@ -147,12 +152,14 @@ class InstallFailedError(CommandError):
 # Downloaders
 #
 
+
 class DownloadError(Exception):
     pass
 
 
 class IncompleteDownloadError(DownloadError):
     pass
+
 
 class UnaccountedDownloadError(IncompleteDownloadError):
     pass
@@ -178,8 +185,10 @@ class UnhandledRedirectError(DownloadError):
 # Crawler
 #
 
+
 class CrawlerError(Exception):
     pass
+
 
 class PipelineNotSpecifiedError(CrawlerError):
     pass

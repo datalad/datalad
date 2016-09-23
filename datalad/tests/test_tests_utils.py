@@ -49,6 +49,7 @@ from .utils import run_under_dir
 from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
+from .utils import with_testsui
 
 #
 # Test with_tempfile, especially nested invocations
@@ -528,3 +529,28 @@ def test_assert_dict_equal():
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
+
+
+def test_testsui():
+    # just one for now to test conflicting arguments
+    with assert_raises(ValueError):
+        @with_testsui(responses='some', interactive=False)
+        def some_func():   # pragma: no cover
+            pass
+
+    from datalad.ui import ui
+
+    @with_testsui(responses=['yes', "maybe so"])
+    def func2(x):
+        assert x == 1
+        eq_(ui.yesno("title"), True)
+        eq_(ui.question("title2"), "maybe so")
+        assert_raises(AssertionError, ui.question, "asking more than we know")
+        return x*2
+    eq_(func2(1), 2)
+
+    @with_testsui(interactive=False)
+    def func3(x):
+        assert_false(ui.is_interactive)
+        return x*3
+    eq_(func3(2), 6)
