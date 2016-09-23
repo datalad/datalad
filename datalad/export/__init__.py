@@ -93,10 +93,13 @@ class Export(Interface):
             if not hasattr(exmod, '_datalad_get_cmdline_help'):
                 lgr.error("export plugin '{}' does not provide help".format(exmod))
                 return
-            help, replacement = exmod._datalad_get_cmdline_help()
+            replacement = []
+            help = exmod._datalad_get_cmdline_help()
+            if isinstance(help, tuple):
+                help, replacement = help
             if replacement:
                 for in_s, out_s in replacement:
                     help = help.replace(in_s, out_s + ' ' * max(0, len(in_s) - len(out_s)))
-                print(help)
+            print(help)
             return
         # TODO call exporter function (if any)
