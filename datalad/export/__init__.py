@@ -48,7 +48,6 @@ class Export(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         astype=Parameter(
             args=("astype",),
-            metavar='TYPE',
             choices=_get_exporter_names(),
             doc="""label of the type or format the dataset shall be exported
             to."""),
