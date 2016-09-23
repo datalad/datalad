@@ -69,7 +69,10 @@ class Export(Interface):
     def __call__(astype, dataset, getcmdhelp=False, output=None, **kwargs):
         # get a handle on the relevant plugin module
         import datalad.export as export_mod
-        exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
+        try:
+            exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
+        except ImportError:
+            raise ValueError("cannot find exporter '{}'".format(astype))
         if getcmdhelp:
             # no result, but return the module to make the renderer do the rest
             return (exmod, None)
