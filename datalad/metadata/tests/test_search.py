@@ -86,7 +86,14 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
-                list(search("bu"))
+                list(search(".", regex=True))
+
+            # and if path exists and is a valid dataset and we say "no"
+            Dataset(central_dspath).create()
+            ui.add_responses('no')
+            mock_install.reset_mock()
+            with assert_raises(NoDatasetArgumentFound):
+                list(search(".", regex=True))
 
 _mocked_search_results = [
     ('ds1', {'f': 'v'}),

@@ -129,6 +129,8 @@ class Search(Interface):
                                  "meta-dataset under % r and search within it?"
                                   % LOCAL_CENTRAL_PATH):
                             pass
+                        else:
+                            reraise(*exc_info)
                     else:
                         raise NoDatasetArgumentFound(
                             "No DataLad dataset found at current location and "
