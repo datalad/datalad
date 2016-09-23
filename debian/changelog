@@ -1,4 +1,10 @@
-datalad (0.2.3+git843-g18c597d-1) experimental; urgency=medium
+datalad (0.3~rc1+git38-g7a5b4da-1) experimental; urgency=medium
+
+  * New upstream rc snapshot from 0.3rc1-38-g7a5b4da 
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 22 Sep 2016 23:35:55 -0400
+
+datalad (0.2.3+git843-g18c597d-1) UNRELEASED; urgency=medium
 
   * New upstream snapshot from 0.2.3-843-g18c597d
   * debian/control

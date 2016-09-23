@@ -2,3 +2,5 @@
 # the same source package. This pulls in the necessary python version with all
 # its dependencies
 datalad: python-script-but-no-python-dep usr/bin/datalad
+# indeed contains 1 compressed line - but it is as much of source of it as we have
+datalad: source-is-missing datalad/resources/website/tests/qunit/sinon-*

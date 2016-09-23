@@ -4,13 +4,37 @@ Source: https://github.com/datalad/datalad/
 
 Files: *
 Copyright: 2013, Yaroslav Halchenko
-           2014-2015, DataLad Team
+           2014-2016, DataLad Team
 License: Expat
 
 Files: datalad/utils.py
 Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
 Comment: just optional_args function
-License: BSD-3
+License: BSD-3-Clause
+
+Files: datalad/resources/website/tests/qunit/sinon*
+Copyright: 2010-2014, Christian Johansen <christian@cjohansen.no> and contributors
+           2012-2013, Maximilian Antoni
+		   2011, Sven Fuchs
+License: BSD-3-Clause
+
+Files: datalad/resources/website/tests/qunit/qunit*
+Copyright: 2016, jQuery Foundation and other contributors
+           2006, Google Inc.
+License: Expat and Apache-2.0
+
+Files: datalad/resources/website/assets/js/jquery.dataTables*
+Copyright: 2008-2015, SpryMedia Ltd.
+License: Expat
+
+Files: datalad/resources/website/assets/js/md5*
+Copyright: 2011, Sebastian Tschan
+           1999-2009, Paul Johnston
+License: Expat and BSD-3-Clause
+
+Files: datalad/resources/website/assets/js/jquery*
+Copyright: 2016, jQuery Foundation and other contributors
+License: Expat
 
 License: Expat
   Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,7 +55,7 @@ License: Expat
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 
-License: BSD-3
+License: BSD-3-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
  met:
@@ -57,3 +81,19 @@ License: BSD-3
  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ .
+ https://www.apache.org/licenses/LICENSE-2.0
+ .
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ .
+ On Debian systems, the complete text of the Apache version 2.0 license
+ can be found in "/usr/share/common-licenses/Apache-2.0".
