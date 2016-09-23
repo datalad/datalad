@@ -51,6 +51,12 @@ class Export(Interface):
             choices=_get_exporter_names(),
             doc="""label of the type or format the dataset shall be exported
             to."""),
+        output=Parameter(
+            args=('-o', '--output'),
+            doc="""output destination specification to be passes to the exporter.
+            The particular semantics of the option value depend on the actual
+            exporter. Typically, this will be a file name or a path to a
+            directory."""),
         getcmdhelp=Parameter(
             args=('--help-type',),
             dest='getcmdhelp',
@@ -60,7 +66,7 @@ class Export(Interface):
 
     @staticmethod
     @datasetmethod(name='export')
-    def __call__(astype, dataset, getcmdhelp=False, **kwargs):
+    def __call__(astype, dataset, getcmdhelp=False, output=None, **kwargs):
         # get a handle on the relevant plugin module
         import datalad.export as export_mod
         exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
@@ -73,9 +79,10 @@ class Export(Interface):
         # or directly with the kwargs
         if 'datalad_unparsed_args' in kwargs:
             result = exmod._datalad_export_plugin_call(
-                ds, argv=kwargs['datalad_unparsed_args'])
+                ds, argv=kwargs['datalad_unparsed_args'], output=output)
         else:
-            result = exmod._datalad_export_plugin_call(ds, **kwargs)
+            result = exmod._datalad_export_plugin_call(
+                ds, output=output, **kwargs)
         return (exmod, result)
 
     @staticmethod
@@ -83,6 +90,13 @@ class Export(Interface):
         exmod, result = res
         if args.getcmdhelp:
             # the function that prints the help was returned as result
-            exmod._datalad_print_cmdline_help()
+            if not hasattr(exmod, '_datalad_get_cmdline_help'):
+                lgr.error("export plugin '{}' does not provide help".format(exmod))
+                return
+            help, replacement = exmod._datalad_get_cmdline_help()
+            if replacement:
+                for in_s, out_s in replacement:
+                    help = help.replace(in_s, out_s + ' ' * max(0, len(in_s) - len(out_s)))
+                print(help)
             return
         # TODO call exporter function (if any)
