@@ -9,7 +9,7 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.3 (Sep 22, 2016) -- winter is coming
+## 0.3 (Sep 23, 2016) -- winter is coming
 
 Lots of everything, including but not limited to
 
@@ -19,6 +19,8 @@ Lots of everything, including but not limited to
 - new and/or improved crawler pipelines for [BALSA], [CRCNS], [OpenfMRI]
 - refactored [install] command, now with separate [get]
 - some other commands renaming/refactoring (e.g., [create-sibling])
+- datalad [search] would give you an option to install datalad's 
+  super-dataset under ~/datalad if ran outside of a dataset
 
 ### 0.2.3 (Jun 28, 2016) -- busy OHBM
 
@@ -62,4 +64,5 @@ publishing
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
+[search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 
