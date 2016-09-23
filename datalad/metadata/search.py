@@ -13,13 +13,16 @@ __docformat__ = 'restructuredtext'
 
 import os
 import re
+import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
 from six import string_types
 from six import text_type
 from six import iteritems
+from six import reraise
 from datalad.interface.base import Interface
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from ..support.param import Parameter
@@ -27,8 +30,12 @@ from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
 from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
+
+from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad import cfg as dlcfg
 from datalad.utils import assure_list
+from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.ui import ui
 
 
 class Search(Interface):
@@ -94,9 +101,65 @@ class Search(Interface):
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match, dataset, report=None, report_matched=False, format='custom', regex=False):
+    def __call__(match, dataset=None, report=None, report_matched=False, format='custom', regex=False):
 
-        ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+        lgr.debug("Initiating search for match=%r and dataset %r",
+                  match, dataset)
+        try:
+            ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+        except NoDatasetArgumentFound:
+            exc_info = sys.exc_info()
+            if dataset is None:
+                if not ui.is_interactive:
+                    raise NoDatasetArgumentFound(
+                        "No DataLad dataset found at current location and "
+                        "current UI is not interactive to assist in installing "
+                        "one.  Please run `search` command interactively or "
+                        "under an existing DataLad dataset"
+                    )
+                # none was provided so we could ask user either he possibly wants
+                # to install our beautiful mega-duper-super-dataset?
+                # TODO: following logic could possibly benefit other actions.
+                if os.path.exists(LOCAL_CENTRAL_PATH):
+                    central_ds = Dataset(LOCAL_CENTRAL_PATH)
+                    if central_ds.is_installed():
+                        if ui.yesno(
+                            title="No DataLad dataset found at current location",
+                            text="Would you like to search within DataLad "
+                                 "meta-dataset under % r and search within it?"
+                                  % LOCAL_CENTRAL_PATH):
+                            pass
+                        else:
+                            reraise(*exc_info)
+                    else:
+                        raise NoDatasetArgumentFound(
+                            "No DataLad dataset found at current location and "
+                            "%r already exists but does not contain an "
+                            "installed dataset." % LOCAL_CENTRAL_PATH)
+                elif ui.yesno(
+                       title="No DataLad dataset found at current location",
+                       text="Would you like to install stock DataLad "
+                            "meta-dataset under %r?"
+                            % LOCAL_CENTRAL_PATH
+                       ):
+                    from datalad.api import install
+                    central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+                else:
+                    reraise(*exc_info)
+
+                lgr.info(
+                    "Performing search using central dataset %r",
+                    central_ds.path
+                )
+                for loc, r in central_ds.search(
+                        match,
+                        report=report, report_matched=report_matched,
+                        format=format, regex=regex):
+                    full_loc = opj(central_ds.path, loc)
+                    yield full_loc, r
+                return
+            else:
+                raise
 
         cache_dir = opj(dlcfg.dirs.user_cache_dir, 'metadata')
         mcache_fname = opj(cache_dir, ds.id)

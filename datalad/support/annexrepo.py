@@ -712,6 +712,20 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('enableremote', annex_options=[name])
 
+    def merge_annex(self, remote=None):
+        """Call git annex merge to merge git-annex branch
+
+        Parameters
+        ----------
+        remote: str, optional
+          Name of a remote to be "merged". Not used ATM since git-annex merge
+          doesn't support yet.  But is available in place so uses could specify
+          expected remote to be merged
+        """
+        # TODO: wait for support of remote
+        self._run_annex_command('merge')
+
+
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
                         batch=False, git_options=None, annex_options=None):

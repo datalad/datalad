@@ -649,6 +649,7 @@ def swallow_logs(new_level=None, file_=None):
                 out_file = file_
             # PY3 requires clearly one or another.  race condition possible
             self._out = open(out_file, 'a')
+            self._final_out = None
 
         def _read(self, h):
             with open(h.name) as f:
@@ -656,8 +657,12 @@ def swallow_logs(new_level=None, file_=None):
 
         @property
         def out(self):
-            self._out.flush()
-            return self._read(self._out)
+            if self._final_out is not None:
+                # we closed and cleaned up already
+                return self._final_out
+            else:
+                self._out.flush()
+                return self._read(self._out)
 
         @property
         def lines(self):
@@ -668,6 +673,8 @@ def swallow_logs(new_level=None, file_=None):
             return self._out
 
         def cleanup(self):
+            # store for access while object exists
+            self._final_out = self.out
             self._out.close()
             out_name = self._out.name
             del self._out
@@ -675,13 +682,54 @@ def swallow_logs(new_level=None, file_=None):
             if not file_:
                 rmtemp(out_name)
 
+        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
+            """Provide assertion on either a msg was logged at a given level
+
+            If neither `msg` nor `level` provided, checks if anything was logged
+            at all.
+
+            Parameters
+            ----------
+            msg: str, optional
+              Message (as a regular expression, if `regex`) to be searched.
+              If no msg provided, checks if anything was logged at a given level.
+            level: str, optional
+              String representing the level to be logged
+            regex: bool, optional
+              If False, regular `assert_in` is used
+            **kwargs: str, optional
+              Passed to `assert_re_in` or `assert_in`
+            """
+            from datalad.tests.utils import assert_re_in
+            from datalad.tests.utils import assert_in
+
+            if regex:
+                match = '\[%s\] ' % level if level else "\[\S+\] "
+            else:
+                match = '[%s] ' % level if level else ''
+
+            if msg:
+                match += msg
+
+            if match:
+                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
+            else:
+                assert not kwargs, "no kwargs to be passed anywhere"
+                assert self.out, "Nothing was logged!?"
+
+
     adapter = StringIOAdapter()
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
     # set
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    swallow_handler = logging.StreamHandler(adapter.handle)
+    # we want to log levelname so we could test against it
+    swallow_handler.setFormatter(
+        logging.Formatter('[%(levelname)s] %(message)s'))
+    lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
+
     if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 

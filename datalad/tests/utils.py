@@ -41,6 +41,7 @@ from nose.tools import \
     raises, ok_, eq_, make_decorator
 
 from nose.tools import assert_set_equal
+from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -321,8 +322,13 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+
 def ok_generator(gen):
     assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+
+assert_is_generator = ok_generator  # just an alias
+
 
 def ok_archives_caches(repopath, n=1, persistent=None):
     """Given a path to repository verify number of archives
@@ -976,7 +982,7 @@ def get_most_obscure_supported_name(tdir):
 
 
 @optional_args
-def with_testsui(t, responses=None):
+def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
@@ -984,7 +990,7 @@ def with_testsui(t, responses=None):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
-            ui.set_backend('tests')
+            ui.set_backend('tests' if interactive else 'tests-noninteractive')
             if responses:
                 ui.add_responses(responses)
             ret = t(*args, **kwargs)
@@ -995,7 +1001,11 @@ def with_testsui(t, responses=None):
         finally:
             ui.set_backend(old_backend)
 
+    if not interactive and responses is not None:
+        raise ValueError("Non-interactive UI cannot provide responses")
+
     return newfunc
+
 with_testsui.__test__ = False
 
 

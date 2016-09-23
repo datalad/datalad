@@ -26,11 +26,14 @@ from ...tests.utils import assert_equal, assert_in, assert_raises, assert_not_eq
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
+from ...tests.utils import skip_if_no_network
 from datalad.interface.ls import ignored, fs_traverse, _ls_json, machinesize
 from os.path import exists, join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
 
+
+@skip_if_no_network
 @use_cassette('test_ls_s3')
 def test_ls_s3():
     url = 's3://datalad-test0-versioned/'

@@ -59,7 +59,7 @@ def get_metadata(ds, ds_identifier):
     if 'BIDSVersion' in bids:
         compliance.append(
             'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
-                bids['BIDSVersion']))
+                bids['BIDSVersion'].strip()))
     else:
         compliance.append('http://bids.neuroimaging.io')
     meta['dcterms:conformsTo'] = compliance

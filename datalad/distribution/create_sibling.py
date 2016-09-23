@@ -99,7 +99,7 @@ class CreateSibling(Interface):
             args=('--target-url',),
             metavar='URL',
             doc=""""public" access URL of the to-be-created target dataset(s)
-                (default: `sshurl`). Accessiblity of this URL determines the
+                (default: `sshurl`). Accessibility of this URL determines the
                 access permissions of potential consumers of the dataset.
                 As with `target_dir`, templates (same set of placeholders)
                 are supported.\n""",
@@ -311,13 +311,16 @@ class CreateSibling(Interface):
             # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                CreateSibling.create_postupdate_hook(path, ssh, datasets[current_dspath])
+                CreateSibling.create_postupdate_hook(
+                    path, ssh, datasets[current_dspath])
             except CommandError as e:
-                lgr.error("Failed to add json creation command to post update hook.\n"
-                          "Error: %s" % exc_str(e))
+                lgr.error("Failed to add json creation command to post update "
+                          "hook.\nError: %s" % exc_str(e))
 
             if not only_reconfigure:
-                # Initialize annex repo on remote copy if current_dspath is an AnnexRepo
+                lgr.debug("Initializing annex repo on remote sibling")
+                # Initialize annex repo on remote copy if current_dspath
+                # is an AnnexRepo
                 if isinstance(datasets[current_dspath].repo, AnnexRepo):
                     ssh(['git', '-C', path, 'annex', 'init', path])
 
@@ -328,12 +331,13 @@ class CreateSibling(Interface):
                 try:
                     CreateSibling.upload_web_interface(path, ssh, shared, ui)
                 except CommandError as e:
-                    lgr.error("Failed to push web interface to the remote datalad repository.\n"
-                              "Error: %s" % exc_str(e))
+                    lgr.error("Failed to push web interface to the remote "
+                              "datalad repository.\nError: %s" % exc_str(e))
 
             remote_repos_to_run_hook_for.append(path)
 
         # in reverse order would be depth first
+        lgr.debug("Running post-update hooks in all created siblings")
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
             try:
@@ -347,6 +351,7 @@ class CreateSibling(Interface):
 
         if target:
             # add the sibling(s):
+            lgr.debug("Adding the siblings")
             if target_url is None:
                 target_url = sshurl
             if target_pushurl is None:
@@ -356,6 +361,7 @@ class CreateSibling(Interface):
                          url=target_url,
                          pushurl=target_pushurl,
                          recursive=recursive,
+                         fetch=True,
                          force=existing in {'replace'})
 
         # TODO: Return value!?
