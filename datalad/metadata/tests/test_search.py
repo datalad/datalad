@@ -43,10 +43,9 @@ def test_search_outside1_noninteractive_ui(tdir):
         assert_in('UI is not interactive', str(cme.exception))
 
 
-@with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_search_outside1_install_central_ds(tdir, newhome):#, mocked_exists):
+def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
@@ -55,31 +54,57 @@ def test_search_outside1_install_central_ds(tdir, newhome):#, mocked_exists):
             assert_is_generator(gen)
             assert_raises(NoDatasetArgumentFound, next, gen)
 
+        # and if we point to some non-existing dataset -- the same
+        assert_raises(ValueError, next, search("bu", dataset=newhome))
+
+
+@with_testsui(responses='yes')
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_search_outside1_install_central_ds(tdir, central_dspath):
+    with chpwd(tdir):
         # let's mock out even actual install/search calls
-        central_dspath = opj(newhome, "datalad")
-
-        mocked_results = [
-            ('ds1', {'f': 'v'}),
-            ('d2/ds2', {'f1': 'v1'})
-        ]
-        class mock_search(object):
-            def __call__(*args, **kwargs):
-                for loc, report in mocked_results:
-                    yield loc, report
-
         with \
             patch.object(search_mod, 'LOCAL_CENTRAL_PATH', central_dspath), \
             patch('datalad.api.install',
                   return_value=Dataset(central_dspath)) as mock_install, \
             patch('datalad.distribution.dataset.Dataset.search',
-                  new_callable=mock_search):
-            gen = search(".", regex=True)
-            assert_is_generator(gen)
-            assert_equal(
-                list(gen), [(opj(central_dspath, loc), report)
-                            for loc, report in mocked_results])
-            mock_install.assert_called_once_with(central_dspath, source='///')
+                  new_callable=_mock_search):
+            _check_mocked_install(central_dspath, mock_install)
 
-        # now on subsequent run, we want to mock as if dataset already exists
-        # at central location and then do search again
-        # TODO
+            # now on subsequent run, we want to mock as if dataset already exists
+            # at central location and then do search again
+            from datalad.ui import ui
+            ui.add_responses('yes')
+            mock_install.reset_mock()
+            with patch(
+                    'datalad.distribution.dataset.Dataset.is_installed',
+                    True):
+                _check_mocked_install(central_dspath, mock_install)
+
+            # and what if we say "no" to install?
+            ui.add_responses('no')
+            mock_install.reset_mock()
+            with assert_raises(NoDatasetArgumentFound):
+                list(search("bu"))
+
+_mocked_search_results = [
+    ('ds1', {'f': 'v'}),
+    ('d2/ds2', {'f1': 'v1'})
+]
+
+
+class _mock_search(object):
+    def __call__(*args, **kwargs):
+        for loc, report in _mocked_search_results:
+            yield loc, report
+
+
+def _check_mocked_install(central_dspath, mock_install):
+    gen = search(".", regex=True)
+    assert_is_generator(gen)
+    assert_equal(
+        list(gen), [(opj(central_dspath, loc), report)
+                    for loc, report in _mocked_search_results])
+    mock_install.assert_called_once_with(central_dspath, source='///')
+

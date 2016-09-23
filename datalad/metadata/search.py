@@ -145,9 +145,9 @@ class Search(Interface):
                 else:
                     reraise(*exc_info)
 
-                ui.message(
-                    "Performing search using central dataset %r"
-                    % central_ds.path
+                lgr.info(
+                    "Performing search using central dataset %r",
+                    central_ds.path
                 )
                 for loc, r in central_ds.search(
                         match,
