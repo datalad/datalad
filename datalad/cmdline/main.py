@@ -229,7 +229,7 @@ def main(args=None):
 
     # parse cmd args
     cmdlineargs = parser.parse_args(args)
-    if not cmdlineargs.change_path is None:
+    if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)
 
