@@ -8,6 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
+from collections import namedtuple
+from collections import OrderedDict
+from functools import partial
 from .distribution.dataset import Dataset
 
 
@@ -38,6 +41,36 @@ def _generate_func_api():
                     intf.__call__.__doc__)
             )
             globals()[get_api_name(intfspec)] = intf.__call__
+            # And the one with '_' suffix which would use cmdline results
+            # renderer
+            if hasattr(intf, 'result_renderer_cmdline'):
+                def intf_(call, renderer, *args, **kwargs):
+                    ret = call(*args, **kwargs)
+                    renderer(ret, _kwargs_to_namespace(call, args, kwargs))
+                intf__ = partial(intf_, intf.__call__, intf.result_renderer_cmdline)
+                # Fix up docs and may be make it make it work without partial
+                # abomination
+                #intf__.__doc__ = intf.__call__.__doc__
+                # TODO provide clarification note to the __doc__
+                globals()[get_api_name(intfspec) + '_'] = intf__
+
+
+def _kwargs_to_namespace(call, args, kwargs):
+    """
+    Given a __call__, args and kwargs passed, prepare a cmdlineargs-like thing
+    """
+    from inspect import getargspec
+    argspec = getargspec(call)
+    defaults = argspec.defaults
+    nargs = len(argspec.args)
+    assert(nargs >= len(defaults))
+    values = args + defaults[-(nargs - len(args)):]
+    assert(nargs == len(values))
+    kwargs_ = OrderedDict(zip(argspec.args, values))
+    # update with provided kwarg args
+    kwargs_.update(kwargs)
+    namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
+    return namespace
 
 
 def _fix_datasetmethod_docs():
