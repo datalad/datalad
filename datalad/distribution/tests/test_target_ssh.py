@@ -100,7 +100,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                 dataset=source,
                 target="local_target",
                 sshurl="ssh://localhost",
-                target_dir=target_path)
+                target_dir=target_path,
+                ui=True)
         # is not actually happening on one of the two basic cases -- TODO figure it out
         # assert_in('enableremote local_target failed', cml.out)
 
@@ -174,6 +175,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_dir=target_path,
             target_url=target_path,
             target_pushurl="ssh://localhost" + target_path,
+            ui=True,
         )
         assert_create_sshwebserver(existing='replace', **cpkwargs)
         eq_(target_path,
@@ -274,7 +276,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 target=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
-                recursive=True)
+                recursive=True,
+                ui=True)
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
