@@ -37,6 +37,8 @@ from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
+from datalad.support.external_versions import external_versions
+from datalad.support.external_versions import LooseVersion
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -54,6 +56,8 @@ from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
+from .exceptions import OutdatedExternalDependency
+from .exceptions import MissingExternalDependency
 from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
@@ -73,6 +77,10 @@ class AnnexRepo(GitRepo):
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
+
+    # To be assigned and checked to be good enough upon first call to AnnexRepo
+    GIT_ANNEX_MIN_VERSION = LooseVersion('6.20160808')
+    git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True, create=True,
@@ -120,6 +128,8 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+        if self.git_annex_version is None:
+            self._check_git_annex_version()
 
         # initialize
         self._uuid = None
@@ -222,6 +232,19 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+    @classmethod
+    def _check_git_annex_version(cls):
+        cls.git_annex_version = ver = external_versions['cmd:annex']
+        if not ver:
+            raise MissingExternalDependency(
+                "git-annex",
+                ver=cls.GIT_ANNEX_MIN_VERSION)
+        elif ver < cls.GIT_ANNEX_MIN_VERSION:
+            raise OutdatedExternalDependency(
+                "git-annex",
+                ver=cls.GIT_ANNEX_MIN_VERSION,
+                ver_present=ver)
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):

@@ -19,6 +19,8 @@ from shutil import copyfile
 from nose.tools import assert_is_instance
 
 from datalad.tests.utils import *
+from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import OutdatedExternalDependency
 
 # imports from same module:
 from ..annexrepo import *
@@ -1183,3 +1185,43 @@ def test_annex_add_no_dotfiles(path):
         index=True, working_tree=True, untracked_files=True, submodules=True))
     # not known to annex
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
+
+
+@with_tempfile
+def test_annex_version_handling(path):
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+         patch.object(AnnexRepo, '_check_git_annex_version',
+                      auto_spec=True,
+                      side_effect=AnnexRepo._check_git_annex_version) \
+            as cmpc, \
+         patch.object(external_versions, '_versions',
+                      {'cmd:annex': AnnexRepo.GIT_ANNEX_MIN_VERSION}):
+            eq_(AnnexRepo.git_annex_version, None)
+            ar1 = AnnexRepo(path, create=True)
+            assert(ar1)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+            # 2nd time must not be called
+            ar2 = AnnexRepo(path)
+            assert(ar2)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+            patch.object(AnnexRepo, '_check_git_annex_version',
+                         auto_spec=True,
+                         side_effect=AnnexRepo._check_git_annex_version):
+        # no git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': None}):
+            eq_(AnnexRepo.git_annex_version, None)
+            assert_raises(MissingExternalDependency, AnnexRepo, path)
+            eq_(AnnexRepo.git_annex_version, None)
+
+        # outdated git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': '6.20160505'}):
+            eq_(AnnexRepo.git_annex_version, None)
+            assert_raises(MissingExternalDependency, AnnexRepo, path)
+            # and we do assign it
+            eq_(AnnexRepo.git_annex_version, '6.20160505')
