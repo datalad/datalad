@@ -8,9 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
-from collections import namedtuple
-from collections import OrderedDict
-from functools import partial
+# Should have no spurious imports/definitions at the module leve
 from .distribution.dataset import Dataset
 
 
@@ -19,10 +17,54 @@ def _generate_func_api():
        API from them
     """
     from importlib import import_module
+    from collections import namedtuple
+    from collections import OrderedDict
+    from functools import wraps
+
     from .interface.base import update_docstring_with_parameters
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
     from .interface.base import alter_interface_docs_for_api
+
+    def _kwargs_to_namespace(call, args, kwargs):
+        """
+        Given a __call__, args and kwargs passed, prepare a cmdlineargs-like
+        thing
+        """
+        from inspect import getargspec
+        argspec = getargspec(call)
+        defaults = argspec.defaults
+        nargs = len(argspec.args)
+        assert (nargs >= len(defaults))
+        values = args + defaults[-(nargs - len(args)):]
+        assert (nargs == len(values))
+        kwargs_ = OrderedDict(zip(argspec.args, values))
+        # update with provided kwarg args
+        kwargs_.update(kwargs)
+        namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
+        return namespace
+
+    def call_gen(call, renderer):
+        """Helper to generate a call_ for call, to use provided renderer"""
+
+        @wraps(call)
+        def call_(*args, **kwargs):
+            ret = call(*args, **kwargs)
+            renderer(ret, _kwargs_to_namespace(call, args, kwargs))
+            # TODO: returning wouldn't quite work if we had a
+            # generator since it would get depleted -- we would need
+            # to 'duplicate' its content and return a new generator.
+            # OR may be we shouldn't return anything at all, or not for
+            # generators
+            return ret
+
+        # TODO: see if we could proxy the "signature" of function
+        # call from the original one
+        call_.__doc__ += \
+            "\nNote\n----\n\n" \
+            "This version of a function uses cmdline results renderer before " \
+            "returning the result"
+        return call_
 
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
@@ -44,33 +86,8 @@ def _generate_func_api():
             # And the one with '_' suffix which would use cmdline results
             # renderer
             if hasattr(intf, 'result_renderer_cmdline'):
-                def intf_(call, renderer, *args, **kwargs):
-                    ret = call(*args, **kwargs)
-                    renderer(ret, _kwargs_to_namespace(call, args, kwargs))
-                intf__ = partial(intf_, intf.__call__, intf.result_renderer_cmdline)
-                # Fix up docs and may be make it make it work without partial
-                # abomination
-                #intf__.__doc__ = intf.__call__.__doc__
-                # TODO provide clarification note to the __doc__
+                intf__ = call_gen(intf.__call__, intf.result_renderer_cmdline)
                 globals()[get_api_name(intfspec) + '_'] = intf__
-
-
-def _kwargs_to_namespace(call, args, kwargs):
-    """
-    Given a __call__, args and kwargs passed, prepare a cmdlineargs-like thing
-    """
-    from inspect import getargspec
-    argspec = getargspec(call)
-    defaults = argspec.defaults
-    nargs = len(argspec.args)
-    assert(nargs >= len(defaults))
-    values = args + defaults[-(nargs - len(args)):]
-    assert(nargs == len(values))
-    kwargs_ = OrderedDict(zip(argspec.args, values))
-    # update with provided kwarg args
-    kwargs_.update(kwargs)
-    namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
-    return namespace
 
 
 def _fix_datasetmethod_docs():
