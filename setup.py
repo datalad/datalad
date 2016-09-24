@@ -94,17 +94,18 @@ requires = {
 requires['full'] = sum(list(requires.values()), [])
 
 
+# let's not build manpages and examples automatically (gh-896)
 # configure additional command for custom build steps
-class DataladBuild(build_py):
-    def run(self):
-        self.run_command('build_manpage')
-        self.run_command('build_examples')
-        build_py.run(self)
+#class DataladBuild(build_py):
+#    def run(self):
+#        self.run_command('build_manpage')
+#        self.run_command('build_examples')
+#        build_py.run(self)
 
 cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
-    'build_py': DataladBuild
+#    'build_py': DataladBuild
 }
 
 setup(
