@@ -36,17 +36,18 @@ class MissingExternalDependency(RuntimeError):
     """External dependency is missing error"""
 
     def __init__(self, name, ver=None, msg=""):
-        super(MissingExternalDependency, self).__init__(msg)
+        super(MissingExternalDependency, self).__init__()
         self.name = name
         self.ver = ver
+        self.msg = msg
 
     def __str__(self):
-        to_str = "%s: dependency '%s'" % (self.__class__.__name__, self.name)
+        to_str = str(self.name)
         if self.ver:
             to_str += " of version >= %s" % self.ver
-        to_str += " is missing.\n"
+        to_str += " is missing."
         if self.msg:
-            to_str += ".\n%s" % self.msg
+            to_str += " %s" % self.msg
         return to_str
 
 
@@ -59,9 +60,10 @@ class OutdatedExternalDependency(MissingExternalDependency):
 
     def __str__(self):
         to_str = super(OutdatedExternalDependency, self).__str__()
-        to_str += " Found version %s" % self.ver_present \
+        to_str += ". You have version %s" % self.ver_present \
             if self.ver_present else \
             " Some unknown version of dependency found."
+        return to_str
 
 
 class AnnexBatchCommandError(CommandError):

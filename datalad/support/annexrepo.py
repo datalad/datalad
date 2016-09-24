@@ -34,6 +34,8 @@ from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
+from datalad.utils import platform_system
+from datalad.utils import linux_distribution_name
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
@@ -235,16 +237,23 @@ class AnnexRepo(GitRepo):
 
     @classmethod
     def _check_git_annex_version(cls):
-        cls.git_annex_version = ver = external_versions['cmd:annex']
+        ver = external_versions['cmd:annex']
+        # in case it is missing
+        if linux_distribution_name in {'debian', 'ubuntu'}:
+            msg = "Install  git-annex-standalone  from NeuroDebian " \
+                   "(http://neuro.debian.net)"
+        else:
+            msg = "Visit http://git-annex.branchable.com/install/"
+        exc_kwargs = dict(
+            name="git-annex",
+            msg=msg,
+            ver=cls.GIT_ANNEX_MIN_VERSION
+        )
         if not ver:
-            raise MissingExternalDependency(
-                "git-annex",
-                ver=cls.GIT_ANNEX_MIN_VERSION)
+            raise MissingExternalDependency(**exc_kwargs)
         elif ver < cls.GIT_ANNEX_MIN_VERSION:
-            raise OutdatedExternalDependency(
-                "git-annex",
-                ver=cls.GIT_ANNEX_MIN_VERSION,
-                ver_present=ver)
+            raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
+        cls.git_annex_version = ver
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):

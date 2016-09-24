@@ -39,17 +39,19 @@ lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-_platform_system = platform.system().lower()
-on_windows = _platform_system == 'windows'
-on_osx = _platform_system == 'darwin'
-on_linux = _platform_system == 'linux'
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+on_osx = platform_system == 'darwin'
+on_linux = platform_system == 'linux'
 try:
-    linux_distribution = platform.linux_distribution()
+    linux_distribution_name, linux_distribution_release \
+        = platform.linux_distribution()[:2]
     on_debian_wheezy = on_linux \
-                       and linux_distribution[0] == 'debian' \
-                       and linux_distribution[1].startswith('7.')
+                       and linux_distribution_name == 'debian' \
+                       and linux_distribution_release.startswith('7.')
 except:  # pragma: no cover
     on_debian_wheezy = False
+    linux_distribution_name = linux_distribution_release = None
 
 #
 # Little helpers

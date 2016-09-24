@@ -18,6 +18,7 @@ from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
 from nose.tools import assert_is_instance
 
+from datalad.utils import linux_distribution_name
 from datalad.tests.utils import *
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.exceptions import OutdatedExternalDependency
@@ -1215,13 +1216,18 @@ def test_annex_version_handling(path):
         with patch.object(
                 external_versions, '_versions', {'cmd:annex': None}):
             eq_(AnnexRepo.git_annex_version, None)
-            assert_raises(MissingExternalDependency, AnnexRepo, path)
+            with assert_raises(MissingExternalDependency) as cme:
+                AnnexRepo(path)
+            if linux_distribution_name == 'debian':
+                assert_in("http://neuro.debian.net", str(cme.exception))
             eq_(AnnexRepo.git_annex_version, None)
 
         # outdated git-annex at all
         with patch.object(
                 external_versions, '_versions', {'cmd:annex': '6.20160505'}):
             eq_(AnnexRepo.git_annex_version, None)
-            assert_raises(MissingExternalDependency, AnnexRepo, path)
-            # and we do assign it
-            eq_(AnnexRepo.git_annex_version, '6.20160505')
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+            # and we don't assign it
+            eq_(AnnexRepo.git_annex_version, None)
+            # so we could still fail
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
