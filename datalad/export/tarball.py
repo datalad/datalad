@@ -33,7 +33,7 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
     if output is None:
         output = "datalad_{}.tar.gz".format(dataset.id)
     else:
-        if not output.endswith('.tar.gz.'):
+        if not output.endswith('.tar.gz'):
             output += '.tar.gz'
 
     root = dataset.path
