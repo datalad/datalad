@@ -279,7 +279,18 @@ class Interface(object):
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from inspect import getargspec
-        argnames = getargspec(cls.__call__)[0]
+        argspec = getargspec(cls.__call__)
+        if argspec[2] is None:
+            # no **kwargs in the call receiver, pull argnames from signature
+            argnames = getargspec(cls.__call__)[0]
+        else:
+            # common options
+            # XXX define or better get from elsewhere
+            common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
+                           'help', 'log_level', 'logger', 'pbs_runner',
+                           'result_renderer', 'subparser')
+            argnames = [name for name in dir(args)
+                        if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
         try:
             return cls.__call__(**kwargs)
