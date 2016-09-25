@@ -137,10 +137,49 @@ class Runner(object):
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
                            expect_stderr=False, expect_fail=False):
+        """
+
+        If log_stdout or log_stderr are callables, they will be given a read
+        line to be processed, and return processed result.  So if they need to
+        'swallow' the line from being logged, should just return None
+
+        Parameters
+        ----------
+        proc
+        log_stdout: bool or callable or 'online' or 'offline'
+        log_stderr: : bool or callable or 'online' or 'offline'
+          If any of those 'offline', we would call proc.communicate at the
+          end to grab possibly outstanding output from it
+        expect_stderr
+        expect_fail
+
+        Returns
+        -------
+
+        """
         stdout, stderr = binary_type(), binary_type()
+
+        def decide_to_log(v):
+            """Hacky workaround for now so we could specify per each which to
+            log online and which to the log"""
+            if isinstance(v, bool) or callable(v):
+                return v
+            elif v in {'online'}:
+                return True
+            elif v in {'offline'}:
+                return False
+            else:
+                raise ValueError("can be bool, callable, 'online' or 'offline'")
+
+        log_stdout_ = decide_to_log(log_stdout)
+        log_stderr_ = decide_to_log(log_stderr)
+
         while proc.poll() is None:
-            if log_stdout:
+            if log_stdout_:
                 line = proc.stdout.readline()
+                if line and callable(log_stdout_):
+                    # Let it be processed
+                    line = log_stdout_(line)
                 if line:
                     stdout += line
                     self._log_out(line.decode())
@@ -150,8 +189,15 @@ class Runner(object):
             else:
                 pass
 
-            if log_stderr:
+            if log_stderr_:
+                # see for a possibly useful approach to processing output
+                # in another thread http://codereview.stackexchange.com/a/17959
+                # current problem is that if there is no output on stderr
+                # it stalls
                 line = proc.stderr.readline()
+                if line and callable(log_stderr_):
+                    # Let it be processed
+                    line = log_stderr_(line)
                 if line:
                     stderr += line
                     self._log_err(line.decode() if PY3 else line,
@@ -161,6 +207,11 @@ class Runner(object):
                     # test.cmd.test_runner_log_stderr()
             else:
                 pass
+
+        if log_stdout in {'offline'} or log_stderr in {'offline'}:
+            stdout_, stderr_ = proc.communicate()
+            stdout += stdout_
+            stderr += stderr_
 
         return stdout, stderr
 
@@ -247,7 +298,6 @@ class Runner(object):
                     shlex.split(cmd, posix=not on_windows)
                     if isinstance(cmd, string_types)
                     else cmd)
-
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
                                         stderr=errstream,

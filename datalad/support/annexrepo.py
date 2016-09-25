@@ -14,8 +14,10 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 import json
 import logging
+import math
 import re
 import shlex
+
 from os import linesep
 from os import unlink
 from os.path import join as opj
@@ -447,14 +449,74 @@ class AnnexRepo(GitRepo):
         list of dict
         """
         options = options[:] if options else []
-        from datalad.cmd import Runner
+
+        # TODO:  check annex version and issue a one time warning if not
+        # old enough for --json-progress
+        # we can log progress! (theoretically)
+
+        # TODO: move
+        class ProcessAnnexProgressIndicators(object):
+
+            def __init__(self):
+                # looking forward for multiple downloads at the same time
+                self.pbars = {}
+
+            def __call__(self, line):
+                try:
+                    j = json.loads(line)
+                except:
+                    # if we fail to parse, just return this precious thing for
+                    # possibly further processing
+                    return line
+
+                # TODO -- catch when download finishes up
+                if 'byte-progress' not in j:
+                    # some other thing than progress
+                    return line
+
+                def get_size_from_perc_complete(count, perc):
+                    return int(math.ceil(int(count) / (float(perc) / 100.)))
+
+                def get_size_from_key(key):
+                    return int(key.split('-', 2)[1].lstrip('s'))
+                # so we have a progress indicator, let's dead with it
+                action = j['action']
+                download_item = action.get('file') or action.get('key')
+                download_id = (action['command'], action['key'])
+                if download_id not in self.pbars:
+                    # New download!
+                    from datalad.ui import ui
+                    # TODO: whenever target size gets reported -- used it!
+                    # http://git-annex.branchable.com/todo/interface_to_the___34__progress__34___of_annex_operations/#comment-6bbc26aae9867603863050ddcb09a9a0
+                    # for now deduce from key or approx from '%'
+                    target_size = \
+                        get_size_from_key(action.get('key')) or \
+                        get_size_from_perc_complete(
+                            j['byte-progress'],
+                            j['percent-progress'].rstrip('%')
+                        )
+
+                    pbar = self.pbars[download_id] = ui.get_progressbar(
+                        label=download_item, maxval=target_size)
+                    pbar.start()
+                self.pbars[download_id].update(int(j.get('byte-progress')))
+
+
+        run_kwargs = {}
+        if self.git_annex_version >= '6.20160923':
+            run_kwargs.update(dict(
+                log_stdout=ProcessAnnexProgressIndicators(),
+                log_stderr='offline',
+                log_online=True
+            ))
+            options += ['--json-progress']
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
         # which are contradicting conditions atm. (See _run_annex_command_json)
-        with swallow_logs(new_level=logging.DEBUG):
-            results = self._run_annex_command_json('get',
-                                                   args=options + files)
+#        with swallow_logs(new_level=logging.DEBUG):
+        results = self._run_annex_command_json(
+                'get', args=options + files, **run_kwargs)
         return [i for i in results]
 
     @normalize_paths
