@@ -11,13 +11,15 @@
 
 from datalad.api import Dataset
 from datalad.api import export
-from nose.tools import assert_true, assert_not_equal, assert_raises
-from datalad.tests.utils import with_tree, with_tempfile
+from nose.tools import assert_true, assert_not_equal, assert_raises, \
+    assert_false, assert_equal
+from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
 from datalad.utils import md5sum
 import os
 import time
 from os.path import join as opj
+import tarfile
 
 
 _dataset_template = {
@@ -57,3 +59,15 @@ def test_tarball(path):
     ds.export('tarball', output=custom_outname)
     # encodes mtime -> different checksum, despit same content and name
     assert_not_equal(md5sum(custom_outname), custom1_md5)
+    # check content
+    with tarfile.open(default_outname) as tf:
+        nfiles = 0
+        for ti in tf:
+            # any annex links resolved
+            assert_false(ti.issym())
+            if not '.datalad' in ti.name:
+                # ignore any files in .datalad for this test to not be
+                # susceptible to changes in how much we generate a meta info
+                nfiles += 1
+        # we have exactly three files, and expect no content for any directory
+        assert_equal(nfiles, 3)
