@@ -22,6 +22,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
+from datalad.dochelpers import exc_str
 
 from datalad.interface.base import Interface
 
@@ -71,8 +72,9 @@ class Export(Interface):
         import datalad.export as export_mod
         try:
             exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
-        except ImportError:
-            raise ValueError("cannot find exporter '{}'".format(astype))
+        except ImportError as e:
+            raise ValueError("cannot load exporter '{}': {}".format(
+                astype, exc_str(e)))
         if getcmdhelp:
             # no result, but return the module to make the renderer do the rest
             return (exmod, None)
