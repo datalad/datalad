@@ -39,7 +39,7 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
     root = dataset.path
 
     with tarfile.open(output, "w:gz") as tar:
-        for rpath in dataset.repo.get_indexed_files():
+        for rpath in sorted(dataset.repo.get_indexed_files()):
             fpath = opj(root, rpath)
             if islink(fpath):
                 link_target = os.readlink(fpath)
