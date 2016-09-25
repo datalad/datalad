@@ -15,7 +15,8 @@ __docformat__ = 'restructuredtext'
 import logging
 import tarfile
 import os
-from os.path import join as opj, dirname, normpath, islink, isabs
+from os.path import join as opj, dirname, normpath, isabs
+from datalad.support.annexrepo import AnnexRepo
 
 lgr = logging.getLogger('datalad.export.tarball')
 
@@ -39,9 +40,16 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
     root = dataset.path
 
     with tarfile.open(output, "w:gz") as tar:
-        for rpath in sorted(dataset.repo.get_indexed_files()):
+        repo_files = sorted(dataset.repo.get_indexed_files())
+        if isinstance(dataset.repo, AnnexRepo):
+            annexed = dataset.repo.is_under_annex(
+                repo_files, allow_quick=True, batch=True)
+        else:
+            annexed = [False] * len(repo_file)
+        for i, rpath in enumerate(repo_files):
             fpath = opj(root, rpath)
-            if islink(fpath):
+            if annexed[i]:
+                # resolve to possible link target
                 link_target = os.readlink(fpath)
                 if not isabs(link_target):
                     link_target = normpath(opj(dirname(fpath), link_target))
