@@ -500,7 +500,9 @@ class GitRepo(object):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
+                                                  url,
+                                                  path,
                                                   odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break

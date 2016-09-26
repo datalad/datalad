@@ -205,7 +205,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
     if not success:
-        raise InstallFailedError("Failed to install dataset %s" % ds)
+        raise InstallFailedError("Failed to install dataset %s" % subds)
 
 
 # TODO:  git_clone options

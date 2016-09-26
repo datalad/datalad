@@ -225,6 +225,7 @@ def is_explicit_path(path):
         or path.startswith(os.curdir + os.sep) \
         or path.startswith(os.pardir + os.sep)
 
+
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
