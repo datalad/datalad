@@ -220,6 +220,11 @@ def test_obtain(path):
         assert_equal(cfg.obtain(dummy), 5.3)
     ask()
 
+    @with_testsui(responses='murks')
+    def ask():
+        assert_raises(ValueError, cfg.obtain, dummy)
+    ask()
+
     # fail to store when destination is not specified, will not even ask
     @with_testsui()
     def ask():
