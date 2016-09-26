@@ -47,12 +47,9 @@ keyring_requires = ['keyring>=8.0', 'keyrings.alt']
 pbar_requires = ['tqdm']
 
 dist = platform.dist()
-# on oldstable Debian let's ask for lower versions and progressbar instead
-if dist[0] == 'gentoo':
-    pbar_requires = ['progressbar']
+# on oldstable Debian let's ask for lower versions of keyring
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
-    pbar_requires = ['progressbar']
 
 requires = {
     'core': [

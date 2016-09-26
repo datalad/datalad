@@ -18,7 +18,9 @@ import sys
 # we will provide our interface and adapters for few popular ones
 #
 
+
 class ProgressBarBase(object):
+    """Base class for any progress bar"""
     def __init__(self, maxval=None):
         self._prev_value = 0
         self.maxval = maxval
@@ -36,67 +38,6 @@ class ProgressBarBase(object):
         self._prev_value = 0
 
 progressbars = {}
-try:
-    from progressbar import Bar, ETA, FileTransferSpeed, \
-        Percentage, ProgressBar, RotatingMarker
-
-    # TODO: might better delegate to an arbitrary bar?
-    class BarWithFillText(Bar):
-        """A progress bar widget which fills the bar with the target text"""
-
-        def __init__(self, fill_text, **kwargs):
-            super(BarWithFillText, self).__init__(**kwargs)
-            self.fill_text = fill_text
-
-        def update(self, pbar, width):
-            orig = super(BarWithFillText, self).update(pbar, width)
-            # replace beginning with the title
-            if len(self.fill_text) > width:
-                # TODO:  make it fancier! That we also at the same time scroll it from
-                # the left so it does end up at the end with the tail but starts with
-                # the beginning
-                fill_text = '...' + self.fill_text[-(width-4):]
-            else:
-                fill_text = self.fill_text
-            fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
-            return fill_text + " " + orig[len(fill_text)+1:]
-
-    class progressbarProgressBar(ProgressBarBase):
-        """Adapter for progressbar.ProgressBar"""
-
-        backend = 'progressbar'
-
-        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
-            super(progressbarProgressBar, self).__init__(maxval=maxval)
-            assert(unit == 'B')  # none other "supported" ATM
-            bar = dict(marker=RotatingMarker())
-            # TODO: RF entire messaging to be able to support multiple progressbars at once
-            widgets = ['%s: ' % label,
-                       BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
-                       Percentage(), ' ',
-                       ETA(), ' ',
-                       FileTransferSpeed()]
-            self._pbar = ProgressBar(widgets=widgets, maxval=maxval, fd=out).start()
-
-        def update(self, size, increment=False):
-            self._pbar.update(self._prev_value + size if increment else size)
-            super(progressbarProgressBar, self).update(size, increment=increment)
-
-        def start(self):
-            super(progressbarProgressBar, self).start()
-            self._pbar.start()
-
-        def clear(self):
-            pass
-
-        def finish(self):
-            if self._pbar:
-                self._pbar.finish()
-            super(progressbarProgressBar, self).finish()
-
-    progressbars['progressbar'] = progressbarProgressBar
-except ImportError:  # pragma: no cover
-    pass
 
 try:
     from tqdm import tqdm
@@ -148,5 +89,5 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-assert len(progressbars), "We need tqdm or progressbar library to report progress"
+assert len(progressbars), "We need tqdm library to report progress"
 
