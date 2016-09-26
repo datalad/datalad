@@ -47,7 +47,7 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
     # use dir inside matching the output filename
     # TODO: could be an option to the export plugin allowing empty value
     # for no leading dir
-    leading_dir = dataset.id # file_basename(output)
+    leading_dir = file_basename(output)
 
     # workaround for inability to pass down the time stamp
     with patch('time.time', return_value=committed_date), \
