@@ -16,7 +16,6 @@ import logging
 import datalad
 from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
-from jsmin import jsmin
 from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
@@ -25,7 +24,6 @@ from datalad.support.param import Parameter
 from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
@@ -33,10 +31,8 @@ from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 from datalad import ssh_manager
-from datalad.cmd import Runner
-from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
-from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
+from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
 
@@ -457,7 +453,11 @@ class CreateSibling(Interface):
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
             with open(js_file) as asset:
-                minified = jsmin(asset.read())                          # minify asset
+                try:
+                    from jsmin import jsmin
+                    minified = jsmin(asset.read())                      # minify asset
+                except ImportError:
+                    minified = asset.read()                             # no minify available
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
                     ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
