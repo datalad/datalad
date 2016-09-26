@@ -34,9 +34,13 @@ from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
+from datalad.utils import platform_system
+from datalad.utils import linux_distribution_name
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
+from datalad.support.external_versions import external_versions
+from datalad.support.external_versions import LooseVersion
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -54,6 +58,8 @@ from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
+from .exceptions import OutdatedExternalDependency
+from .exceptions import MissingExternalDependency
 from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
@@ -73,6 +79,10 @@ class AnnexRepo(GitRepo):
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
+
+    # To be assigned and checked to be good enough upon first call to AnnexRepo
+    GIT_ANNEX_MIN_VERSION = LooseVersion('6.20160808')
+    git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True, create=True,
@@ -120,6 +130,8 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+        if self.git_annex_version is None:
+            self._check_git_annex_version()
 
         # initialize
         self._uuid = None
@@ -222,6 +234,26 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+    @classmethod
+    def _check_git_annex_version(cls):
+        ver = external_versions['cmd:annex']
+        # in case it is missing
+        if linux_distribution_name in {'debian', 'ubuntu'}:
+            msg = "Install  git-annex-standalone  from NeuroDebian " \
+                   "(http://neuro.debian.net)"
+        else:
+            msg = "Visit http://git-annex.branchable.com/install/"
+        exc_kwargs = dict(
+            name="git-annex",
+            msg=msg,
+            ver=cls.GIT_ANNEX_MIN_VERSION
+        )
+        if not ver:
+            raise MissingExternalDependency(**exc_kwargs)
+        elif ver < cls.GIT_ANNEX_MIN_VERSION:
+            raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
+        cls.git_annex_version = ver
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
@@ -711,6 +743,20 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('enableremote', annex_options=[name])
+
+    def merge_annex(self, remote=None):
+        """Call git annex merge to merge git-annex branch
+
+        Parameters
+        ----------
+        remote: str, optional
+          Name of a remote to be "merged". Not used ATM since git-annex merge
+          doesn't support yet.  But is available in place so uses could specify
+          expected remote to be merged
+        """
+        # TODO: wait for support of remote
+        self._run_annex_command('merge')
+
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,

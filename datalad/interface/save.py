@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
@@ -58,7 +59,7 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
             _install_subds_inplace(
                 ds=ds,
                 path=utf_abspath,  # can be ignored, we don't need the return value
-                relativepath=utf,
+                relativepath=utf.rstrip(os.sep),
                 name=None)
             _modified_flag = True
 

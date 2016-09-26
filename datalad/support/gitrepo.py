@@ -803,8 +803,20 @@ class GitRepo(object):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def get_active_branch(self):
+    def get_committed_date(self, branch=None):
+        """Get the date stamp of the last commit (in a branch). None if no commit"""
+        try:
+            commit = next(
+                self.get_branch_commits(branch
+                                        or self.get_active_branch())
+            )
+        except Exception as exc:
+            lgr.debug("Got exception while trying to get last commit: %s",
+                      exc_str(exc))
+            return None
+        return commit.committed_date
 
+    def get_active_branch(self):
         return self.repo.active_branch.name
 
     def get_branches(self):

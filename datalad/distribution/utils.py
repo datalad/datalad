@@ -11,9 +11,7 @@
 """
 
 import logging
-from os import linesep
 from os.path import exists
-from os.path import lexists
 from os.path import isdir
 from os.path import join as opj
 from os.path import islink
@@ -28,9 +26,6 @@ lgr = logging.getLogger('datalad.distribution.utils')
 
 def _install_subds_inplace(ds, path, relativepath, name=None):
     """Register an existing repository in the repo tree as a submodule"""
-    # FLOW GUIDE EXIT POINT
-    # this is an existing repo and must be in-place turned into
-    # a submodule of this dataset
     ds.repo.add_submodule(relativepath, url=None, name=name)
     _fixup_submodule_dotgit_setup(ds, relativepath)
     # return newly added submodule as a dataset

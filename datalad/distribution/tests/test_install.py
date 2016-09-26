@@ -423,11 +423,17 @@ def test_implicit_install(src, dst):
     subsub = Dataset(opj(sub.path, "subsub"))
     ok_(not subsub.is_installed())
 
+    # fail on obscure non-existing one
+    assert_raises(ValueError, ds.install, 'obscure')
+
     # install 3rd level and therefore implicitly the 2nd:
     result = ds.install(path=opj("sub", "subsub"))
     ok_(sub.is_installed())
     ok_(subsub.is_installed())
     eq_(result, subsub)
+
+    # fail on obscure non-existing one in subds
+    assert_raises(ValueError, ds.install, opj('sub', 'obscure'))
 
     # clean up:
     rmtree(dst, chmod_files=True)

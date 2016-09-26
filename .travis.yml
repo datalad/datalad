@@ -31,6 +31,7 @@ matrix:
     env:
     - DATALAD_LOGLEVEL=2
     - DATALAD_LOGTARGET=/dev/null
+    - DATALAD_API_ALWAYS_RENDER=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -85,6 +86,7 @@ before_install:
 install:
   # Install standalone build of git-annex for the recent enough version
   - travis_retry sudo apt-get install git-annex-standalone zip
+  - travis_retry sudo apt-get install shunit2
   # For Python3 compatibility needs never-released master
   - pip install https://github.com/niltonvolpato/python-progressbar/archive/master.zip
   - git config --global user.email "test@travis.land"
@@ -100,6 +102,8 @@ install:
   # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
   - pip install sphinx
   - pip install sphinx_rtd_theme
+  # Specifically needed for tests here (e.g. example scripts testing)
+  - pip install nibabel
   # TMPDIRs
   - if [ ! -z "$TMPDIR" ] && [[ $TMPDIR =~ ".*/sym link" ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
@@ -111,11 +115,19 @@ install:
 
 script:
   - echo "Running tests"
+  - python setup.py build_manpage
+  - python setup.py build_examples
   - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
+  # Run doc examples "tests"
+  # but for that we need first to install the beast and minimal installation
+  # must be sufficient
+  - pip install .
+  # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
+  - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
   - codecov
