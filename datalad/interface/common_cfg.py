@@ -71,5 +71,6 @@ ui_definitions = {
                'title': 'Crawler pipeline house keeping',
                'text': 'Should the crawler tidy up datasets (git gc, repack, clean)?'}),
         'destination': 'global',
+        'type': EnsureBool(),
     },
 }
