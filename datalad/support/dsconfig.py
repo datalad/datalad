@@ -161,8 +161,10 @@ class ConfigManager(object):
           Variable name including any section like `git config` expects them,
           e.g. 'core.editor'
         default : any type
-          Default value to be presented to the user for confirmation (or
-          modification), or to be used as setting in non-interactive mode.
+          In interactive sessions and if `store` is True, this default value
+          will be presented to the user for confirmation (or modification).
+          In all other cases, this value will be silently assigned unless
+          there is an existing configuration setting.
         dialog_type : {'question', 'yesno', None}
           Which dialog type to use in interactive sessions. If `None`,
           preconfigured UI options are used.
@@ -185,15 +187,28 @@ class ConfigManager(object):
         if valtype is None:
             valtype = lambda x: x
 
+        # any default?
+        if default is None and 'default' in cdef:
+            default = cdef['default']
+
+        _value = None
         if var in self:
             # nothing needs to be obtained, it is all here already
+            _value = self[var]
+        elif store is False and default is not None:
+            # nothing will be stored, and we have a default -> no user confirmation
+            lgr.debug('using default {} for config setting {}'.format(default, var))
+            _value = default
+
+        if _value is not None:
+            # we got everything we need and can exit early
             try:
-                return valtype(self[var])
+                return valtype(_value)
             except Exception as e:
                 raise ValueError(
                     "value '{}' of existing configuration for '{}' cannot be "
                     "converted to the desired type '{}' ({})".format(
-                        self[var], var, valtype, exc_str(e)))
+                        _value, var, valtype, exc_str(e)))
 
         # now we need to try to obtain something from the user
         from datalad.ui import ui
@@ -209,7 +224,6 @@ class ConfigManager(object):
                 # update with input
                 dialog_opts.update(kwargs)
 
-        _value = None
         if (not ui.is_interactive or dialog_type is None) and default is None:
             raise RuntimeError(
                 "cannot obtain value for configuration item '{}', "
