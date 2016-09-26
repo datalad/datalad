@@ -491,13 +491,16 @@ def test_memoized_generator():
         for i in range(n):
             yield i
 
-    from ..utils import memoized_generator
+    from ..utils import saved_generator
     ok_generator(g1(3))
-    g1_ = memoized_generator(g1(3))
+    g1_, g2_ = saved_generator(g1(3))
     ok_generator(g1_)
+    ok_generator(g2_)
     target = list(g1(3))
     eq_(called[0], 1)
     eq_(target, list(g1_))
     eq_(called[0], 2)
-    eq_(target, list(g1_))
+    eq_(target, list(g2_))
     eq_(called[0], 2)  # no new call to make a generator
+    # but we can't (ab)use 2nd time
+    eq_([], list(g2_))

@@ -50,17 +50,18 @@ def _generate_func_api():
 
         @wraps(call)
         def call_(*args, **kwargs):
-            ret = call(*args, **kwargs)
+            ret1 = ret = call(*args, **kwargs)
             if isgenerator(ret):
                 # At first I thought we might just rerun it for output
                 # at the end, but that wouldn't work if command actually
                 # has a side-effect, i.e. actually doing something
                 # so we actually need to memoize all generated output and output
                 # it instead
-                ret = get_memoized_generator(ret)
+                from datalad.utils import saved_generator
+                ret, ret1 = saved_generator(ret)
 
             renderer(ret, _kwargs_to_namespace(call, args, kwargs))
-            return ret
+            return ret1
 
         # TODO: see if we could proxy the "signature" of function
         # call from the original one
@@ -92,6 +93,8 @@ def _generate_func_api():
             if hasattr(intf, 'result_renderer_cmdline'):
                 intf__ = call_gen(intf.__call__, intf.result_renderer_cmdline)
                 globals()[get_api_name(intfspec) + '_'] = intf__
+                # TODO: trigger by some env var to do that for any func
+                # globals()[get_api_name(intfspec)] = intf__
 
 
 def _fix_datasetmethod_docs():

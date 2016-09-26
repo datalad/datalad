@@ -462,48 +462,27 @@ def unique(seq, key=None):
 
 
 #
-# Generators help
+# Generators helpers
 #
 
-@auto_repr
-class memoized_generator(object):
-    """Make a proxy for a generator, which if asked again would replay
+def saved_generator(gen):
+    """Given a generator returns two generators, where 2nd one just replays
 
-    So the thing is also a generator
+    So the first one would be going through the generated items and 2nd one
+    would be yielding saved items
     """
+    saved = []
 
-    def __init__(self, gen):
-        self._saved = None
-        self._replay_idx = 0
-        self.gen = gen
-        self._finished_gen = False
+    def gen1():
+        for x in gen:  # iterating over original generator
+            saved.append(x)
+            yield x
 
-    def __iter__(self):
-        return self
+    def gen2():
+        for x in saved:  # yielding saved entries
+            yield x
 
-    # Python 3 compatibility
-    def __next__(self):
-        return self.next()
-
-    def next(self):
-        if not self._finished_gen:
-            try:
-                element = next(self.gen)
-                if self._saved is None:
-                    self._saved = []
-                self._saved.append(element)
-            except StopIteration:
-                self._finished_gen = True
-                raise
-        else:
-            # we are replaying
-            if self._replay_idx >= len(self._saved):
-                self._replay_idx = 0
-                raise StopIteration
-            element = self._saved[self._replay_idx]
-            self._replay_idx += 1
-
-        return element
+    return gen1(), gen2()
 
 #
 # Decorators
