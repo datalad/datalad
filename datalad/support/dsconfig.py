@@ -255,7 +255,9 @@ class ConfigManager(object):
         if store:
             # store value as it was before any conversion, needs to be str
             # anyway
-            self.add(var, _value, where=where, reload=reload)
+            # needs string conversion nevertheless, because default could come
+            # in as something else
+            self.add(var, '{}'.format(_value), where=where, reload=reload)
         return value
 
     #

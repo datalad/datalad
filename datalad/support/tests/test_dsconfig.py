@@ -195,13 +195,15 @@ def test_obtain(path):
     cfg.unset(dummy)
     # we know nothing and we don't know how to ask
     assert_raises(RuntimeError, cfg.obtain, dummy)
+
     #
     # test actual interaction
     #
-    # fail on unkown dialog type
-    assert_raises(ValueError, cfg.obtain, dummy, dialog_type='Rorschach_test')
-    # needs a text at least
-    assert_raises(TypeError, cfg.obtain, dummy, dialog_type='question')
+    @with_testsui()
+    def ask():
+        # fail on unkown dialog type
+        assert_raises(ValueError, cfg.obtain, dummy, dialog_type='Rorschach_test')
+    ask()
 
     # ask nicely, and get a value of proper type using the preconfiguration
     @with_testsui(responses='5.3')
@@ -219,7 +221,11 @@ def test_obtain(path):
     ask()
 
     # fail to store when destination is not specified, will not even ask
-    assert_raises(ValueError, cfg.obtain, dummy, store=True)
+    @with_testsui()
+    def ask():
+        assert_raises(ValueError, cfg.obtain, dummy, store=True)
+    ask()
+
     # but we can preconfigure it
     cfg_defs[dummy]['destination'] = 'broken'
 
@@ -235,8 +241,12 @@ def test_obtain(path):
     def ask():
         assert_equal(cfg.obtain(dummy, store=True), 5.3)
     ask()
+
     # now it won't have to ask again
-    assert_equal(cfg.obtain(dummy), 5.3)
+    @with_testsui()
+    def ask():
+        assert_equal(cfg.obtain(dummy), 5.3)
+    ask()
 
     # wipe it out again
     cfg.unset(dummy)
