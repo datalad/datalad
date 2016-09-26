@@ -509,7 +509,8 @@ class AnnexRepo(GitRepo):
                 log_stderr='offline',
                 log_online=True
             ))
-            options += ['--json-progress']
+            # options  might be the '--key' which should go last
+            options = ['--json-progress'] + options
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
