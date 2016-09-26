@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from datalad.support.constraints import EnsureBool
 dirs = AppDirs("datalad", "datalad.org")
 
 
@@ -44,7 +45,7 @@ ui_definitions = {
                'title': 'Crawler dry-run',
                'text': 'Should the crawler ... I AM NOT QUITE SURE WHAT?'}),
         'destination': 'local',
-        'type': bool,
+        'type': EnsureBool(),
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {

@@ -25,7 +25,7 @@ from datalad import utils
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
 
-from .. import cfg
+from .. import dlcfg
 
 class Crawl(Interface):
     """Crawl online resource to create or update a dataset.
@@ -90,9 +90,10 @@ class Crawl(Interface):
 
             # TODO: centralize via _params_ handling
             if dry_run:
-                if 'crawl' not in cfg.sections():
-                    cfg.add_section('crawl')
-                cfg.set('crawl', 'dryrun', "True")
+                dryrun_optlabel = 'datalad.crawl.dryrun'
+                if dryrun_optlabel in dlcfg:
+                    dlcfg.unset(dryrun_optlabel, where='local', reload=False)
+                dlcfg.add(dryrun_optlabel, "True", where='local')
 
             if path is None:
 
