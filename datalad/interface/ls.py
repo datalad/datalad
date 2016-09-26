@@ -201,11 +201,7 @@ class GitModel(object):
     def date(self):
         """Date of the last commit
         """
-        try:
-            commit = next(self.repo.get_branch_commits(self.branch))
-        except:
-            return None
-        return commit.committed_date
+        return self.repo.get_committed_date()
 
     @property
     def count_objects(self):

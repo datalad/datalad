@@ -15,8 +15,11 @@ __docformat__ = 'restructuredtext'
 import logging
 import tarfile
 import os
+
+from mock import patch
 from os.path import join as opj, dirname, normpath, isabs
 from datalad.support.annexrepo import AnnexRepo
+from datalad.utils import file_basename
 
 lgr = logging.getLogger('datalad.export.tarball')
 
@@ -37,15 +40,24 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
         if not output.endswith('.tar.gz'):
             output += '.tar.gz'
 
-    root = dataset.path
+    repo = dataset.repo
+    committed_date = repo.get_committed_date()
 
-    with tarfile.open(output, "w:gz") as tar:
-        repo_files = sorted(dataset.repo.get_indexed_files())
-        if isinstance(dataset.repo, AnnexRepo):
-            annexed = dataset.repo.is_under_annex(
+    root = dataset.path
+    # use dir inside matching the output filename
+    # TODO: could be an option to the export plugin allowing empty value
+    # for no leading dir
+    leading_dir = dataset.id # file_basename(output)
+
+    # workaround for inability to pass down the time stamp
+    with patch('time.time', return_value=committed_date), \
+        tarfile.open(output, "w:gz") as tar:
+        repo_files = sorted(repo.get_indexed_files())
+        if isinstance(repo, AnnexRepo):
+            annexed = repo.is_under_annex(
                 repo_files, allow_quick=True, batch=True)
         else:
-            annexed = [False] * len(repo_file)
+            annexed = [False] * len(repo_files)
         for i, rpath in enumerate(repo_files):
             fpath = opj(root, rpath)
             if annexed[i]:
@@ -55,12 +67,15 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
                     link_target = normpath(opj(dirname(fpath), link_target))
                 fpath = link_target
             # name in the tarball
-            aname = normpath(opj(dataset.id, rpath))
+            aname = normpath(opj(leading_dir, rpath))
             tar.add(
                 fpath,
                 arcname=aname,
                 recursive=False,
                 filter=_filter_tarinfo)
+
+    # I think it might better return "final" filename where stuff was saved
+    return output
 
 
 # PLUGIN API

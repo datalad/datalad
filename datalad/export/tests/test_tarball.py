@@ -9,6 +9,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test tarball exporter"""
 
+import os
+import time
+from os.path import join as opj
+from os.path import isabs
+import tarfile
+
 from datalad.api import Dataset
 from datalad.api import export
 from nose.tools import assert_true, assert_not_equal, assert_raises, \
@@ -16,10 +22,6 @@ from nose.tools import assert_true, assert_not_equal, assert_raises, \
 from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
 from datalad.utils import md5sum
-import os
-import time
-from os.path import join as opj
-import tarfile
 
 
 _dataset_template = {
@@ -44,8 +46,11 @@ def test_tarball(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save(auto_add_changes=True)
     with chpwd(path):
-        ds.export('tarball')
+        _mod, tarball1 = ds.export('tarball')
+        assert(not isabs(tarball1))
+        tarball1 = opj(path, tarball1)
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
+    assert_equal(tarball1, default_outname)
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension
@@ -54,11 +59,12 @@ def test_tarball(path):
     custom1_md5 = md5sum(custom_outname)
     # encodes the original tarball filename -> different checksum, despit
     # same content
+    # import pdb; pdb.set_trace()
     assert_not_equal(md5sum(default_outname), custom1_md5)
     time.sleep(1.1)
     ds.export('tarball', output=custom_outname)
-    # encodes mtime -> different checksum, despit same content and name
-    assert_not_equal(md5sum(custom_outname), custom1_md5)
+    # encodes mtime -> different checksum, despite same content and name
+    assert_equal(md5sum(custom_outname), custom1_md5)
     # check content
     with tarfile.open(default_outname) as tf:
         nfiles = 0
