@@ -159,13 +159,16 @@ function metadata_locator(md5, parent) {
     return current_loc + '/' + metadata_dir + md5('/');
   // else
   else {
-    // find current nodes parent dataset
+    // find current nodes parent dataset, if exists
     while (current_loc !== loc().pathname) {
+      // return if parent dataset not found till the root dataset
+      if (current_loc.length <= loc().pathname.length)
+        return -1;
       current_loc = parent_url(current_loc);
       if (url_exists(current_loc + '/' + metadata_dir))
         break;
     }
-    // and compute name of current nodes metadata hash
+    // else compute name of current nodes metadata hash
     var metadata_path = getParameterByName('dir')
           .replace(current_loc.replace(loc().pathname, ''), '')   // remove basepath to dir
           .replace(/^\/?/, '')                                    // replace beginning '/'
