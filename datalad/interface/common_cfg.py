@@ -38,5 +38,12 @@ ui_definitions = {
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
         'type': bool,
-    }
+    },
+    'datalad.crawl.dryrun': {
+        'ui': ('yesno', {
+               'title': 'Crawler dry-run',
+               'text': 'Should the crawler ... I AM NOT QUITE SURE WHAT?'}),
+        'destination': 'local',
+        'type': bool,
+    },
 }

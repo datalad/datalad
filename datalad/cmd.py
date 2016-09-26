@@ -30,7 +30,6 @@ from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
-from . import cfg
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -413,8 +412,10 @@ def link_file_load(src, dst, dry_run=False):
 
 
 def get_runner(*args, **kwargs):
+    # needs local import, because the ConfigManager itself needs the runner
+    from . import dlcfg
     # TODO:  this is all crawl specific -- should be moved away
-    if cfg.getboolean('crawl', 'dryrun', default=False):
+    if dlcfg.obtain('datalad.crawl.dryrun', default=False):
         kwargs = kwargs.copy()
         kwargs['protocol'] = DryRunProtocol()
     return Runner(*args, **kwargs)
