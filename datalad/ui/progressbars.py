@@ -82,7 +82,12 @@ try:
                 pass
 
         def clear(self):
-            self._pbar.clear()
+            try:
+                self._pbar.clear()
+            except:
+                # if has none -- we can't do anything about it for now ;)
+                # 4.7.4 seems to have it
+                pass
 
 
     progressbars['tqdm'] = tqdmProgressBar
