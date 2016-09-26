@@ -16,6 +16,7 @@ def _generate_func_api():
     """Auto detect all available interfaces and generate a function-based
        API from them
     """
+    import os
     from importlib import import_module
     from inspect import isgenerator
     from collections import namedtuple
@@ -71,6 +72,7 @@ def _generate_func_api():
             "returning the result"
         return call_
 
+    always_render = os.environ.get('DATALAD_API_ALWAYS_RENDER')
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance
@@ -93,8 +95,8 @@ def _generate_func_api():
             if hasattr(intf, 'result_renderer_cmdline'):
                 intf__ = call_gen(intf.__call__, intf.result_renderer_cmdline)
                 globals()[get_api_name(intfspec) + '_'] = intf__
-                # TODO: trigger by some env var to do that for any func
-                # globals()[get_api_name(intfspec)] = intf__
+                if always_render:
+                    globals()[get_api_name(intfspec)] = intf__
 
 
 def _fix_datasetmethod_docs():
