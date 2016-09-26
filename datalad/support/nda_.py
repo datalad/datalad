@@ -14,7 +14,7 @@ on closed SDK/libraries) module to access miNDAR database.
 
 __docformat__ = 'restructuredtext'
 
-from datalad import dlcfg
+from datalad import cfg
 from datalad.downloaders.providers import Providers
 
 from logging import getLogger
@@ -48,7 +48,7 @@ def get_oracle_db(
         sid='ORCL',
         credential=None,
     ):
-    dbserver = dbserver or dlcfg.obtain('datalad.externals.nda.dbserver',
+    dbserver = dbserver or cfg.obtain('datalad.externals.nda.dbserver',
                                         default=DEFAULT_SERVER)
     # This specific username has access to the 'Image' selection of NDA as of about today
     #username = username \

@@ -25,7 +25,7 @@ from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath, is_implicit_metadata
 from datalad.support.json_py import dump as jsondump
-from datalad.support.dsconfig import ConfigManager
+from datalad.config import ConfigManager
 
 
 def _store_json(path, meta):

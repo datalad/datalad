@@ -16,8 +16,6 @@ from .log import lgr
 lgr.log(5, "Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
-from datalad.support.dsconfig import ConfigManager as NewConfigManager
-dlcfg = NewConfigManager()
 
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager

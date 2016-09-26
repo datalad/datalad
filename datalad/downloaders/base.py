@@ -22,7 +22,7 @@ from six import PY2
 from six import binary_type, PY3
 
 
-from .. import dlcfg
+from .. import cfg
 from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
@@ -369,7 +369,7 @@ class BaseDownloader(object):
                 import dbm
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
-            cache_dir = dlcfg.obtain('datalad.locations.cache')
+            cache_dir = cfg.obtain('datalad.locations.cache')
             if not exists(cache_dir):
                 os.makedirs(cache_dir)
             cache_path = opj(cache_dir, 'crawl_cache.dbm')
@@ -401,7 +401,7 @@ class BaseDownloader(object):
         lgr.log(3, "_fetch(%r, cache=%r, size=%r, allow_redirects=%r)",
                 url, cache, size, allow_redirects)
         if cache is None:
-            cache = dlcfg.obtain('datalad.crawl.cache', default=False)
+            cache = cfg.obtain('datalad.crawl.cache', default=False)
 
         if cache:
             cache_key = msgpack.dumps(url)
