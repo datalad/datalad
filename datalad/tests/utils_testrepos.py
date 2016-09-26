@@ -11,7 +11,9 @@ import tempfile
 
 from abc import ABCMeta, abstractmethod
 from os.path import dirname, join as opj, exists, pardir
+from os import makedirs
 
+from ..config import ConfigManager
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
@@ -19,30 +21,60 @@ from ..support.network import get_local_file_url
 from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
+from ..utils import rmtree
+from ..utils import _path_
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
+
+import logging
+lgr = logging.getLogger('datalad.tests.testrepos')
 
 
 class TestRepo(object):
 
     __metaclass__ = ABCMeta
+    __version__ = '0.1'  # Version of test repos -- to be adjusted if anything changes
 
-    REPO_CLASS = None # Assign to the class to be used in the subclass
+    VERSION_FILE = '.git/datalad/__version__'
+    REPO_CLASS = None  # Assign to the class to be used in the subclass
 
-    def __init__(self, path=None, puke_if_exists=True):
+    def __init__(self, path=None, puke_if_exists=True, cached=True):
+        create = True
+        self._populated = False
         if not path:
-            from .utils import get_tempfile_kwargs
-            path = tempfile.mktemp(**get_tempfile_kwargs({}, prefix='testrepo'))
-            # to be removed upon teardown
-            _TEMP_PATHS_GENERATED.append(path)
-        if puke_if_exists and exists(path):
-            raise RuntimeError("Directory %s for test repo already exist" % path)
+            if not cached:
+                from .utils import get_tempfile_kwargs
+                path = tempfile.mktemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+                # to be removed upon teardown
+                _TEMP_PATHS_GENERATED.append(path)
+                if exists(path):
+                    raise RuntimeError("Directory %s for test repo already exist" % path)
+            else:
+                path = opj(ConfigManager.dirs.user_cache_dir, 'testrepo-%s' % self.__class__.__name__)
+                # check existence and verify version
+                if exists(path):
+                    # could be part of INFO.txt but I was lazy to fix it up
+
+                    version_file = _path_(path, self.VERSION_FILE)
+                    create = "Creating new"
+                    if exists(version_file):
+                        with open(version_file) as f:
+                            version = f.read()
+                        if version != self.__version__:
+                            create = "Regenerating old (v.%s)" % version
+                            rmtree(path)
+                        else:
+                            create = ""
+                            self._populated = True
+                        if create:
+                            lgr.debug("%s test repository under %s", create, path)
+
         # swallow logs so we don't print all those about crippled FS etc
         with swallow_logs():
-            self.repo = self.REPO_CLASS(path)
-        self.runner = Runner(cwd=self.repo.path)
-        self._created = False
+            self.repo = self.REPO_CLASS(path, create=bool(create))
+
+        self.runner = Runner(cwd=path)
 
     @property
     def path(self):
@@ -66,12 +98,19 @@ class TestRepo(object):
                 self.repo.add(name, git=True)
 
     def create(self):
-        if self._created:
+        if self._populated:
             assert(exists(self.path))
             return  # was already done
         with swallow_outputs():  # we don't need those outputs at this point
+            # create version stamp
+            version_file = _path_(self.path, self.VERSION_FILE)
+            version_file_dir = dirname(version_file)
+            if not exists(version_file_dir):
+                makedirs(version_file_dir)
+            with open(version_file, 'w') as f:
+                f.write(self.__version__)
             self.populate()
-        self._created = True
+        self._populated = True
 
     @abstractmethod
     def populate(self):

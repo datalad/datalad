@@ -805,7 +805,7 @@ def assure_dir(*args):
     Joins the list of arguments to an os-specific path to the desired
     directory and creates it, if it not exists yet.
     """
-    dirname = opj(*args)
+    dirname = __path__(*args)
     if not exists(dirname):
         os.makedirs(dirname)
     return dirname
