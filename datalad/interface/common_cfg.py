@@ -30,5 +30,13 @@ ui_definitions = {
                 'text': 'Where should datalad cache files?'}),
         'destination': 'global',
         'default': dirs.user_cache_dir,
+    },
+    # this is actually used in downloaders, but kept cfg name original
+    'datalad.crawl.cache': {
+        'ui': ('yesno', {
+               'title': 'Crawler download caching',
+               'text': 'Should the crawler cache downloaded files?'}),
+        'destination': 'local',
+        'type': bool,
     }
 }
