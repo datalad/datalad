@@ -469,7 +469,15 @@ class AnnexRepo(GitRepo):
                     # possibly further processing
                     return line
 
-                # TODO -- catch when download finishes up
+                if 'command' in j and 'key' in j:
+                    # might be the finish line message
+                    j_download_id = (j['command'], j['key'])
+                    if j_download_id in self.pbars:
+                        pbar = self.pbars.pop(j_download_id)
+                        if j.get('success'):
+                            pbar.update(pbar.maxval)
+                        pbar.finish()
+
                 if 'byte-progress' not in j:
                     # some other thing than progress
                     return line
@@ -499,6 +507,8 @@ class AnnexRepo(GitRepo):
                     pbar = self.pbars[download_id] = ui.get_progressbar(
                         label=download_item, maxval=target_size)
                     pbar.start()
+                # if we are to have global download size -- needs to be updated
+                # as well. TODO
                 self.pbars[download_id].update(int(j.get('byte-progress')))
 
 
@@ -516,9 +526,21 @@ class AnnexRepo(GitRepo):
         # not found, but don't fail and report about other files and use JSON,
         # which are contradicting conditions atm. (See _run_annex_command_json)
 #        with swallow_logs(new_level=logging.DEBUG):
-        results = self._run_annex_command_json(
-                'get', args=options + files, **run_kwargs)
-        return [i for i in results]
+        from datalad.ui import ui
+        global_pbar = ui.get_progressbar(label="Total (items)", maxval=len(files),
+                                         unit='')
+        global_pbar.start()
+        results = []
+        for f in files:
+            # todo --batch, but actually after we RF it should be the same
+            # ProcessAnnexProgressIndicators which updates both pbars I think
+            # it just needs to know how many to expect
+            result = self._run_annex_command_json(
+                    'get', args=options + [f], **run_kwargs)
+            results.extend(list(result))
+            global_pbar.update(1, increment=True)
+        global_pbar.finish()
+        return results
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,

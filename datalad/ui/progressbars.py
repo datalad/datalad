@@ -19,8 +19,9 @@ import sys
 #
 
 class ProgressBarBase(object):
-    def __init__(self):
+    def __init__(self, maxval=None):
         self._prev_value = 0
+        self.maxval = maxval
 
     def update(self, size, increment=False):
         if increment:
@@ -66,7 +67,7 @@ try:
         backend = 'progressbar'
 
         def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
-            super(progressbarProgressBar, self).__init__()
+            super(progressbarProgressBar, self).__init__(maxval=maxval)
             assert(unit == 'B')  # none other "supported" ATM
             bar = dict(marker=RotatingMarker())
             # TODO: RF entire messaging to be able to support multiple progressbars at once
@@ -84,6 +85,9 @@ try:
         def start(self):
             super(progressbarProgressBar, self).start()
             self._pbar.start()
+
+        def clear(self):
+            pass
 
         def finish(self):
             if self._pbar:
@@ -103,7 +107,7 @@ try:
         backend = 'tqdm'
 
         def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
-            super(tqdmProgressBar, self).__init__()
+            super(tqdmProgressBar, self).__init__(maxval=maxval)
             self._pbar_params = dict(desc=label, unit=unit, unit_scale=True, total=maxval, file=out)
             self._pbar = None
 
@@ -123,6 +127,7 @@ try:
             self._create()
 
         def finish(self):
+            self.clear()
             # be tollerant to bugs in those
             try:
                 if self._pbar is not None:
@@ -134,6 +139,10 @@ try:
             except Exception as exc:  # pragma: no cover
                 #lgr.debug("Finishing tqdmProgresBar thrown %s", str_exc(exc))
                 pass
+
+        def clear(self):
+            self._pbar.clear()
+
 
     progressbars['tqdm'] = tqdmProgressBar
 except ImportError:  # pragma: no cover
