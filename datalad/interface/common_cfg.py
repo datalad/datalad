@@ -46,4 +46,10 @@ ui_definitions = {
         'destination': 'local',
         'type': bool,
     },
+    'datalad.externals.nda.dbserver': {
+        'ui': ('question', {
+               'title': 'NDA database server',
+               'text': 'Hostname of the database server'}),
+        'destination': 'global',
+    },
 }
