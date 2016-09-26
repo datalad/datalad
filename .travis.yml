@@ -31,6 +31,7 @@ matrix:
     env:
     - DATALAD_LOGLEVEL=2
     - DATALAD_LOGTARGET=/dev/null
+    - DATALAD_API_ALWAYS_RENDER=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
