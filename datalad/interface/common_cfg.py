@@ -12,6 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
+from appdirs import AppDirs
+dirs = AppDirs("datalad", "datalad.org")
+
 
 ui_definitions = {
     # TODO fill with wisdom
@@ -21,4 +24,11 @@ ui_definitions = {
     #            'text': 'Eh?'}),
     #    'destination': 'dataset',  # where it should be stored by default
     #}
+    'datalad.locations.cache': {
+        'ui': ('question',
+               {'title': 'Cache directory',
+                'text': 'Where should datalad cache files?'}),
+        'destination': 'global',
+        'default': dirs.user_cache_dir,
+    }
 }
