@@ -35,6 +35,7 @@ from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad import cfg as dlcfg
 from datalad.utils import assure_list
 from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support import ansi_colors
 from datalad.ui import ui
 
 
@@ -295,10 +296,11 @@ class Search(Interface):
             for location, r in res:
                 # XXX Yarik thinks that Match should be replaced with actual path to the dataset
                 ui.message('{}{}{}{}'.format(
-                    location,
+                    ansi_colors.color_word(location, ansi_colors.DATASET),
                     ':' if r else '',
                     ichr,
-                    jchr.join([fmt.format(k=k, v=pretty_str(r[k])) for k in sorted(r)])))
+                    jchr.join([fmt.format(
+                        k=ansi_colors.color_word(k, ansi_colors.FIELD), v=pretty_str(r[k])) for k in sorted(r)])))
                 anything = True
             if not anything:
                 ui.message("Nothing to report")
@@ -311,6 +313,9 @@ class Search(Interface):
             ui.message(yaml.safe_dump(list(map(itemgetter(1), res)), allow_unicode=True, encoding='utf-8'))
 
 
+_lines_regex = re.compile('[\n\r]')
+
+
 def pretty_str(s):
     """Helper to provide sensible rendering for lists, dicts, and unicode"""
     if isinstance(s, list):
@@ -320,7 +325,8 @@ def pretty_str(s):
                            for k, v in s.items()])
     elif isinstance(s, text_type):
         try:
-            return s.encode('utf-8')
+            b = s.encode('utf-8')
+            return (os.linesep + "  ").join(_lines_regex.split(b))
         except UnicodeEncodeError:
             lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
             # TODO: get current encoding
