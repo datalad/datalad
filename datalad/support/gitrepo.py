@@ -51,7 +51,9 @@ from datalad.utils import updated
 from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .network import RI
 from .network import is_ssh
+from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -69,6 +71,7 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
+# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -425,6 +428,21 @@ class GitRepo(object):
             lgr.warning("TODO: options passed to git are currently ignored.\n"
                         "options received: %s" % git_opts)
 
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+
+        # try to get a local path from `url`:
+        if url is not None:
+            try:
+                if not isinstance(url, RI):
+                    url = RI(url).localpath
+                else:
+                    url = url.localpath
+            except ValueError:
+                pass
+
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
@@ -437,6 +455,8 @@ class GitRepo(object):
 
         # TODO: somehow do more extensive checks that url and path don't point
         #       to the same location
+
+        self.repo = None
         if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
@@ -454,14 +474,15 @@ class GitRepo(object):
                 lgr.error(exc_str(e))
                 raise
         else:
-            try:
-                self.repo = self.cmd_call_wrapper(Repo, path)
-                lgr.debug("Using existing Git repository at {0}".format(path))
-            except (GitCommandError,
-                    NoSuchPathError,
-                    InvalidGitRepositoryError) as e:
-                lgr.error("%s: %s" % (type(e), str(e)))
-                raise
+            if self.repo is None:
+                try:
+                    self.repo = self.cmd_call_wrapper(Repo, path)
+                    lgr.debug("Using existing Git repository at {0}".format(path))
+                except (GitCommandError,
+                        NoSuchPathError,
+                        InvalidGitRepositoryError) as e:
+                    lgr.error("%s: %s" % (type(e), str(e)))
+                    raise
 
     def clone(self, url, path):
         """Clone url into path
@@ -474,18 +495,19 @@ class GitRepo(object):
         url : str
         path : str
         """
-        ntries = 5  # r is not enough for robust workaround
+
+        ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
-                lgr.warning("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                                  odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
-                e_str = str(e)
+                e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
                 if re.search("Request for .*aborted.*Unable to find", str(e),
                              re.DOTALL) \
@@ -781,8 +803,20 @@ class GitRepo(object):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def get_active_branch(self):
+    def get_committed_date(self, branch=None):
+        """Get the date stamp of the last commit (in a branch). None if no commit"""
+        try:
+            commit = next(
+                self.get_branch_commits(branch
+                                        or self.get_active_branch())
+            )
+        except Exception as exc:
+            lgr.debug("Got exception while trying to get last commit: %s",
+                      exc_str(exc))
+            return None
+        return commit.committed_date
 
+    def get_active_branch(self):
         return self.repo.active_branch.name
 
     def get_branches(self):
@@ -1386,6 +1420,7 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
@@ -1402,6 +1437,7 @@ class GitRepo(object):
         kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
+        # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
@@ -1433,6 +1469,7 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def tag(self, tag):
         """Assign a tag to current commit

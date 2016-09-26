@@ -30,8 +30,10 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
 
 from datalad.api import install
+
 
 def test_EnsureDataset():
 
@@ -195,7 +197,7 @@ def test_subdatasets(path):
     eq_(ds.get_subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.install(path='test')
+    ds.add(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
 
@@ -221,10 +223,12 @@ def test_subdatasets(path):
 def test_get_containing_subdataset(path):
 
     ds = create(path, force=True)
-    ds.install(path='test.txt')
+    ds.add(path='test.txt')
     ds.save("Initial commit")
     subds = ds.create("sub")
+    subsubds = subds.create("subsub")
 
+    eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
@@ -233,10 +237,11 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
-    assert_raises(ValueError, ds.get_containing_subdataset,
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
+                  outside_path)
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
                   opj(os.curdir, outside_path))
-    assert_raises(ValueError, ds.get_containing_subdataset,
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
                   abspath(outside_path))
 
 

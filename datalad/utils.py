@@ -39,17 +39,19 @@ lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-_platform_system = platform.system().lower()
-on_windows = _platform_system == 'windows'
-on_osx = _platform_system == 'darwin'
-on_linux = _platform_system == 'linux'
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+on_osx = platform_system == 'darwin'
+on_linux = platform_system == 'linux'
 try:
-    linux_distribution = platform.linux_distribution()
+    linux_distribution_name, linux_distribution_release \
+        = platform.linux_distribution()[:2]
     on_debian_wheezy = on_linux \
-                       and linux_distribution[0] == 'debian' \
-                       and linux_distribution[1].startswith('7.')
+                       and linux_distribution_name == 'debian' \
+                       and linux_distribution_release.startswith('7.')
 except:  # pragma: no cover
     on_debian_wheezy = False
+    linux_distribution_name = linux_distribution_release = None
 
 #
 # Little helpers
@@ -73,14 +75,6 @@ def get_func_kwargs_doc(func):
 
     # TODO: format error message with descriptions of args
     # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
-
-
-def assure_tuple_or_list(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
 
 
 def any_re_search(regexes, value):
@@ -371,6 +365,14 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
 def assure_list(s):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -459,6 +461,30 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+#
+# Generators helpers
+#
+
+def saved_generator(gen):
+    """Given a generator returns two generators, where 2nd one just replays
+
+    So the first one would be going through the generated items and 2nd one
+    would be yielding saved items
+    """
+    saved = []
+
+    def gen1():
+        for x in gen:  # iterating over original generator
+            saved.append(x)
+            yield x
+
+    def gen2():
+        for x in saved:  # yielding saved entries
+            yield x
+
+    return gen1(), gen2()
 
 #
 # Decorators
@@ -649,6 +675,7 @@ def swallow_logs(new_level=None, file_=None):
                 out_file = file_
             # PY3 requires clearly one or another.  race condition possible
             self._out = open(out_file, 'a')
+            self._final_out = None
 
         def _read(self, h):
             with open(h.name) as f:
@@ -656,8 +683,12 @@ def swallow_logs(new_level=None, file_=None):
 
         @property
         def out(self):
-            self._out.flush()
-            return self._read(self._out)
+            if self._final_out is not None:
+                # we closed and cleaned up already
+                return self._final_out
+            else:
+                self._out.flush()
+                return self._read(self._out)
 
         @property
         def lines(self):
@@ -668,6 +699,8 @@ def swallow_logs(new_level=None, file_=None):
             return self._out
 
         def cleanup(self):
+            # store for access while object exists
+            self._final_out = self.out
             self._out.close()
             out_name = self._out.name
             del self._out
@@ -675,13 +708,54 @@ def swallow_logs(new_level=None, file_=None):
             if not file_:
                 rmtemp(out_name)
 
+        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
+            """Provide assertion on either a msg was logged at a given level
+
+            If neither `msg` nor `level` provided, checks if anything was logged
+            at all.
+
+            Parameters
+            ----------
+            msg: str, optional
+              Message (as a regular expression, if `regex`) to be searched.
+              If no msg provided, checks if anything was logged at a given level.
+            level: str, optional
+              String representing the level to be logged
+            regex: bool, optional
+              If False, regular `assert_in` is used
+            **kwargs: str, optional
+              Passed to `assert_re_in` or `assert_in`
+            """
+            from datalad.tests.utils import assert_re_in
+            from datalad.tests.utils import assert_in
+
+            if regex:
+                match = '\[%s\] ' % level if level else "\[\S+\] "
+            else:
+                match = '[%s] ' % level if level else ''
+
+            if msg:
+                match += msg
+
+            if match:
+                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
+            else:
+                assert not kwargs, "no kwargs to be passed anywhere"
+                assert self.out, "Nothing was logged!?"
+
+
     adapter = StringIOAdapter()
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
     # set
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    swallow_handler = logging.StreamHandler(adapter.handle)
+    # we want to log levelname so we could test against it
+    swallow_handler.setFormatter(
+        logging.Formatter('[%(levelname)s] %(message)s'))
+    lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
+
     if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 

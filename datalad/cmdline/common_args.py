@@ -22,22 +22,26 @@ from ..cmdline.helpers import HelpAction, LogLevelAction
 help = (
     'help', ('-h', '--help', '--help-np'),
     dict(nargs=0, action=HelpAction,
-         help="""show this help message and exit.  --help-np forcefully disables
+         help="""show this help message.  --help-np forcefully disables
                  the use of a pager for displaying the help message""")
 )
 
 version = (
     'version', ('--version',),
     dict(action='version',
-         help="show the program's version and license information and exit")
+         help="show the program's version and license information")
 )
 
+_log_level_names = ['critical', 'error', 'warning', 'info', 'debug']
 log_level = (
     'log-level', ('-l', '--log-level'),
     dict(action=LogLevelAction,
-         choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
+         choices=_log_level_names + [str(x) for x in range(1, 10)],
+         metavar="LEVEL",
          default='warning',
-         help="""level of verbosity.  Integers provide even more debugging information""")
+         help="""set logging verbosity level.  Choose among %s.  Also you can
+         specify an integer <10 to provide even more debugging information"""
+              % ', '.join(_log_level_names))
 )
 
 pbs_runner = (

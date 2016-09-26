@@ -23,7 +23,7 @@ from setup_support import get_version
 
 
 def findsome(subdir, extensions):
-    """Find files under subdir having speified extensions
+    """Find files under subdir having specified extensions
 
     Leading directory (datalad) gets stripped
     """
@@ -57,7 +57,7 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.0.3',
+        'GitPython>=2.0.8',
         'iso8601',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
@@ -76,7 +76,7 @@ requires = {
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],
     'publish': [
-        'jsmin',
+        'jsmin',             # nice to have, and actually also involved in `install`
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -94,17 +94,18 @@ requires = {
 requires['full'] = sum(list(requires.values()), [])
 
 
+# let's not build manpages and examples automatically (gh-896)
 # configure additional command for custom build steps
-class DataladBuild(build_py):
-    def run(self):
-        self.run_command('build_manpage')
-        self.run_command('build_examples')
-        build_py.run(self)
+#class DataladBuild(build_py):
+#    def run(self):
+#        self.run_command('build_manpage')
+#        self.run_command('build_examples')
+#        build_py.run(self)
 
 cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
-    'build_py': DataladBuild
+#    'build_py': DataladBuild
 }
 
 setup(

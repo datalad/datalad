@@ -1,0 +1,4 @@
+[paths]
+source =
+    datalad/
+    */datalad/

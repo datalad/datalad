@@ -41,6 +41,12 @@ git_opts = Parameter(
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git` calls""")
 
+git_clone_opts = Parameter(
+    args=("--git-clone-opts",),
+    metavar='STRING',
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :command:`git clone` calls""")
+
 annex_opts = Parameter(
     args=("--annex-opts",),
     metavar='STRING',
@@ -91,3 +97,8 @@ nosave_opt = Parameter(
     action="store_false",
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
+
+verbose = Parameter(
+    args=("-v", "--verbose",),
+    action="store_true",
+    doc="""print out more detailed information while executing a command""")

@@ -142,7 +142,7 @@ def setup_parser(
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__)
+                    _intf.__doc__.strip())
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -181,13 +181,13 @@ def setup_parser(
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  - %s:  %s'
-                               % (cd[0],
+            cmd_summary.append('  - %-20s %s'
+                               % ((cd[0] + ':',
                                   textwrap.fill(
                                       cd[1].rstrip(' .'),
                                       75,
                                       #initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 8)))
+                                      subsequent_indent=' ' * 8))))
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
@@ -228,8 +228,19 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs = parser.parse_args(args)
-    if not cmdlineargs.change_path is None:
+    cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    if unparsed_args:
+        if cmdlineargs.func.__self__.__name__ != 'Export':
+            lgr.error('unknown argument{}: {}'.format(
+                's' if len(unparsed_args) > 1 else '',
+                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0]))
+            cmdlineargs.subparser.print_usage()
+            sys.exit(1)
+        else:
+            # store all unparsed arguments
+            cmdlineargs.datalad_unparsed_args = unparsed_args
+
+    if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)
 

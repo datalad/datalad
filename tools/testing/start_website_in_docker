@@ -48,9 +48,10 @@ sed -e '/DL_APT/d' -i $dockerfile
 echo "I: copy authorized keys so they become avail inside"
 cp ~/.ssh/authorized_keys $topdir/conf/
 
-tag=datalad:website_${USER}_$DL_DIST
+tag_=website_${USER}_${DL_DIST}
+tag=datalad:${tag_}
 echo "I: tag $tag"
-if docker images | grep -q datalad.*test_README.*$DL_DIST; then
+if docker images | grep -q datalad.*${tag_}; then
     echo "I: tag already exists -- skipping rebuilding"
 else
     docker build -t $tag -f $dockerfile . #&& rm Dockerfile

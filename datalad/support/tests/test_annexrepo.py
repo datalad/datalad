@@ -18,7 +18,10 @@ from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
 from nose.tools import assert_is_instance
 
+from datalad.utils import linux_distribution_name
 from datalad.tests.utils import *
+from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import OutdatedExternalDependency
 
 # imports from same module:
 from ..annexrepo import *
@@ -174,6 +177,33 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_get_outofspace(annex_path):
+    ar = AnnexRepo(annex_path, create=True)
+
+    def raise_cmderror(*args, **kwargs):
+        raise CommandError(
+            cmd="whatever",
+            stderr="junk around not enough free space, need 905.6 MB more and after"
+        )
+
+    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+        assert_raises(OutOfSpaceError) as cme:
+        ar.get("file")
+    exc = cme.exception
+    assert_equal(exc.sizemore_msg, '905.6 MB')
+    assert_re_in(".*annex get. needs 905.6 MB more", str(exc))
+
+
+@with_testrepos('basic_annex', flavors=['local'])
+def test_AnnexRepo_get_remote_na(path):
+    ar = AnnexRepo(path)
+
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
+    eq_(cme.exception.remote, "NotExistingRemote")
 
 
 # 1 is enough to test file_has_content
@@ -738,7 +768,8 @@ def test_AnnexRepo_get(src, dst):
 #def enable_remote(self, name):
 
 @with_testrepos('basic_annex$', flavors=['clone'])
-def _test_AnnexRepo_get_contentlocation(batch, path):
+@with_tempfile
+def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
     annex = AnnexRepo(path, create=False, init=False)
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
@@ -753,8 +784,15 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
 
-    # TODO: test how it would look if done under a subdir
-    with chpwd('subdir', mkdir=True):
+    # test how it would look if done under a subdir of the annex:
+    with chpwd(opj(annex.path, 'subdir'), mkdir=True):
+        key_location = annex.get_contentlocation(key, batch=batch)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
+
+    # test how it would look if done under a dir outside of the annex:
+    with chpwd(work_dir_outside, mkdir=True):
         key_location = annex.get_contentlocation(key, batch=batch)
         # they both should point to the same location eventually
         eq_(os.path.realpath(opj(annex.path, fname)),
@@ -1148,3 +1186,48 @@ def test_annex_add_no_dotfiles(path):
         index=True, working_tree=True, untracked_files=True, submodules=True))
     # not known to annex
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
+
+
+@with_tempfile
+def test_annex_version_handling(path):
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+         patch.object(AnnexRepo, '_check_git_annex_version',
+                      auto_spec=True,
+                      side_effect=AnnexRepo._check_git_annex_version) \
+            as cmpc, \
+         patch.object(external_versions, '_versions',
+                      {'cmd:annex': AnnexRepo.GIT_ANNEX_MIN_VERSION}):
+            eq_(AnnexRepo.git_annex_version, None)
+            ar1 = AnnexRepo(path, create=True)
+            assert(ar1)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+            # 2nd time must not be called
+            ar2 = AnnexRepo(path)
+            assert(ar2)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+            patch.object(AnnexRepo, '_check_git_annex_version',
+                         auto_spec=True,
+                         side_effect=AnnexRepo._check_git_annex_version):
+        # no git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': None}):
+            eq_(AnnexRepo.git_annex_version, None)
+            with assert_raises(MissingExternalDependency) as cme:
+                AnnexRepo(path)
+            if linux_distribution_name == 'debian':
+                assert_in("http://neuro.debian.net", str(cme.exception))
+            eq_(AnnexRepo.git_annex_version, None)
+
+        # outdated git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': '6.20160505'}):
+            eq_(AnnexRepo.git_annex_version, None)
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+            # and we don't assign it
+            eq_(AnnexRepo.git_annex_version, None)
+            # so we could still fail
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)

@@ -101,6 +101,10 @@ class ConsoleLog(object):
             pbar = progressbars[backend]
         return pbar(*args, out=self.out, **kwargs)
 
+    @property
+    def is_interactive(self):
+        return isinstance(self, InteractiveUI)
+
 
 def getpass_echo(prompt='Password: ', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
@@ -140,7 +144,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
                  default=None,
                  hidden=False):
         # Do initial checks first
-        if default and default not in choices:
+        if default and choices and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
                              % (default, choices))
 
@@ -158,6 +162,8 @@ class DialogUI(ConsoleLog, InteractiveUI):
 
         if choices is not None:
             msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
+        elif default is not None:
+            msg += '{} [{}]'.format(text, default)
         else:
             msg += text
         """

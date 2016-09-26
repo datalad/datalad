@@ -18,10 +18,12 @@ from ..dochelpers import exc_str
 from .utils import assert_equal, assert_true, assert_raises
 from .utils import assert_re_in
 
+
 def test_basic():
     assert_equal(single_or_plural('a', 'b', 1), 'a')
     assert_equal(single_or_plural('a', 'b', 0), 'b')
     assert_equal(single_or_plural('a', 'b', 123), 'b')
+    assert_equal(single_or_plural('a', 'b', 123, include_count=True), '123 b')
 
 
 def test_borrow_doc():

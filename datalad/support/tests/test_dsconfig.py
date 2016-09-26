@@ -23,8 +23,11 @@ from datalad.tests.utils import with_tempfile
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
+from datalad.api import create
 from datalad.support.dsconfig import ConfigManager
 from datalad.cmd import CommandError
+
+from datalad.tests.utils import with_testsui
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -167,3 +170,96 @@ def test_something(path, new_home):
 def test_crazy_cfg(path):
     cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
     assert_in('crazy.padry', cfg)
+
+
+@with_tempfile
+def test_obtain(path):
+    ds = create(path)
+    cfg = ConfigManager(ds)
+    dummy = 'datalad.test.dummy'
+    # we know nothing and we don't know how to ask
+    assert_raises(RuntimeError, cfg.obtain, dummy)
+    # can report known ones
+    cfg.add(dummy, '5.3')
+    assert_equal(cfg.obtain(dummy), '5.3')
+    # better type
+    assert_equal(cfg.obtain(dummy, valtype=float), 5.3)
+    # don't hide type issues, float doesn't become an int magically
+    assert_raises(ValueError, cfg.obtain, dummy, valtype=int)
+    # inject some prior knowledge
+    from datalad.interface.common_cfg import ui_definitions as cfg_defs
+    cfg_defs[dummy] = dict(type=float)
+    # no we don't need to specify a type anymore
+    assert_equal(cfg.obtain(dummy), 5.3)
+    # but if we remove the value from the config, all magic is gone
+    cfg.unset(dummy)
+    # we know nothing and we don't know how to ask
+    assert_raises(RuntimeError, cfg.obtain, dummy)
+
+    #
+    # test actual interaction
+    #
+    @with_testsui()
+    def ask():
+        # fail on unkown dialog type
+        assert_raises(ValueError, cfg.obtain, dummy, dialog_type='Rorschach_test')
+    ask()
+
+    # ask nicely, and get a value of proper type using the preconfiguration
+    @with_testsui(responses='5.3')
+    def ask():
+        assert_equal(
+            cfg.obtain(dummy, dialog_type='question', text='Tell me'), 5.3)
+    ask()
+
+    # preconfigure even more, to get the most compact call
+    cfg_defs[dummy]['ui'] = ('question', dict(text='tell me', title='Gretchen Frage'))
+
+    @with_testsui(responses='5.3')
+    def ask():
+        assert_equal(cfg.obtain(dummy), 5.3)
+    ask()
+
+    @with_testsui(responses='murks')
+    def ask():
+        assert_raises(ValueError, cfg.obtain, dummy)
+    ask()
+
+    # fail to store when destination is not specified, will not even ask
+    @with_testsui()
+    def ask():
+        assert_raises(ValueError, cfg.obtain, dummy, store=True)
+    ask()
+
+    # but we can preconfigure it
+    cfg_defs[dummy]['destination'] = 'broken'
+
+    @with_testsui(responses='5.3')
+    def ask():
+        assert_raises(ValueError, cfg.obtain, dummy, store=True)
+    ask()
+
+    # fixup destination
+    cfg_defs[dummy]['destination'] = 'dataset'
+
+    @with_testsui(responses='5.3')
+    def ask():
+        assert_equal(cfg.obtain(dummy, store=True), 5.3)
+    ask()
+
+    # now it won't have to ask again
+    @with_testsui()
+    def ask():
+        assert_equal(cfg.obtain(dummy), 5.3)
+    ask()
+
+    # wipe it out again
+    cfg.unset(dummy)
+    assert_not_in(dummy, cfg)
+
+    # XXX cannot figure out how I can simulate a simple <Enter>
+    ## respond with accepting the default
+    #@with_testsui(responses=...)
+    #def ask():
+    #    assert_equal(cfg.obtain(dummy, default=5.3), 5.3)
+    #ask()
