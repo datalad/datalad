@@ -32,7 +32,6 @@ Plumbing
    auto
    cmd
    consts
-   db
    log
    utils
    version
