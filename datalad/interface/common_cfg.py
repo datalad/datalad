@@ -53,4 +53,23 @@ ui_definitions = {
                'text': 'Hostname of the database server'}),
         'destination': 'global',
     },
+    'datalad.crawl.default_backend': {
+        'ui': ('question', {
+               'title': 'Default annex backend',
+               # XXX we could add choices... but might get out of sync
+               'text': 'Content hashing method to be used by git-annex'}),
+        'destination': 'dataset',
+    },
+    'datalad.crawl.init_direct': {
+        'ui': ('question', {
+               'title': 'Default annex repository mode',
+               'text': 'Should dataset be initialized in direct mode?'}),
+        'destination': 'global',
+    },
+    'datalad.crawl.pipeline.housekeeping': {
+        'ui': ('yesno', {
+               'title': 'Crawler pipeline house keeping',
+               'text': 'Should the crawler tidy up datasets (git gc, repack, clean)?'}),
+        'destination': 'global',
+    },
 }
