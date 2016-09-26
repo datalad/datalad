@@ -30,8 +30,17 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
         lgr.warn("tarball exporter ignores any additional options '{}'".format(
             argv))
 
+    repo = dataset.repo
+    committed_date = repo.get_committed_date()
+
     # could be used later on to filter files by some criterion
     def _filter_tarinfo(ti):
+        # Reset the date to match the one of the last commit, not from the
+        # filesystem since git doesn't track those at all
+        # TODO: use the date of the last commit when any particular
+        # file was changed -- would be the most kosher yoh thinks to the
+        # degree of our abilities
+        ti.mtime = committed_date
         return ti
 
     if output is None:
@@ -39,9 +48,6 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
     else:
         if not output.endswith('.tar.gz'):
             output += '.tar.gz'
-
-    repo = dataset.repo
-    committed_date = repo.get_committed_date()
 
     root = dataset.path
     # use dir inside matching the output filename

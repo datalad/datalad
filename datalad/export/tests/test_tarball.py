@@ -47,6 +47,7 @@ def test_failure(path):
 def test_tarball(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save(auto_add_changes=True)
+    committed_date = ds.repo.get_committed_date()
     with chpwd(path):
         _mod, tarball1 = ds.export('tarball')
         assert(not isabs(tarball1))
@@ -75,6 +76,7 @@ def test_tarball(path):
                 # any annex links resolved
                 assert_false(ti.issym())
                 ok_startswith(ti.name, prefix + '/')
+                assert_equal(ti.mtime, committed_date)
                 if '.datalad' not in ti.name:
                     # ignore any files in .datalad for this test to not be
                     # susceptible to changes in how much we generate a meta info
