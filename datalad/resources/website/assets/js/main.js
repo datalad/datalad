@@ -142,7 +142,7 @@ function click_handler(data, url) {
 /**
  * construct path to metadata json of node to be rendered
  * @param {object} md5 the md5 library object, used to compute metadata hash name of current node
- * @param {bool} parent if parent, find metadata json of parent directory
+ * @param {bool} parent if parent, find metadata json of parent directory instead
  * @return {string} path to the current node's metadata json
  */
 function metadata_locator(md5, parent) {
@@ -180,14 +180,20 @@ function metadata_locator(md5, parent) {
 /**
  * Retrieve metadata json of parent if exists
  * @param {string} jQuery jQuery library object
- * @param {string} path path of current dataset
+ * @param {string} md5 path of current dataset
  * @return {object} return metadata json object of parent if parent exists
  */
 function parent_json(jQuery, md5) {
   var parent_metadata = metadata_locator(md5, true);
-  if (url_exists(parent_metadata))
-    return jQuery.getJSON(parent_metadata, function(data) { return data; });
-  return -1;
+
+  // if parent directory or parent metadata directory doesn't exist, return error code
+  if (parent_metadata !== -1 && !url_exists(parent_metadata))
+    return -1;
+
+  // else return parent metadata json
+  return jQuery.getJSON(parent_metadata, function(data) {
+    return data;
+  });
 }
 
 /**
@@ -196,6 +202,9 @@ function parent_json(jQuery, md5) {
  * @return {string} return html string to be rendered in size column of current row entry
 */
 function size_renderer(size) {
+  // if size is undefined
+  if (!size)
+    return '-';
   // set ondisk_size = '-' if ondisk doesn't exist or = 0
   if (!size.ondisk || size.ondisk === '0 Bytes')
     size.ondisk = '-';
@@ -260,8 +269,14 @@ function directory(jQuery, md5) {
     initComplete: function() {
       var api = this.api();
       // all tables should have ../ parent path
-      if (!parent)
-        api.row.add({name: "..", repo: "", date: "", path: "", type: "annex", size: ""}).draw();
+      var parent_json_ = parent_json(jQuery, md5);
+      if (!parent && parent_json_ !== -1)
+        api.row.add({name: '..', repo: parent_json.repo || '-',
+                     date: parent_json.date || '-',
+                     path: parent_json.path || '-',
+                     type: parent_json.type || 'dir',
+                     size: size_renderer(parent_json.size || null)}).draw();
+        // api.row.add(parent_json).draw();
       // add click handlers
       api.$('tr').click(function() {
         var traverse = click_handler(api.row(this).data());
