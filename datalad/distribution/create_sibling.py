@@ -457,6 +457,8 @@ class CreateSibling(Interface):
                     from jsmin import jsmin
                     minified = jsmin(asset.read())                      # minify asset
                 except ImportError:
+                    lgr.warning(
+                        "Will not minify web interface javascript, no jsmin available")
                     minified = asset.read()                             # no minify available
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
