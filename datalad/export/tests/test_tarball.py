@@ -9,17 +9,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test tarball exporter"""
 
-from datalad.api import Dataset
-from datalad.api import export
-from nose.tools import assert_true, assert_not_equal, assert_raises, \
-    assert_false, assert_equal
-from datalad.tests.utils import with_tree
-from datalad.utils import chpwd
-from datalad.utils import md5sum
 import os
 import time
 from os.path import join as opj
+from os.path import isabs
 import tarfile
+
+from datalad.api import Dataset
+from datalad.api import export
+from datalad.utils import chpwd
+from datalad.utils import md5sum
+
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import ok_startswith
+from datalad.tests.utils import assert_true, assert_not_equal, assert_raises, \
+    assert_false, assert_equal
 
 
 _dataset_template = {
@@ -43,9 +47,13 @@ def test_failure(path):
 def test_tarball(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.save(auto_add_changes=True)
+    committed_date = ds.repo.get_committed_date()
     with chpwd(path):
-        ds.export('tarball')
+        _mod, tarball1 = ds.export('tarball')
+        assert(not isabs(tarball1))
+        tarball1 = opj(path, tarball1)
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
+    assert_equal(tarball1, default_outname)
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension
@@ -55,19 +63,25 @@ def test_tarball(path):
     # encodes the original tarball filename -> different checksum, despit
     # same content
     assert_not_equal(md5sum(default_outname), custom1_md5)
+    # should really sleep so if they stop using time.time - we know
     time.sleep(1.1)
     ds.export('tarball', output=custom_outname)
-    # encodes mtime -> different checksum, despit same content and name
-    assert_not_equal(md5sum(custom_outname), custom1_md5)
-    # check content
-    with tarfile.open(default_outname) as tf:
-        nfiles = 0
-        for ti in tf:
-            # any annex links resolved
-            assert_false(ti.issym())
-            if not '.datalad' in ti.name:
-                # ignore any files in .datalad for this test to not be
-                # susceptible to changes in how much we generate a meta info
-                nfiles += 1
-        # we have exactly three files, and expect no content for any directory
-        assert_equal(nfiles, 3)
+    # should not encode mtime, so should be identical
+    assert_equal(md5sum(custom_outname), custom1_md5)
+
+    def check_contents(outname, prefix):
+        with tarfile.open(outname) as tf:
+            nfiles = 0
+            for ti in tf:
+                # any annex links resolved
+                assert_false(ti.issym())
+                ok_startswith(ti.name, prefix + '/')
+                assert_equal(ti.mtime, committed_date)
+                if '.datalad' not in ti.name:
+                    # ignore any files in .datalad for this test to not be
+                    # susceptible to changes in how much we generate a meta info
+                    nfiles += 1
+            # we have exactly three files, and expect no content for any directory
+            assert_equal(nfiles, 3)
+    check_contents(default_outname, 'datalad_%s' % ds.id)
+    check_contents(custom_outname, 'myexport')
