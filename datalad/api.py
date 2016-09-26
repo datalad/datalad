@@ -17,6 +17,7 @@ def _generate_func_api():
        API from them
     """
     from importlib import import_module
+    from inspect import isgenerator
     from collections import namedtuple
     from collections import OrderedDict
     from functools import wraps
@@ -50,12 +51,15 @@ def _generate_func_api():
         @wraps(call)
         def call_(*args, **kwargs):
             ret = call(*args, **kwargs)
+            if isgenerator(ret):
+                # At first I thought we might just rerun it for output
+                # at the end, but that wouldn't work if command actually
+                # has a side-effect, i.e. actually doing something
+                # so we actually need to memoize all generated output and output
+                # it instead
+                ret = get_memoized_generator(ret)
+
             renderer(ret, _kwargs_to_namespace(call, args, kwargs))
-            # TODO: returning wouldn't quite work if we had a
-            # generator since it would get depleted -- we would need
-            # to 'duplicate' its content and return a new generator.
-            # OR may be we shouldn't return anything at all, or not for
-            # generators
             return ret
 
         # TODO: see if we could proxy the "signature" of function

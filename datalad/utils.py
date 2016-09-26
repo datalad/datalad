@@ -75,14 +75,6 @@ def get_func_kwargs_doc(func):
     # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
-def assure_tuple_or_list(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
-
-
 def any_re_search(regexes, value):
     """Return if any of regexes (list or str) searches succesfully for value"""
     for regex in assure_tuple_or_list(regexes):
@@ -371,6 +363,14 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
 def assure_list(s):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -459,6 +459,51 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+#
+# Generators help
+#
+
+@auto_repr
+class memoized_generator(object):
+    """Make a proxy for a generator, which if asked again would replay
+
+    So the thing is also a generator
+    """
+
+    def __init__(self, gen):
+        self._saved = None
+        self._replay_idx = 0
+        self.gen = gen
+        self._finished_gen = False
+
+    def __iter__(self):
+        return self
+
+    # Python 3 compatibility
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        if not self._finished_gen:
+            try:
+                element = next(self.gen)
+                if self._saved is None:
+                    self._saved = []
+                self._saved.append(element)
+            except StopIteration:
+                self._finished_gen = True
+                raise
+        else:
+            # we are replaying
+            if self._replay_idx >= len(self._saved):
+                self._replay_idx = 0
+                raise StopIteration
+            element = self._saved[self._replay_idx]
+            self._replay_idx += 1
+
+        return element
 
 #
 # Decorators

@@ -10,6 +10,7 @@
 
 """
 
+import inspect
 import os
 import shutil
 import sys
@@ -479,3 +480,24 @@ def test_get_timestamp_suffix():
             assert(get_timestamp_suffix().startswith('-'))
     finally:
         time.tzset()
+
+
+def test_memoized_generator():
+    called = [0]
+
+    def g1(n):
+        """a generator"""
+        called[0] += 1
+        for i in range(n):
+            yield i
+
+    from ..utils import memoized_generator
+    ok_generator(g1(3))
+    g1_ = memoized_generator(g1(3))
+    ok_generator(g1_)
+    target = list(g1(3))
+    eq_(called[0], 1)
+    eq_(target, list(g1_))
+    eq_(called[0], 2)
+    eq_(target, list(g1_))
+    eq_(called[0], 2)  # no new call to make a generator
