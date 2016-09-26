@@ -15,6 +15,8 @@ env:
     # will be used in the matrix, where neither other variable is used
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
+    # Special settings/helper for combined coverage from special remotes execution
+    - COVERAGE=coverage
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
 #    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
@@ -117,7 +119,7 @@ script:
   - echo "Running tests"
   - python setup.py build_manpage
   - python setup.py build_examples
-  - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
+  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
@@ -130,6 +132,8 @@ script:
   - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
+  - coverage combine -a /tmp/.coverage-entrypoints-*
+  - coverage report
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
