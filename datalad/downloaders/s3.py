@@ -11,21 +11,17 @@
 """
 
 
-import re
-import os
-from os.path import exists, join as opj, isdir
-from six.moves.urllib.parse import urljoin, urlsplit
+from six.moves.urllib.parse import urlsplit
 
-from ..ui import ui
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
-from ..dochelpers import borrowkwargs, exc_str
+from ..dochelpers import borrowkwargs
 from ..support.network import get_url_straight_filename
 from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
-from .base import DownloadError, AccessDeniedError, TargetFileAbsent
+from .base import DownloadError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
 from ..support.s3 import get_bucket
 from ..support.status import FileStatus
@@ -150,7 +146,6 @@ class S3Downloader(BaseDownloader):
         # deal with non key=value
         return rec.netloc, rec.path.lstrip('/'), assure_dict_from_str(rec.query, sep='&') or {}
 
-
     def _establish_session(self, url, allow_old=True):
         """
 
@@ -212,7 +207,6 @@ class S3Downloader(BaseDownloader):
             headers=headers,
             key=key
         )
-
 
     @classmethod
     def get_key_headers(cls, key, dateformat='rfc2822'):

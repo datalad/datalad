@@ -105,4 +105,3 @@ class DownloadURL(Interface):
         if failed_urls:
             raise RuntimeError("%d url(s) failed to download" % len(failed_urls))
         return downloaded_paths
-

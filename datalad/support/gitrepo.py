@@ -53,7 +53,6 @@ from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import RI
 from .network import is_ssh
-from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -99,8 +98,8 @@ def kwargs_to_options(func, split_single_char_options=True,
         t_kwargs = dict()
         t_kwargs[target_kw] = \
             gitpy.Git().transform_kwargs(
-                        split_single_char_options=split_single_char_options,
-                        **kwargs)
+                split_single_char_options=split_single_char_options,
+                **kwargs)
         return func(self, *args, **t_kwargs)
     return newfunc
 
@@ -167,7 +166,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = normpath(opj(realpath(getpwd()), path))  # realpath OK
+        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -279,7 +278,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
         else:
             remap_filenames = lambda x: x
 
-        if serialize: # and not single_file:
+        if serialize:  # and not single_file:
             result = [
                 func(self, f, *args, **kwargs)
                 for f in files_new
@@ -520,8 +519,8 @@ class GitRepo(object):
                 lgr.error(e_str)
                 raise
             except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                                "I/O operation on closed file" in str(e):
+                if gitpy.__version__ == '1.0.2' \
+                        and "I/O operation on closed file" in str(e):
                     # bug https://github.com/gitpython-developers/GitPython
                     # /issues/383
                     raise GitCommandError(
@@ -1005,9 +1004,9 @@ class GitRepo(object):
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
-                           log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=True, cwd=None, env=None,
-                           shell=None, expect_fail=False):
+                            log_stdout=True, log_stderr=True, log_online=False,
+                            expect_stderr=True, cwd=None, env=None,
+                            shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1029,10 +1028,16 @@ class GitRepo(object):
             else cmd_str + files
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr,
+            log_stdout=log_stdout,
+            log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd,
+            env=env,
+            shell=shell,
+            expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
@@ -1348,7 +1353,7 @@ class GitRepo(object):
             '', ['git', 'ls-remote'] + options + [remote]
         )
         # TODO: Return values?
-    
+
     @property
     def dirty(self):
         """Returns true if there are uncommitted changes or files not known to

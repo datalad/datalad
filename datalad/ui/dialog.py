@@ -21,7 +21,6 @@ import os
 import sys
 import time
 
-from six import PY2
 import getpass
 
 #!!! OPT adds >100ms to import time!!!
@@ -60,7 +59,6 @@ for i in range(10):
 # and code in docker: pkg/progressreader/progressreader.go pkg/streamformatter/streamformatter.go
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
-
 
 
 @auto_repr
@@ -123,7 +121,7 @@ def getpass_echo(prompt='Password: ', stream=None):
         #         return
         #     stream.write(out)
         from mock import patch
-        with patch('termios.ECHO', 255**2):
+        with patch('termios.ECHO', 255 ** 2):
             #patch.object(stream, 'write', _no_emptyline_write(stream)):
             return getpass.getpass(prompt=prompt, stream=stream)
 

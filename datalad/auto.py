@@ -23,23 +23,20 @@ except ImportError:
 
 import logging
 
-from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
+from os.path import dirname, lexists
 from git.exc import InvalidGitRepositoryError
 
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
-from .support.gitrepo import GitRepo
-from .support.exceptions import CommandError
-from .cmd import Runner
 from .cmdline.helpers import get_repo_instance
 
-from .utils import swallow_outputs
 lgr = logging.getLogger("datalad.auto")
 
 
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""
     pass
+
 
 class AutomagicIO(object):
     """Class to proxy commonly used API for accessing files so they get automatically fetched

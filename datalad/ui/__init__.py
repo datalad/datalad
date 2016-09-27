@@ -27,6 +27,7 @@ from ..utils import is_interactive
 # user by proxying some other appropriate (cmdline or GUI) UI, while others, such
 # as reporting on progress etc -- should get back to the annex
 
+
 # TODO: singleton
 class _UI_Switcher(object):
     """
@@ -44,12 +45,12 @@ class _UI_Switcher(object):
         if backend is None:
             backend = 'console' if not is_interactive() else 'dialog'
         self._ui = {
-                'console': ConsoleLog,
-                'dialog': DialogUI,
-                'annex': UnderAnnexUI,
-                'tests': UnderTestsUI,
-                'tests-noninteractive': ConsoleLog,
-            }[backend]()
+            'console': ConsoleLog,
+            'dialog': DialogUI,
+            'annex': UnderAnnexUI,
+            'tests': UnderTestsUI,
+            'tests-noninteractive': ConsoleLog,
+        }[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend
 

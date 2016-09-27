@@ -177,7 +177,7 @@ class AWS_S3(Credential):
         if not exp:
             return True
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - calendar.timegm(time.localtime()))/3600.
+        expire_in = (exp_epoch - calendar.timegm(time.localtime())) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
@@ -210,7 +210,7 @@ class CompositeCredential(Credential):
         # the rest with index suffix, but storing themselves in the same keyring
         for iC, C in enumerate(self._CREDENTIAL_CLASSES[1:]):
             credentials.append(
-                C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self._keyring)
+                C(name="%s:%d" % (self.name, iC + 1), url=None, keyring=self._keyring)
             )
         self._credentials = credentials
 
@@ -229,8 +229,6 @@ class CompositeCredential(Credential):
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
-        name = self.name
-
         # Start from the tail until we have credentials set
         idx = len(self._credentials) - 1
         for c in self._credentials[::-1]:
@@ -250,7 +248,7 @@ class CompositeCredential(Credential):
         for c, adapter, next_c in zip(
                 self._credentials[idx:],
                 self._CREDENTIAL_ADAPTERS[idx:],
-                self._credentials[idx+1:]):
+                self._credentials[idx + 1:]):
             fields = c()
             next_fields = adapter(**fields)
             next_c.set(**next_fields)

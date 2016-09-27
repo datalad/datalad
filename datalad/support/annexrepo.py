@@ -25,7 +25,6 @@ from os.path import realpath
 from os.path import lexists
 from os.path import isdir
 from subprocess import Popen, PIPE
-from functools import wraps
 
 from six import string_types
 from six.moves import filter
@@ -34,7 +33,6 @@ from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
-from datalad.utils import platform_system
 from datalad.utils import linux_distribution_name
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
@@ -241,7 +239,7 @@ class AnnexRepo(GitRepo):
         # in case it is missing
         if linux_distribution_name in {'debian', 'ubuntu'}:
             msg = "Install  git-annex-standalone  from NeuroDebian " \
-                   "(http://neuro.debian.net)"
+                  "(http://neuro.debian.net)"
         else:
             msg = "Visit http://git-annex.branchable.com/install/"
         exc_kwargs = dict(
@@ -263,7 +261,7 @@ class AnnexRepo(GitRepo):
         if allow_noninitialized:
             try:
                 return initialized_annex \
-                       or GitRepo(path, create=False, init=False).is_with_annex()
+                    or GitRepo(path, create=False, init=False).is_with_annex()
             except (NoSuchPathError, InvalidGitRepositoryError):
                 return False
         else:
@@ -447,7 +445,6 @@ class AnnexRepo(GitRepo):
         list of dict
         """
         options = options[:] if options else []
-        from datalad.cmd import Runner
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
@@ -757,7 +754,6 @@ class AnnexRepo(GitRepo):
         # TODO: wait for support of remote
         self._run_annex_command('merge')
 
-
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
                         batch=False, git_options=None, annex_options=None):
@@ -825,14 +821,14 @@ class AnnexRepo(GitRepo):
                 # if isinstance(exc, IOError):
                 #     raise
                 raise AnnexBatchCommandError(
-                        cmd="addurl",
-                        msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
+                    cmd="addurl",
+                    msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
             assert(out_json['command'] == 'addurl')
             if not out_json.get('success', False):
                 raise AnnexBatchCommandError(
-                        cmd="addurl",
-                        msg="Error, annex reported failure for addurl: %s"
-                        % str(out_json))
+                    cmd="addurl",
+                    msg="Error, annex reported failure for addurl: %s"
+                    % str(out_json))
             return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
@@ -980,9 +976,9 @@ class AnnexRepo(GitRepo):
         try:
             # TODO: refactor to account for possible --batch ones
             out, err = self._run_annex_command(
-                    command,
-                    annex_options=['--json'] + args,
-                    **kwargs)
+                command,
+                annex_options=['--json'] + args,
+                **kwargs)
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -1037,12 +1033,11 @@ class AnnexRepo(GitRepo):
                 if not out.endswith(linesep):
                     out += linesep
                 out += linesep.join(
-                        ['{{"command": "{cmd}", "file": "{path}", '
-                         '"note": "{note}",'
-                         '"success":false}}'.format(cmd=command,
-                                                    path=f,
-                                                    note="not found")
-                         for f in not_existing])
+                    ['{{"command": "{cmd}", "file": "{path}", '
+                     '"note": "{note}",'
+                     '"success":false}}'.format(
+                         cmd=command, path=f, note="not found")
+                     for f in not_existing])
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
@@ -1154,7 +1149,7 @@ class AnnexRepo(GitRepo):
             if not j['success']:
                 j = None
             else:
-                assert(j.pop('success') == True)
+                assert(j.pop('success') is True)
                 # convert size to int
                 j['size'] = int(j['size']) if 'unknown' not in j['size'] else None
                 # and pop the "command" field
@@ -1343,7 +1338,7 @@ class AnnexRepo(GitRepo):
             out = self._batched.get(':'.join(annex_cmd), annex_cmd, path=self.path)(key_)
             try:
                 return {
-                    '': False, # when remote is misspecified ... stderr carries the msg
+                    '': False,  # when remote is misspecified ... stderr carries the msg
                     '0': False,
                     '1': True,
                 }[out]
@@ -1353,10 +1348,10 @@ class AnnexRepo(GitRepo):
                 )
 
     @normalize_paths(match_return_type=False)
-    def _annex_custom_command(self, files, cmd_str,
-                           log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False, cwd=None, env=None,
-                           shell=None, expect_fail=False):
+    def _annex_custom_command(
+            self, files, cmd_str, log_stdout=True, log_stderr=True,
+            log_online=False, expect_stderr=False, cwd=None, env=None,
+            shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git-annex
@@ -1490,10 +1485,10 @@ class AnnexRepo(GitRepo):
         # As of now, there is no --json option for annex copy. Use it once this
         # changed.
         std_out, std_err = self._run_annex_command(
-                'copy',
-                annex_options=annex_options,
-                log_stdout=True, log_stderr=not log_online,
-                log_online=log_online, expect_stderr=True)
+            'copy',
+            annex_options=annex_options,
+            log_stdout=True, log_stderr=not log_online,
+            log_online=log_online, expect_stderr=True)
 
         return [line.split()[1] for line in std_out.splitlines()
                 if line.startswith('copy ') and line.endswith('ok')]
@@ -1604,7 +1599,7 @@ class BatchedAnnex(object):
         # in AnnexRepo class
         lgr.debug("Initiating a new process for %s" % repr(self))
         cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
-              ['annex'] + self.annex_cmd + self.annex_options + ['--batch'] # , '--debug']
+              ['annex'] + self.annex_cmd + self.annex_options + ['--batch']  # , '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
         #
@@ -1612,13 +1607,13 @@ class BatchedAnnex(object):
         # while avoid deadlocks etc.  We would need to start a thread/subprocess
         # to timeout etc
         # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
-        self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
-                              # , stderr=PIPE
-                              , env=GitRunner.get_git_environ_adjusted()
-                              , cwd=self.path
-                              , bufsize=1
-                              , universal_newlines=True #**kwargs
-                              )
+        self._process = Popen(
+            cmd, stdin=PIPE, stdout=PIPE,  # stderr=PIPE
+            env=GitRunner.get_git_environ_adjusted(),
+            cwd=self.path,
+            bufsize=1,
+            universal_newlines=True  # **kwargs
+        )
 
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
@@ -1666,7 +1661,7 @@ class BatchedAnnex(object):
             # according to the internet wisdom there is no easy way with subprocess
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
-            process.stdin.write(entry)#.encode())
+            process.stdin.write(entry)  # .encode())
             process.stdin.flush()
             lgr.log(5, "Done sending.")
             # TODO: somehow do catch stderr which might be there or not

@@ -14,7 +14,6 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from os.path import isdir
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 from six import text_type, binary_type
 
 import logging
@@ -60,7 +59,7 @@ except:  # pragma: no cover
 
 def get_func_kwargs_doc(func):
     """ Provides args for a function
-    
+
     Parameters
     ----------
     func: str
@@ -99,7 +98,7 @@ def shortened_repr(value, l=30):
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s...>>" % (value_repr[:l-8])
+                value_repr = "<<%s...>>" % (value_repr[:l - 8])
             elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
                 raise ValueError("I hate those useless long reprs")
         else:
@@ -129,6 +128,7 @@ def __auto_repr__(obj):
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 
+
 def auto_repr(cls):
     """Decorator for a class to assign it an automagic quick and dirty __repr__
 
@@ -139,6 +139,7 @@ def auto_repr(cls):
 
     cls.__repr__ = __auto_repr__
     return cls
+
 
 def is_interactive():
     """Return True if all in/outs are tty"""
@@ -158,8 +159,8 @@ def md5sum(filename):
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
-    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
+    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
+                       for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
@@ -224,6 +225,7 @@ def is_explicit_path(path):
     return isabs(path) \
         or path.startswith(os.curdir + os.sep) \
         or path.startswith(os.pardir + os.sep)
+
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -314,7 +316,7 @@ def file_basename(name, return_ext=False):
     bname = basename(name)
     fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
     if return_ext:
-        return fbname, bname[len(fbname)+1:]
+        return fbname, bname[len(fbname) + 1:]
     else:
         return fbname
 
@@ -429,7 +431,7 @@ def assure_dict_from_str(s, **kwargs):
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
         if k in out:
-            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            err = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
             raise ValueError(err)
         out[k] = v
     return out
@@ -486,6 +488,7 @@ def saved_generator(gen):
 
     return gen1(), gen2()
 
+
 #
 # Decorators
 #
@@ -532,14 +535,14 @@ def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
         tkwargs_['prefix'] = '_'.join(
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
-            ([''] if (on_windows or not wrapped)
-                  else [wrapped.__name__]))
+            ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
     return tkwargs_
+
 
 @optional_args
 def line_profile(func):
@@ -563,6 +566,7 @@ def line_profile(func):
 
 from contextlib import contextmanager
 
+
 @contextmanager
 def swallow_outputs():
     """Context manager to help consuming both stdout and stderr, and print()
@@ -577,7 +581,6 @@ def swallow_outputs():
     print function had desired effect
     """
 
-    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -615,8 +618,6 @@ def swallow_outputs():
             gc.collect()
             rmtemp(out_name)
             rmtemp(err_name)
-
-
 
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
@@ -743,7 +744,6 @@ def swallow_logs(new_level=None, file_=None):
                 assert not kwargs, "no kwargs to be passed anywhere"
                 assert self.out, "Nothing was logged!?"
 
-
     adapter = StringIOAdapter()
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
@@ -775,6 +775,8 @@ def swallow_logs(new_level=None, file_=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
+
+
 def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -810,6 +812,7 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+
 def updated(d, update):
     """Return a copy of the input with the 'update'
 
@@ -818,6 +821,7 @@ def updated(d, update):
     d = d.copy()
     d.update(update)
     return d
+
 
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
@@ -828,6 +832,7 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
 
 class chpwd(object):
     """Wrapper around os.chdir which also adjusts environ['PWD']

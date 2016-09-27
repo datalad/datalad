@@ -17,7 +17,7 @@ import sys
 from os.path import exists, join as opj, realpath, dirname, lexists
 
 from six.moves import range
-from six.moves.urllib.parse import urlparse, urlunparse
+from six.moves.urllib.parse import urlparse
 
 import logging
 lgr = logging.getLogger('datalad.customremotes')
@@ -103,8 +103,9 @@ send () {
             return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
-                      "cd %s; vim %s"
-                      % (realpath(self.repopath), _file[len(self.repopath)+1:]))
+                  "cd %s; vim %s"
+                  % (realpath(self.repopath),
+                     _file[len(self.repopath) + 1:]))
         with open(_file, 'a') as f:
             f.write(self.HEADER)
         os.chmod(_file, 0o755)
@@ -114,10 +115,10 @@ send () {
         with open(self._file, 'a') as f:
             f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
         lgr.debug("New section in the protocol: "
-                      "cd %s; PATH=%s:$PATH %s"
-                      % (realpath(self.repopath),
-                         dirname(self._file),
-                         cmd))
+                  "cd %s; PATH=%s:$PATH %s"
+                  % (realpath(self.repopath),
+                     dirname(self._file),
+                     cmd))
 
     def write_entries(self, entries):
         self.initiate()
@@ -211,12 +212,11 @@ class AnnexCustomRemote(object):
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
-                         if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
-                         else None
+        self._protocol = \
+            AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
+            if os.environ.get('DATALAD_PROTOCOL_REMOTE') else None
 
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
-
 
     @classmethod
     def _get_custom_scheme(cls, prefix):
@@ -269,11 +269,11 @@ class AnnexCustomRemote(object):
         msg = " ".join(map(str, args))
         if not self._in_the_loop:
             lgr.debug("We are not yet in the loop, thus should not send to annex"
-                     " anything.  Got: %s" % msg.encode())
+                      " anything.  Got: %s" % msg.encode())
             return
         try:
             self.heavydebug("Sending %r" % msg)
-            self.fout.write(msg + "\n")#.encode())
+            self.fout.write(msg + "\n")  # .encode())
             self.fout.flush()
             if self._protocol is not None:
                 self._protocol += "send %s" % msg
@@ -286,7 +286,6 @@ class AnnexCustomRemote(object):
 
     def send_unsupported(self):
         self.send("UNSUPPORTED-REQUEST")
-
 
     def read(self, req=None, n=1):
         """Read a message from git-annex
@@ -332,7 +331,6 @@ class AnnexCustomRemote(object):
         if self._progress != perc:
             self.send("PROGRESS", perc)
 
-
     def main(self):
         """Interface to the command line tool"""
 
@@ -340,7 +338,7 @@ class AnnexCustomRemote(object):
             self._in_the_loop = True
             self._loop()
         except AnnexRemoteQuit:
-            pass # no harm
+            pass  # no harm
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
         except Exception as e:
@@ -348,12 +346,10 @@ class AnnexCustomRemote(object):
         finally:
             self._in_the_loop = False
 
-
     def stop(self, msg=None):
         lgr.debug("Stopping communications of %s%s" %
                  (self, ": %s" % msg if msg else ""))
         raise AnnexRemoteQuit(msg)
-
 
     def _loop(self):
         """The main loop

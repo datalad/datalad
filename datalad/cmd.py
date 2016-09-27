@@ -41,6 +41,7 @@ if PY2:
     # https://pypi.python.org/pypi/subprocess32/
     pass
 
+
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
@@ -121,7 +122,7 @@ class Runner(object):
             return self.call(cmd, *args, **kwargs)
         else:
             raise TypeError("Argument 'command' is neither a string, "
-                             "nor a list nor a callable.")
+                            "nor a list nor a callable.")
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
@@ -322,9 +323,8 @@ class Runner(object):
         if self.protocol.do_execute_callables:
             if self.protocol.records_callables:
                 prot_exc = None
-                prot_id = self.protocol.start_section([str(f),
-                                                 "args=%s" % str(args),
-                                                 "kwargs=%s" % str(kwargs)])
+                prot_id = self.protocol.start_section(
+                    [str(f), "args=%s" % str(args), "kwargs=%s" % str(kwargs)])
 
             try:
                 return f(*args, **kwargs)
@@ -336,10 +336,9 @@ class Runner(object):
                     self.protocol.end_section(prot_id, prot_exc)
         else:
             if self.protocol.records_callables:
-                self.protocol.add_section([str(f),
-                                             "args=%s" % str(args),
-                                             "kwargs=%s" % str(kwargs)],
-                                          None)
+                self.protocol.add_section(
+                    [str(f), "args=%s" % str(args), "kwargs=%s" % str(kwargs)],
+                    None)
 
     def log(self, msg, level=logging.DEBUG):
         """log helper
@@ -381,6 +380,7 @@ class GitRunner(Runner):
     def run(self, cmd, env=None, *args, **kwargs):
         return super(GitRunner, self).run(
             cmd, env=self.get_git_environ_adjusted(), *args, **kwargs)
+
 
 # ####
 # Preserve from previous version

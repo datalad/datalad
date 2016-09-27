@@ -51,10 +51,10 @@ def get_metadata_type(ds, guess=False):
       Metadata type labels or `None` if no type setting is found and and
       optional auto-detection yielded no results
     """
-    cfg = ds.config
-    if cfg and cfg.has_section('metadata'):
-        if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype').split()
+    cfg_ = ds.config
+    if cfg_ and cfg_.has_section('metadata'):
+        if cfg_.has_option('metadata', 'nativetype'):
+            return cfg_.get_value('metadata', 'nativetype').split()
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in

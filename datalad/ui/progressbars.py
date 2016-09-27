@@ -13,6 +13,7 @@ Should not be imported until we know that interface needs it
 
 import sys
 
+
 #
 # Haven't found an ideal progress bar yet, so to make things modular etc
 # we will provide our interface and adapters for few popular ones
@@ -54,11 +55,11 @@ try:
                 # TODO:  make it fancier! That we also at the same time scroll it from
                 # the left so it does end up at the end with the tail but starts with
                 # the beginning
-                fill_text = '...' + self.fill_text[-(width-4):]
+                fill_text = '...' + self.fill_text[-(width - 4):]
             else:
                 fill_text = self.fill_text
-            fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
-            return fill_text + " " + orig[len(fill_text)+1:]
+            fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage() / 100.)))]
+            return fill_text + " " + orig[len(fill_text) + 1:]
 
     class progressbarProgressBar(ProgressBarBase):
         """Adapter for progressbar.ProgressBar"""
@@ -140,4 +141,3 @@ except ImportError:  # pragma: no cover
     pass
 
 assert len(progressbars), "We need tqdm or progressbar library to report progress"
-

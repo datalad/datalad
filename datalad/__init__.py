@@ -52,6 +52,7 @@ _test_states = {
     'DATALAD_LOGLEVEL': None,
 }
 
+
 def setup_package():
     import os
 

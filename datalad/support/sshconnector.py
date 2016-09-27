@@ -16,7 +16,6 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from subprocess import Popen
 from shlex import split as sh_split
-from os.path import isdir
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time

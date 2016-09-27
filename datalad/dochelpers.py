@@ -15,6 +15,10 @@ the same developers as DataLad
 import logging
 import re
 import textwrap
+import os
+import sys
+import traceback
+
 
 lgr = logging.getLogger("datalad.docutils")
 
@@ -37,15 +41,17 @@ __rst_conventions = 'numpy'
 if __rst_conventions == 'epydoc':
     _rst_sep = "`"
     _rst_indentstr = "  "
+
     def _rst_section(section_name):
         """Provide section heading"""
         return ":%s:" % section_name
 elif __rst_conventions == 'numpy':
     _rst_sep = ""
     _rst_indentstr = ""
+
     def _rst_section(section_name):
         """Provide section heading"""
-        return "%s\n%s" % (section_name, '-'*len(section_name))
+        return "%s\n%s" % (section_name, '-' * len(section_name))
 else:
     raise ValueError("Unknown convention %s for RST" % __rst_conventions)
 
@@ -56,6 +62,7 @@ def _rst(s, snotrst=''):
         return s
     else:
         return snotrst
+
 
 def _rst_underline(text, markup):
     """Add and underline RsT string matching the length of the given string.
@@ -79,7 +86,7 @@ def handle_docstring(text, polite=True):
     """Take care of empty and non existing doc strings."""
     if text is None or not len(text):
         if polite:
-            return '' #No documentation found. Sorry!'
+            return ''  # No documentation found. Sorry!'
         else:
             return ''
     else:
@@ -136,8 +143,9 @@ def _split_out_parameters(initdoc):
         except ValueError:
             pe_i = len(initdoc)
 
-        result = initdoc[:ph_i].rstrip('\n '), \
-                 initdoc[pb_i:pe_i], initdoc[pe_i:]
+        result = (initdoc[:ph_i].rstrip('\n '),
+                  initdoc[pb_i:pe_i],
+                  initdoc[pe_i:])
 
     # XXX a bit of duplication of effort since handle_docstring might
     # do splitting internally
@@ -149,6 +157,8 @@ def _split_out_parameters(initdoc):
 __re_params = re.compile('(?:\n\S.*?)+$')
 __re_spliter1 = re.compile('(?:\n|\A)(?=\S)')
 __re_spliter2 = re.compile('[\n:]')
+
+
 def _parse_parameters(paramdoc):
     """Parse parameters and return list of (name, full_doc_string)
 
@@ -165,6 +175,7 @@ def _parse_parameters(paramdoc):
     lgr.debug('parseParameters: Given "%s", we split into %s' %
               (paramdoc, result))
     return result
+
 
 def get_docstring_split(f):
     """Given a function, break it up into portions
@@ -185,6 +196,7 @@ def get_docstring_split(f):
         f.__doc__)
     params_list = _parse_parameters(params)
     return initdoc, params_list, suffix
+
 
 def borrowdoc(cls, methodname=None):
     """Return a decorator to borrow docstring from another `cls`.`methodname`
@@ -300,9 +312,7 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
         return method
     return _borrowkwargs
 
-import os
-import sys
-import traceback
+
 # TODO: make limit respect config/environment parameter
 # TODO: document, what limit even is about ;-)
 def exc_str(exc=None, limit=None):

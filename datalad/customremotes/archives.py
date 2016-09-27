@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import exists, join as opj, basename, abspath
+from os.path import exists, join as opj
 from collections import OrderedDict
 from operator import itemgetter
 
@@ -141,7 +141,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             ((akey, afile), self.get_contentlocation(
                 akey,
                 absolute=True, verify_exists=False
-                ))
+            ))
             for akey, afile in akey_afiles
         )
 
@@ -231,7 +231,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
+            self.send("CHECKURL-CONTENTS", size)  # , basename(afile))
 
             # so it was a good successful one -- record
             self._last_url = url
@@ -366,6 +366,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
 
 from .main import main as super_main
+
+
 def main():
     """cmdline entry point"""
     super_main(backend="archive")

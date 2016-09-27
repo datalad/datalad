@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 # TODO: we have already smth in progressbar...  check
 import humanize
-from ..utils import auto_repr
 
 _COUNTS = (
     'files', 'urls',
@@ -56,15 +55,16 @@ class ActivityStats(object):
 
     def __repr__(self):
         # since auto_repr doesn't support "non-0" values atm
-        return "%s(%s)" % (self.__class__.__name__,
-                           ", ".join(["%s=%s" % (k,v) for k, v in self._current.items() if v]))
+        return "%s(%s)" \
+            % (self.__class__.__name__,
+               ", ".join(["%s=%s" % (k, v) for k, v in self._current.items() if v]))
 
     # Comparisons operate solely on _current
     def __eq__(self, other):
-        return (self._current == other._current)# and (self._total == other._total)
+        return (self._current == other._current)  # and (self._total == other._total)
 
     def __ne__(self, other):
-        return (self._current != other._current)# or (self._total != other._total)
+        return (self._current != other._current)  # or (self._total != other._total)
 
     def __iadd__(self, other):
         for m in other.__metrics__:
@@ -185,6 +185,6 @@ Branches merged:
             return ','.join(out).lstrip()
             return "{files} files (git/annex: {add_git}/{add_annex}), " \
                    "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(
-                    **entries)
+                       **entries)
         else:
             raise ValueError("Unknown mode %s" % mode)
