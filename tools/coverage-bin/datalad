@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# A little helper to overload default datalad executables with the one ran
+# through coverage
+
+set -eu
+
+bin=$(basename $0)
+curbin=$(which "$bin")
+curdatalad=$(which datalad)
+curdir=$(dirname $curdatalad)
+
+
+COVERAGE=${COVERAGE:-python-coverage}
+COVERAGE_RUN="`which $COVERAGE` run"
+
+export PATH=${PATH//$curdir:/}
+newdatalad=$(which datalad)
+newbin=$(which $bin)
+newpython=$(sed -ne '1s/#!//gp' $newdatalad)
+
+if [ $newdatalad = $curdatalad ]; then
+   echo "E: binary remained the same: $newdatalad" >&2
+   exit 1
+fi
+
+touch /tmp/coverages
+export COVERAGE_FILE=/tmp/.coverage-entrypoints-$RANDOM
+echo "Running now $newpython $COVERAGE_RUN --include=datalad/* -a $newbin $@" >> /tmp/coverages
+#$newpython $COVERAGE_RUN --include=datalad/* -a $newbin "$@"
+$newpython $COVERAGE_RUN -a $newbin "$@"

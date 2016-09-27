@@ -228,7 +228,18 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs = parser.parse_args(args)
+    cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    if unparsed_args:
+        if cmdlineargs.func.__self__.__name__ != 'Export':
+            lgr.error('unknown argument{}: {}'.format(
+                's' if len(unparsed_args) > 1 else '',
+                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0]))
+            cmdlineargs.subparser.print_usage()
+            sys.exit(1)
+        else:
+            # store all unparsed arguments
+            cmdlineargs.datalad_unparsed_args = unparsed_args
+
     if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)

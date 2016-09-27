@@ -341,6 +341,9 @@ Refer datalad/config.py for information on how to add these environment variable
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
+- *DATALAD_API_ALWAYS_RENDER*: 
+  Would make api functions always use a version with cmdline output renderer
+  (i.e. the one with `_` suffix)
 - *DATALAD_LOGTRACEBACK*: 
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."

@@ -28,6 +28,7 @@ from ..ui import ui
 from ..utils import swallow_logs
 from ..dochelpers import exc_str
 from ..support.param import Parameter
+from ..support import ansi_colors
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
 from datalad.cmd import Runner
@@ -130,8 +131,11 @@ class Ls(Interface):
             # TODO: unify all the output here -- _ls functions should just return something
             # to be displayed
             ui.message(
-                "%s%s%s  %sunknown%s"
-                % (LsFormatter.BLUE, loc, LsFormatter.RESET, LsFormatter.RED, LsFormatter.RESET))
+                "{}  {}".format(
+                    ansi_colors.color_word(loc, ansi_colors.DATASET),
+                    ansi_colors.color_word("unknown", ansi_colors.RED)
+                )
+            )
 
 
 #
@@ -201,11 +205,7 @@ class GitModel(object):
     def date(self):
         """Date of the last commit
         """
-        try:
-            commit = next(self.repo.get_branch_commits(self.branch))
-        except:
-            return None
-        return commit.committed_date
+        return self.repo.get_committed_date()
 
     @property
     def count_objects(self):
@@ -328,15 +328,17 @@ import humanize
 from datalad.log import ColorFormatter
 from datalad.utils import is_interactive
 
+
 class LsFormatter(string.Formatter):
     # condition by interactive
     if is_interactive():
-        BLUE = ColorFormatter.COLOR_SEQ % (ColorFormatter.BLUE + 30)
-        RED = ColorFormatter.COLOR_SEQ % (ColorFormatter.RED + 30)
-        GREEN = ColorFormatter.COLOR_SEQ % (ColorFormatter.GREEN + 30)
-        RESET = ColorFormatter.RESET_SEQ
+        BLUE = ansi_colors.COLOR_SEQ % ansi_colors.BLUE
+        RED = ansi_colors.COLOR_SEQ % ansi_colors.RED
+        GREEN = ansi_colors.COLOR_SEQ % ansi_colors.GREEN
+        RESET = ansi_colors.RESET_SEQ
+        DATASET = ansi_colors.COLOR_SEQ % ansi_colors.UNDERLINE
     else:
-        BLUE = RED = GREEN = RESET = u""
+        BLUE = RED = GREEN = RESET = DATASET = u""
 
     # http://stackoverflow.com/questions/9932406/unicodeencodeerror-only-when-running-as-a-cron-job
     # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
@@ -373,8 +375,8 @@ class LsFormatter(string.Formatter):
                 # return "%s✖%s" % (self.RED, self.RESET)
                 return u"%s%s%s" % (self.RED, self.NONE, self.RESET)
             return value
-        elif conversion in {'B', 'R'}:
-            return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
+        elif conversion in {'B', 'R', 'U'}:
+            return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED, 'U': self.DATASET}[conversion], value, self.RESET)
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
@@ -431,7 +433,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     dsms = sorted(dsms, key=lambda m: m.path)
 
     maxpath = max(len(ds_model.path) for ds_model in dsms)
-    path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    path_fmt = u"{ds.path!U:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
     pathtype_fmt = path_fmt + u"  [{ds.type}]"
     full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or long_:

@@ -73,7 +73,7 @@ requires = {
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],
     'publish': [
-        'jsmin',
+        'jsmin',             # nice to have, and actually also involved in `install`
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests

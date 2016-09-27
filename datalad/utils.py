@@ -77,14 +77,6 @@ def get_func_kwargs_doc(func):
     # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
-def assure_tuple_or_list(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
-
-
 def any_re_search(regexes, value):
     """Return if any of regexes (list or str) searches succesfully for value"""
     for regex in assure_tuple_or_list(regexes):
@@ -373,6 +365,14 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
 def assure_list(s):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -461,6 +461,30 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+#
+# Generators helpers
+#
+
+def saved_generator(gen):
+    """Given a generator returns two generators, where 2nd one just replays
+
+    So the first one would be going through the generated items and 2nd one
+    would be yielding saved items
+    """
+    saved = []
+
+    def gen1():
+        for x in gen:  # iterating over original generator
+            saved.append(x)
+            yield x
+
+    def gen2():
+        for x in saved:  # yielding saved entries
+            yield x
+
+    return gen1(), gen2()
 
 #
 # Decorators

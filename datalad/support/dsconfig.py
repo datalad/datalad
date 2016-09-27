@@ -11,6 +11,7 @@
 
 import logging
 from datalad.cmd import Runner
+from datalad.dochelpers import exc_str
 import re
 import os
 from os.path import join as opj, exists
@@ -130,7 +131,7 @@ class ConfigManager(object):
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
             if exists(dscfg_fname):
                 stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
-                    log_stderr=False)
+                                           log_stderr=False)
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store = _parse_gitconfig_dump(
@@ -140,6 +141,124 @@ class ConfigManager(object):
             stdout, stderr = self._run(['-z', '-l'], log_stderr=False)
             self._store = _parse_gitconfig_dump(
                 stdout, self._store, replace=True)
+
+    @_where_reload
+    def obtain(self, var, default=None, dialog_type=None, valtype=None,
+               store=False, where=None, reload=True, **kwargs):
+        """
+        Convenience method to obtain settings interactively, if needed
+
+        A UI will be used to ask for user input in interactive sessions.
+        Questions to ask and additional explanations can be passed directly
+        as arguments, or is retrieved from a list of preconfigured items.
+
+        Additionally, this method allows for type conversion and storage
+        of obtained settings. Both aspects can also be preconfigured.
+
+        Parameters
+        ----------
+        var : str
+          Variable name including any section like `git config` expects them,
+          e.g. 'core.editor'
+        default : any type
+          Default value to be presented to the user for confirmation (or
+          modification), or to be used as setting in non-interactive mode.
+        dialog_type : {'question', 'yesno', None}
+          Which dialog type to use in interactive sessions. If `None`,
+          preconfigured UI options are used.
+        store : bool
+          Whether to store the obtained value (or default)
+        %s
+        **kwargs
+          Additional arguments for the UI function call, such as a question
+          `text`.
+        """
+        # do local import, as this module is import prominently and the
+        # could theroetically import all kind of weired things for type
+        # conversion
+        from datalad.interface.common_cfg import ui_definitions as cfg_defs
+        # fetch what we know about this variable
+        cdef = cfg_defs.get(var, {})
+        # type conversion setup
+        if valtype is None and 'type' in cdef:
+            valtype = cdef['type']
+        if valtype is None:
+            valtype = lambda x: x
+
+        if var in self:
+            # nothing needs to be obtained, it is all here already
+            try:
+                return valtype(self[var])
+            except Exception as e:
+                raise ValueError(
+                    "value '{}' of existing configuration for '{}' cannot be "
+                    "converted to the desired type '{}' ({})".format(
+                        self[var], var, valtype, exc_str(e)))
+
+        # now we need to try to obtain something from the user
+        from datalad.ui import ui
+
+        # configure UI
+        dialog_opts = kwargs
+        if dialog_type is None:  # no override
+            # check for common knowledge on how to obtain a value
+            if 'ui' in cdef:
+                dialog_type = cdef['ui'][0]
+                # pull standard dialog settings
+                dialog_opts = cdef['ui'][1]
+                # update with input
+                dialog_opts.update(kwargs)
+
+        _value = None
+        if (not ui.is_interactive or dialog_type is None) and default is None:
+            raise RuntimeError(
+                "cannot obtain value for configuration item '{}', "
+                "not preconfigured, no default, no UI available".format(var))
+
+        if not hasattr(ui, dialog_type):
+            raise ValueError("UI '{}' does not support dialog type '{}'".format(
+                ui, dialog_type))
+
+        # configure storage destination, if needed
+        if store:
+            if where is None and 'destination' in cdef:
+                where = cdef['destination']
+            if where is None:
+                raise ValueError(
+                    "request to store configuration item '{}', but no "
+                    "storage destination specified".format(var))
+
+        # obtain via UI
+        dialog = getattr(ui, dialog_type)
+        _value = dialog(default=default, **dialog_opts)
+
+        if _value is None:
+            # we got nothing
+            if default is None:
+                raise RuntimeError(
+                    "could not obtain value for configuration item '{}', "
+                    "not preconfigured, no default".format(var))
+            # XXX maybe we should return default here, even it was returned
+            # from the UI -- if that is even possible
+
+        # execute type conversion before storing to check that we got
+        # something that looks like what we want
+        try:
+            value = valtype(_value)
+        except Exception as e:
+            raise ValueError(
+                "cannot convert user input `{}` to desired type ({})".format(
+                    _value, exc_str(e)))
+            # XXX we could consider "looping" until we have a value of proper
+            # type in case of a user typo...
+
+        if store:
+            # store value as it was before any conversion, needs to be str
+            # anyway
+            # needs string conversion nevertheless, because default could come
+            # in as something else
+            self.add(var, '{}'.format(_value), where=where, reload=reload)
+        return value
 
     #
     # Compatibility with dict API
@@ -254,10 +373,11 @@ class ConfigManager(object):
     def _get_location_args(self, where, args=None):
         if args is None:
             args = []
-        if where not in ('dataset', 'local', 'global'):
+        cfg_labels = ('dataset', 'local', 'global')
+        if where not in cfg_labels:
             raise ValueError(
-                "unknown configuration label '{}' (not 'dataset', or 'global')".format(
-                    where))
+                "unknown configuration label '{}' (not in {})".format(
+                    where, cfg_labels))
         if where == 'dataset':
             if not self._dataset:
                 raise ValueError(
