@@ -151,7 +151,8 @@ function metadata_locator(md5, parent) {
 
   // if parent argument set, find metadata json of parent directory instead
   var find_parent_ds = typeof parent !== 'undefined' ? parent : false;
-  var current_ds = find_parent_ds ? parent_url(start_loc).replace(/\/*$/, '/') : start_loc;
+  start_loc = find_parent_ds ? parent_url(start_loc).replace(/\/*$/, '/') : start_loc;
+  var current_ds = start_loc;
 
   // traverse up directory tree till a dataset directory found
   // check by testing if current directory has a metadata directory
@@ -164,16 +165,16 @@ function metadata_locator(md5, parent) {
   }
 
   // if locating parent dataset or current_loc is a dataset, metadata filename = md5 of '/'
-  if (find_parent_ds || start_loc === current_ds)
+  if (start_loc === current_ds)
     return current_ds + metadata_dir + md5('/');
 
   // else compute name of current nodes metadata hash
   var metadata_path = getParameterByName('dir')
         .replace(current_ds
-                 .replace(/\/$/, '')
-                 .replace(loc().pathname, ''), '')   // remove basepath to dir
-        .replace(/^\/*/, '')                                   // replace beginning /'s
-        .replace(/\/*$/, '');                                  // replace ending /'s with /
+                 .replace(/\/$/, '')                // remove ending / from current_ds
+                 .replace(loc().pathname, ''), '')  // remove basepath to dir
+        .replace(/^\/*/, '')                        // replace beginning /'s
+        .replace(/\/*$/, '');                       // replace ending /'s with /
   return current_ds + metadata_dir + md5(metadata_path);
 }
 
