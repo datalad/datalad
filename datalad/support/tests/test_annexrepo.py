@@ -768,9 +768,9 @@ def test_AnnexRepo_get(src, dst):
     def check_run(cmd, args, **kwargs):
         called.append(cmd)
         if cmd == 'find':
-            assert_not_in('-J100', args)
+            assert_not_in('-J5', args)
         elif cmd == 'get':
-            assert_in('-J100', args)
+            assert_in('-J5', args)
         else:
             raise AssertionError(
                 "no other commands so far should be ran. Got %s, %s" %
@@ -782,7 +782,7 @@ def test_AnnexRepo_get(src, dst):
     with patch.object(AnnexRepo, '_run_annex_command_json',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
-        annex.get(testfile, jobs=100)
+        annex.get(testfile, jobs=5)
     assert_equal(called, ['find', 'get'])
     ok_file_has_content(testfile_abs, '123', strip=True)
 
