@@ -118,7 +118,7 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
-            repo_info = ds.repo.repo_info()
+            repo_info = ds.repo.repo_info(fast=True)
         annex_meta = []
         for src in ('trusted repositories',
                     'semitrusted repositories',
