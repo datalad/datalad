@@ -111,10 +111,12 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
 
     # common kwargs which would later would be tuned up
     def add_archive_content(**kw):
+        if 'leading_dirs_depth' not in kw:
+            kw['leading_dirs_depth'] = leading_dirs_depth
+        if 'strip_leading_dirs' not in kw:
+            kw['strip_leading_dirs'] = bool(leading_dirs_depth)
         return annex.add_archive_content(
             existing='archive-suffix',
-            strip_leading_dirs=bool(leading_dirs_depth),
-            leading_dirs_depth=leading_dirs_depth,
             delete=True,
             exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
             **kw
@@ -186,7 +188,10 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
                 assign({'dataset_file': dataset + '///%(filename)s'}, interpolate=True),
                 switch(
                     'dataset_file',
-                    {'ds0*158///aalmasks\.zip$': add_archive_content(add_archive_leading_dir=True)},
+                    {
+                        'ds0*158///aalmasks\.zip$': add_archive_content(add_archive_leading_dir=True),
+                        '.*///ds000030_R1\.0\.1_metadata\.tgz': add_archive_content(leading_dirs_depth=4),
+                    },
                     default=add_archive_content(),
                     re=True,
                 ),
