@@ -444,20 +444,21 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def get(self, files, options=None):
+    def get(self, files, options=None, jobs=None):
         """Get the actual content of files
 
         Parameters
         ----------
-        files: list of str
+        files : list of str
             paths to get
-
-        options: list of str
-            commandline options for the git annex get command.
+        options : list of str, optional
+            commandline options for the git annex get command
+        jobs : int, optional
+            how many jobs to run in parallel (passed to git-annex call)
 
         Returns
         -------
-        list of dict
+        files : list of dict
         """
         options = options[:] if options else []
 
@@ -495,6 +496,9 @@ class AnnexRepo(GitRepo):
             assert(len(files) == 1)
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
+        if not fetch_files:
+            lgr.info("Not files found need fetching")
+            return
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
 
@@ -513,6 +517,8 @@ class AnnexRepo(GitRepo):
         if self.git_annex_version >= '6.20160923':
             # options  might be the '--key' which should go last
             options = ['--json-progress'] + options
+        if jobs:
+            options = ['-J%d' % jobs] + options
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,

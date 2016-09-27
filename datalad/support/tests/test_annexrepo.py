@@ -10,6 +10,7 @@
 
 """
 
+import mock
 from functools import partial
 from os import mkdir
 
@@ -750,17 +751,41 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
-    ds = AnnexRepo(dst, src)
-    assert_is_instance(ds, AnnexRepo, "AnnexRepo was not created.")
+    annex = AnnexRepo(dst, src)
+    assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = opj(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat"))
-    with swallow_outputs() as cmo:
-        ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat"))
-    f = open(testfile_abs, 'r')
-    assert_equal(f.readlines(), ['123\n'],
-                 "test-annex.dat's content doesn't match.")
+    assert_false(annex.file_has_content("test-annex.dat"))
+    with swallow_outputs():
+        annex.get(testfile)
+    assert_true(annex.file_has_content("test-annex.dat"))
+    ok_file_has_content(testfile_abs, '123', strip=True)
+
+    called = []
+    # for some reason yoh failed mock to properly just call original func
+    orig_run = annex._run_annex_command_json
+
+    def check_run(cmd, args, **kwargs):
+        called.append(cmd)
+        if cmd == 'find':
+            assert_not_in('-J100', args)
+        elif cmd == 'get':
+            assert_in('-J100', args)
+        else:
+            raise AssertionError(
+                "no other commands so far should be ran. Got %s, %s" %
+                (cmd, args)
+            )
+        return orig_run(cmd, args, **kwargs)
+
+    annex.drop(testfile)
+    with patch.object(AnnexRepo, '_run_annex_command_json',
+                      side_effect=check_run, auto_spec=True), \
+            swallow_outputs():
+        annex.get(testfile, jobs=100)
+    assert_equal(called, ['find', 'get'])
+    ok_file_has_content(testfile_abs, '123', strip=True)
+
 
 
 # TODO:

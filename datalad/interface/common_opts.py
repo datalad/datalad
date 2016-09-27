@@ -98,6 +98,12 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
+jobs_opt = Parameter(
+    args=("-J", "--jobs"),
+    metavar="NJOBS",
+    constraints=EnsureInt() | EnsureNone(),
+    doc="""how many parallel jobs (where possible) to use.""")
+
 verbose = Parameter(
     args=("-v", "--verbose",),
     action="store_true",

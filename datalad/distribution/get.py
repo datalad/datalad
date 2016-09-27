@@ -25,6 +25,7 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import verbose
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -99,6 +100,7 @@ class Get(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
+        jobs=jobs_opt,
         verbose=verbose)
 
     # Note: May be use 'git annex find --not --in here' to have a list of all
@@ -116,6 +118,7 @@ class Get(Interface):
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
+            jobs=None,
             verbose=False):
 
         # check parameters:
@@ -223,7 +226,8 @@ class Get(Interface):
 
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
                                             options=['--from=%s' % source]
-                                                     if source else [])
+                                                     if source else [],
+                                            jobs=jobs)
 
             # if we recurse into subdatasets, adapt relative paths reported by
             # annex to be relative to the toplevel dataset we operate on:
