@@ -189,6 +189,7 @@ def is_url_quoted(url):
         url_ = urlunquote(url)
         return url != url_
     except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
+        # MIH: ValueError?
         return False
 
 
@@ -785,7 +786,7 @@ def is_url(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI))
 
@@ -799,7 +800,7 @@ def is_datalad_compat_ri(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI, DataLadRI))
 

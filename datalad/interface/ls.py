@@ -183,7 +183,7 @@ class GitModel(object):
         if self._branch is None:
             try:
                 self._branch = self.repo.get_active_branch()
-            except:
+            except:  # MIH: InvalidGitRepositoryError?
                 return None
         return self._branch
 

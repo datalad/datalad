@@ -102,7 +102,7 @@ class S3DownloaderSession(DownloaderSession):
             if pbar:
                 try:
                     pbar.update(downloaded)
-                except:
+                except:  # MIH: what does it do? MemoryError?
                     pass  # do not let pbar spoil our fun
 
         headers = {}

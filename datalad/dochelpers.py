@@ -338,7 +338,7 @@ def exc_str(exc=None, limit=None):
         entries = traceback.extract_tb(tb)
         if entries:
             out += " [%s]" % (','.join(['%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1]) for x in entries[-limit:]]))
-    except:
+    except:  # MIH: TypeError?
         return out  # To the best of our abilities
     finally:
         # As the bible teaches us:

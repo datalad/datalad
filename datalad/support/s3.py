@@ -180,7 +180,7 @@ def gen_test_bucket(bucket_name):
         bucket = conn.get_bucket(bucket_name)
         lgr.info("Deleting existing bucket %s" % bucket.name)
         prune_and_delete_bucket(bucket)
-    except:
+    except:  # MIH: MemoryError?
         # so nothing to worry about
         pass
     finally:

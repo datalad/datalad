@@ -21,7 +21,7 @@ def has_metadata(ds):
     fname = opj(ds.path, _metadata_fname)
     try:
         return exists(fname) and 'name' in jsonload(fname)
-    except:
+    except:  # MIH: Some kind of JSONError?
         return False
 
 

@@ -144,7 +144,7 @@ class Credential(object):
                              % (f, self._FIELDS.keys()))
         try:
             return self._keyring.get(self.name, f)
-        except:
+        except:  # MIH: what could even happen? _keyring not a dict?
             return default
 
     def delete(self):

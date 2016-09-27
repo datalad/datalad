@@ -156,7 +156,7 @@ class AutomagicIO(object):
             # might fail.  TODO: troubleshoot when it does e.g.
             # datalad/tests/test_auto.py:test_proxying_open_testrepobased
             under_annex = annex.is_under_annex(filepath, batch=True)
-        except:
+        except:  # MIH: really? what if MemoryError
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
@@ -171,7 +171,7 @@ class AutomagicIO(object):
             if self._log_online:
                 sys.stdout.fileno()
                 sys.stderr.fileno()
-        except:
+        except:  # MIH: IOError?
             self._log_online = False
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
@@ -195,7 +195,7 @@ class AutomagicIO(object):
         try:
             if self._active:
                 self.deactivate()
-        except:
+        except:  # MIH: IOError?
             pass
         try:
             super(self.__class__, self).__del__()

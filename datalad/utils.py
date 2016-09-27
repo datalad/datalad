@@ -49,6 +49,7 @@ try:
                        and linux_distribution_name == 'debian' \
                        and linux_distribution_release.startswith('7.')
 except:  # pragma: no cover
+    # MIH: IndexError?
     on_debian_wheezy = False
     linux_distribution_name = linux_distribution_release = None
 

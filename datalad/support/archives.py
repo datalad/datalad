@@ -328,7 +328,7 @@ class ArchivesCache(object):
             # we can at least try
             if not self.persistent:
                 self.clean()
-        except:
+        except:  # MIH: IOError?
             pass
 
 
@@ -507,5 +507,5 @@ class ExtractedArchive(object):
         try:
             if self._persistent:
                 self.clean()
-        except:
+        except:  # MIH: IOError?
             pass

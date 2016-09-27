@@ -37,6 +37,6 @@ if lexists(opj(projdir, '.git')):
         __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
         # To follow PEP440 we can't have all the git fanciness
         __version__ = __full_version__.split('-')[0]
-    except:
+    except:  # MIH: OSError, IndexError
         # just stick to the hard-coded
         __full_version__ = __version__
