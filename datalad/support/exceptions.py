@@ -178,9 +178,6 @@ class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""
     pass
 
-# TODO:
-# PathOutsideRepositoryError
-# test_annexrepo.py:763
 
 #
 # Downloaders
