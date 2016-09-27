@@ -1876,6 +1876,7 @@ class ProcessAnnexProgressIndicators(object):
         if download_id not in self.pbars:
             # New download!
             from datalad.ui import ui
+            from datalad.ui import utils as ui_utils
             # TODO: whenever target size gets reported -- used it!
             # http://git-annex.branchable.com/todo/interface_to_the___34__progress__34___of_annex_operations/#comment-6bbc26aae9867603863050ddcb09a9a0
             # for now deduce from key or approx from '%'
@@ -1887,10 +1888,13 @@ class ProcessAnnexProgressIndicators(object):
                     j['byte-progress'],
                     j['percent-progress'].rstrip('%')
                 )
-
+            w, h = ui_utils.get_terminal_size()
             title = str(download_item)
-            if len(title) > 36:
-                title = '%s .. %s' % (title[:16], title[-16:])
+            pbar_right = 50
+            title_len = w - pbar_right - 4  # (4 for reserve)
+            if len(title) > title_len:
+                half = title_len//2 - 2
+                title = '%s .. %s' % (title[:half], title[-half:])
             pbar = self.pbars[download_id] = ui.get_progressbar(
                 label=title, maxval=target_size)
             pbar.start()
