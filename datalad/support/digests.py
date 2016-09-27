@@ -9,7 +9,6 @@
 """Provides helper to compute digests (md5 etc) on files
 """
 
-import sys
 import hashlib
 
 from ..utils import auto_repr
@@ -31,7 +30,7 @@ class Digester(object):
 
     DEFAULT_DIGESTS = ['md5', 'sha1', 'sha256', 'sha512']
 
-    def __init__(self, digests=None, blocksize=1<<16):
+    def __init__(self, digests=None, blocksize=1 << 16):
         self._digests = digests or self.DEFAULT_DIGESTS
         self._digest_funcs = [getattr(hashlib, digest) for digest in self._digests]
         self.blocksize = blocksize

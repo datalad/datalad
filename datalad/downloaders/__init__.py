@@ -12,11 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six.moves.urllib.parse import urlparse
-
-
-from .providers import Providers
-
 from logging import getLogger
 lgr = getLogger('datalad.providers')
 

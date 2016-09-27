@@ -28,28 +28,28 @@ from collections import namedtuple
 #  https://ndar.nih.gov/api/datadictionary/v2/datastructure/image03
 # where type is File
 image03_file_fields = [
- 'image_file',
- 'data_file2'
+    'image_file',
+    'data_file2'
 ]
 image03_fields = [
- 'collection_id',
- 'submission_id',
- 'dataset_id',
- 'experiment_id',
-# 'subjectkey',
-# 'src_subject_id',
+    'collection_id',
+    'submission_id',
+    'dataset_id',
+    'experiment_id',
+    # 'subjectkey',
+    # 'src_subject_id',
 ] + image03_file_fields
 
 image03_Record = namedtuple('image03_Record', image03_fields)
+
 
 def get_oracle_db(
         dbserver=None,
         port=1521,
         sid='ORCL',
-        credential=None,
-    ):
+        credential=None):
     dbserver = dbserver or cfg.obtain('datalad.externals.nda.dbserver',
-                                        default=DEFAULT_SERVER)
+                                      default=DEFAULT_SERVER)
     # This specific username has access to the 'Image' selection of NDA as of about today
     #username = username \
     #           or cfg.get('externals:nda', 'username',

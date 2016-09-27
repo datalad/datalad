@@ -314,7 +314,7 @@ def _compare_dicts(d1, d2):
                 try:
                     if d1[k] != d2[k]:
                         changed.append(k)
-                except:
+                except:  # MIH: TypeError?
                     maybe_changed.append(k)
     return added, changed, removed, maybe_changed
 

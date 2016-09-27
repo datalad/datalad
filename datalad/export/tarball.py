@@ -57,7 +57,7 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
 
     # workaround for inability to pass down the time stamp
     with patch('time.time', return_value=committed_date), \
-        tarfile.open(output, "w:gz") as tar:
+            tarfile.open(output, "w:gz") as tar:
         repo_files = sorted(repo.get_indexed_files())
         if isinstance(repo, AnnexRepo):
             annexed = repo.is_under_annex(

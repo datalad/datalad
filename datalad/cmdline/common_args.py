@@ -50,4 +50,3 @@ pbs_runner = (
          default=None,
          help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
 )
-

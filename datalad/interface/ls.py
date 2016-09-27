@@ -31,7 +31,13 @@ from ..support.param import Parameter
 from ..support import ansi_colors
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
-from datalad.cmd import Runner
+
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import GitRepo
+
+import string
+import humanize
+from datalad.utils import is_interactive
 
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
@@ -142,10 +148,6 @@ class Ls(Interface):
 # Dataset listing
 #
 
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.annexrepo import GitRepo
-
-
 @auto_repr
 class AbsentRepoModel(object):
     """Just a base for those where repo wasn't installed yet"""
@@ -184,7 +186,7 @@ class GitModel(object):
         if self._branch is None:
             try:
                 self._branch = self.repo.get_active_branch()
-            except:
+            except:  # MIH: InvalidGitRepositoryError?
                 return None
         return self._branch
 
@@ -293,8 +295,8 @@ class FsModel(AnnexModel):
             # else ask fs for node size (= ondisk_size)
             else:
                 size = ondisk_size = 0 \
-                       if type_ == 'link-broken' \
-                       else lstat(self.symlink or self._path).st_size
+                    if type_ == 'link-broken' \
+                    else lstat(self.symlink or self._path).st_size
 
             sizes.update({'total': size, 'ondisk': ondisk_size})
 
@@ -321,12 +323,6 @@ class FsModel(AnnexModel):
             return 'dir'
         else:
             return None
-
-
-import string
-import humanize
-from datalad.log import ColorFormatter
-from datalad.utils import is_interactive
 
 
 class LsFormatter(string.Formatter):
@@ -466,7 +462,7 @@ def machinesize(humansize):
     except AttributeError:
         return float(humansize)
     unit_converter = {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
-    machinesize = float(size_str)*(1000**unit_converter[size_unit])
+    machinesize = float(size_str) * (1000 ** unit_converter[size_unit])
     return machinesize
 
 
@@ -701,9 +697,9 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     fs['tags'] = rootds_model.describe
     fs['branch'] = rootds_model.branch
     index_file = opj(rootds.path, '.git', 'index')
-    fs['index-mtime'] = time.strftime(u"%Y-%m-%d %H:%M:%S",
-                                      time.localtime(getmtime(index_file))) \
-                        if exists(index_file) else ''
+    fs['index-mtime'] = time.strftime(
+        u"%Y-%m-%d %H:%M:%S",
+        time.localtime(getmtime(index_file))) if exists(index_file) else ''
 
     # append children datasets info to current dataset
     fs['nodes'].extend(children)
@@ -748,7 +744,8 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
     ui.message("Connecting to bucket: %s" % bucket_name)
     if config_file:
-        config = SafeConfigParser(); config.read(config_file)
+        config = SafeConfigParser()
+        config.read(config_file)
         access_key = config.get('default', 'access_key')
         secret_key = config.get('default', 'secret_key')
 

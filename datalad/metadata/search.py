@@ -138,11 +138,10 @@ class Search(Interface):
                             "%r already exists but does not contain an "
                             "installed dataset." % LOCAL_CENTRAL_PATH)
                 elif ui.yesno(
-                       title="No DataLad dataset found at current location",
-                       text="Would you like to install stock DataLad "
-                            "meta-dataset under %r?"
-                            % LOCAL_CENTRAL_PATH
-                       ):
+                        title="No DataLad dataset found at current location",
+                        text="Would you like to install stock DataLad "
+                             "meta-dataset under %r?"
+                             % LOCAL_CENTRAL_PATH):
                     from datalad.api import install
                     central_ds = install(LOCAL_CENTRAL_PATH, source='///')
                 else:
@@ -212,14 +211,15 @@ class Search(Interface):
         def get_in_matcher(m):
             """Function generator to provide closure for a specific value of m"""
             mlower = m.lower()
+
             def matcher(s):
                 return mlower in s.lower()
             return matcher
 
         matchers = [
             re.compile(match_).search
-                if regex
-                else get_in_matcher(match_)
+            if regex
+            else get_in_matcher(match_)
             for match_ in match
         ]
 
@@ -270,7 +270,6 @@ class Search(Interface):
                     # not report any specific field
                 yield location, report_dict
 
-
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
         from datalad.ui import ui
@@ -278,7 +277,7 @@ class Search(Interface):
             res = []
 
         format = cmdlineargs.format or 'custom'
-        if format =='custom':
+        if format == 'custom':
 
             if cmdlineargs.report in ('*', ['*']) \
                     or cmdlineargs.report_matched \
