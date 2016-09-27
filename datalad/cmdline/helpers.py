@@ -106,21 +106,6 @@ class LogLevelAction(argparse.Action):
 #        i = 1
 
 
-def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
-    from . import common_args
-    for i, args in enumerate((pos, opt)):
-        if args is None:
-            continue
-        for arg in args:
-            arg_tmpl = getattr(common_args, arg)
-            arg_kwargs = arg_tmpl[2].copy()
-            arg_kwargs.update(kwargs)
-            if i:
-                parser.add_argument(*arg_tmpl[i], **arg_kwargs)
-            else:
-                parser.add_argument(arg_tmpl[i], **arg_kwargs)
-
-
 def parser_add_common_opt(parser, opt, names=None, **kwargs):
     from . import common_args
     opt_tmpl = getattr(common_args, opt)
