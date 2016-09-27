@@ -181,9 +181,9 @@ Branches merged:
         if mode == 'full':
             return '\n'.join(out)
         elif mode == 'line':
-            for i in range(len(out)):
-                if out[i][0] != ' ':
-                    out[i] = '  ' + out[i]
+            for i, o in enumerate(out):
+                if o[0] != ' ':
+                    out[i] = '  ' + o
             return ','.join(out).lstrip()
             return "{files} files (git/annex: {add_git}/{add_annex}), " \
                    "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(

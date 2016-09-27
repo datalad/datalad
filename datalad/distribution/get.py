@@ -30,7 +30,6 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
@@ -228,9 +227,8 @@ class Get(Interface):
             # if we recurse into subdatasets, adapt relative paths reported by
             # annex to be relative to the toplevel dataset we operate on:
             if cur_ds != ds:
-                for i in range(len(local_results)):
-                    local_results[i]['file'] = \
-                        relpath(opj(ds_path, local_results[i]['file']), ds.path)
+                for lr in local_results:
+                    lr['file'] = relpath(opj(ds_path, lr['file']), ds.path)
 
             global_results.extend(local_results)
 
@@ -269,5 +267,3 @@ class Get(Interface):
                     path=item.get('file'))
                 for item in res])
             ui.message(msg)
-
-
