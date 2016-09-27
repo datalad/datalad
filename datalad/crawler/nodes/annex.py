@@ -140,8 +140,8 @@ class initiate_dataset(object):
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creator"
 
-        backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
-        direct = cfg.getboolean('crawl', 'init direct', default=False)
+        backend = self.backend or cfg.obtain('datalad.crawl.default_backend', default='MD5E')
+        direct = cfg.obtain('datalad.crawl.init_direct', default=False)
 
         if direct:
             raise NotImplementedError("Disabled for now to init direct mode ones")
@@ -1311,7 +1311,7 @@ class Annexificator(object):
             if cleanup:
                 total_stats = stats.get_total()
                 if total_stats.add_git or total_stats.add_annex or total_stats.merges:
-                    if cfg.getboolean('crawl', 'pipeline.housekeeping', default=True):
+                    if cfg.obtain('datalad.crawl.pipeline.housekeeping', default=True):
                         lgr.info("House keeping: gc, repack and clean")
                         # gc and repack
                         self.repo.gc(allow_background=False)

@@ -53,7 +53,6 @@ from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 from os import makedirs
 
-from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
@@ -70,6 +69,7 @@ lgr = getLogger('datalad.crawler.pipeline')
 # name of the section in the config file which would define pipeline parameters
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 CRAWLER_PIPELINE_SECTION_DEPRECATED = 'crawler'
+
 
 class FinishPipeline(Exception):
     """Exception to use to signal that any given pipeline should be stopped
@@ -475,20 +475,20 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None, return_
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
-    
+
     Typical example description
-    
+
         [crawl:pipeline]
         pipeline = standard
         func = pipeline1
         _kwarg1 = 1
-   
+
     which would instantiate a pipeline from standard.py module by calling
     `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
-    
+
         [crawl:pipeline]
         pipeline = standard?func=pipeline1&_kwarg1=1
-   
+
     so that theoretically we could specify basic pipelines completely within
     a URL
     """

@@ -32,7 +32,7 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
-from datalad import cfg as dlcfg
+from datalad import cfg
 from datalad.utils import assure_list
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support import ansi_colors
@@ -162,7 +162,7 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(dlcfg.dirs.user_cache_dir, 'metadata')
+        cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'metadata')
         mcache_fname = opj(cache_dir, ds.id)
 
         meta = None

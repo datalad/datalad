@@ -31,7 +31,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
-from datalad.support.dsconfig import ConfigManager
+from datalad.config import ConfigManager
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd

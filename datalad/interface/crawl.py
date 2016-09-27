@@ -90,9 +90,10 @@ class Crawl(Interface):
 
             # TODO: centralize via _params_ handling
             if dry_run:
-                if 'crawl' not in cfg.sections():
-                    cfg.add_section('crawl')
-                cfg.set('crawl', 'dryrun', "True")
+                dryrun_optlabel = 'datalad.crawl.dryrun'
+                if dryrun_optlabel in cfg:
+                    cfg.unset(dryrun_optlabel, where='local', reload=False)
+                cfg.add(dryrun_optlabel, "True", where='local')
 
             if path is None:
 

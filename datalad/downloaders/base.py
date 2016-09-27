@@ -369,7 +369,7 @@ class BaseDownloader(object):
                 import dbm
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
-            cache_dir = opj(cfg.dirs.user_cache_dir)
+            cache_dir = cfg.obtain('datalad.locations.cache')
             if not exists(cache_dir):
                 os.makedirs(cache_dir)
             cache_path = opj(cache_dir, 'crawl_cache.dbm')
@@ -401,7 +401,7 @@ class BaseDownloader(object):
         lgr.log(3, "_fetch(%r, cache=%r, size=%r, allow_redirects=%r)",
                 url, cache, size, allow_redirects)
         if cache is None:
-            cache = cfg.getboolean('crawl', 'cache', False)
+            cache = cfg.obtain('datalad.crawl.cache', default=False)
 
         if cache:
             cache_key = msgpack.dumps(url)

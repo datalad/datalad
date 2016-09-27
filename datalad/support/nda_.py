@@ -48,8 +48,8 @@ def get_oracle_db(
         sid='ORCL',
         credential=None,
     ):
-    dbserver = dbserver \
-               or cfg.get('externals:nda', 'dbserver', default=DEFAULT_SERVER)
+    dbserver = dbserver or cfg.obtain('datalad.externals.nda.dbserver',
+                                        default=DEFAULT_SERVER)
     # This specific username has access to the 'Image' selection of NDA as of about today
     #username = username \
     #           or cfg.get('externals:nda', 'username',
