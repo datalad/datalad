@@ -194,7 +194,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
         ar.get("file")
     exc = cme.exception
     assert_equal(exc.sizemore_msg, '905.6 MB')
-    assert_re_in(".*annex get. needs 905.6 MB more", str(exc))
+    assert_re_in(".*annex (find|get). needs 905.6 MB more", str(exc))
 
 
 @with_testrepos('basic_annex', flavors=['local'])

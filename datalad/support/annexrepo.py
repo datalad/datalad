@@ -43,6 +43,7 @@ from datalad.utils import on_windows
 from datalad.utils import swallow_logs
 from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
+from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -256,6 +257,12 @@ class AnnexRepo(GitRepo):
         elif ver < cls.GIT_ANNEX_MIN_VERSION:
             raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
         cls.git_annex_version = ver
+
+    @staticmethod
+    def get_size_from_key(key):
+        """A little helper to obtain size encoded in a key"""
+        size_str = key.split('-', 2)[1].lstrip('s')
+        return int(size_str) if size_str.isdigit() else None
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
@@ -480,6 +487,8 @@ class AnnexRepo(GitRepo):
                     unknown_sizes.append(j['file'])
         else:
             fetch_files = files
+            assert(len(files) == 1)
+            target_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
@@ -487,17 +496,18 @@ class AnnexRepo(GitRepo):
         # TODO:  check annex version and issue a one time warning if not
         # old enough for --json-progress
 
-        run_kwargs = {}
+        progress_indicators = ProcessAnnexProgressIndicators(
+            target_downloads=target_downloads,
+        )
+        run_kwargs = dict(
+            log_stdout=progress_indicators,
+            log_stderr='offline',
+            log_online=True
+        )
+        # Without up to date annex, we would still report total! ;)
         if self.git_annex_version >= '6.20160923':
-            run_kwargs.update(dict(
-                log_stdout=ProcessAnnexProgressIndicators(
-                    target_downloads=target_downloads,
-                ),
-                log_stderr='offline',
-                log_online=True
-            ))
             # options  might be the '--key' which should go last
-            options = ['--json-progress', '-J10'] + options
+            options = ['--json-progress'] + options
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
@@ -509,7 +519,10 @@ class AnnexRepo(GitRepo):
             # failed to download
             results = self._run_annex_command_json(
                 'get', args=options + fetch_files, **run_kwargs)
-        return list(results)
+        results_list = list(results)
+        progress_indicators.finish()
+        return results_list
+
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
@@ -1806,14 +1819,27 @@ class ProcessAnnexProgressIndicators(object):
                 self._succeeded += 1
                 if pbar:
                     self._update_pbar(pbar, pbar.maxval)
+                elif self.total_pbar:
+                    # we didn't have a pbar for this download, so total should
+                    # get it all at once
+                    try:
+                        size = self.target_downloads[j['key']]
+                    except:
+                        size = AnnexRepo.get_size_from_key(j['key'])
+                    self.total_pbar.update(size, increment=True)
             else:
                 self._failed += 1
 
             if self.total_pbar:
+                failed_str = (
+                    ", " + ansi_colors.color_word("%d failed" % self._failed,
+                                                  ansi_colors.RED)) \
+                    if self._failed else ''
+
                 self.total_pbar._pbar.desc = \
-                    "Total (%d ok, %d failed out of %d)" % (
+                    "Total (%d ok%s out of %d)" % (
                         self._succeeded,
-                        self._failed,
+                        failed_str,
                         len(self.target_downloads)
                         if self.target_downloads
                         else self._succeeded + self._failed)
@@ -1831,9 +1857,6 @@ class ProcessAnnexProgressIndicators(object):
         def get_size_from_perc_complete(count, perc):
             return int(math.ceil(int(count) / (float(perc) / 100.)))
 
-        def get_size_from_key(key):
-            return int(key.split('-', 2)[1].lstrip('s'))
-
         # so we have a progress indicator, let's dead with it
         action = j['action']
         download_item = action.get('file') or action.get('key')
@@ -1847,7 +1870,7 @@ class ProcessAnnexProgressIndicators(object):
             # TODO: unittest etc to check when we have a relaxed
             # URL without any size known in advance
             target_size = \
-                get_size_from_key(action.get('key')) or \
+                AnnexRepo.get_size_from_key(action.get('key')) or \
                 get_size_from_perc_complete(
                     j['byte-progress'],
                     j['percent-progress'].rstrip('%')
@@ -1862,7 +1885,7 @@ class ProcessAnnexProgressIndicators(object):
             int(j.get('byte-progress'))
         )
 
-    def stop(self):
+    def finish(self):
         if self.total_pbar:
             self.total_pbar.finish()
             self.total_pbar = None
