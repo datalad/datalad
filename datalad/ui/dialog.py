@@ -21,7 +21,6 @@ import os
 import sys
 import time
 
-from six import PY2
 import getpass
 
 #!!! OPT adds >100ms to import time!!!
@@ -41,18 +40,18 @@ from .base import InteractiveUI
 # - docker has multiple simultaneous progressbars.  Apparently "navigation"
 #   is obtained with escape characters in the terminal.
 #   see docker/pkg/jsonmessage/jsonmessage.go or following snippet
-"""
-from time import sleep
-import sys
-
-out = sys.stderr
-for i in range(10):
-  diff = 2
-  if i:
-      out.write("%c[%dA" % (27, diff))
-  out.write("%d\n%d\n" % (i, i ** 2))
-  sleep(0.5)
-"""
+#
+#from time import sleep
+#import sys
+#
+#out = sys.stderr
+#for i in range(10):
+#  diff = 2
+#  if i:
+#      out.write("%c[%dA" % (27, diff))
+#  out.write("%d\n%d\n" % (i, i ** 2))
+#  sleep(0.5)
+#
 # They also use JSON representation for the message which might provide a nice abstraction
 # Other useful codes
 #         // <ESC>[2K = erase entire current line
@@ -60,7 +59,6 @@ for i in range(10):
 # and code in docker: pkg/progressreader/progressreader.go pkg/streamformatter/streamformatter.go
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
-
 
 
 @auto_repr
@@ -123,7 +121,7 @@ def getpass_echo(prompt='Password: ', stream=None):
         #         return
         #     stream.write(out)
         from mock import patch
-        with patch('termios.ECHO', 255**2):
+        with patch('termios.ECHO', 255 ** 2):
             #patch.object(stream, 'write', _no_emptyline_write(stream)):
             return getpass.getpass(prompt=prompt, stream=stream)
 
@@ -166,12 +164,11 @@ class DialogUI(ConsoleLog, InteractiveUI):
             msg += '{} [{}]'.format(text, default)
         else:
             msg += text
-        """
-        Anaconda format:
-
-Question? [choice1|choice2]
-[default] >>> yes
-        """
+        # Like this:
+        #Anaconda format:
+        #
+        #Question? [choice1|choice2]
+        #[default] >>> yes
         attempt = 0
         while True:
             attempt += 1

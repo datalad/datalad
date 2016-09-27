@@ -13,6 +13,7 @@ Should not be imported until we know that interface needs it
 
 import sys
 
+
 #
 # Haven't found an ideal progress bar yet, so to make things modular etc
 # we will provide our interface and adapters for few popular ones
@@ -106,4 +107,3 @@ except ImportError:  # pragma: no cover
     pass
 
 assert len(progressbars), "We need tqdm library to report progress"
-

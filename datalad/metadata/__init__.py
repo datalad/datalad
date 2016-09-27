@@ -25,7 +25,7 @@ from datalad.utils import swallow_logs
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
-from datalad import cfg as dlcfg
+from datalad import cfg
 
 
 # common format
@@ -51,10 +51,10 @@ def get_metadata_type(ds, guess=False):
       Metadata type labels or `None` if no type setting is found and and
       optional auto-detection yielded no results
     """
-    cfg = ds.config
-    if cfg and cfg.has_section('metadata'):
-        if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype').split()
+    cfg_ = ds.config
+    if cfg_ and cfg_.has_section('metadata'):
+        if cfg_.has_option('metadata', 'nativetype'):
+            return cfg_.get_value('metadata', 'nativetype').split()
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in
@@ -314,9 +314,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
 def _cached_load_document(url):
     from pyld.jsonld import load_document
-    cache_dir = opj(
-        dlcfg.dirs.user_cache_dir,
-        'schema')
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
     doc_fname = opj(
         cache_dir,
         '{}-{}'.format(

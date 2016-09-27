@@ -11,6 +11,7 @@
 
 from collections import OrderedDict
 
+
 # based on http://stackoverflow.com/a/2437645/1265472
 class DictCache(OrderedDict):
     """A simple cache (dictionary) with limited size which expunges oldest entries

@@ -14,8 +14,6 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureBool
 
 
 dataset_description = Parameter(
