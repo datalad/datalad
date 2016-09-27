@@ -304,17 +304,15 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             Indicates that no location is known for a key.
         """
         self.send("WHEREIS-FAILURE")
-        """
-        although more logical is to report back success, it leads to imho more confusing
-        duplication. See
-        http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
+        # although more logical is to report back success, it leads to imho more confusing
+        # duplication. See
+        # http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
 
-        try:
-            key, file = self._get_akey_afile(key)
-            self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
-        except ValueError:
-            self.send("WHEREIS-FAILURE")
-        """
+        # try:
+        #     key, file = self._get_akey_afile(key)
+        #     self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
+        # except ValueError:
+        #     self.send("WHEREIS-FAILURE")
 
     def _transfer(self, cmd, key, path):
 

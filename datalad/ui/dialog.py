@@ -40,18 +40,18 @@ from .base import InteractiveUI
 # - docker has multiple simultaneous progressbars.  Apparently "navigation"
 #   is obtained with escape characters in the terminal.
 #   see docker/pkg/jsonmessage/jsonmessage.go or following snippet
-"""
-from time import sleep
-import sys
-
-out = sys.stderr
-for i in range(10):
-  diff = 2
-  if i:
-      out.write("%c[%dA" % (27, diff))
-  out.write("%d\n%d\n" % (i, i ** 2))
-  sleep(0.5)
-"""
+#
+#from time import sleep
+#import sys
+#
+#out = sys.stderr
+#for i in range(10):
+#  diff = 2
+#  if i:
+#      out.write("%c[%dA" % (27, diff))
+#  out.write("%d\n%d\n" % (i, i ** 2))
+#  sleep(0.5)
+#
 # They also use JSON representation for the message which might provide a nice abstraction
 # Other useful codes
 #         // <ESC>[2K = erase entire current line
@@ -164,12 +164,11 @@ class DialogUI(ConsoleLog, InteractiveUI):
             msg += '{} [{}]'.format(text, default)
         else:
             msg += text
-        """
-        Anaconda format:
-
-Question? [choice1|choice2]
-[default] >>> yes
-        """
+        # Like this:
+        #Anaconda format:
+        #
+        #Question? [choice1|choice2]
+        #[default] >>> yes
         attempt = 0
         while True:
             attempt += 1

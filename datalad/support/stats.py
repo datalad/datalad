@@ -139,20 +139,20 @@ class ActivityStats(object):
         """
 
         # Example
-        """
-URLs processed: {urls}
- downloaded: {downloaded}
- downloaded size: {downloaded_size}
-Files processed: {files}
- skipped: {skipped}
- renamed: {renamed}
- removed: {removed}
- added to git: {add_git}
- added to annex: {add_annex}
- overwritten: {overwritten}
-Branches merged:
-  upstream -> master
-"""
+        #"""
+        #URLs processed: {urls}
+        # downloaded: {downloaded}
+        # downloaded size: {downloaded_size}
+        #Files processed: {files}
+        # skipped: {skipped}
+        # renamed: {renamed}
+        # removed: {removed}
+        # added to git: {add_git}
+        # added to annex: {add_annex}
+        # overwritten: {overwritten}
+        #Branches merged:
+        #  upstream -> master
+        #"""
 
         # TODO: improve
         entries = self.as_dict()
