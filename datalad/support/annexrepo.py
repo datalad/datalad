@@ -261,7 +261,11 @@ class AnnexRepo(GitRepo):
     @staticmethod
     def get_size_from_key(key):
         """A little helper to obtain size encoded in a key"""
-        size_str = key.split('-', 2)[1].lstrip('s')
+        try:
+            size_str = key.split('-', 2)[1].lstrip('s')
+        except IndexError:
+            # has no 2nd field in the key
+            return None
         return int(size_str) if size_str.isdigit() else None
 
     @classmethod
@@ -463,7 +467,7 @@ class AnnexRepo(GitRepo):
         if '--key' not in options:
             lgr.info("Obtaining information on what files need to be obtained")
             # Let's figure out first which files/keys and of what size to download
-            target_downloads = {}
+            expected_downloads = {}
             fetch_files = []
             keys_seen = set()
             unknown_sizes = []  # unused atm
@@ -482,14 +486,14 @@ class AnnexRepo(GitRepo):
                 assert j['file']
                 fetch_files.append(j['file'])
                 if size and size.isdigit():
-                    target_downloads[key] = int(size)
+                    expected_downloads[key] = int(size)
                 else:
-                    target_downloads[key] = None
+                    expected_downloads[key] = None
                     unknown_sizes.append(j['file'])
         else:
             fetch_files = files
             assert(len(files) == 1)
-            target_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
+            expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
@@ -498,7 +502,7 @@ class AnnexRepo(GitRepo):
         # old enough for --json-progress
 
         progress_indicators = ProcessAnnexProgressIndicators(
-            target_downloads=target_downloads,
+            expected=expected_downloads,
         )
         run_kwargs = dict(
             log_stdout=progress_indicators,
@@ -1772,26 +1776,26 @@ class ProcessAnnexProgressIndicators(object):
     for git-annex commands runner
     """
 
-    def __init__(self, target_downloads=None):
+    def __init__(self, expected=None):
         """
 
         Parameters
         ----------
-        target_downloads: dict, optional
-           key -> size, expected downloads
+        expected: dict, optional
+           key -> size, expected entries (e.g. downloads)
         """
         # looking forward for multiple downloads at the same time
         self.pbars = {}
         self.total_pbar = None
-        self.target_downloads = target_downloads
+        self.expected = expected
         self._failed = 0
         self._succeeded = 0
         self.start()
 
     def start(self):
-        if self.target_downloads:
+        if self.expected:
             from datalad.ui import ui
-            total = sum(self.target_downloads.values())
+            total = sum(filter(bool, self.expected.values()))
             self.total_pbar = ui.get_progressbar(
                 label="Total", maxval=total)
             self.total_pbar.start()
@@ -1824,9 +1828,10 @@ class ProcessAnnexProgressIndicators(object):
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
                     try:
-                        size = self.target_downloads[j['key']]
+                        size_j = self.expected[j['key']]
                     except:
-                        size = AnnexRepo.get_size_from_key(j['key'])
+                        size_j = None
+                    size = size_j or AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(size, increment=True)
             else:
                 self._failed += 1
@@ -1841,8 +1846,8 @@ class ProcessAnnexProgressIndicators(object):
                     "Total (%d ok%s out of %d)" % (
                         self._succeeded,
                         failed_str,
-                        len(self.target_downloads)
-                        if self.target_downloads
+                        len(self.expected)
+                        if self.expected
                         else self._succeeded + self._failed)
                 # seems to be of no effect to force it repaint
                 self.total_pbar.refresh()

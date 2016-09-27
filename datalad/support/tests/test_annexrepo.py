@@ -1231,3 +1231,66 @@ def test_annex_version_handling(path):
             eq_(AnnexRepo.git_annex_version, None)
             # so we could still fail
             assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+
+
+def test_ProcessAnnexProgressIndicators():
+    irrelevant_lines = (
+        'abra',
+        '{"some_json": "sure thing"}'
+    )
+    # regular lines, without completion for known downloads
+    success_lines = (
+        '{"command":"get","note":"","success":true,"key":"key1","file":"file1"}',
+        '{"command":"comm","note":"","success":true,"key":"backend-s10--key2"}',
+    )
+    progress_lines = (
+        '{"byte-progress":10,"action":{"command":"get","note":"from web...",'
+            '"key":"key1","file":"file1"},"percent-progress":"10%"}',
+    )
+
+    # without providing expected entries
+    proc = ProcessAnnexProgressIndicators()
+    # when without any target downloads, there is no total_pbar
+    assert_is(proc.total_pbar, None)
+    # for regular lines -- should just return them without side-effects
+    for l in irrelevant_lines + success_lines:
+        with swallow_outputs() as cmo:
+            assert_equal(proc(l), l)
+            assert_equal(proc.pbars, {})
+            assert_equal(cmo.out, '')
+            assert_equal(cmo.err, '')
+    # should process progress lines
+    assert_equal(proc(progress_lines[0]), None)
+    assert_equal(len(proc.pbars), 1)
+    # but when we finish download -- should get cleared
+    assert_equal(proc(success_lines[0]), success_lines[0])
+    assert_equal(proc.pbars, {})
+    # and no side-effect of any kind in finish
+    assert_equal(proc.finish(), None)
+
+    proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
+    # when without any target downloads, there is no total_pbar
+    assert(proc.total_pbar is not None)
+    assert_equal(proc.total_pbar._pbar.total, 100)  # as much as it knows at this point
+    # for regular lines -- should still just return them without side-effects
+    for l in irrelevant_lines:
+        with swallow_outputs() as cmo:
+            assert_equal(proc(l), l)
+            assert_equal(proc.pbars, {})
+            assert_equal(cmo.out, '')
+            assert_equal(cmo.err, '')
+    # should process progress lines
+    # it doesn't swallow everything -- so there will be side-effects in output
+    with swallow_outputs() as cmo:
+        assert_equal(proc(progress_lines[0]), None)
+        assert_equal(len(proc.pbars), 1)
+        # but when we finish download -- should get cleared
+        assert_equal(proc(success_lines[0]), success_lines[0])
+        assert_equal(proc.pbars, {})
+        out = cmo.out
+    assert out  # just assert that something was output
+    assert proc.total_pbar is not None
+    # and no side-effect of any kind in finish
+    with swallow_outputs() as cmo:
+        assert_equal(proc.finish(), None)
+        assert_equal(proc.total_pbar, None)
