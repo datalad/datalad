@@ -25,6 +25,10 @@ class ProgressBarBase(object):
         self._prev_value = 0
         self.maxval = maxval
 
+    def refresh(self):
+        """Force update"""
+        pass
+
     def update(self, size, increment=False):
         if increment:
             self._prev_value += size
@@ -66,6 +70,10 @@ try:
         def start(self):
             super(tqdmProgressBar, self).start()
             self._create()
+
+        def refresh(self):
+            super(tqdmProgressBar, self).refresh()
+            self._pbar.refresh()
 
         def finish(self):
             self.clear()
