@@ -59,9 +59,9 @@ def get_metadata_type(ds, guess=False):
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
-            if pmod.has_metadata(ds):
+            if pmod.MetadataParser(ds).has_metadata():
                 mtypes.append(mtype)
     return mtypes if len(mtypes) else None
 
@@ -376,7 +376,7 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
         try:
-            native_meta = pmod.get_metadata(ds, ds_identifier)
+            native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
             lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
             continue
