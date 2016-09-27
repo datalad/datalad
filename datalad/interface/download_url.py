@@ -72,7 +72,7 @@ class DownloadURL(Interface):
           downloaded successfully files
         """
 
-        from ..downloaders import Providers
+        from ..downloaders.providers import Providers
 
         urls = assure_list_from_str(urls)
 
