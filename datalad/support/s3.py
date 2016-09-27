@@ -172,8 +172,8 @@ def set_bucket_public_access_policy(bucket):
       ]
     }""" % bucket.name)
 
-    # XXX: MIH: This syntax makes no sense!
-    def gen_test_bucket(bucket_name):
+
+def gen_test_bucket(bucket_name):
     conn = _get_bucket_connection(S3_ADMIN_CREDENTIAL)
     # assure we have none
     try:
