@@ -1888,8 +1888,11 @@ class ProcessAnnexProgressIndicators(object):
                     j['percent-progress'].rstrip('%')
                 )
 
+            title = str(download_item)
+            if len(title) > 36:
+                title = '%s .. %s' % (title[:16], title[-16:])
             pbar = self.pbars[download_id] = ui.get_progressbar(
-                label=download_item, maxval=target_size)
+                label=title, maxval=target_size)
             pbar.start()
 
         self._update_pbar(
