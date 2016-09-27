@@ -147,34 +147,34 @@ function click_handler(data, url) {
  */
 function metadata_locator(md5, parent) {
   var metadata_dir = '.git/datalad/metadata/';
-  var current_loc = absolute_url(getParameterByName('dir')).replace(/\/?$/, '');
+  var start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
 
-  // if parent find metadata json of parent directory
-  var parent_ = typeof parent !== 'undefined' ? parent : false;
-  if (parent_)
-    current_loc = parent_url(current_loc).replace(/\/?$/, '');
+  // if parent argument set, find metadata json of parent directory instead
+  var find_parent_ds = typeof parent !== 'undefined' ? parent : false;
+  var current_ds = find_parent_ds ? parent_url(start_loc).replace(/\/*$/, '/') : start_loc;
 
-  // if current node is a parent dataset
-  if (url_exists(current_loc + '/' + metadata_dir))
-    return current_loc + '/' + metadata_dir + md5('/');
-  // else
-  else {
-    // find current nodes parent dataset, if exists
-    while (current_loc !== loc().pathname) {
-      // return if parent dataset not found till the root dataset
-      if (current_loc.length <= loc().pathname.length)
-        return -1;
-      current_loc = parent_url(current_loc);
-      if (url_exists(current_loc + '/' + metadata_dir))
-        break;
-    }
-    // else compute name of current nodes metadata hash
-    var metadata_path = getParameterByName('dir')
-          .replace(current_loc.replace(loc().pathname, ''), '')   // remove basepath to dir
-          .replace(/^\/?/, '')                                    // replace beginning '/'
-          .replace(/\/?$/, '');                                   // replace ending '/'
-    return current_loc + metadata_dir + md5(metadata_path);
+  // traverse up directory tree till a dataset directory found
+  // check by testing if current directory has a metadata directory
+  while (!url_exists(current_ds + metadata_dir)) {
+    // return error code, if no dataset found till root dataset
+    if (current_ds.length <= loc().pathname.length)
+      return '';
+    // go to parent of current directory
+    current_ds = parent_url(current_ds).replace(/^\/*/, '/').replace(/\/*$/, '/');
   }
+
+  // if locating parent dataset or current_loc is a dataset, metadata filename = md5 of '/'
+  if (find_parent_ds || start_loc === current_ds)
+    return current_ds + metadata_dir + md5('/');
+
+  // else compute name of current nodes metadata hash
+  var metadata_path = getParameterByName('dir')
+        .replace(current_ds
+                 .replace(/\/$/, '')
+                 .replace(loc().pathname, ''), '')   // remove basepath to dir
+        .replace(/^\/*/, '')                                   // replace beginning /'s
+        .replace(/\/*$/, '');                                  // replace ending /'s with /
+  return current_ds + metadata_dir + md5(metadata_path);
 }
 
 /**
@@ -186,14 +186,25 @@ function metadata_locator(md5, parent) {
 function parent_json(jQuery, md5) {
   var parent_metadata = metadata_locator(md5, true);
 
-  // if parent directory or parent metadata directory doesn't exist, return error code
-  if (parent_metadata !== -1 && !url_exists(parent_metadata))
-    return -1;
+  // if parent dataset or parent metadata directory doesn't exist, return error code
+  if (parent_metadata === '' || !url_exists(parent_metadata))
+    return {};
 
-  // else return parent metadata json
-  return jQuery.getJSON(parent_metadata, function(data) {
-    return data;
+  // else return required info for parent row from parent metadata json
+  var parent_json_ = {};
+  jQuery.ajax({
+    url: parent_metadata,
+    dataType: 'json',
+    async: false,
+    success: function(data) {
+      parent_json_ = {name: '..',
+                      date: data.date || '-',
+                      path: data.path || '-',
+                      type: data.type || 'dir',
+                      size: size_renderer(data.size || null)};
+    }
   });
+  return parent_json_;
 }
 
 /**
@@ -268,15 +279,12 @@ function directory(jQuery, md5) {
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {
       var api = this.api();
-      // all tables should have ../ parent path
-      var parent_json_ = parent_json(jQuery, md5);
-      if (!parent && parent_json_ !== -1)
-        api.row.add({name: '..', repo: parent_json.repo || '-',
-                     date: parent_json.date || '-',
-                     path: parent_json.path || '-',
-                     type: parent_json.type || 'dir',
-                     size: size_renderer(parent_json.size || null)}).draw();
-        // api.row.add(parent_json).draw();
+      // all tables (except root ds) should have ../ parent path
+      if (!parent) {
+        var parent_meta = parent_json(jQuery, md5);
+        if (!jQuery.isEmptyObject(parent_meta))
+          api.row.add(parent_meta).draw();
+      }
       // add click handlers
       api.$('tr').click(function() {
         var traverse = click_handler(api.row(this).data());
