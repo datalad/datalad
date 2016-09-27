@@ -19,6 +19,7 @@ from ..nodes.misc import sub
 from ..nodes.misc import switch
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
+from ..nodes.misc import skip_if
 from ..nodes.misc import debug
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
@@ -36,13 +37,16 @@ TOPURL = "https://openfmri.org/dataset/"
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
 def superdataset_pipeline(url=TOPURL, **kwargs):
-    annex = Annexificator(no_annex=True)
+    annex = Annexificator(no_annex=True, allow_dirty=True)
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     return [
         crawl_url(url),
         a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        skip_if({'dataset_name': 'ds000017'}), # was split into A/B
+        # TODO:  crawl into the dataset url, and check if there is any tarball available
+        # if not -- do not bother (e.g. ds000053)
         annex.initiate_dataset(
             template="openfmri",
             data_fields=['dataset'],
@@ -111,10 +115,12 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
 
     # common kwargs which would later would be tuned up
     def add_archive_content(**kw):
+        if 'leading_dirs_depth' not in kw:
+            kw['leading_dirs_depth'] = leading_dirs_depth
+        if 'strip_leading_dirs' not in kw:
+            kw['strip_leading_dirs'] = bool(leading_dirs_depth)
         return annex.add_archive_content(
             existing='archive-suffix',
-            strip_leading_dirs=bool(leading_dirs_depth),
-            leading_dirs_depth=leading_dirs_depth,
             delete=True,
             exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
             **kw
@@ -186,7 +192,10 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
                 assign({'dataset_file': dataset + '///%(filename)s'}, interpolate=True),
                 switch(
                     'dataset_file',
-                    {'ds0*158///aalmasks\.zip$': add_archive_content(add_archive_leading_dir=True)},
+                    {
+                        'ds0*158///aalmasks\.zip$': add_archive_content(add_archive_leading_dir=True),
+                        '.*///ds000030_R1\.0\.1_metadata\.tgz': add_archive_content(leading_dirs_depth=4),
+                    },
                     default=add_archive_content(),
                     re=True,
                 ),

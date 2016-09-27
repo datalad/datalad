@@ -56,7 +56,7 @@ def get_metadata(ds, ds_identifier):
             meta[dataladterm] = bids[bidsterm]
     compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
     # special case
-    if 'BIDSVersion' in bids:
+    if bids.get('BIDSVersion'):
         compliance.append(
             'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
                 bids['BIDSVersion'].strip()))
