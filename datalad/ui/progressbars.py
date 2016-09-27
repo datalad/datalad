@@ -73,7 +73,10 @@ try:
 
         def refresh(self):
             super(tqdmProgressBar, self).refresh()
-            self._pbar.refresh()
+            # older tqdms might not have refresh yet but I think we can live
+            # without it for a bit there
+            if hasattr(tqdm, 'refresh'):
+                self._pbar.refresh()
 
         def finish(self):
             self.clear()
