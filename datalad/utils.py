@@ -29,6 +29,11 @@ import glob
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+import hashlib
+from os.path import sep as dirsep
+from contextlib import contextmanager
+
+
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 
@@ -149,9 +154,6 @@ def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
-import hashlib
-
-
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
@@ -164,7 +166,6 @@ def sorted_files(dout):
                        for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-from os.path import sep as dirsep
 _VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
 _DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
@@ -567,8 +568,6 @@ def line_profile(func):
 #
 # Context Managers
 #
-
-from contextlib import contextmanager
 
 
 @contextmanager

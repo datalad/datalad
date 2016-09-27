@@ -25,6 +25,7 @@ from ..support.network import URL
 from ..utils import getpwd
 from ..utils import unique
 from .base import AnnexCustomRemote
+from .main import main as super_main
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -363,9 +364,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 continue
 
         self.error("Failed to fetch any archive containing {key}. Tried: {akeys}".format(**locals()))
-
-
-from .main import main as super_main
 
 
 def main():

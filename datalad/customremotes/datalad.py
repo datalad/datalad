@@ -19,6 +19,7 @@ from ..dochelpers import exc_str
 
 from ..downloaders.providers import Providers
 from ..downloaders.base import TargetFileAbsent
+from .main import main as super_main
 
 
 class DataladAnnexCustomRemote(AnnexCustomRemote):
@@ -164,9 +165,6 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
         self.send('TRANSFER-FAILURE', cmd, key,
                   "Failed to download from any of %d locations" % len(urls))
-
-
-from .main import main as super_main
 
 
 def main():

@@ -24,6 +24,9 @@ from os.path import realpath
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
+import string
+import random
+
 from ..utils import any_re_search
 
 import logging
@@ -60,6 +63,8 @@ from ..consts import ARCHIVES_TEMP_DIR
 from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
 
+from ..utils import on_windows
+
 _runner = Runner()
 
 
@@ -87,8 +92,6 @@ DECOMPRESSORS = {
     '\.(tar\.gz|tgz)$': 'tar -xzvf %(file)s -C %(dir)s',
     '\.(zip)$': 'unzip %(file)s -d %(dir)s',
 }
-
-from ..utils import on_windows
 
 
 def unixify_path(path):
@@ -207,10 +210,6 @@ def _get_cached_filename(archive):
     archive_cached = hashlib.md5(realpath(archive).encode()).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
-
-
-import string
-import random
 
 
 def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):

@@ -26,6 +26,10 @@ lgr = logging.getLogger('datalad.s3')
 from ..dochelpers import exc_str
 from .exceptions import DownloadError, AccessDeniedError
 
+from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.parse import urlparse, urlunparse
+
+
 try:
     import boto
     from boto.s3.key import Key
@@ -254,10 +258,6 @@ def gen_bucket_test1_dirs():
     files("d1/file1.txt")
     # and then delete it and place it back
     files("d1", load="smth")
-
-
-from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.parse import urlparse, urlunparse
 
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,

@@ -32,6 +32,13 @@ from ..support import ansi_colors
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
 
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import GitRepo
+
+import string
+import humanize
+from datalad.utils import is_interactive
+
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
 
@@ -140,10 +147,6 @@ class Ls(Interface):
 #
 # Dataset listing
 #
-
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.annexrepo import GitRepo
-
 
 @auto_repr
 class AbsentRepoModel(object):
@@ -320,11 +323,6 @@ class FsModel(AnnexModel):
             return 'dir'
         else:
             return None
-
-
-import string
-import humanize
-from datalad.utils import is_interactive
 
 
 class LsFormatter(string.Formatter):
