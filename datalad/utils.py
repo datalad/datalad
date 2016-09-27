@@ -523,11 +523,14 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
-    # operate on a copy of tkwargs to avoid any side-effects
-    tkwargs_ = tkwargs.copy()
+    if tkwargs is None:
+        tkwargs_ = {}
+    else:
+        # operate on a copy of tkwargs to avoid any side-effects
+        tkwargs_ = tkwargs.copy()
 
     # TODO: don't remember why I had this one originally
     # if len(targs)<2 and \

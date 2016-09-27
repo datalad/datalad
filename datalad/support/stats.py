@@ -107,14 +107,16 @@ class ActivityStats(object):
         """Helper for incrementing counters"""
         self._current[k] += v
 
-    def _reset_values(self, d, vals={}):
+    def _reset_values(self, d, vals):
         for c in _COUNTS:
             d[c] = vals.get(c, 0)
         for l in _LISTS:
             d[l] = vals.get(l, [])
 
-    def reset(self, full=False, vals={}):
+    def reset(self, full=False, vals=None):
         # Initialize
+        if vals is None:
+            vals = {}
         if not full:
             self._total = self._get_updated_total()
         self._reset_values(self._current, vals=vals)

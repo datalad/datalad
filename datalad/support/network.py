@@ -76,7 +76,7 @@ def get_url_disposition_filename(url, headers=None):
             r.close()
 
 
-def get_url_straight_filename(url, strip=[], allowdir=False):
+def get_url_straight_filename(url, strip=None, allowdir=False):
     """Get file/dir name of the last path component of the URL
 
     Parameters
@@ -107,13 +107,13 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
         return None
 
 
-def get_url_filename(url, headers=None, strip=[]):
+def get_url_filename(url, headers=None, strip=None):
     """Get filename from the url, first consulting server about Content-Disposition
     """
     filename = get_url_disposition_filename(url, headers)
     if filename:
         return filename
-    return get_url_straight_filename(url, strip=[])
+    return get_url_straight_filename(url, strip=strip)
 
 
 def get_url_response_stamp(url, response_info):

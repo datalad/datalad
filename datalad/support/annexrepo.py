@@ -267,10 +267,10 @@ class AnnexRepo(GitRepo):
         else:
             return initialized_annex
 
-    def add_remote(self, name, url, options=[]):
+    def add_remote(self, name, url, options=None):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
-        super(AnnexRepo, self).add_remote(name, url, options)
+        super(AnnexRepo, self).add_remote(name, url, options if options else [])
         from datalad.support.network import is_ssh
         if is_ssh(url):
             c = ssh_manager.get_connection(url)
@@ -970,14 +970,17 @@ class AnnexRepo(GitRepo):
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
-    def _run_annex_command_json(self, command, args=[], **kwargs):
+    def _run_annex_command_json(self, command, args=None, **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
         """
         try:
             # TODO: refactor to account for possible --batch ones
+            annex_options = ['--json']
+            if args:
+                annex_options += args
             out, err = self._run_annex_command(
                 command,
-                annex_options=['--json'] + args,
+                annex_options=annex_options,
                 **kwargs)
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
@@ -1580,13 +1583,14 @@ class BatchedAnnex(object):
     """Container for an annex process which would allow for persistent communication
     """
 
-    def __init__(self, annex_cmd, git_options=[], annex_options=[], path=None,
+    def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
                  json=False,
                  output_proc=None):
         if not isinstance(annex_cmd, list):
             annex_cmd = [annex_cmd]
         self.annex_cmd = annex_cmd
-        self.git_options = git_options
+        self.git_options = git_options if git_options else []
+        annex_options = annex_options if annex_options else []
         self.annex_options = annex_options + (['--json'] if json else [])
         self.path = path
         if output_proc is None:

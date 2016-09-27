@@ -1041,13 +1041,15 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-    def add_remote(self, name, url, options=[]):
+    def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
         """
+        cmd = ['git', 'remote', 'add']
+        if options:
+            cmd += options
+        cmd += [name, url]
 
-        return self._git_custom_command(
-            '', ['git', 'remote', 'add'] + options + [name, url]
-        )
+        return self._git_custom_command('', cmd)
 
     def remove_remote(self, name):
         """Remove existing remote
@@ -1321,19 +1323,22 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def checkout(self, name, options=[]):
+    def checkout(self, name, options=None):
         """
         """
         # TODO: May be check for the need of -b options herein?
+        cmd = ['git', 'checkout']
+        if options:
+            cmd += options
+        cmd += [str(name)]
 
-        self._git_custom_command(
-            '', ['git', 'checkout'] + options + [str(name)],
-            expect_stderr=True
-        )
+        self._git_custom_command('', cmd, expect_stderr=True)
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=[], msg=None, allow_unrelated=False, **kwargs):
+    def merge(self, name, options=None, msg=None, allow_unrelated=False, **kwargs):
+        if options is None:
+            options = []
         if msg:
             options = options + ["-m", msg]
         if allow_unrelated and external_versions['cmd:git'] >= '2.9':
@@ -1348,7 +1353,9 @@ class GitRepo(object):
             '', ['git', 'branch', '-D', branch]
         )
 
-    def ls_remote(self, remote, options=[]):
+    def ls_remote(self, remote, options=None):
+        if options is None:
+            options = []
         self._git_custom_command(
             '', ['git', 'ls-remote'] + options + [remote]
         )
