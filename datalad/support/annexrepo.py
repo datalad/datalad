@@ -1889,6 +1889,7 @@ class ProcessAnnexProgressIndicators(object):
                     j['percent-progress'].rstrip('%')
                 )
             w, h = ui_utils.get_terminal_size()
+            w = w or 80  # default to 80
             title = str(download_item)
             pbar_right = 50
             title_len = w - pbar_right - 4  # (4 for reserve)
