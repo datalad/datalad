@@ -21,9 +21,7 @@ projdir = curdir if moddir == 'datalad' else dirname(moddir)
 if lexists(opj(projdir, '.git')):
     # If under git -- attempt to deduce a better "dynamic" version following git
     try:
-        import sys
         from subprocess import Popen, PIPE
-        from os.path import dirname
         git = Popen(['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
                     stdout=PIPE, stderr=PIPE,
                     cwd=projdir)
