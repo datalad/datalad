@@ -461,6 +461,7 @@ class AnnexRepo(GitRepo):
         # fetched
 
         if '--key' not in options:
+            lgr.info("Obtaining information on what files need to be obtained")
             # Let's figure out first which files/keys and of what size to download
             target_downloads = {}
             fetch_files = []
