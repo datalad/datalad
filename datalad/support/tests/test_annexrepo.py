@@ -1319,3 +1319,29 @@ def test_ProcessAnnexProgressIndicators():
     with swallow_outputs() as cmo:
         assert_equal(proc.finish(), None)
         assert_equal(proc.total_pbar, None)
+
+
+@with_tempfile
+def test_get_description(path1, path2):
+    annex1 = AnnexRepo(path1, create=True)
+    # some content for git-annex branch
+    create_tree(path1, {'1.dat': 'content'})
+    annex1.add('1.dat', git=False)
+    annex1.commit("msg")
+    annex1_description = annex1.get_description()
+    assert_not_equal(annex1_description, path1)
+
+    annex2 = AnnexRepo(path2, create=True, description='custom 2')
+    assert_equal(annex2.get_description(), 'custom 2')
+    # not yet known
+    assert_equal(annex2.get_description(uuid=annex1.uuid), None)
+
+    annex2.add_remote('annex1', path1)
+    annex2.fetch('annex1')
+    # it will match the remote name
+    assert_equal(annex2.get_description(uuid=annex1.uuid),
+                 annex1_description + ' [annex1]')
+    # but let's remove the remote
+    annex1.merge_annex('annex1')
+    annex2.remove_remote('annex1')
+    assert_equal(annex2.get_description(uuid=annex1.uuid), annex1_description)
