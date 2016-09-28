@@ -187,7 +187,7 @@ def test_obtain(path):
     # don't hide type issues, float doesn't become an int magically
     assert_raises(ValueError, cfg.obtain, dummy, valtype=int)
     # inject some prior knowledge
-    from datalad.interface.common_cfg import ui_definitions as cfg_defs
+    from datalad.interface.common_cfg import definitions as cfg_defs
     cfg_defs[dummy] = dict(type=float)
     # no we don't need to specify a type anymore
     assert_equal(cfg.obtain(dummy), 5.3)

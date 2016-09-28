@@ -17,7 +17,7 @@ from datalad.support.constraints import EnsureBool
 dirs = AppDirs("datalad", "datalad.org")
 
 
-ui_definitions = {
+definitions = {
     # TODO fill with wisdom
     #'datalad.metadata.nativetype': {
     #    'ui': ('question',  # UI dialog type

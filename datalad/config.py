@@ -178,7 +178,7 @@ class ConfigManager(object):
         # do local import, as this module is import prominently and the
         # could theroetically import all kind of weired things for type
         # conversion
-        from datalad.interface.common_cfg import ui_definitions as cfg_defs
+        from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
         cdef = cfg_defs.get(var, {})
         # type conversion setup
