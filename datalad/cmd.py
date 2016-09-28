@@ -176,6 +176,7 @@ class Runner(object):
 
         while proc.poll() is None:
             if log_stdout_:
+                lgr.log(3, "Reading line from stdout")
                 line = proc.stdout.readline()
                 if line and callable(log_stdout_):
                     # Let it be processed
@@ -194,6 +195,7 @@ class Runner(object):
                 # in another thread http://codereview.stackexchange.com/a/17959
                 # current problem is that if there is no output on stderr
                 # it stalls
+                lgr.log(3, "Reading line from stderr")
                 line = proc.stderr.readline()
                 if line and callable(log_stderr_):
                     # Let it be processed
@@ -209,6 +211,8 @@ class Runner(object):
                 pass
 
         if log_stdout in {'offline'} or log_stderr in {'offline'}:
+            lgr.log(4, "Issuing proc.communicate() since one of the targets "
+                       "is 'offline'")
             stdout_, stderr_ = proc.communicate()
             stdout += stdout_
             stderr += stderr_
@@ -281,7 +285,9 @@ class Runner(object):
            CommandError's `code`-field. Command's stdout and stderr are stored
            in CommandError's `stdout` and `stderr` fields respectively.
         """
-
+        # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
+        # would need either threaded solution as in .communicate or just allow
+        # only one to be monitored and another one just being dumped into a file
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
         errstream = subprocess.PIPE if log_stderr else sys.stderr
 

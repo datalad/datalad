@@ -205,7 +205,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
 # poor man thingie for now
 @auto_repr
 class UnderAnnexUI(DialogUI):
-    def __init__(self, **kwargs):
+    def __init__(self, specialremote=None, **kwargs):
         if 'out' not in kwargs:
             # to avoid buffering
             # http://stackoverflow.com/a/181654/1265472
@@ -213,6 +213,18 @@ class UnderAnnexUI(DialogUI):
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
         super(UnderAnnexUI, self).__init__(**kwargs)
+        self.specialremote = specialremote
+
+    def set_specialremote(self, specialremote):
+        self.specialremote = specialremote
+
+    def get_progressbar(self, *args, **kwargs):
+        if self.specialremote:
+            kwargs = kwargs.copy()
+            kwargs['backend'] = 'annex-remote'
+            kwargs['remote'] = self.specialremote
+        return super(UnderAnnexUI, self).get_progressbar(
+                *args, **kwargs)
 
 
 @auto_repr

@@ -156,7 +156,9 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
         for url in urls:
             try:
-                downloaded_path = self._providers.download(url, path=path, overwrite=True)
+                downloaded_path = self._providers.download(
+                    url, path=path, overwrite=True
+                )
                 lgr.info("Successfully downloaded %s into %s" % (url, downloaded_path))
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
