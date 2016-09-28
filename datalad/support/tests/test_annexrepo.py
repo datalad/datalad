@@ -1322,6 +1322,7 @@ def test_ProcessAnnexProgressIndicators():
 
 
 @with_tempfile
+@with_tempfile
 def test_get_description(path1, path2):
     annex1 = AnnexRepo(path1, create=True)
     # some content for git-annex branch
