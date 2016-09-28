@@ -10,6 +10,7 @@
 
 # Should have no spurious imports/definitions at the module leve
 from .distribution.dataset import Dataset
+from datalad import cfg
 
 
 def _generate_func_api():
@@ -72,7 +73,7 @@ def _generate_func_api():
             "returning the result"
         return call_
 
-    always_render = os.environ.get('DATALAD_API_ALWAYS_RENDER')
+    always_render = cfg.obtain('datalad.api.always.render')
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance

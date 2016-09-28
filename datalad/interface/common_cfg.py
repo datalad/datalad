@@ -96,7 +96,9 @@ definitions = {
     },
     'datalad.api.always.render': {
         'ui': ('yesno', {
-               'title': 'Would make api functions always use a version with cmdline output renderer (i.e. the one with `_` suffix)'}),
+               'title': 'Python API output rendering',
+               'text': 'Should the high-level API functions be altered to render output like the command line interface would do, in order to make interactive use less cumbersome?'}),
+        'default': False,
         'type': EnsureBool(),
     },
     'datalad.logtraceback': {
