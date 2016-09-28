@@ -33,18 +33,20 @@ from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
+from os.path import relpath
 
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
     raises, ok_, eq_, make_decorator
 
+from nose.tools import assert_set_equal
+from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
-from ..support.archives import compress_files
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..dochelpers import exc_str, borrowkwargs
@@ -82,6 +84,7 @@ def skip_if_scrapy_without_selector():
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
+    from ..support.archives import compress_files
     dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
@@ -114,7 +117,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     for name, load in tree:
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz') or name.endswith('.tar'):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
                 create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
@@ -155,7 +158,10 @@ def ok_clean_git_annex_proxy(path):
     finally:
         chpwd(cwd)
 
-    assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
+    assert_in(
+        "nothing to commit", out[0],
+        msg="git-status output via proxy not plausible: %s" % out[0]
+    )
 
 
 def ok_clean_git(path, annex=True, untracked=[]):
@@ -215,9 +221,9 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True)
+        repo.add(file_repo_path, commit=True, _datalad_msg=True)
     else:
-        repo.add(file_repo_path, git=True)
+        repo.add(file_repo_path, git=True, _datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
@@ -289,6 +295,7 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+
 def ok_git_config_not_empty(ar):
     """Helper to verify that nothing rewritten the config file"""
     # TODO: we don't support bare -- do we?
@@ -300,13 +307,13 @@ def ok_annex_get(ar, files, network=True):
 
     get passes through stderr from the ar to the user, which pollutes
     screen while running tests
+
+    Note: Currently not true anymore, since usage of --json disables
+    progressbars
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.get(files)
-        if network:
-            # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -315,8 +322,13 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+
 def ok_generator(gen):
     assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+
+assert_is_generator = ok_generator  # just an alias
+
 
 def ok_archives_caches(repopath, n=1, persistent=None):
     """Given a path to repository verify number of archives
@@ -339,15 +351,30 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n2,
                  msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
-def ok_file_has_content(path, content):
+
+def ok_exists(path):
+    assert exists(path), 'path %s does not exist' % path
+
+
+def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
     """Verify that file exists and has expected content"""
-    assert(exists(path))
+    ok_exists(path)
     with open(path, 'r') as f:
-        assert_equal(f.read(), content)
+        content_ = f.read()
+
+        if strip:
+            content_ = content_.strip()
+
+        if re_:
+            assert_re_in(content, content_, **kwargs)
+        else:
+            assert_equal(content, content_, **kwargs)
+
 
 #
 # Decorators
 #
+
 
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
@@ -744,7 +771,8 @@ def skip_ssh(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
-        if not os.environ.get('DATALAD_TESTS_SSH'):
+        test_ssh = os.environ.get('DATALAD_TESTS_SSH', '').lower()
+        if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
@@ -822,15 +850,44 @@ def run_under_dir(func, newdir='.'):
     return newfunc
 
 
-def assert_re_in(regex, c, flags=0):
+def assert_re_in(regex, c, flags=0, match=True, msg=None):
     """Assert that container (list, str, etc) contains entry matching the regex
     """
     if not isinstance(c, (list, tuple)):
         c = [c]
     for e in c:
-        if re.match(regex, e, flags=flags):
+        if (re.match if match else re.search)(regex, e, flags=flags):
             return
-    raise AssertionError("Not a single entry matched %r in %r" % (regex, c))
+    raise AssertionError(
+        msg or "Not a single entry matched %r in %r" % (regex, c)
+    )
+
+
+def assert_dict_equal(d1, d2):
+    msgs = []
+    if set(d1).difference(d2):
+        msgs.append(" keys in the first dict but not in the second: %s"
+                    % list(set(d1).difference(d2)))
+    if set(d2).difference(d1):
+        msgs.append(" keys in the second dict but not in the first: %s"
+                    % list(set(d2).difference(d1)))
+    for k in set(d1).intersection(d2):
+        same = True
+        try:
+            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+        except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
+            same = False
+
+        if not same:
+            msgs.append(" [%r] differs: %r != %r" % (k, d1[k], d2[k]))
+
+        if len(msgs) > 10:
+            msgs.append("and more")
+            break
+    if msgs:
+        raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
+    # do generic comparison just in case we screwed up to detect difference correctly above
+    eq_(d1, d2)
 
 
 def ignore_nose_capturing_stdout(func):
@@ -925,7 +982,7 @@ def get_most_obscure_supported_name(tdir):
 
 
 @optional_args
-def with_testsui(t, responses=None):
+def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
@@ -933,7 +990,7 @@ def with_testsui(t, responses=None):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
-            ui.set_backend('tests')
+            ui.set_backend('tests' if interactive else 'tests-noninteractive')
             if responses:
                 ui.add_responses(responses)
             ret = t(*args, **kwargs)
@@ -944,8 +1001,47 @@ def with_testsui(t, responses=None):
         finally:
             ui.set_backend(old_backend)
 
+    if not interactive and responses is not None:
+        raise ValueError("Non-interactive UI cannot provide responses")
+
     return newfunc
+
 with_testsui.__test__ = False
+
+
+def assert_no_errors_logged(func):
+    """Decorator around function to assert that no errors logged during its execution"""
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        with swallow_logs(new_level=logging.ERROR) as cml:
+            out = func(*args, **kwargs)
+            if cml.out:
+                raise AssertionError("Expected no errors to be logged, but log output is %s"
+                                     % cml.out)
+        return out
+
+    return new_func
+
+
+def get_mtimes_and_digests(target_path):
+    """Return digests (md5) and mtimes for all the files under target_path"""
+    from datalad.utils import find_files
+    from datalad.support.digests import Digester
+    digester = Digester(['md5'])
+
+    # bother only with existing ones for this test, i.e. skip annexed files without content
+    target_files = [
+        f for f in find_files('.*', topdir=target_path, exclude_vcs=False, exclude_datalad=False)
+        if exists(f)
+    ]
+    # let's leave only relative paths for easier analysis
+    target_files_ = [relpath(f, target_path) for f in target_files]
+
+    digests = {frel: digester(f) for f, frel in zip(target_files, target_files_)}
+    mtimes = {frel: os.stat(f).st_mtime for f, frel in zip(target_files, target_files_)}
+    return digests, mtimes
+
+
 
 #
 # Context Managers

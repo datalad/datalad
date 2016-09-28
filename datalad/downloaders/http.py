@@ -9,7 +9,6 @@
 """Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
-import functools
 import re
 import requests
 import requests.auth
@@ -99,7 +98,8 @@ def check_response_status(response, err_prefix="", session=None):
 class HTTPBaseAuthenticator(Authenticator):
     """Base class for html_form and http_auth authenticators
     """
-    def __init__(self, url=None, failure_re=None, success_re=None, **kwargs):
+    def __init__(self, url=None, failure_re=None, success_re=None,
+                 session_cookies=None, **kwargs):
         """
         Parameters
         ----------
@@ -110,12 +110,14 @@ class HTTPBaseAuthenticator(Authenticator):
         success_re : str or list of str, optional
           Regular expressions to determine either login has failed or succeeded.
           TODO: we might condition when it gets ran
+        session_cookies : str or list of str, optional
+          Session cookies to store (besides auth response cookies)
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
         self.failure_re = assure_list_from_str(failure_re)
         self.success_re = assure_list_from_str(success_re)
-
+        self.session_cookies = assure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
@@ -155,14 +157,22 @@ class HTTPBaseAuthenticator(Authenticator):
                         err_prefix + " returned output did not match 'success' regular expression %s" % success_re
                     )
 
+        cookies_dict = {}
         if response.cookies:
             cookies_dict = requests.utils.dict_from_cookiejar(response.cookies)
+        if self.session_cookies:
+            # any session cookies to store
+            cookies_dict.update({k: session.cookies[k] for k in self.session_cookies})
+
+        if cookies_dict:
             if (url in cookies_db) and update:
                 cookies_db[url].update(cookies_dict)
             else:
                 cookies_db[url] = cookies_dict
             # assign cookies for this session
-            session.cookies = response.cookies
+            for c, v in cookies_dict.items():
+                if c not in session.cookies or session.cookies[c] != v:
+                    session.cookies[c] = v  # .update(cookies_dict)
         return response
 
     def _post_credential(self, credentials, post_url, session):
@@ -223,8 +233,11 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
         post_fields = {
             k: v.format(**credentials)
             for k, v in self.fields.items()
-            }
+        }
+
         response = session.post(post_url, data=post_fields)
+        lgr.debug("Posted to %s fields %s, got response %s with headers %s",
+                  post_url, list(post_fields.keys()), response, list(response.headers.keys()))
         return response
 
 
@@ -279,7 +292,7 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
 @auto_repr
 class HTTPDownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None,  url=None, headers=None,
-                 response=None, chunk_size=1024**2):
+                 response=None, chunk_size=1024 ** 2):
         super(HTTPDownloaderSession, self).__init__(
             size=size, filename=filename, url=url, headers=headers,
         )
@@ -381,10 +394,10 @@ class HTTPDownloader(BaseDownloader):
                 lgr.debug("http session: Reusing previous")
                 return True  # we used old
             elif url in cookies_db:
-                lgr.debug("http session: Creating new with old cookies")
+                cookie_dict = cookies_db[url]
+                lgr.debug("http session: Creating new with old cookies %s", list(cookie_dict.keys()))
                 self._session = requests.Session()
                 # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
-                cookie_dict = cookies_db[url]
 
                 # TODO dict_to_cookiejar doesn't preserve all fields when reversed
                 self._session.cookies = requests.utils.cookiejar_from_dict(cookie_dict)
@@ -401,11 +414,17 @@ class HTTPDownloader(BaseDownloader):
         return False
 
     def get_downloader_session(self, url,
-                              allow_redirects=True, use_redirected_url=True):
+                               allow_redirects=True,
+                               use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
-        response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
+        # TODO: make it not this ugly -- but at the moment we are testing end-file size
+        # while can't know for sure if content was gunziped and either it all went ok.
+        # So safer option -- just request to not have it gzipped
+        headers = {'Accept-Encoding': ''}
+        response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
         check_response_status(response, session=self._session)
         headers = response.headers
+        lgr.debug("Establishing session for url %s, response headers: %s", url, headers)
         target_size = int(headers.get('Content-Length', '0').strip()) or None
         if use_redirected_url and response.url and response.url != url:
             lgr.debug("URL %s was redirected to %s and thus the later will be used"
@@ -416,7 +435,6 @@ class HTTPDownloader(BaseDownloader):
         url_filename = get_url_filename(url, headers=headers)
 
         headers['Url-Filename'] = url_filename
-
         return HTTPDownloaderSession(
             size=target_size,
             url=response.url,
@@ -455,7 +473,7 @@ class HTTPDownloader(BaseDownloader):
         return FileStatus(
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
-            filename=get_response_disposition_filename(status.get('Content-Disposition'))
-                     or status.get('Url-Filename'),
+            filename=get_response_disposition_filename(
+                status.get('Content-Disposition')) or status.get('Url-Filename'),
             content_type=status.get('Content-Type')
         )

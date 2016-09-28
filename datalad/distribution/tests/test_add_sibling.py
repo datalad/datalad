@@ -13,7 +13,6 @@ import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import install, add_sibling
-from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -37,12 +36,7 @@ from datalad.tests.utils import ok_clean_git
 def test_add_sibling(origin, repo_path):
 
     # prepare src
-    source = install(path=repo_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(repo_path, subds), init=True,
-                  create=True).checkout("master")
+    source = install(path=repo_path, source=origin, recursive=True)[0]
 
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")
@@ -99,11 +93,11 @@ def test_add_sibling(origin, repo_path):
                       force=True)
 
     eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "sub1"),
-                   opj(basename(source.path), "sub2")})
+                   opj(basename(source.path), "subm 1"),
+                   opj(basename(source.path), "subm 2")})
     for repo in [source.repo,
-                 GitRepo(opj(source.path, "sub1")),
-                 GitRepo(opj(source.path, "sub2"))]:
+                 GitRepo(opj(source.path, "subm 1")),
+                 GitRepo(opj(source.path, "subm 2"))]:
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
         pushurl = repo.get_remote_url("test-remote", push=True)
@@ -119,12 +113,12 @@ def test_add_sibling(origin, repo_path):
                       recursive=True,
                       force=True)
     eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "sub1"),
-                   opj(basename(source.path), "sub2")})
+                   opj(basename(source.path), "subm 1"),
+                   opj(basename(source.path), "subm 2")})
 
     for repo in [source.repo,
-                 GitRepo(opj(source.path, "sub1")),
-                 GitRepo(opj(source.path, "sub2"))]:
+                 GitRepo(opj(source.path, "subm 1")),
+                 GitRepo(opj(source.path, "subm 2"))]:
         assert_in("test-remote-2", repo.get_remotes())
         url = repo.get_remote_url("test-remote-2")
         pushurl = repo.get_remote_url("test-remote-2", push=True)

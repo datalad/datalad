@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
 
+
 dataset_description = Parameter(
     args=("-D", "--description",),
     constraints=EnsureStr() | EnsureNone(),
@@ -32,16 +33,17 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
-add_to_superdataset = Parameter(
-    args=("--add-to-super",),
-    doc="""add the new dataset as a component to a super dataset""",
-    action="store_true")
-
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git` calls""")
+
+git_clone_opts = Parameter(
+    args=("--git-clone-opts",),
+    metavar='STRING',
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :command:`git clone` calls""")
 
 annex_opts = Parameter(
     args=("--annex-opts",),
@@ -72,3 +74,35 @@ annex_copy_opts = Parameter(
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex copy` calls""")
+
+allow_dirty = Parameter(
+    args=("--allow-dirty",),
+    action="store_true",
+    doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok""")
+
+if_dirty_opt = Parameter(
+    args=("--if-dirty",),
+    choices=('fail', 'save-before', 'ignore'),
+    doc="""desired behavior if a dataset with unsaved changes is discovered:
+    'fail' will trigger an error and further processing is aborted;
+    'save-before' will save all changes prior any further action;
+    'ignore' let's datalad proceed as if the dataset would not have unsaved
+    changes.""")
+
+nosave_opt = Parameter(
+    args=("--nosave",),
+    dest='save',
+    action="store_false",
+    doc="""by default all modifications to a dataset are immediately saved. Given
+    this option will disable this behavior.""")
+
+jobs_opt = Parameter(
+    args=("-J", "--jobs"),
+    metavar="NJOBS",
+    constraints=EnsureInt() | EnsureNone(),
+    doc="""how many parallel jobs (where possible) to use.""")
+
+verbose = Parameter(
+    args=("-v", "--verbose",),
+    action="store_true",
+    doc="""print out more detailed information while executing a command""")

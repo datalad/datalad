@@ -68,6 +68,7 @@ except Exception as exc:
         lgr.warning("Failed to import vcr, no cassettes will be available: %s",
                     exc_str(exc, limit=10))
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+
     def use_cassette(*args, **kwargs):
         def do_nothing_decorator(t):
             @wraps(t)
@@ -86,6 +87,6 @@ def externals_use_cassette(name):
     but want to minimize their network traffic by using vcr.py
     """
     from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
+    cassette_path = realpath(_get_cassette_path(name))  # realpath OK
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': cassette_path}):
         yield
-

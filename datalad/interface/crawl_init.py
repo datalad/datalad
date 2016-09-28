@@ -10,10 +10,10 @@
 
 __docformat__ = 'restructuredtext'
 
-
+from os.path import curdir
 from .base import Interface
 from collections import OrderedDict
-
+from datalad.distribution.dataset import Dataset
 
 from ..dochelpers import exc_str
 from ..support.param import Parameter
@@ -21,21 +21,21 @@ from ..support.constraints import EnsureStr, EnsureNone
 from ..utils import get_func_kwargs_doc
 from ..crawler.pipeline import load_pipeline_from_template, initiate_pipeline_config
 
-
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 
 
 class CrawlInit(Interface):
-    """
-    Allows user to specify template and function to generate a pipeline
+    """Initialize crawling configuration
+
+    Allows to specify template and function to generate a crawling pipeline
 
     Examples:
 
     $ datalad crawl-init \
         --template openfmri \
-        --func superdataset_pipeline
+        --template-func superdataset_pipeline
 
     $ datalad crawl-init \
         --template fcptable \
@@ -58,14 +58,14 @@ class CrawlInit(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""keyword arguments to pass into the template function generating actual pipeline,
             organized in [PY: a dict PY][CMD: key=value pairs CMD]"""),
-        commit=Parameter(
-            args=("--commit",),
+        save=Parameter(
+            args=("--save",),
             action="store_true",
-            doc="""flag if to commit crawl config file"""),
+            doc="""flag to save file into git repo"""),
     )
 
     @staticmethod
-    def __call__(args=None, template=None, template_func=None, commit=False):
+    def __call__(args=None, template=None, template_func=None, save=False):
 
         if args:
             if isinstance(args, str):
@@ -99,4 +99,9 @@ class CrawlInit(Interface):
         if not isinstance(pipeline, list):
             raise ValueError("pipeline should be represented as a list. Got: %r" % pipeline)
 
-        initiate_pipeline_config(template, template_func, args)
+        configfile = initiate_pipeline_config(template, template_func, args)
+
+        if save:
+            from datalad.api import save
+            ds = Dataset(curdir)
+            ds.save("committing crawl config file", files=[configfile])

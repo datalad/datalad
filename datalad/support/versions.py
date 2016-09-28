@@ -13,15 +13,10 @@ import re
 from distutils.version import LooseVersion
 import time
 
-import os
-from os import unlink
-from os.path import splitext, dirname, basename, curdir
-from os.path import lexists
-from os.path import join as opj
+from os.path import basename
 
 from collections import OrderedDict
 from collections import defaultdict
-from six import iteritems
 
 from logging import getLogger
 lgr = getLogger('datalad.support.versions')
@@ -43,7 +38,7 @@ def get_versions(vfpath_statuses, regex, overlay=True,
       Regular expression to extract version.  Group 'version' should be defined
       if more than a single group present. If no groups defined at all, entire
       match considered to be a version.  Matched entry is stripped from the filename
-      to generated unversioned path (fpath)
+      to generate unversioned path (fpath)
     overlay: bool, optional
       Assume overlayed structure, so if a file misses an entry for some version,
       it is ok
@@ -79,7 +74,6 @@ def get_versions(vfpath_statuses, regex, overlay=True,
         raise NotImplementedError(overlay)
         # we should add a check that if there is a gap in versions for some file
         # then we must ... puke?
-
 
     # collect all versioned files for now in non-ordered dict
     # vfpaths = {}  # file -> [versions]
@@ -169,5 +163,3 @@ def _get_default_version(entry, default, status):
         return time.strftime(default, time.localtime(status.mtime))
     else:  # just the default
         return default
-
-

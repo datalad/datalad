@@ -10,16 +10,17 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.cmdline')
+
+lgr.log(5, "Importing cmdline.main")
 
 import argparse
-import logging
 import sys
-import os
 import textwrap
 from importlib import import_module
 
 import datalad
-from datalad.log import lgr
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -51,9 +52,16 @@ THE SOFTWARE.
 """
 
 
+# TODO:  OPT look into making setup_parser smarter to become faster
+# Now it seems to take up to 200ms to do all the parser setup
+# even though it might not be necessary to know about all the commands etc.
+# I wondered if it could somehow decide on what commands to worry about etc
+# by going through sys.args first
 def setup_parser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
+
+    lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline
@@ -61,7 +69,9 @@ def setup_parser(
     parts = {}
     # main parser
     parser = argparse.ArgumentParser(
-        fromfile_prefix_chars='@',
+        # cannot use '@' because we need to input JSON-LD properties (which might come wit @ prefix)
+        # MH: question, do we need this at all?
+        fromfile_prefix_chars=':',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             DataLad provides a unified data distribution with the convenience of git-annex
@@ -121,6 +131,7 @@ def setup_parser(
 
         for _intfspec in _interfaces:
             # turn the interface spec into an instance
+            lgr.log(5, "Importing module %s " % _intfspec[0])
             _mod = import_module(_intfspec[0], package='datalad')
             _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
@@ -131,7 +142,7 @@ def setup_parser(
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__)
+                    _intf.__doc__.strip())
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -170,13 +181,13 @@ def setup_parser(
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  - %s:  %s'
-                               % (cd[0],
+            cmd_summary.append('  - %-20s %s'
+                               % ((cd[0] + ':',
                                   textwrap.fill(
                                       cd[1].rstrip(' .'),
                                       75,
                                       #initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 8)))
+                                      subsequent_indent=' ' * 8))))
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
@@ -189,6 +200,7 @@ def setup_parser(
     datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     parts['datalad'] = parser
+    lgr.log(5, "Finished setup_parser")
     if return_subparsers:
         return parts
     else:
@@ -206,6 +218,7 @@ def setup_parser(
 
 
 def main(args=None):
+    lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
     try:
@@ -215,8 +228,19 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs = parser.parse_args(args)
-    if not cmdlineargs.change_path is None:
+    cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    if unparsed_args:
+        if cmdlineargs.func.__self__.__name__ != 'Export':
+            lgr.error('unknown argument{}: {}'.format(
+                's' if len(unparsed_args) > 1 else '',
+                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0]))
+            cmdlineargs.subparser.print_usage()
+            sys.exit(1)
+        else:
+            # store all unparsed arguments
+            cmdlineargs.datalad_unparsed_args = unparsed_args
+
+    if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)
 
@@ -246,4 +270,6 @@ def main(args=None):
             lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)
     if hasattr(cmdlineargs, 'result_renderer'):
-        cmdlineargs.result_renderer(ret)
+        cmdlineargs.result_renderer(ret, cmdlineargs)
+
+lgr.log(5, "Done importing cmdline.main")

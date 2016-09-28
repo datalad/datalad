@@ -13,7 +13,6 @@ import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import update, install
-from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -38,23 +37,13 @@ from datalad.tests.utils import ok_clean_git, swallow_outputs
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True,
-                  create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
 
     # get a clone to update later on:
-    dest = install(path=dst_path, source=src_path, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in dest.get_subdatasets(recursive=True):
-        AnnexRepo(opj(dst_path, subds), init=True,
-                  create=True).checkout("master")
+    dest = install(path=dst_path, source=src_path, recursive=True)[0]
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)
@@ -68,7 +57,7 @@ def test_update_simple(origin, src_path, dst_path):
     # modify origin:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
-    source.install(path="update.txt")
+    source.add(path="update.txt")
     source.save("Added update.txt")
     ok_clean_git(src_path)
 

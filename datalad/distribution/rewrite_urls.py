@@ -20,10 +20,10 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.interface.base import Interface
-from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
-from datalad.utils import getpwd
+from datalad.distribution.dataset import Dataset, EnsureDataset, \
+    datasetmethod, require_dataset
 
-lgr = logging.getLogger('datalad.distribution.modify_subdataset_urls')
+lgr = logging.getLogger('datalad.distribution.rewrite_urls')
 
 
 def get_module_parser(repo):
@@ -37,8 +37,8 @@ def get_module_parser(repo):
     return parser
 
 
-class ModifySubdatasetURLs(Interface):
-    """Modify the URLs of sub-datasets of a dataset
+class RewriteURLs(Interface):
+    """Rewrite the URLs of sub-datasets of a dataset
     """
 
     _params_ = dict(
@@ -70,28 +70,13 @@ class ModifySubdatasetURLs(Interface):
     #     constraints=EnsureChoice(["all", "ask"]),)
 
     @staticmethod
-    @datasetmethod(name='modify_subdataset_urls')
+    @datasetmethod(name='rewrite_urls')
     def __call__(url, dataset=None, recursive=False):
 
         # shortcut
-        ds = dataset
-
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-
-        # if we have no dataset given, figure out which one we need to operate
-        # on, based on the current working directory of the process:
-        if ds is None:
-            # try to find a dataset at or above PWD:
-            dspath = GitRepo.get_toppath(getpwd())
-            if dspath is None:
-                raise ValueError("No dataset found at %s." % getpwd())
-            ds = Dataset(dspath)
-        assert(ds is not None)
-
-        if not ds.is_installed():
-            raise ValueError("No installed dataset found at "
-                             "{0}.".format(ds.path))
+        ds = require_dataset(
+            dataset, check_installed=True,
+            purpose='modifying subdataset URLs')
         assert(ds.repo is not None)
 
         repos_to_update = [ds.repo]

@@ -36,7 +36,7 @@ def test_point_to_github(url):
 def test_clone(src, tempdir):
     # Verify that all our repos are clonable
     r = Runner()
-    output = r.run("git clone %(src)s %(tempdir)s" % locals(), log_online=True)
+    output = r.run(["git" , "clone", src, tempdir], log_online=True)
     #status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
     # TODO: requires network for sure! ;)

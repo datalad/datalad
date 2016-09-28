@@ -10,8 +10,37 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import OrderedDict
 from six import binary_type, text_type
 import re
+
+
+def get_replacement_dict(rules):
+    """Given a string with replacement rules, produces a dict of from: to"""
+
+    if isinstance(rules, (binary_type, text_type)):
+        rules = [rules]
+
+    pairs = OrderedDict()
+    for rule in rules:
+        if isinstance(rule, (list, tuple)):
+            if len(rule) == 2:
+                pairs.append(rule)
+            else:
+                raise ValueError("Got a rule %s which is not a string or a pair of values (from, to)"
+                                 % repr(rule))
+        if len(rule) <= 2:
+            raise ValueError("")
+        rule_split = rule[1:].split(rule[0])
+        if len(rule_split) != 2:
+            raise ValueError(
+                "Rename string must be of format '/pat1/replacement', "
+                "where / is an arbitrary character to decide replacement. "
+                "Got %s when trying to separate %s" % (rule_split, rule)
+            )
+        pairs[rule_split[0]] = rule_split[1]
+    return pairs
+
 
 def apply_replacement_rules(rules, s):
     """Apply replacement rules specified as a single string
@@ -33,20 +62,7 @@ def apply_replacement_rules(rules, s):
     str
     """
 
-    if isinstance(rules, (binary_type, text_type)):
-        rules = [rules]
-
-    for rule in rules:
-        if len(rule) <= 2:
-            raise ValueError("")
-        rule_split = rule[1:].split(rule[0])
-        if len(rule_split) != 2:
-            raise ValueError(
-                "Rename string must be of format '/pat1/replacement', "
-                "where / is an arbitrary character to decide replacement. "
-                "Got %s when trying to separate %s" % (rule_split, rule)
-            )
-        regexp, replacement = rule_split
+    for regexp, replacement in get_replacement_dict(rules).items():
         s = re.sub(regexp, replacement, s)
 
     return s

@@ -15,28 +15,35 @@ from collections import OrderedDict
 from os.path import exists
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, chpwd
+from datalad.tests.utils import ok_clean_git
 from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
+from datalad.distribution.dataset import Dataset
 
 
 @with_tempfile(mkdir=True)
-def _test_crawl_init(args, template, template_func, target_value, tmpdir):
+def _test_crawl_init(args, template, template_func, save, target_value, tmpdir):
     ar = AnnexRepo(tmpdir, create=True)
     with chpwd(tmpdir):
-        crawl_init(args=args, template=template, template_func=template_func)
+        crawl_init(args=args, template=template, template_func=template_func, save=save)
         eq_(exists(CRAWLER_META_DIR), True)
         eq_(exists(CRAWLER_META_CONFIG_PATH), True)
         f = open(CRAWLER_META_CONFIG_PATH, 'r')
         contents = f.read()
         eq_(contents, target_value)
+        if save:
+            ds = Dataset(tmpdir)
+            ok_clean_git(tmpdir, annex=isinstance(ds.repo, AnnexRepo))
 
 
 def test_crawl_init():
-    yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', \
+    yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', False, \
           '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
-    yield _test_crawl_init, {'dataset': 'ds000001'}, 'openfmri', None, \
+    yield _test_crawl_init, {'dataset': 'ds000001'}, 'openfmri', None, False, \
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n\n'
-    yield _test_crawl_init, ['dataset=ds000001', 'versioned_urls=True'], 'openfmri', None, \
+    yield _test_crawl_init, ['dataset=ds000001', 'versioned_urls=True'], 'openfmri', None, False, \
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n_versioned_urls = True\n\n'
+    yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', True, \
+          '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
 
 
 @with_tempfile(mkdir=True)
@@ -69,4 +76,6 @@ def _test_crawl_init_error_patch(return_value, exc, exc_msg, d):
 def test_crawl_init_error_patch():
     yield _test_crawl_init_error_patch, [], ValueError, "returned pipeline is empty"
     yield _test_crawl_init_error_patch, {1: 2}, ValueError, "pipeline should be represented as a list. Got: {1: 2}"
+
+
 

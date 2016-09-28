@@ -10,7 +10,7 @@
 
 """
 
-__docformat__ = 'restructuredtext'
+__docformat__ = 'numpy'
 
 
 import random
@@ -53,6 +53,28 @@ def _parse_spec(spec):
 
 
 def _makeds(path, levels, ds=None):
+    """Create a hierarchy of datasets
+
+    Used recursively, with current invocation generating datasets for the
+    first level, and delegating sub-levels to recursive invocation
+
+    Parameters
+    ----------
+    path : str
+      Path to the top directory under which dataset will be created.
+      If relative -- relative to current directory
+    levels : list of list
+      List of specifications for :func:`random.randint` call per each level.
+    ds : Dataset, optional
+      Super-dataset which would contain a new dataset (thus its path whould be
+      a parent of path. Note that ds needs to be installed.
+
+    Yields
+    ------
+    str
+       Path to the generated dataset(s)
+
+    """
     # we apparently can't import api functionality within api
     from datalad.api import install
     # To simplify managing all the file paths etc
@@ -66,19 +88,16 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.add(fn, git=True, commit=True, msg="Added %s" % fn)
+    repo.add(fn, git=True, commit=True, msg="Added %s" % fn, _datalad_msg=True)
     if ds:
+        assert ds.is_installed()
         rpath = os.path.relpath(path, ds.path)
         out = install(
             dataset=ds,
             path=rpath,
-            source='./' + rpath,
+            source=opj(os.curdir, rpath)
         )
-        # TODO: The following is to be adapted when refactoring AnnexRepo/GitRepo to make it uniform
-        if isinstance(ds.repo, AnnexRepo):
-            ds.repo.commit("subdataset %s installed." % rpath)
-        else:
-            ds.repo.commit("subdataset %s installed." % rpath)
+        ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
 
     if not levels:
         return
@@ -144,7 +163,7 @@ class CreateTestDataset(Interface):
         return list(_makeds(path, levels))
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             res = []

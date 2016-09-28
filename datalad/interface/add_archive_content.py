@@ -19,15 +19,19 @@ import os
 import shlex
 import tempfile
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename, abspath
+from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
 from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
 from os.path import isabs
+from os.path import dirname
+from os.path import normpath
+
 from .base import Interface
+from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
+from ..support.constraints import EnsureStr, EnsureNone
 
 from ..support.annexrepo import AnnexRepo
 from ..support.strings import apply_replacement_rules
@@ -38,14 +42,18 @@ from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 
 from six import string_types
-from six.moves.urllib.parse import urlparse
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
 
 
+# Shortcut note
+_KEY_OPT = "[PY: `key=True` PY][CMD: --key CMD]"
+_KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
+
 # TODO: may be we could enable separate logging or add a flag to enable
 # all but by default to print only the one associated with this given action
+
 
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
@@ -64,7 +72,13 @@ class AddArchiveContent(Interface):
             args=("-d", "--delete"),
             action="store_true",
             doc="""flag to delete original archive from the filesystem/git in current tree.
-                   Note that it will be of no effect if --key is given."""),
+                   %s""" % _KEY_OPT_NOTE),
+        add_archive_leading_dir=Parameter(
+            args=("--add-archive-leading-dir",),
+            action="store_true",
+            doc="""flag to place extracted content under a directory which would correspond
+                   to archive name with suffix stripped.  E.g. for archive `example.zip` its
+                   content will be extracted under a directory `example/`"""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
@@ -82,6 +96,11 @@ class AddArchiveContent(Interface):
             doc="""regular expression(s) for directories to consider to strip away""",
             constraints=EnsureStr() | EnsureNone(),
         ),
+        use_current_dir=Parameter(
+            args=("--use-current-dir",),
+            action="store_true",
+            doc="""flag to extract archive under the current directory,  not the directory where archive is located.
+                   %s""" % _KEY_OPT_NOTE),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
@@ -131,10 +150,7 @@ class AddArchiveContent(Interface):
             args=("--copy",),
             action="store_true",
             doc="""flag to copy the content of the archive instead of moving"""),
-        allow_dirty=Parameter(
-            args=("--allow-dirty",),
-            action="store_true",
-            doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok"""),
+        allow_dirty=allow_dirty,
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
@@ -154,7 +170,7 @@ class AddArchiveContent(Interface):
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
-            doc="archive file or a key (if --key option specified)",
+            doc="archive file or a key (if %s specified)" % _KEY_OPT,
             constraints=EnsureStr()),
     )
 
@@ -171,7 +187,9 @@ class AddArchiveContent(Interface):
 
     @staticmethod
     def __call__(archive, annex=None,
+                 add_archive_leading_dir=False,
                  strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
+                 use_current_dir=False,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None, drop_after=False, delete_after=False):
@@ -188,62 +206,84 @@ class AddArchiveContent(Interface):
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
         archive_path = archive
+        pwd = getpwd()
         if annex is None:
-            annex = get_repo_instance(class_=AnnexRepo)
+            annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
-                # if not absolute -- relative to curdir and thus
-                archive_path = relpath(abspath(archive), annex.path)
+                # if not absolute -- relative to wd and thus
+                archive_path = normpath(opj(pwd, archive))
+                # abspath(archive) is not "good" since dereferences links in the path
+                # archive_path = abspath(archive)
         elif not isabs(archive):
             # if we are given an annex, then assume that given path is within annex, not
             # relative to PWD
             archive_path = opj(annex.path, archive)
+        annex_path = annex.path
+
+        # _rpath below should depict paths relative to the top of the annex
+        archive_rpath = relpath(archive_path, annex_path)
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if not allow_dirty and annex.dirty:
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
-        # are we in a subdirectory of the repository? then we should add content under that
-        # subdirectory,
-        # get the path relative to the repo top
-        extract_relpath = relpath(getpwd(), annex.path) \
-            if commonprefix([realpath(getpwd()), annex.path]) == annex.path \
-            else None
-
         if not key:
             # we were given a file which must exist
-            if not exists(opj(annex.path, archive_path)):
+            if not exists(archive_path):
                 raise ValueError("Archive {} does not exist".format(archive))
             # TODO: support adding archives content from outside the annex/repo
-            origin = archive
-            key = annex.get_file_key(archive_path)
+            origin = 'archive'
+            key = annex.get_file_key(archive_rpath)
+            archive_dir = dirname(archive_path)
         else:
-            origin = key
+            origin = 'key'
+            key = archive
+            archive_dir = None  # We must not have anything to do with the location under .git/annex
+
+        archive_basename = file_basename(archive)
 
         if not key:
             # TODO: allow for it to be under git???  how to reference then?
             raise NotImplementedError(
-                "Provided file is not under annex.  We don't support yet adding everything "
-                "straight to git"
+                "Provided file %s is not under annex.  We don't support yet adding everything "
+                "straight to git" % archive
             )
+
+        # are we in a subdirectory of the repository?
+        pwd_under_annex = commonprefix([pwd, annex_path]) == annex_path
+        #  then we should add content under that
+        # subdirectory,
+        # get the path relative to the repo top
+        if use_current_dir:
+            # if outside -- extract to the top of repo
+            extract_rpath = relpath(pwd, annex_path) \
+                if pwd_under_annex \
+                else None
+        else:
+            extract_rpath = relpath(archive_dir, annex_path)
+
+        # relpath might return '.' as the relative path to curdir, which then normalize_paths
+        # would take as instructions to really go from cwd, so we need to sanitize
+        if extract_rpath == curdir:
+            extract_rpath = None  # no special relpath from top of the repo
 
         # and operate from now on the key or whereever content available "canonically"
         try:
-            key_path = annex.get_contentlocation(key)  # , relative_to_top=True)
+            key_rpath = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:
             raise RuntimeError("Content of %s seems to be N/A.  Fetch it first" % key)
 
-        #key_path = opj(reltop, key_path)
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
         from datalad.customremotes.archives import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        annexarchive = ArchiveAnnexCustomRemote(path=annex.path, persistent_cache=True)
+        annexarchive = ArchiveAnnexCustomRemote(path=annex_path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
-        earchive = annexarchive.cache[key_path]
+        earchive = annexarchive.cache[key_rpath]
 
         # TODO: check if may be it was already added
         if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
@@ -264,13 +304,13 @@ class AddArchiveContent(Interface):
                     annex_options = shlex.split(annex_options)
 
             leading_dir = earchive.get_leading_directory(
-                    depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
+                depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
                 if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # we need to create a temporary directory at the top level which would later be
             # removed
-            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex.path)) \
+            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex_path)) \
                 if delete_after \
                 else None
 
@@ -293,16 +333,22 @@ class AddArchiveContent(Interface):
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
 
+                # strip leading dirs
                 target_file = target_file[leading_dir_len:]
+
+                if add_archive_leading_dir:
+                    target_file = opj(archive_basename, target_file)
 
                 if rename:
                     target_file = apply_replacement_rules(rename, target_file)
 
+                # continue to next iteration if extracted_file in excluded
                 if exclude:
                     try:  # since we need to skip outside loop from inside loop
                         for regexp in exclude:
-                            if re.search(regexp, target_file):
-                                lgr.debug("Skipping {target_file} since contains {regexp} pattern".format(**locals()))
+                            if re.search(regexp, extracted_file):
+                                lgr.debug(
+                                    "Skipping {extracted_file} since contains {regexp} pattern".format(**locals()))
                                 stats.skipped += 1
                                 raise StopIteration
                     except StopIteration:
@@ -336,7 +382,7 @@ class AddArchiveContent(Interface):
                         fn_base, fn_ext = file_basename(fn, return_ext=True)
 
                         if existing == 'archive-suffix':
-                            fn_base += '-%s' % file_basename(origin)
+                            fn_base += '-%s' % archive_basename
                         elif existing == 'numeric-suffix':
                             pass  # archive-suffix will have the same logic
                         else:
@@ -370,9 +416,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                target_file_gitpath = opj(extract_relpath, target_file) if extract_relpath else target_file
+                target_file_rpath = opj(extract_rpath, target_file) if extract_rpath else target_file
                 out_json = annex.add_url_to_file(
-                    target_file_gitpath,
+                    target_file_rpath,
                     url, options=annex_options,
                     batch=True)
 
@@ -389,7 +435,7 @@ class AddArchiveContent(Interface):
 
                 if delete_after:
                     # forcing since it is only staged, not yet committed
-                    annex.remove(target_file_gitpath, force=True)  # TODO: batch!
+                    annex.remove(target_file_rpath, force=True)  # TODO: batch!
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
@@ -407,10 +453,10 @@ class AddArchiveContent(Interface):
 
                 del target_file  # Done with target_file -- just to have clear end of the loop
 
-            if delete and archive:
+            if delete and archive and origin != 'key':
                 lgr.debug("Removing the original archive {}".format(archive))
                 # force=True since some times might still be staged and fail
-                annex.remove(archive_path, force=True)
+                annex.remove(archive_rpath, force=True)
 
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
 
@@ -419,7 +465,8 @@ class AddArchiveContent(Interface):
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
-                    "Added content extracted from %s\n\n%s" % (origin, commit_stats.as_str(mode='full'))
+                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
+                    _datalad_msg=True
                 )
                 commit_stats.reset()
         finally:
@@ -427,7 +474,7 @@ class AddArchiveContent(Interface):
             annex.precommit()
 
             if delete_after:
-                prefix_path = opj(annex.path, prefix_dir)
+                prefix_path = opj(annex_path, prefix_dir)
                 if exists(prefix_path):  # probably would always be there
                     lgr.info("Removing temporary directory under which extracted files were annexed: %s",
                              prefix_path)

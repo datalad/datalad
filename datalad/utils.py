@@ -13,7 +13,7 @@ import six.moves.builtins as __builtin__
 import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
+from os.path import isdir
 from six import text_type, binary_type
 
 import logging
@@ -29,7 +29,13 @@ import glob
 from functools import wraps
 from time import sleep
 from inspect import getargspec
-from datalad.dochelpers import get_docstring_split
+import hashlib
+from os.path import sep as dirsep
+from contextlib import contextmanager
+
+
+# from datalad.dochelpers import get_docstring_split
+from datalad.consts import TIMESTAMP_FMT
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -37,17 +43,20 @@ lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-_platform_system = platform.system().lower()
-on_windows = _platform_system == 'windows'
-on_osx = _platform_system == 'darwin'
-on_linux = _platform_system == 'linux'
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+on_osx = platform_system == 'darwin'
+on_linux = platform_system == 'linux'
 try:
-    linux_distribution = platform.linux_distribution()
+    linux_distribution_name, linux_distribution_release \
+        = platform.linux_distribution()[:2]
     on_debian_wheezy = on_linux \
-                       and linux_distribution[0] == 'debian' \
-                       and linux_distribution[1].startswith('7.')
+                       and linux_distribution_name == 'debian' \
+                       and linux_distribution_release.startswith('7.')
 except:  # pragma: no cover
+    # MIH: IndexError?
     on_debian_wheezy = False
+    linux_distribution_name = linux_distribution_release = None
 
 #
 # Little helpers
@@ -56,7 +65,7 @@ except:  # pragma: no cover
 
 def get_func_kwargs_doc(func):
     """ Provides args for a function
-    
+
     Parameters
     ----------
     func: str
@@ -71,14 +80,6 @@ def get_func_kwargs_doc(func):
 
     # TODO: format error message with descriptions of args
     # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
-
-
-def assure_tuple_or_list(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
 
 
 def any_re_search(regexes, value):
@@ -103,7 +104,7 @@ def shortened_repr(value, l=30):
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s...>>" % (value_repr[:l-8])
+                value_repr = "<<%s...>>" % (value_repr[:l - 8])
             elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
                 raise ValueError("I hate those useless long reprs")
         else:
@@ -133,6 +134,7 @@ def __auto_repr__(obj):
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 
+
 def auto_repr(cls):
     """Decorator for a class to assign it an automagic quick and dirty __repr__
 
@@ -144,14 +146,12 @@ def auto_repr(cls):
     cls.__repr__ = __auto_repr__
     return cls
 
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
-
-
-import hashlib
 
 
 def md5sum(filename):
@@ -162,15 +162,15 @@ def md5sum(filename):
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
-    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
+    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
+                       for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
 
-def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
     """Generator to find files matching regex
 
     Parameters
@@ -180,12 +180,15 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
       Matches to exclude
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
-      as regex to exclude those files (regex: %r)
+      as regex to exclude those files (regex: `%r`)
+    exclude_datalad:
+      If True, excludes files known to be datalad meta-data files (e.g. under
+      .datalad/ subdirectory) (regex: `%r`)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % _VCS_REGEX
+    """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -197,7 +200,10 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
                 continue
+            if exclude_datalad and re.search(_DATALAD_REGEX, path):
+                continue
             yield path
+find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
 
 
 def expandpath(path, force_absolute=True):
@@ -221,6 +227,7 @@ def is_explicit_path(path):
     return isabs(path) \
         or path.startswith(os.curdir + os.sep) \
         or path.startswith(os.pardir + os.sep)
+
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -311,7 +318,7 @@ def file_basename(name, return_ext=False):
     bname = basename(name)
     fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
     if return_ext:
-        return fbname, bname[len(fbname)+1:]
+        return fbname, bname[len(fbname) + 1:]
     else:
         return fbname
 
@@ -362,6 +369,32 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
+def assure_list(s):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    """
+
+    if isinstance(s, list):
+        return s
+    elif isinstance(s, tuple):
+        return list(s)
+    elif s is None:
+        return []
+    else:
+        return [s]
+
+
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
@@ -400,7 +433,7 @@ def assure_dict_from_str(s, **kwargs):
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
         if k in out:
-            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            err = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
             raise ValueError(err)
         out[k] = v
     return out
@@ -432,6 +465,31 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+#
+# Generators helpers
+#
+
+def saved_generator(gen):
+    """Given a generator returns two generators, where 2nd one just replays
+
+    So the first one would be going through the generated items and 2nd one
+    would be yielding saved items
+    """
+    saved = []
+
+    def gen1():
+        for x in gen:  # iterating over original generator
+            saved.append(x)
+            yield x
+
+    def gen2():
+        for x in saved:  # yielding saved entries
+            yield x
+
+    return gen1(), gen2()
+
 
 #
 # Decorators
@@ -467,26 +525,29 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
-    # operate on a copy of tkwargs to avoid any side-effects
-    tkwargs_ = tkwargs.copy()
+    if tkwargs is None:
+        tkwargs_ = {}
+    else:
+        # operate on a copy of tkwargs to avoid any side-effects
+        tkwargs_ = tkwargs.copy()
 
     # TODO: don't remember why I had this one originally
     # if len(targs)<2 and \
-    if not 'prefix' in tkwargs_:
+    if 'prefix' not in tkwargs_:
         tkwargs_['prefix'] = '_'.join(
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
-            ([''] if (on_windows or not wrapped)
-                  else [wrapped.__name__]))
+            ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
     return tkwargs_
+
 
 @optional_args
 def line_profile(func):
@@ -508,7 +569,6 @@ def line_profile(func):
 # Context Managers
 #
 
-from contextlib import contextmanager
 
 @contextmanager
 def swallow_outputs():
@@ -524,7 +584,6 @@ def swallow_outputs():
     print function had desired effect
     """
 
-    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -563,8 +622,6 @@ def swallow_outputs():
             rmtemp(out_name)
             rmtemp(err_name)
 
-
-
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
         end = kwargs.pop('end', '\n')
@@ -597,7 +654,7 @@ def swallow_outputs():
 
 
 @contextmanager
-def swallow_logs(new_level=None):
+def swallow_logs(new_level=None, file_=None):
     """Context manager to consume all logs.
 
     """
@@ -615,10 +672,14 @@ def swallow_logs(new_level=None):
         And to stay consistent with how swallow_outputs behaves
         """
         def __init__(self):
-            kw = dict()
-            get_tempfile_kwargs(kw, prefix="logs")
-
-            self._out = open(tempfile.mktemp(**kw), 'w')
+            if file_ is None:
+                kw = get_tempfile_kwargs({}, prefix="logs")
+                out_file = tempfile.mktemp(**kw)
+            else:
+                out_file = file_
+            # PY3 requires clearly one or another.  race condition possible
+            self._out = open(out_file, 'a')
+            self._final_out = None
 
         def _read(self, h):
             with open(h.name) as f:
@@ -626,8 +687,12 @@ def swallow_logs(new_level=None):
 
         @property
         def out(self):
-            self._out.flush()
-            return self._read(self._out)
+            if self._final_out is not None:
+                # we closed and cleaned up already
+                return self._final_out
+            else:
+                self._out.flush()
+                return self._read(self._out)
 
         @property
         def lines(self):
@@ -638,16 +703,62 @@ def swallow_logs(new_level=None):
             return self._out
 
         def cleanup(self):
+            # store for access while object exists
+            self._final_out = self.out
             self._out.close()
             out_name = self._out.name
             del self._out
             gc.collect()
-            rmtemp(out_name)
+            if not file_:
+                rmtemp(out_name)
+
+        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
+            """Provide assertion on either a msg was logged at a given level
+
+            If neither `msg` nor `level` provided, checks if anything was logged
+            at all.
+
+            Parameters
+            ----------
+            msg: str, optional
+              Message (as a regular expression, if `regex`) to be searched.
+              If no msg provided, checks if anything was logged at a given level.
+            level: str, optional
+              String representing the level to be logged
+            regex: bool, optional
+              If False, regular `assert_in` is used
+            **kwargs: str, optional
+              Passed to `assert_re_in` or `assert_in`
+            """
+            from datalad.tests.utils import assert_re_in
+            from datalad.tests.utils import assert_in
+
+            if regex:
+                match = '\[%s\] ' % level if level else "\[\S+\] "
+            else:
+                match = '[%s] ' % level if level else ''
+
+            if msg:
+                match += msg
+
+            if match:
+                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
+            else:
+                assert not kwargs, "no kwargs to be passed anywhere"
+                assert self.out, "Nothing was logged!?"
 
     adapter = StringIOAdapter()
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    # TODO: it does store messages but without any formatting, i.e. even without
+    # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
+    # set
+    swallow_handler = logging.StreamHandler(adapter.handle)
+    # we want to log levelname so we could test against it
+    swallow_handler.setFormatter(
+        logging.Formatter('[%(levelname)s] %(message)s'))
+    lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
+
     if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
@@ -656,6 +767,8 @@ def swallow_logs(new_level=None):
 
     try:
         yield adapter
+        # TODO: if file_ and there was an exception -- most probably worth logging it?
+        # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
         lgr.handlers, lgr.level = old_handlers, old_level
         adapter.cleanup()
@@ -665,6 +778,8 @@ def swallow_logs(new_level=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
+
+
 def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -700,6 +815,7 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+
 def updated(d, update):
     """Return a copy of the input with the 'update'
 
@@ -708,6 +824,7 @@ def updated(d, update):
     d = d.copy()
     d.update(update)
     return d
+
 
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
@@ -718,6 +835,7 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
 
 class chpwd(object):
     """Wrapper around os.chdir which also adjusts environ['PWD']
@@ -763,6 +881,9 @@ class chpwd(object):
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
+    It is just a thin wrapper around GitRepo.is_with_annex() classmethod
+    which also checks for `path` to exist first.
+
     This includes actually present annexes, but also uninitialized ones, or
     even the presence of a remote annex branch.
     """
@@ -771,9 +892,7 @@ def knows_annex(path):
         lgr.debug("No annex: test path {0} doesn't exist".format(path))
         return False
     from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.get_remote_branches() \
-           or "git-annex" in repo.get_branches()
+    return GitRepo(path, init=False, create=False).is_with_annex()
 
 
 @contextmanager
@@ -850,5 +969,40 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
                 rmtemp(f)
             except OSError:
                 pass
+
+
+def _path_(*p):
+    """Given a path in POSIX" notation, regenerate one in native to the env one"""
+    if on_windows:
+        return opj(*map(lambda x: x.split('/'), p))
+    else:
+        # Assume that all others as POSIX compliant so nothing to be done
+        return opj(*p)
+
+
+def get_timestamp_suffix(time_=None, prefix='-'):
+    """Return a time stamp (full date and time up to second)
+
+    primarily to be used for generation of log files names
+    """
+    args = []
+    if time_ is not None:
+        if isinstance(time_, int):
+            time_ = time.gmtime(time_)
+        args.append(time_)
+    return time.strftime(prefix + TIMESTAMP_FMT, *args)
+
+
+def get_logfilename(dspath, cmd='datalad'):
+    """Return a filename to use for logging under a dataset/repository
+
+    directory would be created if doesn't exist, but dspath must exist
+    and be a directory
+    """
+    assert(exists(dspath))
+    assert(isdir(dspath))
+    ds_logdir = assure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
+    return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
+
 
 lgr.log(5, "Done importing datalad.utils")

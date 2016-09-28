@@ -64,12 +64,13 @@ class Provider(object):
     """
     # TODO: we might need a lazy loading of the submodules which would provide
     # specific downloaders while importing needed Python modules "on demand"
-    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'externals': {'requests'}},
-                   'https': {'class': HTTPDownloader, 'externals': {'requests'}},
-                   'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
-                   's3': {'class': S3Downloader, 'externals': {'boto'}}
-                    # ... TODO
-                  }
+    DOWNLOADERS = {
+        'http': {'class': HTTPDownloader, 'externals': {'requests'}},
+        'https': {'class': HTTPDownloader, 'externals': {'requests'}},
+        'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
+        's3': {'class': S3Downloader, 'externals': {'boto'}}
+        # ... TODO
+    }
 
     def __init__(self, name, url_res, credential=None, authenticator=None,
                  downloader=None):
@@ -208,7 +209,8 @@ class Providers(object):
                     o: config.get(section, o) for o in config.options(section)
                 }
                 # side-effect -- items get poped
-                locals().get(type_+"s")[name] = getattr(cls, '_process_' + type_)(name, items)
+                locals().get(type_ + "s")[name] = getattr(
+                    cls, '_process_' + type_)(name, items)
                 if len(items):
                     raise ValueError("Unprocessed fields left for %s: %s" % (name, str(items)))
             else:
@@ -251,9 +253,9 @@ class Providers(object):
         if auth_type != 'none':
             authenticator = AUTHENTICATION_TYPES[auth_type](
                 # Extract all the fields as keyword arguments
-                **{k[len(auth_type)+1:]: items.pop(k)
+                **{k[len(auth_type) + 1:]: items.pop(k)
                    for k in list(items.keys())
-                   if k.startswith(auth_type+"_")}
+                   if k.startswith(auth_type + "_")}
             )
         else:
             authenticator = None
@@ -305,8 +307,10 @@ class Providers(object):
         if scheme not in self._default_providers:
             lgr.debug("Initializing default provider for %s" % scheme)
             self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
-        lgr.debug("No dedicated provider, returning default one for %s" % scheme)
-        return self._default_providers[scheme]
+        provider = self._default_providers[scheme]
+        lgr.debug("No dedicated provider, returning default one for %s: %s",
+                  scheme, provider)
+        return provider
 
     # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders
@@ -356,4 +360,3 @@ class Providers(object):
     #                    % self.providers.get(url, 'credentials_url'))
     #     return { 'user': ui.question("Username:"),
     #              'password': ui.password() }
-

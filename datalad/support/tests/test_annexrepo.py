@@ -10,6 +10,7 @@
 
 """
 
+import mock
 from functools import partial
 from os import mkdir
 
@@ -18,7 +19,10 @@ from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
 from nose.tools import assert_is_instance
 
+from datalad.utils import linux_distribution_name
 from datalad.tests.utils import *
+from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import OutdatedExternalDependency
 
 # imports from same module:
 from ..annexrepo import *
@@ -176,6 +180,33 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_get_outofspace(annex_path):
+    ar = AnnexRepo(annex_path, create=True)
+
+    def raise_cmderror(*args, **kwargs):
+        raise CommandError(
+            cmd="whatever",
+            stderr="junk around not enough free space, need 905.6 MB more and after"
+        )
+
+    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+        assert_raises(OutOfSpaceError) as cme:
+        ar.get("file")
+    exc = cme.exception
+    assert_equal(exc.sizemore_msg, '905.6 MB')
+    assert_re_in(".*annex (find|get). needs 905.6 MB more", str(exc))
+
+
+@with_testrepos('basic_annex', flavors=['local'])
+def test_AnnexRepo_get_remote_na(path):
+    ar = AnnexRepo(path)
+
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
+    eq_(cme.exception.remote, "NotExistingRemote")
+
+
 # 1 is enough to test file_has_content
 @with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
@@ -261,20 +292,25 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     ldesc = ar.whereis(testfile, output='descriptions')
     assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))
 
-    # info
-    info = ar.info(testfile)
-    assert_equal(info['size'], 14)
-    assert(info['key'])  # that it is there
-    info_batched = ar.info(testfile, batch=True)
-    assert_equal(info, info_batched)
-    # while at it ;)
-    assert_equal(ar.info('nonexistent', batch=False), None)
-    assert_equal(ar.info('nonexistent', batch=True), None)
+    # info w/ and w/o fast mode
+    for fast in [True, False]:
+        info = ar.info(testfile, fast=fast)
+        assert_equal(info['size'], 14)
+        assert(info['key'])  # that it is there
+        info_batched = ar.info(testfile, batch=True, fast=fast)
+        assert_equal(info, info_batched)
+        # while at it ;)
+        assert_equal(ar.info('nonexistent', batch=False), None)
+        assert_equal(ar.info('nonexistent', batch=True), None)
 
     # annex repo info
-    repo_info = ar.repo_info()
+    repo_info = ar.repo_info(fast=False)
     assert_equal(repo_info['local annex size'], 14)
     assert_equal(repo_info['backend usage'], {'SHA256E': 1})
+    # annex repo info in fast mode
+    repo_info_fast = ar.repo_info(fast=True)
+    # doesn't give much testable info, so just comparing a subset for match with repo_info info
+    assert_equal(repo_info_fast['semitrusted repositories'], repo_info['semitrusted repositories'])
     #import pprint; pprint.pprint(repo_info)
 
     # remove the remote
@@ -715,17 +751,41 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
-    ds = AnnexRepo(dst, src)
-    assert_is_instance(ds, AnnexRepo, "AnnexRepo was not created.")
+    annex = AnnexRepo(dst, src)
+    assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = opj(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat"))
-    with swallow_outputs() as cmo:
-        ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat"))
-    f = open(testfile_abs, 'r')
-    assert_equal(f.readlines(), ['123\n'],
-                 "test-annex.dat's content doesn't match.")
+    assert_false(annex.file_has_content("test-annex.dat"))
+    with swallow_outputs():
+        annex.get(testfile)
+    assert_true(annex.file_has_content("test-annex.dat"))
+    ok_file_has_content(testfile_abs, '123', strip=True)
+
+    called = []
+    # for some reason yoh failed mock to properly just call original func
+    orig_run = annex._run_annex_command_json
+
+    def check_run(cmd, args, **kwargs):
+        called.append(cmd)
+        if cmd == 'find':
+            assert_not_in('-J5', args)
+        elif cmd == 'get':
+            assert_in('-J5', args)
+        else:
+            raise AssertionError(
+                "no other commands so far should be ran. Got %s, %s" %
+                (cmd, args)
+            )
+        return orig_run(cmd, args, **kwargs)
+
+    annex.drop(testfile)
+    with patch.object(AnnexRepo, '_run_annex_command_json',
+                      side_effect=check_run, auto_spec=True), \
+            swallow_outputs():
+        annex.get(testfile, jobs=5)
+    assert_equal(called, ['find', 'get'])
+    ok_file_has_content(testfile_abs, '123', strip=True)
+
 
 
 # TODO:
@@ -733,7 +793,8 @@ def test_AnnexRepo_get(src, dst):
 #def enable_remote(self, name):
 
 @with_testrepos('basic_annex$', flavors=['clone'])
-def _test_AnnexRepo_get_contentlocation(batch, path):
+@with_tempfile
+def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
     annex = AnnexRepo(path, create=False, init=False)
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
@@ -748,8 +809,15 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
 
-    # TODO: test how it would look if done under a subdir
-    with chpwd('subdir', mkdir=True):
+    # test how it would look if done under a subdir of the annex:
+    with chpwd(opj(annex.path, 'subdir'), mkdir=True):
+        key_location = annex.get_contentlocation(key, batch=batch)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
+
+    # test how it would look if done under a dir outside of the annex:
+    with chpwd(work_dir_outside, mkdir=True):
         key_location = annex.get_contentlocation(key, batch=batch)
         # they both should point to the same location eventually
         eq_(os.path.realpath(opj(annex.path, fname)),
@@ -1109,3 +1177,145 @@ def test_is_available(batch, direct, p):
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
     assert is_available(fname, remote='web') is False
+
+
+@with_tempfile(mkdir=True)
+def test_annex_add_no_dotfiles(path):
+    ar = AnnexRepo(path, create=True)
+    print(ar.path)
+    assert_true(os.path.exists(ar.path))
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    os.makedirs(opj(ar.path, '.datalad'))
+    # we don't care about empty directories
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
+        f.write('some content')
+    # make sure the repo is considered dirty now
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # no file is being added, as dotfiles/directories are ignored by default
+    ar.add('.', git=False)
+    # double check, still dirty
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # now add to git, and it should work
+    ar.add('.', git=True)
+    # all in index
+    assert_false(ar.repo.is_dirty(
+        index=False, working_tree=True, untracked_files=True, submodules=True))
+    ar.commit(msg="some")
+    # all committed
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    # not known to annex
+    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
+
+
+@with_tempfile
+def test_annex_version_handling(path):
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+         patch.object(AnnexRepo, '_check_git_annex_version',
+                      auto_spec=True,
+                      side_effect=AnnexRepo._check_git_annex_version) \
+            as cmpc, \
+         patch.object(external_versions, '_versions',
+                      {'cmd:annex': AnnexRepo.GIT_ANNEX_MIN_VERSION}):
+            eq_(AnnexRepo.git_annex_version, None)
+            ar1 = AnnexRepo(path, create=True)
+            assert(ar1)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+            # 2nd time must not be called
+            ar2 = AnnexRepo(path)
+            assert(ar2)
+            eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            eq_(cmpc.call_count, 1)
+
+    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
+            patch.object(AnnexRepo, '_check_git_annex_version',
+                         auto_spec=True,
+                         side_effect=AnnexRepo._check_git_annex_version):
+        # no git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': None}):
+            eq_(AnnexRepo.git_annex_version, None)
+            with assert_raises(MissingExternalDependency) as cme:
+                AnnexRepo(path)
+            if linux_distribution_name == 'debian':
+                assert_in("http://neuro.debian.net", str(cme.exception))
+            eq_(AnnexRepo.git_annex_version, None)
+
+        # outdated git-annex at all
+        with patch.object(
+                external_versions, '_versions', {'cmd:annex': '6.20160505'}):
+            eq_(AnnexRepo.git_annex_version, None)
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+            # and we don't assign it
+            eq_(AnnexRepo.git_annex_version, None)
+            # so we could still fail
+            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+
+
+def test_ProcessAnnexProgressIndicators():
+    irrelevant_lines = (
+        'abra',
+        '{"some_json": "sure thing"}'
+    )
+    # regular lines, without completion for known downloads
+    success_lines = (
+        '{"command":"get","note":"","success":true,"key":"key1","file":"file1"}',
+        '{"command":"comm","note":"","success":true,"key":"backend-s10--key2"}',
+    )
+    progress_lines = (
+        '{"byte-progress":10,"action":{"command":"get","note":"from web...",'
+            '"key":"key1","file":"file1"},"percent-progress":"10%"}',
+    )
+
+    # without providing expected entries
+    proc = ProcessAnnexProgressIndicators()
+    # when without any target downloads, there is no total_pbar
+    assert_is(proc.total_pbar, None)
+    # for regular lines -- should just return them without side-effects
+    for l in irrelevant_lines + success_lines:
+        with swallow_outputs() as cmo:
+            assert_equal(proc(l), l)
+            assert_equal(proc.pbars, {})
+            assert_equal(cmo.out, '')
+            assert_equal(cmo.err, '')
+    # should process progress lines
+    assert_equal(proc(progress_lines[0]), None)
+    assert_equal(len(proc.pbars), 1)
+    # but when we finish download -- should get cleared
+    assert_equal(proc(success_lines[0]), success_lines[0])
+    assert_equal(proc.pbars, {})
+    # and no side-effect of any kind in finish
+    assert_equal(proc.finish(), None)
+
+    proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
+    # when without any target downloads, there is no total_pbar
+    assert(proc.total_pbar is not None)
+    assert_equal(proc.total_pbar._pbar.total, 100)  # as much as it knows at this point
+    # for regular lines -- should still just return them without side-effects
+    for l in irrelevant_lines:
+        with swallow_outputs() as cmo:
+            assert_equal(proc(l), l)
+            assert_equal(proc.pbars, {})
+            assert_equal(cmo.out, '')
+            assert_equal(cmo.err, '')
+    # should process progress lines
+    # it doesn't swallow everything -- so there will be side-effects in output
+    with swallow_outputs() as cmo:
+        assert_equal(proc(progress_lines[0]), None)
+        assert_equal(len(proc.pbars), 1)
+        # but when we finish download -- should get cleared
+        assert_equal(proc(success_lines[0]), success_lines[0])
+        assert_equal(proc.pbars, {})
+        out = cmo.out
+    assert out  # just assert that something was output
+    assert proc.total_pbar is not None
+    # and no side-effect of any kind in finish
+    with swallow_outputs() as cmo:
+        assert_equal(proc.finish(), None)
+        assert_equal(proc.total_pbar, None)

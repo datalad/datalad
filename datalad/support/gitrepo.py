@@ -13,6 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import logging
+import re
 import shlex
 from os import linesep
 from os.path import join as opj
@@ -47,8 +48,10 @@ from datalad.utils import swallow_logs
 from datalad.utils import updated
 
 # imports from same module:
+from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .network import RI
 from .network import is_ssh
 
 # shortcuts
@@ -67,6 +70,7 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
+# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -94,8 +98,8 @@ def kwargs_to_options(func, split_single_char_options=True,
         t_kwargs = dict()
         t_kwargs[target_kw] = \
             gitpy.Git().transform_kwargs(
-                        split_single_char_options=split_single_char_options,
-                        **kwargs)
+                split_single_char_options=split_single_char_options,
+                **kwargs)
         return func(self, *args, **t_kwargs)
     return newfunc
 
@@ -142,7 +146,7 @@ def _normalize_path(base_dir, path):
     if not path:
         return path
 
-    base_dir = realpath(base_dir)
+    base_dir = realpath(base_dir)  # realpath OK
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
@@ -152,12 +156,7 @@ def _normalize_path(base_dir, path):
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))
-        if commonprefix([path, base_dir]) != base_dir:
-            raise FileNotInRepositoryError(msg="Path outside repository: %s"
-                                               % path, filename=path)
-        else:
-            pass
+        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -167,11 +166,15 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = opj(realpath(getpwd()), path)
+        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
         return path
+
+    if commonprefix([path, base_dir]) != base_dir:
+        raise FileNotInRepositoryError(msg="Path outside repository: %s"
+                                           % path, filename=path)
 
     return relpath(path, start=base_dir)
 
@@ -275,7 +278,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
         else:
             remap_filenames = lambda x: x
 
-        if serialize: # and not single_file:
+        if serialize:  # and not single_file:
             result = [
                 func(self, f, *args, **kwargs)
                 for f in files_new
@@ -424,6 +427,21 @@ class GitRepo(object):
             lgr.warning("TODO: options passed to git are currently ignored.\n"
                         "options received: %s" % git_opts)
 
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+
+        # try to get a local path from `url`:
+        if url is not None:
+            try:
+                if not isinstance(url, RI):
+                    url = RI(url).localpath
+                else:
+                    url = url.localpath
+            except ValueError:
+                pass
+
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
@@ -436,29 +454,13 @@ class GitRepo(object):
 
         # TODO: somehow do more extensive checks that url and path don't point
         #       to the same location
+
+        self.repo = None
         if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
-            try:
-                lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
-                                      odbt=default_git_odbt)
-                lgr.debug("Git clone completed")
-                # TODO: more arguments possible: ObjectDB etc.
-            except GitCommandError as e:
-                # log here but let caller decide what to do
-                lgr.error(str(e))
-                raise
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                   "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython/issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
+            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -471,14 +473,61 @@ class GitRepo(object):
                 lgr.error(exc_str(e))
                 raise
         else:
+            if self.repo is None:
+                try:
+                    self.repo = self.cmd_call_wrapper(Repo, path)
+                    lgr.debug("Using existing Git repository at {0}".format(path))
+                except (GitCommandError,
+                        NoSuchPathError,
+                        InvalidGitRepositoryError) as e:
+                    lgr.error("%s: %s" % (type(e), str(e)))
+                    raise
+
+    def clone(self, url, path):
+        """Clone url into path
+
+        Provides workarounds for known issues (e.g.
+        https://github.com/datalad/datalad/issues/785)
+
+        Parameters
+        ----------
+        url : str
+        path : str
+        """
+
+        ntries = 5  # 3 is not enough for robust workaround
+        for trial in range(ntries):
             try:
-                self.repo = self.cmd_call_wrapper(Repo, path)
-                lgr.debug("Using existing Git repository at {0}".format(path))
-            except (GitCommandError,
-                    NoSuchPathError,
-                    InvalidGitRepositoryError) as e:
-                lgr.error("%s: %s" % (type(e), str(e)))
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                                  odbt=default_git_odbt)
+                lgr.debug("Git clone completed")
+                break
+                # TODO: more arguments possible: ObjectDB etc.
+            except GitCommandError as e:
+                # log here but let caller decide what to do
+                e_str = exc_str(e)
+                # see https://github.com/datalad/datalad/issues/785
+                if re.search("Request for .*aborted.*Unable to find", str(e),
+                             re.DOTALL) \
+                        and trial < ntries - 1:
+                    lgr.info(
+                        "Hit a known issue with Git (see GH#785). Trial #%d, "
+                        "retrying",
+                        trial)
+                    continue
+                lgr.error(e_str)
                 raise
+            except ValueError as e:
+                if gitpy.__version__ == '1.0.2' \
+                        and "I/O operation on closed file" in str(e):
+                    # bug https://github.com/gitpython-developers/GitPython
+                    # /issues/383
+                    raise GitCommandError(
+                        "clone has failed, telling ya",
+                        999,  # good number
+                        stdout="%s already exists" if exists(path) else "")
+                raise  # reraise original
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -494,6 +543,17 @@ class GitRepo(object):
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git', 'objects'))
+
+    def is_with_annex(self, only_remote=False):
+        """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
+
+        Parameters
+        ----------
+        only_remote: bool, optional
+            Check only remote (no local branches) for having git-annex branch
+        """
+        return any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
+            ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
     def get_toppath(cls, path):
@@ -527,7 +587,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -543,6 +603,9 @@ class GitRepo(object):
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
 
         # needs to be True - see docstring:
         assert(git)
@@ -581,7 +644,13 @@ class GitRepo(object):
         if commit:
             if msg is None:
                 msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg)
+            self.commit(msg=msg, _datalad_msg=_datalad_msg)
+
+        # Make sure return value from GitRepo is consistent with AnnexRepo
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in files]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
@@ -630,7 +699,12 @@ class GitRepo(object):
         # flush possibly cached in GitPython changes to index:
         self.repo.index.write()
 
-    def commit(self, msg=None, options=None):
+    @staticmethod
+    def _get_prefixed_commit_msg(msg):
+        DATALAD_PREFIX = "[DATALAD]"
+        return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
+
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """Commit changes to git.
 
         Parameters
@@ -639,7 +713,13 @@ class GitRepo(object):
           commit-message
         options: list of str
           cmdline options for git-commit
+        _datalad_msg: bool, optional
+          To signal that commit is automated commit by datalad, so
+          it would carry the [DATALAD] prefix
         """
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
 
         if not msg:
             if options:
@@ -652,7 +732,7 @@ class GitRepo(object):
         if options:
             # we can't pass all possible options to gitpython's implementation
             # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
+            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
             lgr.debug("Committing via direct call of git: %s" % cmd)
             self._git_custom_command([], cmd)
         else:
@@ -722,8 +802,20 @@ class GitRepo(object):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def get_active_branch(self):
+    def get_committed_date(self, branch=None):
+        """Get the date stamp of the last commit (in a branch). None if no commit"""
+        try:
+            commit = next(
+                self.get_branch_commits(branch
+                                        or self.get_active_branch())
+            )
+        except Exception as exc:
+            lgr.debug("Got exception while trying to get last commit: %s",
+                      exc_str(exc))
+            return None
+        return commit.committed_date
 
+    def get_active_branch(self):
         return self.repo.active_branch.name
 
     def get_branches(self):
@@ -912,9 +1004,9 @@ class GitRepo(object):
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
-                           log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=True, cwd=None, env=None,
-                           shell=None, expect_fail=False):
+                            log_stdout=True, log_stderr=True, log_online=False,
+                            expect_stderr=True, cwd=None, env=None,
+                            shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -936,42 +1028,57 @@ class GitRepo(object):
             else cmd_str + files
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr,
+            log_stdout=log_stdout,
+            log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd,
+            env=env,
+            shell=shell,
+            expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
-    def add_remote(self, name, url, options=''):
+    def add_remote(self, name, url, options=None):
+        """Register remote pointing to a url
         """
-        """
+        cmd = ['git', 'remote', 'add']
+        if options:
+            cmd += options
+        cmd += [name, url]
 
-        return self._git_custom_command('', 'git remote add %s %s %s' %
-                                 (options, name, url))
+        return self._git_custom_command('', cmd)
 
     def remove_remote(self, name):
-        """
+        """Remove existing remote
         """
 
-        return self._git_custom_command('', 'git remote remove %s' % name)
+        return self._git_custom_command(
+            '', ['git', 'remote', 'remove', name]
+        )
 
     def show_remotes(self, name='', verbose=False):
         """
         """
 
-        v = "-v" if verbose else ""
-        out, err = self._git_custom_command('', 'git remote %s show %s' %
-                                            (v, name))
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        out, err = self._git_custom_command(
+            '', ['git', 'remote'] + options + ['show'] + name
+        )
         return out.rstrip(linesep).splitlines()
 
-    def update_remote(self, name='', verbose=False):
+    def update_remote(self, name=None, verbose=False):
         """
         """
-
-        v = "-v" if verbose else ''
-        self._git_custom_command('', 'git remote %s update %s' % (name, v),
-                                 expect_stderr=True)
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        self._git_custom_command(
+            '', ['git', 'remote'] + name + ['update'] + options,
+            expect_stderr=True
+        )
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
@@ -998,8 +1105,8 @@ class GitRepo(object):
 
         Returns
         -------
-        Nothing yet.
-        TODO: Provide FetchInfo?
+        list
+            FetchInfo objects of the items fetched from remote
         """
         # TODO: options=> **kwargs):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
@@ -1011,7 +1118,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
@@ -1049,6 +1156,7 @@ class GitRepo(object):
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+        return fi_list
 
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """See fetch
@@ -1059,7 +1167,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
             tb = self.repo.active_branch.tracking_branch().name
@@ -1085,8 +1193,7 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                return remote.pull(refspec=refspec, progress=progress,
-                                      **kwargs)
+                return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
@@ -1095,6 +1202,10 @@ class GitRepo(object):
     def push(self, remote=None, refspec=None, progress=None, all_=False,
              **kwargs):
         """See fetch
+        Returns
+        -------
+        list
+            PushInfo objects of the items pushed to remote
         """
 
         if remote is None:
@@ -1103,7 +1214,7 @@ class GitRepo(object):
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
-                                  refspec)
+                                 refspec)
             if all_:
                 remotes_to_push = self.repo.remotes
             else:
@@ -1134,12 +1245,12 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list += rm.push(refspec=refspec, progress=progress,
-                                   **kwargs)
+                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
+        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
@@ -1212,31 +1323,44 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def checkout(self, name, options=''):
+    def checkout(self, name, options=None):
         """
         """
         # TODO: May be check for the need of -b options herein?
+        cmd = ['git', 'checkout']
+        if options:
+            cmd += options
+        cmd += [str(name)]
 
-        self._git_custom_command('', 'git checkout %s %s' % (options, name),
-                                 expect_stderr=True)
+        self._git_custom_command('', cmd, expect_stderr=True)
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=[], msg=None, **kwargs):
+    def merge(self, name, options=None, msg=None, allow_unrelated=False, **kwargs):
+        if options is None:
+            options = []
         if msg:
             options = options + ["-m", msg]
-        self._git_custom_command('', ['git', 'merge'] + options + [name],
-                                 **kwargs)
+        if allow_unrelated and external_versions['cmd:git'] >= '2.9':
+            options += ['--allow-unrelated-histories']
+        self._git_custom_command(
+            '', ['git', 'merge'] + options + [name],
+            **kwargs
+        )
 
     def remove_branch(self, branch):
-        self._git_custom_command('', 'git branch -D %s' % branch)
+        self._git_custom_command(
+            '', ['git', 'branch', '-D', branch]
+        )
 
     def ls_remote(self, remote, options=None):
-        self._git_custom_command('', 'git ls-remote %s %s' %
-                                 (options if options is not None else '',
-                                  remote))
+        if options is None:
+            options = []
+        self._git_custom_command(
+            '', ['git', 'ls-remote'] + options + [remote]
+        )
         # TODO: Return values?
-    
+
     @property
     def dirty(self):
         """Returns true if there are uncommitted changes or files not known to
@@ -1253,12 +1377,15 @@ class GitRepo(object):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
-    def get_submodules(self):
+    def get_submodules(self, sorted_=True):
         """Return a list of git.Submodule instances for all submodules"""
         # check whether we have anything in the repo. if not go home early
         if not self.repo.head.is_valid():
             return []
-        return self.repo.submodules
+        submodules = self.repo.submodules
+        if sorted_:
+            submodules = sorted(submodules, key=lambda x: x.path)
+        return submodules
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.
@@ -1305,6 +1432,7 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
@@ -1321,6 +1449,7 @@ class GitRepo(object):
         kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
+        # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
@@ -1352,6 +1481,7 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+        # TODO: return value
 
     def tag(self, tag):
         """Assign a tag to current commit
@@ -1362,7 +1492,9 @@ class GitRepo(object):
           Custom tag label.
         """
         # TODO later to be extended with tagging particular commits and signing
-        self._git_custom_command('', 'git tag "{0}"'.format(tag))
+        self._git_custom_command(
+            '', ['git', 'tag', str(tag)]
+        )
 
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
@@ -1410,7 +1542,12 @@ class GitRepo(object):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_deleted_files(self):
+        """return a list of paths with deleted files (deletion not yet commited)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
+                if f.split('\t')[0] == 'D']
+
 # TODO
 # remove submodule
 # status?
-

@@ -143,12 +143,12 @@ and additionally, for development we suggest to use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python-{dev,httpretty,testtools,nose,pip,vcr,virtualenv} python-tox
+apt-get install -y -q python-{dev,httpretty,nose,pip,vcr,virtualenv} python-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
 
-some of which you could also install from PyP?i using pip  (prior installation of those libraries listed above
+some of which you could also install from PyPi using pip  (prior installation of those libraries listed above
 might be necessary)
 
 ```sh
@@ -341,6 +341,9 @@ Refer datalad/config.py for information on how to add these environment variable
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
+- *DATALAD_API_ALWAYS_RENDER*: 
+  Would make api functions always use a version with cmdline output renderer
+  (i.e. the one with `_` suffix)
 - *DATALAD_LOGTRACEBACK*: 
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."

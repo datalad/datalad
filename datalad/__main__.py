@@ -13,6 +13,7 @@ from . import __version__
 from .auto import AutomagicIO
 from .log import lgr
 
+
 def usage(outfile, executable=sys.argv[0]):
     if '__main__.py' in executable:
         # That was -m datalad way to launch
@@ -42,6 +43,7 @@ def runctx(cmd, globals=None, locals=None):
         # good opportunity to avoid atexit I guess. pass for now
         pass
 
+
 def main(argv=None):
     import os
     import getopt
@@ -59,7 +61,6 @@ def main(argv=None):
         sys.stderr.write("Try `%s --help' for more information\n"
                          % sys.argv[0])
         sys.exit(1)
-
 
     # and now we need to execute target script "manually"
     # Borrowing up on from trace.py

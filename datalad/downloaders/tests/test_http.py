@@ -57,6 +57,7 @@ from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
 from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
+from ...support.network import get_url_disposition_filename
 
 
 def test_docstring():
@@ -197,16 +198,22 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     # TODO -- more and more specific
 
 
+@skip_if_no_network
 @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
           "datafiles/meta_data_files.tar.gz"
+    # seems to be gone
+    # yield check_download_external_url, \
+    #       'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
+    #       "failed", \
+    #       "2000 1005 2000 3000"
     yield check_download_external_url, \
-          'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
+          'https://db.humanconnectome.org/data/experiments/ConnectomeDB_E09797/resources/166768/files/filescans.csv', \
           "failed", \
-          "2000 1005 2000 3000"
+          "'Scan','FilePath'"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
@@ -255,11 +262,18 @@ def test_get_status_from_headers():
     assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
                  FileStatus(size=123))
 
+    filename = 'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip'
+    headers_content_disposition = {
+        'Content-Disposition':
+            'Attachment;Filename="%s"' % filename, }
     assert_equal(
-        HTTPDownloader.get_status_from_headers({
-            'Content-Disposition': 'Attachment;Filename="Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip"',
-        }).filename,
-        'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip')
+        HTTPDownloader.get_status_from_headers(headers_content_disposition).filename,
+        filename)
+
+    # since we are providing full headers -- irrelevant
+    assert_equal(get_url_disposition_filename("http://irrelevant", headers_content_disposition),
+                 filename)
+
 
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url

@@ -15,7 +15,8 @@ from mock import patch
 
 import datalad
 from ..cmdline.main import main
-from .utils import assert_equal, ok_, assert_raises, in_, ok_startswith
+from .utils import assert_equal, assert_raises, in_, ok_startswith
+
 
 def run_main(args, exit_code=0, expect_stderr=False):
     """Run main() of the datalad, do basic checks and provide outputs
@@ -41,9 +42,9 @@ def run_main(args, exit_code=0, expect_stderr=False):
             assert_equal(cm.exception.code, exit_code)  # exit code must be 0
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
-            if expect_stderr == False:
+            if expect_stderr is False:
                 assert_equal(stderr, "")
-            elif expect_stderr == True:
+            elif expect_stderr is True:
                 # do nothing -- just return
                 pass
             else:
@@ -78,11 +79,29 @@ def test_help_np():
     # thus testing sets
     assert_equal(set(sections),
                  {'Commands for dataset operations',
+                  'Commands for meta data handling',
                   'Miscellaneous commands',
                   'General information',
                   'Global options'})
+
+    # none of the lines must be longer than 80 chars
+    # TODO: decide on   create-sibling and possibly
+    # rewrite-urls
+    long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
+                  if len(l) > 80 and '{' not in l  # on nd70 summary line is unsplit
+                  ]
+    if long_lines:
+        raise AssertionError(
+            "Following lines in --help output were longer than 80 chars:\n%s"
+            % '\n'.join(long_lines)
+        )
 
 
 def test_usage_on_insufficient_args():
     stdout, stderr = run_main(['install'], exit_code=1)
     ok_startswith(stdout, 'usage:')
+
+
+def test_subcmd_usage_on_unknown_args():
+    stdout, stderr = run_main(['install', '--murks'], exit_code=1)
+    in_('install', stdout)

@@ -53,7 +53,6 @@ from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 from os import makedirs
 
-from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
@@ -61,6 +60,7 @@ from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
 from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
+from ..support.exceptions import PipelineNotSpecifiedError
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 from logging import getLogger
@@ -69,6 +69,7 @@ lgr = getLogger('datalad.crawler.pipeline')
 # name of the section in the config file which would define pipeline parameters
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 CRAWLER_PIPELINE_SECTION_DEPRECATED = 'crawler'
+
 
 class FinishPipeline(Exception):
     """Exception to use to signal that any given pipeline should be stopped
@@ -313,7 +314,7 @@ def _compare_dicts(d1, d2):
                 try:
                     if d1[k] != d2[k]:
                         changed.append(k)
-                except:
+                except:  # MIH: TypeError?
                     maybe_changed.append(k)
     return added, changed, removed, maybe_changed
 
@@ -349,7 +350,8 @@ def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
         repo = GitRepo(path)
         repo.add(crawl_config_repo_path)
         if repo.dirty:
-            repo.commit("Initialized crawling configuration to use template %s" % template)
+            repo.commit("Initialized crawling configuration to use template %s" % template,
+                        _datalad_msg=True)
         else:
             lgr.debug("Repository is not dirty -- not committing")
 
@@ -460,9 +462,9 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None, return_
 
     if filename:
         if not exists(filename):
-            raise IOError("Pipeline file %s is N/A" % filename)
+            raise PipelineNotSpecifiedError("Pipeline file %s is N/A" % filename)
     else:
-        raise ValueError("could not find pipeline for %s" % name)
+        raise PipelineNotSpecifiedError("could not find pipeline for %s" % name)
 
     return load_pipeline_from_module(filename, func=func, args=args, kwargs=kwargs, return_only=return_only)
 
@@ -473,20 +475,20 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None, return_
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
-    
+
     Typical example description
-    
+
         [crawl:pipeline]
         pipeline = standard
         func = pipeline1
         _kwarg1 = 1
-   
+
     which would instantiate a pipeline from standard.py module by calling
     `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
-    
+
         [crawl:pipeline]
         pipeline = standard?func=pipeline1&_kwarg1=1
-   
+
     so that theoretically we could specify basic pipelines completely within
     a URL
     """
@@ -503,7 +505,7 @@ def load_pipeline_from_config(path):
         opts = cfg_.options(sec)
         # must have template
         if 'template' not in opts:
-            raise IOError("%s lacks %r field within %s section" % (path, '_template', sec))
+            raise PipelineNotSpecifiedError("%s lacks %r field within %s section" % (path, 'template', sec))
         template = cfg_.get(sec, 'template')
         # parse template spec
         template_name, url_opts = parse_url_opts(template)

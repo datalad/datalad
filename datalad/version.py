@@ -12,7 +12,7 @@
 from os.path import lexists, dirname, join as opj, curdir
 
 # Hard coded version, to be done by release process
-__version__ = '0.2.3'
+__version__ = '0.3.0.dev1'
 
 # NOTE: might cause problems with "python setup.py develop" deployments
 #  so I have even changed buildbot to use  pip install -e .
@@ -21,9 +21,7 @@ projdir = curdir if moddir == 'datalad' else dirname(moddir)
 if lexists(opj(projdir, '.git')):
     # If under git -- attempt to deduce a better "dynamic" version following git
     try:
-        import sys
         from subprocess import Popen, PIPE
-        from os.path import dirname
         git = Popen(['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
                     stdout=PIPE, stderr=PIPE,
                     cwd=projdir)
@@ -37,6 +35,6 @@ if lexists(opj(projdir, '.git')):
         __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
         # To follow PEP440 we can't have all the git fanciness
         __version__ = __full_version__.split('-')[0]
-    except:
+    except:  # MIH: OSError, IndexError
         # just stick to the hard-coded
         __full_version__ = __version__

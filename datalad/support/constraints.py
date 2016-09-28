@@ -289,7 +289,7 @@ class EnsureRange(Constraint):
         return 'value must be in range [%s, %s]' % (min_str, max_str)
 
     def short_description(self):
-        None
+        return None
 
 
 class AltConstraints(Constraint):
@@ -403,8 +403,8 @@ constraint_spec_map = {
 }
 
 
-def expand_contraint_spec(spec):
-    """Helper to translate literal contraint specs into functional ones
+def expand_constraint_spec(spec):
+    """Helper to translate literal constraint specs into functional ones
 
     e.g. 'float' -> EnsureFloat()
     """

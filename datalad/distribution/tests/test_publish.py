@@ -9,11 +9,11 @@
 
 """
 
+import logging
 import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import publish, install
-from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -30,6 +30,8 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_not_in
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -38,18 +40,14 @@ from datalad.tests.utils import ok_clean_git
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, to="target")
@@ -99,15 +97,11 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
@@ -117,16 +111,21 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
-    sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub1_target.checkout("TMP", ["-b"])
+    sub2_target = AnnexRepo(sub2_pub, create=True)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
     # publish recursively
-    res = publish(dataset=source, to="target", recursive=True)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res = publish(dataset=source, to="target", recursive=True)
+        assert_not_in(
+            'forced update', cml.out,
+            "we probably haven't merged git-annex before pushing"
+        )
 
     # testing result list
     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
@@ -152,6 +151,28 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
 
+    # test for publishing with  --since.  By default since no changes, only current pushed
+    res_ = publish(dataset=source, recursive=True)
+    # only current one would get pushed
+    eq_(set(r.path for r in res_[0]), {src_path})
+
+    # all get pushed
+    res_ = publish(dataset=source, recursive=True, since='HEAD^')
+    eq_(set(r.path for r in res_[0]), {src_path, sub1.path, sub2.path})
+
+    # Let's now update one subm
+    with open(opj(sub2.path, "file.txt"), 'w') as f:
+        f.write('')
+    sub2.add('file.txt')
+    sub2.commit("")
+    # TODO: Doesn't work:  https://github.com/datalad/datalad/issues/636
+    #source.save("changed sub2", auto_add_changes=True)
+    source.repo.commit("", options=['-a'])
+
+    res_ = publish(dataset=source, recursive=True)
+    # only updated ones were published
+    eq_(set(r.path for r in res_[0]), {src_path, sub2.path})
+
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
@@ -161,25 +182,21 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_subdatasets(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+    source = install(path=src_path, source=origin, recursive=True)[0]
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
+    sub1_target.checkout("TMP", ["-b"])
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -221,6 +238,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
             result_paths.append(item.path)
         else:
             result_paths.append(item)
-    eq_({source.path, opj(source.path, "sub1"),
-         opj(source.path, "sub2"), 'test-annex.dat'},
+    eq_({source.path, opj(source.path, "subm 1"),
+         opj(source.path, "subm 2"), 'test-annex.dat'},
         set(result_paths))

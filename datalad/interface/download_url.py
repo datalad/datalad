@@ -30,7 +30,7 @@ lgr = getLogger('datalad.api.download-url')
 
 
 class DownloadURL(Interface):
-    """Download a content from a URL using DataLad's downloader
+    """Download content
 
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication detail maintained by
@@ -72,7 +72,7 @@ class DownloadURL(Interface):
           downloaded successfully files
         """
 
-        from ..downloaders import Providers
+        from ..downloaders.providers import Providers
 
         urls = assure_list_from_str(urls)
 
@@ -105,4 +105,3 @@ class DownloadURL(Interface):
         if failed_urls:
             raise RuntimeError("%d url(s) failed to download" % len(failed_urls))
         return downloaded_paths
-

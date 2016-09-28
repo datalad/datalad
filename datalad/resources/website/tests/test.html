@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Datalad WebUI Test</title>
+    <link rel="stylesheet" href="qunit/qunit-2.0.1.css">
+  </head>
+  <body>
+    <div id="qunit"></div>
+    <div id="qunit-fixture"></div>
+    <script src="../assets/js/jquery-2.2.4.js"></script>
+    <script src="../assets/js/jquery.dataTables-1.10.12.js"></script>
+    <script src="../assets/js/md5-2.3.0.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script src="qunit/sinon-1.17.5.js"></script>
+    <script src="qunit/sinon-qunit-1.0.0.js"></script>
+    <script src="qunit/qunit-2.0.1.js"></script>
+    <script>
+      QUnit.test("Parent URL", function(assert) {
+	  assert.equal(parent_url('root/child'), 'root/');
+	  assert.equal(parent_url('root/child/'), 'root/');
+	  assert.equal(parent_url('/root/child/'), '/root/');
+	  assert.equal(parent_url('/root'), '/');
+	  assert.equal(parent_url('root/'), '');
+	  assert.equal(parent_url('/root/'), '/');
+	  assert.equal(parent_url('/'), '');
+	  assert.equal(parent_url(''), '');
+      });
+      QUnit.test("Child URL", function(assert) {
+	  assert.equal(child_url('/root', 'child'), '/root/child');
+	  assert.equal(child_url('/root/', 'child'), '/root/child');
+	  assert.equal(child_url('root/', '/child'), 'root/child');
+	  assert.equal(child_url('/root/', 'child/'), '/root/child/');
+	  assert.equal(child_url('/root/', '/child/'), '/root/child/');
+	  assert.equal(child_url('/root', 'child/'), '/root/child/');
+	  assert.equal(child_url('/', '/root'), '/root');
+	  assert.equal(child_url('', 'root'), '/root');
+	  //assert.equal('http://localhost:8000/?dir=MLd_cells/');
+      });
+      QUnit.test("Construct Absolute URL", function(assert) {
+	  // mock out loc func with stub (normally returns window.location.pathname)
+	  loc = sinon.stub().returns({pathname: 'example.com'});
+	  assert.equal(absolute_url('/d1'), 'example.com/d1',
+		       'at domain root');
+
+	  loc.returns({pathname: 'example.com/ds/'});
+	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/',
+		       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
+
+	  loc.returns({pathname: 'example.com/ds2/?dir=/'});
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
+		       'if root path(/) in GET parameter');
+
+	  loc.returns({pathname: 'example.com/ds/?dir=d1/d2'});
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
+		       'if subpath in GET parameter');
+	  assert.equal(absolute_url(), loc().pathname, 'if nothing passed return current location');
+      });
+      QUnit.test("Update Param or Path ?", function(assert) {
+	  assert.equal(update_param_or_path('/ds1/', 'dir'), true, 'param if next is a directory');
+	  assert.equal(update_param_or_path('/ds1/', 'file'), false, 'param if next is a file');
+	  assert.equal(update_param_or_path('/ds1/', 'link'), false, 'param if next is a link');
+	  assert.equal(update_param_or_path('/'), false, 'path if next is the root dataset');
+	  assert.equal(update_param_or_path(), false, 'path if next null/undefined/empty');
+	  loc = sinon.stub().returns({pathname: '/ds1'});
+	  assert.equal(update_param_or_path('/ds1'), false, 'path if next is root of dataset at subfolder');
+      });
+      QUnit.test("Get Parameter by Name", function(assert) {
+	  assert.equal(getParameterByName('dir'), null,
+		       'ok if no url passed');
+	  assert.equal(getParameterByName('dir', 'example.com/d1?dir=/test'), '/test',
+		       'value if parameter has value');
+	  assert.equal(getParameterByName('dir', 'example.com/d1/?dir='), null,
+		       'null if parameter value is empty');
+	  assert.equal(getParameterByName('dir', 'example.com/d1/d2/d3'), null,
+		       'null if parameter does not exist');
+      });
+      QUnit.test("jQuery Ajax", function(assert) {
+	  sinon.spy(jQuery, "ajax");
+	  jQuery.getJSON("/some/resource");
+
+	  assert.ok(jQuery.ajax.calledOnce);
+	  assert.equal(jQuery.ajax.getCall(0).args[0].url, "/some/resource");
+	  assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
+      });
+      QUnit.test("Click Handler", function(assert) {
+	  loc = sinon.stub().returns({pathname: '/ds1/', href: '/ds1/?dir=/d1/'});
+	  assert.deepEqual(click_handler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
+	  assert.deepEqual(click_handler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(click_handler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(click_handler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
+      });
+      QUnit.test("Size Rendering", function(assert) {
+	assert.equal(size_renderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
+	assert.equal(size_renderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
+	assert.equal(size_renderer({}), "-", "no sizes in sizes json");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
+      });
+
+    </script>
+  </body>
+</html>

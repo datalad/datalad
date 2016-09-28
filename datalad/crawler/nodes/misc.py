@@ -452,6 +452,12 @@ class find_files(object):
 @auto_repr
 class switch(object):
     """Helper node which would decide which sub-pipeline/node to execute based on values in data
+
+
+    Example
+    -------
+
+    TODO
     """
 
     def __init__(self, key, mapping, default=None, missing='raise', re=False):

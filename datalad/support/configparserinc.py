@@ -11,11 +11,12 @@
 #
 #  ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import logging
+import os
+import sys
 
 
-import logging, os, sys
-
-if sys.version_info >= (3,2): # pragma: no cover
+if sys.version_info >= (3, 2):  # pragma: no cover
 
     # SafeConfigParser deprecated from Python 3.2 (renamed to ConfigParser)
     from configparser import ConfigParser as SafeConfigParser, \
@@ -45,13 +46,14 @@ if sys.version_info >= (3,2): # pragma: no cover
                 return super(BasicInterpolationWithName, self)._interpolate_some(
                         parser, option, accum, rest, section, map, depth)
 
-else: # pragma: no cover
+else:  # pragma: no cover
     from ConfigParser import SafeConfigParser
 
 # Gets the instance of the logger.
 logSys = logging.getLogger(__name__)
 
 __all__ = ['SafeConfigParserWithIncludes']
+
 
 class SafeConfigParserWithIncludes(SafeConfigParser):
     """
@@ -146,4 +148,3 @@ class SafeConfigParserWithIncludes(SafeConfigParser):
                     return SafeConfigParser.read(self, fileNamesFull, encoding='utf-8')
             else:
                     return SafeConfigParser.read(self, fileNamesFull)
-

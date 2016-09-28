@@ -18,6 +18,7 @@ from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, rea
 from os.path import split as ops
 from os.path import isdir, islink
 from os.path import basename
+from os.path import relpath
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -41,7 +42,7 @@ from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
 from ...distribution.dataset import Dataset
-from ...api import install
+from ...api import create
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
@@ -75,6 +76,7 @@ class initiate_dataset(object):
     def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
                  template_func=None, template_kwargs=None,
+                 add_to_super='auto',
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -98,6 +100,8 @@ class initiate_dataset(object):
           Supported by git-annex backend.  By default (if None specified),
           it is MD5E backend to improve compatibility with filesystems
           having a relatively small limit for a maximum path size
+        add_to_super : bool or 'auto', optional
+          Add to super-dataset
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the dataset crawling options -- would be passed into the corresponding
@@ -122,28 +126,61 @@ class initiate_dataset(object):
         self.branch = branch
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
         self.backend = backend
+        self.add_to_super = add_to_super
 
     def _initiate_dataset(self, path, name):
         lgr.info("Initiating dataset %s" % name)
+
         if self.branch is not None:
+            raise NotImplementedError("Disabled for now")
             # because all the 'create' magic is stuffed into the constructor ATM
             # we need first to initiate a git repository
             git_repo = GitRepo(path, create=True)
             # since we are initiating, that branch shouldn't exist yet, thus --orphan
-            git_repo.checkout(self.branch, options="--orphan")
+            git_repo.checkout(self.branch, options=["--orphan"])
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creator"
-        backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
-        repo = AnnexRepo(
-            path,
-            direct=cfg.getboolean('crawl', 'init direct', default=False),
-            #  name=name,
-            backend=backend,
-            create=True)
-        # TODO: centralize
+
+        backend = self.backend or cfg.obtain('datalad.crawl.default_backend', default='MD5E')
+        direct = cfg.obtain('datalad.crawl.init_direct', default=False)
+
+        if direct:
+            raise NotImplementedError("Disabled for now to init direct mode ones")
+
+        ds = create(
+                path=path,
+                force=False,
+                # no_annex=False,  # TODO: add as an arg
+                # Passing save arg based on backend was that we need to save only if
+                #  custom backend was specified, but now with dataset id -- should always save
+                # save=not bool(backend),
+                # annex_version=None,
+                annex_backend=backend,
+                #git_opts=None,
+                #annex_opts=None,
+                #annex_init_opts=None
+        )
+        if self.add_to_super:
+            # place hack from 'add-to-super' times here
+            sds = ds.get_superdataset()
+            if sds is not None:
+                from datalad.distribution.utils import _install_subds_inplace
+                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
+                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
+                _install_subds_inplace(ds=sds, path=ds.path,
+                                       relativepath=subdsrelpath)
+                # this leaves the subdataset staged in the parent
+            elif str(self.add_to_super) != 'auto':
+                raise ValueError(
+                    "Was instructed to add to super dataset but no super dataset "
+                    "was found for %s" % ds
+                )
+
+        # create/AnnexRepo specification of backend does it non-persistently in .git/config
         if backend:
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
-        return repo
+
+        return ds
 
     def _save_crawl_config(self, dataset_path, data):
         kwargs = self.template_kwargs or {}
@@ -204,7 +241,9 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
 
-    def __init__(self, path=None, mode='full', options=None,
+    def __init__(self, path=None,
+                 no_annex=False,
+                 mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
                  auto_finalize=True,
@@ -223,6 +262,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and the files' keys are their URLs
+        no_annex : bool
+          Assume/create a simple Git repository, without git-annex
         special_remotes : list, optional
           List of custom special remotes to initialize and enable by default
         yield_non_updated : bool, optional
@@ -264,14 +305,18 @@ class Annexificator(object):
                 if (len(listdir(path))) and (not allow_dirty):
                     raise RuntimeError("Directory %s is not empty." % path)
 
-        self.repo = AnnexRepo(path, always_commit=False, **kwargs)
+        self.repo = (GitRepo if no_annex else AnnexRepo)(path, always_commit=False, **kwargs)
 
         git_remotes = self.repo.get_remotes()
-        # TODO: move under AnnexRepo with proper testing etc
-        repo_info_repos = [v for k, v in self.repo.repo_info().items()
-                           if k.endswith(' repositories')]
-        annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
         if special_remotes:
+            if no_annex: # isinstance(self.repo, GitRepo):
+                raise ValueError("Cannot have special remotes in a simple git repo")
+
+            # TODO: move under AnnexRepo with proper testing etc
+            repo_info_repos = [v for k, v in self.repo.repo_info().items()
+                               if k.endswith(' repositories')]
+            annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
+
             for remote in special_remotes:
                 if remote not in git_remotes:
                     if remote in annex_remotes:
@@ -384,7 +429,7 @@ class Annexificator(object):
                 stats.skipped += 1
                 lgr.debug("Failed to figure out filename for url %s" % url)
                 return
-            raise ValueError("No filename were provided")
+            raise ValueError("No filename was provided")
 
         filepath = opj(self.repo.path, fpath)
 
@@ -695,7 +740,7 @@ class Annexificator(object):
                     if remote_branch in remote_branches:
                         lgr.info("Did not find branch %r locally. Checking out remote one %r"
                                  % (branch, remote_branch))
-                        self.repo.checkout(remote_branch, options='--track')
+                        self.repo.checkout(remote_branch, options=['--track'])
                         # refresh the list -- same check will come again
                         existing_branches = self.repo.get_branches()
                         break
@@ -704,14 +749,14 @@ class Annexificator(object):
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
-                    self.repo.checkout(branch, options="--orphan")
+                    self.repo.checkout(branch, options=["--orphan"])
                     if self.repo.dirty:
                         self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
                     lgr.info("Checking out %s into a new branch %s" % (parent, branch))
-                    self.repo.checkout(parent, options="-b %s" % branch)
+                    self.repo.checkout(parent, options=["-b", branch])
             else:
                 lgr.info("Checking out an existing branch %s" % (branch))
                 self.repo.checkout(branch)
@@ -720,7 +765,8 @@ class Annexificator(object):
         return switch_branch
 
     def merge_branch(self, branch, target_branch=None,
-                     strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
+                     strategy=None, commit=True, one_commit_at_a_time=False,
+                     skip_no_changes=None, **merge_kwargs):
         """Merge a branch into the current branch
 
         Parameters
@@ -760,12 +806,13 @@ class Annexificator(object):
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            skip_no_changes_ = skip_no_changes
+            if skip_no_changes is None:
+                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                skip_no_changes_ = True
+
             if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
-                skip_no_changes_ = skip_no_changes
-                if skip_no_changes is None:
-                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
-                    skip_no_changes_ = True
                 if skip_no_changes_:
                     lgr.debug("Skipping the merge")
                     return
@@ -781,6 +828,14 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
+
+            # There were no merges, but we were instructed to not skip
+            if not nmerges and skip_no_changes_ is False:
+                # so we will try to merge it nevertheless
+                lgr.info("There was nothing to merge but we were instructed to merge due to skip_no_changes=False")
+                all_to_merge = [branch]
+                nmerges = 1
+
             plmerges = "s" if nmerges > 1 else ""
             lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
@@ -790,9 +845,10 @@ class Annexificator(object):
                 if self.repo.get_active_branch() != target_branch_:
                     self.repo.checkout(target_branch_)
                 if strategy is None:
-                    self.repo.merge(to_merge, options=options)
+                    self.repo.merge(to_merge, options=options, **merge_kwargs)
                 elif strategy == 'theirs':
-                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"],
+                                    expect_stderr=True, **merge_kwargs)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.add('.', options=self.options)  # so everything is staged to be committed
                 else:
@@ -837,6 +893,7 @@ class Annexificator(object):
             # we need to provide some commit msg, could may be deduced from current status
             # TODO
             msg = "a commit"
+        msg = GitRepo._get_prefixed_commit_msg(msg)
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
@@ -966,7 +1023,9 @@ class Annexificator(object):
                 # all new versions must be greater than the previous version
                 # since otherwise it would mean that we are complementing previous version and it might be
                 # a sign of a problem
-                assert (all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # Well -- so far in the single use-case with openfmri it was that they added
+                # derivatives for the same version, so I guess we will allow for that, thus allowing =
+                assert (all((LooseVersion(prev_version) <= LooseVersion(v)) for v in versions))
                 # old implementation when we didn't have entire versions db stored
                 # new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
@@ -977,8 +1036,8 @@ class Annexificator(object):
             if new_versions:
                 smallest_new_version = next(iter(new_versions))
                 if prev_version:
-                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
-                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                    if LooseVersion(smallest_new_version) < LooseVersion(prev_version):
+                        raise ValueError("Smallest new version %s is < prev_version %s"
                                          % (smallest_new_version, prev_version))
 
             versions_db.update_versions(versions)  # store all new known versions
@@ -1047,17 +1106,57 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False):
+    def remove_other_versions(self, name=None, db=None,
+                              overlay=None, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
+
+        Parameters
+        ----------
+        name : str, optional
+          Name of the SingleVersionDB to consult (e.g., original name of the branch)
+        db : SingleVersionDB, optional
+          If provided, `name` must be None.
+        overlay : int or callable, optional
+          Overlay files of the next version to only replace files from the
+          previous version.  If specified as `int`, value will determine how
+          many leading levels of .-separated (e.g., of major.minor.patch)
+          semantic version format will be used to identify "unique"
+          non-overlayable version. E.g. overlay=2, would overlay all .patch
+          levels, while starting without overlay for any new major.minor version.
+          If a callable, it would be used to augment versions before identifying
+          non-overlayable version component.  So in other words `overlay=2`
+          should be identical to `overlay=lambda v: '.'.join(v.split('.')[:2])`
+        remove_unversioned: bool, optional
+          If there is a version defined now, remove those files which are unversioned
+          i.e. not listed associated with any version
+        exclude : basestring, optional
+          Regexp to search to exclude files from considering to remove them if
+          `remove_unversioned`.  Passed to `find_files`.  E.g. `README.*` which
+          could have been generated in `incoming` branch
         """
 
+        if overlay is None:
+            overlay_version_func = lambda x: x
+        elif isinstance(overlay, int) and not isinstance(overlay, bool):
+            overlay_version_func = lambda v: '.'.join(v.split('.')[:overlay])
+        elif hasattr(overlay, '__call__'):
+            overlay_version_func = overlay
+        else:
+            raise TypeError("overlay  must be an int or a callable. Got %s"
+                            % repr(overlay))
+
+        if db is not None and name is not None:
+            raise ValueError(
+                "Must have specified either name or version_db, not both"
+            )
+
         def _remove_other_versions(data):
-            if overlay:
-                raise NotImplementedError(overlay)
             stats = data.get('datalad_stats', None)
-            versions_db = SingleVersionDB(self.repo, name=name)
+            versions_db = SingleVersionDB(self.repo, name=name) \
+                if db is None \
+                else db
 
             current_version = versions_db.version
 
@@ -1066,15 +1165,73 @@ class Annexificator(object):
                 yield data
                 return
 
+            current_overlay_version = overlay_version_func(current_version)
+            prev_version = None
+            tracked_files = {}  # track files in case of overlaying
             for version, fpaths in iteritems(versions_db.versions):
-                # we do not care about non-versioned or current version
-                if version is None or current_version == version:
-                    continue  # skip current version
-                for fpath, vfpath in iteritems(fpaths):
+                # sanity check since we now will have assumption that versions
+                # are sorted
+                if prev_version is not None:
+                    assert(prev_version < LooseVersion(version))
+                prev_version = LooseVersion(version)
+                overlay_version = overlay_version_func(version)
+                # we do not care about non-versioned or current "overlay" version
+                #import pdb; pdb.set_trace()
+                if version is None:
+                    continue
+
+                files_to_remove = []
+                if current_overlay_version == overlay_version and \
+                    LooseVersion(version) <= LooseVersion(current_version):
+                    # the same overlay but before current version
+                    # we need to track the last known within overlay and if
+                    # current updates, remove older version
+                    for fpath, vfpath in fpaths.items():
+                        if fpath in tracked_files:
+                            files_to_remove.append(tracked_files[fpath])
+                        tracked_files[fpath] = vfpath  # replace with current one
+                    if version == current_version:
+                        # just clean out those tracked_files with the most recent versions
+                        # and remove nothing
+                        tracked_files = {}
+                else:
+                    files_to_remove = fpaths.values()
+
+                for vfpath in files_to_remove:
                     vfpathfull = opj(self.repo.path, vfpath)
-                    if lexists(vfpathfull):
-                        lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
+                    if os.path.lexists(vfpathfull):
+                        lgr.debug(
+                            "Removing %s of version %s (overlay %s). "
+                            "Current one %s (overlay %s)",
+                            vfpathfull, version, overlay_version,
+                            current_version, current_overlay_version
+                        )
                         os.unlink(vfpathfull)
+
+            assert not tracked_files, "we must not end up having tracked files"
+            if remove_unversioned:
+                # it might be that we haven't 'recorded' unversioned ones at all
+                # and now got an explicit version, so we would just need to remove them all
+                # For that we need to get all files which left, and remove them unless they
+                # were a versioned file (considered above) for any version
+                all_versioned_files = set()
+                for versioned_files_ in versions_db.versions.values():
+                    all_versioned_files.update(versioned_files_.values())
+                for fpath in find_files(
+                        '.*',
+                        topdir=self.repo.path,
+                        exclude=exclude, exclude_datalad=True, exclude_vcs=True
+                    ):
+                    fpath = relpath(fpath, self.repo.path)  # ./bla -> bla
+                    if fpath in all_versioned_files:
+                        lgr.log(
+                            5, "Not removing %s file since it was versioned",
+                            fpath)
+                        continue
+                    lgr.log(5, "Removing unversioned %s file", fpath)
+                    os.unlink(fpath)
+            elif exclude:
+                lgr.warning("`exclude=%r` was specified whenever remove_unversioned is False", exclude)
 
             if stats:
                 stats.versions.append(current_version)
@@ -1114,7 +1271,7 @@ class Annexificator(object):
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False, existing_tag=None, cleanup=False):
+    def finalize(self, tag=False, existing_tag=None, cleanup=False, aggregate=False):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -1131,6 +1288,8 @@ class Annexificator(object):
           +0, +1, +2 ... are tried until available one is found.
         cleanup: bool, optional
           Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
+        aggregate: bool, optional
+          Aggregate meta-data (ATM no recursion, guessing the type)
         """
 
         def _finalize(data):
@@ -1145,7 +1304,11 @@ class Annexificator(object):
                 if stats:
                     _call(stats.reset)
             else:
-                lgr.info("Found branch non-dirty - nothing is committed")
+                lgr.info("Found branch non-dirty -- nothing was committed")
+
+            if aggregate:
+                from datalad.api import aggregate_metadata
+                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
 
             if tag and stats:
                 # versions survive only in total_stats
@@ -1182,7 +1345,7 @@ class Annexificator(object):
             if cleanup:
                 total_stats = stats.get_total()
                 if total_stats.add_git or total_stats.add_annex or total_stats.merges:
-                    if cfg.getboolean('crawl', 'pipeline.housekeeping', default=True):
+                    if cfg.obtain('datalad.crawl.pipeline.housekeeping', default=True):
                         lgr.info("House keeping: gc, repack and clean")
                         # gc and repack
                         self.repo.gc(allow_background=False)
@@ -1240,21 +1403,5 @@ class Annexificator(object):
     def initiate_dataset(self, *args, **kwargs):
         """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator
         """
-
-        def _initiate_dataset(data):
-            # TODO: actually ATM is not that thin and forces to us to use Annexificator
-            # which forces meta-dataset to become an annex, not pure git repo...
-            for data_ in initiate_dataset(*args, **kwargs)(data):
-                # Also "register" as a sub-dataset if not yet registered
-                ds = Dataset(self.repo.path)
-                # TODO:  rename dataset_  into dataset_
-                if data['dataset_name'] not in ds.get_subdatasets():
-                    out = install(
-                        dataset=ds,
-                        path=data_['dataset_path'],
-                        source=data_['dataset_path'],
-                    )
-                    # TODO: reconsider adding smth to data_ to be yielded"
-                yield data_
-
-        return _initiate_dataset
+        # now we can just refer to initiate_dataset which uses create
+        return initiate_dataset(*args, **kwargs)

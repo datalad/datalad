@@ -7,13 +7,14 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import logging
+lgr = logging.getLogger('datalad.network')
+
+lgr.log(5, "Importing support.network")
 import calendar
 import email.utils
-import gzip
 import os
 import re
-import shutil
-import time
 import iso8601
 
 from collections import OrderedDict
@@ -21,9 +22,9 @@ from os.path import abspath, isabs
 
 from six import string_types
 from six import iteritems
-from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.request import Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, ParseResult
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
 from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
@@ -31,12 +32,9 @@ from six.moves.urllib.error import URLError
 from datalad.utils import on_windows
 from datalad.consts import DATASETS_TOPURL
 
-from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
-import requests
-
-import logging
-lgr = logging.getLogger('datalad.network')
+# !!! Lazily import requests where needed -- needs 30ms or so
+# import requests
 
 
 def get_response_disposition_filename(s):
@@ -47,8 +45,8 @@ def get_response_disposition_filename(s):
         return None
     # If the response has Content-Disposition, try to get filename from it
     cd = map(
-            lambda x: x.strip().split('=', 1) if '=' in x else [x.strip(), ''],
-            s.split(';')
+        lambda x: x.strip().split('=', 1) if '=' in x else [x.strip(), ''],
+        s.split(';')
     )
     # unify the key to be lower case and make it into a dict
     cd = dict([[x[0].lower()] + x[1:] for x in cd])
@@ -78,7 +76,7 @@ def get_url_disposition_filename(url, headers=None):
             r.close()
 
 
-def get_url_straight_filename(url, strip=[], allowdir=False):
+def get_url_straight_filename(url, strip=None, allowdir=False):
     """Get file/dir name of the last path component of the URL
 
     Parameters
@@ -109,13 +107,13 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
         return None
 
 
-def get_url_filename(url, headers=None, strip=[]):
+def get_url_filename(url, headers=None, strip=None):
     """Get filename from the url, first consulting server about Content-Disposition
     """
     filename = get_url_disposition_filename(url, headers)
     if filename:
         return filename
-    return get_url_straight_filename(url, strip=[])
+    return get_url_straight_filename(url, strip=strip)
 
 
 def get_url_response_stamp(url, response_info):
@@ -149,12 +147,13 @@ def get_tld(url):
 
 
 from email.utils import parsedate_tz, mktime_tz
+
+
 def rfc2822_to_epoch(datestr):
     """Given rfc2822 date/time format, return seconds since epoch"""
     return mktime_tz(parsedate_tz(datestr))
 
 
-import calendar
 def iso8601_to_epoch(datestr):
     """Given ISO 8601 date/time format, return in seconds since epoch
 
@@ -164,11 +163,12 @@ def iso8601_to_epoch(datestr):
     return calendar.timegm(iso8601.parse_date(datestr).timetuple())
 
 
-def __urlopen_requests(url, header_vals=None):
+def __urlopen_requests(url):
     # XXX Workaround for now for ... broken code
     if isinstance(url, Request):
         url = url.get_full_url()
-    return requests.Session().get(url)
+    from requests import Session
+    return Session().get(url)
 
 
 def retry_urlopen(url, retries=3):
@@ -189,6 +189,7 @@ def is_url_quoted(url):
         url_ = urlunquote(url)
         return url != url_
     except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
+        # MIH: ValueError?
         return False
 
 
@@ -622,11 +623,10 @@ class URL(RI):
             raise ValueError(
                 "Non 'file://' URL cannot be resolved to a local path")
         hostname = self.hostname
-        if not (hostname in (None, '', 'localhost', '::1') \
+        if not (hostname in (None, '', 'localhost', '::1')
                 or hostname.startswith('127.')):
             raise ValueError("file:// URL does not point to 'localhost'")
         return self.path
-
 
 
 class PathRI(RI):
@@ -732,7 +732,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
         """
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
-        return "{}{}".format(DATASETS_TOPURL, self.path)
+        return "{}{}".format(DATASETS_TOPURL, urlquote(self.path))
 
 
 def _split_colon(s, maxsplit=1):
@@ -786,7 +786,7 @@ def is_url(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI))
 
@@ -800,7 +800,7 @@ def is_datalad_compat_ri(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI, DataLadRI))
 
@@ -822,8 +822,8 @@ def is_ssh(ri):
     # string or RI only, but with everything RI itself can deal with:
     _ri = RI(ri) if not isinstance(ri, RI) else ri
 
-    return isinstance(_ri, SSHRI) or \
-           (isinstance(_ri, URL) and _ri.scheme == 'ssh')
+    return isinstance(_ri, SSHRI) \
+        or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
 #### windows workaround ###
@@ -845,3 +845,5 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
+
+lgr.log(5, "Done importing support.network")
