@@ -157,7 +157,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in urls:
             try:
                 downloaded_path = self._providers.download(url, path=path, overwrite=True)
-                lgr.info("Succesfully downloaded %s into %s" % (url, downloaded_path))
+                lgr.info("Successfully downloaded %s into %s" % (url, downloaded_path))
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:

@@ -14,8 +14,10 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 import json
 import logging
+import math
 import re
 import shlex
+
 from os import linesep
 from os import unlink
 from os.path import join as opj
@@ -39,6 +41,7 @@ from datalad.utils import on_windows
 from datalad.utils import swallow_logs
 from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
+from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -253,6 +256,16 @@ class AnnexRepo(GitRepo):
             raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
         cls.git_annex_version = ver
 
+    @staticmethod
+    def get_size_from_key(key):
+        """A little helper to obtain size encoded in a key"""
+        try:
+            size_str = key.split('-', 2)[1].lstrip('s')
+        except IndexError:
+            # has no 2nd field in the key
+            return None
+        return int(size_str) if size_str.isdigit() else None
+
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository"""
@@ -429,30 +442,97 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def get(self, files, options=None):
+    def get(self, files, options=None, jobs=None):
         """Get the actual content of files
 
         Parameters
         ----------
-        files: list of str
+        files : list of str
             paths to get
-
-        options: list of str
-            commandline options for the git annex get command.
+        options : list of str, optional
+            commandline options for the git annex get command
+        jobs : int, optional
+            how many jobs to run in parallel (passed to git-annex call)
 
         Returns
         -------
-        list of dict
+        files : list of dict
         """
         options = options[:] if options else []
+
+        # analyze provided files to decide which actually are needed to be
+        # fetched
+
+        if '--key' not in options:
+            lgr.info("Obtaining information on what files need to be obtained")
+            # Let's figure out first which files/keys and of what size to download
+            expected_downloads = {}
+            fetch_files = []
+            keys_seen = set()
+            unknown_sizes = []  # unused atm
+
+            # for now just record total size, and
+            for j in self._run_annex_command_json(
+                'find', args=['--json', '--not', '--in', 'here'] + files
+                ):
+                key = j['key']
+                size = j.get('bytesize')
+                if key in keys_seen:
+                    # multiple files could point to the same key.  no need to
+                    # request multiple times
+                    continue
+                keys_seen.add(key)
+                assert j['file']
+                fetch_files.append(j['file'])
+                if size and size.isdigit():
+                    expected_downloads[key] = int(size)
+                else:
+                    expected_downloads[key] = None
+                    unknown_sizes.append(j['file'])
+        else:
+            fetch_files = files
+            assert(len(files) == 1)
+            expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
+
+        # if not fetch_files:
+        #     lgr.info("Not files found need fetching")
+        #     return []
+        if len(fetch_files) != len(files):
+            lgr.info("Actually getting %d files", len(fetch_files))
+
+        # TODO:  check annex version and issue a one time warning if not
+        # old enough for --json-progress
+
+        progress_indicators = ProcessAnnexProgressIndicators(
+            expected=expected_downloads,
+        )
+        run_kwargs = dict(
+            log_stdout=progress_indicators,
+            log_stderr='offline',
+            log_online=True
+        )
+        # Without up to date annex, we would still report total! ;)
+        if self.git_annex_version >= '6.20160923':
+            # options  might be the '--key' which should go last
+            options = ['--json-progress'] + options
+        if jobs:
+            options = ['-J%d' % jobs] + options
+
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
         # which are contradicting conditions atm. (See _run_annex_command_json)
         with swallow_logs(new_level=logging.DEBUG):
-            results = self._run_annex_command_json('get',
-                                                   args=options + files)
-        return [i for i in results]
+            # TODO: provide more meaningful message (possibly aggregating 'note'
+            #  from annex failed ones
+            # TODO: fail api.get -- must exit in cmdline with non-0 if anything
+            # failed to download
+            results = self._run_annex_command_json(
+                'get', args=options + fetch_files, **run_kwargs)
+        results_list = list(results)
+        progress_indicators.finish()
+        return results_list
+
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
@@ -1694,3 +1774,147 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+
+
+class ProcessAnnexProgressIndicators(object):
+    """'Filter' for annex --json output to react to progress indicators
+
+    Instance of this beast should be passed into log_stdout option
+    for git-annex commands runner
+    """
+
+    def __init__(self, expected=None):
+        """
+
+        Parameters
+        ----------
+        expected: dict, optional
+           key -> size, expected entries (e.g. downloads)
+        """
+        # looking forward for multiple downloads at the same time
+        self.pbars = {}
+        self.total_pbar = None
+        self.expected = expected
+        self._failed = 0
+        self._succeeded = 0
+        self.start()
+
+    def start(self):
+        if self.expected:
+            from datalad.ui import ui
+            total = sum(filter(bool, self.expected.values()))
+            self.total_pbar = ui.get_progressbar(
+                label="Total", maxval=total)
+            self.total_pbar.start()
+
+    def _update_pbar(self, pbar, new_value):
+        """Updates pbar while also updating possibly total pbar"""
+        diff = new_value - getattr(pbar, '_old_value', 0)
+        setattr(pbar, '_old_value', new_value)
+        if self.total_pbar:
+            self.total_pbar.update(diff, increment=True)
+        pbar.update(new_value)
+
+    def __call__(self, line):
+        try:
+            j = json.loads(line)
+        except:
+            # if we fail to parse, just return this precious thing for
+            # possibly further processing
+            return line
+
+        if 'command' in j and 'key' in j:
+            # might be the finish line message
+            j_download_id = (j['command'], j['key'])
+            pbar = self.pbars.pop(j_download_id, None)
+            if j.get('success') in {True, 'true'}:
+                self._succeeded += 1
+                if pbar:
+                    self._update_pbar(pbar, pbar.maxval)
+                elif self.total_pbar:
+                    # we didn't have a pbar for this download, so total should
+                    # get it all at once
+                    try:
+                        size_j = self.expected[j['key']]
+                    except:
+                        size_j = None
+                    size = size_j or AnnexRepo.get_size_from_key(j['key'])
+                    self.total_pbar.update(size, increment=True)
+            else:
+                self._failed += 1
+
+            if self.total_pbar:
+                failed_str = (
+                    ", " + ansi_colors.color_word("%d failed" % self._failed,
+                                                  ansi_colors.RED)) \
+                    if self._failed else ''
+
+                self.total_pbar._pbar.desc = \
+                    "Total (%d ok%s out of %d)" % (
+                        self._succeeded,
+                        failed_str,
+                        len(self.expected)
+                        if self.expected
+                        else self._succeeded + self._failed)
+                # seems to be of no effect to force it repaint
+                self.total_pbar.refresh()
+
+            if pbar:
+                pbar.finish()
+
+
+        if 'byte-progress' not in j:
+            # some other thing than progress
+            return line
+
+        def get_size_from_perc_complete(count, perc):
+            return int(math.ceil(int(count) / (float(perc) / 100.)))
+
+        # so we have a progress indicator, let's dead with it
+        action = j['action']
+        download_item = action.get('file') or action.get('key')
+        download_id = (action['command'], action['key'])
+        if download_id not in self.pbars:
+            # New download!
+            from datalad.ui import ui
+            from datalad.ui import utils as ui_utils
+            # TODO: whenever target size gets reported -- used it!
+            # http://git-annex.branchable.com/todo/interface_to_the___34__progress__34___of_annex_operations/#comment-6bbc26aae9867603863050ddcb09a9a0
+            # for now deduce from key or approx from '%'
+            # TODO: unittest etc to check when we have a relaxed
+            # URL without any size known in advance
+            target_size = \
+                AnnexRepo.get_size_from_key(action.get('key')) or \
+                get_size_from_perc_complete(
+                    j['byte-progress'],
+                    j['percent-progress'].rstrip('%')
+                )
+            w, h = ui_utils.get_terminal_size()
+            w = w or 80  # default to 80
+            title = str(download_item)
+            pbar_right = 50
+            title_len = w - pbar_right - 4  # (4 for reserve)
+            if len(title) > title_len:
+                half = title_len//2 - 2
+                title = '%s .. %s' % (title[:half], title[-half:])
+            pbar = self.pbars[download_id] = ui.get_progressbar(
+                label=title, maxval=target_size)
+            pbar.start()
+
+        self._update_pbar(
+            self.pbars[download_id],
+            int(j.get('byte-progress'))
+        )
+
+    def finish(self):
+        if self.total_pbar:
+            self.total_pbar.finish()
+            self.total_pbar = None
+        if self.pbars:
+            lgr.warning("Still have %d active progress bars when stopping",
+                        len(self.pbars))
+        for pbar in self.pbars.values():
+            pbar.finish()
+        self.pbars = {}
+        self._failed = 0
+        self._succeeded = 0
