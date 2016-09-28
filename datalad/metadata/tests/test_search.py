@@ -43,7 +43,7 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
-        always_render = cfg.obtain('datalad.api.always.render')
+        always_render = cfg.obtain('datalad.api.alwaysrender')
         with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
             if always_render:
                 # we do try to render results which actually causes exception

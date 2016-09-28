@@ -127,7 +127,7 @@ def test_ExtractedArchive(path):
         ]))
 
     earchive.clean()
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         assert_false(exists(earchive.path))
 
 #@with_tree(**tree_simplearchive)

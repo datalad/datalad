@@ -219,7 +219,7 @@ class AnnexCustomRemote(object):
         self._in_the_loop = False
         self._protocol = \
             AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
-            if os.environ.get('DATALAD_PROTOCOL_REMOTE') else None
+            if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE') else None
 
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
 

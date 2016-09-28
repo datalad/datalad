@@ -73,7 +73,7 @@ def _generate_func_api():
             "returning the result"
         return call_
 
-    always_render = cfg.obtain('datalad.api.always.render')
+    always_render = cfg.obtain('datalad.api.alwaysrender')
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance

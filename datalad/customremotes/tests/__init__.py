@@ -21,7 +21,7 @@ def _get_custom_runner(d):
     env.update({'DATALAD_LOG_TARGET': d + '_custom.log'})
     if os.environ.get('DATALAD_LOG_LEVEL'):
         env['DATALAD_LOG_LEVEL'] = os.environ.get('DATALAD_LOG_LEVEL')
-    if os.environ.get('DATALAD_PROTOCOL_REMOTE'):  # TODO config tests.customremotes.protocol
+    if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE'):  # TODO config tests.customremotes.protocol
         protocol = AnnexExchangeProtocol(d, 'archive')
     else:
         protocol = None
