@@ -310,7 +310,7 @@ class Install(Interface):
                 for p in path:
                     result = Install.__call__(
                         path=p,
-                        source=None,
+                        source=source,
                         dataset=dataset,
                         get_data=get_data,
                         description=description,
