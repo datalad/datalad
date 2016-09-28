@@ -8,11 +8,19 @@ command. Both a *global* user configuration (typically at
 (:file:`.git/config`) are inspected.
 
 In addition, datalad supports a persistent dataset-specific configuration.
-This configuration is stored at :file:`.datalad/config` in any dataset.
-As it is part of a dataset, settings stored there will also be in effect
-for any consumer of such a dataset.
+This configuration is stored at :file:`.datalad/config` in any dataset.  As it
+is part of a dataset, settings stored there will also be in effect for any
+consumer of such a dataset. Both *global* and *local* settings on a particular
+machine always override configuration shipped with a dataset.
 
-All datalad-specifc configuration variables are prefixed with ``datalad.``.
+All datalad-specific configuration variables are prefixed with ``datalad.``.
+
+It is possible to override or amend the configuration using environment
+variables. Any variable with a name that starts with ``DATALAD_`` will
+be available as the corresponding ``datalad.`` configuration variable,
+replacing any ``_`` in the name with a dot, and all letters converted
+to lower case. Values from environment variables take precedence over
+configuration file settings.
 
 The following sections provide a (non-exhaustive) list of settings honored
 by datalad. They are categorized according to the scope they are typically
