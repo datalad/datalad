@@ -17,7 +17,7 @@ import re
 import textwrap
 
 from ..ui import ui
-
+from ..dochelpers import exc_str
 
 def get_api_name(intfspec):
     """Given an interface specification return an API name for it"""
@@ -294,6 +294,6 @@ class Interface(object):
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
         try:
             return cls.__call__(**kwargs)
-        except KeyboardInterrupt:
-            ui.error("\nInterrupted by user while doing magic")
+        except KeyboardInterrupt as exc:
+            ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)
