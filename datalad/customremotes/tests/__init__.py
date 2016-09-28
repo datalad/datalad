@@ -18,9 +18,9 @@ def _get_custom_runner(d):
     """
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
-    env.update({'DATALAD_LOGTARGET': d + '_custom.log'})
-    if os.environ.get('DATALAD_LOGLEVEL'):
-        env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
+    env.update({'DATALAD_LOG_TARGET': d + '_custom.log'})
+    if os.environ.get('DATALAD_LOG_LEVEL'):
+        env['DATALAD_LOG_LEVEL'] = os.environ.get('DATALAD_LOG_LEVEL')
     if os.environ.get('DATALAD_PROTOCOL_REMOTE'):  # TODO config tests.customremotes.protocol
         protocol = AnnexExchangeProtocol(d, 'archive')
     else:

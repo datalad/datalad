@@ -104,8 +104,8 @@ class ColorFormatter(logging.Formatter):
         msg = colors.format_msg(self._get_format(log_name, log_pid),
                                 self.use_color)
         self._tb = TraceBack(
-            collide=os.environ.get('DATALAD_LOGTRACEBACK', '') == 'collide') \
-            if os.environ.get('DATALAD_LOGTRACEBACK', False) else None
+            collide=os.environ.get('DATALAD_LOG_TRACEBACK', '') == 'collide') \
+            if os.environ.get('DATALAD_LOG_TRACEBACK', False) else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):

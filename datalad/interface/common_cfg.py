@@ -101,7 +101,16 @@ definitions = {
         'default': False,
         'type': EnsureBool(),
     },
-    'datalad.logtraceback': {
+    'datalad.log.level': {
+        'ui': ('question', {
+               'title': 'Used for control the verbosity of logs printed to stdout while running datalad commands/debugging'}),
+    },
+    'datalad.log.timestamp': {
+        'ui': ('yesno', {
+               'title': 'Used to add timestamp to datalad logs'}),
+        'type': EnsureBool(),
+    },
+    'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
     },
@@ -120,15 +129,6 @@ definitions = {
     'datalad.protocol.remote': {
         'ui': ('yesno', {
                'title': 'Binary flag to specify whether to test protocol interactions of custom remote with annex'}),
-        'type': EnsureBool(),
-    },
-    'datalad.loglevel': {  # -> datalad.log.level?
-        'ui': ('question', {
-               'title': 'Used for control the verbosity of logs printed to stdout while running datalad commands/debugging'}),
-    },
-    'datalad.log.timestamp': {
-        'ui': ('yesno', {
-               'title': 'Used to add timestamp to datalad logs'}),
         'type': EnsureBool(),
     },
     'datalad.run.cmdline.tests': {  # -> datalad.tests.runcmdline?

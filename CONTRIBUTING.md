@@ -326,7 +326,7 @@ Various hints for developers
 ### Useful Environment Variables
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
-- *DATALAD_LOGLEVEL*: 
+- *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_TESTS_KEEPTEMP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
@@ -344,7 +344,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_API_ALWAYS_RENDER*: 
   Would make api functions always use a version with cmdline output renderer
   (i.e. the one with `_` suffix)
-- *DATALAD_LOGTRACEBACK*: 
+- *DATALAD_LOG_TRACEBACK*: 
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
