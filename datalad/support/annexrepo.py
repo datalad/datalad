@@ -494,9 +494,10 @@ class AnnexRepo(GitRepo):
             assert(len(files) == 1)
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
-        # if not fetch_files:
-        #     lgr.info("Not files found need fetching")
-        #     return []
+        if not fetch_files:
+             lgr.debug("No files found needing fetching.")
+             return []
+
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
 
