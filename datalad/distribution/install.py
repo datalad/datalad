@@ -734,24 +734,6 @@ class Install(Interface):
             return installed_items
 
     @staticmethod
-    def _get_new_vcs(ds, source):
-        if source is None:
-            raise RuntimeError(
-                "No `source` was provided. To create a new dataset "
-                "use the `create` command.")
-        else:
-            # when obtained from remote, try with plain Git
-            lgr.info("Creating a new git repo at %s", ds.path)
-            vcs = GitRepo(ds.path, url=source, create=True)
-            if knows_annex(ds.path):
-                # init annex when traces of a remote annex can be detected
-                lgr.info("Initializing annex repo at %s", ds.path)
-                vcs = AnnexRepo(ds.path, init=True)
-            else:
-                lgr.debug("New repository clone has no traces of an annex")
-        return vcs
-
-    @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
