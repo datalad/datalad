@@ -164,14 +164,19 @@ class BuildConfigInfo(Command):
         from datalad.interface.common_cfg import definitions as cfgdefs
         from datalad.dochelpers import _indent
 
-        known_types = ('global', 'local', 'dataset')
-        for type_ in known_types + ('misc',):
-            with open(opj(opath, '{}.rst'.format(type_)), 'w') as rst:
+        categories = {
+            'global': {},
+            'local': {},
+            'dataset': {},
+            'misc': {}
+        }
+        for term, v in cfgdefs.items():
+            categories[v.get('destination', 'misc')][term] = v
+
+        for cat in categories:
+            with open(opj(opath, '{}.rst'.format(cat)), 'w') as rst:
                 rst.write('.. glossary::\n')
-                for term, v in cfgdefs.items():
-                    destination = v.get('destination', 'misc')
-                    if type_ != destination:
-                        continue
+                for term, v in sorted(categories[cat].items(), key=lambda x: x[0]):
                     rst.write(_indent(term, '\n  '))
                     qtype, docs = v.get('ui', (None, {}))
                     desc_tmpl = '\n'
@@ -185,6 +190,14 @@ class BuildConfigInfo(Command):
                             # protect against leaking specific home dirs
                             v['default'] = default.replace(os.path.expanduser('~'), '~')
                         desc_tmpl += 'Default: {default}\n'
+                    if 'type' in v:
+                        type_ = v['type']
+                        if hasattr(type_, 'long_description'):
+                            type_ = type_.long_description()
+                        else:
+                            type_ = type_.__name__
+                        desc_tmpl += '\n[{type}]\n'
+                        v['type'] = type_
                     if desc_tmpl == '\n':
                         # we need something to avoid joining terms
                         desc_tmpl += 'undocumented\n'
