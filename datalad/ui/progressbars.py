@@ -113,14 +113,16 @@ assert len(progressbars), "We need tqdm library to report progress"
 class AnnexSpecialRemoteProgressBar(ProgressBarBase):
     """Hook up to the special remote and report progress back to annex"""
 
-    def __init__(self, remote, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # not worth passing anything since we don't care about anything
+        remote = kwargs.get('remote')
         super(AnnexSpecialRemoteProgressBar, self).__init__()
         self.remote = remote
 
     def update(self, *args, **kwargs):
         super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
         # now use stored value
-        self.remote.progress(self._prev_value)
+        if self.remote:
+            self.remote.progress(self._prev_value)
 
 progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar

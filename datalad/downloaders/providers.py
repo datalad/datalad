@@ -308,7 +308,7 @@ class Providers(object):
             lgr.debug("Initializing default provider for %s" % scheme)
             self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
         provider = self._default_providers[scheme]
-        lgr.debughttp("No dedicated provider, returning default one for %s: %s",
+        lgr.debug("No dedicated provider, returning default one for %s: %s",
                   scheme, provider)
         return provider
 

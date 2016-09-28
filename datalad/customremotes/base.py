@@ -223,8 +223,9 @@ class AnnexCustomRemote(object):
 
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
 
-        # instruct UI to use this remote
-        ui.set_specialremote(self)
+        # instruct annex backend UI to use this remote
+        if ui.backend == 'annex':
+            ui.set_specialremote(self)
 
     @classmethod
     def _get_custom_scheme(cls, prefix):

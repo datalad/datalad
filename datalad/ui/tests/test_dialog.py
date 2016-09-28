@@ -82,12 +82,14 @@ def _test_progress_bar(backend, len, increment):
             pb.update(x if not increment else 1, increment=increment)
         out.flush()  # needed atm
         pstr = out.getvalue()
-        ok_startswith(pstr.lstrip('\r'), 'label:')
-        assert_re_in(r'.*\b%d%%.*' % (10*x), pstr)
+        if backend not in ('annex-remote',):  # no str repr
+            ok_startswith(pstr.lstrip('\r'), 'label:')
+            assert_re_in(r'.*\b%d%%.*' % (10*x), pstr)
         if backend == 'progressbar':
             assert_in('ETA', pstr)
     pb.finish()
-    ok_endswith(out.getvalue(), '\n')
+    if backend not in ('annex-remote',):
+        ok_endswith(out.getvalue(), '\n')
 
 
 def test_progress_bar():

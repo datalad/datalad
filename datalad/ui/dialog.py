@@ -219,10 +219,12 @@ class UnderAnnexUI(DialogUI):
         self.specialremote = specialremote
 
     def get_progressbar(self, *args, **kwargs):
-        kwargs = kwargs.copy()
-        kwargs['backend'] = 'annex-remote'
+        if self.specialremote:
+            kwargs = kwargs.copy()
+            kwargs['backend'] = 'annex-remote'
+            kwargs['remote'] = self.specialremote
         return super(UnderAnnexUI, self).get_progressbar(
-            self.specialremote, *args, **kwargs)
+                *args, **kwargs)
 
 
 @auto_repr
