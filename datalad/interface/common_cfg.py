@@ -18,13 +18,6 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 definitions = {
-    # TODO fill with wisdom
-    #'datalad.metadata.nativetype': {
-    #    'ui': ('question',  # UI dialog type
-    #           {'title': 'Metadata',
-    #            'text': 'Eh?'}),
-    #    'destination': 'dataset',  # where it should be stored by default
-    #}
     'datalad.locations.cache': {
         'ui': ('question',
                {'title': 'Cache directory',

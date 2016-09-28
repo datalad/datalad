@@ -115,7 +115,7 @@ class BuildRSTExamplesFromScripts(Command):
             raise DistutilsOptionError('\'expath\' option is required')
         if self.rstpath is None:
             raise DistutilsOptionError('\'rstpath\' option is required')
-        self.announce('Converting exanmple scripts')
+        self.announce('Converting example scripts')
 
     def run(self):
         opath = self.rstpath
@@ -130,3 +130,54 @@ class BuildRSTExamplesFromScripts(Command):
                     open(example),
                     out=out,
                     ref='_example_{0}'.format(exname))
+
+
+class BuildConfigInfo(Command):
+    description = 'Generate RST documentation for all config items.'
+
+    user_options = [
+        ('rstpath=', None, 'output path for RST file'),
+    ]
+
+    def initialize_options(self):
+        self.rstpath = None
+
+    def finalize_options(self):
+        if self.rstpath is None:
+            raise DistutilsOptionError('\'rstpath\' option is required')
+        self.announce('Generating configuration documentation')
+
+    def run(self):
+        opath = self.rstpath
+        if not os.path.exists(opath):
+            os.makedirs(opath)
+
+        from datalad.interface.common_cfg import definitions as cfgdefs
+        from datalad.dochelpers import _indent
+
+        known_types = ('global', 'local', 'dataset')
+        for type_ in known_types + ('misc',):
+            with open(opj(opath, '{}.rst'.format(type_)), 'w') as rst:
+                rst.write('.. glossary::\n')
+                for term, v in cfgdefs.iteritems():
+                    destination = v.get('destination', 'misc')
+                    if type_ != destination:
+                        continue
+                    rst.write(_indent(term, '\n  '))
+                    qtype, docs = v.get('ui', (None, {}))
+                    desc_tmpl = '\n'
+                    if 'title' in docs:
+                        desc_tmpl += '{title}:\n'
+                    if 'text' in docs:
+                        desc_tmpl += '{text}\n'
+                    if 'default' in v:
+                        default = v['default']
+                        if hasattr(default, 'replace'):
+                            # protect against leaking specific home dirs
+                            v['default'] = default.replace(os.path.expanduser('~'), '~')
+                        desc_tmpl += 'Default: {default}\n'
+                    if desc_tmpl == '\n':
+                        # we need something to avoid joining terms
+                        desc_tmpl += 'undocumented\n'
+                    v.update(docs)
+                    rst.write(_indent(desc_tmpl.format(**v), '    '))
