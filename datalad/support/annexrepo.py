@@ -18,6 +18,7 @@ import math
 import re
 import shlex
 
+from itertools import chain
 from os import linesep
 from os import unlink
 from os.path import join as opj
@@ -29,6 +30,7 @@ from os.path import isdir
 from subprocess import Popen, PIPE
 
 from six import string_types
+from six import iteritems
 from six.moves import filter
 from six.moves.configparser import NoOptionError
 from six.moves.configparser import NoSectionError
@@ -1246,7 +1248,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         dict
-          Info for the repository, with keys matching the ones retuned by annex
+          Info for the repository, with keys matching the ones returned by annex
         """
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
@@ -1594,6 +1596,44 @@ class AnnexRepo(GitRepo):
                 self._uuid = None
         return self._uuid
 
+    def get_description(self, uuid=None):
+        """Get annex repository description
+
+        Parameters
+        ----------
+        uuid : str, optional
+          For which remote (based on uuid) to report description for
+
+        Returns
+        -------
+        str or None
+          None returned if not found
+        """
+        info = self.repo_info(fast=True)
+        match = \
+            (lambda x: x['here']) \
+            if uuid is None \
+            else (lambda x: x['uuid'] == uuid)
+
+        matches = list(set(chain.from_iterable(
+            [
+                [r['description'] for r in remotes if match(r)]
+                for k, remotes in iteritems(info)
+                if k.endswith(' repositories')
+            ]
+        )))
+
+        if len(matches) == 1:
+            # single hit as it should
+            return matches[0]
+        elif len(matches) == 2:
+            lgr.warning(
+                "Found multiple hits while sarching. Returning first among: %s",
+                str(matches)
+            )
+            return matches[0]
+        else:
+            return None
 
 # TODO: Why was this commented out?
 # @auto_repr
