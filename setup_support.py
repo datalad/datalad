@@ -15,6 +15,10 @@ import datetime
 import formatters as fmt
 
 
+def _path_rel2file(p):
+    return opj(dirname(__file__), p)
+
+
 def get_version():
     """Load version of datalad from version.py without entailing any imports
     """
@@ -42,9 +46,9 @@ class BuildManPage(Command):
     ]
 
     def initialize_options(self):
-        self.manpath = None
-        self.rstpath = None
-        self.parser = None
+        self.manpath = opj('build', 'man')
+        self.rstpath = opj('docs', 'source', 'generated', 'man')
+        self.parser = 'datalad.cmdline.main:setup_parser'
 
     def finalize_options(self):
         if self.manpath is None:
@@ -53,6 +57,8 @@ class BuildManPage(Command):
             raise DistutilsOptionError('\'rstpath\' option is required')
         if self.parser is None:
             raise DistutilsOptionError('\'parser\' option is required')
+        self.manpath = _path_rel2file(self.manpath)
+        self.rstpath = _path_rel2file(self.rstpath)
         mod_name, func_name = self.parser.split(':')
         fromlist = mod_name.split('.')
         try:
@@ -107,14 +113,16 @@ class BuildRSTExamplesFromScripts(Command):
     ]
 
     def initialize_options(self):
-        self.expath = None
-        self.rstpath = None
+        self.expath = opj('docs', 'examples')
+        self.rstpath = opj('docs', 'source', 'generated', 'examples')
 
     def finalize_options(self):
         if self.expath is None:
             raise DistutilsOptionError('\'expath\' option is required')
         if self.rstpath is None:
             raise DistutilsOptionError('\'rstpath\' option is required')
+        self.expath = _path_rel2file(self.expath)
+        self.rstpath = _path_rel2file(self.rstpath)
         self.announce('Converting example scripts')
 
     def run(self):
@@ -140,11 +148,12 @@ class BuildConfigInfo(Command):
     ]
 
     def initialize_options(self):
-        self.rstpath = None
+        self.rstpath = opj('docs', 'source', 'generated', 'cfginfo')
 
     def finalize_options(self):
         if self.rstpath is None:
             raise DistutilsOptionError('\'rstpath\' option is required')
+        self.rstpath = _path_rel2file(self.rstpath)
         self.announce('Generating configuration documentation')
 
     def run(self):
@@ -159,7 +168,7 @@ class BuildConfigInfo(Command):
         for type_ in known_types + ('misc',):
             with open(opj(opath, '{}.rst'.format(type_)), 'w') as rst:
                 rst.write('.. glossary::\n')
-                for term, v in cfgdefs.iteritems():
+                for term, v in cfgdefs.items():
                     destination = v.get('destination', 'misc')
                     if type_ != destination:
                         continue
