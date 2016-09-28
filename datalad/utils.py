@@ -571,6 +571,12 @@ def line_profile(func):
 
 
 @contextmanager
+def nothing_cm():
+    """Just a dummy cm to programmically switch context managers"""
+    yield
+
+
+@contextmanager
 def swallow_outputs():
     """Context manager to help consuming both stdout and stderr, and print()
 

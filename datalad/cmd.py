@@ -285,7 +285,9 @@ class Runner(object):
            CommandError's `code`-field. Command's stdout and stderr are stored
            in CommandError's `stdout` and `stderr` fields respectively.
         """
-
+        # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
+        # would need either threaded solution as in .communicate or just allow
+        # only one to be monitored and another one just being dumped into a file
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
         errstream = subprocess.PIPE if log_stderr else sys.stderr
 

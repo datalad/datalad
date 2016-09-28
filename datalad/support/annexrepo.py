@@ -36,6 +36,7 @@ from six.moves.configparser import NoSectionError
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import linux_distribution_name
+from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
@@ -509,7 +510,7 @@ class AnnexRepo(GitRepo):
         )
         run_kwargs = dict(
             log_stdout=progress_indicators,
-            log_stderr='offline',
+            log_stderr='offline',  # False, # to avoid lock down
             log_online=True
         )
         # Without up to date annex, we would still report total! ;)
@@ -523,15 +524,26 @@ class AnnexRepo(GitRepo):
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
         # which are contradicting conditions atm. (See _run_annex_command_json)
-        with swallow_logs(new_level=logging.DEBUG):
-            # TODO: provide more meaningful message (possibly aggregating 'note'
-            #  from annex failed ones
-            # TODO: fail api.get -- must exit in cmdline with non-0 if anything
-            # failed to download
+
+        # YOH:  oh -- this puts quite a bit of stress on the pipe since now
+        # annex runs in --debug mode spitting out shits load of information.
+        # Since nothing was hardcoded in tests, have no clue what was expected
+        # effect.  I will swallow the logs so they don't scare the user, but only
+        # in non debugging level of logging
+        cm = swallow_logs() \
+            if lgr.getEffectiveLevel() > logging.DEBUG \
+            else nothing_cm()
+        # TODO: provide more meaningful message (possibly aggregating 'note'
+        #  from annex failed ones
+        # TODO: fail api.get -- must exit in cmdline with non-0 if anything
+        # failed to download
+        with cm:
             results = self._run_annex_command_json(
                 'get', args=options + fetch_files, **run_kwargs)
         results_list = list(results)
         progress_indicators.finish()
+        # TODO:  should we here compare fetch_files against result_list
+        # and womit an exception of incomplete download????
         return results_list
 
 
@@ -1077,7 +1089,10 @@ class AnnexRepo(GitRepo):
                 raise OutOfSpaceError(cmd="annex %s" % command,
                                       sizemore_msg=out_of_space_re.groups()[0])
             # RemoteNotAvailableError:
-            remote_na_re = re.search("there is no available git remote named \"(.*)\"", e.stderr)
+            remote_na_re = re.search(
+                "there is no available git remote named \"(.*)\"",
+                e.stderr
+            )
             if remote_na_re:
                 raise RemoteNotAvailableError(cmd="annex %s" % command,
                                               remote=remote_na_re.groups()[0])
