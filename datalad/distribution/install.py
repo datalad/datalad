@@ -208,10 +208,6 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         raise InstallFailedError("Failed to install dataset %s" % subds)
 
 
-# TODO:  git_clone options
-# use --shared by default? => option --no-shared
-
-
 class Install(Interface):
     """Install a dataset or subdataset.
 
@@ -272,6 +268,15 @@ class Install(Interface):
         recursion_limit=recursion_limit,
         if_dirty=if_dirty_opt,
         save=nosave_opt,
+        reckless=Parameter(
+            args=("--reckless",),
+            action="store_true",
+            doc="""Set up the dataset to be able to obtain content in the
+            cheapest/fastest possible way, even if this poses a potential
+            risk the data integrity (e.g. hardlink files from a local clone
+            of the dataset). Use with care, and limit to "read-only" use
+            cases. With this flag the installed dataset will be marked as
+            untrusted."""),
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
@@ -289,6 +294,7 @@ class Install(Interface):
             recursion_limit=None,
             if_dirty='save-before',
             save=True,
+            reckless=False,
             git_opts=None,
             git_clone_opts=None,
             annex_opts=None,
@@ -317,6 +323,7 @@ class Install(Interface):
                         recursive=recursive,
                         recursion_limit=recursion_limit,
                         save=save,
+                        reckless=reckless,
                         if_dirty=if_dirty,
                         git_opts=git_opts,
                         git_clone_opts=git_clone_opts,
@@ -665,10 +672,18 @@ class Install(Interface):
         # in any case check whether we need to annex-init the installed thing:
         if knows_annex(current_dataset.path):
             # init annex when traces of a remote annex can be detected
+            if reckless:
+                lgr.debug(
+                    "Instruct annex to hardlink content in %s from local "
+                    "sources, if possible (reckless)", current_dataset.path)
+                current_dataset.config.add('annex.hardlink', 'true',
+                                           where='local', reload=True)
             lgr.info("Initializing annex repo at %s", current_dataset.path)
-            AnnexRepo(current_dataset.path, init=True)
+            repo = AnnexRepo(current_dataset.path, init=True)
+            if reckless:
+                repo._run_annex_command('untrust', annex_options=['here'])
 
-        lgr.debug("Installation of {0} done.".format(current_dataset))
+        lgr.debug("Installation of %s done.", current_dataset)
 
         if not current_dataset.is_installed():
             # log error and don't report as installed item, but don't raise,
@@ -734,24 +749,6 @@ class Install(Interface):
             return installed_items
 
     @staticmethod
-    def _get_new_vcs(ds, source):
-        if source is None:
-            raise RuntimeError(
-                "No `source` was provided. To create a new dataset "
-                "use the `create` command.")
-        else:
-            # when obtained from remote, try with plain Git
-            lgr.info("Creating a new git repo at %s", ds.path)
-            vcs = GitRepo(ds.path, url=source, create=True)
-            if knows_annex(ds.path):
-                # init annex when traces of a remote annex can be detected
-                lgr.info("Initializing annex repo at %s", ds.path)
-                vcs = AnnexRepo(ds.path, init=True)
-            else:
-                lgr.debug("New repository clone has no traces of an annex")
-        return vcs
-
-    @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
@@ -767,4 +764,3 @@ class Install(Interface):
             n=len(res),
             items=items)
         ui.message(msg)
-
