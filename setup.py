@@ -8,7 +8,6 @@
 
 import platform
 
-from glob import glob
 from os.path import sep as pathsep
 from os.path import join as opj
 from os.path import splitext
@@ -17,8 +16,9 @@ from setuptools import findall
 from setuptools import setup, find_packages
 
 # manpage build imports
-from distutils.command.build_py import build_py
-from setup_support import BuildManPage, BuildRSTExamplesFromScripts
+from setup_support import BuildManPage
+from setup_support import BuildRSTExamplesFromScripts
+from setup_support import BuildConfigInfo
 from setup_support import get_version
 
 
@@ -102,7 +102,8 @@ requires['full'] = sum(list(requires.values()), [])
 cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
-#    'build_py': DataladBuild
+    'build_cfginfo': BuildConfigInfo,
+    # 'build_py': DataladBuild
 }
 
 setup(

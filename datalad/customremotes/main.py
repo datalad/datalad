@@ -99,10 +99,10 @@ def _main(args, backend=None):
         print(remote.url_prefix)
     elif args.command is None:
         # If no command - run the special remote
-        if 'DATALAD_USECASSETTE' in os.environ:
+        if 'DATALAD_TESTS_USECASSETTE' in os.environ:
             # optionally feeding it a cassette, used by tests
             from ..support.vcr_ import use_cassette
-            with use_cassette(os.environ['DATALAD_USECASSETTE']):
+            with use_cassette(os.environ['DATALAD_TESTS_USECASSETTE']):
                 remote.main()
         else:
             remote.main()

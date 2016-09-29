@@ -11,6 +11,7 @@
 
 import os
 from mock import patch
+from datalad import cfg
 from datalad.api import Dataset, aggregate_metadata, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
@@ -42,7 +43,7 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
-        always_render = os.environ.get('DATALAD_API_ALWAYS_RENDER')
+        always_render = cfg.obtain('datalad.api.alwaysrender')
         with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
             if always_render:
                 # we do try to render results which actually causes exception

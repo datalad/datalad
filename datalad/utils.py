@@ -284,10 +284,10 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
 
-    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    It will not remove the temporary file/directory if DATALAD_TESTS_TEMP_KEEP
     environment variable is defined
     """
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         if not os.path.lexists(f):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
@@ -542,7 +542,7 @@ def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
-    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    directory = os.environ.get('DATALAD_TESTS_TEMP_DIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
@@ -921,7 +921,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         '_').
 
     To change the used directory without providing keyword argument 'dir' set
-    DATALAD_TESTS_TEMPDIR.
+    DATALAD_TESTS_TEMP_DIR.
 
     Examples
     --------
@@ -940,7 +940,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
 
-    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # if DATALAD_TESTS_TEMP_DIR is set, use that as directory,
     # let mktemp handle it otherwise. However, an explicitly provided
     # dir=... will override this.
     mkdir = tkwargs_.pop('mkdir', False)
