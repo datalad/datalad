@@ -98,10 +98,10 @@ def test_help_np():
 
 
 def test_usage_on_insufficient_args():
-    stdout, stderr = run_main(['install'], exit_code=1)
-    ok_startswith(stdout, 'usage:')
+    stdout, stderr = run_main(['install'], exit_code=2, expect_stderr=True)
+    ok_startswith(stderr, 'usage:')
 
 
 def test_subcmd_usage_on_unknown_args():
-    stdout, stderr = run_main(['install', '--murks'], exit_code=1)
-    in_('install', stdout)
+    stdout, stderr = run_main(['get', '--murks'], exit_code=1)
+    in_('get', stdout)

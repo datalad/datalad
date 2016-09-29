@@ -174,7 +174,7 @@ def test_ls_json(topdir):
     ds.add(path='subdsfile.txt')
     ds.save("Hello!", version_tag=1)
     # add a subdataset
-    ds.install('subds', source=topdir)
+    ds.install(topdir, path='subds')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
     git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)              # commit to git to init git repo

@@ -40,7 +40,7 @@ from datalad.tests.utils import assert_not_in
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(origin, path=src_path, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
@@ -97,7 +97,7 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(origin, path=src_path, recursive=True)[0]
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -182,7 +182,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(origin, path=src_path, recursive=True)[0]
     source.repo.get('test-annex.dat')
 
     # create plain git at target:

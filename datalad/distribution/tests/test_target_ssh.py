@@ -89,7 +89,7 @@ assert_create_sshwebserver = (
 def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
-    source = install(path=src_path, source=origin)
+    source = install(origin, path=src_path)
 
     target_path = opj(target_rootpath, "basic")
     # it will try to fetch it so would fail as well since sshurl is wrong
@@ -256,7 +256,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(origin, path=src_path, recursive=True)[0]
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))

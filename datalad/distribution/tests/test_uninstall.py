@@ -135,7 +135,7 @@ def test_uninstall_git_file(path):
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
 
-    ds = install(path=dst, source=src, recursive=True)[0]
+    ds = install(src, path=dst, recursive=True)[0]
     ok_(ds.is_installed())
     for subds_path in ds.get_subdatasets():
         subds = Dataset(opj(ds.path, subds_path))
