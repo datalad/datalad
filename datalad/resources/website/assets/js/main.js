@@ -280,7 +280,7 @@ function directory(jQuery, md5) {
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {
       var api = this.api();
-      // all tables (except root ds) should have ../ parent path
+      // all tables should have ../ parent path except webinterface root
       if (!parent) {
         var parent_meta = parent_json(jQuery, md5);
         if (!jQuery.isEmptyObject(parent_meta))

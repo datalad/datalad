@@ -205,7 +205,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
     if not success:
-        raise InstallFailedError("Failed to install dataset %s" % ds)
+        raise InstallFailedError("Failed to install dataset %s" % subds)
 
 
 # TODO:  git_clone options
@@ -310,7 +310,7 @@ class Install(Interface):
                 for p in path:
                     result = Install.__call__(
                         path=p,
-                        source=None,
+                        source=source,
                         dataset=dataset,
                         get_data=get_data,
                         description=description,
@@ -424,34 +424,46 @@ class Install(Interface):
             # one or it is an existing and installed dataset, that is requested
             # to be installed again (but with recursive or get-data)
 
-
-
-            # So, test for that last remaining option:
-
-            # if `path` was a known subdataset to be installed, let's assume
-            # it would be one:
             assume_ds = Dataset(path)
-            candidate_super_ds = assume_ds.get_superdataset()
-
-            if candidate_super_ds and candidate_super_ds != assume_ds:
-                # `path` has a potential superdataset
-                if assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
-                    # candidate knows it, so we have the case of a
-                    # known subdataset:
-                    _install_known_sub = True
-                    _install_into_ds = True
-                    ds = candidate_super_ds
-                else:
-                    # it is not (yet) known to the candidate. May be there's is
-                    # a not yet installed one in between. Let's try:
-                    _try_implicit = True
-                    _install_into_ds = True
-                    ds = candidate_super_ds
+            # Work in progress:
+            if assume_ds.is_installed():
+                # `path` is installed already and not to be installed into
+                # another one (_install_into_ds is False!)
+                # so we can only execute additional arguments like `recursive`
+                # or `get_data`.
+                # Theoretically, we could update from existing remote, but this
+                # is not a matter of install atm.
+                lgr.debug("{0} already installed.".format(assume_ds))
+                _skip_ = True  # TODO: Better name
+                source = path  # we have nothing else;
+                # this should lead to FLOW GUIDE 2 and there skip due to
+                # "already exists" and perform remaining actions
             else:
-                # no match, we can't deal with that `path` argument
-                # without a `source`:
-                raise InsufficientArgumentsError(
-                    "Got no source to install from.")
+                # So, test for that last remaining option:
+
+                # if `path` was a known subdataset to be installed, let's assume
+                # it would be one:
+                candidate_super_ds = assume_ds.get_superdataset()
+
+                if candidate_super_ds and candidate_super_ds != assume_ds:
+                    # `path` has a potential superdataset
+                    if assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
+                        # candidate knows it, so we have the case of a
+                        # known subdataset:
+                        _install_known_sub = True
+                        _install_into_ds = True
+                        ds = candidate_super_ds
+                    else:
+                        # it is not (yet) known to the candidate. May be there's is
+                        # a not yet installed one in between. Let's try:
+                        _try_implicit = True
+                        _install_into_ds = True
+                        ds = candidate_super_ds
+                else:
+                    # no match, we can't deal with that `path` argument
+                    # without a `source`:
+                    raise InsufficientArgumentsError(
+                        "Got no source to install from.")
 
         _install_inplace = False
         from os.path import realpath
@@ -463,7 +475,7 @@ class Install(Interface):
         if source and path and realpath(source) == realpath(path):
             if _install_into_ds:
                 _install_inplace = True
-            else:
+            elif not _skip_:
                 raise InsufficientArgumentsError(
                     "Source and target are the same ({0}). This doesn't make "
                     "sense without a dataset to install into.".format(path))

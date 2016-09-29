@@ -9,7 +9,6 @@
 """Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
-import functools
 import re
 import requests
 import requests.auth
@@ -120,7 +119,6 @@ class HTTPBaseAuthenticator(Authenticator):
         self.success_re = assure_list_from_str(success_re)
         self.session_cookies = assure_list_from_str(session_cookies)
 
-
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
         lgr.info("http session: Authenticating into session for %s", url)
@@ -174,7 +172,7 @@ class HTTPBaseAuthenticator(Authenticator):
             # assign cookies for this session
             for c, v in cookies_dict.items():
                 if c not in session.cookies or session.cookies[c] != v:
-                    session.cookies[c] = v #.update(cookies_dict)
+                    session.cookies[c] = v  # .update(cookies_dict)
         return response
 
     def _post_credential(self, credentials, post_url, session):
@@ -294,7 +292,7 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
 @auto_repr
 class HTTPDownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None,  url=None, headers=None,
-                 response=None, chunk_size=1024**2):
+                 response=None, chunk_size=1024 ** 2):
         super(HTTPDownloaderSession, self).__init__(
             size=size, filename=filename, url=url, headers=headers,
         )
@@ -401,7 +399,6 @@ class HTTPDownloader(BaseDownloader):
                 self._session = requests.Session()
                 # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
 
-
                 # TODO dict_to_cookiejar doesn't preserve all fields when reversed
                 self._session.cookies = requests.utils.cookiejar_from_dict(cookie_dict)
                 # TODO cookie could be expired w/ something like (but docs say it should be expired automatically):
@@ -417,7 +414,8 @@ class HTTPDownloader(BaseDownloader):
         return False
 
     def get_downloader_session(self, url,
-                              allow_redirects=True, use_redirected_url=True):
+                               allow_redirects=True,
+                               use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
         # TODO: make it not this ugly -- but at the moment we are testing end-file size
         # while can't know for sure if content was gunziped and either it all went ok.
@@ -473,6 +471,6 @@ class HTTPDownloader(BaseDownloader):
         return FileStatus(
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
-            filename=get_response_disposition_filename(status.get('Content-Disposition'))
-                     or status.get('Url-Filename')
+            filename=get_response_disposition_filename(
+                status.get('Content-Disposition')) or status.get('Url-Filename')
         )

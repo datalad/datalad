@@ -98,7 +98,8 @@ class CreateSibling(Interface):
                 (default: `sshurl`). Accessibility of this URL determines the
                 access permissions of potential consumers of the dataset.
                 As with `target_dir`, templates (same set of placeholders)
-                are supported.\n""",
+                are supported.  Also, if specified, it is provided as the annex
+                description\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
@@ -280,8 +281,10 @@ class CreateSibling(Interface):
 
             # don't (re-)initialize dataset if existing == reconfigure
             if not only_reconfigure:
-                # init git repo
-                if not CreateSibling.init_remote_repo(path, ssh, shared, datasets[current_dspath]):
+                # init git and possibly annex repo
+                if not CreateSibling.init_remote_repo(
+                        path, ssh, shared, datasets[current_dspath],
+                        description=target_url):
                     continue
 
             # check git version on remote end
@@ -312,13 +315,6 @@ class CreateSibling(Interface):
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update "
                           "hook.\nError: %s" % exc_str(e))
-
-            if not only_reconfigure:
-                lgr.debug("Initializing annex repo on remote sibling")
-                # Initialize annex repo on remote copy if current_dspath
-                # is an AnnexRepo
-                if isinstance(datasets[current_dspath].repo, AnnexRepo):
-                    ssh(['git', '-C', path, 'annex', 'init', path])
 
             # publish web-interface to root dataset on publication server
             if at_root and ui:
@@ -364,7 +360,7 @@ class CreateSibling(Interface):
         #       => [(Dataset, fetch_url)]
 
     @staticmethod
-    def init_remote_repo(path, ssh, shared, dataset):
+    def init_remote_repo(path, ssh, shared, dataset, description=None):
         cmd = ["git", "-C", path, "init"]
         if shared:
             cmd.append("--shared=%s" % shared)
@@ -378,7 +374,10 @@ class CreateSibling(Interface):
         if isinstance(dataset.repo, AnnexRepo):
             # init remote git annex repo (part fix of #463)
             try:
-                ssh(["git", "-C", path, "annex", "init"])
+                ssh(
+                    ["git", "-C", path, "annex", "init"] +
+                    ([description] if description else [])
+                )
             except CommandError as e:
                 lgr.error("Initialization of remote git annex repository failed at %s."
                           "\nError: %s\nSkipping ..." % (path, exc_str(e)))

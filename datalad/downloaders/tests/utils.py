@@ -10,7 +10,8 @@
 
 from unittest import SkipTest
 
-from datalad.downloaders import Providers
+from datalad.downloaders.providers import Providers
+
 
 def get_test_providers(url=None, reload=False):
     """Return reusable instance of our global providers + verify credentials for url"""

@@ -53,7 +53,6 @@ from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import RI
 from .network import is_ssh
-from .network import RI
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -99,8 +98,8 @@ def kwargs_to_options(func, split_single_char_options=True,
         t_kwargs = dict()
         t_kwargs[target_kw] = \
             gitpy.Git().transform_kwargs(
-                        split_single_char_options=split_single_char_options,
-                        **kwargs)
+                split_single_char_options=split_single_char_options,
+                **kwargs)
         return func(self, *args, **t_kwargs)
     return newfunc
 
@@ -167,7 +166,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = normpath(opj(realpath(getpwd()), path))  # realpath OK
+        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -279,7 +278,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
         else:
             remap_filenames = lambda x: x
 
-        if serialize: # and not single_file:
+        if serialize:  # and not single_file:
             result = [
                 func(self, f, *args, **kwargs)
                 for f in files_new
@@ -500,7 +499,9 @@ class GitRepo(object):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
+                                                  url,
+                                                  path,
                                                   odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
@@ -520,8 +521,8 @@ class GitRepo(object):
                 lgr.error(e_str)
                 raise
             except ValueError as e:
-                if gitpy.__version__ == '1.0.2' and \
-                                "I/O operation on closed file" in str(e):
+                if gitpy.__version__ == '1.0.2' \
+                        and "I/O operation on closed file" in str(e):
                     # bug https://github.com/gitpython-developers/GitPython
                     # /issues/383
                     raise GitCommandError(
@@ -1005,9 +1006,9 @@ class GitRepo(object):
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
-                           log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=True, cwd=None, env=None,
-                           shell=None, expect_fail=False):
+                            log_stdout=True, log_stderr=True, log_online=False,
+                            expect_stderr=True, cwd=None, env=None,
+                            shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1029,20 +1030,28 @@ class GitRepo(object):
             else cmd_str + files
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr,
+            log_stdout=log_stdout,
+            log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd,
+            env=env,
+            shell=shell,
+            expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
-    def add_remote(self, name, url, options=[]):
+    def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
         """
+        cmd = ['git', 'remote', 'add']
+        if options:
+            cmd += options
+        cmd += [name, url]
 
-        return self._git_custom_command(
-            '', ['git', 'remote', 'add'] + options + [name, url]
-        )
+        return self._git_custom_command('', cmd)
 
     def remove_remote(self, name):
         """Remove existing remote
@@ -1316,19 +1325,22 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def checkout(self, name, options=[]):
+    def checkout(self, name, options=None):
         """
         """
         # TODO: May be check for the need of -b options herein?
+        cmd = ['git', 'checkout']
+        if options:
+            cmd += options
+        cmd += [str(name)]
 
-        self._git_custom_command(
-            '', ['git', 'checkout'] + options + [str(name)],
-            expect_stderr=True
-        )
+        self._git_custom_command('', cmd, expect_stderr=True)
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=[], msg=None, allow_unrelated=False, **kwargs):
+    def merge(self, name, options=None, msg=None, allow_unrelated=False, **kwargs):
+        if options is None:
+            options = []
         if msg:
             options = options + ["-m", msg]
         if allow_unrelated and external_versions['cmd:git'] >= '2.9':
@@ -1343,12 +1355,14 @@ class GitRepo(object):
             '', ['git', 'branch', '-D', branch]
         )
 
-    def ls_remote(self, remote, options=[]):
+    def ls_remote(self, remote, options=None):
+        if options is None:
+            options = []
         self._git_custom_command(
             '', ['git', 'ls-remote'] + options + [remote]
         )
         # TODO: Return values?
-    
+
     @property
     def dirty(self):
         """Returns true if there are uncommitted changes or files not known to
