@@ -96,6 +96,11 @@ class Get(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        fulfill=Parameter(
+            args=("--fulfill",),
+            choices=('auto', 'all'),
+            doc="""whether to fulfill file handles. The default will do the
+            right thing (TM). But it could be forced ('all')."""),
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -114,6 +119,7 @@ class Get(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            fulfill='auto',
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
@@ -143,10 +149,17 @@ class Get(Interface):
         # resolve possible subdatasets:
         lgr.debug("Resolving (sub-)datasets ...")
         resolved_datasets = dict()
+        just_installed = dict()
         for p in resolved_paths:
-
             try:
+                # where would the current dataset think this path belongs
+                present_container = ds.get_containing_subdataset(p, recursion_limit)
+                was_installed = present_container.is_installed()
+                # where does it actually belong
                 p_ds = install_necessary_subdatasets(ds, p)
+                # take note of whether the final subdataset just came to life
+                just_installed[p_ds.path] = \
+                    present_container.path != p_ds.path or not was_installed
             except PathOutsideRepositoryError as e:
                 lgr.warning(exc_str(e) + linesep + "Ignored.")
                 continue
@@ -215,16 +228,24 @@ class Get(Interface):
         # the actual calls:
         for ds_path in resolved_datasets:
             cur_ds = Dataset(ds_path)
-            if not recursive and ds.path != ds_path:
+            if fulfill != 'all' \
+                    and just_installed.get(ds_path, False) \
+                    and len(resolved_datasets[ds_path]) \
+                    and resolved_datasets[ds_path][0] == ds_path:
+                # we hit a subdataset that just got installed few lines above, and was
+                # requested specifically, as opposed to some of its content. Unless we
+                # are asked to fulfill all handles that at some point in the process
+                # we consider having fulfilled the dataset handle good enough
                 lgr.debug(
                     "Will not get any content in subdataset %s without recursion enabled",
                     cur_ds)
+                global_results.append(cur_ds)
                 continue
             # needs to be an annex:
-            if not isinstance(cur_ds.repo, AnnexRepo):
+            found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
+            if not found_an_annex:
                 lgr.debug("Found no annex at {0}. Skipped.".format(cur_ds))
                 continue
-            found_an_annex = True
             lgr.info("Getting {0} file/dir(s) of dataset "
                      "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
 
@@ -241,8 +262,6 @@ class Get(Interface):
 
             global_results.extend(local_results)
 
-        if not found_an_annex:
-            lgr.warning("Found no annex. Could not perform any get operation.")
         return global_results
 
     @staticmethod

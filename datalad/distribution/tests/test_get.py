@@ -14,7 +14,7 @@ import logging
 import re
 
 from os import curdir
-from os.path import join as opj
+from os.path import join as opj, basename
 
 from datalad.api import get
 from datalad.api import install
@@ -61,12 +61,14 @@ def test_get_invalid_call(path, file_outside):
                   source="some", path=None)
 
     # get on a plain git:
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        # but we don't fail if not annex -- just inform
-        out = ds.get(curdir)
-        assert_in('Found no annex. Could not perform any get operation.',
-                  cml.out)
-        eq_(out, [])
+    # MIH: why do we warn? user got what was desired. if they want technical
+    # background they better read books not warnings
+    #with swallow_logs(new_level=logging.WARNING) as cml:
+    #    # but we don't fail if not annex -- just inform
+    #    out = ds.get(curdir)
+    #    assert_in('Found no annex. Could not perform any get operation.',
+    #              cml.out)
+    #    eq_(out, [])
 
     # make it an annex:
     AnnexRepo(path, init=True, create=True)
@@ -204,10 +206,13 @@ def test_get_recurse_dirs(o_path, c_path):
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src, path):
 
-    ds, subds1, subds2 = install(path=path, source=src, recursive=True)
+    ds = install(path=path, source=src)
+
+    # ask for the two subdatasets specifically. This will obtain them,
+    # but not any content of any files in them
+    subds1, subds2 = ds.get(['subm 1', 'subm 2'])
 
     # there are 3 files to get: test-annex.dat within each dataset:
-    from os.path import basename
     rel_path_sub1 = opj(basename(subds1.path), 'test-annex.dat')
     rel_path_sub2 = opj(basename(subds2.path), 'test-annex.dat')
     annexed_files = {'test-annex.dat',
@@ -220,7 +225,9 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
     # explicitly given path in subdataset => implicit recursion:
-    result = ds.get(rel_path_sub1)
+    # MIH: Nope, we fulfill the dataset handle, but that doesn't
+    #      imply fulfilling all file handles
+    result = ds.get(rel_path_sub1, recursive=True)
 
     eq_(result[0].get('file'), rel_path_sub1)
     ok_(result[0].get('success', False) is True)
@@ -257,6 +264,22 @@ def test_get_recurse_subdatasets(src, path):
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
+
+
+@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
+def test_get_greedy_recurse_subdatasets(src, path):
+
+    ds = install(path=path, source=src)
+
+    # GIMME EVERYTHING
+    ds.get(['subm 1', 'subm 2'], fulfill='all')
+
+    # We got all content in the subdatasets
+    subds1, subds2 = [Dataset(d) for d in ds.get_subdatasets(absolute=True)]
+    ok_(ds.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
+    ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
 
 @with_testrepos('submodule_annex', flavors='local')
