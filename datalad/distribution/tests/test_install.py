@@ -10,6 +10,7 @@
 """
 
 import logging
+import os
 
 from os.path import join as opj
 from os.path import isdir
@@ -399,6 +400,14 @@ def test_install_known_subdataset(src, path):
     assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
     assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
 
+    # now, get the data by reinstalling with -g:
+    ok_(subds.repo.file_has_content('test-annex.dat') is False)
+    with chpwd(ds.path):
+        result = install(path='subm 1', dataset=os.curdir, get_data=True)
+        eq_(result, subds)
+        ok_(subds.repo.file_has_content('test-annex.dat') is True)
+        ok_(subds.is_installed())
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -501,3 +510,47 @@ def test_reckless(path, top_path):
     ds = install(path=top_path, source=path, reckless=True)
     eq_(ds.config.get('annex.hardlink', None), 'true')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+
+
+@with_tree(tree={'top_file.txt': 'some',
+                 'sub 1': {'sub1file.txt': 'something else',
+                           'subsub': {'subsubfile.txt': 'completely different',
+                                      }
+                           },
+                 'sub 2': {'sub2file.txt': 'meaningless',
+                           }
+                 })
+@with_tempfile(mkdir=True)
+def test_install_recursive_repeat(src, path):
+    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
+    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
+    sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
+    top_src = Dataset(src).create(force=True)
+    top_src.save(auto_add_changes=True, recursive=True)
+
+    # install top level:
+    top_ds = install(path=path, source=src)
+    ok_(top_ds.is_installed() is True)
+    sub1 = Dataset(opj(path, 'sub 1'))
+    ok_(sub1.is_installed() is False)
+    sub2 = Dataset(opj(path, 'sub 2'))
+    ok_(sub2.is_installed() is False)
+    subsub = Dataset(opj(path, 'sub 1', 'subsub'))
+    ok_(subsub.is_installed() is False)
+
+    # install again, now with data and recursive, but recursion_limit 1:
+    result = install(path=path, recursive=True, recursion_limit=1, get_data=True)
+    assert_in(top_ds, result)
+    assert_in(sub1, result)
+    assert_in(sub2, result)
+    assert_not_in(subsub, result)
+    ok_(top_ds.repo.file_has_content('top_file.txt') is True)
+    ok_(sub1.repo.file_has_content('sub1file.txt') is True)
+    ok_(sub2.repo.file_has_content('sub2file.txt') is True)
+
+    # install sub1 again, recursively:
+    top_ds.install('sub 1', recursive=True, get_data=True)
+    ok_(subsub.is_installed())
+    ok_(subsub.repo.file_has_content('subsubfile.txt'))
+
+
