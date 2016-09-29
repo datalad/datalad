@@ -190,7 +190,7 @@ class ConfigManager(object):
         store : bool
           Whether to store the obtained value (or default)
         %s
-        **kwargs
+        `**kwargs`
           Additional arguments for the UI function call, such as a question
           `text`.
         """
