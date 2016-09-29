@@ -12,20 +12,19 @@ __docformat__ = 'restructuredtext'
 
 
 from os.path import exists
-from os.path import join as opj
 from .base import Interface
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
 from datalad.support.stats import ActivityStats
-from datalad.utils import assure_dir
 from datalad import utils
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
 
 from .. import cfg
+
 
 class Crawl(Interface):
     """Crawl online resource to create or update a dataset.
@@ -35,13 +34,13 @@ class Crawl(Interface):
       $ datalad crawl  # within a dataset having .datalad/crawl/crawl.cfg
     """
     _params_ = dict(
-# Dry run is untested and largely probably not working in this implementation
-# so let's not expose it for now at all
-#        dry_run=Parameter(
-#            args=("-n", "--dry-run"),
-#            action="store_true",
-#            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
-#            If not, commands are only printed to the stdout"""),
+        # Dry run is untested and largely probably not working in this implementation
+        # so let's not expose it for now at all
+        #        dry_run=Parameter(
+        #            args=("-n", "--dry-run"),
+        #            action="store_true",
+        #            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
+        #            If not, commands are only printed to the stdout"""),
         is_pipeline=Parameter(
             args=("--is-pipeline",),
             action="store_true",
@@ -68,7 +67,8 @@ class Crawl(Interface):
     )
 
     @staticmethod
-    def __call__(path=None, is_pipeline=False, is_template=False, recursive=False, chdir=None): # dry_run=False,
+    def __call__(path=None, is_pipeline=False, is_template=False,
+                 recursive=False, chdir=None):  # dry_run=False,
         dry_run = False
 
         from datalad.crawler.pipeline import (
@@ -77,12 +77,10 @@ class Crawl(Interface):
         )
         from datalad.crawler.pipeline import run_pipeline
         from datalad.utils import chpwd  # import late so we could mock during tests
-        from datalad.utils import getpwd
 
         with chpwd(chdir):
 
             assert not (is_pipeline and is_template), "it is either a pipeline or a template name, can't be both"
-            path_orig = path
             if is_template:
                 # generate a config and overload path with its filename
                 path = initiate_pipeline_config(template=path,  # kwargs=TODO,
@@ -90,9 +88,10 @@ class Crawl(Interface):
 
             # TODO: centralize via _params_ handling
             if dry_run:
-                if 'crawl' not in cfg.sections():
-                    cfg.add_section('crawl')
-                cfg.set('crawl', 'dryrun', "True")
+                dryrun_optlabel = 'datalad.crawl.dryrun'
+                if dryrun_optlabel in cfg:
+                    cfg.unset(dryrun_optlabel, where='local', reload=False)
+                cfg.add(dryrun_optlabel, "True", where='local')
 
             if path is None:
 
@@ -169,8 +168,8 @@ class Crawl(Interface):
                         stats_total.datasets_crawl_failed += 1
                         stats_total.datasets_crawled += 1
                         output += [None]
-                        lgr.warning("Crawling of %s has failed (more in %s): %s.",  #  Log output: %s",
-                                    ds_, ds_logfile, exc_str(exc))  #, cml.out)
+                        lgr.warning("Crawling of %s has failed (more in %s): %s.",  # Log output: %s",
+                                    ds_, ds_logfile, exc_str(exc))  # , cml.out)
 
             lgr.info("Total stats: %s", stats_total.as_str(mode='line'))
 

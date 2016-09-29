@@ -27,6 +27,7 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
@@ -75,8 +76,13 @@ def test_get_invalid_call(path, file_outside):
     eq_(len(result), 0)
 
     # invalid source:
+    # yoh:  but now we would need to add it to annex since clever code first
+    # checks what needs to be fetched at all
+    create_tree(path, {'annexed.dat': 'some'})
+    ds.add("annexed.dat")
+    ds.repo.drop("annexed.dat", options=['--force'])
     with assert_raises(RemoteNotAvailableError) as ce:
-        ds.get("some.txt", source='MysteriousRemote')
+        ds.get("annexed.dat", source='MysteriousRemote')
     eq_("MysteriousRemote", ce.exception.remote)
 
     # warning on not existing file:

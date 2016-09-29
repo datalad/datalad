@@ -195,6 +195,7 @@ class IncompleteDownloadError(DownloadError):
 class UnaccountedDownloadError(IncompleteDownloadError):
     pass
 
+
 class TargetFileAbsent(DownloadError):
     pass
 

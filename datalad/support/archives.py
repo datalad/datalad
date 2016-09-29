@@ -13,19 +13,20 @@
 from distutils.version import StrictVersion
 import hashlib
 import patoolib
-import re
 # There were issues, so let's stay consistently with recent version
 assert(StrictVersion(patoolib.__version__) >= "1.7")
 
 import os
 import tempfile
-from os.path import join as opj, exists, abspath, basename, isabs, normpath, relpath, pardir, isdir
-from os.path import split as ops, sep as opsep
+from os.path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
+from os.path import sep as opsep
 from os.path import realpath
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
-from ..utils import getpwd
+import string
+import random
+
 from ..utils import any_re_search
 
 import logging
@@ -59,10 +60,13 @@ from ..utils import swallow_outputs
 from ..utils import rmtemp
 from ..cmd import Runner
 from ..consts import ARCHIVES_TEMP_DIR
-from ..utils import rotree, rmtree
+from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
 
+from ..utils import on_windows
+
 _runner = Runner()
+
 
 def _patool_run(cmd, verbosity=0, **kwargs):
     """Decorated runner for patool so it doesn't spit out outputs to stdout"""
@@ -87,9 +91,9 @@ DECOMPRESSORS = {
     '\.(tar\.xz)$': 'tar -xJvf %(file)s -C %(dir)s',
     '\.(tar\.gz|tgz)$': 'tar -xzvf %(file)s -C %(dir)s',
     '\.(zip)$': 'unzip %(file)s -d %(dir)s',
-    }
+}
 
-from ..utils import on_windows
+
 def unixify_path(path):
     """On windows convert paths from drive:\d\file to /drive/d/file
 
@@ -208,8 +212,6 @@ def _get_cached_filename(archive):
     return archive_cached
 
 
-import string
-import random
 def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
     """Return a random ID composed from digits and uppercase letters
 
@@ -240,7 +242,7 @@ class ArchivesCache(object):
             if not persistent:
                 tempsuffix = "-" + _get_random_id()
                 lgr.debug("For non-persistent archives using %s suffix for path %s",
-                          tempsuffix, path )
+                          tempsuffix, path)
                 path += tempsuffix
         else:
             if persistent:
@@ -267,7 +269,6 @@ class ArchivesCache(object):
             lgr.debug("Not initiating existing cache for the archives under %s" % self.path)
             self._made_path = False
 
-
     @property
     def path(self):
         return self._path
@@ -281,8 +282,8 @@ class ArchivesCache(object):
         #     lgr.debug("Removing the entire archives cache under %s" % self.path)
         #     rmtemp(self.path)
         if (not self.persistent) or force:
-             lgr.debug("Removing the entire archives cache under %s" % self.path)
-             rmtemp(self.path)
+            lgr.debug("Removing the entire archives cache under %s" % self.path)
+            rmtemp(self.path)
 
     def _get_normalized_archive_path(self, archive):
         """Return full path to archive
@@ -326,7 +327,7 @@ class ArchivesCache(object):
             # we can at least try
             if not self.persistent:
                 self.clean()
-        except:
+        except:  # MIH: IOError?
             pass
 
 
@@ -370,7 +371,6 @@ class ExtractedArchive(object):
                     #        only of directories
                     (rmtree if isdir(path) else os.unlink)(path)
 
-
     @property
     def path(self):
         """Given an archive -- return full path to it within cache (extracted)
@@ -384,7 +384,7 @@ class ExtractedArchive(object):
     @property
     def is_extracted(self):
         return exists(self.path) and exists(self.stamp_path) \
-               and os.stat(self.stamp_path).st_mtime >= os.stat(self.path).st_mtime
+            and os.stat(self.stamp_path).st_mtime >= os.stat(self.path).st_mtime
 
     def assure_extracted(self):
         """Return path to the extracted `archive`.  Extract archive if necessary
@@ -506,5 +506,5 @@ class ExtractedArchive(object):
         try:
             if self._persistent:
                 self.clean()
-        except:
+        except:  # MIH: IOError?
             pass

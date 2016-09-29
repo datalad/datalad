@@ -8,24 +8,29 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test BIDS meta data parser """
 
+from os.path import join as opj
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
-from datalad.metadata.parsers.bids import has_metadata, get_metadata
-from nose.tools import assert_true, assert_false, assert_raises, assert_equal
+from datalad.metadata.parsers.bids import MetadataParser
+from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
 
 @with_tree(tree={'dataset_description.json': '{}'})
 def test_has_metadata(path):
     ds = Dataset(path)
-    assert_true(has_metadata(ds))
+    p = MetadataParser(ds)
+    assert_true(p.has_metadata())
+    assert_equal(p.get_core_metadata_filenames(),
+                 [opj(path, 'dataset_description.json')])
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
     ds = Dataset(path)
-    assert_false(has_metadata(ds))
-    assert_raises(ValueError, get_metadata, ds, 'ID')
+    p = MetadataParser(ds)
+    assert_false(p.has_metadata())
+    assert_equal(p.get_core_metadata_filenames(), [])
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -47,7 +52,7 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path)
-    meta = get_metadata(ds, 'ID')
+    meta = MetadataParser(ds).get_metadata('ID')
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\

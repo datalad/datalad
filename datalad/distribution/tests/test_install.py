@@ -476,6 +476,7 @@ def test_install_list(path, top_path):
     # we want to be able to install several things, if these are known
     # (no 'source' allowed). Therefore first toplevel:
     ds = install(path=top_path, source=path, recursive=False)
+    assert_not_in('annex.hardlink', ds.config)
     ok_(ds.is_installed())
     sub1 = Dataset(opj(top_path, 'subm 1'))
     sub2 = Dataset(opj(top_path, 'subm 2'))
@@ -494,3 +495,9 @@ def test_install_list(path, top_path):
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
 
 
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_reckless(path, top_path):
+    ds = install(path=top_path, source=path, reckless=True)
+    eq_(ds.config.get('annex.hardlink', None), 'true')
+    eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)

@@ -25,7 +25,7 @@ from datalad.utils import swallow_logs
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
-from datalad import cfg as dlcfg
+from datalad import cfg
 
 
 # common format
@@ -51,17 +51,17 @@ def get_metadata_type(ds, guess=False):
       Metadata type labels or `None` if no type setting is found and and
       optional auto-detection yielded no results
     """
-    cfg = ds.config
-    if cfg and cfg.has_section('metadata'):
-        if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype').split()
+    cfg_ = ds.config
+    if cfg_ and cfg_.has_section('metadata'):
+        if cfg_.has_option('metadata', 'nativetype'):
+            return cfg_.get_value('metadata', 'nativetype').split()
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
-            if pmod.has_metadata(ds):
+            if pmod.MetadataParser(ds).has_metadata():
                 mtypes.append(mtype)
     return mtypes if len(mtypes) else None
 
@@ -118,7 +118,7 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
-            repo_info = ds.repo.repo_info()
+            repo_info = ds.repo.repo_info(fast=True)
         annex_meta = []
         for src in ('trusted repositories',
                     'semitrusted repositories',
@@ -314,9 +314,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
 def _cached_load_document(url):
     from pyld.jsonld import load_document
-    cache_dir = opj(
-        dlcfg.dirs.user_cache_dir,
-        'schema')
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
     doc_fname = opj(
         cache_dir,
         '{}-{}'.format(
@@ -378,7 +376,7 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
         try:
-            native_meta = pmod.get_metadata(ds, ds_identifier)
+            native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
             lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
             continue
