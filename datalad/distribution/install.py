@@ -303,39 +303,42 @@ class Install(Interface):
 
         # handle calls with multiple paths first:
         if path and isinstance(path, list):
-            if len(path) > 1 and source is not None:
-                raise ValueError("source argument not valid when "
-                                 "installing multiple datasets.")
-            else:
-                for p in path:
-                    try:
-                        result = Install.__call__(
-                            path=p,
-                            source=None,
-                            dataset=dataset,
-                            get_data=get_data,
-                            description=description,
-                            recursive=recursive,
-                            recursion_limit=recursion_limit,
-                            save=save,
-                            if_dirty=if_dirty,
-                            git_opts=git_opts,
-                            git_clone_opts=git_clone_opts,
-                            annex_opts=annex_opts,
-                            annex_init_opts=annex_init_opts
-                        )
-
-                        installed_items += assure_list(result)
-                    except Exception:
-                        # Note: We don't exactly know what was skipped but
-                        # the `path` requested to be installed, since it will be
-                        # resolved only within the recursive call of install.
-                        lgr.info("Installation of {0} skipped.".format(p))
-
-                if len(installed_items) == 1:
-                    return installed_items[0]
+            if len(path) > 1:
+                if source is not None:
+                    raise ValueError("source argument not valid when "
+                                     "installing multiple datasets.")
                 else:
-                    return installed_items
+                    for p in path:
+                        try:
+                            result = Install.__call__(
+                                path=p,
+                                source=None,
+                                dataset=dataset,
+                                get_data=get_data,
+                                description=description,
+                                recursive=recursive,
+                                recursion_limit=recursion_limit,
+                                save=save,
+                                if_dirty=if_dirty,
+                                git_opts=git_opts,
+                                git_clone_opts=git_clone_opts,
+                                annex_opts=annex_opts,
+                                annex_init_opts=annex_init_opts
+                            )
+
+                            installed_items += assure_list(result)
+                        except Exception:
+                            # Note: We don't exactly know what was skipped but
+                            # the `path` requested to be installed, since it will be
+                            # resolved only within the recursive call of install.
+                            lgr.info("Installation of {0} skipped.".format(p))
+
+                    if len(installed_items) == 1:
+                        return installed_items[0]
+                    else:
+                        return installed_items
+            else:
+                path = path[0]
 
         # now the 'usual' flow with single `path`argument:
         # shortcut
