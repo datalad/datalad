@@ -253,12 +253,11 @@ class Install(Interface):
             interpreted as the source URL of a dataset and a destination
             path will be derived from the URL similar to :command:`git
             clone`""",
-            nargs="*",
-            constraints=EnsureStr() | EnsureNone()),
+            nargs='?'),
         source=Parameter(
-            args=("-s", "--source",),
-            doc="URL or local path of the installation source",
-            constraints=EnsureStr() | EnsureNone()),
+            args=('source',),
+            metavar='SOURCE',
+            doc="URL or local path of the installation source"),
         get_data=Parameter(
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
@@ -285,8 +284,8 @@ class Install(Interface):
     @staticmethod
     @datasetmethod(name='install')
     def __call__(
+            source,
             path=None,
-            source=None,
             dataset=None,
             get_data=False,
             description=None,
