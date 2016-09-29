@@ -212,16 +212,16 @@ class Install(Interface):
     """Install a dataset or subdataset.
 
     This command creates a local :term:`sibling` of an existing dataset from a
-    (remote) location identified via a URL or path, or by the name of a
-    registered subdataset. Optional recursion into potential subdatasets, and
-    download of all referenced data is supported. The new dataset can be
-    optionally registered in an existing :term:`superdataset` (the new
-    dataset's path needs to be located within the superdataset for that, and
-    the superdataset will be detected automatically). It is recommended to
-    provide a brief description to label the dataset's nature *and* location,
-    e.g. "Michael's music on black laptop". This helps humans to identify data
-    locations in distributed scenarios.  By default an identifier comprised of
-    user and machine name, plus path will be generated.
+    (remote) location identified via a URL or path. Optional recursion into
+    potential subdatasets, and download of all referenced data is supported.
+    The new dataset can be optionally registered in an existing
+    :term:`superdataset` (the new dataset's path needs to be located within the
+    superdataset for that, and the superdataset will be detected
+    automatically). It is recommended to provide a brief description to label
+    the dataset's nature *and* location, e.g. "Michael's music on black
+    laptop". This helps humans to identify data locations in distributed
+    scenarios.  By default an identifier comprised of user and machine name,
+    plus path will be generated.
 
     When only partial dataset content shall be obtained, it is recommended to
     use this command without the `get-data` flag, followed by a
@@ -361,6 +361,7 @@ class Install(Interface):
         if path and realpath(source) == realpath(path):
             if _install_into_ds:
                 _install_inplace = True
+            # TODO _skip is (no longer) defined
             elif not _skip_:
                 raise InsufficientArgumentsError(
                     "Source and target are the same ({0}). This doesn't make "
@@ -482,7 +483,7 @@ class Install(Interface):
             existed = current_dataset.path and exists(current_dataset.path)
 
             # We possibly need to consider /.git URL
-            candidate_source_urls = [source_url]
+            candidate_source_urls = assure_list(source_url)
             # TODO: isn't this a duplicate of above logic/implementation
             # in _install_subds_from_flexible_source????
             if source_url and not source_url.rstrip('/').endswith('/.git'):
