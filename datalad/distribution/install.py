@@ -248,11 +248,9 @@ class Install(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
-            doc="""path/name of the installation target.  If no `source` is
-            provided, and no `dataset` is given or detected, this is
-            interpreted as the source URL of a dataset and a destination
-            path will be derived from the URL similar to :command:`git
-            clone`""",
+            doc="""path/name of the installation target.  If no `path` is
+            provided a destination path will be derived from a source URL
+            similar to :command:`git clone`""",
             nargs='?'),
         source=Parameter(
             args=('source',),
@@ -299,6 +297,11 @@ class Install(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
+        # parameter constraints:
+        if not source:
+            raise InsufficientArgumentsError(
+                "a `source` is required for installation")
+
         installed_items = []
 
         # shortcut
@@ -331,22 +334,7 @@ class Install(Interface):
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
-                # URL doesn't point to a local something
-                # so we have an actual URL in `path`. Since this is valid as a
-                # single positional argument, `source` has to be None at this
-                # point.
-
-                if is_datalad_compat_ri(path) and source is None:
-                    # we have an actual URL -> this should be the source
-                    lgr.debug(
-                        "Single argument given to install, that doesn't seem to "
-                        "be a local path. "
-                        "Assuming the argument identifies a source location.")
-                    source = path
-                    path = None
-
-                else:
-                    # `path` is neither a valid source nor a local path.
+                    # `path` is not a local path.
                     # TODO: The only thing left is a known subdataset with a
                     # name, that is not a path; Once we correctly distinguish
                     # between path and name of a submodule, we need to consider
@@ -363,78 +351,6 @@ class Install(Interface):
         _install_known_sub = False
         _try_implicit = False
 
-        if _install_into_ds and source is None and path is not None:
-            # Check for `path` being a known subdataset:
-            if path in [opj(ds.path, sub)
-                        for sub in ds.get_subdatasets(recursive=True)]:
-                _install_known_sub = True
-                lgr.debug("Identified {0} as subdataset to "
-                          "install.".format(path))
-            elif not lexists(path):
-                # it's not a known subdataset and it doesn't exist in the
-                # filesystem => path possibly points to a subdataset beneath a
-                # not yet installed one
-                _try_implicit = True
-            elif exists(path) and GitRepo.is_valid_repo(path):
-                # the only option left is an existing repo to be added inplace:
-                lgr.debug("No source given, but path points to an existing "
-                          "repository and a dataset to install into was "
-                          "given. Assuming we want to install {0} "
-                          "inplace into {1}.".format(path, ds))
-                source = path
-
-        if source is None and \
-                not _install_known_sub and \
-                not _try_implicit and \
-                        path is not None:
-            # we have no source and don't have a dataset to install into.
-            # could be a single positional argument, that points to a known
-            # subdataset or a subdataset beneath a known but not yet installed
-            # one or it is an existing and installed dataset, that is requested
-            # to be installed again (but with recursive or get-data)
-
-            assume_ds = Dataset(path)
-            # Work in progress:
-            if assume_ds.is_installed():
-                # `path` is installed already and not to be installed into
-                # another one (_install_into_ds is False!)
-                # so we can only execute additional arguments like `recursive`
-                # or `get_data`.
-                # Theoretically, we could update from existing remote, but this
-                # is not a matter of install atm.
-                lgr.debug("{0} already installed.".format(assume_ds))
-                _skip_ = True  # TODO: Better name
-                source = path  # we have nothing else;
-                # this should lead to FLOW GUIDE 2 and there skip due to
-                # "already exists" and perform remaining actions
-            else:
-                # So, test for that last remaining option:
-
-                # if `path` was a known subdataset to be installed, let's assume
-                # it would be one:
-                candidate_super_ds = assume_ds.get_superdataset()
-
-                if candidate_super_ds and candidate_super_ds != assume_ds:
-                    # `path` has a potential superdataset
-                    if assume_ds.path in \
-                            candidate_super_ds.get_subdatasets(absolute=True):
-                        # candidate knows it, so we have the case of a
-                        # known subdataset:
-                        _install_known_sub = True
-                        _install_into_ds = True
-                        ds = candidate_super_ds
-                    else:
-                        # it is not (yet) known to the candidate. May be there's
-                        # a not yet installed one in between. Let's try:
-                        _try_implicit = True
-                        _install_into_ds = True
-                        ds = candidate_super_ds
-                else:
-                    # no match, we can't deal with that `path` argument
-                    # without a `source`:
-                    raise InsufficientArgumentsError(
-                        "Got no source to install from.")
-
         _install_inplace = False
         from os.path import realpath
         # TODO: does it make sense to use realpath here or just normpath for
@@ -442,7 +358,7 @@ class Install(Interface):
         #       Consider: If normpath wouldn't be equal, but realpath would -
         #       is there any use case, where such a setup would be benefitial
         #       instead of being troublesome?
-        if source and path and realpath(source) == realpath(path):
+        if path and realpath(source) == realpath(path):
             if _install_into_ds:
                 _install_inplace = True
             elif not _skip_:
@@ -668,6 +584,7 @@ class Install(Interface):
                                                     absolute=True)]
             for subds in subs:
                 try:
+                    # MIH: TODO this should rather use get
                     rec_installed = Install.__call__(
                         subds.path,
                         dataset=current_dataset,
