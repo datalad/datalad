@@ -145,7 +145,8 @@ def test_install_crcns(tdir, ds_path):
             assert_not_in('with exit code', cml.out)
 
         # should not hang in infinite recursion
-        install(_path_("all-nonrecursive/crcns"))
+        with chpwd('all-nonrecursive'):
+            get("crcns")
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
 
     # again, but into existing dataset:
