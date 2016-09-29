@@ -274,7 +274,8 @@ class Get(Interface):
             return
 
         # provide summary
-        nsuccess = sum(item.get('success', False) for item in res)
+        nsuccess = sum(item.get('success', False) if isinstance(item, dict) else True
+                       for item in res)
         nfailure = len(res) - nsuccess
         msg = "Tried to get %d %s." % (len(res), single_or_plural("file", "files", len(res)))
         if nsuccess:
@@ -287,8 +288,8 @@ class Get(Interface):
         if len(res) < 10 or args.verbose:
             msg = linesep.join([
                 "{path} ... {suc}".format(
-                    suc="ok." if item.get('success', False)
+                    suc="ok." if isinstance(item, Dataset) or item.get('success', False)
                         else "failed. (%s)" % item.get('note', 'unknown reason'),
-                    path=item.get('file'))
+                    path=item.get('file') if isinstance(item, dict) else item.path)
                 for item in res])
             ui.message(msg)
