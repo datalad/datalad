@@ -139,7 +139,7 @@ def test_get_multiple_files(path, url, ds_dir):
     origin.add(file_list)
     origin.save("initial")
 
-    ds = install(ds_dir, source=path)
+    ds = install(path, path=ds_dir)
 
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))
@@ -175,7 +175,7 @@ def test_get_recurse_dirs(o_path, c_path):
     origin = Dataset(o_path).create(force=True)
     origin.save("Initial", auto_add_changes=True)
 
-    ds = install(c_path, source=o_path)
+    ds = install(o_path, path=c_path)
 
     file_list = ['file1.txt',
                  opj('subdir', 'file2.txt'),
@@ -206,7 +206,7 @@ def test_get_recurse_dirs(o_path, c_path):
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src, path):
 
-    ds = install(path=path, source=src)
+    ds = install(src, path=path)
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
@@ -270,7 +270,7 @@ def test_get_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_greedy_recurse_subdatasets(src, path):
 
-    ds = install(path=path, source=src)
+    ds = install(src, path=path)
 
     # GIMME EVERYTHING
     ds.get(['subm 1', 'subm 2'], fulfill='all')
@@ -286,7 +286,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_install_missing_subdataset(src, path):
 
-    ds = install(path=path, source=src)
+    ds = install(src, path=path)
     subs = [Dataset(s_path) for s_path in ds.get_subdatasets(absolute=True)]
     ok_(all([not sub.is_installed() for sub in subs]))
 
@@ -324,7 +324,7 @@ def test_get_mixed_hierarchy(src, path):
     origin.save(auto_add_changes=True)
 
     # now, install that thing:
-    ds, subds = install(path=path, source=src, recursive=True)
+    ds, subds = install(src, path=path, recursive=True)
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:

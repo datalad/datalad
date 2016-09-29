@@ -35,6 +35,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
+from datalad.utils import assure_list
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -131,11 +132,7 @@ class Get(Interface):
             raise InsufficientArgumentsError("insufficient information for "
                                              "getting: requires at least a "
                                              "path.")
-        # When called from cmdline `path` will be a list even if
-        # there is only one item.
-        # Make sure we deal with the same when called via python API:
-        if not isinstance(path, list):
-            path = [path]
+        path = assure_list(path)
 
         # resolve path(s):
         lgr.debug("Resolving paths ...")
