@@ -10,19 +10,19 @@
 
 # Should have no spurious imports/definitions at the module leve
 from .distribution.dataset import Dataset
-from datalad import cfg
 
 
 def _generate_func_api():
     """Auto detect all available interfaces and generate a function-based
        API from them
     """
-    import os
     from importlib import import_module
     from inspect import isgenerator
     from collections import namedtuple
     from collections import OrderedDict
     from functools import wraps
+
+    from datalad import cfg
 
     from .interface.base import update_docstring_with_parameters
     from .interface.base import get_interface_groups
