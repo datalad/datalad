@@ -215,6 +215,11 @@ class Get(Interface):
         # the actual calls:
         for ds_path in resolved_datasets:
             cur_ds = Dataset(ds_path)
+            if not recursive and ds.path != ds_path:
+                lgr.debug(
+                    "Will not get any content in subdataset %s without recursion enabled",
+                    cur_ds)
+                continue
             # needs to be an annex:
             if not isinstance(cur_ds.repo, AnnexRepo):
                 lgr.debug("Found no annex at {0}. Skipped.".format(cur_ds))
