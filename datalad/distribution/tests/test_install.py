@@ -254,7 +254,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     # Q (ben): remote urls only? Sure? => TODO
 
     with chpwd(path, mkdir=True):
-        ds = install(path=url)
+        ds = install(url)
 
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
