@@ -16,6 +16,7 @@ from datalad.metadata import get_metadata_type, get_metadata
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
+from datalad.utils import assure_unicode
 from datalad.dochelpers import exc_str
 import os
 from os.path import join as opj, exists
@@ -134,10 +135,7 @@ def test_aggregation(path):
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
-        if PY2:
-            assert_true(sum([s.get('name', None) == name.decode('utf-8') for s in meta]))
-        else:
-            assert_true(sum([s.get('name', None) == name for s in meta]))
+        assert_true(sum([s.get('name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         meta[0]['dcterms:hasPart']['@id'],
         subds.id)
@@ -287,7 +285,4 @@ def test_aggregate_with_missing_id(path):
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
-        if PY2:
-            assert_false(sum([s.get('name', '') == name.decode('utf-8') for s in meta]))
-        else:
-            assert_false(sum([s.get('name', '') == name for s in meta]))
+        assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
