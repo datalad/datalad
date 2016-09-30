@@ -108,12 +108,21 @@ cmdclass = {
     # 'build_py': DataladBuild
 }
 
+# PyPI doesn't render markdown yet. Workaround for a sane appearance
+# https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except ImportError:
+    long_description = open('README.md').read()
+
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
     author_email="team@datalad.org",
     version=version,
     description="data distribution geared toward scientific datasets",
+    long_description=long_description,
     packages=datalad_pkgs,
     install_requires=
         requires['core'] + requires['downloaders'] +
