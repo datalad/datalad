@@ -424,52 +424,14 @@ class Install(Interface):
             lgr.debug("Resolved installation target relative to dataset "
                       "{0}: {1}".format(ds, relativepath))
 
-            if _install_known_sub:
-                # FLOW_GUIDE: 1.1.
-                submodule = [sm for sm in ds.repo.get_submodules()
-                             if sm.path == relativepath][0]
-                lgr.info("Installing subdataset from '{0}' at: {0}".format(
-                    submodule.url, submodule.path))
-
-                current_dataset = _install_subds_from_flexible_source(
-                    ds,
-                    submodule.path,
-                    submodule.url,
-                    recursive=False)
-
-            elif _install_inplace:
-                # FLOW GUIDE: 1.2.
-                lgr.info("Installing existing dataset as subdataset at: {0}".format(
-                    path))
-                current_dataset = _install_subds_inplace(
-                    ds,
-                    path,
-                    relpath(path, ds.path))
-
-            elif _try_implicit:
-                # FLOW GUIDE: 1.3.
-                from .utils import install_necessary_subdatasets
-                # TODO: due to current implementation of
-                # install_necessary_subdatasets we get only the last one returned
-                try:
-                    lgr.debug("Attempt to locate installation target in known subdatasets")
-                    current_dataset = install_necessary_subdatasets(ds, path)
-                except Exception as e:
-                    lgr.error("Installation attempt for target {0} failed:"
-                              "{1}{2}".format(path, linesep, exc_str(e)))
-                    raise
-                # check that we got what we were looking for
-                if not lexists(path):
-                    raise ValueError("Cannot install '{}', does not exist in dataset '{}' or any known subdataset".format(path, ds))
-            else:
-                # FLOW_GUIDE 1.4.
-                lgr.info("Installing subdataset from '{0}' at: {0}".format(
-                    source_url, relativepath))
-                current_dataset = _install_subds_from_flexible_source(
-                    ds,
-                    relativepath,
-                    source_url,
-                    recursive=False)
+            # FLOW_GUIDE 1.4.
+            lgr.info("Installing subdataset from '{0}' at: {0}".format(
+                source_url, relativepath))
+            current_dataset = _install_subds_from_flexible_source(
+                ds,
+                relativepath,
+                source_url,
+                recursive=False)
         else:
             # FLOW GUIDE: 2.
             lgr.info("Installing dataset at: {0}".format(path))
