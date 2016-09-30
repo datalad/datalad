@@ -71,7 +71,8 @@ def resolve_path(path, ds=None):
         return abspath(path)
     # no dataset given, use CWD as reference
     # note: abspath would disregard symlink in CWD
-    top_path = getpwd() if ds is None else ds.path
+    top_path = getpwd() \
+        if ds is None else ds.path if isinstance(ds, Dataset) else ds
     return normpath(opj(top_path, path))
 
 
