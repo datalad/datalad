@@ -11,6 +11,7 @@ import platform
 from os.path import sep as pathsep
 from os.path import join as opj
 from os.path import splitext
+from os.path import dirname
 
 from setuptools import findall
 from setuptools import setup, find_packages
@@ -110,11 +111,12 @@ cmdclass = {
 
 # PyPI doesn't render markdown yet. Workaround for a sane appearance
 # https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+README = opj(dirname(__file__), 'README.md')
 try:
     import pypandoc
-    long_description = pypandoc.convert('README.md', 'rst')
+    long_description = pypandoc.convert(README, 'rst')
 except ImportError:
-    long_description = open('README.md').read()
+    long_description = open(README).read()
 
 setup(
     name="datalad",
