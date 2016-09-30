@@ -89,6 +89,8 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
+        if not hasattr(other, 'path'):
+            return False
         return realpath(self.path) == realpath(other.path)
 
     @property
