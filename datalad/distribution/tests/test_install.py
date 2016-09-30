@@ -128,10 +128,14 @@ def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
 
-def test_invalid_args():
+@with_tempfile(mkdir=True)
+def test_invalid_args(path):
     assert_raises(ValueError, install, 'Zoidberg', path='Zoidberg')
     # install to a remote location
     assert_raises(ValueError, install, 'Zoidberg', path='ssh://mars:Zoidberg')
+    # make fake dataset
+    ds = create(path)
+    assert_raises(ValueError, install, 'Zoidberg', path='/higherup.', dataset=ds)
 
 
 @skip_if_no_network
