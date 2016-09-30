@@ -13,12 +13,12 @@ from operator import itemgetter
 from six import PY2
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
-from nose.tools import assert_true, assert_equal, assert_raises
+from nose.tools import assert_true, assert_equal, assert_raises, assert_false
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
 from datalad.dochelpers import exc_str
 import os
-from os.path import join as opj
+from os.path import join as opj, exists
 from datalad.support.exceptions import InsufficientArgumentsError
 from nose import SkipTest
 
@@ -267,3 +267,27 @@ def test_aggregation(path):
         pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+def test_aggregate_with_missing_id(path):
+    # a hierarchy of three (super/sub)datasets, each with some native metadata
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    subds = ds.create('sub', force=True, if_dirty='ignore')
+    subds.repo.remove(opj('.datalad', 'config'))
+    subds.save()
+    assert_false(exists(opj(subds.path, '.datalad', 'config')))
+    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+    # aggregate from bottom to top, guess native data, no compacting of graph
+    # should yield 6 meta data sets, one implicit, and one native per dataset
+    # and a second natiev set for the topmost dataset
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
+    # no only ask the top superdataset, no recursion, just reading from the cache
+    meta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+    # and we know nothing subsub
+    for name in ('grandchild_äöü東',):
+        if PY2:
+            assert_false(sum([s.get('name', '') == name.decode('utf-8') for s in meta]))
+        else:
+            assert_false(sum([s.get('name', '') == name for s in meta]))
