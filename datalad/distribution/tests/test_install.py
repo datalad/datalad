@@ -554,3 +554,22 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 
 
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_install_list_arguments(src, path, path_outside):
+
+    # get the top-level thing, but pass a one item list as `path`:
+    ds = install(path=[path], source=src)
+    ok_(ds.is_installed())
+
+    # install a list with valid and invalid items:
+    with swallow_logs(new_level=logging.INFO) as cml:
+        result = ds.install(path=['subm 1', 'not_existing',
+                               path_outside, 'subm 2'])
+        for skipped in ['not_existing', path_outside]:
+            cml.assert_logged(msg="Installation of {0} skipped".format(skipped),
+                              regex=False, level='INFO')
+        for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
+            assert_in(sub, result)
+            ok_(sub.is_installed())
