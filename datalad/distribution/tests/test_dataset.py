@@ -15,6 +15,7 @@ from os.path import join as opj, abspath, normpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
+from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.support.gitrepo import GitRepo
@@ -229,6 +230,14 @@ def test_subdatasets(path):
     assert_true(subsubds.is_installed())
     eq_(subsubds.get_superdataset(), subds)
     eq_(subsubds.get_superdataset(topmost=True), ds)
+
+    # verify that '^' alias would work
+    with chpwd(subsubds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
+        # and while in the dataset we still can resolve into central one
+        dscentral = Dataset('///')
+        eq_(dscentral.path, LOCAL_CENTRAL_PATH)
 
     # TODO actual submodule checkout is still there
 

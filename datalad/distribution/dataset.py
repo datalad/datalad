@@ -20,6 +20,7 @@ from os.path import relpath
 from os.path import commonprefix
 from os.path import sep
 from os.path import exists
+from os.path import curdir
 from six import string_types
 from six import PY2
 from functools import wraps
@@ -38,6 +39,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.dochelpers import exc_str
+from datalad.consts import LOCAL_CENTRAL_PATH
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -80,7 +82,19 @@ class Dataset(object):
     __slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):
-        self._path = abspath(path)
+        # Custom handling for few special abbreviations
+        path_ = path
+        if path == '^':
+            # get the topmost dataset from current location. Note that 'zsh'
+            # might have its ideas on what to do with ^, so better use as -d^
+            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+        elif path == '///':
+            # TODO: logic/UI on installing a central dataset could move here
+            # from search?
+            path_ = LOCAL_CENTRAL_PATH
+        if path != path_:
+            lgr.debug("Resolved dataset path=%r to %r", path, path_)
+        self._path = abspath(path_)
         self._repo = None
         self._id = None
         self._cfg = None
