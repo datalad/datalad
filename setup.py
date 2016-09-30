@@ -85,6 +85,8 @@ requires = {
     'metadata': [
         'simplejson',
         'pyld',
+    ],
+    'metadata-extra': [
         'PyYAML',  # very optional
     ]
 }
@@ -113,7 +115,9 @@ setup(
     version=version,
     description="data distribution geared toward scientific datasets",
     packages=datalad_pkgs,
-    install_requires=requires['core'] + requires['downloaders'] + requires['publish'],
+    install_requires=
+        requires['core'] + requires['downloaders'] +
+        requires['publish'] + requires['metadata'],
     extras_require=requires,
     entry_points={
         'console_scripts': [
