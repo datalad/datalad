@@ -131,8 +131,10 @@ def test_insufficient_args():
 @with_tempfile(mkdir=True)
 def test_invalid_args(path):
     assert_raises(ValueError, install, 'Zoidberg', path='Zoidberg')
-    # install to a remote location
+    # install to an invalid URL
     assert_raises(ValueError, install, 'Zoidberg', path='ssh://mars:Zoidberg')
+    # install to a remote location
+    assert_raises(ValueError, install, 'Zoidberg', path='ssh://mars/Zoidberg')
     # make fake dataset
     ds = create(path)
     assert_raises(ValueError, install, 'Zoidberg', path='/higherup.', dataset=ds)

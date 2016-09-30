@@ -357,7 +357,11 @@ class Install(Interface):
         if path is not None:
             # Should work out just fine for regular paths, so no additional
             # conditioning is necessary
-            path_ri = RI(path)
+            try:
+                path_ri = RI(path)
+            except Exception as e:
+                raise ValueError(
+                    "invalid path argument {}: ({})".format(path, exc_str(e)))
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
                 path = resolve_path(path_ri.localpath, dataset)
@@ -370,7 +374,8 @@ class Install(Interface):
                     # between path and name of a submodule, we need to consider
                     # this.
                     # For now: Just raise
-                    raise ValueError("Invalid path argument {0}".format(path))
+                    raise ValueError(
+                        "Invalid destination path {0}".format(path))
 
         # `path` resolved, if there was any.
 
