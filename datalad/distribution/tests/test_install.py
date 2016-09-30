@@ -37,7 +37,6 @@ from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_false
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
@@ -389,8 +388,9 @@ def test_install_known_subdataset(src, path):
     # now, get the data by reinstalling with -g:
     ok_(subds.repo.file_has_content('test-annex.dat') is False)
     with chpwd(ds.path):
-        result = install(path='subm 1', dataset=os.curdir, get_data=True)
-        eq_(result, subds)
+        result = get(path='subm 1', dataset=os.curdir)
+        eq_(len(result), 1)
+        eq_(result[0]['file'], opj('subm 1', 'test-annex.dat'))
         ok_(subds.repo.file_has_content('test-annex.dat') is True)
         ok_(subds.is_installed())
 
@@ -510,7 +510,7 @@ def test_install_recursive_repeat(src, path):
     top_src.save(auto_add_changes=True, recursive=True)
 
     # install top level:
-    top_ds = install(path=path, source=src)
+    top_ds = install(src, path=path)
     ok_(top_ds.is_installed() is True)
     sub1 = Dataset(opj(path, 'sub 1'))
     ok_(sub1.is_installed() is False)
@@ -520,8 +520,9 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = install(path=path, recursive=True, recursion_limit=1, get_data=True)
-    assert_in(top_ds, result)
+    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1)
+    # top-level dataset was not reobtained
+    assert_not_in(top_ds, result)
     assert_in(sub1, result)
     assert_in(sub2, result)
     assert_not_in(subsub, result)
@@ -530,7 +531,7 @@ def test_install_recursive_repeat(src, path):
     ok_(sub2.repo.file_has_content('sub2file.txt') is True)
 
     # install sub1 again, recursively:
-    top_ds.install('sub 1', recursive=True, get_data=True)
+    top_ds.get('sub 1', recursive=True)
     ok_(subsub.is_installed())
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 

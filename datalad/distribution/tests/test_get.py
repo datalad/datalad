@@ -296,16 +296,15 @@ def test_get_install_missing_subdataset(src, path):
     ds.get(curdir)
     ok_(all([not sub.is_installed() for sub in subs]))
 
-    # with no such paths, we also don't install when recursive is used - it just
-    # means to recursively include subdatasets in the get operation:
-    ds.get(curdir, recursive=True)
-    ok_(all([not sub.is_installed() for sub in subs]))
-
     # but we do, whenever a given path is contained in such a subdataset:
     file = opj(subs[0].path, 'test-annex.dat')
     ds.get(file)
     ok_(subs[0].is_installed())
     ok_(subs[0].repo.file_has_content('test-annex.dat') is True)
+
+    # but we fulfill any handles, and dataset handles too
+    ds.get(curdir, recursive=True)
+    ok_(all([sub.is_installed() for sub in subs]))
 
 
 # @with_tree(tree={'file_in_git.txt': 'no idea',
