@@ -338,12 +338,6 @@ class Install(Interface):
 
         # `path` resolved, if there was any.
 
-        # we need a source to install from. Either we have one in `source` or
-        # it is implicit, since `path` is an already known subdataset or an
-        # existing dataset, that should be installed into the given dataset as a
-        # subdataset inplace.
-        _install_known_sub = False
-
         # Possibly do conversion from source into a git-friendly url
         source_url = _get_git_url_from_source(source)
         lgr.debug("Resolved source: {0}".format(source_url))
@@ -552,7 +546,7 @@ class Install(Interface):
                 d.get(curdir)
 
         # everything done => save changes:
-        if save and _install_into_ds and not _install_known_sub:
+        if save and _install_into_ds:
             # Note: The only possible changes are installed subdatasets, we
             # didn't know before.
             lgr.info("Saving changes to {0}".format(ds))
