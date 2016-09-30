@@ -98,6 +98,31 @@ def _get_installationpath_from_url(url):
     return path
 
 
+def _get_flexible_url_candidates(url, base_url=None, url_suffix=''):
+    candidates = []
+    if url.startswith('/') or is_url(url):
+        # this seems to be an absolute location -> take as is
+        candidates.append(url)
+        # additionally try to consider .git:
+        if not url.rstrip('/').endswith('/.git'):
+            candidates.append(
+                '{0}/.git'.format(url.rstrip('/')))
+    else:
+        # need to resolve relative URL
+        base_url_l = base_url.split('/')
+        url_l = url.split('/')
+        for i, c in enumerate(url_l):
+            if c == pardir:
+                base_url_l = base_url_l[:-1]
+            else:
+                candidates.append('{0}/{1}{2}'.format(
+                    '/'.join(base_url_l),
+                    '/'.join(url_l[i:]),
+                    url_suffix))
+                break
+    return candidates
+
+
 def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     """Tries to obtain a given subdataset from several meaningful locations"""
 
@@ -131,30 +156,10 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     # TODO: consider supporting DataLadRI here?  or would confuse
     #  git and we wouldn't want that (i.e. not allow pure git clone
     #  --recursive)
-    if sm_url.startswith('/') or is_url(sm_url):
-        # this seems to be an absolute location -> take as is
-        clone_urls.append(sm_url)
-        # additionally try to consider .git:
-        if not sm_url.rstrip('/').endswith('/.git'):
-            clone_urls.append(
-                '{0}/.git'.format(sm_url.rstrip('/')))
-    else:
-        # need to resolve relative URL
-        if not remote_url:
-            # we have no remote URL, hence we need to go with the
-            # local path
-            remote_url = ds.path
-        remote_url_l = remote_url.split('/')
-        sm_url_l = sm_url.split('/')
-        for i, c in enumerate(sm_url_l):
-            if c == pardir:
-                remote_url_l = remote_url_l[:-1]
-            else:
-                clone_urls.append('{0}/{1}{2}'.format(
-                    '/'.join(remote_url_l),
-                    '/'.join(sm_url_l[i:]),
-                    url_suffix))
-                break
+    clone_urls += _get_flexible_url_candidates(
+        sm_url,
+        remote_url if remote_url else ds.path,
+        url_suffix)
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
     success = False
@@ -414,12 +419,7 @@ class Install(Interface):
             existed = destination_dataset.path and exists(destination_dataset.path)
 
             # We possibly need to consider /.git URL
-            candidate_sources = assure_list(source)
-            # TODO: isn't this a duplicate of above logic/implementation
-            # in _install_subds_from_flexible_source????
-            if source and not source.rstrip('/').endswith('/.git'):
-                candidate_sources.append(
-                    '{0}/.git'.format(source.rstrip('/')))
+            candidate_sources = _get_flexible_url_candidates(source)
 
             for source_ in candidate_sources:
                 try:
