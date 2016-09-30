@@ -295,9 +295,9 @@ def test_install_recursive(src, path_nr, path_r):
 
     # now recursively:
     ds_list = install(src, path=path_r, recursive=True)
-    # installed a dataset and two subdatasets:
+    # installed a dataset and two subdatasets
     eq_(len(ds_list), 3)
-    ok_(all([isinstance(i, Dataset) for i in ds_list]))
+    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(ds_list[0].path, path_r)
@@ -329,9 +329,9 @@ def test_install_recursive_with_data(src, path):
 
     # now again; with data:
     ds_list = install(src, path=path, recursive=True, get_data=True)
-    # installed a dataset and two subdatasets:
-    eq_(len(ds_list), 3)
-    ok_(all([isinstance(i, Dataset) for i in ds_list]))
+    # installed a dataset and two subdatasets, and two files:
+    eq_(len(ds_list), 5)
+    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(ds_list[0].path, path)

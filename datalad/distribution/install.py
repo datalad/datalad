@@ -53,6 +53,7 @@ from .dataset import datasetmethod
 from .dataset import resolve_path
 from .dataset import require_dataset
 from .dataset import EnsureDataset
+from .get import Get
 from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
@@ -479,45 +480,33 @@ class Install(Interface):
             installed_items.append(destination_dataset)
 
         # Now, recursive calls:
-        if recursive and \
-                (recursion_limit is None
-                 or (recursion_limit and recursion_limit > 0)):
+        if recursive:
             if description:
                 lgr.warning("Description can't be assigned recursively.")
-            subs = [Dataset(p) for p in
-                    destination_dataset.get_subdatasets(
-                        recursive=True,
-                        recursion_limit=1,
-                        absolute=True)]
-            for subds in subs:
-                try:
-                    # MIH: TODO this should rather use get
-                    rec_installed = Install.__call__(
-                        subds.path,
-                        dataset=destination_dataset,
-                        recursive=True,
-                        recursion_limit=recursion_limit - 1
-                        if recursion_limit else None,
-                        if_dirty=if_dirty,
-                        save=save,
-                        git_opts=git_opts,
-                        git_clone_opts=git_clone_opts,
-                        annex_opts=annex_opts,
-                        annex_init_opts=annex_init_opts)
-                    if isinstance(rec_installed, list):
-                        installed_items.extend(rec_installed)
-                    else:
-                        installed_items.append(rec_installed)
+            subs = destination_dataset.get_subdatasets(
+                recursive=True,
+                recursion_limit=recursion_limit,
+                absolute=False)
 
-                except Exception:
-                    # Error itself should already be logged.
-                    lgr.info("{0} skipped.".format(subds))
+            rec_installed = Get.__call__(
+                subs,  # all at once
+                dataset=destination_dataset,
+                recursive=True,
+                recursion_limit=recursion_limit,
+                fulfill='all' if get_data else 'auto',
+                git_opts=git_opts,
+                annex_opts=annex_opts,
+                # TODO expose this
+                #annex_get_opts=annex_get_opts,
+            )
+            if isinstance(rec_installed, list):
+                installed_items.extend(rec_installed)
+            else:
+                installed_items.append(rec_installed)
 
-        # get the content of installed (sub-)datasets:
         if get_data:
-            for d in installed_items:
-                lgr.debug("Getting data of {0}".format(d))
-                d.get(curdir)
+            lgr.debug("Getting data of {0}".format(destination_dataset))
+            destination_dataset.get(curdir)
 
         # everything done => save changes:
         if save and ds is not None:
