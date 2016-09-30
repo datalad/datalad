@@ -73,6 +73,14 @@ class Search(Interface):
         #    nargs=2,
         #    doc="""Pair of two regular expressions to match a property and its
         #    value.[CMD:  This option can be given multiple times CMD]"""),
+        search=Parameter(
+            args=('-s', '--search'),
+            metavar='PROPERTY',
+            action='append',
+            # could also be regex
+            doc="""name of the property to search for any match.[CMD:  This
+            option can be given multiple times. CMD] By default, all properties
+            are searched."""),
         report=Parameter(
             args=('-r', '--report'),
             metavar='PROPERTY',
@@ -102,7 +110,13 @@ class Search(Interface):
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match, dataset=None, report=None, report_matched=False, format='custom', regex=False):
+    def __call__(match,
+                 dataset=None,
+                 search=None,
+                 report=None,
+                 report_matched=False,
+                 format='custom',
+                 regex=False):
 
         lgr.debug("Initiating search for match=%r and dataset %r",
                   match, dataset)
@@ -153,7 +167,8 @@ class Search(Interface):
                 )
                 for loc, r in central_ds.search(
                         match,
-                        report=report, report_matched=report_matched,
+                        search=search, report=report,
+                        report_matched=report_matched,
                         format=format, regex=regex):
                     full_loc = opj(central_ds.path, loc)
                     yield full_loc, r
@@ -207,6 +222,9 @@ class Search(Interface):
             report = [report]
 
         match = assure_list(match)
+        search = assure_list(search)
+        # convert all to lower case for case incensitive matching
+        search = {x.lower() for x in search}
 
         def get_in_matcher(m):
             """Function generator to provide closure for a specific value of m"""
@@ -239,8 +257,10 @@ class Search(Interface):
 
             # manual loop for now
             for k, v in iteritems(mds):
+                if search and k.lower() not in search:
+                    continue
                 if isinstance(v, dict) or isinstance(v, list):
-                    v = unicode(v)
+                    v = text_type(v)
                 for imatcher, matcher in enumerate(matchers):
                     if matcher(v):
                         hits[imatcher] = True

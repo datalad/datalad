@@ -194,8 +194,19 @@ def test_aggregation(path):
 
         child_res = list(clone.search('child'))
         assert_equal(len(child_res), 2)
+        # little helper to match names
+        def assert_names(res, names):
+            assert_equal(list(map(itemgetter(0), res)), names)
         # should yield (location, report) tuples
-        assert_equal(list(map(itemgetter(0), child_res)), ['sub', 'sub/subsub'])
+        assert_names(child_res, ['sub', 'sub/subsub'])
+
+        # test searching among specified properties only
+        assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
+        assert_names(clone.search('i', search='keywords'), ['.'])
+        # case shouldn't matter
+        assert_names(clone.search('i', search='Keywords'), ['.'])
+        assert_names(clone.search('i', search=['name', 'keywords']),
+                     ['.', 'sub', 'sub/subsub'])
 
         # without report_matched, we are getting none of the fields
         assert(all([not x for x in map(itemgetter(1), child_res)]))
