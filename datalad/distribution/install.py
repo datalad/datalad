@@ -18,7 +18,6 @@ from os.path import join as opj
 from os.path import relpath
 from os.path import pardir
 from os.path import exists
-from os.path import lexists
 
 from six.moves.urllib.parse import quote as urlquote
 
@@ -33,7 +32,6 @@ from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.utils import handle_dirty_dataset
-from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -45,7 +43,6 @@ from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
-from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import knows_annex
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
@@ -55,8 +52,8 @@ from datalad.dochelpers import exc_str
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import resolve_path
+from .dataset import require_dataset
 from .dataset import EnsureDataset
-from .utils import _install_subds_inplace
 from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
@@ -64,19 +61,13 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.install')
 
 
-def _get_git_url_from_source(source, none_ok=False):
+def _get_git_url_from_source(source):
     """Return URL for cloning associated with a source specification
 
     For now just resolves DataLadRIs
     """
     # TODO: Probably RF this into RI.as_git_url(), that would be overridden
     # by subclasses or sth. like that
-
-    if source is None:
-        if not none_ok:
-            lgr.warning("received 'None' as 'source'.")
-        return source
-
     if not isinstance(source, RI):
         source_ri = RI(source)
     else:
@@ -314,12 +305,8 @@ class Install(Interface):
 
         if ds is not None:
             _install_into_ds = True
-            if not isinstance(ds, Dataset):
-                ds = Dataset(ds)
-            if not ds.is_installed():
-                # TODO: possible magic: ds.install() for known subdataset 'ds'
-                raise ValueError("{0} needs to be installed in order to "
-                                 "install something into it.".format(ds))
+            ds = require_dataset(ds, check_installed=True,
+                                 purpose='installation')
             handle_dirty_dataset(ds, if_dirty)
 
         # resolve the target location (if local) against the provided dataset
@@ -349,7 +336,6 @@ class Install(Interface):
         # existing dataset, that should be installed into the given dataset as a
         # subdataset inplace.
         _install_known_sub = False
-        _try_implicit = False
 
         _install_inplace = False
         from os.path import realpath
@@ -368,7 +354,7 @@ class Install(Interface):
                     "sense without a dataset to install into.".format(path))
 
         # Possibly do conversion from source into a git-friendly url
-        source_url = _get_git_url_from_source(source, none_ok=True)
+        source_url = _get_git_url_from_source(source)
         lgr.debug("Resolved source: {0}".format(source_url))
         # TODO: we probably need to resolve source_url, if it is a local path;
         # expandpath, normpath, ... Where exactly is the point to do it?
