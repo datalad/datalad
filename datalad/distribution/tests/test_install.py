@@ -128,6 +128,10 @@ def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
 
+def test_invalid_args():
+    assert_raises(ValueError, install, 'Zoidberg', path='Zoidberg')
+
+
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)

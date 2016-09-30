@@ -293,6 +293,16 @@ class Install(Interface):
             raise InsufficientArgumentsError(
                 "a `source` is required for installation")
 
+        if source == path:
+            # even if they turn out to be identical after resolving symlinks
+            # and more sophisticated witchcraft, it would still happily say
+            # "it appears to be already installed", so we just catch an
+            # obviously pointless input combination
+            raise ValueError(
+                "installation `source` and destination `path` are identical. "
+                "If you are trying to add a subdataset simply use `save` %s".format(
+                    path))
+
         installed_items = []
 
         # shortcut
@@ -337,22 +347,6 @@ class Install(Interface):
         # subdataset inplace.
         _install_known_sub = False
 
-        _install_inplace = False
-        from os.path import realpath
-        # TODO: does it make sense to use realpath here or just normpath for
-        #       comparison?
-        #       Consider: If normpath wouldn't be equal, but realpath would -
-        #       is there any use case, where such a setup would be benefitial
-        #       instead of being troublesome?
-        if path and realpath(source) == realpath(path):
-            if _install_into_ds:
-                _install_inplace = True
-            # TODO _skip is (no longer) defined
-            elif not _skip_:
-                raise InsufficientArgumentsError(
-                    "Source and target are the same ({0}). This doesn't make "
-                    "sense without a dataset to install into.".format(path))
-
         # Possibly do conversion from source into a git-friendly url
         source_url = _get_git_url_from_source(source)
         lgr.debug("Resolved source: {0}".format(source_url))
@@ -360,14 +354,13 @@ class Install(Interface):
         # expandpath, normpath, ... Where exactly is the point to do it?
 
         # derive target from source url:
-        if path is None and source_url is not None:
+        if path is None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source_url and continue
             lgr.debug(
                 "Neither dataset nor target installation path provided. "
-                "Assuming installation of a remote dataset. "
-                "Deriving destination path from given source {0}".format(
-                    source_url))
+                "Deriving destination path from given source %s",
+                source_url)
             path = _get_installationpath_from_url(source_url)
             # since this is a relative `path`, resolve it:
             path = resolve_path(path, ds)
