@@ -305,17 +305,14 @@ class Install(Interface):
 
         installed_items = []
 
-        # shortcut
-        ds = dataset
-
         _install_into_ds = False  # default
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
 
-        if ds is not None:
+        if dataset is not None:
             _install_into_ds = True
-            ds = require_dataset(ds, check_installed=True,
+            ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             handle_dirty_dataset(ds, if_dirty)
 
@@ -327,7 +324,7 @@ class Install(Interface):
             path_ri = RI(path)
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
-                path = resolve_path(path_ri.localpath, ds)
+                path = resolve_path(path_ri.localpath, dataset)
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
@@ -363,7 +360,7 @@ class Install(Interface):
                 source_url)
             path = _get_installationpath_from_url(source_url)
             # since this is a relative `path`, resolve it:
-            path = resolve_path(path, ds)
+            path = resolve_path(path, dataset)
 
         if path is None:
             # still no target => fail
