@@ -460,7 +460,7 @@ def test_implicit_install(src, dst):
     subsub = Dataset(opj(sub.path, "subsub"))
     ok_(not subsub.is_installed())
 
-    # now implicit but wihtout an explicit dataset to install into
+    # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
     with chpwd(dst):
         result = install(path=opj("sub", "subsub"))
@@ -557,7 +557,7 @@ def test_install_recursive_repeat(src, path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_install_list_arguments(src, path, path_outside):
+def test_install_skip_list_arguments(src, path, path_outside):
 
     # get the top-level thing, but pass a one item list as `path`:
     ds = install(path=[path], source=src)
@@ -570,6 +570,33 @@ def test_install_list_arguments(src, path, path_outside):
         for skipped in ['not_existing', path_outside]:
             cml.assert_logged(msg="Installation of {0} skipped".format(skipped),
                               regex=False, level='INFO')
+        ok_(isinstance(result, list))
+        eq_(len(result), 2)
         for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
             assert_in(sub, result)
             ok_(sub.is_installed())
+
+    # install list and have single result item:
+    result = ds.install(path=['subm 1', 'not_existing'])
+    eq_(result, Dataset(opj(path, 'subm 1')))
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_skip_failed_recursive(src, path):
+
+    # install top level:
+    ds = install(path=path, source=src)
+    sub1 = Dataset(opj(path, 'subm 1'))
+    sub2 = Dataset(opj(path, 'subm 2'))
+    # sabotage recursive installation of 'subm 1' by polluting the target:
+    with open(opj(path, 'subm 1', 'blocking.txt'), "w")  as f:
+        f.write("sdfdsf")
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        result = install(path=path, recursive=True)
+        assert_in(ds, result)
+        assert_in(sub2, result)
+        assert_not_in(sub1, result)
+        cml.assert_logged(msg="{0} skipped".format(sub1), regex=False,
+                          level='INFO')
