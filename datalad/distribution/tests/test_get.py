@@ -44,9 +44,10 @@ from ..dataset import _with_sep
 def test_get_invalid_call(path, file_outside):
 
     # no argument at all:
-    assert_raises(InsufficientArgumentsError, get)
+    assert_raises(InsufficientArgumentsError, get, None)
+    assert_raises(InsufficientArgumentsError, get, [])
     # invalid dataset:
-    assert_raises(ValueError, get, dataset=path)
+    assert_raises(ValueError, get, None, dataset=path)
 
     # have a plain git:
     ds = Dataset(path)

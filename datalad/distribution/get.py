@@ -115,7 +115,7 @@ class Get(Interface):
     @staticmethod
     @datasetmethod(name='get')
     def __call__(
-            path=None,
+            path,
             source=None,
             dataset=None,
             recursive=False,
@@ -127,12 +127,10 @@ class Get(Interface):
             jobs=None,
             verbose=False):
 
-        # check parameters:
-        if path is None:
-            raise InsufficientArgumentsError("insufficient information for "
-                                             "getting: requires at least a "
-                                             "path.")
         path = assure_list(path)
+        if not path:
+            raise InsufficientArgumentsError(
+                "`get` needs at least one path as argument")
 
         # resolve path(s):
         lgr.debug("Resolving paths ...")
