@@ -360,7 +360,7 @@ class Install(Interface):
         assert(path is not None)
 
         lgr.debug("Resolved installation target: {0}".format(path))
-        current_dataset = Dataset(path)
+        destination_dataset = Dataset(path)
 
         ###########
         # we should know everything necessary by now
@@ -396,7 +396,7 @@ class Install(Interface):
             # FLOW_GUIDE 1.4.
             lgr.info("Installing subdataset from '{0}' at: {0}".format(
                 source, relativepath))
-            current_dataset = _install_subds_from_flexible_source(
+            destination_dataset = _install_subds_from_flexible_source(
                 ds,
                 relativepath,
                 source,
@@ -411,7 +411,7 @@ class Install(Interface):
             # should not be the case, but we need to distinguish between failure
             # of git-clone, due to existing target and an unsuccessful clone
             # attempt. See below.
-            existed = current_dataset.path and exists(current_dataset.path)
+            existed = destination_dataset.path and exists(destination_dataset.path)
 
             # We possibly need to consider /.git URL
             candidate_sources = assure_list(source)
@@ -426,16 +426,16 @@ class Install(Interface):
                     lgr.debug("Retrieving a dataset from URL: "
                               "{0}".format(source_))
                     with swallow_logs():
-                        GitRepo(current_dataset.path, url=source_, create=True)
+                        GitRepo(destination_dataset.path, url=source_, create=True)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError as e:
                     lgr.debug("Failed to retrieve from URL: "
                               "{0}".format(source_))
-                    if not existed and current_dataset.path \
-                            and exists(current_dataset.path):
+                    if not existed and destination_dataset.path \
+                            and exists(destination_dataset.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at "
-                                  "{}".format(current_dataset.path))
-                        rmtree(current_dataset.path)
+                                  "{}".format(destination_dataset.path))
+                        rmtree(destination_dataset.path)
                     if source_ == candidate_sources[-1]:
 
                         # Note: The following block is evaluated whenever we
@@ -452,14 +452,14 @@ class Install(Interface):
                             # rudimentary check for an installed dataset at target:
                             # (TODO: eventually check for being the one, that this
                             # is about)
-                            if current_dataset.is_installed():
+                            if destination_dataset.is_installed():
                                 lgr.info("{0} appears to be installed already."
-                                         "".format(current_dataset))
+                                         "".format(destination_dataset))
                                 break
                             else:
                                 lgr.warning("Target {0} already exists and is not "
                                             "an installed dataset. Skipped."
-                                            "".format(current_dataset))
+                                            "".format(destination_dataset))
                                 # Keep original in debug output:
                                 lgr.debug("Original failure:{0}"
                                           "{1}".format(linesep, exc_str(e)))
@@ -469,40 +469,40 @@ class Install(Interface):
                         # Re-raise if failed even with the last candidate
                         lgr.debug("Unable to establish repository instance at "
                                   "{0} from {1}"
-                                  "".format(current_dataset.path,
+                                  "".format(destination_dataset.path,
                                             candidate_sources))
                         raise
 
             # cloning done
 
         # FLOW GUIDE: All four cases done.
-        if current_dataset is None:
+        if destination_dataset is None:
             lgr.error("Installation failed.")
             return None
 
         # in any case check whether we need to annex-init the installed thing:
-        if knows_annex(current_dataset.path):
+        if knows_annex(destination_dataset.path):
             # init annex when traces of a remote annex can be detected
             if reckless:
                 lgr.debug(
                     "Instruct annex to hardlink content in %s from local "
-                    "sources, if possible (reckless)", current_dataset.path)
-                current_dataset.config.add('annex.hardlink', 'true',
+                    "sources, if possible (reckless)", destination_dataset.path)
+                destination_dataset.config.add('annex.hardlink', 'true',
                                            where='local', reload=True)
-            lgr.info("Initializing annex repo at %s", current_dataset.path)
-            repo = AnnexRepo(current_dataset.path, init=True)
+            lgr.info("Initializing annex repo at %s", destination_dataset.path)
+            repo = AnnexRepo(destination_dataset.path, init=True)
             if reckless:
                 repo._run_annex_command('untrust', annex_options=['here'])
 
-        lgr.debug("Installation of %s done.", current_dataset)
+        lgr.debug("Installation of %s done.", destination_dataset)
 
-        if not current_dataset.is_installed():
+        if not destination_dataset.is_installed():
             # log error and don't report as installed item, but don't raise,
             # since we might be in a process of recursive installation where
             # a lot of other datasets can still be installed successfully.
-            lgr.error("Installation of {0} failed.".format(current_dataset))
+            lgr.error("Installation of {0} failed.".format(destination_dataset))
         else:
-            installed_items.append(current_dataset)
+            installed_items.append(destination_dataset)
 
         # Now, recursive calls:
         if recursive and \
@@ -511,7 +511,7 @@ class Install(Interface):
             if description:
                 lgr.warning("Description can't be assigned recursively.")
             subs = [Dataset(p) for p in
-                    current_dataset.get_subdatasets(recursive=True,
+                    destination_dataset.get_subdatasets(recursive=True,
                                                     recursion_limit=1,
                                                     absolute=True)]
             for subds in subs:
@@ -519,7 +519,7 @@ class Install(Interface):
                     # MIH: TODO this should rather use get
                     rec_installed = Install.__call__(
                         subds.path,
-                        dataset=current_dataset,
+                        dataset=destination_dataset,
                         recursive=True,
                         recursion_limit=recursion_limit - 1
                         if recursion_limit else None,
