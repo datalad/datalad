@@ -339,20 +339,22 @@ class Install(Interface):
         # `path` resolved, if there was any.
 
         # Possibly do conversion from source into a git-friendly url
-        source_url = _get_git_url_from_source(source)
-        lgr.debug("Resolved source: {0}".format(source_url))
-        # TODO: we probably need to resolve source_url, if it is a local path;
+        # luckily GitRepo will undo any fancy file:/// url to make use of Git's
+        # optimization for local clones....
+        source = _get_git_url_from_source(source)
+        lgr.debug("Resolved source: {0}".format(source))
+        # TODO: we probably need to resolve source, if it is a local path;
         # expandpath, normpath, ... Where exactly is the point to do it?
 
-        # derive target from source url:
+        # derive target from source:
         if path is None:
             # we got nothing but a source. do something similar to git clone
-            # and derive the path from the source_url and continue
+            # and derive the path from the source and continue
             lgr.debug(
                 "Neither dataset nor target installation path provided. "
                 "Deriving destination path from given source %s",
-                source_url)
-            path = _get_installationpath_from_url(source_url)
+                source)
+            path = _get_installationpath_from_url(source)
             # since this is a relative `path`, resolve it:
             path = resolve_path(path, dataset)
 
@@ -396,11 +398,11 @@ class Install(Interface):
 
             # FLOW_GUIDE 1.4.
             lgr.info("Installing subdataset from '{0}' at: {0}".format(
-                source_url, relativepath))
+                source, relativepath))
             current_dataset = _install_subds_from_flexible_source(
                 ds,
                 relativepath,
-                source_url,
+                source,
                 recursive=False)
         else:
             # FLOW GUIDE: 2.
@@ -415,29 +417,29 @@ class Install(Interface):
             existed = current_dataset.path and exists(current_dataset.path)
 
             # We possibly need to consider /.git URL
-            candidate_source_urls = assure_list(source_url)
+            candidate_sources = assure_list(source)
             # TODO: isn't this a duplicate of above logic/implementation
             # in _install_subds_from_flexible_source????
-            if source_url and not source_url.rstrip('/').endswith('/.git'):
-                candidate_source_urls.append(
-                    '{0}/.git'.format(source_url.rstrip('/')))
+            if source and not source.rstrip('/').endswith('/.git'):
+                candidate_sources.append(
+                    '{0}/.git'.format(source.rstrip('/')))
 
-            for source_url_ in candidate_source_urls:
+            for source_ in candidate_sources:
                 try:
                     lgr.debug("Retrieving a dataset from URL: "
-                              "{0}".format(source_url_))
+                              "{0}".format(source_))
                     with swallow_logs():
-                        GitRepo(current_dataset.path, url=source_url_, create=True)
+                        GitRepo(current_dataset.path, url=source_, create=True)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError as e:
                     lgr.debug("Failed to retrieve from URL: "
-                              "{0}".format(source_url_))
+                              "{0}".format(source_))
                     if not existed and current_dataset.path \
                             and exists(current_dataset.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at "
                                   "{}".format(current_dataset.path))
                         rmtree(current_dataset.path)
-                    if source_url_ == candidate_source_urls[-1]:
+                    if source_ == candidate_sources[-1]:
 
                         # Note: The following block is evaluated whenever we
                         # fail even with the last try. Not nice, but currently
@@ -471,7 +473,7 @@ class Install(Interface):
                         lgr.debug("Unable to establish repository instance at "
                                   "{0} from {1}"
                                   "".format(current_dataset.path,
-                                            candidate_source_urls))
+                                            candidate_sources))
                         raise
 
             # cloning done
