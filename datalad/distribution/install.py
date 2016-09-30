@@ -358,9 +358,8 @@ class Install(Interface):
             # since this is a relative `path`, resolve it:
             path = resolve_path(path, dataset)
 
-        if path is None:
-            # still no target => fail
-            raise InsufficientArgumentsError("Got no target to install to.")
+        # there is no other way -- my intoxicated brain tells me
+        assert(path is not None)
 
         lgr.debug("Resolved installation target: {0}".format(path))
         current_dataset = Dataset(path)
