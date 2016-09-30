@@ -14,6 +14,7 @@ import logging
 from os.path import abspath
 from os.path import join as opj
 from os.path import normpath
+from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from os.path import commonprefix
@@ -336,8 +337,13 @@ class Dataset(object):
         else:
             return was_once_installed
 
-    def get_superdataset(self):
+    def get_superdataset(self, topmost=False):
         """Get the dataset's superdataset
+
+        Parameters
+        ----------
+        topmost : bool, optional
+          Return the topmost super-dataset.
 
         Returns
         -------
@@ -346,18 +352,37 @@ class Dataset(object):
 
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
+        path = self.path
+        sds_path = None
+        while path:
+            par_path = opj(path, pardir)
+            sds_path_ = GitRepo.get_toppath(par_path)
+            if sds_path_ is None:
+                # no more parents, use previous found
+                break
+            # TODO:?
+            # test if current git is actually a dataset?
+            # sds = Dataset(sds_path_)
+            # if not sds.id:
+            #     break
 
-        from os import pardir
-        sds_path = GitRepo.get_toppath(opj(self.path, pardir))
+            # That was a good candidate
+            sds_path = sds_path_
+            path = par_path
+            if not topmost:
+                # no looping
+                break
+
         if sds_path is None:
+            # None was found
             return None
-        else:
-            if realpath(self.path) != self.path:
-                # we had symlinks in the path but sds_path would have not
-                # so let's get "symlinked" version of the superdataset path
-                sds_relpath = relpath(sds_path, realpath(self.path))
-                sds_path = normpath(opj(self.path, sds_relpath))
-            return Dataset(sds_path)
+
+        if realpath(self.path) != self.path:
+            # we had symlinks in the path but sds_path would have not
+            # so let's get "symlinked" version of the superdataset path
+            sds_relpath = relpath(sds_path, realpath(self.path))
+            sds_path = normpath(opj(self.path, sds_relpath))
+        return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):
         """Get the (sub-)dataset containing `path`

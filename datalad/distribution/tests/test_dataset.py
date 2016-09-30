@@ -16,6 +16,7 @@ from os.path import join as opj, abspath, normpath
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
 from datalad.utils import chpwd, getpwd, rmtree
+from datalad.utils import _path_
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -200,10 +201,16 @@ def test_subdatasets(path):
     ds.add(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
+    # Assuming that tmp location was not under a super-dataset
+    eq_(ds.get_superdataset(), None)
+    eq_(ds.get_superdataset(topmost=True), None)
 
     # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
+    eq_(subds.get_superdataset(), ds)
+    eq_(subds.get_superdataset(topmost=True), ds)
+
     subdss = ds.get_subdatasets()
     eq_(len(subdss), 1)
     eq_(os.path.join(path, subdss[0]), subds.path)
@@ -216,6 +223,13 @@ def test_subdatasets(path):
     ds.recall_state(1)
     assert_true(ds.is_installed())
     eq_(ds.get_subdatasets(), [])
+
+    # very nested subdataset to test topmost
+    subsubds = subds.install(_path_('d1/subds'), source=path)
+    assert_true(subsubds.is_installed())
+    eq_(subsubds.get_superdataset(), subds)
+    eq_(subsubds.get_superdataset(topmost=True), ds)
+
     # TODO actual submodule checkout is still there
 
 
