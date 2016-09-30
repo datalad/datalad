@@ -235,7 +235,7 @@ class Get(Interface):
                     if jinst:
                         # we found one that we did not know before
                         lgr.debug("Obtained subdataset %s",
-                                  subds_path, p)
+                                  subds_path)
                     resolved_datasets[subds_path] = [curdir]
                     just_installed[subds_path] = jinst
         # Note: While the following is not very telling in terms of progress,
