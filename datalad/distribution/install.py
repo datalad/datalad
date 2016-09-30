@@ -45,7 +45,6 @@ from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
 from datalad.utils import knows_annex
 from datalad.utils import swallow_logs
-from datalad.utils import assure_list
 from datalad.utils import rmtree
 from datalad.dochelpers import exc_str
 
@@ -123,6 +122,64 @@ def _get_flexible_url_candidates(url, base_url=None, url_suffix=''):
     return candidates
 
 
+def _clone_from_any_source(sources, dest):
+    # should not be the case, but we need to distinguish between failure
+    # of git-clone, due to existing target and an unsuccessful clone
+    # attempt. See below.
+    existed = dest and exists(dest)
+    for source_ in sources:
+        try:
+            lgr.debug("Retrieving a dataset from URL: "
+                      "{0}".format(source_))
+            with swallow_logs():
+                GitRepo(dest, url=source_, create=True)
+            return source_  # do not bother with other sources if succeeded
+        except GitCommandError as e:
+            lgr.debug("Failed to retrieve from URL: "
+                      "{0}".format(source_))
+            if not existed and dest \
+                    and exists(dest):
+                lgr.debug("Wiping out unsuccessful clone attempt at "
+                          "{}".format(dest))
+                rmtree(dest)
+
+            if source_ == sources[-1]:
+                # Note: The following block is evaluated whenever we
+                # fail even with the last try. Not nice, but currently
+                # necessary until we get a more precise exception:
+                ####################################
+                # TODO: We may want to introduce a --force option to
+                # overwrite the target.
+                # TODO: Currently assuming if `existed` and there is a
+                # GitCommandError means that these both things are connected.
+                # Need newer GitPython to get stderr from GitCommandError
+                # (already fixed within GitPython.)
+                if existed:
+                    # rudimentary check for an installed dataset at target:
+                    # (TODO: eventually check for being the one, that this
+                    # is about)
+                    dest_ds = Dataset(dest)
+                    if dest_ds.is_installed():
+                        lgr.info("{0} appears to be installed already."
+                                 "".format(dest_ds))
+                        break
+                    else:
+                        lgr.warning("Target {0} already exists and is not "
+                                    "an installed dataset. Skipped."
+                                    "".format(dest))
+                        # Keep original in debug output:
+                        lgr.debug("Original failure:{0}"
+                                  "{1}".format(linesep, exc_str(e)))
+                        return None
+                ##################
+
+                # Re-raise if failed even with the last candidate
+                lgr.debug("Unable to establish repository instance at "
+                          "{0} from {1}"
+                          "".format(dest, sources))
+                raise
+
+
 def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     """Tries to obtain a given subdataset from several meaningful locations"""
 
@@ -162,46 +219,21 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         url_suffix)
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
-    success = False
-    for clone_url in clone_urls:
-        lgr.debug("Attempt clone of subdataset from: {0}".format(clone_url))
-
-        # Note: Condition is a special case handling for now, where install
-        # is called to install an existing ds in place. Here it calls install
-        # again, without a dataset to install it into, since the call is about
-        # the cloning only, which isn't necessary in this case and the addition
-        # is done afterwards.
-        # TODO: RF this helper function; currently its logic is somewhat
-        # conflicting with new install API
-        if not subds.is_installed():
-            try:
-                with swallow_logs():
-                    GitRepo(path=subds.path, url=clone_url, create=True)
-                success = True
-                # Note for RF'ing: The following was originally used and would
-                # currently lead to doing several things twice, like annex init,
-                # analyzing what to install where, etc. Additionally, atm
-                # recursion is done outside anyway
-                # subds = Install.__call__(
-                #     path=subds.path, source=clone_url,
-                #     recursive=recursive)
-            except GitCommandError as e:
-                lgr.debug("clone attempt failed:{0}{1}".format(linesep, exc_str(e)))
-                # TODO: failed clone might leave something behind that causes the
-                # next attempt to fail as well. Implement safe way to remove clone
-                # attempt left-overs.
-                # Note: Do in GitRepo.clone()!
-                continue
+    try:
+        clone_url = _clone_from_any_source(clone_urls, subds.path)
+    except GitCommandError as e:
+        raise InstallFailedError(
+            "Failed to install dataset %s from %s (%s)",
+            subds, clone_urls, e)
+    # do fancy update
+    if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
-            ds.repo.update_submodule(sm_path, init=True)
-        else:
-            # submodule is brand-new and previously unknown
-            ds.repo.add_submodule(sm_path, url=clone_url)
-        _fixup_submodule_dotgit_setup(ds, sm_path)
-        return subds
-    if not success:
-        raise InstallFailedError("Failed to install dataset %s" % subds)
+        ds.repo.update_submodule(sm_path, init=True)
+    else:
+        # submodule is brand-new and previously unknown
+        ds.repo.add_submodule(sm_path, url=clone_url)
+    _fixup_submodule_dotgit_setup(ds, sm_path)
+    return subds
 
 
 class Install(Interface):
@@ -413,70 +445,12 @@ class Install(Interface):
             # Currently assuming there is nothing at the target to deal with
             # and rely on failures raising from the git call ...
 
-            # should not be the case, but we need to distinguish between failure
-            # of git-clone, due to existing target and an unsuccessful clone
-            # attempt. See below.
-            existed = destination_dataset.path and exists(destination_dataset.path)
-
             # We possibly need to consider /.git URL
             candidate_sources = _get_flexible_url_candidates(source)
-
-            for source_ in candidate_sources:
-                try:
-                    lgr.debug("Retrieving a dataset from URL: "
-                              "{0}".format(source_))
-                    with swallow_logs():
-                        GitRepo(destination_dataset.path, url=source_, create=True)
-                    break  # do not bother with other sources if succeeded
-                except GitCommandError as e:
-                    lgr.debug("Failed to retrieve from URL: "
-                              "{0}".format(source_))
-                    if not existed and destination_dataset.path \
-                            and exists(destination_dataset.path):
-                        lgr.debug("Wiping out unsuccessful clone attempt at "
-                                  "{}".format(destination_dataset.path))
-                        rmtree(destination_dataset.path)
-                    if source_ == candidate_sources[-1]:
-
-                        # Note: The following block is evaluated whenever we
-                        # fail even with the last try. Not nice, but currently
-                        # necessary until we get a more precise exception:
-                        ####################################
-                        # TODO: We may want to introduce a --force option to
-                        # overwrite the target.
-                        # TODO: Currently assuming if `existed` and there is a
-                        # GitCommandError means that these both things are connected.
-                        # Need newer GitPython to get stderr from GitCommandError
-                        # (already fixed within GitPython.)
-                        if existed:
-                            # rudimentary check for an installed dataset at target:
-                            # (TODO: eventually check for being the one, that this
-                            # is about)
-                            if destination_dataset.is_installed():
-                                lgr.info("{0} appears to be installed already."
-                                         "".format(destination_dataset))
-                                break
-                            else:
-                                lgr.warning("Target {0} already exists and is not "
-                                            "an installed dataset. Skipped."
-                                            "".format(destination_dataset))
-                                # Keep original in debug output:
-                                lgr.debug("Original failure:{0}"
-                                          "{1}".format(linesep, exc_str(e)))
-                                return None
-                        ##################
-
-                        # Re-raise if failed even with the last candidate
-                        lgr.debug("Unable to establish repository instance at "
-                                  "{0} from {1}"
-                                  "".format(destination_dataset.path,
-                                            candidate_sources))
-                        raise
-
-            # cloning done
+            _clone_from_any_source(candidate_sources, destination_dataset.path)
 
         # FLOW GUIDE: All four cases done.
-        if destination_dataset is None:
+        if not destination_dataset.is_installed():
             lgr.error("Installation failed.")
             return None
 
@@ -487,8 +461,8 @@ class Install(Interface):
                 lgr.debug(
                     "Instruct annex to hardlink content in %s from local "
                     "sources, if possible (reckless)", destination_dataset.path)
-                destination_dataset.config.add('annex.hardlink', 'true',
-                                           where='local', reload=True)
+                destination_dataset.config.add(
+                    'annex.hardlink', 'true', where='local', reload=True)
             lgr.info("Initializing annex repo at %s", destination_dataset.path)
             repo = AnnexRepo(destination_dataset.path, init=True)
             if reckless:
@@ -511,9 +485,10 @@ class Install(Interface):
             if description:
                 lgr.warning("Description can't be assigned recursively.")
             subs = [Dataset(p) for p in
-                    destination_dataset.get_subdatasets(recursive=True,
-                                                    recursion_limit=1,
-                                                    absolute=True)]
+                    destination_dataset.get_subdatasets(
+                        recursive=True,
+                        recursion_limit=1,
+                        absolute=True)]
             for subds in subs:
                 try:
                     # MIH: TODO this should rather use get
