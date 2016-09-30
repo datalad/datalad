@@ -11,6 +11,7 @@ import platform
 from os.path import sep as pathsep
 from os.path import join as opj
 from os.path import splitext
+from os.path import dirname
 
 from setuptools import findall
 from setuptools import setup, find_packages
@@ -108,12 +109,22 @@ cmdclass = {
     # 'build_py': DataladBuild
 }
 
+# PyPI doesn't render markdown yet. Workaround for a sane appearance
+# https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+README = opj(dirname(__file__), 'README.md')
+try:
+    import pypandoc
+    long_description = pypandoc.convert(README, 'rst')
+except ImportError:
+    long_description = open(README).read()
+
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
     author_email="team@datalad.org",
     version=version,
     description="data distribution geared toward scientific datasets",
+    long_description=long_description,
     packages=datalad_pkgs,
     install_requires=
         requires['core'] + requires['downloaders'] +
