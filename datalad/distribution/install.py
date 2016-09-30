@@ -305,13 +305,11 @@ class Install(Interface):
 
         installed_items = []
 
-        _install_into_ds = False  # default
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
-
+        ds = None
         if dataset is not None:
-            _install_into_ds = True
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             handle_dirty_dataset(ds, if_dirty)
@@ -383,7 +381,7 @@ class Install(Interface):
         # 2. we "just" install from an explicit source
         #    => git clone
 
-        if _install_into_ds:
+        if ds is not None:
             # FLOW GUIDE: 1.
 
             # express the destination path relative to the root of
@@ -547,7 +545,7 @@ class Install(Interface):
                 d.get(curdir)
 
         # everything done => save changes:
-        if save and _install_into_ds:
+        if save and ds is not None:
             # Note: The only possible changes are installed subdatasets, we
             # didn't know before.
             lgr.info("Saving changes to {0}".format(ds))
