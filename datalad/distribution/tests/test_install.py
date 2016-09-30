@@ -130,6 +130,8 @@ def test_insufficient_args():
 
 def test_invalid_args():
     assert_raises(ValueError, install, 'Zoidberg', path='Zoidberg')
+    # install to a remote location
+    assert_raises(ValueError, install, 'Zoidberg', path='ssh://mars:Zoidberg')
 
 
 @skip_if_no_network
