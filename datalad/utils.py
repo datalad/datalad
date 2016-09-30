@@ -439,6 +439,11 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
+def assure_unicode(s, encoding='utf-8'):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
+    return s.decode(encoding) if isinstance(s, binary_type) else s
+
+
 def unique(seq, key=None):
     """Given a sequence return a list only with unique elements while maintaining order
 
