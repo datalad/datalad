@@ -195,8 +195,9 @@ def test_aggregation(path):
         child_res = list(clone.search('child'))
         assert_equal(len(child_res), 2)
         # little helper to match names
-        def assert_names(res, names):
-            assert_equal(list(map(itemgetter(0), res)), names)
+        def assert_names(res, names, path=clone.path):
+            assert_equal(list(map(itemgetter(0), res)),
+                         [opj(path, n) for n in names])
         # should yield (location, report) tuples
         assert_names(child_res, ['sub', 'sub/subsub'])
 
@@ -236,13 +237,10 @@ def test_aggregation(path):
         )
 
         # more tests on returned paths:
-        assert_equal(list(map(itemgetter(0),
-                              clone.search('datalad'))),
-                     ['.', 'sub', 'sub/subsub'])
+        assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
         # if we clone subdataset and query for value present in it and its kid
-        assert_equal(list(map(itemgetter(0),
-                              clone.install('sub').search('datalad'))),
-                     ['.', 'subsub'])
+        clone_sub = clone.install('sub')
+        assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
         # Test 'and' for multiple search entries
         assert_equal(len(list(clone.search(['child', 'bids']))), 2)
