@@ -17,6 +17,9 @@ import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
+from os.path import relpath
+from os.path import curdir
+from os.path import pathsep
 from six import string_types
 from six import text_type
 from six import iteritems
@@ -34,6 +37,7 @@ from . import get_metadata, flatten_metadata_graph, pickle
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad import cfg
 from datalad.utils import assure_list
+from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support import ansi_colors
 from datalad.ui import ui
@@ -129,8 +133,9 @@ class Search(Interface):
                     raise NoDatasetArgumentFound(
                         "No DataLad dataset found at current location and "
                         "current UI is not interactive to assist in installing "
-                        "one.  Please run `search` command interactively or "
-                        "under an existing DataLad dataset"
+                        "one. Please either run `search` command interactively,"
+                        " or under an existing DataLad dataset, or using -d/// "
+                        "to refer to central installation."
                     )
                 # none was provided so we could ask user either he possibly wants
                 # to install our beautiful mega-duper-super-dataset?
@@ -158,6 +163,9 @@ class Search(Interface):
                              % LOCAL_CENTRAL_PATH):
                     from datalad.api import install
                     central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+                    ui.message(
+                        "You can in future refer to that dataset using -d///"
+                    )
                 else:
                     reraise(*exc_info)
 
@@ -165,13 +173,12 @@ class Search(Interface):
                     "Performing search using central dataset %r",
                     central_ds.path
                 )
-                for loc, r in central_ds.search(
+                for res in central_ds.search(
                         match,
                         search=search, report=report,
                         report_matched=report_matched,
                         format=format, regex=regex):
-                    full_loc = opj(central_ds.path, loc)
-                    yield full_loc, r
+                    yield res
                 return
             else:
                 raise
@@ -241,6 +248,10 @@ class Search(Interface):
             for match_ in match
         ]
 
+        # location should be reported relative to current location
+        # We will assume that noone chpwd while we are yielding
+        ds_path_prefix = get_path_prefix(ds.path)
+
         # for every meta data set
         for mds in meta:
             hit = False
@@ -288,7 +299,7 @@ class Search(Interface):
                 else:
                     report_dict = {}  # it was empty but not None -- asked to
                     # not report any specific field
-                yield location, report_dict
+                yield opj(ds_path_prefix, location), report_dict
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):

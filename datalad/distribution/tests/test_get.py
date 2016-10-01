@@ -33,10 +33,10 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import assert_re_in
-from datalad.utils import swallow_logs
+from datalad.utils import swallow_logs, with_pathsep
 
 from ..dataset import Dataset
-from ..dataset import _with_sep
+from ..dataset import with_pathsep
 
 
 @with_tempfile(mkdir=True)
@@ -179,7 +179,7 @@ def test_get_recurse_dirs(o_path, c_path):
                  opj('subdir', 'file2.txt'),
                  opj('subdir', 'subsubdir', 'file3.txt'),
                  opj('subdir', 'subsubdir', 'file4.txt')]
-    files_in_sub = [f for f in file_list if f.startswith(_with_sep('subdir'))]
+    files_in_sub = [f for f in file_list if f.startswith(with_pathsep('subdir'))]
 
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))

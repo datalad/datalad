@@ -204,7 +204,7 @@ def test_subdatasets(path):
     ds.save("Hello!", version_tag=1)
     # Assuming that tmp location was not under a super-dataset
     eq_(ds.get_superdataset(), None)
-    eq_(ds.get_superdataset(topmost=True), None)
+    eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
@@ -238,6 +238,10 @@ def test_subdatasets(path):
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path, LOCAL_CENTRAL_PATH)
+
+    with chpwd(ds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
 
     # TODO actual submodule checkout is still there
 

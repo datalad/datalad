@@ -10,46 +10,39 @@
 """
 
 import logging
-
+import uuid
+from functools import wraps
 from os.path import abspath
+from os.path import commonprefix
+from os.path import curdir
+from os.path import exists
 from os.path import join as opj
 from os.path import normpath
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
-from os.path import commonprefix
 from os.path import sep
-from os.path import exists
-from os.path import curdir
-from six import string_types
 from six import PY2
-from functools import wraps
-import uuid
+from six import string_types
 
+from datalad.config import ConfigManager
+from datalad.consts import LOCAL_CENTRAL_PATH
+from datalad.dochelpers import exc_str
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import Constraint
+from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import Constraint
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathOutsideRepositoryError
-from datalad.config import ConfigManager
-from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import swallow_logs
 from datalad.utils import getpwd
-from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.dochelpers import exc_str
-from datalad.consts import LOCAL_CENTRAL_PATH
+from datalad.utils import optional_args, expandpath, is_explicit_path, \
+    with_pathsep
+from datalad.utils import swallow_logs
 
 
 lgr = logging.getLogger('datalad.dataset')
-
 lgr.log(5, "Importing dataset")
-
-
-def _with_sep(path):
-    """Little helper to guarantee that path ends with /"""
-    return path + sep if not path.endswith(sep) else path
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -93,7 +86,7 @@ class Dataset(object):
             # from search?
             path_ = LOCAL_CENTRAL_PATH
         if path != path_:
-            lgr.debug("Resolved dataset path=%r to %r", path, path_)
+            lgr.debug("Resolved dataset alias %r to path %r", path, path_)
         self._path = abspath(path_)
         self._repo = None
         self._id = None
@@ -357,7 +350,7 @@ class Dataset(object):
         Parameters
         ----------
         topmost : bool, optional
-          Return the topmost super-dataset.
+          Return the topmost super-dataset. Might then be the current one.
 
         Returns
         -------
@@ -367,7 +360,7 @@ class Dataset(object):
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
         path = self.path
-        sds_path = None
+        sds_path = path if topmost else None
         while path:
             par_path = opj(path, pardir)
             sds_path_ = GitRepo.get_toppath(par_path)
@@ -429,8 +422,8 @@ class Dataset(object):
         for subds in self.get_subdatasets(recursive=True,
                                           recursion_limit=recursion_limit,
                                           absolute=False):
-            common = commonprefix((_with_sep(subds), _with_sep(path)))
-            if common.endswith(sep) and common == _with_sep(subds):
+            common = commonprefix((with_pathsep(subds), with_pathsep(path)))
+            if common.endswith(sep) and common == with_pathsep(subds):
                 candidates.append(common)
         if candidates:
             return Dataset(path=opj(self.path, max(candidates, key=len)))

@@ -35,13 +35,13 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
+from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import require_dataset
 from .dataset import resolve_path
-from .dataset import _with_sep
 from .utils import install_necessary_subdatasets
 
 __docformat__ = 'restructuredtext'
