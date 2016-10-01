@@ -34,6 +34,7 @@ matrix:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
     - DATALAD_API_ALWAYSRENDER=1
+    - DATALAD_TESTS_PROTOCOLREMOTE=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
