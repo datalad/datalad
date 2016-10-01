@@ -602,3 +602,27 @@ def test_install_skip_failed_recursive(src, path):
         #cml.assert_logged(
         #    msg="Installation of necessary subdatasets for {0} failed. Skipped.".format(sub1),
         #    regex=False, level='WARNING')
+
+
+@with_tree(tree={'top_file.txt': 'some',
+                 'sub 1': {'sub1file.txt': 'something else',
+                           'subsub': {'subsubfile.txt': 'completely different',
+                                      }
+                           },
+                 'sub 2': {'sub2file.txt': 'meaningless',
+                           }
+                 })
+@with_tempfile(mkdir=True)
+def test_install_noautoget_data(src, path):
+    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
+    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
+    sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
+    top_src = Dataset(src).create(force=True)
+    top_src.save(auto_add_changes=True, recursive=True)
+
+    # install top level:
+    cdss = install(src, path=path, recursive=True)
+    # there should only be datasets in the list of installed items,
+    # and non of those should have any data for there annexed files yet
+    for ds in cdss:
+        assert_false(any(ds.repo.file_has_content(ds.repo.get_annexed_files())))
