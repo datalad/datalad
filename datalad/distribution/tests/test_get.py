@@ -15,6 +15,7 @@ import re
 
 from os import curdir
 from os.path import join as opj, basename
+from glob import glob
 
 from datalad.api import get
 from datalad.api import install
@@ -34,6 +35,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import assert_re_in
 from datalad.utils import swallow_logs
+from datalad.utils import chpwd
 
 from ..dataset import Dataset
 from ..dataset import _with_sep
@@ -337,3 +339,14 @@ def test_get_mixed_hierarchy(src, path):
         eq_(result[0]['file'], opj("subds", "file_in_annex.txt"))
         ok_(result[0]['success'] is True)
         ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
+
+
+@with_testrepos('submodule_annex', flavors='local')
+@with_tempfile(mkdir=True)
+def test_autoresolve_multiple_datasets(src, path):
+    with chpwd(path):
+        ds1 = install(src, path='ds1')
+        ds2 = install(src, path='ds2')
+        results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
+        # for now -- doesn't even get here
+        ok_(len(result))
