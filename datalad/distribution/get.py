@@ -70,8 +70,8 @@ def _report_ifjustinstalled(ds, p, recursion_limit):
         # subdataset
         lgr.warning(
             "Installation of necessary subdatasets for %s failed. Skipped.", p)
-        lgr.debug("Installation attempt failed with exception: %s%s",
-                  linesep, exc_str(e))
+        lgr.debug("Installation attempt failed with exception: %s",
+                  exc_str(e))
     return p_ds, fresh
 
 
@@ -171,6 +171,9 @@ class Get(Interface):
         lgr.debug("Determine necessary (sub-)datasets ...")
         resolved_datasets = dict()
         just_installed = dict()
+        # TODO: verify convention that putting ds.path in
+        #       resolved_datasets[ds.path] will prevent files from
+        #       being passed to annex-get -- as opposed to '.'
         for p in resolved_paths:
             # install any required subdatasets
             p_ds, jinst = _report_ifjustinstalled(ds, p, recursion_limit)
@@ -191,7 +194,7 @@ class Get(Interface):
             if p == relpath(p_ds.path, start=ds.path):
                 # path to get is the entire subdataset itself
                 # present it as such to annex below
-                p = curdir
+                p = p_ds.path
 
             # collect all paths belonging to a certain (sub-)datasets in order
             # to have one call to git-annex per repo:
@@ -232,11 +235,28 @@ class Get(Interface):
                     if subds is None:
                         # error reporting in _report_ifjustinstalled
                         continue
+                    # what files to get for this subdataset?
+                    content_selector = None
                     if jinst:
                         # we found one that we did not know before
                         lgr.debug("Obtained subdataset %s",
                                   subds_path)
-                    resolved_datasets[subds_path] = [curdir]
+                        if fulfill == 'all':
+                            # file handles just appeared in this newly
+                            # installed subdataset, only resolve them
+                            # too if explicitly instructed
+                            content_selector = [curdir]
+                        else:
+                            # otherwise we have fulfilled the dataset
+                            # handle and nothing needs to be done for the
+                            # new file handles
+                            content_selector = [subds.path]
+                    else:
+                        # a previously existing subdataset with previously
+                        # existing file handles -> fulfill them too
+                        content_selector = [curdir]
+
+                    resolved_datasets[subds_path] = content_selector
                     just_installed[subds_path] = jinst
         # Note: While the following is not very telling in terms of progress,
         # it remains at info level atm to have at least some idea, what `get` is

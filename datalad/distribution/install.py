@@ -493,21 +493,27 @@ class Install(Interface):
                 recursion_limit=recursion_limit,
                 absolute=False)
 
-            rec_installed = Get.__call__(
-                subs,  # all at once
-                dataset=destination_dataset,
-                recursive=True,
-                recursion_limit=recursion_limit,
-                fulfill='all' if get_data else 'auto',
-                git_opts=git_opts,
-                annex_opts=annex_opts,
-                # TODO expose this
-                #annex_get_opts=annex_get_opts,
-            )
-            if isinstance(rec_installed, list):
-                installed_items.extend(rec_installed)
-            else:
-                installed_items.append(rec_installed)
+            if subs:
+                lgr.debug("Obtaining subdatasets of %s: %s",
+                          destination_dataset,
+                          subs)
+                rec_installed = Get.__call__(
+                    subs,  # all at once
+                    dataset=destination_dataset,
+                    recursive=True,
+                    recursion_limit=recursion_limit,
+                    fulfill='all' if get_data else 'auto',
+                    git_opts=git_opts,
+                    annex_opts=annex_opts,
+                    # TODO expose this
+                    #annex_get_opts=annex_get_opts,
+                )
+                # TODO do we want to filter this so `install` only returns
+                # the datasets?
+                if isinstance(rec_installed, list):
+                    installed_items.extend(rec_installed)
+                else:
+                    installed_items.append(rec_installed)
 
         if get_data:
             lgr.debug("Getting data of {0}".format(destination_dataset))

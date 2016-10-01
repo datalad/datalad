@@ -15,6 +15,7 @@ from os.path import exists
 from os.path import isdir
 from os.path import join as opj
 from os.path import islink
+from os.path import relpath
 
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
@@ -106,6 +107,7 @@ def install_necessary_subdatasets(ds, path):
     Dataset
       the last (deepest) subdataset, that was installed
     """
+    from .install import _install_subds_from_flexible_source
 
     assert ds.is_installed()
 
@@ -121,13 +123,24 @@ def install_necessary_subdatasets(ds, path):
     cur_subds = start_ds
 
     # Note, this is not necessarily `ds`:
-    cur_par_ds = start_ds.get_superdataset()
+    # MIH: would be good to know why?
+    cur_par_ds = cur_subds.get_superdataset()
     assert cur_par_ds is not None
 
     while not cur_subds.is_installed():
         lgr.info("Installing subdataset {0} in order to get "
                  "{1}".format(cur_subds, path))
-        cur_par_ds.install(cur_subds.path)
+        # get submodule info
+        submodule = [sm for sm in cur_par_ds.repo.get_submodules()
+                     if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
+        # install using helper that give some flexibility regarding where to
+        # get the module from
+        _install_subds_from_flexible_source(
+            cur_par_ds,
+            submodule.path,
+            submodule.url,
+            recursive=False)
+
         cur_par_ds = cur_subds
 
         # Note: PathOutsideRepositoryError should not happen here.

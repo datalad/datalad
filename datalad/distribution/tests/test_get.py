@@ -111,6 +111,7 @@ def test_get_invalid_call(path, file_outside):
 def test_get_single_file(path):
 
     ds = Dataset(path)
+    ok_(ds.is_installed())
     ok_(ds.repo.file_has_content('test-annex.dat') is False)
     result = ds.get("test-annex.dat")
     eq_(len(result), 1)
