@@ -25,23 +25,23 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import verbose
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandNotAvailableError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
+from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import require_dataset
 from .dataset import resolve_path
-from .dataset import _with_sep
 from .utils import install_necessary_subdatasets
 
 __docformat__ = 'restructuredtext'
@@ -99,6 +99,7 @@ class Get(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
+        jobs=jobs_opt,
         verbose=verbose)
 
     # Note: May be use 'git annex find --not --in here' to have a list of all
@@ -116,6 +117,7 @@ class Get(Interface):
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
+            jobs=None,
             verbose=False):
 
         # check parameters:
@@ -223,14 +225,14 @@ class Get(Interface):
 
             local_results = cur_ds.repo.get(resolved_datasets[ds_path],
                                             options=['--from=%s' % source]
-                                                     if source else [])
+                                                     if source else [],
+                                            jobs=jobs)
 
             # if we recurse into subdatasets, adapt relative paths reported by
             # annex to be relative to the toplevel dataset we operate on:
             if cur_ds != ds:
-                for i in range(len(local_results)):
-                    local_results[i]['file'] = \
-                        relpath(opj(ds_path, local_results[i]['file']), ds.path)
+                for lr in local_results:
+                    lr['file'] = relpath(opj(ds_path, lr['file']), ds.path)
 
             global_results.extend(local_results)
 
@@ -269,5 +271,3 @@ class Get(Interface):
                     path=item.get('file'))
                 for item in res])
             ui.message(msg)
-
-

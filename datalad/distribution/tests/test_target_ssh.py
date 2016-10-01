@@ -11,8 +11,7 @@
 
 import os
 import re
-from os.path import join as opj, abspath, basename, exists
-from os.path import relpath
+from os.path import join as opj, basename, exists
 
 from git.exc import GitCommandError
 
@@ -22,20 +21,19 @@ from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import eq_, assert_false, assert_is_instance
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_not_in
+from nose.tools import eq_, assert_false
+from datalad.tests.utils import with_tempfile, assert_in, \
+    with_testrepos
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_exists
+from datalad.tests.utils import ok_endswith
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_set_equal
+from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
@@ -44,6 +42,7 @@ from datalad.utils import on_windows
 from datalad.utils import _path_
 
 import logging
+
 
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
@@ -100,7 +99,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                 dataset=source,
                 target="local_target",
                 sshurl="ssh://localhost",
-                target_dir=target_path)
+                target_dir=target_path,
+                ui=True)
         # is not actually happening on one of the two basic cases -- TODO figure it out
         # assert_in('enableremote local_target failed', cml.out)
 
@@ -137,7 +137,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_dir=target_path)
     eq_("Target directory %s already exists." % target_path,
         str(cm.exception))
-
+    if src_is_annex:
+        target_description = AnnexRepo(target_path, create=False).get_description()
+        assert_not_equal(target_description, None)
+        assert_not_equal(target_description, target_path)
+        ok_endswith(target_description, target_path)
     # now, with force and correct url, which is also used to determine
     # target_dir
     # Note: on windows absolute path is not url conform. But this way it's easy
@@ -174,8 +178,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_dir=target_path,
             target_url=target_path,
             target_pushurl="ssh://localhost" + target_path,
+            ui=True,
         )
         assert_create_sshwebserver(existing='replace', **cpkwargs)
+        if src_is_annex:
+            target_description = AnnexRepo(target_path,
+                                           create=False).get_description()
+            eq_(target_description, target_path)
+
         eq_(target_path,
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
@@ -274,7 +284,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 target=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
-                recursive=True)
+                recursive=True,
+                ui=True)
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:

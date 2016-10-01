@@ -25,7 +25,7 @@ from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath, is_implicit_metadata
 from datalad.support.json_py import dump as jsondump
-from datalad.support.dsconfig import ConfigManager
+from datalad.config import ConfigManager
 
 
 def _store_json(path, meta):
@@ -75,14 +75,8 @@ class AggregateMetaData(Interface):
         # one it
         dsonly_cfg = ConfigManager(dataset, dataset_only=True)
         if 'datalad.dataset.id' not in dsonly_cfg:
-            dsonly_cfg.add(
-                'datalad.dataset.id',
-                dataset.id,
-                where='dataset',
-                reload=False)
-            dataset.repo.add(opj('.datalad', 'config'), git=True)
-            dataset.save(message="[DATALAD] record generated dataset ID")
-            _modified_flag = True
+            lgr.warning('%s has not configured ID, skipping.', dataset)
+            return _modified_flag
 
         # use one set of subdataset instances to ensure consistent IDs even
         # when none is configured

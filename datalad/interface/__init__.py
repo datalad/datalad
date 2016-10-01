@@ -38,6 +38,7 @@ _group_dataset = (
          'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
+        ('datalad.export', 'Export', 'export'),
     ])
 
 _group_metadata = (

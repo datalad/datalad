@@ -16,6 +16,7 @@ import logging.handlers
 from os.path import basename, dirname
 
 from .utils import is_interactive
+from .support import ansi_colors as colors
 
 __all__ = ['ColorFormatter']
 
@@ -95,28 +96,16 @@ class TraceBack(object):
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
 
-    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
-
-    RESET_SEQ = "\033[0m"
-    COLOR_SEQ = "\033[1;%dm"
-    BOLD_SEQ = "\033[1m"
-
-    COLORS = {
-        'WARNING': YELLOW,
-        'INFO': WHITE,
-        'DEBUG': BLUE,
-        'CRITICAL': YELLOW,
-        'ERROR': RED
-    }
-
     def __init__(self, use_color=None, log_name=False, log_pid=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
-        msg = self.formatter_msg(self._get_format(log_name, log_pid), self.use_color)
-        self._tb = TraceBack(collide=os.environ.get('DATALAD_LOGTRACEBACK', '') == 'collide') \
-            if os.environ.get('DATALAD_LOGTRACEBACK', False) else None
+        msg = colors.format_msg(self._get_format(log_name, log_pid),
+                                self.use_color)
+        self._tb = TraceBack(
+            collide=os.environ.get('DATALAD_LOG_TRACEBACK', '') == 'collide') \
+            if os.environ.get('DATALAD_LOG_TRACEBACK', False) else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
@@ -128,13 +117,6 @@ class ColorFormatter(logging.Formatter):
                 "%(message)s "
                 "($BOLD%(filename)s$RESET:%(lineno)d)")
 
-    def formatter_msg(self, fmt, use_color=False):
-        if use_color:
-            fmt = fmt.replace("$RESET", self.RESET_SEQ).replace("$BOLD", self.BOLD_SEQ)
-        else:
-            fmt = fmt.replace("$RESET", "").replace("$BOLD", "")
-        return fmt
-
     def format(self, record):
         if record.msg.startswith('| '):
             # If we already log smth which supposed to go without formatting, like
@@ -142,9 +124,10 @@ class ColorFormatter(logging.Formatter):
             return record.msg
 
         levelname = record.levelname
-        if self.use_color and levelname in self.COLORS:
-            fore_color = 30 + self.COLORS[levelname]
-            levelname_color = self.COLOR_SEQ % fore_color + "%-7s" % levelname + self.RESET_SEQ
+        if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
+            fore_color = colors.LOG_LEVEL_COLORS[levelname]
+            levelname_color = (colors.COLOR_SEQ % fore_color) + \
+                              ("%-7s" % levelname) + colors.RESET_SEQ
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:

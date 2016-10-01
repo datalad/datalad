@@ -326,14 +326,14 @@ Various hints for developers
 ### Useful Environment Variables
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
-- *DATALAD_LOGLEVEL*: 
+- *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_TESTS_KEEPTEMP*: 
+- *DATALAD_TESTS_TEMP_KEEP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
-- *DATALAD_TESTS_TEMPDIR*: 
+- *DATALAD_TESTS_TEMP_DIR*: 
   Create a temporary directory at location specified by this flag.
   It is used by tests to create a temporary git directory while testing git annex archives etc
 - *DATALAD_TESTS_NONETWORK*: 
@@ -341,12 +341,15 @@ Refer datalad/config.py for information on how to add these environment variable
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
-- *DATALAD_LOGTRACEBACK*: 
+- *DATALAD_API_ALWAYSRENDER*: 
+  Would make api functions always use a version with cmdline output renderer
+  (i.e. the one with `_` suffix)
+- *DATALAD_LOG_TRACEBACK*: 
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
-- *DATALAD_USECASSETTE*:
+- *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
 - *DATALAD_CMD_PROTOCOL*: 
@@ -355,15 +358,15 @@ Refer datalad/config.py for information on how to add these environment variable
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
-- *DATALAD_PROTOCOL_REMOTE*:
+- *DATALAD_TESTS_PROTOCOLREMOTE*:
   Binary flag to specify whether to test protocol interactions of custom remote with annex
 - *DATALAD_LOG_TIMESTAMP*:
   Used to add timestamp to datalad logs
-- *DATALAD_RUN_CMDLINE_TESTS*:
+- *DATALAD_TESTS_RUNCMDLINE*:
   Binary flag to specify if shell testing using shunit2 to be carried out
-- *DATALAD_TEMP_FS*:
-  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
-- *DATALAD_TEMP_FS_SIZE*:
-  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
-- *DATALAD_NONLO*:
+- *DATALAD_TESTS_TEMP_FS*:
+  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
+- *DATALAD_TESTS_TEMP_FSSIZE*:
+  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
+- *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.

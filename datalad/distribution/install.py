@@ -164,6 +164,18 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
                     '/'.join(sm_url_l[i:]),
                     url_suffix))
                 break
+
+    # TODO:
+    # here clone_urls might contain degenerate urls which should be
+    # normalized and not added into the pool of the ones to try if already
+    # there, e.g. I got
+    #  ['http://datasets.datalad.org/crcns/aa-1/.git', 'http://datasets.datalad.org/crcns/./aa-1/.git']
+    # upon  install aa-1
+
+    # TODO:
+    # We need to provide some error msg with InstallFailedError, since now
+    # it just swallows everything.
+
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
     success = False
@@ -205,11 +217,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
     if not success:
-        raise InstallFailedError("Failed to install dataset %s" % ds)
-
-
-# TODO:  git_clone options
-# use --shared by default? => option --no-shared
+        raise InstallFailedError("Failed to install dataset %s" % subds)
 
 
 class Install(Interface):
@@ -272,6 +280,15 @@ class Install(Interface):
         recursion_limit=recursion_limit,
         if_dirty=if_dirty_opt,
         save=nosave_opt,
+        reckless=Parameter(
+            args=("--reckless",),
+            action="store_true",
+            doc="""Set up the dataset to be able to obtain content in the
+            cheapest/fastest possible way, even if this poses a potential
+            risk the data integrity (e.g. hardlink files from a local clone
+            of the dataset). Use with care, and limit to "read-only" use
+            cases. With this flag the installed dataset will be marked as
+            untrusted."""),
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
@@ -289,6 +306,7 @@ class Install(Interface):
             recursion_limit=None,
             if_dirty='save-before',
             save=True,
+            reckless=False,
             git_opts=None,
             git_clone_opts=None,
             annex_opts=None,
@@ -303,33 +321,42 @@ class Install(Interface):
 
         # handle calls with multiple paths first:
         if path and isinstance(path, list):
-            if len(path) > 1 and source is not None:
-                raise ValueError("source argument not valid when "
-                                 "installing multiple datasets.")
-            else:
-                for p in path:
-                    result = Install.__call__(
-                        path=p,
-                        source=None,
-                        dataset=dataset,
-                        get_data=get_data,
-                        description=description,
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        save=save,
-                        if_dirty=if_dirty,
-                        git_opts=git_opts,
-                        git_clone_opts=git_clone_opts,
-                        annex_opts=annex_opts,
-                        annex_init_opts=annex_init_opts
-                    )
-
-                    installed_items += assure_list(result)
-
-                if len(installed_items) == 1:
-                    return installed_items[0]
+            if len(path) > 1:
+                if source is not None:
+                    raise ValueError("source argument not valid when "
+                                     "installing multiple datasets.")
                 else:
-                    return installed_items
+                    for p in path:
+                        try:
+                            result = Install.__call__(
+                                path=p,
+                                source=None,
+                                dataset=dataset,
+                                get_data=get_data,
+                                description=description,
+                                recursive=recursive,
+                                recursion_limit=recursion_limit,
+                                save=save,
+                                if_dirty=if_dirty,
+                                git_opts=git_opts,
+                                git_clone_opts=git_clone_opts,
+                                annex_opts=annex_opts,
+                                annex_init_opts=annex_init_opts
+                            )
+
+                            installed_items += assure_list(result)
+                        except Exception:
+                            # Note: We don't exactly know what was skipped but
+                            # the `path` requested to be installed, since it will be
+                            # resolved only within the recursive call of install.
+                            lgr.info("Installation of {0} skipped.".format(p))
+
+                    if len(installed_items) == 1:
+                        return installed_items[0]
+                    else:
+                        return installed_items
+            else:
+                path = path[0]
 
         # now the 'usual' flow with single `path`argument:
         # shortcut
@@ -424,34 +451,47 @@ class Install(Interface):
             # one or it is an existing and installed dataset, that is requested
             # to be installed again (but with recursive or get-data)
 
-
-
-            # So, test for that last remaining option:
-
-            # if `path` was a known subdataset to be installed, let's assume
-            # it would be one:
             assume_ds = Dataset(path)
-            candidate_super_ds = assume_ds.get_superdataset()
-
-            if candidate_super_ds and candidate_super_ds != assume_ds:
-                # `path` has a potential superdataset
-                if assume_ds.path in candidate_super_ds.get_subdatasets(absolute=True):
-                    # candidate knows it, so we have the case of a
-                    # known subdataset:
-                    _install_known_sub = True
-                    _install_into_ds = True
-                    ds = candidate_super_ds
-                else:
-                    # it is not (yet) known to the candidate. May be there's is
-                    # a not yet installed one in between. Let's try:
-                    _try_implicit = True
-                    _install_into_ds = True
-                    ds = candidate_super_ds
+            # Work in progress:
+            if assume_ds.is_installed():
+                # `path` is installed already and not to be installed into
+                # another one (_install_into_ds is False!)
+                # so we can only execute additional arguments like `recursive`
+                # or `get_data`.
+                # Theoretically, we could update from existing remote, but this
+                # is not a matter of install atm.
+                lgr.debug("{0} already installed.".format(assume_ds))
+                _skip_ = True  # TODO: Better name
+                source = path  # we have nothing else;
+                # this should lead to FLOW GUIDE 2 and there skip due to
+                # "already exists" and perform remaining actions
             else:
-                # no match, we can't deal with that `path` argument
-                # without a `source`:
-                raise InsufficientArgumentsError(
-                    "Got no source to install from.")
+                # So, test for that last remaining option:
+
+                # if `path` was a known subdataset to be installed, let's assume
+                # it would be one:
+                candidate_super_ds = assume_ds.get_superdataset()
+
+                if candidate_super_ds and candidate_super_ds != assume_ds:
+                    # `path` has a potential superdataset
+                    if assume_ds.path in \
+                            candidate_super_ds.get_subdatasets(absolute=True):
+                        # candidate knows it, so we have the case of a
+                        # known subdataset:
+                        _install_known_sub = True
+                        _install_into_ds = True
+                        ds = candidate_super_ds
+                    else:
+                        # it is not (yet) known to the candidate. May be there's
+                        # a not yet installed one in between. Let's try:
+                        _try_implicit = True
+                        _install_into_ds = True
+                        ds = candidate_super_ds
+                else:
+                    # no match, we can't deal with that `path` argument
+                    # without a `source`:
+                    raise InsufficientArgumentsError(
+                        "Got no source to install from.")
 
         _install_inplace = False
         from os.path import realpath
@@ -463,7 +503,7 @@ class Install(Interface):
         if source and path and realpath(source) == realpath(path):
             if _install_into_ds:
                 _install_inplace = True
-            else:
+            elif not _skip_:
                 raise InsufficientArgumentsError(
                     "Source and target are the same ({0}). This doesn't make "
                     "sense without a dataset to install into.".format(path))
@@ -515,7 +555,6 @@ class Install(Interface):
 
         if _install_into_ds:
             # FLOW GUIDE: 1.
-            lgr.info("Installing subdataset at: {0}".format(path))
 
             # express the destination path relative to the root of
             # the dataset
@@ -530,6 +569,8 @@ class Install(Interface):
                 # FLOW_GUIDE: 1.1.
                 submodule = [sm for sm in ds.repo.get_submodules()
                              if sm.path == relativepath][0]
+                lgr.info("Installing subdataset from '{0}' at: {0}".format(
+                    submodule.url, submodule.path))
 
                 current_dataset = _install_subds_from_flexible_source(
                     ds,
@@ -539,6 +580,8 @@ class Install(Interface):
 
             elif _install_inplace:
                 # FLOW GUIDE: 1.2.
+                lgr.info("Installing existing dataset as subdataset at: {0}".format(
+                    path))
                 current_dataset = _install_subds_inplace(
                     ds,
                     path,
@@ -550,13 +593,19 @@ class Install(Interface):
                 # TODO: due to current implementation of
                 # install_necessary_subdatasets we get only the last one returned
                 try:
+                    lgr.debug("Attempt to locate installation target in known subdatasets")
                     current_dataset = install_necessary_subdatasets(ds, path)
                 except Exception as e:
                     lgr.error("Installation attempt for target {0} failed:"
                               "{1}{2}".format(path, linesep, exc_str(e)))
                     raise
+                # check that we got what we were looking for
+                if not lexists(path):
+                    raise ValueError("Cannot install '{}', does not exist in dataset '{}' or any known subdataset".format(path, ds))
             else:
                 # FLOW_GUIDE 1.4.
+                lgr.info("Installing subdataset from '{0}' at: {0}".format(
+                    source_url, relativepath))
                 current_dataset = _install_subds_from_flexible_source(
                     ds,
                     relativepath,
@@ -644,10 +693,18 @@ class Install(Interface):
         # in any case check whether we need to annex-init the installed thing:
         if knows_annex(current_dataset.path):
             # init annex when traces of a remote annex can be detected
+            if reckless:
+                lgr.debug(
+                    "Instruct annex to hardlink content in %s from local "
+                    "sources, if possible (reckless)", current_dataset.path)
+                current_dataset.config.add('annex.hardlink', 'true',
+                                           where='local', reload=True)
             lgr.info("Initializing annex repo at %s", current_dataset.path)
-            AnnexRepo(current_dataset.path, init=True)
+            repo = AnnexRepo(current_dataset.path, init=True)
+            if reckless:
+                repo._run_annex_command('untrust', annex_options=['here'])
 
-        lgr.debug("Installation of {0} done.".format(current_dataset))
+        lgr.debug("Installation of %s done.", current_dataset)
 
         if not current_dataset.is_installed():
             # log error and don't report as installed item, but don't raise,
@@ -668,10 +725,7 @@ class Install(Interface):
                                                     recursion_limit=1,
                                                     absolute=True)]
             for subds in subs:
-                if subds.is_installed():
-                    lgr.debug("subdataset {0} already installed."
-                              " Skipped.".format(subds))
-                else:
+                try:
                     rec_installed = Install.__call__(
                         path=subds.path,
                         dataset=current_dataset,
@@ -688,6 +742,10 @@ class Install(Interface):
                         installed_items.extend(rec_installed)
                     else:
                         installed_items.append(rec_installed)
+
+                except Exception:
+                    # Error itself should already be logged.
+                    lgr.info("{0} skipped.".format(subds))
 
         # get the content of installed (sub-)datasets:
         if get_data:
@@ -713,24 +771,6 @@ class Install(Interface):
             return installed_items
 
     @staticmethod
-    def _get_new_vcs(ds, source):
-        if source is None:
-            raise RuntimeError(
-                "No `source` was provided. To create a new dataset "
-                "use the `create` command.")
-        else:
-            # when obtained from remote, try with plain Git
-            lgr.info("Creating a new git repo at %s", ds.path)
-            vcs = GitRepo(ds.path, url=source, create=True)
-            if knows_annex(ds.path):
-                # init annex when traces of a remote annex can be detected
-                lgr.info("Initializing annex repo at %s", ds.path)
-                vcs = AnnexRepo(ds.path, init=True)
-            else:
-                lgr.debug("New repository clone has no traces of an annex")
-        return vcs
-
-    @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
@@ -746,4 +786,3 @@ class Install(Interface):
             n=len(res),
             items=items)
         ui.message(msg)
-

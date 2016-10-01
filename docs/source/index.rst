@@ -15,6 +15,7 @@ Concepts and technologies
    background
    related
    metadata
+   config
    usecases/index
    glossary
 

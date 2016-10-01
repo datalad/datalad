@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
@@ -24,10 +25,10 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.dataset import _with_sep
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.utils import assure_list
+from datalad.utils import with_pathsep as _with_sep
 
 from .base import Interface
 
@@ -58,7 +59,7 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
             _install_subds_inplace(
                 ds=ds,
                 path=utf_abspath,  # can be ignored, we don't need the return value
-                relativepath=utf,
+                relativepath=utf.rstrip(os.sep),
                 name=None)
             _modified_flag = True
 

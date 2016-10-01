@@ -13,12 +13,13 @@ from operator import itemgetter
 from six import PY2
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
-from nose.tools import assert_true, assert_equal, assert_raises
+from nose.tools import assert_true, assert_equal, assert_raises, assert_false
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
+from datalad.utils import assure_unicode
 from datalad.dochelpers import exc_str
 import os
-from os.path import join as opj
+from os.path import join as opj, exists
 from datalad.support.exceptions import InsufficientArgumentsError
 from nose import SkipTest
 
@@ -134,10 +135,7 @@ def test_aggregation(path):
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
-        if PY2:
-            assert_true(sum([s.get('name', None) == name.decode('utf-8') for s in meta]))
-        else:
-            assert_true(sum([s.get('name', None) == name for s in meta]))
+        assert_true(sum([s.get('name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         meta[0]['dcterms:hasPart']['@id'],
         subds.id)
@@ -196,8 +194,20 @@ def test_aggregation(path):
 
         child_res = list(clone.search('child'))
         assert_equal(len(child_res), 2)
+        # little helper to match names
+        def assert_names(res, names, path=clone.path):
+            assert_equal(list(map(itemgetter(0), res)),
+                         [opj(path, n) for n in names])
         # should yield (location, report) tuples
-        assert_equal(list(map(itemgetter(0), child_res)), ['sub', 'sub/subsub'])
+        assert_names(child_res, ['sub', 'sub/subsub'])
+
+        # test searching among specified properties only
+        assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
+        assert_names(clone.search('i', search='keywords'), ['.'])
+        # case shouldn't matter
+        assert_names(clone.search('i', search='Keywords'), ['.'])
+        assert_names(clone.search('i', search=['name', 'keywords']),
+                     ['.', 'sub', 'sub/subsub'])
 
         # without report_matched, we are getting none of the fields
         assert(all([not x for x in map(itemgetter(1), child_res)]))
@@ -227,13 +237,10 @@ def test_aggregation(path):
         )
 
         # more tests on returned paths:
-        assert_equal(list(map(itemgetter(0),
-                              clone.search('datalad'))),
-                     ['.', 'sub', 'sub/subsub'])
+        assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
         # if we clone subdataset and query for value present in it and its kid
-        assert_equal(list(map(itemgetter(0),
-                              clone.install('sub').search('datalad'))),
-                     ['.', 'subsub'])
+        clone_sub = clone.install('sub')
+        assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
         # Test 'and' for multiple search entries
         assert_equal(len(list(clone.search(['child', 'bids']))), 2)
@@ -267,3 +274,24 @@ def test_aggregation(path):
         pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+def test_aggregate_with_missing_id(path):
+    # a hierarchy of three (super/sub)datasets, each with some native metadata
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    subds = ds.create('sub', force=True, if_dirty='ignore')
+    subds.repo.remove(opj('.datalad', 'config'))
+    subds.save()
+    assert_false(exists(opj(subds.path, '.datalad', 'config')))
+    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+    # aggregate from bottom to top, guess native data, no compacting of graph
+    # should yield 6 meta data sets, one implicit, and one native per dataset
+    # and a second natiev set for the topmost dataset
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
+    # no only ask the top superdataset, no recursion, just reading from the cache
+    meta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+    # and we know nothing subsub
+    for name in ('grandchild_äöü東',):
+        assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))

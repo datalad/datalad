@@ -289,7 +289,7 @@ class EnsureRange(Constraint):
         return 'value must be in range [%s, %s]' % (min_str, max_str)
 
     def short_description(self):
-        None
+        return None
 
 
 class AltConstraints(Constraint):

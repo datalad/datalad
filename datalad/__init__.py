@@ -49,8 +49,9 @@ test.__test__ = False
 # To store settings which setup_package changes and teardown_package should return
 _test_states = {
     'loglevel': None,
-    'DATALAD_LOGLEVEL': None,
+    'DATALAD_LOG_LEVEL': None,
 }
+
 
 def setup_package():
     import os
@@ -69,16 +70,16 @@ def setup_package():
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
 
-    DATALAD_LOGLEVEL = os.environ.get('DATALAD_LOGLEVEL', None)
-    if DATALAD_LOGLEVEL is None:
+    DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
+    if DATALAD_LOG_LEVEL is None:
         # very very silent.  Tests introspecting logs should use
         # swallow_logs(new_level=...)
         _test_states['loglevel'] = lgr.getEffectiveLevel()
         lgr.setLevel(100)
 
         # And we should also set it within environ so underlying commands also stay silent
-        _test_states['DATALAD_LOGLEVEL'] = DATALAD_LOGLEVEL
-        os.environ['DATALAD_LOGLEVEL'] = '100'
+        _test_states['DATALAD_LOG_LEVEL'] = DATALAD_LOG_LEVEL
+        os.environ['DATALAD_LOG_LEVEL'] = '100'
     else:
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
@@ -91,10 +92,10 @@ def teardown_package():
 
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
-        if _test_states['DATALAD_LOGLEVEL'] is None:
-            os.environ.pop('DATALAD_LOGLEVEL')
+        if _test_states['DATALAD_LOG_LEVEL'] is None:
+            os.environ.pop('DATALAD_LOG_LEVEL')
         else:
-            os.environ['DATALAD_LOGLEVEL'] = _test_states['DATALAD_LOGLEVEL']
+            os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     from datalad.tests.utils import rmtemp

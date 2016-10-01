@@ -9,7 +9,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
+import os
 from mock import patch
+from datalad import cfg
 from datalad.api import Dataset, aggregate_metadata, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
@@ -41,13 +43,21 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
+        always_render = cfg.obtain('datalad.api.alwaysrender')
         with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
-            gen = search("bu")
-            assert_is_generator(gen)
-            assert_raises(NoDatasetArgumentFound, next, gen)
+            if always_render:
+                # we do try to render results which actually causes exception
+                # to come right away
+                assert_raises(NoDatasetArgumentFound, search, "bu")
+            else:
+                gen = search("bu")
+                assert_is_generator(gen)
+                assert_raises(NoDatasetArgumentFound, next, gen)
 
-        # and if we point to some non-existing dataset -- the same
-        assert_raises(ValueError, next, search("bu", dataset=newhome))
+        # and if we point to some non-existing dataset -- the same in both cases
+        # but might come before even next if always_render
+        with assert_raises(ValueError):
+            next(search("bu", dataset=newhome))
 
 
 @with_testsui(responses='yes')
@@ -102,8 +112,10 @@ class _mock_search(object):
 def _check_mocked_install(central_dspath, mock_install):
     gen = search(".", regex=True)
     assert_is_generator(gen)
+    # we no longer do any custom path tune up from the one returned by search
+    # so should match what search returns
     assert_equal(
-        list(gen), [(opj(central_dspath, loc), report)
+        list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
     mock_install.assert_called_once_with(central_dspath, source='///')
 

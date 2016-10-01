@@ -49,12 +49,13 @@ be installed, e.g.
 
     datalad install ///openfmri/ds000113
 
-or install top level dataset by omitting `-r datasets` option and then calling
-`datalad install` for specific sub-datasets you want to be installed, e.g.
+or install top level dataset by omitting `-r` option and then calling
+`datalad install` for specific sub-datasets you want to have installed,
+possibly with `-r` to install their sub-datasets as well, e.g.
 
     datalad install ///
     cd datasets.datalad.org
-    datalad install openfmri indi/fcon1000
+    datalad install -r openfmri/ds000001 indi/fcon1000
 
 You can navigate datasets you have installed in your terminal or browser,
 while fetching necessary files or installing new sub-datasets using the
@@ -73,8 +74,8 @@ You can find more documentation at http://docs.datalad.org .
 
 # Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in
-internals and/or contributing to the project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
+contributing to the project.
 
 # Installation
 
@@ -85,7 +86,7 @@ from which we provide recent releases of DataLad.  datalad package recommends
 some relatively heavy packages (e.g. scrapy) which are useful only if you are
 interested in using `crawl` functionality.  If you need just the base
 functionality of the datalad, install without recommended packages
-(e.g. `apt-get install --no-install-recommends datalad`)
+(e.g., `apt-get install --no-install-recommends datalad`)
 
 ## Other Linux'es, OSX (Windows yet TODO) via pip
 
@@ -94,12 +95,12 @@ allowing for managing datasets etc.  Additional installation schemes
 are available, so you could provide enhanced installation via
 `pip install datalad[SCHEME]` where `SCHEME` could be
 
-- crawl
-     to also install scrapy which is used in some crawling constructs
-- tests
+- `crawl`
+     to also install `scrapy` which is used in some crawling constructs
+- `tests`
      to also install dependencies used by unit-tests battery of the datalad
-- full
-     to install all of possible dependencies.
+- `full`
+     to install all dependencies.
 
 For installation through `pip` you would need some external dependencies
 not shipped from it (e.g. `git-annex`, etc.) for which please refer to
@@ -107,13 +108,13 @@ the next section.
 
 ## Dependencies
 
-Our [setup.py] and accompanying packaging describes all necessary dependencies.
+Our [setup.py] and accompanying packaging describe all necessary dependencies.
 On Debian-based systems we recommend to enable [NeuroDebian]
 since we use it to provide backports of recent fixed external modules we
-depend upon, and up-to-date [Git-annex] necessary for proper operation of
-DataLad packaged from a standalone build.  Additionally, if you would
-like to develop and run our tests battery see [CONTRIBUTING.md](CONTRIBUTING.md)
-regarding additional dependencies.
+depend upon, and up-to-date [Git-annex] is necessary for proper operation of
+DataLad packaged (install `git-annex-standalone` from NeuroDebian repository).
+Additionally, if you would like to develop and run our tests battery see
+[CONTRIBUTING.md](CONTRIBUTING.md) regarding additional dependencies.
 
 Later we will provide bundled installations of DataLad across popular
 platforms.

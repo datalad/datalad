@@ -31,14 +31,13 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import assure_list
-
+from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import Dataset
 from .dataset import resolve_path
 from .dataset import require_dataset
-from .dataset import _with_sep
 from .install import _get_git_url_from_source
 
 

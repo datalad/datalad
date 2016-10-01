@@ -63,7 +63,7 @@ def _with_tempfile_decorated_dummy(path):
 def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
         filename = _with_tempfile_decorated_dummy()
         ok_startswith(filename, target)
 
@@ -152,7 +152,7 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         ok_(not os.path.exists(dnames[0]))  # got removed
 
 
@@ -186,7 +186,7 @@ def test_get_most_obscure_supported_name():
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []
@@ -199,7 +199,7 @@ def test_keeptemp_via_env_variable():
     with patch.dict('os.environ', {}):
         check()
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_KEEPTEMP': '1'}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_KEEP': '1'}):
         check()
 
     eq_(len(files), 2)

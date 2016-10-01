@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 # TODO: we have already smth in progressbar...  check
 import humanize
-from ..utils import auto_repr
 
 _COUNTS = (
     'files', 'urls',
@@ -56,15 +55,16 @@ class ActivityStats(object):
 
     def __repr__(self):
         # since auto_repr doesn't support "non-0" values atm
-        return "%s(%s)" % (self.__class__.__name__,
-                           ", ".join(["%s=%s" % (k,v) for k, v in self._current.items() if v]))
+        return "%s(%s)" \
+            % (self.__class__.__name__,
+               ", ".join(["%s=%s" % (k, v) for k, v in self._current.items() if v]))
 
     # Comparisons operate solely on _current
     def __eq__(self, other):
-        return (self._current == other._current)# and (self._total == other._total)
+        return (self._current == other._current)  # and (self._total == other._total)
 
     def __ne__(self, other):
-        return (self._current != other._current)# or (self._total != other._total)
+        return (self._current != other._current)  # or (self._total != other._total)
 
     def __iadd__(self, other):
         for m in other.__metrics__:
@@ -107,14 +107,16 @@ class ActivityStats(object):
         """Helper for incrementing counters"""
         self._current[k] += v
 
-    def _reset_values(self, d, vals={}):
+    def _reset_values(self, d, vals):
         for c in _COUNTS:
             d[c] = vals.get(c, 0)
         for l in _LISTS:
             d[l] = vals.get(l, [])
 
-    def reset(self, full=False, vals={}):
+    def reset(self, full=False, vals=None):
         # Initialize
+        if vals is None:
+            vals = {}
         if not full:
             self._total = self._get_updated_total()
         self._reset_values(self._current, vals=vals)
@@ -137,20 +139,20 @@ class ActivityStats(object):
         """
 
         # Example
-        """
-URLs processed: {urls}
- downloaded: {downloaded}
- downloaded size: {downloaded_size}
-Files processed: {files}
- skipped: {skipped}
- renamed: {renamed}
- removed: {removed}
- added to git: {add_git}
- added to annex: {add_annex}
- overwritten: {overwritten}
-Branches merged:
-  upstream -> master
-"""
+        #"""
+        #URLs processed: {urls}
+        # downloaded: {downloaded}
+        # downloaded size: {downloaded_size}
+        #Files processed: {files}
+        # skipped: {skipped}
+        # renamed: {renamed}
+        # removed: {removed}
+        # added to git: {add_git}
+        # added to annex: {add_annex}
+        # overwritten: {overwritten}
+        #Branches merged:
+        #  upstream -> master
+        #"""
 
         # TODO: improve
         entries = self.as_dict()
@@ -179,12 +181,12 @@ Branches merged:
         if mode == 'full':
             return '\n'.join(out)
         elif mode == 'line':
-            for i in range(len(out)):
-                if out[i][0] != ' ':
-                    out[i] = '  ' + out[i]
+            for i, o in enumerate(out):
+                if o[0] != ' ':
+                    out[i] = '  ' + o
             return ','.join(out).lstrip()
             return "{files} files (git/annex: {add_git}/{add_annex}), " \
                    "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(
-                    **entries)
+                       **entries)
         else:
             raise ValueError("Unknown mode %s" % mode)

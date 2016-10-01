@@ -16,7 +16,6 @@ import logging
 import datalad
 from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
-from jsmin import jsmin
 from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
@@ -25,7 +24,6 @@ from datalad.support.param import Parameter
 from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
@@ -33,10 +31,8 @@ from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 from datalad import ssh_manager
-from datalad.cmd import Runner
-from datalad.dochelpers import exc_str
 from datalad.utils import make_tempfile
-from datalad.consts import WEB_HTML_DIR, WEB_META_DIR, WEB_META_LOG
+from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
 
@@ -102,7 +98,8 @@ class CreateSibling(Interface):
                 (default: `sshurl`). Accessibility of this URL determines the
                 access permissions of potential consumers of the dataset.
                 As with `target_dir`, templates (same set of placeholders)
-                are supported.\n""",
+                are supported.  Also, if specified, it is provided as the annex
+                description\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
@@ -134,14 +131,21 @@ class CreateSibling(Interface):
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
-            constraints=EnsureStr() | EnsureBool()),)
+            constraints=EnsureStr() | EnsureBool()),
+        ui=Parameter(
+            args=("--ui",),
+            metavar='false|true|html_filename',
+            doc="""publish a web interface for the dataset with an
+            optional user-specified name for the html at publication
+            target. defaults to `index.html` at dataset root""",
+            constraints=EnsureBool() | EnsureStr()),)
 
     @staticmethod
     @datasetmethod(name='create_sibling')
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 existing='error', shared=False):
+                 existing='error', shared=False, ui=False):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -277,9 +281,10 @@ class CreateSibling(Interface):
 
             # don't (re-)initialize dataset if existing == reconfigure
             if not only_reconfigure:
-                # init git repo
-                if not CreateSibling.init_remote_repo(path, ssh, shared,
-                                                                            datasets[current_dspath]):
+                # init git and possibly annex repo
+                if not CreateSibling.init_remote_repo(
+                        path, ssh, shared, datasets[current_dspath],
+                        description=target_url):
                     continue
 
             # check git version on remote end
@@ -311,19 +316,12 @@ class CreateSibling(Interface):
                 lgr.error("Failed to add json creation command to post update "
                           "hook.\nError: %s" % exc_str(e))
 
-            if not only_reconfigure:
-                lgr.debug("Initializing annex repo on remote sibling")
-                # Initialize annex repo on remote copy if current_dspath
-                # is an AnnexRepo
-                if isinstance(datasets[current_dspath].repo, AnnexRepo):
-                    ssh(['git', '-C', path, 'annex', 'init', path])
-
             # publish web-interface to root dataset on publication server
-            if at_root:
+            if at_root and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 at_root = False
                 try:
-                    CreateSibling.upload_web_interface(path, ssh, shared)
+                    CreateSibling.upload_web_interface(path, ssh, shared, ui)
                 except CommandError as e:
                     lgr.error("Failed to push web interface to the remote "
                               "datalad repository.\nError: %s" % exc_str(e))
@@ -362,7 +360,7 @@ class CreateSibling(Interface):
         #       => [(Dataset, fetch_url)]
 
     @staticmethod
-    def init_remote_repo(path, ssh, shared, dataset):
+    def init_remote_repo(path, ssh, shared, dataset, description=None):
         cmd = ["git", "-C", path, "init"]
         if shared:
             cmd.append("--shared=%s" % shared)
@@ -376,7 +374,10 @@ class CreateSibling(Interface):
         if isinstance(dataset.repo, AnnexRepo):
             # init remote git annex repo (part fix of #463)
             try:
-                ssh(["git", "-C", path, "annex", "init"])
+                ssh(
+                    ["git", "-C", path, "annex", "init"] +
+                    ([description] if description else [])
+                )
             except CommandError as e:
                 lgr.error("Initialization of remote git annex repository failed at %s."
                           "\nError: %s\nSkipping ..." % (path, exc_str(e)))
@@ -413,15 +414,13 @@ class CreateSibling(Interface):
 
         # create json command for current dataset
         json_command = r'''
-( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
-  || echo "no datalad found - skipping generation of indexes for web frontend"; \
-) &> "{}/{}"
-'''.format(
-            str(path),
-            logs_remote_dir,
-            'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
-        )
+        ( which datalad > /dev/null \
+        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
+        || echo "no datalad found - skipping generation of indexes for web frontend"; \
+        ) &> "{}/{}"
+        '''.format(str(path),
+                   logs_remote_dir,
+                   'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT)
 
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
@@ -431,12 +430,18 @@ class CreateSibling(Interface):
         ssh(['chmod', '+x', hook_remote_target])            # and make it executable
 
     @staticmethod
-    def upload_web_interface(path, ssh, shared):
+    def upload_web_interface(path, ssh, shared, ui):
         # path to web interface resources on local
         webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
-        # upload html to dataset
-        html = opj(webui_local, 'index.html')
-        ssh.copy(html, path)
+        # local html to dataset
+        html_local = opj(webui_local, "index.html")
+
+        # name and location of web-interface html on target
+        html_targetname = {True: ui, False: "index.html"}[isinstance(ui, str)]
+        html_target = opj(path, html_targetname)
+
+        # upload ui html to target
+        ssh.copy(html_local, html_target)
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
@@ -447,7 +452,13 @@ class CreateSibling(Interface):
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
             with open(js_file) as asset:
-                minified = jsmin(asset.read())                          # minify asset
+                try:
+                    from jsmin import jsmin
+                    minified = jsmin(asset.read())                      # minify asset
+                except ImportError:
+                    lgr.warning(
+                        "Will not minify web interface javascript, no jsmin available")
+                    minified = asset.read()                             # no minify available
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
                     ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
