@@ -223,12 +223,16 @@ def test_get_containing_subdataset(path):
     subsubds = subds.create("subsub")
 
     eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
+    # the top of a subdataset belongs to the subdataset
+    eq_(ds.get_containing_subdataset(opj("sub", "subsub")).path, subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset("sub").path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
     # known
     shutil.rmtree(subds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset("sub").path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
     assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,

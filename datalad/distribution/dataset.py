@@ -365,6 +365,9 @@ class Dataset(object):
     def get_containing_subdataset(self, path, recursion_limit=None):
         """Get the (sub-)dataset containing `path`
 
+        Note: The "mount point" of a subdataset is classified as belonging to
+        that respective subdataset.
+
         Parameters
         ----------
         path : str
