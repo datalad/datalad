@@ -252,6 +252,10 @@ class Search(Interface):
         # We will assume that noone chpwd while we are yielding
         ds_path_prefix = get_path_prefix(ds.path)
 
+        # So we could provide a useful message whenever there were not a single
+        # dataset with specified `--search` properties
+        observed_properties = set()
+
         # for every meta data set
         for mds in meta:
             hit = False
@@ -268,8 +272,15 @@ class Search(Interface):
 
             # manual loop for now
             for k, v in iteritems(mds):
-                if search and k.lower() not in search:
-                    continue
+                if search:
+                    k_lower = k.lower()
+                    if k_lower not in search:
+                        if observed_properties is not None:
+                            # record for providing a hint later
+                            observed_properties.add(k_lower)
+                        continue
+                    # so we have a hit, no need to track
+                    observed_properties = None
                 if isinstance(v, dict) or isinstance(v, list):
                     v = text_type(v)
                 for imatcher, matcher in enumerate(matchers):
@@ -300,6 +311,26 @@ class Search(Interface):
                     report_dict = {}  # it was empty but not None -- asked to
                     # not report any specific field
                 yield opj(ds_path_prefix, location), report_dict
+
+        if search and observed_properties is not None:
+            import difflib
+            suggestions = {
+                s: difflib.get_close_matches(s, observed_properties)
+                for s in search
+            }
+            suggestions_str = "\n ".join(
+                "%s for %s" % (", ".join(choices), s)
+                for s, choices in iteritems(suggestions) if choices
+            )
+            lgr.warning(
+                "Found no properties which matched one of the one you "
+                "specified (%s).  May be you meant one among: %s.\n"
+                "Suggestions:\n"
+                " %s",
+                ", ".join(search),
+                ", ".join(observed_properties),
+                suggestions_str if suggestions_str.strip() else "none"
+            )
 
     @staticmethod
     def result_renderer_cmdline(res, cmdlineargs):
