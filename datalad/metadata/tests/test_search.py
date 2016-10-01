@@ -112,8 +112,10 @@ class _mock_search(object):
 def _check_mocked_install(central_dspath, mock_install):
     gen = search(".", regex=True)
     assert_is_generator(gen)
+    # we no longer do any custom path tune up from the one returned by search
+    # so should match what search returns
     assert_equal(
-        list(gen), [(opj(central_dspath, loc), report)
+        list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
     mock_install.assert_called_once_with(central_dspath, source='///')
 

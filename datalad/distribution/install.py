@@ -164,6 +164,18 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
                     '/'.join(sm_url_l[i:]),
                     url_suffix))
                 break
+
+    # TODO:
+    # here clone_urls might contain degenerate urls which should be
+    # normalized and not added into the pool of the ones to try if already
+    # there, e.g. I got
+    #  ['http://datasets.datalad.org/crcns/aa-1/.git', 'http://datasets.datalad.org/crcns/./aa-1/.git']
+    # upon  install aa-1
+
+    # TODO:
+    # We need to provide some error msg with InstallFailedError, since now
+    # it just swallows everything.
+
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
     success = False
