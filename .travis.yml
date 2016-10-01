@@ -128,6 +128,7 @@ script:
   - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
+  - /bin/ls -l /tmp/.coverage-entry*
   - coverage combine -a /tmp/.coverage-entrypoints-*
   - coverage report
   - codecov
