@@ -10,9 +10,9 @@ Last-Update: 2016-05-20
 
 --- a/setup.py
 +++ b/setup.py
-@@ -40,6 +40,11 @@ if dist[0] == 'debian' and dist[1].split
+@@ -52,6 +52,11 @@ dist = platform.dist()
+ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
      keyring_requires = ['keyring<8.0']
-     pbar_requires = ['progressbar']
  
 +# Debian patch:  do not demand any specific version of keyring via setup
 +#  we will rely on debian/control specification specific for the distribution
