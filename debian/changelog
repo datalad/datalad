@@ -1,3 +1,9 @@
+datalad (0.3.1-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix/minor release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 01 Oct 2016 15:06:47 -0400
+
 datalad (0.3-1) unstable; urgency=medium
 
   * New upstream release
