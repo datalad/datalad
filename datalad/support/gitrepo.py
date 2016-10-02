@@ -875,8 +875,18 @@ class GitRepo(object):
           List of names of the remotes
         """
         if with_refs_only:
-            return [remote.name for remote in self.repo.remotes
-                    if len(remote.refs)]
+            # older versions of GitPython might not tolerate remotes without
+            # any references at all, so we need to catch
+            remotes = []
+            for remote in self.repo.remotes:
+                try:
+                    if len(remote.refs):
+                        remotes.append(remote.name)
+                except AssertionError as exc:
+                    if "not have any references" not in str(exc):
+                        # was some other reason
+                        raise
+            return remotes
         else:
             return [remote.name for remote in self.repo.remotes]
 
