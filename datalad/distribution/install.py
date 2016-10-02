@@ -250,7 +250,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url):
 
 
 class Install(Interface):
-    """Install a dataset or subdataset.
+    """Install a dataset from a (remote) source.
 
     This command creates a local :term:`sibling` of an existing dataset from a
     (remote) location identified via a URL or path. Optional recursion into
@@ -281,6 +281,7 @@ class Install(Interface):
             # TODO: this probably changes to install into the dataset (add_to_super)
             # and to install the thing 'just there' without operating 'on' a dataset.
             # Adapt doc.
+            # MIH: `shouldn't this be the job of `add`?
             doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             in a parent directory of the current working directory and/or the
