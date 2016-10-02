@@ -532,7 +532,7 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, fulfill='all', recursive=True, recursion_limit=1)
+    result = get(os.curdir, dataset=path, fulfill_datasets=True, recursive=True, recursion_limit=1)
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
     assert_in(sub1, result)
@@ -543,7 +543,7 @@ def test_install_recursive_repeat(src, path):
     ok_(sub2.repo.file_has_content('sub2file.txt') is True)
 
     # install sub1 again, recursively:
-    top_ds.get('sub 1', recursive=True, fulfill='all')
+    top_ds.get('sub 1', recursive=True, fulfill_datasets=True)
     ok_(subsub.is_installed())
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 

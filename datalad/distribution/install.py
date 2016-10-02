@@ -513,7 +513,7 @@ class Install(Interface):
                     dataset=destination_dataset,
                     recursive=True,
                     recursion_limit=recursion_limit,
-                    fulfill='all' if get_data else 'auto',
+                    fulfill_datasets=get_data,
                     git_opts=git_opts,
                     annex_opts=annex_opts,
                     # TODO expose this

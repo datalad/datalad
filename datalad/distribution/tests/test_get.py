@@ -277,7 +277,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ds = install(src, path=path)
 
     # GIMME EVERYTHING
-    ds.get(['subm 1', 'subm 2'], fulfill='all')
+    ds.get(['subm 1', 'subm 2'], fulfill_datasets=True)
 
     # We got all content in the subdatasets
     subds1, subds2 = [Dataset(d) for d in ds.get_subdatasets(absolute=True)]

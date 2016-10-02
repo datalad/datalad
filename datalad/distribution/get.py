@@ -114,7 +114,8 @@ def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
     return out, unavailable_paths, dir_lookup
 
 
-def _get(content_by_ds, refpath=None, source=None, jobs=None, fulfillnew=False):
+def _get(content_by_ds, refpath=None, source=None, jobs=None,
+         fulfill_datasets=False):
     for ds_path in sorted(content_by_ds.keys()):
         cur_ds = Dataset(ds_path)
         content = content_by_ds[ds_path]
@@ -125,7 +126,7 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None, fulfillnew=False):
             # are asked to fulfill all handles that at some point in the process
             # we consider having fulfilled the dataset handle good enough
             results.append(cur_ds)
-            if not fulfillnew:
+            if not fulfill_datasets:
                 lgr.debug(
                     "Will not get any content in subdataset %s without recursion enabled",
                     cur_ds)
@@ -201,57 +202,58 @@ def _unwind(generators):
 
 
 class Get(Interface):
-    """Get data content for files/directories of a dataset.
+    """Get any dataset content (files/directories/subdatasets).
 
-    Known data locations for each requested file are evaluated and data are
-    obtained from the best/fastest/cheapest location, unless a dedicated
-    source is identified.
+    This command only operates on dataset content. To obtain a new independent
+    dataset from some source use the `install` command.
 
     By default this command operates recursively within a dataset, but not
     across potential subdatasets, i.e. if a directory is provided, all files in
     the directory are obtained. Recursion into subdatasets is supported too. If
-    enabled, potential subdatasets are detected and installed sequentially, in
-    order to fulfill a request. However, this implicit installation of
-    subdatasets is done only, if an explicitly specified path belongs to such a
-    subdataset and for that purpose `recursion_limit` is ignored. Otherwise get
-    recurses into already installed subdatasets only and the depth of this
-    recursion can be limited by `recursion_limit`.
+    enabled, relevant subdatasets are detected and installed in order to
+    fulfill a request.
+
+    Known data locations for each requested file are evaluated and data are
+    obtained from the best/fastest/cheapest location, unless a specific
+    source is identified.
 
     .. note::
       Power-user info: This command used :command:`git annex get` to fulfill
-      requests. Subdatasets are obtained via the :func:`~datalad.api.install`
-      command.
+      file handles.
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="PATH",
-            doc="""specify the dataset to perform the add operation on.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            doc="""specify the dataset to perform the add operation on, in
+            which case `path` arguments are interpreted as being relative
+            to this dataset.  If no dataset is given, an attempt is made to
+            identify a dataset for each input `path`""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar="PATH",
             doc="""path/name of the requested dataset component. The component
-            must already be known to the dataset.""",
+            must already be known to a dataset. To add new components to a
+            dataset use the `add` command""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
             metavar="LABEL",
-            doc="""label of the data source to be used to fulfill the request.
+            doc="""label of the data source to be used to fulfill requests.
             This can be the name of a dataset :term:`sibling` or another known
             source""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        fulfill=Parameter(
-            args=("--fulfill",),
-            choices=('auto', 'all'),
-            doc="""whether to fulfill file handles. The default will do the
-            right thing (TM). But it could be forced ('all')."""),
+        fulfill_datasets=Parameter(
+            args=("--fulfill-datasets",),
+            action='store_true',
+            doc="""whether to fulfill file handles in obtained datasets. If
+            true, then a subdataset given via `path` will not only be
+            installed, but also all of its file handles will be fulfilled."""),
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -270,7 +272,7 @@ class Get(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            fulfill='auto',
+            fulfill_datasets=False,
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
@@ -310,7 +312,7 @@ class Get(Interface):
         # if the value[0] is the subdataset's path, we want all of it
         # if the value[0] == curdir, we just installed it as part of
         # resolving file handles and we did not say anything but "give
-        # me the dataset handle" -- without fulfill='all' not file handles
+        # me the dataset handle" -- without fulfill-datasets no file handles
         # in such a subdataset will be fulfilled
 
         # explore the unknown
@@ -371,7 +373,7 @@ class Get(Interface):
         # hand over to git-annex
         return _unwind(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
-                 fulfillnew=fulfill == 'all'))
+                 fulfill_datasets=fulfill_datasets))
 
     @staticmethod
     def result_renderer_cmdline(res, args):
