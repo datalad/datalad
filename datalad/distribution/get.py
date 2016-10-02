@@ -51,31 +51,6 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _report_ifjustinstalled(ds, p, recursion_limit):
-    p_ds = None
-    fresh = None
-    try:
-        # where would the current dataset think this path belongs
-        present_container = ds.get_containing_subdataset(p, recursion_limit)
-        was_installed = present_container.is_installed()
-        # where does it actually belong
-        p_ds = install_necessary_subdatasets(ds, p)
-        # take note of whether the final subdataset just came to life
-        fresh = present_container.path != p_ds.path or not was_installed
-        if fresh:
-            lgr.debug("Installed necessary (sub-)datasets: %s", p_ds)
-    except PathOutsideRepositoryError as e:
-        lgr.warning(exc_str(e) + linesep + "Ignored.")
-    except Exception as e:
-        # skip p, if we didn't manage to install its containing
-        # subdataset
-        lgr.warning(
-            "Installation of necessary subdatasets for %s failed. Skipped.", p)
-        lgr.debug("Installation attempt failed with exception: %s",
-                  exc_str(e))
-    return p_ds, fresh
-
-
 def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
                               recursive=False, recursion_limit=None):
     """Returns dict of `existing dataset path`: `directory` mappings
