@@ -860,8 +860,25 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self):
-        return [remote.name for remote in self.repo.remotes]
+    def get_remotes(self, with_refs_only=False):
+        """
+
+        Parameters
+        ----------
+        with_refs_only : bool, optional
+          return only remotes with any refs.  E.g. annex special remotes
+          would not have any refs
+
+        Returns
+        -------
+        remotes : list of str
+          List of names of the remotes
+        """
+        if with_refs_only:
+            return [remote.name for remote in self.repo.remotes
+                    if len(remote.refs)]
+        else:
+            return [remote.name for remote in self.repo.remotes]
 
     def get_files(self, branch=None):
         """Get a list of files in git.
