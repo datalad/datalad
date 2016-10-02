@@ -138,8 +138,7 @@ def install_necessary_subdatasets(ds, path):
         _install_subds_from_flexible_source(
             cur_par_ds,
             submodule.path,
-            submodule.url,
-            recursive=False)
+            submodule.url)
 
         cur_par_ds = cur_subds
 

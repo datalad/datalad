@@ -181,7 +181,7 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
+def _install_subds_from_flexible_source(ds, sm_path, sm_url):
     """Tries to obtain a given subdataset from several meaningful locations"""
 
     # shortcut
@@ -442,8 +442,7 @@ class Install(Interface):
             destination_dataset = _install_subds_from_flexible_source(
                 ds,
                 relativepath,
-                source,
-                recursive=False)
+                source)
         else:
             # FLOW GUIDE: 2.
             lgr.info("Installing dataset at: {0}".format(path))

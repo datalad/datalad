@@ -94,13 +94,13 @@ def test_get_invalid_call(path, file_outside):
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get("NotExistingFile.txt")
         eq_(len(result), 0)
-        assert_in("NotExistingFile.txt not found. Ignored.", cml.out)
+        assert_in("could not find and ignored", cml.out)
 
     # path outside repo:
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(file_outside)
         eq_(len(result), 0)
-        assert_in("path {0} not within repository {1}".format(file_outside, ds),
+        assert_in("{0} is not part of a dataset, ignored".format(file_outside, ds),
                   cml.out)
 
     # TODO: annex --json doesn't report anything when get fails to do get a
@@ -348,5 +348,7 @@ def test_autoresolve_multiple_datasets(src, path):
         ds1 = install(src, path='ds1')
         ds2 = install(src, path='ds2')
         results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
-        # for now -- doesn't even get here
-        ok_(len(result))
+        # each ds has one file
+        eq_(len(results), 2)
+        ok_(ds1.repo.file_has_content('test-annex.dat') is True)
+        ok_(ds2.repo.file_has_content('test-annex.dat') is True)
