@@ -28,11 +28,13 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - DATALAD_LOG_LEVEL=INFO
+    - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
+    - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
     - DATALAD_API_ALWAYSRENDER=1
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
