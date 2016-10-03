@@ -352,3 +352,20 @@ def test_autoresolve_multiple_datasets(src, path):
         eq_(len(results), 2)
         ok_(ds1.repo.file_has_content('test-annex.dat') is True)
         ok_(ds2.repo.file_has_content('test-annex.dat') is True)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_autoresolve_recurse_subdatasets(src, path):
+
+    origin = Dataset(src).create()
+    origin_sub = origin.create('sub')
+    origin_subsub = origin_sub.create('subsub')
+    with open(opj(origin_subsub.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content')
+    origin.save(recursive=True, auto_add_changes=True)
+
+    ds = install(src, path=path)
+
+    result = get(opj(ds.path, 'sub'), recursive=True)
+    print result
