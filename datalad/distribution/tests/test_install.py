@@ -555,19 +555,17 @@ def test_install_recursive_repeat(src, path):
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_install_skip_list_arguments(src, path, path_outside):
-
     ds = install(src, path=path)
     ok_(ds.is_installed())
 
     # install a list with valid and invalid items:
-    with swallow_logs(new_level=logging.INFO) as cml:
+    with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(path=['subm 1', 'not_existing',
                               path_outside, 'subm 2'])
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
-            # TODO MIH: I am too stupid to understand how this works.
-            # the message is in the log, I can see it, but this machine doesn't
-            #cml.assert_logged(msg="{0} not found. Ignored.".format(skipped),
-            #                  regex=False, level='WARNING')
+            cml.assert_logged(msg="could not find and ignored paths: {}\n".format(
+                              [opj(ds.path, 'not_existing'), path_outside]),
+                              regex=False, level='WARNING')
             pass
         ok_(isinstance(result, list))
         eq_(len(result), 2)
@@ -595,17 +593,15 @@ def test_install_skip_failed_recursive(src, path):
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
 
-    with swallow_logs(new_level=logging.DEBUG) as cml:
+    with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(os.curdir, recursive=True)
         # toplevel dataset was in the house already
         assert_not_in(ds, result)
         assert_in(sub2, result)
         assert_not_in(sub1, result)
-        # TODO MIH: same as above. my brain is too small for this
-        #cml.assert_logged(
-        #    msg="Installation of necessary subdatasets for {0} failed. Skipped.".format(sub1),
-        #    regex=False, level='WARNING')
-
+        cml.assert_logged(
+            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
+            regex=False, level='WARNING')
 
 @with_tree(tree={'top_file.txt': 'some',
                  'sub 1': {'sub1file.txt': 'something else',
