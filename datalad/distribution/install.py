@@ -432,7 +432,8 @@ class Install(Interface):
             # this should not be, check if this is an error, or a reinstall
             # from the same source
             # this is where we would have installed this from
-            candidate_sources = _get_flexible_url_candidates(source)
+            candidate_sources = _get_flexible_url_candidates(
+                source, destination_dataset.path)
             # this is where it was installed from
             track_name, track_url = _get_tracking_source(destination_dataset)
             if track_url in candidate_sources or get_local_file_url(track_url):
