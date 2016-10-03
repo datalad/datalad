@@ -28,8 +28,8 @@ from datalad.tests.utils import with_tempfile, ok_, assert_equal
 def test_logging_to_a_file(dst):
     ok_(not exists(dst))
 
-    lgr = LoggerHelper("dataladtest").get_initialized_logger(logtarget=dst)
-    ok_(exists(dst))
+    lgr = LoggerHelper("dataladtest-1").get_initialized_logger(logtarget=dst)
+    ok_(exists(dst))  # nothing was logged -- no file created
 
     msg = "Oh my god, they killed Kenny"
     lgr.error(msg)
@@ -43,24 +43,27 @@ def test_logging_to_a_file(dst):
     # verify that time stamp and level are present in the log line
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
-    ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\] %s" % msg,
+    # .* is added to swallow possible traceback logs
+    ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\](\s+\S+\s*)? %s" % msg,
                  line))
+
 
 @with_tempfile
 def test_logtarget_via_env_variable(dst):
     with patch.dict('os.environ', {'DATALADTEST_LOGTARGET': dst}):
         ok_(not exists(dst))
-        lgr = LoggerHelper("dataladtest").get_initialized_logger()
-        ok_(exists(dst))
+        lgr = LoggerHelper("dataladtest-2").get_initialized_logger()
+        ok_(not exists(dst))
     # just to see that mocking patch worked
     ok_(not 'DATALADTEST_LOGTARGET' in os.environ)
+
 
 @with_tempfile
 @with_tempfile
 def test_mutliple_targets(dst1, dst2):
     ok_(not exists(dst1))
     ok_(not exists(dst2))
-    lgr = LoggerHelper("dataladtest").get_initialized_logger(
+    lgr = LoggerHelper("dataladtest-3").get_initialized_logger(
         logtarget="%s,%s" % (dst1, dst2))
     ok_(exists(dst1))
     ok_(exists(dst2))
