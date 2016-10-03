@@ -266,13 +266,13 @@ class Install(Interface):
     (remote) location identified via a URL or path. Optional recursion into
     potential subdatasets, and download of all referenced data is supported.
     The new dataset can be optionally registered in an existing
-    :term:`superdataset` (the new dataset's path needs to be located within the
-    superdataset for that, and the superdataset will be detected
-    automatically). It is recommended to provide a brief description to label
-    the dataset's nature *and* location, e.g. "Michael's music on black
-    laptop". This helps humans to identify data locations in distributed
-    scenarios.  By default an identifier comprised of user and machine name,
-    plus path will be generated.
+    :term:`superdataset` by identifying it via the `dataset` argument (the new
+    dataset's path needs to be located within the superdataset for that).
+
+    It is recommended to provide a brief description to label the dataset's
+    nature *and* location, e.g. "Michael's music on black laptop". This helps
+    humans to identify data locations in distributed scenarios.  By default an
+    identifier comprised of user and machine name, plus path will be generated.
 
     When only partial dataset content shall be obtained, it is recommended to
     use this command without the `get-data` flag, followed by a
