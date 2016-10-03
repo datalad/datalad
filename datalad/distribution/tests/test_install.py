@@ -180,7 +180,7 @@ def test_install_datasets_root(tdir):
         # do it a second time:
         with swallow_logs(new_level=logging.INFO) as cml:
             result = install("///")
-            assert_in("appears to be installed already.", cml.out)
+            assert_in("was already installed from", cml.out)
             eq_(result, ds)
 
         # and a third time into an existing something, that is not a dataset:
@@ -225,7 +225,7 @@ def test_install_simple_local(src, path):
     # installing it again, shouldn't matter:
     with swallow_logs(new_level=logging.INFO) as cml:
         ds = install(src, path=path)
-        cml.assert_logged(msg="{0} appears to be installed already.".format(ds),
+        cml.assert_logged(msg="{0} was already installed from".format(ds),
                           regex=False, level="INFO")
         ok_(ds.is_installed())
 

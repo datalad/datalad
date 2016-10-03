@@ -43,6 +43,7 @@ from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
+from datalad.support.network import get_local_file_url
 from datalad.utils import knows_annex
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
@@ -192,30 +193,39 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url):
-    """Tries to obtain a given subdataset from several meaningful locations"""
-
-    # shortcut
+def _get_tracking_source(ds):
+    """Returns name and url of a potential configured source
+    tracking remote"""
     vcs = ds.repo
     repo = vcs.repo
-    # compose a list of candidate clone URLs
-    clone_urls = []
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
     tracking_branch = repo.active_branch.tracking_branch()
+    remote_name = None
     remote_url = ''
-    # remember suffix
-    url_suffix = ''
     if tracking_branch:
         # name of the default remote for the active branch
         remote_name = repo.active_branch.tracking_branch().remote_name
         remote_url = vcs.get_remote_url(remote_name, push=False)
+    return remote_name, remote_url
+
+
+def _install_subds_from_flexible_source(ds, sm_path, sm_url):
+    """Tries to obtain a given subdataset from several meaningful locations"""
+    # compose a list of candidate clone URLs
+    clone_urls = []
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+    remote_name, remote_url = _get_tracking_source(ds)
+    # remember suffix
+    url_suffix = ''
+    if remote_url:
         if remote_url.rstrip('/').endswith('/.git'):
             url_suffix = '/.git'
             remote_url = remote_url[:-5]
         # attempt: submodule checkout at parent remote URL
         # We might need to quote sm_path portion, e.g. for spaces etc
-        if remote_url and isinstance(RI(remote_url), URL):
+        if isinstance(RI(remote_url), URL):
             sm_path_url = urlquote(sm_path)
         else:
             sm_path_url = sm_path
@@ -417,6 +427,23 @@ class Install(Interface):
 
         lgr.debug("Resolved installation target: {0}".format(path))
         destination_dataset = Dataset(path)
+
+        if destination_dataset.is_installed():
+            # this should not be, check if this is an error, or a reinstall
+            # from the same source
+            # this is where we would have installed this from
+            candidate_sources = _get_flexible_url_candidates(source)
+            # this is where it was installed from
+            track_name, track_url = _get_tracking_source(destination_dataset)
+            if track_url in candidate_sources or get_local_file_url(track_url):
+                lgr.info(
+                    "%s was already installed from %s. Use `update` to obtain "
+                    "latest updates",
+                    destination_dataset, track_url)
+                return destination_dataset
+            else:
+                raise ValueError("There is already a dataset installed at the "
+                                 "destination: %s", destination_dataset)
 
         ###########
         # we should know everything necessary by now
