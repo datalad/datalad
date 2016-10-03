@@ -109,7 +109,9 @@ def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
                     if subdspath.startswith(_with_sep(path)):
                         # this subdatasets is underneath the search path
                         # we want it all
-                        out[subdspath] = [subdspath]
+                        # be careful to not overwrite anything, in case
+                        # this subdataset has been processed before
+                        out[subdspath] = out.get(subdspath, [subdspath])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, dir_lookup
 
@@ -140,7 +142,7 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
             if results:
                 yield results
             continue
-        lgr.info("Getting %s file/dir(s) of dataset %s ...",
+        lgr.info("Getting %i items of dataset %s ...",
                  len(content), cur_ds)
 
         results.extend(cur_ds.repo.get(
@@ -307,6 +309,8 @@ class Get(Interface):
             _sort_paths_into_datasets(resolved_paths,
                                       recursive=recursive,
                                       recursion_limit=recursion_limit)
+        lgr.debug("Found %i existing dataset(s) to get content in",
+                  len(content_by_ds))
         # IMPORTANT NOTE re `content_by_ds`
         # each key is a subdataset that we need to get something in
         # if the value[0] is the subdataset's path, we want all of it
@@ -329,6 +333,8 @@ class Get(Interface):
             # now actually obtain whatever is necessary to get to this path
             containing_ds = install_necessary_subdatasets(ds, path)
             if containing_ds.path != ds.path:
+                lgr.debug("Installed %s to fulfill request for content for "
+                          "path %s", containing_ds, path)
                 # mark resulting dataset as auto-installed
                 if containing_ds.path == path:
                     # we had to get the entire dataset, not something within
@@ -346,13 +352,18 @@ class Get(Interface):
                     if not isdir(content_path):
                         # a non-directory cannot have content underneath
                         continue
+                    subds = Dataset(subdspath)
+                    lgr.info("Obtain content in %s underneath %s recursively",
+                             subds, content_path)
                     cbysubds = _recursive_install_subds_underneath(
-                        Dataset(subdspath),
+                        subds,
                         # `content_path` was explicitly given as input
                         # we count recursions from the input, hence we
                         # can start with the full number
                         recursion_limit,
-                        start=content_path)
+                        # protect against magic marker misinterpretation
+                        # only relevant for _get, hence replace here
+                        start=content_path if content_path != curdir else None)
                     # gets file content for all freshly installed subdatasets
                     content_by_ds.update(cbysubds)
 

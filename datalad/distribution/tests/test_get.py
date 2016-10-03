@@ -366,6 +366,14 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     origin.save(recursive=True, auto_add_changes=True)
 
     ds = install(src, path=path)
+    eq_(len(ds.get_subdatasets(fulfilled=True)), 0)
 
-    result = get(opj(ds.path, 'sub'), recursive=True)
-    print result
+    results = get(opj(ds.path, 'sub'), recursive=True)
+    eq_(len(ds.get_subdatasets(fulfilled=True, recursive=True)), 2)
+    subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
+    ok_(subsub.is_installed())
+    assert_in(subsub, results)
+    # 'subsub' did not exist prior the get-call above, hence while it
+    # is now installed its file handles are not fulfilled
+    ok_(Dataset(opj(ds.path, 'sub', 'subsub')).repo.file_has_content(
+        "file_in_annex.txt") is False)
