@@ -129,11 +129,12 @@ class Dataset(object):
                             lgr.debug("Detected %s at %s", cls, self._path)
                             self._repo = cls(self._path, create=False, **kw)
                             break
-                        except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError) as exc:
+                        except (InvalidGitRepositoryError, NoSuchPathError) as exc:
                             lgr.debug("Oops -- guess on repo type was wrong?: %s", exc_str(exc))
                             pass
-                if self._repo is None:
-                    lgr.info("Failed to detect a valid repo at %s" % self.path)
+                        # version problems come as RuntimeError: DO NOT CATCH!
+            if self._repo is None:
+                lgr.info("Failed to detect a valid repo at %s" % self.path)
 
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
