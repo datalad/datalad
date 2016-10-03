@@ -221,6 +221,7 @@ def test_install_simple_local(src, path):
         ok_clean_git(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
+        uuid_before = ds.repo.uuid
 
     # installing it again, shouldn't matter:
     with swallow_logs(new_level=logging.INFO) as cml:
@@ -228,6 +229,8 @@ def test_install_simple_local(src, path):
         cml.assert_logged(msg="{0} was already installed from".format(ds),
                           regex=False, level="INFO")
         ok_(ds.is_installed())
+        if isinstance(origin.repo, AnnexRepo):
+            eq_(uuid_before, ds.repo.uuid)
 
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
