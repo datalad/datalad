@@ -179,6 +179,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             continue
         if not subds.is_installed():
             try:
+                lgr.info("Installing subdataset %s", subds.path)
                 subds = _install_subds_from_flexible_source(
                     ds, sub.path, sub.url)
                 # we want the entire thing, but mark this subdataset
@@ -351,7 +352,7 @@ class Get(Interface):
                         # a non-directory cannot have content underneath
                         continue
                     subds = Dataset(subdspath)
-                    lgr.info("Obtain content in %s underneath %s recursively",
+                    lgr.info("Obtaining content in %s underneath %s recursively",
                              subds, content_path)
                     cbysubds = _recursive_install_subds_underneath(
                         subds,
