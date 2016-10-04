@@ -118,6 +118,8 @@ def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
 
 def _get(content_by_ds, refpath=None, source=None, jobs=None,
          fulfill_datasets=False):
+    """Loops through datasets and calls git-annex call where appropriate
+    """
     for ds_path in sorted(content_by_ds.keys()):
         cur_ds = Dataset(ds_path)
         content = content_by_ds[ds_path]
@@ -130,7 +132,8 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
             results.append(cur_ds)
             if not fulfill_datasets:
                 lgr.debug(
-                    "Will not get any content in subdataset %s without recursion enabled",
+                    "Will not get any content in subdataset %s without "
+                    "recursion enabled",
                     cur_ds)
                 yield results
                 continue
@@ -216,11 +219,12 @@ class Get(Interface):
     fulfill a request.
 
     Known data locations for each requested file are evaluated and data are
-    obtained from the best/fastest/cheapest location, unless a specific
-    source is identified.
+    obtained from some available location (according to git-annex configuration
+    and possibly assigned remote priorities), unless a specific source is
+    specified.
 
     .. note::
-      Power-user info: This command used :command:`git annex get` to fulfill
+      Power-user info: This command uses :command:`git annex get` to fulfill
       file handles.
     """
 
@@ -395,14 +399,15 @@ class Get(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Got nothing")
+            ui.message("Got nothing new")
             return
 
         # provide summary
         nsuccess = sum(item.get('success', False) if isinstance(item, dict) else True
                        for item in res)
         nfailure = len(res) - nsuccess
-        msg = "Tried to get %d %s." % (len(res), single_or_plural("file", "files", len(res)))
+        msg = "Tried to get %d %s." % (
+            len(res), single_or_plural("file", "files", len(res)))
         if nsuccess:
             msg += " Got %d. " % nsuccess
         if nfailure:

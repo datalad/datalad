@@ -130,11 +130,16 @@ class Dataset(object):
                             self._repo = cls(self._path, create=False, **kw)
                             break
                         except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                            lgr.debug("Oops -- guess on repo type was wrong?: %s", exc_str(exc))
+                            lgr.debug(
+                                "Oops -- guess on repo type was wrong?: %s",
+                                exc_str(exc))
                             pass
                         # version problems come as RuntimeError: DO NOT CATCH!
             if self._repo is None:
-                lgr.info("Failed to detect a valid repo at %s" % self.path)
+                # Often .repo is requested to 'sense' if anything is installed
+                # under, and if so -- to proceed forward. Thus log here only
+                # at DEBUG level and if necessary "complaint upstairs"
+                lgr.debug("Failed to detect a valid repo at %s" % self.path)
 
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
@@ -426,7 +431,12 @@ class Dataset(object):
             path = relpath(path, self.path)
 
         candidates = []
+        # TODO: this one would follow all the sub-datasets, which might
+        # be inefficient if e.g. there is lots of other sub-datasets already
+        # installed but under another sub-dataset.  There is a TODO 'pattern'
+        # option which we could use I guess eventually
         for subds in self.get_subdatasets(recursive=True,
+                                          #pattern=
                                           recursion_limit=recursion_limit,
                                           absolute=False):
             common = commonprefix((with_pathsep(subds), with_pathsep(path)))
