@@ -202,7 +202,7 @@ def test_subdatasets(path):
     eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
-    subds = ds.install(path, path='subds')
+    subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
     eq_(subds.get_superdataset(), ds)
     eq_(subds.get_superdataset(topmost=True), ds)

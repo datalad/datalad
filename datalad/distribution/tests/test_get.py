@@ -143,7 +143,7 @@ def test_get_multiple_files(path, url, ds_dir):
     origin.add(file_list)
     origin.save("initial")
 
-    ds = install(path, path=ds_dir)
+    ds = install(ds_dir, source=path)
 
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))
@@ -179,7 +179,7 @@ def test_get_recurse_dirs(o_path, c_path):
     origin = Dataset(o_path).create(force=True)
     origin.save("Initial", auto_add_changes=True)
 
-    ds = install(o_path, path=c_path)
+    ds = install(c_path, source=o_path)
 
     file_list = ['file1.txt',
                  opj('subdir', 'file2.txt'),
@@ -210,7 +210,7 @@ def test_get_recurse_dirs(o_path, c_path):
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src, path):
 
-    ds = install(src, path=path)
+    ds = install(path, source=src)
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
@@ -274,7 +274,7 @@ def test_get_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_greedy_recurse_subdatasets(src, path):
 
-    ds = install(src, path=path)
+    ds = install(path, source=src)
 
     # GIMME EVERYTHING
     ds.get(['subm 1', 'subm 2'], fulfill_datasets=True)
@@ -290,7 +290,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_install_missing_subdataset(src, path):
 
-    ds = install(src, path=path)
+    ds = install(path, source=src)
     subs = [Dataset(s_path) for s_path in ds.get_subdatasets(absolute=True)]
     ok_(all([not sub.is_installed() for sub in subs]))
 
@@ -327,7 +327,7 @@ def test_get_mixed_hierarchy(src, path):
     origin.save(auto_add_changes=True)
 
     # now, install that thing:
-    ds, subds = install(src, path=path, recursive=True)
+    ds, subds = install(path, source=src), recursive=True)
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:
@@ -345,8 +345,8 @@ def test_get_mixed_hierarchy(src, path):
 @with_tempfile(mkdir=True)
 def test_autoresolve_multiple_datasets(src, path):
     with chpwd(path):
-        ds1 = install(src, path='ds1')
-        ds2 = install(src, path='ds2')
+        ds1 = install('ds1', source=src)
+        ds2 = install('ds2', source=src)
         results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
         # each ds has one file
         eq_(len(results), 2)
@@ -365,7 +365,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
         f.write('content')
     origin.save(recursive=True, auto_add_changes=True)
 
-    ds = install(src, path=path)
+    ds = install(path, source=src)
     eq_(len(ds.get_subdatasets(fulfilled=True)), 0)
 
     results = get(opj(ds.path, 'sub'), recursive=True)

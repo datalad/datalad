@@ -33,6 +33,7 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureStr
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
@@ -43,7 +44,9 @@ from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url
+from datalad.support.network import is_datalad_compat_ri
 from datalad.support.network import get_local_file_url
+from datalad.utils import assure_list
 from datalad.utils import knows_annex
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
@@ -300,14 +303,16 @@ class Install(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
+            nargs="*",
+            # doc: TODO
             doc="""path/name of the installation target.  If no `path` is
             provided a destination path will be derived from a source URL
-            similar to :command:`git clone`""",
-            nargs='?'),
+            similar to :command:`git clone`"""),
         source=Parameter(
             args=('source',),
             metavar='SOURCE',
-            doc="URL or local path of the installation source"),
+            doc="URL or local path of the installation source",
+            constraints=EnsureStr() | EnsureNone()),
         get_data=Parameter(
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
@@ -334,8 +339,8 @@ class Install(Interface):
     @staticmethod
     @datasetmethod(name='install')
     def __call__(
-            source,
-            path=None,
+            path,
+            source=None,
             dataset=None,
             get_data=False,
             description=None,
@@ -349,11 +354,57 @@ class Install(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
-        # parameter constraints:
-        if not source:
-            raise InsufficientArgumentsError(
-                "a `source` is required for installation")
+        # normalize path argument to be equal when called from cmdline and
+        # python and nothing was passed into `path`
+        if path == []:
+            path = None
 
+        installed_items = []
+
+        # handle calls with multiple paths first:
+        if path and isinstance(path, list):
+            if len(path) > 1:
+                if source is not None:
+                    raise ValueError("source argument not valid when "
+                                     "installing multiple datasets.")
+                else:
+                    for p in path:
+                        try:
+                            result = Install.__call__(
+                                path=p,
+                                source=None,
+                                dataset=dataset,
+                                get_data=get_data,
+                                description=description,
+                                recursive=recursive,
+                                recursion_limit=recursion_limit,
+                                save=save,
+                                if_dirty=if_dirty,
+                                git_opts=git_opts,
+                                git_clone_opts=git_clone_opts,
+                                annex_opts=annex_opts,
+                                annex_init_opts=annex_init_opts
+                            )
+
+                            installed_items += assure_list(result)
+                        except Exception:
+                            # Note: We don't exactly know what was skipped but
+                            # the `path` requested to be installed, since it will be
+                            # resolved only within the recursive call of install.
+                            lgr.info("Installation of {0} skipped.".format(p))
+
+                    if len(installed_items) == 1:
+                        return installed_items[0]
+                    else:
+                        return installed_items
+            else:
+                path = path[0]
+
+        # parameter constraints:
+
+        if not source and not path:
+            raise InsufficientArgumentsError(
+                "Please provide at least a source or a path")
         if source == path:
             # even if they turn out to be identical after resolving symlinks
             # and more sophisticated witchcraft, it would still happily say
@@ -391,15 +442,27 @@ class Install(Interface):
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
-                    # `path` is not a local path.
+                # URL doesn't point to a local something
+                # so we have an actual URL in `path`. Since this is valid as a
+                # single positional argument, `source` has to be None at this
+                # point.
+                if is_datalad_compat_ri(path) and source is None:
+                    # we have an actual URL -> this should be the source
+                    lgr.debug(
+                        "Single argument given to install, that doesn't seem to "
+                        "be a local path. "
+                        "Assuming the argument identifies a source location.")
+                    source = path
+                    path = None
+
+                else:
+                    # `path` is neither a valid source nor a local path.
                     # TODO: The only thing left is a known subdataset with a
                     # name, that is not a path; Once we correctly distinguish
                     # between path and name of a submodule, we need to consider
                     # this.
                     # For now: Just raise
-                    raise ValueError(
-                        "Invalid destination path {0}".format(path))
-
+                    raise ValueError("Invalid path argument {0}".format(path))
         # `path` resolved, if there was any.
 
         # Possibly do conversion from source into a git-friendly url
