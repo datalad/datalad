@@ -83,12 +83,16 @@ function getParameterByName(name, url) {
  */
 function bread2crumbs() {
   var raw_crumbs = loc().href.split('/');
+  var span_class = '<span class="dir">';
   var crumbs = [];
-  for (var index = 2; index < raw_crumbs.length() - 1; index++) {
-    if (raw_crumbs[index] !== '?dir=')
+  for (var index = 2; index < raw_crumbs.length; index++) {
+    if (raw_crumbs[index] === '?dir=')
       continue;
     var crumb_link = raw_crumbs.slice(0, index).join('/');
-    crumbs.append('<a href=' + crumb_link + '>' + raw_crumbs[index] + '</a>');
+    if (index === raw_crumbs.length - 1)
+      span_class = '<span class="cwd">';
+    crumbs.push('<a href=' + crumb_link + '/' + raw_crumbs[index] + '>' + span_class +
+		raw_crumbs[index] + '</span></a>');
   }
   return crumbs;
 }
@@ -212,7 +216,7 @@ function parent_json(jQuery, md5) {
  * render size of row entry based on size's present and their values
  * @param {object} size json object containing size info of current row entry
  * @return {string} return html string to be rendered in size column of current row entry
-*/
+ */
 function size_renderer(size) {
   // if size is undefined
   if (!size)
@@ -294,6 +298,10 @@ function directory(jQuery, md5) {
         else if (traverse.type === 'search')
           window.location.search = traverse.next;
       });
+      // add breadcrumbs
+      jQuery('#directory_filter').prepend('<span class="breadcrumb">' +
+                                           bread2crumbs().join(' / ') +
+                                           '</span>');
     }
   });
   return table;
