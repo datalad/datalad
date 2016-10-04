@@ -272,15 +272,6 @@ def test_aggregation(path):
         raise SkipTest
     except ImportError as exc:
         raise SkipTest(exc_str(exc))
-    except pyld.jsonld.JsonLdError as exc:
-        if PY2:
-            raise
-        #
-        raise SkipTest(
-            "pyld code is not ready for Python 3.5 it seems (see: #756): %s"
-            % exc_str(exc)
-        )
-        pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
