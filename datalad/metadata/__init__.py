@@ -134,9 +134,9 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
                 # XXX maybe report which one is local? Available in anx['here']
                 # XXX maybe report the type of annex remote?
                 annex_meta.append(anx_meta)
-            if len(annex_meta) == 1:
-                annex_meta = annex_meta[0]
-            meta['availableFrom'] = annex_meta
+        if len(annex_meta) == 1:
+            annex_meta = annex_meta[0]
+        meta['availableFrom'] = annex_meta
 
     ## metadata on all subdataset
     subdss = []
