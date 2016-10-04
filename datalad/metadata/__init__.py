@@ -321,10 +321,16 @@ def _cached_load_document(url):
             urlsplit(url).netloc,
             md5(url.encode('utf-8')).hexdigest()))
 
+    doc = None
     if os.path.exists(doc_fname):
-        lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
-        doc = pickle.load(open(doc_fname))
-    else:
+        try:
+            lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
+            doc = pickle.load(open(doc_fname))
+        except:  # it is OK to ignore any error and fall back on the true source
+            lgr.debug("cannot load cache from '%s', fall back on schema download",
+                      doc_fname)
+            pass
+    if doc is None:
         doc = load_document(url)
         if not exists(cache_dir):
             os.makedirs(cache_dir)
