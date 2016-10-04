@@ -140,7 +140,7 @@ class ConfigManager(object):
         #   - load datalad dataset config from dataset
         #   - load git config from all supported by git sources
         # in doing so we always stay compatible with where Git gets its
-        # config from, but also allow to override persisten information
+        # config from, but also allow to override persistent information
         # from dataset locally or globally
         if self._dataset:
             # now any dataset config

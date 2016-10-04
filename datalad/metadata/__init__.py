@@ -19,9 +19,11 @@ from hashlib import md5
 from six.moves.urllib.parse import urlsplit
 from six import string_types
 from os.path import join as opj, exists, relpath
+from os.path import dirname
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
+from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -313,13 +315,9 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
 
 def _cached_load_document(url):
-    from pyld.jsonld import load_document
-    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
-    doc_fname = opj(
-        cache_dir,
-        '{}-{}'.format(
-            urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest()))
+    """Loader of pyld document from a url, which caches loaded instance on disk
+    """
+    doc_fname = _get_schema_url_cache_filename(url)
 
     doc = None
     if os.path.exists(doc_fname):
@@ -330,15 +328,26 @@ def _cached_load_document(url):
             lgr.warning(
                 "cannot load cache from '%s', fall back on schema download: %s",
                 doc_fname, exc_str(e))
-            pass
+
     if doc is None:
+        from pyld.jsonld import load_document
         doc = load_document(url)
-        if not exists(cache_dir):
-            os.makedirs(cache_dir)
+        assure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
         pickle.dump(doc, open(doc_fname, 'w'))
         lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
     return doc
+
+
+def _get_schema_url_cache_filename(url):
+    """Return a filename where to cache schema doc from a url"""
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
+    doc_fname = opj(
+        cache_dir,
+        '{}-{}'.format(
+            urlsplit(url).netloc,
+            md5(url.encode('utf-8')).hexdigest()))
+    return doc_fname
 
 
 def flatten_metadata_graph(obj):
