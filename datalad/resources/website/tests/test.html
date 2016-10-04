@@ -104,6 +104,34 @@
 	assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds2" + metadata_loc);
 	assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
       });
+      QUnit.test("Bread2crumbs", function(assert) {
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"cwd\">datasets.datalad.org</span></a>"],
+			 "base case, root directory in breadcrumbs");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"cwd\">ds1</span></a>"],
+			 "breadcrumbs to server root even if root ds a subdirectory");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir='});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>"],
+			 "empty 'dir' get parameter");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir=/d1'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1><span class=\"cwd\">d1</span></a>"],
+			 "single sub-directory in 'dir' get parameter");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir=/d1/d2'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1><span class=\"dir\">d1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1/d2><span class=\"cwd\">d2</span></a>"],
+			 "multiple sub-directories in 'dir' get parameter");
+      });
     </script>
   </body>
 </html>
