@@ -12,6 +12,7 @@
 
 import logging
 
+from itertools import chain
 from os import curdir
 from os import linesep
 from os.path import isdir
@@ -199,13 +200,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
     return content_by_ds
 
 
-def _unwind(generators):
-    res = []
-    for item in generators:
-        res.extend(item)
-    return res
-
-
 class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
@@ -386,9 +380,9 @@ class Get(Interface):
             lgr.warning('could not find and ignored paths: %s', unavailable_paths)
 
         # hand over to git-annex
-        return _unwind(
+        return list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
-                 fulfill_datasets=fulfill_datasets))
+                 fulfill_datasets=fulfill_datasets)))
 
     @staticmethod
     def result_renderer_cmdline(res, args):
