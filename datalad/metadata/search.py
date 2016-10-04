@@ -186,7 +186,7 @@ class Search(Interface):
         meta = None
         if os.path.exists(mcache_fname):
             lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname))
+            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
             # TODO add more sophisticated tests to decide when the cache is no longer valid
             if checksum != ds.repo.get_hexsha():
                 # errrr, try again below
@@ -211,13 +211,13 @@ class Search(Interface):
 
             # sort entries by location (if present)
             sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x) for x in sort_keys))
+            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(
                 # graph plus checksum from what it was built
                 (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'w'))
+                open(mcache_fname, 'wb'))
             lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
         if report in ('', ['']):

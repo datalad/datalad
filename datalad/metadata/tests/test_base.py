@@ -324,7 +324,7 @@ def test_cached_load_document(tdir):
             cml.assert_logged("cannot load cache from", level="WARNING")
 
         # but now pickled one should have been saved
-        assert_equal(pickle.load(open(cache_filename)), target_schema)
+        assert_equal(pickle.load(open(cache_filename, 'rb')), target_schema)
 
         # and if we reload it -- it should be all fine without warnings
         # should come from cache so no need to overload load_document

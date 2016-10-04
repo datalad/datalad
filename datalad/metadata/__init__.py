@@ -323,7 +323,7 @@ def _cached_load_document(url):
     if os.path.exists(doc_fname):
         try:
             lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
-            doc = pickle.load(open(doc_fname))
+            doc = pickle.load(open(doc_fname, 'rb'))
         except Exception as e:  # it is OK to ignore any error and fall back on the true source
             lgr.warning(
                 "cannot load cache from '%s', fall back on schema download: %s",
@@ -334,7 +334,7 @@ def _cached_load_document(url):
         doc = load_document(url)
         assure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
-        pickle.dump(doc, open(doc_fname, 'w'))
+        pickle.dump(doc, open(doc_fname, 'wb'))
         lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
     return doc
 
