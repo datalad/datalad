@@ -17,9 +17,6 @@ import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
-from os.path import relpath
-from os.path import curdir
-from os.path import pathsep
 from six import string_types
 from six import text_type
 from six import iteritems
@@ -28,6 +25,7 @@ from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
+from datalad.distribution.utils import get_git_dir
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
@@ -35,7 +33,6 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
-from datalad import cfg
 from datalad.utils import assure_list
 from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -183,8 +180,8 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'metadata')
-        mcache_fname = opj(cache_dir, ds.id)
+        cache_dir = opj(get_git_dir(ds.path), 'datalad', 'cache')
+        mcache_fname = opj(cache_dir, 'metadata.pickle')
 
         meta = None
         if os.path.exists(mcache_fname):
