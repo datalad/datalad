@@ -326,9 +326,10 @@ def _cached_load_document(url):
         try:
             lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
             doc = pickle.load(open(doc_fname))
-        except:  # it is OK to ignore any error and fall back on the true source
-            lgr.debug("cannot load cache from '%s', fall back on schema download",
-                      doc_fname)
+        except Exception as e:  # it is OK to ignore any error and fall back on the true source
+            lgr.warning(
+                "cannot load cache from '%s', fall back on schema download: %s",
+                doc_fname, exc_str(e))
             pass
     if doc is None:
         doc = load_document(url)
