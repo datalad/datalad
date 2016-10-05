@@ -196,7 +196,7 @@ def test_aggregation(path):
             raise SkipTest
 
         import pyld
-        from datalad.api import search
+        from datalad.api import search_ as search
 
         assert_equal(len(list(clone.search('mother'))), 1)
         assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive

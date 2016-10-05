@@ -344,9 +344,11 @@ def _get_schema_url_cache_filename(url):
     cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
     doc_fname = opj(
         cache_dir,
-        '{}-{}'.format(
+        '{}-{}.p{}'.format(
             urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest()))
+            md5(url.encode('utf-8')).hexdigest(),
+            pickle.HIGHEST_PROTOCOL)
+    )
     return doc_fname
 
 
