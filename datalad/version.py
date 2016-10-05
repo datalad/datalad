@@ -9,6 +9,7 @@
 """Defines version to be imported in the module and obtained from setup.py
 """
 
+import sys
 from os.path import lexists, dirname, join as opj, curdir
 
 # Hard coded version, to be done by release process
@@ -35,6 +36,9 @@ if lexists(opj(projdir, '.git')):
         __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
         # To follow PEP440 we can't have all the git fanciness
         __version__ = __full_version__.split(b'-')[0]
+        # awkward version specific handling :-/
+        if sys.version_info[0] >= 3:
+            __version__ = __version__.decode()
     except:  # MIH: OSError, IndexError
         # just stick to the hard-coded
         __full_version__ = __version__
