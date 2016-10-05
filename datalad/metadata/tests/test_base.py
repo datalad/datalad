@@ -9,19 +9,28 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
+import logging
+import pickle
+import os
+
+from mock import patch
 from operator import itemgetter
+from os.path import join as opj, exists
 from six import PY2
+
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
-from nose.tools import assert_true, assert_equal, assert_raises, assert_false
-from datalad.tests.utils import with_tree, with_tempfile
+from datalad.metadata import _cached_load_document
+from datalad.utils import swallow_logs
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.dochelpers import exc_str
-import os
-from os.path import join as opj, exists
+from datalad.tests.utils import with_tree, with_tempfile
+from datalad.tests.utils import assert_not_in
 from datalad.support.exceptions import InsufficientArgumentsError
+
 from nose import SkipTest
+from nose.tools import assert_true, assert_equal, assert_raises, assert_false
 
 
 _dataset_hierarchy_template = {
@@ -263,15 +272,6 @@ def test_aggregation(path):
         raise SkipTest
     except ImportError as exc:
         raise SkipTest(exc_str(exc))
-    except pyld.jsonld.JsonLdError as exc:
-        if PY2:
-            raise
-        #
-        raise SkipTest(
-            "pyld code is not ready for Python 3.5 it seems (see: #756): %s"
-            % exc_str(exc)
-        )
-        pass
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
@@ -295,3 +295,31 @@ def test_aggregate_with_missing_id(path):
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
         assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
+
+
+@with_tempfile(mkdir=True)
+def test_cached_load_document(tdir):
+
+    target_schema = {'buga': 'duga'}
+    cache_filename = opj(tdir, "crap")
+
+    with open(cache_filename, 'wb') as f:
+        f.write("CRAPNOTPICKLED".encode())
+
+    with patch('datalad.metadata._get_schema_url_cache_filename',
+               return_value=cache_filename):
+        with patch('pyld.jsonld.load_document', return_value=target_schema), \
+            swallow_logs(new_level=logging.WARNING) as cml:
+            schema = _cached_load_document("http://schema.org/")
+            assert_equal(schema, target_schema)
+            cml.assert_logged("cannot load cache from", level="WARNING")
+
+        # but now pickled one should have been saved
+        assert_equal(pickle.load(open(cache_filename, 'rb')), target_schema)
+
+        # and if we reload it -- it should be all fine without warnings
+        # should come from cache so no need to overload load_document
+        with swallow_logs(new_level=logging.WARNING) as cml:
+            schema = _cached_load_document("http://schema.org/")
+            assert_equal(schema, target_schema)
+            assert_not_in("cannot load cache from", cml.out)

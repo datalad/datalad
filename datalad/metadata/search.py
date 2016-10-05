@@ -17,9 +17,6 @@ import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
-from os.path import relpath
-from os.path import curdir
-from os.path import pathsep
 from six import string_types
 from six import text_type
 from six import iteritems
@@ -28,6 +25,7 @@ from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
+from datalad.distribution.utils import get_git_dir
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
@@ -35,7 +33,6 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
-from datalad import cfg
 from datalad.utils import assure_list
 from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -183,13 +180,13 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'metadata')
-        mcache_fname = opj(cache_dir, ds.id)
+        cache_dir = opj(get_git_dir(ds.path), 'datalad', 'cache')
+        mcache_fname = opj(cache_dir, 'metadata.pickle')
 
         meta = None
         if os.path.exists(mcache_fname):
             lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname))
+            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
             # TODO add more sophisticated tests to decide when the cache is no longer valid
             if checksum != ds.repo.get_hexsha():
                 # errrr, try again below
@@ -214,13 +211,13 @@ class Search(Interface):
 
             # sort entries by location (if present)
             sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x) for x in sort_keys))
+            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(
                 # graph plus checksum from what it was built
                 (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'w'))
+                open(mcache_fname, 'wb'))
             lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
         if report in ('', ['']):
