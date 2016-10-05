@@ -21,6 +21,7 @@ from six import string_types
 from six import text_type
 from six import iteritems
 from six import reraise
+from six import PY3
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
@@ -180,8 +181,8 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(get_git_dir(ds.path), 'datalad', 'cache')
-        mcache_fname = opj(cache_dir, 'metadata.pickle')
+        cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
+        mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
 
         meta = None
         if os.path.exists(mcache_fname):
@@ -227,7 +228,7 @@ class Search(Interface):
 
         match = assure_list(match)
         search = assure_list(search)
-        # convert all to lower case for case incensitive matching
+        # convert all to lower case for case insensitive matching
         search = {x.lower() for x in search}
 
         def get_in_matcher(m):
@@ -357,8 +358,13 @@ class Search(Interface):
                     ansi_colors.color_word(location, ansi_colors.DATASET),
                     ':' if r else '',
                     ichr,
-                    jchr.join([fmt.format(
-                        k=ansi_colors.color_word(k, ansi_colors.FIELD), v=pretty_str(r[k])) for k in sorted(r)])))
+                    jchr.join(
+                        [
+                            fmt.format(
+                                k=ansi_colors.color_word(k, ansi_colors.FIELD),
+                                v=pretty_bytes(r[k]))
+                            for k in sorted(r)
+                        ])))
                 anything = True
             if not anything:
                 ui.message("Nothing to report")
@@ -368,26 +374,32 @@ class Search(Interface):
         elif format == 'yaml':
             import yaml
             lgr.warning("yaml output support is not yet polished")
-            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)), allow_unicode=True, encoding='utf-8'))
+            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)),
+                                      allow_unicode=True))
 
 
 _lines_regex = re.compile('[\n\r]')
 
 
-def pretty_str(s):
-    """Helper to provide sensible rendering for lists, dicts, and unicode"""
+def pretty_bytes(s):
+    """Helper to provide sensible rendering for lists, dicts, and unicode
+
+    encoded into byte-stream (why really???)
+    """
     if isinstance(s, list):
-        return ", ".join(map(pretty_str, s))
+        return ", ".join(map(pretty_bytes, s))
     elif isinstance(s, dict):
-        return pretty_str(["%s=%s" % (pretty_str(k), pretty_str(v))
-                           for k, v in s.items()])
+        return pretty_bytes(["%s=%s" % (pretty_bytes(k), pretty_bytes(v))
+                             for k, v in s.items()])
     elif isinstance(s, text_type):
+        s_ = (os.linesep + "  ").join(_lines_regex.split(s))
         try:
-            b = s.encode('utf-8')
-            return (os.linesep + "  ").join(_lines_regex.split(b))
+            if PY3:
+                return s_
+            return s_.encode('utf-8')
         except UnicodeEncodeError:
             lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
             # TODO: get current encoding
-            return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
+            return s_.encode('utf-8', 'ignore') if isinstance(s_, string_types) else "ERROR"
     else:
-        return str(s)
+        return str(s).encode()
