@@ -27,6 +27,8 @@ from datalad.utils import assure_unicode
 from datalad.dochelpers import exc_str
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import swallow_outputs
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from nose import SkipTest
@@ -196,7 +198,7 @@ def test_aggregation(path):
             raise SkipTest
 
         import pyld
-        from datalad.api import search_ as search
+        from datalad.api import search_
 
         assert_equal(len(list(clone.search('mother'))), 1)
         assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
@@ -209,6 +211,18 @@ def test_aggregation(path):
                          [opj(path, n) for n in names])
         # should yield (location, report) tuples
         assert_names(child_res, ['sub', 'sub/subsub'])
+
+        # result should be identical to invoking search from api
+        # and search_ should spit out locations out
+        with swallow_outputs() as cmo:
+            res = list(search_('child', dataset=clone))
+            assert_equal(res, child_res)
+            assert_in(res[0][0], cmo.out)
+        # and overarching search_ just for smoke testing of processing outputs
+        # and not puking (e.g. under PY3)
+        with swallow_outputs() as cmo:
+            assert list(search_('.', regex=True, dataset=clone))
+            assert cmo.out
 
         # test searching among specified properties only
         assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
