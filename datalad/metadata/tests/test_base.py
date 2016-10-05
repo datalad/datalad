@@ -337,13 +337,3 @@ def test_cached_load_document(tdir):
             schema = _cached_load_document("http://schema.org/")
             assert_equal(schema, target_schema)
             assert_not_in("cannot load cache from", cml.out)
-
-
-@with_tempfile
-def test_our_metadataset_search(tdir):
-    # smoke test for basic search operations on our super-megadataset
-    # expensive operation but ok
-    ds = install(path=tdir, source="///")
-    assert list(ds.search('.', report='*', regex=True))
-    assert list(ds.search('.', report='*'))
-    assert list(ds.search('.', report_matched=True))

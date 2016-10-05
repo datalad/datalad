@@ -375,7 +375,7 @@ class Search(Interface):
             import yaml
             lgr.warning("yaml output support is not yet polished")
             ui.message(yaml.safe_dump(list(map(itemgetter(1), res)),
-                                      allow_unicode=True, encoding='utf-8'))
+                                      allow_unicode=True))
 
 
 _lines_regex = re.compile('[\n\r]')
