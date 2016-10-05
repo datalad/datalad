@@ -34,7 +34,7 @@ if lexists(opj(projdir, '.git')):
         # and thus misses in __cmp__ necessary wrapping for unicode strings
         __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
         # To follow PEP440 we can't have all the git fanciness
-        __version__ = __full_version__.split('-')[0]
+        __version__ = __full_version__.split(b'-')[0]
     except:  # MIH: OSError, IndexError
         # just stick to the hard-coded
         __full_version__ = __version__
