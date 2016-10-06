@@ -229,7 +229,7 @@ def main(args=None):
 
     # parse cmd args
     cmdlineargs, unparsed_args = parser.parse_known_args(args)
-    has_func = hasattr(cmdlineargs, 'func')
+    has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
     if unparsed_args:
         if has_func and cmdlineargs.func.__self__.__name__ != 'Export':
             lgr.error('unknown argument{}: {}'.format(
