@@ -34,6 +34,14 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
 
+try:
+    import pyld
+    # do here to prevent pyld from being needed
+except ImportError as exc:
+    raise SkipTest(exc_str(exc))
+
+from datalad.api import search
+from datalad.api import search_
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -193,105 +201,97 @@ def test_aggregation(path):
                  partial[1]['@id'])
 
     # query smoke test
-    try:
-        if os.environ.get('DATALAD_TESTS_NONETWORK'):
-            raise SkipTest
-
-        import pyld
-        from datalad.api import search_
-
-        assert_equal(len(list(clone.search('mother'))), 1)
-        assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
-
-        child_res = list(clone.search('child'))
-        assert_equal(len(child_res), 2)
-        # little helper to match names
-        def assert_names(res, names, path=clone.path):
-            assert_equal(list(map(itemgetter(0), res)),
-                         [opj(path, n) for n in names])
-        # should yield (location, report) tuples
-        assert_names(child_res, ['sub', 'sub/subsub'])
-
-        # result should be identical to invoking search from api
-        # and search_ should spit out locations out
-        with swallow_outputs() as cmo:
-            res = list(search_('child', dataset=clone))
-            assert_equal(res, child_res)
-            assert_in(res[0][0], cmo.out)
-        # and overarching search_ just for smoke testing of processing outputs
-        # and not puking (e.g. under PY3)
-        with swallow_outputs() as cmo:
-            assert list(search_('.', regex=True, dataset=clone))
-            assert cmo.out
-
-        # test searching among specified properties only
-        assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
-        assert_names(clone.search('i', search='keywords'), ['.'])
-        # case shouldn't matter
-        assert_names(clone.search('i', search='Keywords'), ['.'])
-        assert_names(clone.search('i', search=['name', 'keywords']),
-                     ['.', 'sub', 'sub/subsub'])
-
-        # without report_matched, we are getting none of the fields
-        assert(all([not x for x in map(itemgetter(1), child_res)]))
-        # but we would get all if asking for '*'
-        assert(all([len(x) >= 9
-                    for x in map(itemgetter(1),
-                                 list(clone.search('child', report='*')))]))
-        # but we would get only the matching name if we ask for report_matched
-        assert_equal(
-            set(map(lambda x: tuple(x[1].keys()),
-                    clone.search('child', report_matched=True))),
-            set([('name',)])
-        )
-        # and the additional field we might have asked with report
-        assert_equal(
-            set(map(lambda x: tuple(sorted(x[1].keys())),
-                    clone.search('child', report_matched=True,
-                                 report=['type']))),
-            set([('name', 'type')])
-        )
-        # and if we ask report to be 'empty', we should get no fields
-        child_res_empty = list(clone.search('child', report=''))
-        assert_equal(len(child_res_empty), 2)
-        assert_equal(
-            set(map(lambda x: tuple(x[1].keys()), child_res_empty)),
-            set([tuple()])
-        )
-
-        # more tests on returned paths:
-        assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
-        # if we clone subdataset and query for value present in it and its kid
-        clone_sub = clone.install('sub')
-        assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
-
-        # Test 'and' for multiple search entries
-        assert_equal(len(list(clone.search(['child', 'bids']))), 2)
-        assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
-        assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
-
-        res = list(clone.search('.*', regex=True))  # with regex
-        assert_equal(len(res), 3)  # one per dataset
-
-        # we do search, not match
-        assert_equal(len(list(clone.search('randchild', regex=True))), 1)
-        assert_equal(len(list(clone.search(['gr.nd', 'ch.ld'], regex=True))), 1)
-        assert_equal(len(list(clone.search('randchil.', regex=True))), 1)
-        assert_equal(len(list(clone.search('^randchild.*', regex=True))), 0)
-        assert_equal(len(list(clone.search('^grandchild.*', regex=True))), 1)
-        assert_equal(len(list(clone.search('grandchild'))), 1)
-
-    # do here to prevent pyld from being needed
-    except SkipTest:
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
         raise SkipTest
-    except ImportError as exc:
-        raise SkipTest(exc_str(exc))
+
+    assert_equal(len(list(clone.search('mother'))), 1)
+    assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
+
+    child_res = list(clone.search('child'))
+    assert_equal(len(child_res), 2)
+
+    # little helper to match names
+    def assert_names(res, names, path=clone.path):
+        assert_equal(list(map(itemgetter(0), res)),
+                     [opj(path, n) for n in names])
+    # should yield (location, report) tuples
+    assert_names(child_res, ['sub', 'sub/subsub'])
+
+    # result should be identical to invoking search from api
+    # and search_ should spit out locations out
+    with swallow_outputs() as cmo:
+        res = list(search_('child', dataset=clone))
+        assert_equal(res, child_res)
+        assert_in(res[0][0], cmo.out)
+    # and overarching search_ just for smoke testing of processing outputs
+    # and not puking (e.g. under PY3)
+    with swallow_outputs() as cmo:
+        assert list(search_('.', regex=True, dataset=clone))
+        assert cmo.out
+
+    # test searching among specified properties only
+    assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
+    assert_names(clone.search('i', search='keywords'), ['.'])
+    # case shouldn't matter
+    assert_names(clone.search('i', search='Keywords'), ['.'])
+    assert_names(clone.search('i', search=['name', 'keywords']),
+                 ['.', 'sub', 'sub/subsub'])
+
+    # without report_matched, we are getting none of the fields
+    assert(all([not x for x in map(itemgetter(1), child_res)]))
+    # but we would get all if asking for '*'
+    assert(all([len(x) >= 9
+                for x in map(itemgetter(1),
+                             list(clone.search('child', report='*')))]))
+    # but we would get only the matching name if we ask for report_matched
+    assert_equal(
+        set(map(lambda x: tuple(x[1].keys()),
+                clone.search('child', report_matched=True))),
+        set([('name',)])
+    )
+    # and the additional field we might have asked with report
+    assert_equal(
+        set(map(lambda x: tuple(sorted(x[1].keys())),
+                clone.search('child', report_matched=True,
+                             report=['type']))),
+        set([('name', 'type')])
+    )
+    # and if we ask report to be 'empty', we should get no fields
+    child_res_empty = list(clone.search('child', report=''))
+    assert_equal(len(child_res_empty), 2)
+    assert_equal(
+        set(map(lambda x: tuple(x[1].keys()), child_res_empty)),
+        set([tuple()])
+    )
+
+    # more tests on returned paths:
+    assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
+    # if we clone subdataset and query for value present in it and its kid
+    clone_sub = clone.install('sub')
+    assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
+
+    # Test 'and' for multiple search entries
+    assert_equal(len(list(clone.search(['child', 'bids']))), 2)
+    assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
+    assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
+
+    res = list(clone.search('.*', regex=True))  # with regex
+    assert_equal(len(res), 3)  # one per dataset
+
+    # we do search, not match
+    assert_equal(len(list(clone.search('randchild', regex=True))), 1)
+    assert_equal(len(list(clone.search(['gr.nd', 'ch.ld'], regex=True))), 1)
+    assert_equal(len(list(clone.search('randchil.', regex=True))), 1)
+    assert_equal(len(list(clone.search('^randchild.*', regex=True))), 0)
+    assert_equal(len(list(clone.search('^grandchild.*', regex=True))), 1)
+    assert_equal(len(list(clone.search('grandchild'))), 1)
+
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
 
 @with_tree(tree=_dataset_hierarchy_template)
-def test_aggregate_with_missing_id(path):
+def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True, if_dirty='ignore')
@@ -301,7 +301,7 @@ def test_aggregate_with_missing_id(path):
     subsubds = subds.create('subsub', force=True, if_dirty='ignore')
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second natiev set for the topmost dataset
+    # and a second native set for the topmost dataset
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
@@ -309,6 +309,21 @@ def test_aggregate_with_missing_id(path):
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
         assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
+
+    # but search should not fail
+    with swallow_outputs():
+        res1 = list(search_('.', regex=True, dataset=ds))
+    assert res1
+
+    # and let's see now if we wouldn't fail if dataset is duplicate if we
+    # install the same dataset twice
+    subds_clone = ds.install(source=subds.path, path="subds2")
+    with swallow_outputs():
+        res2 = list(search_('.', regex=True, dataset=ds))
+    assert_equal(len(res1) + 1, len(res2))
+    assert_equal(
+        set(map(itemgetter(0), res1)).union({subds_clone.path}),
+        set(map(itemgetter(0), res2)))
 
 
 @with_tempfile(mkdir=True)
