@@ -17,6 +17,7 @@ import datalad
 from ..main import main
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_re_in
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -112,12 +113,12 @@ def check_incorrect_option(opts, err_str):
     stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
     out = stdout + stderr
     assert_in("usage: ", out)
-    assert_in(err_str, out)
+    assert_re_in(err_str, out, match=False)
 
 
 def test_incorrect_options():
     # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: invalid"
+    err_invalid = "error: (invalid|too few arguments)"
     yield check_incorrect_option, ('--buga',), err_invalid
     yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
 
