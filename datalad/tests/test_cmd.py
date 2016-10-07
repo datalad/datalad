@@ -147,13 +147,15 @@ def test_runner_log_stdout():
         with swallow_logs(logging.DEBUG) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
             cm.assert_logged("Running: %s" % cmd, level='DEBUG', regex=False)
-            if not on_windows:
-                # we can just count on sanity
-                cm.assert_logged("stdout| stdout-"
-                                 "Message should be logged", regex=False)
-            else:
-                # echo outputs quoted lines for some reason, so relax check
-                ok_("stdout-Message should be logged" in cm.lines[1])
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False):
+                if not on_windows:
+                    # we can just count on sanity
+                    cm.assert_logged("stdout| stdout-"
+                                     "Message should be logged", regex=False)
+                else:
+                    # echo outputs quoted lines for some reason, so relax check
+                    ok_("stdout-Message should be logged" in cm.lines[1])
 
     cmd = 'echo stdout-Message should not be logged'
     with swallow_outputs() as cmo:

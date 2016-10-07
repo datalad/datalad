@@ -38,6 +38,7 @@ matrix:
     - DATALAD_API_ALWAYSRENDER=1
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
+    - DATALAD_LOG_OUTPUTS=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to

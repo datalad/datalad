@@ -130,8 +130,8 @@ class Runner(object):
         if self.__log_outputs is None:
             try:
                 from . import cfg
-                self.__log_outputs = bool(cfg.get('datalad.log.outputs',
-                                                  default=False))
+                self.__log_outputs = \
+                    cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
                 # could be too early, then log!
                 return True
