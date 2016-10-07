@@ -349,6 +349,28 @@ class ConfigManager(object):
         """A convenience method which coerces the option value to an integer"""
         return int(self.get_value(section, option))
 
+    def getbool(self, section, option, default=None):
+        """A convenience method which coerces the option value to a bool
+
+        Values "on", "yes", "true" and any int!=0 are considered True
+        Values which evaluate to bool False, "off", "no", "false" are considered
+        False
+        TypeError is raised for other values.
+        """
+        val = self.get_value(section, option, default=default)
+        if hasattr(val, 'lower'):
+            val = val.lower()
+        if val in {"off", "no", "false", "0"} or not bool(val):
+            return False
+        elif val in {"on", "yes", "true", True} \
+                or (hasattr(val, 'isdigit') and val.isdigit() and int(val)) \
+                or isinstance(val, int) and val:
+            return True
+        else:
+            raise TypeError(
+                "Got config value %s which should be interpreted as bool"
+                % repr(val))
+
     def getfloat(self, section, option):
         """A convenience method which coerces the option value to a float"""
         return float(self.get_value(section, option))
