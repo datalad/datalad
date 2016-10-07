@@ -308,7 +308,13 @@ class Search(Interface):
                 else:
                     report_dict = {}  # it was empty but not None -- asked to
                     # not report any specific field
-                yield opj(ds_path_prefix, location), report_dict
+                if isinstance(location, (list, tuple)):
+                    # could be that the same dataset installed into multiple
+                    # locations. For now report them separately
+                    for l in location:
+                        yield opj(ds_path_prefix, l), report_dict
+                else:
+                    yield opj(ds_path_prefix, location), report_dict
 
         if search and observed_properties is not None:
             import difflib

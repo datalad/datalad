@@ -133,8 +133,9 @@ script:
 
 after_success:
   - /bin/ls -l /tmp/.coverage-entry*
+  - echo "BEFORE combining"; coverage report --show-missing
   - coverage combine -a /tmp/.coverage-entrypoints-*
-  - coverage report
+  - echo "AFTER combining"; coverage report --show-missing
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
