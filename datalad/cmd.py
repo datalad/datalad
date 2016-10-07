@@ -56,7 +56,7 @@ class Runner(object):
     able to record calls and allows for dry runs.
     """
 
-    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol', '__log_outputs']
 
     def __init__(self, cwd=None, env=None, protocol=None):
         """
@@ -76,13 +76,13 @@ class Runner(object):
         self.env = env
         if protocol is None:
             # TODO: config cmd.protocol = null
-            cfg = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
+            protocol_str = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
             protocol = {
                 'externals-time': ExecutionTimeExternalsProtocol,
                 'time': ExecutionTimeProtocol,
                 'null': NullProtocol
-            }[cfg]()
-            if cfg != 'null':
+            }[protocol_str]()
+            if protocol_str != 'null':
                 # we need to dump it into a file at the end
                 # TODO: config cmd.protocol_prefix = protocol
                 filename = '%s-%s.log' % (
@@ -92,6 +92,7 @@ class Runner(object):
                 atexit.register(functools.partial(protocol.write_to_file, filename))
 
         self.protocol = protocol
+        self.__log_outputs = None  # we don't know yet either we need ot log every output or not
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -124,13 +125,25 @@ class Runner(object):
             raise TypeError("Argument 'command' is neither a string, "
                             "nor a list nor a callable.")
 
+    @property
+    def _log_outputs(self):
+        if self.__log_outputs is None:
+            try:
+                from . import cfg
+                self.__log_outputs = bool(cfg.get('datalad.log.outputs',
+                                                  default=False))
+            except ImportError:
+                # could be too early, then log!
+                return True
+        return self.__log_outputs
+
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
-        if line:
+        if line and self._log_outputs:
             self.log("stdout| " + line.rstrip('\n'))
 
     def _log_err(self, line, expected=False):
-        if line:
+        if line and self._log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
                      level={True: logging.DEBUG,
                             False: logging.ERROR}[expected])
@@ -285,6 +298,7 @@ class Runner(object):
            CommandError's `code`-field. Command's stdout and stderr are stored
            in CommandError's `stdout` and `stderr` fields respectively.
         """
+
         # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
         # would need either threaded solution as in .communicate or just allow
         # only one to be monitored and another one just being dumped into a file
