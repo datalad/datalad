@@ -164,7 +164,7 @@ class LoggerHelper(object):
         """
         if level is None:
             # see if nothing in the environment
-            level = self._get_environ('LOGLEVEL')
+            level = self._get_environ('LOG_LEVEL')
         if level is None:
             level = default
 
