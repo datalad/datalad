@@ -84,29 +84,29 @@ class ConfigManager(object):
     """Thin wrapper around `git-config` with support for a dataset configuration.
 
     The general idea is to have an object that is primarily used to read/query
-    configuration option. Upon creation, current configuration is read via one
+    configuration option.  Upon creation, current configuration is read via one
     (or max two, in the case of the presence of dataset-specific configuration)
-    calls to `git config`). If this class is initialized with a Dataset
+    calls to `git config`.  If this class is initialized with a Dataset
     instance, it supports reading and writing configuration from
-    ``.datalad/config`` inside a dataset too. This file is commit to Git and
+    ``.datalad/config`` inside a dataset too. This file is committed to Git and
     hence useful to ship certain configuration items with a dataset.
 
-    The API aims to provide the most significant read-access bits of a
+    The API aims to provide the most significant read-access API of a
     dictionary, the Python ConfigParser, and GitPython's config parser
-    implementation.
+    implementations.
 
-    This class is presently not capable of effienciently writing multiple
-    configurations items at once. Instead, each modification results in a
-    dedicated call to `git config`. This authors thinks this is OK, as he
+    This class is presently not capable of efficiently writing multiple
+    configurations items at once.  Instead, each modification results in a
+    dedicated call to `git config`. This author thinks this is OK, as he
     cannot think of a situation where a large number of items need to be
     written during normal operation. If such need arises, various solutions are
     possible (via GitPython, or an independent writer).
 
     Any DATALAD_* environment variable is also presented as a configuration
-    item. Setting read from environment variables are not stored in any of the
-    configuration file, but are read dynamically from the environement at each
-    `reload()` call. Their value take precedence over any specification in a
-    configuration file.
+    item. Settings read from environment variables are not stored in any of the
+    configuration file, but are read dynamically from the environment at each
+    `reload()` call. Their values take precedence over any specification in
+    configuration files.
 
     Parameters
     ----------
@@ -116,7 +116,8 @@ class ConfigManager(object):
       this dataset's configuration file (which will be created on demand)
     dataset_only : bool
       If True, configuration items are only read from a datasets persistent
-      configuration file, if any (the one in .datalad/config, not .git/config).
+      configuration file, if any present (the one in ``.datalad/config``, not
+      ``.git/config``).
     """
     def __init__(self, dataset=None, dataset_only=False):
         # store in a simple dict
@@ -168,11 +169,11 @@ class ConfigManager(object):
         Convenience method to obtain settings interactively, if needed
 
         A UI will be used to ask for user input in interactive sessions.
-        Questions to ask and additional explanations can be passed directly
-        as arguments, or is retrieved from a list of preconfigured items.
+        Questions to ask, and additional explanations can be passed directly
+        as arguments, or retrieved from a list of pre-configured items.
 
         Additionally, this method allows for type conversion and storage
-        of obtained settings. Both aspects can also be preconfigured.
+        of obtained settings. Both aspects can also be pre-configured.
 
         Parameters
         ----------
@@ -186,7 +187,7 @@ class ConfigManager(object):
           there is an existing configuration setting.
         dialog_type : {'question', 'yesno', None}
           Which dialog type to use in interactive sessions. If `None`,
-          preconfigured UI options are used.
+          pre-configured UI options are used.
         store : bool
           Whether to store the obtained value (or default)
         %s
@@ -360,7 +361,8 @@ class ConfigManager(object):
         """
         if section is None:
             return self._store.items()
-        return [(k, v) for k, v in self._store.items() if cfg_section_regex.match(k).group(1) == section]
+        return [(k, v) for k, v in self._store.items()
+                if cfg_section_regex.match(k).group(1) == section]
 
     #
     # Compatibility with GitPython's ConfigParser
