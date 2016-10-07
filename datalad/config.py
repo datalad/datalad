@@ -70,6 +70,16 @@ def _parse_gitconfig_dump(dump, store, replace):
     return store
 
 
+def _parse_env(store):
+    dct = {}
+    for k in os.environ:
+        if not k.startswith('DATALAD_'):
+            continue
+        dct[k.replace('_', '.').lower()] = os.environ[k]
+    store.update(dct)
+    return store
+
+
 class ConfigManager(object):
     """Thin wrapper around `git-config` with support for a dataset configuration.
 
@@ -91,6 +101,12 @@ class ConfigManager(object):
     cannot think of a situation where a large number of items need to be
     written during normal operation. If such need arises, various solutions are
     possible (via GitPython, or an independent writer).
+
+    Any DATALAD_* environment variable is also presented as a configuration
+    item. Setting read from environment variables are not stored in any of the
+    configuration file, but are read dynamically from the environement at each
+    `reload()` call. Their value take precedence over any specification in a
+    configuration file.
 
     Parameters
     ----------
@@ -124,7 +140,7 @@ class ConfigManager(object):
         #   - load datalad dataset config from dataset
         #   - load git config from all supported by git sources
         # in doing so we always stay compatible with where Git gets its
-        # config from, but also allow to override persisten information
+        # config from, but also allow to override persistent information
         # from dataset locally or globally
         if self._dataset:
             # now any dataset config
@@ -141,6 +157,9 @@ class ConfigManager(object):
             stdout, stderr = self._run(['-z', '-l'], log_stderr=False)
             self._store = _parse_gitconfig_dump(
                 stdout, self._store, replace=True)
+
+            # override with environment variables
+            self._store = _parse_env(self._store)
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
@@ -171,14 +190,14 @@ class ConfigManager(object):
         store : bool
           Whether to store the obtained value (or default)
         %s
-        **kwargs
+        `**kwargs`
           Additional arguments for the UI function call, such as a question
           `text`.
         """
         # do local import, as this module is import prominently and the
         # could theroetically import all kind of weired things for type
         # conversion
-        from datalad.interface.common_cfg import ui_definitions as cfg_defs
+        from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
         cdef = cfg_defs.get(var, {})
         # type conversion setup

@@ -54,7 +54,8 @@ try:
 
         def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
             super(tqdmProgressBar, self).__init__(maxval=maxval)
-            self._pbar_params = dict(desc=label, unit=unit, unit_scale=True, total=maxval, file=out)
+            self._pbar_params = dict(desc=label, unit=unit,
+                                     unit_scale=True, total=maxval, file=out)
             self._pbar = None
 
         def _create(self):
@@ -107,3 +108,21 @@ except ImportError:  # pragma: no cover
     pass
 
 assert len(progressbars), "We need tqdm library to report progress"
+
+
+class AnnexSpecialRemoteProgressBar(ProgressBarBase):
+    """Hook up to the special remote and report progress back to annex"""
+
+    def __init__(self, *args, **kwargs):
+        # not worth passing anything since we don't care about anything
+        remote = kwargs.get('remote')
+        super(AnnexSpecialRemoteProgressBar, self).__init__()
+        self.remote = remote
+
+    def update(self, *args, **kwargs):
+        super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
+        # now use stored value
+        if self.remote:
+            self.remote.progress(self._prev_value)
+
+progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar

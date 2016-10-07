@@ -15,11 +15,24 @@
 import sys
 import os
 import shlex
+from os.path import join as opj, exists
+from os import pardir
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+
+# generate missing pieces
+for setup_py_path in (opj(pardir, 'setup.py'),  # travis
+                      opj(pardir, pardir, 'setup.py')):  # RTD
+    if exists(setup_py_path):
+        try:
+            for cmd in 'manpage', 'cfginfo', 'examples':
+                os.system('{} build_{}'.format(setup_py_path, cmd))
+        except:
+            # shut up and do your best
+            pass
 
 # -- General configuration ------------------------------------------------
 

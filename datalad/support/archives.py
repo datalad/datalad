@@ -355,7 +355,7 @@ class ExtractedArchive(object):
 
     def clean(self, force=False):
         # would interfere with tests
-        # if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        # if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         #     lgr.info("As instructed, not cleaning up the cache under %s"
         #              % self._path)
         #     return

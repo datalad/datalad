@@ -16,12 +16,13 @@ def _generate_func_api():
     """Auto detect all available interfaces and generate a function-based
        API from them
     """
-    import os
     from importlib import import_module
     from inspect import isgenerator
     from collections import namedtuple
     from collections import OrderedDict
     from functools import wraps
+
+    from datalad import cfg
 
     from .interface.base import update_docstring_with_parameters
     from .interface.base import get_interface_groups
@@ -72,7 +73,7 @@ def _generate_func_api():
             "returning the result"
         return call_
 
-    always_render = os.environ.get('DATALAD_API_ALWAYS_RENDER')
+    always_render = cfg.obtain('datalad.api.alwaysrender')
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance

@@ -8,6 +8,8 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Base classes to custom git-annex remotes (e.g. extraction from archives)"""
 
+from __future__ import absolute_import
+
 __docformat__ = 'restructuredtext'
 
 import errno
@@ -23,6 +25,7 @@ import logging
 lgr = logging.getLogger('datalad.customremotes')
 lgr.log(5, "Importing datalad.customremotes.main")
 
+from ..ui import ui
 from ..support.protocol import ProtocolInterface
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
@@ -33,6 +36,8 @@ SUPPORTED_PROTOCOL = 1
 
 DEFAULT_COST = 100
 DEFAULT_AVAILABILITY = "local"
+
+from datalad.ui.progressbars import ProgressBarBase
 
 
 class AnnexRemoteQuit(Exception):
@@ -214,9 +219,13 @@ class AnnexCustomRemote(object):
         self._in_the_loop = False
         self._protocol = \
             AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
-            if os.environ.get('DATALAD_PROTOCOL_REMOTE') else None
+            if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE') else None
 
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
+
+        # instruct annex backend UI to use this remote
+        if ui.backend == 'annex':
+            ui.set_specialremote(self)
 
     @classmethod
     def _get_custom_scheme(cls, prefix):
@@ -326,10 +335,10 @@ class AnnexCustomRemote(object):
         lgr.error(msg)
         self.send(annex_err, msg)
 
-    def progress(self, perc):
-        perc = int(perc)
-        if self._progress != perc:
-            self.send("PROGRESS", perc)
+    def progress(self, bytes):
+        bytes = int(bytes)
+        if self._progress != bytes:
+            self.send("PROGRESS", bytes)
 
     def main(self):
         """Interface to the command line tool"""

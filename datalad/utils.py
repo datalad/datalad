@@ -8,13 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+import hashlib
 import re
 import six.moves.builtins as __builtin__
 import time
-
-from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
-from os.path import isdir
-from six import text_type, binary_type
 
 import logging
 import shutil
@@ -26,13 +23,20 @@ import platform
 import gc
 import glob
 
+from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
-import hashlib
-from os.path import sep as dirsep
-from contextlib import contextmanager
 
+from os.path import sep as dirsep
+from os.path import commonprefix
+from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
+from os.path import isdir
+from os.path import relpath
+
+
+from six import text_type, binary_type
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -284,10 +288,10 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
 
-    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    It will not remove the temporary file/directory if DATALAD_TESTS_TEMP_KEEP
     environment variable is defined
     """
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         if not os.path.lexists(f):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
@@ -439,6 +443,11 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
+def assure_unicode(s, encoding='utf-8'):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
+    return s.decode(encoding) if isinstance(s, binary_type) else s
+
+
 def unique(seq, key=None):
     """Given a sequence return a list only with unique elements while maintaining order
 
@@ -542,7 +551,7 @@ def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
-    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    directory = os.environ.get('DATALAD_TESTS_TEMP_DIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
@@ -568,6 +577,12 @@ def line_profile(func):
 #
 # Context Managers
 #
+
+
+@contextmanager
+def nothing_cm():
+    """Just a dummy cm to programmically switch context managers"""
+    yield
 
 
 @contextmanager
@@ -878,6 +893,37 @@ class chpwd(object):
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
+def with_pathsep(path):
+    """Little helper to guarantee that path ends with /"""
+    return path + sep if not path.endswith(sep) else path
+
+
+def get_path_prefix(path, pwd=None):
+    """Get path prefix (for current directory)
+
+    Returns relative path to the topdir, if we are under topdir, and if not
+    absolute path to topdir.  If `pwd` is not specified - current directory
+    assumed
+    """
+    pwd = pwd or getpwd()
+    if not isabs(path):
+        # if not absolute -- relative to pwd
+        path = opj(getpwd(), path)
+    path_ = with_pathsep(path)
+    pwd_ = with_pathsep(pwd)
+    common = commonprefix((path_, pwd_))
+    if common.endswith(sep) and common in {path_, pwd_}:
+        # we are in subdir or above the path = use relative path
+        location_prefix = relpath(path, pwd)
+        # if benign "here" - cut off
+        if location_prefix in (curdir, curdir + sep):
+            location_prefix = ''
+        return location_prefix
+    else:
+        # just return absolute path
+        return path
+
+
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
@@ -915,7 +961,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         '_').
 
     To change the used directory without providing keyword argument 'dir' set
-    DATALAD_TESTS_TEMPDIR.
+    DATALAD_TESTS_TEMP_DIR.
 
     Examples
     --------
@@ -934,7 +980,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
 
-    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # if DATALAD_TESTS_TEMP_DIR is set, use that as directory,
     # let mktemp handle it otherwise. However, an explicitly provided
     # dir=... will override this.
     mkdir = tkwargs_.pop('mkdir', False)
@@ -1006,3 +1052,4 @@ def get_logfilename(dspath, cmd='datalad'):
 
 
 lgr.log(5, "Done importing datalad.utils")
+

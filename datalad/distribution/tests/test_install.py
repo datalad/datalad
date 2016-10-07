@@ -10,6 +10,7 @@
 """
 
 import logging
+import os
 
 from os.path import join as opj
 from os.path import isdir
@@ -208,6 +209,29 @@ def test_install_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
 
+    # installing it again, shouldn't matter:
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ds = install(path=path, source=src)
+        cml.assert_logged(msg="{0} appears to be installed already.".format(ds),
+                          regex=False, level="INFO")
+        ok_(ds.is_installed())
+
+    # neither should installing just the installed one (without source):
+    # Note: Message is different, since we don't conclude from cloning failure,
+    # but we know the thing is already there before. This leads to passing
+    # identical source and target to GitRepo, which doesn't even try to clone.
+    # Therefore we don't get the message from above.
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ds = install(path=path)
+        cml.assert_logged(msg="{0} already installed.".format(ds),
+                          regex=False, level="DEBUG")
+        ok_(ds.is_installed())
+
+    # but we can apply additional action:
+    ds = install(path=path, get_data=True)
+    if isinstance(origin.repo, AnnexRepo):
+        ok_(ds.repo.file_has_content('test-annex.dat') is True)
+
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
@@ -376,6 +400,14 @@ def test_install_known_subdataset(src, path):
     assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
     assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
 
+    # now, get the data by reinstalling with -g:
+    ok_(subds.repo.file_has_content('test-annex.dat') is False)
+    with chpwd(ds.path):
+        result = install(path='subm 1', dataset=os.curdir, get_data=True)
+        eq_(result, subds)
+        ok_(subds.repo.file_has_content('test-annex.dat') is True)
+        ok_(subds.is_installed())
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -428,7 +460,7 @@ def test_implicit_install(src, dst):
     subsub = Dataset(opj(sub.path, "subsub"))
     ok_(not subsub.is_installed())
 
-    # now implicit but wihtout an explicit dataset to install into
+    # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
     with chpwd(dst):
         result = install(path=opj("sub", "subsub"))
@@ -453,6 +485,7 @@ def test_install_list(path, top_path):
     # we want to be able to install several things, if these are known
     # (no 'source' allowed). Therefore first toplevel:
     ds = install(path=top_path, source=path, recursive=False)
+    assert_not_in('annex.hardlink', ds.config)
     ok_(ds.is_installed())
     sub1 = Dataset(opj(top_path, 'subm 1'))
     sub2 = Dataset(opj(top_path, 'subm 2'))
@@ -471,3 +504,99 @@ def test_install_list(path, top_path):
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
 
 
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_reckless(path, top_path):
+    ds = install(path=top_path, source=path, reckless=True)
+    eq_(ds.config.get('annex.hardlink', None), 'true')
+    eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+
+
+@with_tree(tree={'top_file.txt': 'some',
+                 'sub 1': {'sub1file.txt': 'something else',
+                           'subsub': {'subsubfile.txt': 'completely different',
+                                      }
+                           },
+                 'sub 2': {'sub2file.txt': 'meaningless',
+                           }
+                 })
+@with_tempfile(mkdir=True)
+def test_install_recursive_repeat(src, path):
+    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
+    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
+    sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
+    top_src = Dataset(src).create(force=True)
+    top_src.save(auto_add_changes=True, recursive=True)
+
+    # install top level:
+    top_ds = install(path=path, source=src)
+    ok_(top_ds.is_installed() is True)
+    sub1 = Dataset(opj(path, 'sub 1'))
+    ok_(sub1.is_installed() is False)
+    sub2 = Dataset(opj(path, 'sub 2'))
+    ok_(sub2.is_installed() is False)
+    subsub = Dataset(opj(path, 'sub 1', 'subsub'))
+    ok_(subsub.is_installed() is False)
+
+    # install again, now with data and recursive, but recursion_limit 1:
+    result = install(path=path, recursive=True, recursion_limit=1, get_data=True)
+    assert_in(top_ds, result)
+    assert_in(sub1, result)
+    assert_in(sub2, result)
+    assert_not_in(subsub, result)
+    ok_(top_ds.repo.file_has_content('top_file.txt') is True)
+    ok_(sub1.repo.file_has_content('sub1file.txt') is True)
+    ok_(sub2.repo.file_has_content('sub2file.txt') is True)
+
+    # install sub1 again, recursively:
+    top_ds.install('sub 1', recursive=True, get_data=True)
+    ok_(subsub.is_installed())
+    ok_(subsub.repo.file_has_content('subsubfile.txt'))
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_install_skip_list_arguments(src, path, path_outside):
+
+    # get the top-level thing, but pass a one item list as `path`:
+    ds = install(path=[path], source=src)
+    ok_(ds.is_installed())
+
+    # install a list with valid and invalid items:
+    with swallow_logs(new_level=logging.INFO) as cml:
+        result = ds.install(path=['subm 1', 'not_existing',
+                               path_outside, 'subm 2'])
+        for skipped in ['not_existing', path_outside]:
+            cml.assert_logged(msg="Installation of {0} skipped".format(skipped),
+                              regex=False, level='INFO')
+        ok_(isinstance(result, list))
+        eq_(len(result), 2)
+        for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
+            assert_in(sub, result)
+            ok_(sub.is_installed())
+
+    # install list and have single result item:
+    result = ds.install(path=['subm 1', 'not_existing'])
+    eq_(result, Dataset(opj(path, 'subm 1')))
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_skip_failed_recursive(src, path):
+
+    # install top level:
+    ds = install(path=path, source=src)
+    sub1 = Dataset(opj(path, 'subm 1'))
+    sub2 = Dataset(opj(path, 'subm 2'))
+    # sabotage recursive installation of 'subm 1' by polluting the target:
+    with open(opj(path, 'subm 1', 'blocking.txt'), "w")  as f:
+        f.write("sdfdsf")
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        result = install(path=path, recursive=True)
+        assert_in(ds, result)
+        assert_in(sub2, result)
+        assert_not_in(sub1, result)
+        cml.assert_logged(msg="{0} skipped".format(sub1), regex=False,
+                          level='INFO')
