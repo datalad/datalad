@@ -264,6 +264,7 @@ def test_get_recurse_subdatasets(src, path):
 def test_get_install_missing_subdataset(src, path):
 
     ds = install(path=path, source=src)
+    ds.create(force=True)  # force, to cause dataset initialization
     subs = [Dataset(s_path) for s_path in ds.get_subdatasets(absolute=True)]
     ok_(all([not sub.is_installed() for sub in subs]))
 

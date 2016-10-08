@@ -374,11 +374,14 @@ class Dataset(object):
             if sds_path_ is None:
                 # no more parents, use previous found
                 break
-            # TODO:?
+
             # test if current git is actually a dataset?
-            # sds = Dataset(sds_path_)
+            sds = Dataset(sds_path_)
+            # can't use ATM since we just autogenerate and ID, see
+            # https://github.com/datalad/datalad/issues/986
             # if not sds.id:
-            #     break
+            if not sds.config.get('datalad.dataset.id', None):
+                break
 
             # That was a good candidate
             sds_path = sds_path_
