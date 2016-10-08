@@ -27,6 +27,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.interface.common_opts import super_datasets_flag
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 
@@ -118,10 +119,11 @@ class Save(Interface):
             independent of the current working directory.""",
             action="store_true"),
         version_tag=Parameter(
-            args=("--version-tag", ),
+            args=("--version-tag",),
             metavar='ID',
             doc="""an additional marker for that state.""",
             constraints=EnsureStr() | EnsureNone()),
+        super_datasets=super_datasets_flag,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
     )
@@ -130,7 +132,7 @@ class Save(Interface):
     @datasetmethod(name='save')
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None,
-                 recursive=False, recursion_limit=None):
+                 recursive=False, recursion_limit=None, super_datasets=False):
         # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
@@ -220,12 +222,18 @@ class Save(Interface):
                     _modified_flag = True
 
         if files:  # could still be none without auto add changes
-            absf = [f for f in files
-                    if ds.get_containing_subdataset(f, recursion_limit=1) == ds]
-            if len(absf):
+            subdatasets_paths = {
+                opj(ds.path, f) for f in ds.get_subdatasets(recursive=False)
+            }
+            ds_files = [
+                f for f in files
+                if f in subdatasets_paths or \
+                    ds.get_containing_subdataset(f, recursion_limit=1) == ds
+            ]
+            if len(ds_files):
                 # XXX Is there a better way to handle files in mixed repos?
-                ds.repo.add(absf)
-                ds.repo.add(absf, git=True)
+                ds.repo.add(ds_files)
+                ds.repo.add(ds_files, git=True)
 
         _datalad_msg = False
         if not message:
@@ -251,6 +259,34 @@ class Save(Interface):
         if version_tag:
             ds.repo.tag(version_tag)
 
+        # and now we could consider saving our changes within super-datasets
+        # Let's float up until we get to a non-dataset
+        if super_datasets:
+            if _modified_flag:
+                if version_tag:
+                    lgr.info("Version tag %s will not be applied to super datasets",
+                             version_tag)
+                superds = ds
+                while True:
+                    supersubds = superds
+                    superds = superds.get_superdataset()
+                    if not superds:
+                        break
+                    Save.__call__(
+                        message=message
+                            + " [origin: %s]" % relpath(ds.path, superds.path),
+                        files=[relpath(supersubds.path, superds.path)],
+                        dataset=superds,
+                        auto_add_changes=False,
+                        version_tag=None,
+                        recursive=False,
+                    )
+            else:
+                lgr.info(
+                    "Not trying to save super-datasets since no modifications")
+
+        # TODO: figure out what we should return for recursive/super_datasets
+        # shouldn't we return all commits???
         return ds.repo.repo.head.commit if _modified_flag else None
 
     @staticmethod

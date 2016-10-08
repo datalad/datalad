@@ -33,6 +33,12 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
+super_datasets_flag = Parameter(
+    args=("-S", "--super-datasets",),
+    action="store_true",
+    doc="""if set, traverse and save stats corresponding to the change
+    within super-datasets""")
+
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',

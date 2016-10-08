@@ -21,6 +21,8 @@ from datalad import api as _
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import assert_equal
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -113,3 +115,28 @@ def test_recursive_save(path):
     newstates = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     for old, new in zip(states, newstates):
         assert_not_equal(old, new)
+
+    ## now let's check saving "upwards"
+    assert not subds.repo.dirty
+    create_tree(subds.path, {"testnew": 'smth'})
+    indexed_files = subds.repo.get_indexed_files()
+    assert subds.repo.dirty
+    assert ds.repo.dirty
+
+    assert not subsubds.repo.dirty
+    create_tree(subsubds.path, {"testnew2": 'smth'})
+    assert subsubds.repo.dirty
+    # and indexed files didn't change
+    assert_equal(indexed_files, subds.repo.get_indexed_files())
+    subsubds.save(message="saving", super_datasets=True,
+                  auto_add_changes=True)
+    assert not subsubds.repo.dirty
+    # but its super should have got only the subsub saved
+    # not the file we created
+    assert subds.repo.dirty
+
+    # check commits to have correct messages
+    assert_equal(next(ds.repo.get_branch_commits('master')).message,
+                 'saving [origin: sub/subsub]')
+    assert_equal(next(subds.repo.get_branch_commits('master')).message,
+                 'saving [origin: subsub]')
