@@ -208,7 +208,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_environ('LOGTARGET', logtarget or 'stderr')
+        logtarget = self._get_environ('LOG_TARGET', logtarget or 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
@@ -231,8 +231,8 @@ class LoggerHelper(object):
         loghandler.setFormatter(
             ColorFormatter(use_color=use_color,
                            # TODO: config log.name, pid
-                           log_name=self._get_environ("LOGNAME", False),
-                           log_pid=self._get_environ("LOGPID", False),
+                           log_name=self._get_environ("LOG_NAME", False),
+                           log_pid=self._get_environ("LOG_PID", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
