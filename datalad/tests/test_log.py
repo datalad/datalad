@@ -50,12 +50,12 @@ def test_logging_to_a_file(dst):
 
 @with_tempfile
 def test_logtarget_via_env_variable(dst):
-    with patch.dict('os.environ', {'DATALADTEST_LOGTARGET': dst}):
+    with patch.dict('os.environ', {'DATALADTEST_LOG_TARGET': dst}):
         ok_(not exists(dst))
         lgr = LoggerHelper("dataladtest-2").get_initialized_logger()
         ok_(not exists(dst))
     # just to see that mocking patch worked
-    ok_(not 'DATALADTEST_LOGTARGET' in os.environ)
+    ok_(not 'DATALADTEST_LOG_TARGET' in os.environ)
 
 
 @with_tempfile
