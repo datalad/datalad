@@ -158,6 +158,10 @@ function metadata_locator(md5, parent) {
   var metadata_dir = '.git/datalad/metadata/';
   var start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
 
+  if (start_loc === '/' && parent) {
+    return "";
+  }
+
   // if parent argument set, find metadata json of parent directory instead
   var find_parent_ds = typeof parent !== 'undefined' ? parent : false;
   start_loc = find_parent_ds ? parent_url(start_loc).replace(/\/*$/, '/') : start_loc;
@@ -257,7 +261,7 @@ function directory(jQuery, md5) {
   var parent = false;
   var md5_url = metadata_locator(md5);
 
-  if (md5_url == "") {
+  if (md5_url === "") {
     error_msg(
         jQuery,
         "Could not find any metadata directory. Sorry.  Most probably cause is " +
