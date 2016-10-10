@@ -214,7 +214,7 @@ def test_get_recurse_subdatasets(src, path):
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
-    subds1, subds2 = ds.get(['subm 1', 'subm 2'])
+    subds1, subds2 = ds.get(['subm 1', 'subm 2'], get_data=False)
 
     # there are 3 files to get: test-annex.dat within each dataset:
     rel_path_sub1 = opj(basename(subds1.path), 'test-annex.dat')
@@ -277,7 +277,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ds = install(src, path=path)
 
     # GIMME EVERYTHING
-    ds.get(['subm 1', 'subm 2'], fulfill_datasets=True)
+    ds.get(['subm 1', 'subm 2'])
 
     # We got all content in the subdatasets
     subds1, subds2 = [Dataset(d) for d in ds.get_subdatasets(absolute=True)]
@@ -373,7 +373,6 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)
-    # 'subsub' did not exist prior the get-call above, hence while it
-    # is now installed its file handles are not fulfilled
+    # all file handles are fulfilled by default
     ok_(Dataset(opj(ds.path, 'sub', 'subsub')).repo.file_has_content(
-        "file_in_annex.txt") is False)
+        "file_in_annex.txt") is True)

@@ -14,7 +14,6 @@ import logging
 
 from itertools import chain
 from os import curdir
-from os import linesep
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
@@ -36,7 +35,6 @@ from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import assure_list
@@ -119,7 +117,7 @@ def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
 
 
 def _get(content_by_ds, refpath=None, source=None, jobs=None,
-         fulfill_datasets=False):
+         get_data=True):
     """Loops through datasets and calls git-annex call where appropriate
     """
     for ds_path in sorted(content_by_ds.keys()):
@@ -128,17 +126,15 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
         results = []
         if len(content) >= 1 and content[0] == curdir:
             # we hit a subdataset that just got installed few lines above, and was
-            # requested specifically, as opposed to some of its content. Unless we
-            # are asked to fulfill all handles that at some point in the process
-            # we consider having fulfilled the dataset handle good enough
+            # requested specifically, as opposed to some of its content.
             results.append(cur_ds)
-            if not fulfill_datasets:
-                lgr.debug(
-                    "Will not get any content in subdataset %s without "
-                    "recursion enabled",
-                    cur_ds)
-                yield results
-                continue
+
+        if not get_data:
+            lgr.debug(
+                "Will not get any content in %s, as instructed.",
+                cur_ds)
+            yield results
+            continue
 
         # needs to be an annex:
         found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
@@ -324,8 +320,7 @@ class Get(Interface):
         # if the value[0] is the subdataset's path, we want all of it
         # if the value[0] == curdir, we just installed it as part of
         # resolving file handles and we did not say anything but "give
-        # me the dataset handle" -- without fulfill-datasets no file handles
-        # in such a subdataset will be fulfilled
+        # me the dataset handle"
 
         # explore the unknown
         for path in sorted(unavailable_paths):
@@ -352,9 +347,10 @@ class Get(Interface):
                     # we need to get content within
                     content_by_ds[path] = [path]
 
-        if recursive:
+        if recursive and not recursion_limit == 'existing':
             # obtain any subdatasets underneath the paths given inside the
             # subdatasets that we know already exist
+            # unless we do not want recursion into not-yet-installed datasets
             for subdspath in sorted(content_by_ds.keys()):
                 for content_path in content_by_ds[subdspath]:
                     if not isdir(content_path):
@@ -392,7 +388,7 @@ class Get(Interface):
         # hand over to git-annex
         return list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
-                 fulfill_datasets=fulfill_datasets)))
+                 get_data=get_data)))
 
     @staticmethod
     def result_renderer_cmdline(res, args):

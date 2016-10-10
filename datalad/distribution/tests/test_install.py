@@ -494,7 +494,7 @@ def test_install_list(path, top_path):
     ok_(not sub2.is_installed())
 
     # now should work:
-    result = ds.get(path=['subm 1', 'subm 2'])
+    result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
     ok_(sub1.is_installed())
     ok_(sub2.is_installed())
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
@@ -535,7 +535,7 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, fulfill_datasets=True, recursive=True, recursion_limit=1)
+    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1)
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
     assert_in(sub1, result)
@@ -546,7 +546,7 @@ def test_install_recursive_repeat(src, path):
     ok_(sub2.repo.file_has_content('sub2file.txt') is True)
 
     # install sub1 again, recursively:
-    top_ds.get('sub 1', recursive=True, fulfill_datasets=True)
+    top_ds.get('sub 1', recursive=True)
     ok_(subsub.is_installed())
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 
@@ -561,7 +561,8 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # install a list with valid and invalid items:
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(path=['subm 1', 'not_existing',
-                              path_outside, 'subm 2'])
+                              path_outside, 'subm 2'],
+                              get_data=False)
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
             cml.assert_logged(msg="could not find and ignored paths: {}\n".format(
                               [opj(ds.path, 'not_existing'), path_outside]),
