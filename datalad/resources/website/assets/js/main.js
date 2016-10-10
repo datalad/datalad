@@ -339,7 +339,13 @@ function directory(jQuery, md5) {
       {data: null, title: "Sort", visible: false,
        render: function(data) {
          return (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized');
-       }}
+       }},
+      /// make metadata searchable right there!
+      {data: null, title: "Metadata", visible: false,
+        render: function(data) {
+          var meta = data.metadata;
+          if (meta) { return JSON.stringify(meta); } else {return "";}
+        }}
     ],
     createdRow: function(row, data, index) {
       if (data.name === '..')
