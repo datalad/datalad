@@ -414,11 +414,13 @@ class CreateSibling(Interface):
 
         # create json command for current dataset
         json_command = r'''
+        mkdir -p {};
         ( which datalad > /dev/null \
         && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
         || echo "no datalad found - skipping generation of indexes for web frontend"; \
         ) &> "{}/{}"
-        '''.format(str(path),
+        '''.format(logs_remote_dir,
+                   str(path),
                    logs_remote_dir,
                    'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT)
 
