@@ -388,7 +388,7 @@ function directory(jQuery, md5) {
             '<span class="command">datalad install ' + ri + '</span>' +
             '<P>To install with all subdatasets and all data</P>' +
             '<span class="command">datalad install -r -g ' + ri + '</span>' +
-
+            '<P style="font-size: 90%;">For more information about DataLad and installation instructions visit <a href="http://datalad.org">datalad.org</a></P>' +
             '</div>');
       }
       // add breadcrumbs
