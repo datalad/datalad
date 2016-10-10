@@ -605,7 +605,9 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     fs = fs_extract(path, repo)
 
     if isdir(path):                                # if node is a directory
-        children = [fs_extract(path, repo)]        # store its info in its children dict too
+        children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
+        # ATM seems some pieces still rely on having this duplication, so left as is
+        # TODO: strip away
         for node in listdir(path):
             nodepath = opj(path, node)
 
@@ -613,7 +615,9 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
             if not ignored(nodepath):
                 # if recursive, create info dictionary of each child node too
                 if recursive:
-                    subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
+                    subdir = fs_traverse(nodepath, repo,
+                                         parent=None, # children[0],
+                                         recursive=recursive, json=json)
                 else:
                     # read child metadata from its metadata file if it exists
                     subdir_json = metadata_locator(path=nodepath, ds_path=fs["repo"])
