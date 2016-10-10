@@ -17,17 +17,16 @@ import sys
 
 from operator import itemgetter
 from os.path import join as opj, exists
-from os.path import relpath
-from os.path import curdir
-from os.path import pathsep
 from six import string_types
 from six import text_type
 from six import iteritems
 from six import reraise
+from six import PY3
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
+from datalad.distribution.utils import get_git_dir
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
@@ -35,7 +34,6 @@ from ..log import lgr
 from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
-from datalad import cfg
 from datalad.utils import assure_list
 from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -183,13 +181,13 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'metadata')
-        mcache_fname = opj(cache_dir, ds.id)
+        cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
+        mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
 
         meta = None
         if os.path.exists(mcache_fname):
             lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname))
+            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
             # TODO add more sophisticated tests to decide when the cache is no longer valid
             if checksum != ds.repo.get_hexsha():
                 # errrr, try again below
@@ -214,13 +212,13 @@ class Search(Interface):
 
             # sort entries by location (if present)
             sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x) for x in sort_keys))
+            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(
                 # graph plus checksum from what it was built
                 (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'w'))
+                open(mcache_fname, 'wb'))
             lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
         if report in ('', ['']):
@@ -230,7 +228,7 @@ class Search(Interface):
 
         match = assure_list(match)
         search = assure_list(search)
-        # convert all to lower case for case incensitive matching
+        # convert all to lower case for case insensitive matching
         search = {x.lower() for x in search}
 
         def get_in_matcher(m):
@@ -310,7 +308,13 @@ class Search(Interface):
                 else:
                     report_dict = {}  # it was empty but not None -- asked to
                     # not report any specific field
-                yield opj(ds_path_prefix, location), report_dict
+                if isinstance(location, (list, tuple)):
+                    # could be that the same dataset installed into multiple
+                    # locations. For now report them separately
+                    for l in location:
+                        yield opj(ds_path_prefix, l), report_dict
+                else:
+                    yield opj(ds_path_prefix, location), report_dict
 
         if search and observed_properties is not None:
             import difflib
@@ -360,8 +364,13 @@ class Search(Interface):
                     ansi_colors.color_word(location, ansi_colors.DATASET),
                     ':' if r else '',
                     ichr,
-                    jchr.join([fmt.format(
-                        k=ansi_colors.color_word(k, ansi_colors.FIELD), v=pretty_str(r[k])) for k in sorted(r)])))
+                    jchr.join(
+                        [
+                            fmt.format(
+                                k=ansi_colors.color_word(k, ansi_colors.FIELD),
+                                v=pretty_bytes(r[k]))
+                            for k in sorted(r)
+                        ])))
                 anything = True
             if not anything:
                 ui.message("Nothing to report")
@@ -371,26 +380,32 @@ class Search(Interface):
         elif format == 'yaml':
             import yaml
             lgr.warning("yaml output support is not yet polished")
-            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)), allow_unicode=True, encoding='utf-8'))
+            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)),
+                                      allow_unicode=True))
 
 
 _lines_regex = re.compile('[\n\r]')
 
 
-def pretty_str(s):
-    """Helper to provide sensible rendering for lists, dicts, and unicode"""
+def pretty_bytes(s):
+    """Helper to provide sensible rendering for lists, dicts, and unicode
+
+    encoded into byte-stream (why really???)
+    """
     if isinstance(s, list):
-        return ", ".join(map(pretty_str, s))
+        return ", ".join(map(pretty_bytes, s))
     elif isinstance(s, dict):
-        return pretty_str(["%s=%s" % (pretty_str(k), pretty_str(v))
-                           for k, v in s.items()])
+        return pretty_bytes(["%s=%s" % (pretty_bytes(k), pretty_bytes(v))
+                             for k, v in s.items()])
     elif isinstance(s, text_type):
+        s_ = (os.linesep + "  ").join(_lines_regex.split(s))
         try:
-            b = s.encode('utf-8')
-            return (os.linesep + "  ").join(_lines_regex.split(b))
+            if PY3:
+                return s_
+            return s_.encode('utf-8')
         except UnicodeEncodeError:
             lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
             # TODO: get current encoding
-            return s.encode('utf-8', 'ignore') if isinstance(s, string_types) else "ERROR"
+            return s_.encode('utf-8', 'ignore') if isinstance(s_, string_types) else "ERROR"
     else:
-        return str(s)
+        return str(s).encode()

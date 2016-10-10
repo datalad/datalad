@@ -11,6 +11,7 @@
 import sys
 from os import linesep
 from six import string_types
+from six import binary_type
 
 from distutils.version import StrictVersion, LooseVersion
 
@@ -93,6 +94,8 @@ class ExternalVersions(object):
             version = ".".join(str(x) for x in version)
 
         if version:
+            if isinstance(version, binary_type):
+                version = version.decode()
             try:
                 return StrictVersion(version)
             except ValueError:

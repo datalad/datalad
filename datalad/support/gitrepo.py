@@ -877,8 +877,35 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self):
-        return [remote.name for remote in self.repo.remotes]
+    def get_remotes(self, with_refs_only=False):
+        """
+
+        Parameters
+        ----------
+        with_refs_only : bool, optional
+          return only remotes with any refs.  E.g. annex special remotes
+          would not have any refs
+
+        Returns
+        -------
+        remotes : list of str
+          List of names of the remotes
+        """
+        if with_refs_only:
+            # older versions of GitPython might not tolerate remotes without
+            # any references at all, so we need to catch
+            remotes = []
+            for remote in self.repo.remotes:
+                try:
+                    if len(remote.refs):
+                        remotes.append(remote.name)
+                except AssertionError as exc:
+                    if "not have any references" not in str(exc):
+                        # was some other reason
+                        raise
+            return remotes
+        else:
+            return [remote.name for remote in self.repo.remotes]
 
     def get_files(self, branch=None):
         """Get a list of files in git.

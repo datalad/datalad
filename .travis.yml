@@ -28,12 +28,17 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - DATALAD_LOG_LEVEL=INFO
+    - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
+    - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
     - DATALAD_API_ALWAYSRENDER=1
+    - DATALAD_TESTS_PROTOCOLREMOTE=1
+    - DATALAD_TESTS_DATALADREMOTE=1
+    - DATALAD_LOG_OUTPUTS=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -105,8 +110,8 @@ install:
   # Specifically needed for tests here (e.g. example scripts testing)
   - pip install nibabel
   # TMPDIRs
-  - if [ ! -z "$TMPDIR" ] && [[ $TMPDIR =~ ".*/sym link" ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
+  - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
+  - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
@@ -128,8 +133,10 @@ script:
   - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
+  - /bin/ls -l /tmp/.coverage-entry*
+  - echo "BEFORE combining"; coverage report --show-missing
   - coverage combine -a /tmp/.coverage-entrypoints-*
-  - coverage report
+  - echo "AFTER combining"; coverage report --show-missing
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary

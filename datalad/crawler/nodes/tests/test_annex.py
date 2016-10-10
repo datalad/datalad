@@ -323,7 +323,7 @@ def test_remove_other_versions(repo_path):
                 patch('os.path.lexists', return_value=True),\
                 patch('datalad.crawler.nodes.annex.find_files', new_callable=cmunlink.Find_files):
             out = list(rov(data))
-        assert(len(out), 1)
+        assert_equal(len(out), 1)
         eq_(out[0]['datalad_stats'].versions, [version])
         if remaining is not None:
             eq_(cmunlink.remaining, remaining)
