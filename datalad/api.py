@@ -40,9 +40,9 @@ def _generate_func_api():
         nargs = len(argspec.args)
         assert (nargs >= len(defaults))
         # map any args to their name
-        argmap = zip(argspec.args[:len(args)], args)
+        argmap = list(zip(argspec.args[:len(args)], args))
         # map defaults of kwargs to their names (update below)
-        argmap += zip(argspec.args[-len(defaults):], defaults)
+        argmap += list(zip(argspec.args[-len(defaults):], defaults))
         kwargs_ = OrderedDict(argmap)
         # update with provided kwarg args
         kwargs_.update(kwargs)
