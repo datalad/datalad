@@ -23,12 +23,13 @@ from os.path import dirname
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import verbose
+from datalad.support.constraints import EnsureInt
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -248,13 +249,21 @@ class Get(Interface):
             source""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit,
-        fulfill_datasets=Parameter(
-            args=("--fulfill-datasets",),
-            action='store_true',
-            doc="""whether to fulfill file handles in obtained datasets. If
-            true, then a subdataset given via `path` will not only be
-            installed, but also all of its file handles will be fulfilled."""),
+        recursion_limit=Parameter(
+            args=("--recursion-limit",),
+            metavar="LEVELS",
+            constraints=EnsureInt() | EnsureChoice('existing') | EnsureNone(),
+            doc="""limit recursion into subdataset to the given number of levels.
+            Alternatively, 'existing' will limit recursion to subdatasets that already
+            existed on the filesystem at the start of processing, and prevent new
+            subdatasets from being obtained recursively."""),
+        get_data=Parameter(
+            args=("-n", "--no-data",),
+            dest='get_data',
+            action='store_false',
+            doc="""whether to obtain data for all file handles. If disabled, `get`
+            operations are limited to dataset handles.[CMD:  This option prevents data
+            for file handles from being obtained CMD]"""),
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -273,7 +282,7 @@ class Get(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            fulfill_datasets=False,
+            get_data=True,
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
