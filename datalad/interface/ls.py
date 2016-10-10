@@ -26,6 +26,8 @@ from ..utils import auto_repr
 from .base import Interface
 from ..ui import ui
 from ..utils import swallow_logs
+from ..consts import METADATA_DIR
+from ..consts import METADATA_FILENAME
 from ..dochelpers import exc_str
 from ..support.param import Parameter
 from ..support import ansi_colors
@@ -520,15 +522,31 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
 
 
 def fs_extract(nodepath, repo):
-    """extract required info of nodepath with its associated parent repository and returns it as a dictionary"""
+    """extract required info of nodepath with its associated parent repository and returns it as a dictionary
 
+    Parameters
+    ----------
+    nodepath : str
+        Full path to the location we are exploring (must be a directory within
+        `repo`
+    repo : GitRepo
+        Is the repository nodepath belongs to
+    """
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
     pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
-    return {"name": name, "path": node._path, "repo": node.repo.path,
-            "type": node.type_, "size": pretty_size, "date": pretty_date}
+    rec = {
+        "name": name, "path": node._path, "repo": node.repo.path,
+        "type": node.type_, "size": pretty_size, "date": pretty_date,
+    }
+    # if there is meta-data for the dataset (done by aggregate-metadata)
+    # we include it
+    metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
+    if exists(metadata_path):
+        rec["metadata"] = js.load(open(metadata_path))
+    return rec
 
 
 def fs_render(fs_metadata, json=None, **kwargs):
@@ -657,7 +675,9 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     fsparent = fs_extract(parent.path, parent.repo) if parent else None
 
     # (recursively) traverse file tree of current dataset
-    fs = fs_traverse(rootds.path, rootds.repo, render=False, parent=fsparent, recursive=recursive, json=json)
+    fs = fs_traverse(rootds.path, rootds.repo,
+                     render=False, parent=fsparent, recursive=recursive,
+                     json=json)
     size_list = [fs['size']]
 
     # (recursively) traverse each subdataset
