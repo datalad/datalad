@@ -215,6 +215,7 @@ function parent_json(jQuery, md5) {
                       date: data.date || '-',
                       path: data.path || '-',
                       type: data.type || 'dir',
+                      description: data.description || '',
                       size: size_renderer(data.size || null)};
     }
   });
@@ -291,11 +292,16 @@ function directory(jQuery, md5) {
     },
     order: [[6, "desc"], [0, 'asc']],
     columns: [      // select columns and their names from json
-      {data: "name", title: "Name"},
-      {data: "date", title: "Last Modified", className: "dt-center", width: "20%"},
-      {data: "size", title: "Size", className: "dt-center"},
-      {data: null, title: "Description", className: "dt-center",
-       render: function(data) { return ''; }},
+      {data: "name", title: "Name", width: "25%"},
+      {data: "date", title: "Last Modified", className: "dt-center", width: "15%"},
+      {data: "size", title: "Size", className: "dt-center", width: "15%"},
+      {data: null, title: "Description", className: "dt-left",
+       render: function(data) {
+         var meta = data.metadata;
+         if (!meta) { return ''; }
+         var desc = meta[0].name;
+         if (desc) { return desc; } else { return '';}
+       }},
       {data: "type", title: "Type", className: "dt-center", visible: false},
       {data: "path", title: "Path", className: "dt-center", visible: false},
       {data: null, title: "Sort", visible: false,

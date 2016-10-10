@@ -545,7 +545,7 @@ def fs_extract(nodepath, repo):
     # we include it
     metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
     if exists(metadata_path):
-        rec["metadata"] = js.load(open(metadata_path))
+        rec["metadata"] = metadata = js.load(open(metadata_path))
     return rec
 
 
@@ -611,6 +611,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
         for node in listdir(path):
             nodepath = opj(path, node)
 
+            # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
             if not ignored(nodepath):
                 # if recursive, create info dictionary of each child node too
@@ -689,10 +690,18 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     for subds_path in rootds.get_subdatasets():
         if all_:
             subds = Dataset(opj(rootds.path, subds_path))
-            subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
-            subfs.pop('nodes', None)
+            if subds.is_installed():
+                subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+                subfs.pop('nodes', None)
+                size_list.append(subfs['size'])
+            else:
+                # for now just traverse as fs
+                subfs = fs_extract(opj(rootds.path, subds_path), rootds)
+                # but add a custom type that it is a not installed subds
+                subfs['type'] = 'not-installed-repo'
+                size_list.append({})
             children.extend([subfs])
-            size_list.append(subfs['size'])
+
         # else just pick the data from metadata_file of each subdataset
         else:
             subds_path = opj(rootds.path, subds_path)
@@ -704,6 +713,14 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
                     subfs.pop('nodes', None)
                     children.extend([subfs])
                     size_list.append(subfs['size'])
+            else:
+                # It is still a submodule, but probably wasn't yet processed or
+                # was not even installed!
+                lgr.warning("Have no metadata on %s", subds_path)
+                subfs = fs_extract(opj(rootds.path, subds_path), rootds)
+                # but add a custom type that it is a not installed subds
+                subfs['type'] = 'not-installed-repo'
+                size_list.append({})
 
     # sum sizes of all 1st level children dataset
     children_size = {}
