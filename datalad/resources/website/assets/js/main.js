@@ -1,4 +1,5 @@
 /* global window XMLHttpRequest */
+var metadata_dir = '.git/datalad/metadata/';
 
 /**
  * check if url exists
@@ -103,6 +104,38 @@ function bread2crumbs() {
 }
 
 /**
+ * Create installation RI
+ * @return {string} RI to install current dataset from
+ */
+function uri2installri() {
+  /// TODO -- RF to centralize common logic with bread2crumbs
+  var raw_crumbs = loc().href.split('/');
+  var span_class = '<span class="dir">';
+  var ri_ = '';
+  /// poor Yarik knows no JS
+  /// TODO:  now check for the last dataset is crippled, we would need
+  /// meld logic with breadcrumbs I guess, whenever they would get idea
+  /// of where dataset boundary is
+  var ri = null;
+  for (var index = 0; index < raw_crumbs.length; index++) {
+    if (raw_crumbs[index] === '?dir=')
+      continue;
+    if (ri_)
+      ri_ += '/'
+    ri_ += raw_crumbs[index];
+    if (url_exists(ri_ + '/' + metadata_dir)) {
+      ri = ri_;
+    }
+  }
+  /// possible shortcuts
+  if (ri) {
+    ri = ri.replace('http://localhost:8080', '//');   // for local debugging
+    ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
+  }
+  return ri
+}
+
+/**
  * update url parameter or url ?
  * @param {string} next_url next url to traverse to
  * @param {string} type type of clicked node
@@ -155,7 +188,6 @@ function click_handler(data, url) {
  * @return {string} path to the current node's metadata json
  */
 function metadata_locator(md5, parent) {
-  var metadata_dir = '.git/datalad/metadata/';
   var start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
 
   if (start_loc === '/' && parent) {
@@ -347,6 +379,18 @@ function directory(jQuery, md5) {
         else if (traverse.type === 'search')
           window.location.search = traverse.next;
       });
+      // add HOWTO install
+      var ri = uri2installri();
+      if (ri) {
+        jQuery('#content').prepend(
+            '<div id="installation">' +
+            '<P>To install this dataset in your current directory use</P>' +
+            '<span class="command">datalad install ' + ri + '</span>' +
+            '<P>To install with all subdatasets and all data</P>' +
+            '<span class="command">datalad install -r -g ' + ri + '</span>' +
+
+            '</div>');
+      }
       // add breadcrumbs
       jQuery('#directory_filter').prepend('<span class="breadcrumb">' +
                                            bread2crumbs().join(' / ') +
