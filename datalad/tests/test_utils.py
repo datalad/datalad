@@ -1,4 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -17,6 +18,7 @@ import sys
 import logging
 from mock import patch
 from six import PY3
+from six import text_type
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -28,6 +30,7 @@ from ..utils import updated
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import getpwd, chpwd
+from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
 from ..utils import line_profile
@@ -51,6 +54,7 @@ from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
+from .utils import assure_unicode
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
@@ -504,3 +508,25 @@ def test_memoized_generator():
     eq_(called[0], 2)  # no new call to make a generator
     # but we can't (ab)use 2nd time
     eq_([], list(g2_))
+
+
+def test_assure_unicode():
+    ok_(isinstance(assure_unicode("m"), text_type))
+    ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
+    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
+    eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+
+
+@with_tempfile(mkdir=True)
+def test_path_prefix(tdir):
+    eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
+    # so we are under /d1/d2 so path prefix is ..
+    eq_(get_path_prefix('/d1/d2', '/d1/d2/d3'), '..')
+    eq_(get_path_prefix('/d1/d2/d3', '/d1/d2'), 'd3')
+    # but if outside -- full path
+    eq_(get_path_prefix('/d1/d2', '/d1/d20/d3'), '/d1/d2')
+    with chpwd(tdir):
+        eq_(get_path_prefix('.'), '')
+        eq_(get_path_prefix('d1'), 'd1')
+        eq_(get_path_prefix('d1', 'd2'), opj(tdir, 'd1'))
+        eq_(get_path_prefix('..'), '..')

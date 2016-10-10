@@ -11,6 +11,7 @@
 
 import os
 from mock import patch
+from datalad import cfg
 from datalad.api import Dataset, aggregate_metadata, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
@@ -18,6 +19,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testsui
+from datalad.tests.utils import SkipTest
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from os.path import join as opj
@@ -42,7 +44,7 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
-        always_render = os.environ.get('DATALAD_API_ALWAYS_RENDER')
+        always_render = cfg.obtain('datalad.api.alwaysrender')
         with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
             if always_render:
                 # we do try to render results which actually causes exception
@@ -111,8 +113,39 @@ class _mock_search(object):
 def _check_mocked_install(central_dspath, mock_install):
     gen = search(".", regex=True)
     assert_is_generator(gen)
+    # we no longer do any custom path tune up from the one returned by search
+    # so should match what search returns
     assert_equal(
-        list(gen), [(opj(central_dspath, loc), report)
+        list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
     mock_install.assert_called_once_with(central_dspath, source='///')
+
+
+@with_tempfile
+def test_our_metadataset_search(tdir):
+    # smoke test for basic search operations on our super-megadataset
+    # expensive operation but ok
+    ds = install(path=tdir, source="///")
+    assert list(ds.search('.', report='*', regex=True))
+    assert list(ds.search('.', report='*'))
+    assert list(ds.search('.', report_matched=True))
+
+    # and either we could provide output in different formats
+    import simplejson
+    from datalad.utils import swallow_outputs
+    from datalad.api import search_
+    with swallow_outputs() as cmo:
+        assert list(search_('.', report='*', regex=True, format='json', dataset=ds))
+        out = cmo.out
+    # since this one is just absorbs all first, we can't go one by one
+    assert simplejson.loads(out)
+
+    try:
+        import yaml
+    except ImportError:
+        raise SkipTest("no yaml module")
+    with swallow_outputs() as cmo:
+        assert list(search_('.', report='*', regex=True, format='yaml', dataset=ds))
+        out = cmo.out
+    assert yaml.load(out)
 

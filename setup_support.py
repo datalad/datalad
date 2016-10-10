@@ -15,6 +15,10 @@ import datetime
 import formatters as fmt
 
 
+def _path_rel2file(p):
+    return opj(dirname(__file__), p)
+
+
 def get_version():
     """Load version of datalad from version.py without entailing any imports
     """
@@ -42,9 +46,9 @@ class BuildManPage(Command):
     ]
 
     def initialize_options(self):
-        self.manpath = None
-        self.rstpath = None
-        self.parser = None
+        self.manpath = opj('build', 'man')
+        self.rstpath = opj('docs', 'source', 'generated', 'man')
+        self.parser = 'datalad.cmdline.main:setup_parser'
 
     def finalize_options(self):
         if self.manpath is None:
@@ -53,6 +57,8 @@ class BuildManPage(Command):
             raise DistutilsOptionError('\'rstpath\' option is required')
         if self.parser is None:
             raise DistutilsOptionError('\'parser\' option is required')
+        self.manpath = _path_rel2file(self.manpath)
+        self.rstpath = _path_rel2file(self.rstpath)
         mod_name, func_name = self.parser.split(':')
         fromlist = mod_name.split('.')
         try:
@@ -107,15 +113,17 @@ class BuildRSTExamplesFromScripts(Command):
     ]
 
     def initialize_options(self):
-        self.expath = None
-        self.rstpath = None
+        self.expath = opj('docs', 'examples')
+        self.rstpath = opj('docs', 'source', 'generated', 'examples')
 
     def finalize_options(self):
         if self.expath is None:
             raise DistutilsOptionError('\'expath\' option is required')
         if self.rstpath is None:
             raise DistutilsOptionError('\'rstpath\' option is required')
-        self.announce('Converting exanmple scripts')
+        self.expath = _path_rel2file(self.expath)
+        self.rstpath = _path_rel2file(self.rstpath)
+        self.announce('Converting example scripts')
 
     def run(self):
         opath = self.rstpath
@@ -130,3 +138,68 @@ class BuildRSTExamplesFromScripts(Command):
                     open(example),
                     out=out,
                     ref='_example_{0}'.format(exname))
+
+
+class BuildConfigInfo(Command):
+    description = 'Generate RST documentation for all config items.'
+
+    user_options = [
+        ('rstpath=', None, 'output path for RST file'),
+    ]
+
+    def initialize_options(self):
+        self.rstpath = opj('docs', 'source', 'generated', 'cfginfo')
+
+    def finalize_options(self):
+        if self.rstpath is None:
+            raise DistutilsOptionError('\'rstpath\' option is required')
+        self.rstpath = _path_rel2file(self.rstpath)
+        self.announce('Generating configuration documentation')
+
+    def run(self):
+        opath = self.rstpath
+        if not os.path.exists(opath):
+            os.makedirs(opath)
+
+        from datalad.interface.common_cfg import definitions as cfgdefs
+        from datalad.dochelpers import _indent
+
+        categories = {
+            'global': {},
+            'local': {},
+            'dataset': {},
+            'misc': {}
+        }
+        for term, v in cfgdefs.items():
+            categories[v.get('destination', 'misc')][term] = v
+
+        for cat in categories:
+            with open(opj(opath, '{}.rst'.format(cat)), 'w') as rst:
+                rst.write('.. glossary::\n')
+                for term, v in sorted(categories[cat].items(), key=lambda x: x[0]):
+                    rst.write(_indent(term, '\n  '))
+                    qtype, docs = v.get('ui', (None, {}))
+                    desc_tmpl = '\n'
+                    if 'title' in docs:
+                        desc_tmpl += '{title}:\n'
+                    if 'text' in docs:
+                        desc_tmpl += '{text}\n'
+                    if 'default' in v:
+                        default = v['default']
+                        if hasattr(default, 'replace'):
+                            # protect against leaking specific home dirs
+                            v['default'] = default.replace(os.path.expanduser('~'), '~')
+                        desc_tmpl += 'Default: {default}\n'
+                    if 'type' in v:
+                        type_ = v['type']
+                        if hasattr(type_, 'long_description'):
+                            type_ = type_.long_description()
+                        else:
+                            type_ = type_.__name__
+                        desc_tmpl += '\n[{type}]\n'
+                        v['type'] = type_
+                    if desc_tmpl == '\n':
+                        # we need something to avoid joining terms
+                        desc_tmpl += 'undocumented\n'
+                    v.update(docs)
+                    rst.write(_indent(desc_tmpl.format(**v), '    '))

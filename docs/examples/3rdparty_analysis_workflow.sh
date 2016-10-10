@@ -299,4 +299,4 @@ testEquality() {
   assertEquals 1 1
 }
 
-[ -n "$DATALAD_RUN_CMDLINE_TESTS" ] && . shunit2 || true
+[ -n "$DATALAD_TESTS_RUNCMDLINE" ] && . shunit2 || true

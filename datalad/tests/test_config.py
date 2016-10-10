@@ -10,6 +10,7 @@
 
 """
 
+import os
 from os.path import exists
 from os.path import join as opj
 
@@ -87,6 +88,9 @@ def test_something(path, new_home):
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
     assert_equal(cfg.getfloat('onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
+    assert_equal(cfg.getbool('something', 'myint'), True)
+    assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
+    assert_raises(TypeError, cfg.getbool, 'something', 'user')
 
     # gitpython-style access
     assert_equal(cfg.get('something.myint'), cfg.get_value('something', 'myint'))
@@ -126,11 +130,13 @@ def test_something(path, new_home):
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
     # lame datalad unittest sections in his precious ~/.gitconfig
-    with patch.dict('os.environ', {'HOME': new_home}):
+    with patch.dict('os.environ',
+                    {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
         globalcfg = ConfigManager(dataset_only=False)
         assert_not_in('datalad.unittest.youcan', globalcfg)
+        assert_in('datalad.sneaky.addition', globalcfg)
         cfg.add('datalad.unittest.youcan', 'removeme', where='global')
         assert(exists(global_gitconfig))
         # it did not go into the dataset's config!
@@ -187,7 +193,7 @@ def test_obtain(path):
     # don't hide type issues, float doesn't become an int magically
     assert_raises(ValueError, cfg.obtain, dummy, valtype=int)
     # inject some prior knowledge
-    from datalad.interface.common_cfg import ui_definitions as cfg_defs
+    from datalad.interface.common_cfg import definitions as cfg_defs
     cfg_defs[dummy] = dict(type=float)
     # no we don't need to specify a type anymore
     assert_equal(cfg.obtain(dummy), 5.3)
@@ -263,3 +269,15 @@ def test_obtain(path):
     #def ask():
     #    assert_equal(cfg.obtain(dummy, default=5.3), 5.3)
     #ask()
+
+
+def test_from_env():
+    cfg = ConfigManager()
+    assert_not_in('datalad.crazy.cfg', cfg)
+    os.environ['DATALAD_CRAZY_CFG'] = 'impossibletoguess'
+    cfg.reload()
+    assert_in('datalad.crazy.cfg', cfg)
+    assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
+    # not in dataset-only mode
+    cfg = ConfigManager(Dataset('nowhere'), dataset_only=True)
+    assert_not_in('datalad.crazy.cfg', cfg)

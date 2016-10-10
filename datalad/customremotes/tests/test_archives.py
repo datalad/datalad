@@ -9,10 +9,12 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 from ..archives import ArchiveAnnexCustomRemote
+from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
 from ...cmd import Runner, GitRunner
+from ...utils import _path_
 
 from . import _get_custom_runner
 
@@ -98,6 +100,17 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(cloned_annex.file_has_content(fn_extracted))
     # as a result it would also fetch tarball
     assert_true(cloned_annex.file_has_content(fn_archive))
+
+    # Check if protocol was collected
+    if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE'):
+        assert_is_instance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol)
+        protocol_file = _path_(annex.path,
+                               '.git/bin/git-annex-remote-datalad-archive')
+        ok_file_has_content(protocol_file, "VERSION 1", re_=True, match=False)
+        ok_file_has_content(protocol_file, "GETAVAILABILITY", re_=True, match=False)
+        ok_file_has_content(protocol_file, "#!/bin/bash", re_=True, match=False)
+    else:
+        assert_false(isinstance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol))
 
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py

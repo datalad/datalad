@@ -505,7 +505,7 @@ def with_tempfile(t, **tkwargs):
     ----------
 
     To change the used directory without providing keyword argument 'dir' set
-    DATALAD_TESTS_TEMPDIR.
+    DATALAD_TESTS_TEMP_DIR.
 
     Examples
     --------
