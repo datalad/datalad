@@ -7,8 +7,13 @@
  */
 function url_exists(url) {
   var http = new XMLHttpRequest();
-  http.open('HEAD', url, false);
-  http.send();
+  try {
+    http.open('HEAD', url, false);
+    http.send();
+  } catch(err) {
+    // seems to not work if subdir is not there at all. TODO
+    return false;
+  }
   return http.status !== 404;
 }
 
@@ -236,6 +241,12 @@ function size_renderer(size) {
     return size.ondisk + "/" + size.total;
 }
 
+function error_msg(jQuery, msg) {
+    jQuery('#content').prepend(
+      "<P> ERROR: " + msg + "</P>"
+    );
+}
+
 /**
  * render the datatable interface based on current node metadata
  * @param {object} jQuery jQuery library object
@@ -244,12 +255,34 @@ function size_renderer(size) {
  */
 function directory(jQuery, md5) {
   var parent = false;
+  var md5_url = metadata_locator(md5);
+
+  if (md5_url == "") {
+    error_msg(
+        jQuery,
+        "Could not find any metadata directory. Sorry.  Most probably cause is " +
+        "that 'publish' didn't run the post-update hook"
+    );
+    return;
+  }
+
+  if (!url_exists(md5_url)) {
+    error_msg(
+        jQuery,
+        "Could not find metadata for current dataset. Sorry.  Most probably cause is " +
+        "that 'publish' didn't run the post-update hook"
+    );
+    return;
+  }
+
+  // Embed the table placeholder
+  jQuery('#content').prepend('<table id="directory" class="display"></table>');
 
   var table = jQuery('#directory').dataTable({
     async: true,    // async get json
     paging: false,  // ensure scrolling instead of pages
     ajax: {         // specify url to get json from ajax
-      url: metadata_locator(md5),
+      url: md5_url,
       dataSrc: "nodes"
     },
     order: [[6, "desc"], [0, 'asc']],
