@@ -317,8 +317,14 @@ function directory(jQuery, md5) {
       jQuery('td', row).eq(2).html(size_renderer(data.size));
 
       // if row is a directory append '/' to name cell
-      if (data.type === 'dir' || data.type === 'git' || data.type === 'annex')
-        jQuery('td', row).eq(0).html('<a>' + jQuery('td', row).eq(0).html() + '/</a>');
+      if (data.type === 'dir' || data.type === 'git' || data.type === 'annex') {
+        var orig = jQuery('td', row).eq(0).html();
+        orig = '<a>' + orig + '/</a>';
+         if (data.tags) {
+           orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
+         }
+         jQuery('td', row).eq(0).html(orig);
+      }
       if (data.name === '..')
         jQuery('td', row).eq(2).html('');
       for (var i = 0; i < 4; i++)  // attach css based on node-type to visible columns of each row
