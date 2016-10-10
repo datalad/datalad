@@ -35,7 +35,6 @@ from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
@@ -45,6 +44,7 @@ from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import resolve_path
 from .utils import install_necessary_subdatasets
+from .utils import _recursive_install_subds_underneath
 
 __docformat__ = 'restructuredtext'
 
@@ -159,43 +159,6 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
                     if isinstance(lr, dict):
                         lr['file'] = relpath(opj(ds_path, lr['file']), refpath)
         yield results
-
-
-def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
-    from .install import _install_subds_from_flexible_source
-    content_by_ds = {}
-    if recursion_limit is not None and recursion_limit <= 0:
-        return content_by_ds
-    # loop over submodules not subdatasets to get the url right away
-    # install using helper that give some flexibility regarding where to
-    # get the module from
-    for sub in ds.repo.get_submodules():
-        subds = Dataset(opj(ds.path, sub.path))
-        if start is not None and not subds.path.startswith(_with_sep(start)):
-            # this one we can ignore, not underneath the start path
-            continue
-        if not subds.is_installed():
-            try:
-                lgr.info("Installing subdataset %s", subds.path)
-                subds = _install_subds_from_flexible_source(
-                    ds, sub.path, sub.url)
-                # we want the entire thing, but mark this subdataset
-                # as automatically installed
-                content_by_ds[subds.path] = [curdir]
-            except Exception as e:
-                # skip, if we didn't manage to install subdataset
-                lgr.warning(
-                    "Installation of subdatasets %s failed, skipped", subds)
-                lgr.debug("Installation attempt failed with exception: %s",
-                          exc_str(e))
-                continue
-            # otherwise recurse
-            # we can skip the start expression, we know we are within
-            content_by_ds.update(_recursive_install_subds_underneath(
-                subds,
-                recursion_limit=None if recursion_limit is None else recursion_limit - 1
-            ))
-    return content_by_ds
 
 
 class Get(Interface):
