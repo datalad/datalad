@@ -306,7 +306,7 @@ function directory(jQuery, md5) {
       {data: "path", title: "Path", className: "dt-center", visible: false},
       {data: null, title: "Sort", visible: false,
        render: function(data) {
-         return (data.type === 'dir' || data.type === 'git' || data.type === 'annex');
+         return (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized');
        }}
     ],
     createdRow: function(row, data, index) {
@@ -317,7 +317,7 @@ function directory(jQuery, md5) {
       jQuery('td', row).eq(2).html(size_renderer(data.size));
 
       // if row is a directory append '/' to name cell
-      if (data.type === 'dir' || data.type === 'git' || data.type === 'annex') {
+      if (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized') {
         var orig = jQuery('td', row).eq(0).html();
         orig = '<a>' + orig + '/</a>';
          if (data.tags) {
