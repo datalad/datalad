@@ -681,7 +681,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
     # (recursively) traverse file tree of current dataset
     fs = fs_traverse(rootds.path, rootds.repo,
-                     render=False, parent=fsparent, recursive=recursive,
+                     render=False, parent=fsparent, recursive=all_,
                      json=json)
     size_list = [fs['size']]
 
@@ -708,8 +708,12 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
         if not subds.is_installed():
             subfs = handle_not_installed()
-        elif all_:
-            subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+        elif recursive:
+            subfs = ds_traverse(subds,
+                                json=json,
+                                recursive=recursive,
+                                all_=all_,
+                                parent=rootds)
             subfs.pop('nodes', None)
             size_list.append(subfs['size'])
         # else just pick the data from metadata_file of each subdataset

@@ -197,7 +197,7 @@ def test_ls_json(topdir):
                 # subdataset should have its json created and deleted when all=True else not
                 subds_metahash = get_metahash('/')
                 subds_metapath = opj(topdir, 'subds', meta_dir, subds_metahash)
-                assert_equal(exists(subds_metapath), (state == 'file' and all_))
+                assert_equal(exists(subds_metapath), (state == 'file' and recursive))
 
                 # root should have its json file created and deleted in all cases
                 ds_metahash = get_metahash('/')
@@ -207,7 +207,7 @@ def test_ls_json(topdir):
                 # children should have their metadata json's created and deleted only when recursive=True
                 child_metahash = get_metahash('dir', 'subdir')
                 child_metapath = opj(meta_path, child_metahash)
-                assert_equal(exists(child_metapath), (state == 'file' and recursive))
+                assert_equal(exists(child_metapath), (state == 'file' and all_))
 
                 # ignored directories should not have json files created in any case
                 for subdir in [('.hidden'), ('dir', 'subgit')]:
@@ -223,7 +223,7 @@ def test_ls_json(topdir):
 
                 # run non-recursive dataset traversal after subdataset metadata already created
                 # to verify sub-dataset metadata being picked up from its metadata file in such cases
-                if state == 'file' and all_ and not recursive:
+                if state == 'file' and recursive and not all_:
                     ds = _ls_json(topdir, json='file', all_=False)
                     subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
                     assert_equal(subds['size']['total'], '3 Bytes')

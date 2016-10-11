@@ -416,7 +416,7 @@ class CreateSibling(Interface):
         json_command = r'''
         mkdir -p {};
         ( which datalad > /dev/null \
-        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -r --json file '{}'; ) \
+        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file '{}'; ) \
         || echo "no datalad found - skipping generation of indexes for web frontend"; \
         ) &> "{}/{}"
         '''.format(logs_remote_dir,
