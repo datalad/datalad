@@ -26,6 +26,8 @@ from ..utils import auto_repr
 from .base import Interface
 from ..ui import ui
 from ..utils import swallow_logs
+from ..consts import METADATA_DIR
+from ..consts import METADATA_FILENAME
 from ..dochelpers import exc_str
 from ..support.param import Parameter
 from ..support import ansi_colors
@@ -520,15 +522,31 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
 
 
 def fs_extract(nodepath, repo):
-    """extract required info of nodepath with its associated parent repository and returns it as a dictionary"""
+    """extract required info of nodepath with its associated parent repository and returns it as a dictionary
 
+    Parameters
+    ----------
+    nodepath : str
+        Full path to the location we are exploring (must be a directory within
+        `repo`
+    repo : GitRepo
+        Is the repository nodepath belongs to
+    """
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
     pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
-    return {"name": name, "path": node._path, "repo": node.repo.path,
-            "type": node.type_, "size": pretty_size, "date": pretty_date}
+    rec = {
+        "name": name, "path": node._path, "repo": node.repo.path,
+        "type": node.type_, "size": pretty_size, "date": pretty_date,
+    }
+    # if there is meta-data for the dataset (done by aggregate-metadata)
+    # we include it
+    metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
+    if exists(metadata_path):
+        rec["metadata"] = metadata = js.load(open(metadata_path))
+    return rec
 
 
 def fs_render(fs_metadata, json=None, **kwargs):
@@ -587,15 +605,20 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     fs = fs_extract(path, repo)
 
     if isdir(path):                                # if node is a directory
-        children = [fs_extract(path, repo)]        # store its info in its children dict too
+        children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
+        # ATM seems some pieces still rely on having this duplication, so left as is
+        # TODO: strip away
         for node in listdir(path):
             nodepath = opj(path, node)
 
+            # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
             if not ignored(nodepath):
                 # if recursive, create info dictionary of each child node too
                 if recursive:
-                    subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
+                    subdir = fs_traverse(nodepath, repo,
+                                         parent=None, # children[0],
+                                         recursive=recursive, json=json)
                 else:
                     # read child metadata from its metadata file if it exists
                     subdir_json = metadata_locator(path=nodepath, ds_path=fs["repo"])
@@ -657,29 +680,56 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     fsparent = fs_extract(parent.path, parent.repo) if parent else None
 
     # (recursively) traverse file tree of current dataset
-    fs = fs_traverse(rootds.path, rootds.repo, render=False, parent=fsparent, recursive=recursive, json=json)
+    fs = fs_traverse(rootds.path, rootds.repo,
+                     render=False, parent=fsparent, recursive=all_,
+                     json=json)
     size_list = [fs['size']]
 
     # (recursively) traverse each subdataset
     children = []
     for subds_path in rootds.get_subdatasets():
-        if all_:
-            subds = Dataset(opj(rootds.path, subds_path))
-            subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+
+        subds_path = opj(rootds.path, subds_path)
+        subds = Dataset(subds_path)
+        subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+
+        def handle_not_installed():
+            # for now just traverse as fs
+            lgr.warning("%s is either not installed or lacks meta-data", subds)
+            subfs = fs_extract(subds_path, rootds)
+            # but add a custom type that it is a not installed subds
+            subfs['type'] = 'uninitialized'
+            # we need to kick it out from 'children'
+            # TODO:  this is inefficient and cruel -- "ignored" should be made
+            # smarted to ignore submodules for the repo
+            if fs['nodes']:
+                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_path]
+            return subfs
+
+        if not subds.is_installed():
+            subfs = handle_not_installed()
+        elif recursive:
+            subfs = ds_traverse(subds,
+                                json=json,
+                                recursive=recursive,
+                                all_=all_,
+                                parent=rootds)
             subfs.pop('nodes', None)
-            children.extend([subfs])
             size_list.append(subfs['size'])
         # else just pick the data from metadata_file of each subdataset
         else:
-            subds_path = opj(rootds.path, subds_path)
-            subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+            lgr.info(subds_path)
             if exists(subds_json):
-                lgr.info(subds_path)
                 with open(subds_json) as data_file:
                     subfs = js.load(data_file)
                     subfs.pop('nodes', None)
-                    children.extend([subfs])
                     size_list.append(subfs['size'])
+            else:
+                # the same drill as if not installed
+                lgr.warning("%s is installed but no meta-data yet", subds)
+                subfs = handle_not_installed()
+
+        children.extend([subfs])
 
     # sum sizes of all 1st level children dataset
     children_size = {}
