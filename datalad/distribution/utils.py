@@ -352,7 +352,7 @@ def _clone_from_any_source(sources, dest):
 
 def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
     content_by_ds = {}
-    if recursion_limit is not None and recursion_limit <= 0:
+    if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return content_by_ds
     # loop over submodules not subdatasets to get the url right away
     # install using helper that give some flexibility regarding where to
@@ -381,6 +381,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             # we can skip the start expression, we know we are within
             content_by_ds.update(_recursive_install_subds_underneath(
                 subds,
-                recursion_limit=None if recursion_limit is None else recursion_limit - 1
+                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit
             ))
     return content_by_ds

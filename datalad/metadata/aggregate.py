@@ -95,7 +95,7 @@ class AggregateMetaData(Interface):
                     subds,
                     guess_native_type=guess_native_type,
                     recursive=recursive,
-                    recursion_limit=None if recursion_limit is None else recursion_limit - 1,
+                    recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
                     if_dirty=if_dirty
                 )
                 if subds_modified:

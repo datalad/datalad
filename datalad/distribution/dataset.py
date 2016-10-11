@@ -252,7 +252,7 @@ class Dataset(object):
           existing repository with no subdatasets an empty list is returned.
         """
 
-        if recursion_limit is not None and (recursion_limit <= 0):
+        if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return []
 
         if pattern is not None:
@@ -283,7 +283,10 @@ class Dataset(object):
 
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
-        if recursive and (recursion_limit is None or recursion_limit > 1):
+        if recursive \
+                and (recursion_limit is None
+                     or (isinstance(recursion_limit, int)
+                         and recursion_limit > 1)):
             rsm = []
             for sm in submodules:
                 rsm.append(sm)
