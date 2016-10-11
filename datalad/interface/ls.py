@@ -693,7 +693,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
         subds = Dataset(subds_path)
         subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
 
-        if not subds.is_installed() or not exists(subds_json):
+        def handle_not_installed():
             # for now just traverse as fs
             lgr.warning("%s is either not installed or lacks meta-data", subds)
             subfs = fs_extract(subds_path, rootds)
@@ -704,6 +704,10 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
             # smarted to ignore submodules for the repo
             if fs['nodes']:
                 fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_path]
+            return subfs
+
+        if not subds.is_installed():
+            subfs = handle_not_installed()
         elif all_:
             subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
             subfs.pop('nodes', None)
@@ -711,10 +715,15 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
         # else just pick the data from metadata_file of each subdataset
         else:
             lgr.info(subds_path)
-            with open(subds_json) as data_file:
-                subfs = js.load(data_file)
-                subfs.pop('nodes', None)
-                size_list.append(subfs['size'])
+            if exists(subds_json):
+                with open(subds_json) as data_file:
+                    subfs = js.load(data_file)
+                    subfs.pop('nodes', None)
+                    size_list.append(subfs['size'])
+            else:
+                # the same drill as if not installed
+                lgr.warning("%s is installed but no meta-data yet", subds)
+                subfs = handle_not_installed()
 
         children.extend([subfs])
 
