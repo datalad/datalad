@@ -342,7 +342,10 @@ class Install(Interface):
             if description:
                 lgr.warning("Description can't be assigned recursively.")
             subs = destination_dataset.get_subdatasets(
-                recursive=True,
+                # yes, it does make sense to combine no recursion with
+                # recursion_limit: when the latter is 0 we get no subdatasets
+                # reported, otherwise we always get the 1st-level subs
+                recursive=False,
                 recursion_limit=recursion_limit,
                 absolute=False)
 
@@ -354,7 +357,9 @@ class Install(Interface):
                     subs,  # all at once
                     dataset=destination_dataset,
                     recursive=True,
-                    recursion_limit=recursion_limit,
+                    # we need to decrease the recursion limit, relative to
+                    # subdatasets now
+                    recursion_limit=max(0, recursion_limit - 1) if isinstance(recursion_limit, int) else recursion_limit,
                     get_data=get_data,
                     git_opts=git_opts,
                     annex_opts=annex_opts,

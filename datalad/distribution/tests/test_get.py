@@ -36,6 +36,8 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import assert_re_in
 from datalad.utils import swallow_logs, with_pathsep
 from datalad.utils import chpwd
+from datalad.utils import assure_list
+from datalad.utils import rmtree
 
 from ..dataset import Dataset
 from ..dataset import with_pathsep
@@ -376,3 +378,47 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     # all file handles are fulfilled by default
     ok_(Dataset(opj(ds.path, 'sub', 'subsub')).repo.file_has_content(
         "file_in_annex.txt") is True)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_recurse_existing(src, path):
+    # build dataset hierarchy
+    origin = Dataset(src).create()
+    origin_sub1 = origin.create('sub1')
+    origin_sub2 = origin_sub1.create('sub2')
+    with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content2')
+    origin_sub3 = origin_sub2.create('sub3')
+    with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content3')
+    origin_sub4 = origin_sub3.create('sub4')
+    origin.save(recursive=True, auto_add_changes=True)
+
+    # make sure recursion_limit works as expected across a range of depths
+    for depth in range(5):
+        datasets = assure_list(
+            install(src, path, recursive=True, recursion_limit=depth))
+        # we expect one dataset per level
+        eq_(len(datasets), depth + 1)
+        rmtree(path)
+
+    # now install all but the last two levels, no data
+    root, sub1, sub2 = install(src, path, recursive=True, recursion_limit=2)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
+    sub3 = Dataset(opj(sub2.path, 'sub3'))
+    ok_(not sub3.is_installed())
+    # now get all content in all existing datasets, no new datasets installed
+    # in the process
+    files = root.get(curdir, recursive=True, recursion_limit='existing')
+    eq_(len(files), 1)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(not sub3.is_installed())
+    # now pull down all remaining datasets, no data
+    sub3, sub4 = root.get(curdir, recursive=True, get_data=False)
+    ok_(sub4.is_installed())
+    ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
+    # aaannd all data
+    files = root.get(curdir, recursive=True)
+    eq_(len(files), 1)
+    ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)

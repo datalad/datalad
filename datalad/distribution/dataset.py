@@ -294,7 +294,7 @@ class Dataset(object):
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive,
                          recursion_limit=(recursion_limit - 1)
-                         if recursion_limit is not None else None)])
+                         if isinstance(recursion_limit, int) else recursion_limit)])
             submodules = rsm
 
         if absolute:
