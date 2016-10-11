@@ -325,8 +325,8 @@ function directory(jQuery, md5) {
     order: [[6, "desc"], [0, 'asc']],
     columns: [      // select columns and their names from json
       {data: "name", title: "Name", width: "25%"},
-      {data: "date", title: "Last Modified", className: "dt-center", width: "15%"},
-      {data: "size", title: "Size", className: "dt-center", width: "15%"},
+      {data: "date", title: "Last Modified", className: "dt-center", width: "18%"},
+      {data: "size", title: "Size", className: "dt-center", width: "18%"},
       {data: null, title: "Description", className: "dt-left",
        render: function(data) {
          var meta = data.metadata;
