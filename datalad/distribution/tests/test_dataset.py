@@ -12,6 +12,8 @@
 import os
 import shutil
 from os.path import join as opj, abspath, normpath
+from os.path import realpath
+from os.path import pardir
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
@@ -21,6 +23,7 @@ from datalad.utils import _path_
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
+from nose import SkipTest
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import SkipTest
@@ -84,6 +87,50 @@ def test_resolve_path(somedir):
 
 
 # TODO: test remember/recall more extensive?
+@with_tempfile()
+def test_recall_invalid(path):
+    # assert exception type
+    assert_raises(RuntimeError, Dataset(path).recall_state, 'itdoesntmatter')
+
+
+@with_tempfile(mkdir=True)
+def test_super_symlink_resolution(path):
+    # prep environment
+    real_super = Dataset(opj(path, 'super'))
+    real_sub = Dataset(opj(path, 'sub'))
+    os.makedirs(real_super.path)
+    os.makedirs(real_sub.path)
+    real_super.create()
+    real_sub.create()
+    assert_true(real_super.is_installed())
+    assert_true(real_sub.is_installed())
+    # no put the sub into the super by means of a symlink
+    # this is a "cheap" and way to have a hierarchy when you actually have
+    # a list of datasets
+    inside_path = opj(real_super.path, 'fake_sub')
+    try:
+        os.symlink(opj(pardir, 'sub'), inside_path)
+    except:
+        # likely no symlink
+        raise SkipTest
+    # not enough to just be within the folder
+    eq_(Dataset(inside_path).get_superdataset(), None)
+
+    # actually install
+    os.remove(inside_path)
+    # revert for #959
+    #real_super.install(real_sub.path, path='fake_sub')
+    real_super.install(source=real_sub.path, path='fake_sub')
+    # should find the super repo
+    # revert for #959
+    #eq_(Dataset(inside_path).get_superdataset(), real_super)
+    eq_(Dataset(inside_path).get_superdataset().path, real_super.path)
+    # wipe out and replace with symlink
+    rmtree(inside_path)
+    os.symlink(opj(pardir, 'sub'), inside_path)
+    # I think this is what `get_superdataset()` wants, but it yields None
+    eq_(Dataset(inside_path).get_superdataset(), real_super)
+
 
 @with_testrepos(flavors=['local', 'local-url'])
 @with_tempfile(mkdir=True)
