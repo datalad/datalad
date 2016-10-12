@@ -35,6 +35,7 @@ from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
@@ -349,9 +350,13 @@ class Get(Interface):
             lgr.warning('could not find and ignored paths: %s', unavailable_paths)
 
         # hand over to git-annex
-        return list(chain.from_iterable(
+        results = list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
                  get_data=get_data)))
+        if unavailable_paths:  # and likely other error flags
+            raise IncompleteResultsError(results)
+        else:
+            return results
 
     @staticmethod
     def result_renderer_cmdline(res, args):

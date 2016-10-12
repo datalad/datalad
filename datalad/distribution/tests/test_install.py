@@ -26,6 +26,7 @@ from datalad.consts import DATASETS_TOPURL
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
@@ -560,9 +561,10 @@ def test_install_skip_list_arguments(src, path, path_outside):
 
     # install a list with valid and invalid items:
     with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(path=['subm 1', 'not_existing',
-                              path_outside, 'subm 2'],
-                              get_data=False)
+        with assert_raises(IncompleteResultsError) as cme:
+            ds.get(path=['subm 1', 'not_existing', path_outside, 'subm 2'],
+                   get_data=False)
+        result = cme.exception.results
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
             cml.assert_logged(msg="could not find and ignored paths: {}\n".format(
                               [opj(ds.path, 'not_existing'), path_outside]),
@@ -577,7 +579,9 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # return of get is always a list, even if just one thing was gotten
     # in this case 'subm1' was already obtained above, so this will get this
     # content of the subdataset
-    result = ds.get(path=['subm 1', 'not_existing'])
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.get(path=['subm 1', 'not_existing'])
+    result = cme.exception.results
     eq_(len(result), 1)
     eq_(result[0]['file'], 'subm 1/test-annex.dat')
 

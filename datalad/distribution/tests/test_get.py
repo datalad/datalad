@@ -21,7 +21,7 @@ from datalad.api import get
 from datalad.api import install
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -29,7 +29,6 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
@@ -40,7 +39,6 @@ from datalad.utils import assure_list
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..dataset import with_pathsep
 
 
 @with_tempfile(mkdir=True)
@@ -94,7 +92,9 @@ def test_get_invalid_call(path, file_outside):
 
     # warning on not existing file:
     with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get("NotExistingFile.txt")
+        with assert_raises(IncompleteResultsError) as cme:
+            ds.get("NotExistingFile.txt")
+        result = cme.exception.results
         eq_(len(result), 0)
         assert_in("could not find and ignored", cml.out)
 
@@ -151,7 +151,9 @@ def test_get_multiple_files(path, url, ds_dir):
     ok_(not any(ds.repo.file_has_content(file_list)))
 
     # get two plus an invalid one:
-    result = ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'])
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'])
+    result = cme.exception.results
     # explicitly given not existing file was skipped:
     # (see test_get_invalid_call)
     eq_(set([item.get('file') for item in result]),
