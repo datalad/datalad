@@ -12,7 +12,7 @@
 import os
 import shutil
 from os.path import join as opj, abspath, normpath
-from os.path import join as realpath
+from os.path import realpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
