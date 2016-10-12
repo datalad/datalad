@@ -284,7 +284,7 @@ class Dataset(object):
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
         if recursive \
-                and (recursion_limit is None
+                and (recursion_limit in (None, 'existing')
                      or (isinstance(recursion_limit, int)
                          and recursion_limit > 1)):
             rsm = []
