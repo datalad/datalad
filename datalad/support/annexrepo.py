@@ -203,7 +203,11 @@ class AnnexRepo(GitRepo):
 
         self.always_commit = always_commit
 
-        cfg = ConfigManager()
+        # Note: Not sure yet, whether 'dataset=self' is appropriate, but we need
+        # to be able to read dataset's config in case we don't create a brand
+        # new one here.
+        cfg = ConfigManager(dataset=self)
+
         if version is None:
             try:
                 version = cfg["datalad.repo.version"]
@@ -239,7 +243,6 @@ class AnnexRepo(GitRepo):
             if self.repo.config_reader().get_value('annex', 'version') < 6:
                 lgr.debug("Switching to direct mode (%s)." % self)
                 self.set_direct_mode()
-                self.repo.git(c='core.bare=false')
             else:
                 # TODO: This may change to either not being a warning and/or
                 # to use 'git annex unlock' instead.
@@ -441,6 +444,12 @@ class AnnexRepo(GitRepo):
         # For paranoid we will just re-request
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
+
+        if self.is_direct_mode():
+            # adjust git options for plain git calls on this repo:
+            # Note: Not sure yet, whether this solves the issue entirely or we
+            # still need 'annex proxy' in some cases ...
+            self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
