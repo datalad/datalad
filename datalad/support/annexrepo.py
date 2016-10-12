@@ -46,6 +46,7 @@ from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
 from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
+from datalad.config import ConfigManager
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -79,7 +80,8 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode', '_uuid']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
+                                     '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -89,7 +91,7 @@ class AnnexRepo(GitRepo):
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True,
+                 direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None):
         """Creates representation of git-annex repository at `path`.
@@ -200,6 +202,14 @@ class AnnexRepo(GitRepo):
                             writer.release()
 
         self.always_commit = always_commit
+
+        cfg = ConfigManager()
+        if version is None:
+            try:
+                version = cfg["datalad.repo.version"]
+            except KeyError:
+                pass
+
         if fix_it:
             self._init(version=version, description=description)
             self.fsck()
@@ -220,10 +230,20 @@ class AnnexRepo(GitRepo):
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
 
-        # only force direct mode; don't force indirect mode
+        # - only force direct mode; don't force indirect mode
+        # - parameter `direct` has priority over config
+        if direct is None:
+            direct = "datalad.repo.direct" in cfg and (create or init)
         self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
-            self.set_direct_mode()
+            if self.repo.config_reader().get_value('annex', 'version') < 6:
+                lgr.debug("Switching to direct mode (%s)." % self)
+                self.set_direct_mode()
+                self.repo.git(c='core.bare=false')
+            else:
+                # TODO: This may change to either not being a warning and/or
+                # to use 'git annex unlock' instead.
+                lgr.warning("direct mode not available for %s. Ignored." % self)
 
         # set default backend for future annex commands:
         # TODO: Should the backend option of __init__() also migrate
