@@ -143,8 +143,9 @@ def install_necessary_subdatasets(ds, path):
     assert cur_par_ds is not None
 
     while not cur_subds.is_installed():
-        lgr.info("Installing subdataset {0} in order to get "
-                 "{1}".format(cur_subds, path))
+        lgr.info("Installing subdataset %s%s",
+                 cur_subds,
+                 ' in order to get %s' % path if cur_subds.path != path else '')
         # get submodule info
         submodule = [sm for sm in cur_par_ds.repo.get_submodules()
                      if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
