@@ -72,13 +72,15 @@ def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
 
-    return {
+    meta = {
         "@context": "http://schema.org/",
-        "@id": ds_identifier,
         "type": "Dataset",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
+    if ds_identifier is not None:
+        meta["@id"] = ds_identifier
+    return meta
 
 
 def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
@@ -144,12 +146,11 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     subdss = []
     # we only want immediate subdatasets
     for subds in subdatasets:
-        subds_id = subds.id
         submeta = {
             'location': relpath(subds.path, ds.path),
             'type': 'Dataset'}
-        if not subds_id.startswith('_:'):
-            submeta['@id'] = subds_id
+        if subds.id:
+            submeta['@id'] = subds.id
         subdss.append(submeta)
     if len(subdss):
         if len(subdss) == 1:
