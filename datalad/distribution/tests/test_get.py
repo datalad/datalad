@@ -41,6 +41,20 @@ from datalad.utils import rmtree
 from ..dataset import Dataset
 
 
+def _make_dataset_hierarchy(path):
+    origin = Dataset(path).create()
+    origin_sub1 = origin.create('sub1')
+    origin_sub2 = origin_sub1.create('sub2')
+    with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content2')
+    origin_sub3 = origin_sub2.create('sub3')
+    with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content3')
+    origin_sub4 = origin_sub3.create('sub4')
+    origin.save(recursive=True, auto_add_changes=True)
+    return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
 def test_get_invalid_call(path, file_outside):
@@ -96,7 +110,7 @@ def test_get_invalid_call(path, file_outside):
             ds.get("NotExistingFile.txt")
         result = cme.exception.results
         eq_(len(result), 0)
-        assert_in("could not find and ignored", cml.out)
+        assert_in("ignored non-existing paths", cml.out)
 
     # path outside repo:
     with swallow_logs(new_level=logging.WARNING) as cml:
@@ -385,20 +399,10 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_recurse_existing(src, path):
-    # build dataset hierarchy
-    origin = Dataset(src).create()
-    origin_sub1 = origin.create('sub1')
-    origin_sub2 = origin_sub1.create('sub2')
-    with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
-        f.write('content2')
-    origin_sub3 = origin_sub2.create('sub3')
-    with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
-        f.write('content3')
-    origin_sub4 = origin_sub3.create('sub4')
-    origin.save(recursive=True, auto_add_changes=True)
+    origin_ds = _make_dataset_hierarchy(src)
 
     # make sure recursion_limit works as expected across a range of depths
-    for depth in range(5):
+    for depth in range(len(origin_ds)):
         datasets = assure_list(
             install(src, path, recursive=True, recursion_limit=depth))
         # we expect one dataset per level
@@ -424,3 +428,18 @@ def test_recurse_existing(src, path):
     files = root.get(curdir, recursive=True)
     eq_(len(files), 1)
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_in_unavailable_subdataset(src, path):
+    origin_ds = _make_dataset_hierarchy(src)
+    root = install(src, path)
+    targetpath = opj('sub1', 'sub2')
+    targetabspath = opj(root.path, targetpath)
+    get(targetabspath)
+    # we got the dataset, and its immediate content, but nothing below
+    sub2 = Dataset(targetabspath)
+    ok_(sub2.is_installed())
+    ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(not Dataset(opj(targetabspath, 'sub3')).is_installed())
