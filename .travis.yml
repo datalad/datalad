@@ -80,7 +80,7 @@ matrix:
     - DATALAD_REPO_DIRECT=1
   allow_failures:
   # For now, don't fail entirely when direct mode fails
-  - env: DATALAD_REPO_DIRECT=1
+  - env: DATALAD_REPO_DIRECT=1 BOTO_CONFIG=/tmp/nowhere DATALAD_TESTS_SSH=1 COVERAGE=coverage
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
 #  - python: 3.5
