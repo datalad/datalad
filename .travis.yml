@@ -77,7 +77,7 @@ matrix:
   # To check current state of direct mode operation
   - python: 2.7
     env:
-      - DATALAD_REPO_DIRECT=1
+    - DATALAD_REPO_DIRECT=1
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
 #  - python: 3.5
