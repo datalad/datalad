@@ -17,8 +17,6 @@ env:
     - DATALAD_TESTS_SSH=1
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
-  # testing everything in direct mode:
-  - DATALAD_REPO_DIRECT=1
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -76,8 +74,12 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
+  - python: 2.7
+    # To check current state of direct mode operation
+    env:
+    - DATALAD_REPO_DIRECT=1
   allow_failures:
-  # To check current state of direct mode operation
+  # For now, don't fail entirely when direct mode fails
   - env: DATALAD_REPO_DIRECT=1
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
