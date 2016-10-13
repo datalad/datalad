@@ -449,7 +449,8 @@ class AnnexRepo(GitRepo):
             # adjust git options for plain git calls on this repo:
             # Note: Not sure yet, whether this solves the issue entirely or we
             # still need 'annex proxy' in some cases ...
-            self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
+            if 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
+                self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
