@@ -160,7 +160,7 @@ class Search(Interface):
                              "meta-dataset under %r?"
                              % LOCAL_CENTRAL_PATH):
                     from datalad.api import install
-                    central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+                    central_ds = install('///', path=LOCAL_CENTRAL_PATH)
                     ui.message(
                         "You can in future refer to that dataset using -d///"
                     )

@@ -67,7 +67,8 @@ def resolve_path(path, ds=None):
         return abspath(path)
     # no dataset given, use CWD as reference
     # note: abspath would disregard symlink in CWD
-    top_path = getpwd() if ds is None else ds.path
+    top_path = getpwd() \
+        if ds is None else ds.path if isinstance(ds, Dataset) else ds
     return normpath(opj(top_path, path))
 
 
@@ -96,6 +97,8 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
+        if not hasattr(other, 'path'):
+            return False
         return realpath(self.path) == realpath(other.path)
 
     @property
@@ -126,11 +129,17 @@ class Dataset(object):
                             lgr.debug("Detected %s at %s", cls, self._path)
                             self._repo = cls(self._path, create=False, **kw)
                             break
-                        except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError) as exc:
-                            lgr.debug("Oops -- guess on repo type was wrong?: %s", exc_str(exc))
+                        except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                            lgr.debug(
+                                "Oops -- guess on repo type was wrong?: %s",
+                                exc_str(exc))
                             pass
-                if self._repo is None:
-                    lgr.info("Failed to detect a valid repo at %s" % self.path)
+                        # version problems come as RuntimeError: DO NOT CATCH!
+            if self._repo is None:
+                # Often .repo is requested to 'sense' if anything is installed
+                # under, and if so -- to proceed forward. Thus log here only
+                # at DEBUG level and if necessary "complaint upstairs"
+                lgr.debug("Failed to detect a valid repo at %s" % self.path)
 
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
@@ -243,7 +252,7 @@ class Dataset(object):
           existing repository with no subdatasets an empty list is returned.
         """
 
-        if recursion_limit is not None and (recursion_limit <= 0):
+        if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return []
 
         if pattern is not None:
@@ -274,7 +283,10 @@ class Dataset(object):
 
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
-        if recursive and (recursion_limit is None or recursion_limit > 1):
+        if recursive \
+                and (recursion_limit in (None, 'existing')
+                     or (isinstance(recursion_limit, int)
+                         and recursion_limit > 1)):
             rsm = []
             for sm in submodules:
                 rsm.append(sm)
@@ -285,7 +297,7 @@ class Dataset(object):
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive,
                          recursion_limit=(recursion_limit - 1)
-                         if recursion_limit is not None else None)])
+                         if isinstance(recursion_limit, int) else recursion_limit)])
             submodules = rsm
 
         if absolute:
@@ -394,6 +406,9 @@ class Dataset(object):
     def get_containing_subdataset(self, path, recursion_limit=None):
         """Get the (sub-)dataset containing `path`
 
+        Note: The "mount point" of a subdataset is classified as belonging to
+        that respective subdataset.
+
         Parameters
         ----------
         path : str
@@ -419,7 +434,12 @@ class Dataset(object):
             path = relpath(path, self.path)
 
         candidates = []
+        # TODO: this one would follow all the sub-datasets, which might
+        # be inefficient if e.g. there is lots of other sub-datasets already
+        # installed but under another sub-dataset.  There is a TODO 'pattern'
+        # option which we could use I guess eventually
         for subds in self.get_subdatasets(recursive=True,
+                                          #pattern=
                                           recursion_limit=recursion_limit,
                                           absolute=False):
             common = commonprefix((with_pathsep(subds), with_pathsep(path)))
