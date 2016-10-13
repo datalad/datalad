@@ -237,7 +237,9 @@ class AnnexRepo(GitRepo):
         # - only force direct mode; don't force indirect mode
         # - parameter `direct` has priority over config
         if direct is None:
-            direct = "datalad.repo.direct" in cfg and (create or init)
+            direct = (create or init) and \
+                     cfg.obtain("datalad.repo.direct",
+                                default=False, valtype=bool)
         self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
             if self.repo.config_reader().get_value('annex', 'version') < 6:
