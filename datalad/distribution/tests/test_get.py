@@ -110,7 +110,7 @@ def test_get_invalid_call(path, file_outside):
             ds.get("NotExistingFile.txt")
         result = cme.exception.results
         eq_(len(result), 0)
-        assert_in("could not find and ignored", cml.out)
+        assert_in("ignored non-existing paths", cml.out)
 
     # path outside repo:
     with swallow_logs(new_level=logging.WARNING) as cml:

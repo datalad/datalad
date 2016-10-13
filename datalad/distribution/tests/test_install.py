@@ -566,7 +566,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
                    get_data=False)
         result = cme.exception.results
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
-            cml.assert_logged(msg="could not find and ignored paths: {}\n".format(
+            cml.assert_logged(msg="ignored non-existing paths: {}\n".format(
                               [opj(ds.path, 'not_existing'), path_outside]),
                               regex=False, level='WARNING')
             pass

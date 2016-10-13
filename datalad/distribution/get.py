@@ -347,7 +347,7 @@ class Get(Interface):
                 recursion_limit=recursion_limit)
 
         if unavailable_paths:
-            lgr.warning('could not find and ignored paths: %s', unavailable_paths)
+            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
 
         # hand over to git-annex
         results = list(chain.from_iterable(
