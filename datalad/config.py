@@ -148,14 +148,14 @@ class ConfigManager(object):
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
             if exists(dscfg_fname):
                 stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
-                                           log_stderr=False)
+                                           log_stderr=True)
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store = _parse_gitconfig_dump(
                     stdout, self._store, replace=False)
 
         if not self._dataset_only:
-            stdout, stderr = self._run(['-z', '-l'], log_stderr=False)
+            stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
             self._store = _parse_gitconfig_dump(
                 stdout, self._store, replace=True)
 
