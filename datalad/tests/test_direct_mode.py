@@ -24,13 +24,23 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import swallow_logs
 from datalad.distribution.dataset import Dataset
 
-from .utils import with_tempfile, skip_if_no_network, with_testrepos
+from .utils import with_tempfile
+from .utils import skip_if_no_network
+from .utils import with_testrepos
+from .utils import on_windows
+from .utils import SkipTest
+
+
+if on_windows:
+    raise SkipTest("Can't test direct mode switch, "
+                   "if direct mode is forced by OS anyway.")
 
 
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_direct_cfg(path1, path2, path3):
+@with_tempfile
+def test_direct_cfg(path1, path2, path3, path4):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         # create annex repo in direct mode:
         with swallow_logs(new_level=logging.DEBUG) as cml:
@@ -48,18 +58,28 @@ def test_direct_cfg(path1, path2, path3):
 
         # explicit parameter `direct` has priority:
         ar = AnnexRepo(path3, create=True, direct=False)
-        ok_(not ar.is_direct_mode())
+        if not ar.is_crippled_fs():  # otherwise forced direct mode
+            ok_(not ar.is_direct_mode())
 
         # don't touch existing repo:
         ar = AnnexRepo(path2, create=True)
-        ok_(not ar.is_direct_mode())
+        if not ar.is_crippled_fs():  # otherwise forced direct mode
+            ok_(not ar.is_direct_mode())
+
+    # make sure, value is relevant:
+    with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': '0'}):
+        # don't use direct mode
+        ar = AnnexRepo(path4, create=True)
+        if not ar.is_crippled_fs():  # otherwise forced direct mode
+            ok_(not ar.is_direct_mode())
 
 
 @with_tempfile
 def test_direct_create(path):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         ds = Dataset(path).create()
-        ok_(ds.repo.is_direct_mode())
+        if not ds.repo.is_crippled_fs():  # otherwise forced direct mode
+            ok_(ds.repo.is_direct_mode())
 
 
 # Note/TODO: Currently flavor 'network' only, since creation of local testrepos
@@ -72,4 +92,5 @@ def test_direct_install(url, path):
 
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         ds = datalad.api.install(path=path, source=url)
-        ok_(ds.repo.is_direct_mode())
+        if not ds.repo.is_crippled_fs():  # otherwise forced direct mode
+            ok_(ds.repo.is_direct_mode())
