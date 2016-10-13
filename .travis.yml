@@ -73,10 +73,10 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
-  - allow_failures:
-    - python: 2.7
-      # To make sure datalad operates correctly in direct mode
-      env:
+  allow_failures:
+  # To check current state of direct mode operation
+  - python: 2.7
+    env:
       - DATALAD_REPO_DIRECT=1
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
