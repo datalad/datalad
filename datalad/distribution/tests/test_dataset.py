@@ -12,7 +12,6 @@
 import os
 import shutil
 from os.path import join as opj, abspath, normpath
-from os.path import join as realpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
@@ -253,7 +252,7 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     # the top of a subdataset belongs to the subdataset
     eq_(ds.get_containing_subdataset(opj("sub", "subsub")).path, subsubds.path)
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub", "subsub")), realpath(subsubds.path))
+    eq_(GitRepo.get_toppath(opj(ds.path, "sub", "subsub")), subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("sub").path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)

@@ -24,6 +24,7 @@ import datalad
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
@@ -229,8 +230,9 @@ def main(args=None):
 
     # parse cmd args
     cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
     if unparsed_args:
-        if cmdlineargs.func.__self__.__name__ != 'Export':
+        if has_func and cmdlineargs.func.__self__.__name__ != 'Export':
             lgr.error('unknown argument{}: {}'.format(
                 's' if len(unparsed_args) > 1 else '',
                 unparsed_args if len(unparsed_args) > 1 else unparsed_args[0]))
@@ -252,23 +254,38 @@ def main(args=None):
         args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif cmdlineargs.common_debug or cmdlineargs.common_idebug:
-        # so we could see/stop clearly at the point of failure
-        setup_exceptionhook(ipython=cmdlineargs.common_idebug)
-        ret = cmdlineargs.func(cmdlineargs)
-    else:
-        # otherwise - guard and only log the summary. Postmortem is not
-        # as convenient if being caught in this ultimate except
-        try:
+    elif has_func:
+        if cmdlineargs.common_debug or cmdlineargs.common_idebug:
+            # so we could see/stop clearly at the point of failure
+            setup_exceptionhook(ipython=cmdlineargs.common_idebug)
             ret = cmdlineargs.func(cmdlineargs)
-        except InsufficientArgumentsError as exc:
-            # if the func reports inappropriate usage, give help output
-            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-            cmdlineargs.subparser.print_usage()
-            sys.exit(1)
-        except Exception as exc:
-            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-            sys.exit(1)
+        else:
+            # otherwise - guard and only log the summary. Postmortem is not
+            # as convenient if being caught in this ultimate except
+            try:
+                ret = cmdlineargs.func(cmdlineargs)
+            except InsufficientArgumentsError as exc:
+                # if the func reports inappropriate usage, give help output
+                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                cmdlineargs.subparser.print_usage()
+                sys.exit(1)
+            except IncompleteResultsError as exc:
+                # we didn't get everything we wanted: still present what we got
+                # as usual, but exit with an error
+                if hasattr(cmdlineargs, 'result_renderer'):
+                    cmdlineargs.result_renderer(exc.results, cmdlineargs)
+                lgr.error('could not perform all requested actions')
+                sys.exit(1)
+            except Exception as exc:
+                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                sys.exit(1)
+    else:
+        # just let argparser spit out its error, since there is smth wrong
+        parser.parse_args(args)
+        # if that one didn't puke -- we should
+        parser.print_usage()
+        lgr.error("Please specify the command")
+        sys.exit(2)
     if hasattr(cmdlineargs, 'result_renderer'):
         cmdlineargs.result_renderer(ret, cmdlineargs)
 

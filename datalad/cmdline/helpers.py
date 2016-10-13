@@ -41,8 +41,8 @@ class HelpAction(argparse.Action):
                 if not os.path.exists(manfile):
                     raise IOError("manfile is not found")
                 with gzip.open(manfile) as f:
-                    man_th = [line for line in f if line.startswith(".TH")][0]
-                man_version = man_th.split(' ')[5].strip(" '\"\t\n")
+                    man_th = [line for line in f if line.startswith(b".TH")][0]
+                man_version = man_th.split(b' ')[5].strip(b" '\"\t\n").decode('utf-8')
 
                 # don't show manpage if man_version not equal to current datalad_version
                 if __version__ != man_version:

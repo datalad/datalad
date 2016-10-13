@@ -14,12 +14,8 @@
 import logging
 from os import curdir
 from os import linesep
-from os.path import join as opj
 from os.path import relpath
 from os.path import pardir
-from os.path import exists
-
-from six.moves.urllib.parse import quote as urlquote
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -36,20 +32,12 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
-from datalad.support.network import URL
-from datalad.support.network import DataLadRI
-from datalad.support.network import is_url
 from datalad.support.network import is_datalad_compat_ri
 from datalad.support.network import get_local_file_url
 from datalad.utils import assure_list
 from datalad.utils import knows_annex
-from datalad.utils import swallow_logs
-from datalad.utils import rmtree
 from datalad.dochelpers import exc_str
 
 from .dataset import Dataset
@@ -58,30 +46,15 @@ from .dataset import resolve_path
 from .dataset import require_dataset
 from .dataset import EnsureDataset
 from .get import Get
-from .utils import _fixup_submodule_dotgit_setup
+from .utils import _get_git_url_from_source
+from .utils import _install_subds_from_flexible_source
+from .utils import _get_flexible_url_candidates
+from .utils import _get_tracking_source
+from .utils import _clone_from_any_source
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.install')
-
-
-def _get_git_url_from_source(source):
-    """Return URL for cloning associated with a source specification
-
-    For now just resolves DataLadRIs
-    """
-    # TODO: Probably RF this into RI.as_git_url(), that would be overridden
-    # by subclasses or sth. like that
-    if not isinstance(source, RI):
-        source_ri = RI(source)
-    else:
-        source_ri = source
-    if isinstance(source_ri, DataLadRI):
-        # we have got our DataLadRI as the source, so expand it
-        source = source_ri.as_git_url()
-    else:
-        source = str(source_ri)
-    return source
 
 
 def _get_installationpath_from_url(url):
@@ -100,166 +73,6 @@ def _get_installationpath_from_url(url):
     if path.endswith('.git'):
         path = path[:-4]
     return path
-
-
-def _get_flexible_url_candidates(url, base_url=None, url_suffix=''):
-    candidates = []
-    if url.startswith('/') or is_url(url):
-        # this seems to be an absolute location -> take as is
-        candidates.append(url)
-        # additionally try to consider .git:
-        if not url.rstrip('/').endswith('/.git'):
-            candidates.append(
-                '{0}/.git'.format(url.rstrip('/')))
-    else:
-        # need to resolve relative URL
-        base_url_l = base_url.split('/')
-        url_l = url.split('/')
-        for i, c in enumerate(url_l):
-            if c == pardir:
-                base_url_l = base_url_l[:-1]
-            else:
-                candidates.append('{0}/{1}{2}'.format(
-                    '/'.join(base_url_l),
-                    '/'.join(url_l[i:]),
-                    url_suffix))
-                break
-    # TODO:
-    # here clone_urls might contain degenerate urls which should be
-    # normalized and not added into the pool of the ones to try if already
-    # there, e.g. I got
-    #  ['http://datasets.datalad.org/crcns/aa-1/.git', 'http://datasets.datalad.org/crcns/./aa-1/.git']
-    # upon  install aa-1
-
-    # TODO:
-    # We need to provide some error msg with InstallFailedError, since now
-    # it just swallows everything.
-
-    return candidates
-
-
-def _clone_from_any_source(sources, dest):
-    # should not be the case, but we need to distinguish between failure
-    # of git-clone, due to existing target and an unsuccessful clone
-    # attempt. See below.
-    existed = dest and exists(dest)
-    for source_ in sources:
-        try:
-            lgr.debug("Retrieving a dataset from URL: "
-                      "{0}".format(source_))
-            with swallow_logs():
-                GitRepo(dest, url=source_, create=True)
-            return source_  # do not bother with other sources if succeeded
-        except GitCommandError as e:
-            lgr.debug("Failed to retrieve from URL: "
-                      "{0}".format(source_))
-            if not existed and dest \
-                    and exists(dest):
-                lgr.debug("Wiping out unsuccessful clone attempt at "
-                          "{}".format(dest))
-                rmtree(dest)
-
-            if source_ == sources[-1]:
-                # Note: The following block is evaluated whenever we
-                # fail even with the last try. Not nice, but currently
-                # necessary until we get a more precise exception:
-                ####################################
-                # TODO: We may want to introduce a --force option to
-                # overwrite the target.
-                # TODO: Currently assuming if `existed` and there is a
-                # GitCommandError means that these both things are connected.
-                # Need newer GitPython to get stderr from GitCommandError
-                # (already fixed within GitPython.)
-                if existed:
-                    # rudimentary check for an installed dataset at target:
-                    # (TODO: eventually check for being the one, that this
-                    # is about)
-                    dest_ds = Dataset(dest)
-                    if dest_ds.is_installed():
-                        lgr.info("{0} appears to be installed already."
-                                 "".format(dest_ds))
-                        break
-                    else:
-                        lgr.warning("Target {0} already exists and is not "
-                                    "an installed dataset. Skipped."
-                                    "".format(dest))
-                        # Keep original in debug output:
-                        lgr.debug("Original failure:{0}"
-                                  "{1}".format(linesep, exc_str(e)))
-                        return None
-                ##################
-
-                # Re-raise if failed even with the last candidate
-                lgr.debug("Unable to establish repository instance at "
-                          "{0} from {1}"
-                          "".format(dest, sources))
-                raise
-
-
-def _get_tracking_source(ds):
-    """Returns name and url of a potential configured source
-    tracking remote"""
-    vcs = ds.repo
-    repo = vcs.repo
-    # if we have a remote, let's check the location of that remote
-    # for the presence of the desired submodule
-    tracking_branch = repo.active_branch.tracking_branch()
-    remote_name = None
-    remote_url = ''
-    if tracking_branch:
-        # name of the default remote for the active branch
-        remote_name = repo.active_branch.tracking_branch().remote_name
-        remote_url = vcs.get_remote_url(remote_name, push=False)
-    return remote_name, remote_url
-
-
-def _install_subds_from_flexible_source(ds, sm_path, sm_url):
-    """Tries to obtain a given subdataset from several meaningful locations"""
-    # compose a list of candidate clone URLs
-    clone_urls = []
-    # if we have a remote, let's check the location of that remote
-    # for the presence of the desired submodule
-    remote_name, remote_url = _get_tracking_source(ds)
-    # remember suffix
-    url_suffix = ''
-    if remote_url:
-        if remote_url.rstrip('/').endswith('/.git'):
-            url_suffix = '/.git'
-            remote_url = remote_url[:-5]
-        # attempt: submodule checkout at parent remote URL
-        # We might need to quote sm_path portion, e.g. for spaces etc
-        if isinstance(RI(remote_url), URL):
-            sm_path_url = urlquote(sm_path)
-        else:
-            sm_path_url = sm_path
-        clone_urls.append('{0}/{1}{2}'.format(
-            remote_url, sm_path_url, url_suffix))
-    # attempt: configured submodule URL
-    # TODO: consider supporting DataLadRI here?  or would confuse
-    #  git and we wouldn't want that (i.e. not allow pure git clone
-    #  --recursive)
-    clone_urls += _get_flexible_url_candidates(
-        sm_url,
-        remote_url if remote_url else ds.path,
-        url_suffix)
-
-    # now loop over all candidates and try to clone
-    subds = Dataset(opj(ds.path, sm_path))
-    try:
-        clone_url = _clone_from_any_source(clone_urls, subds.path)
-    except GitCommandError as e:
-        raise InstallFailedError(
-            "Failed to install dataset %s from %s (%s)",
-            subds, clone_urls, e)
-    # do fancy update
-    if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
-        lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        ds.repo.update_submodule(sm_path, init=True)
-    else:
-        # submodule is brand-new and previously unknown
-        ds.repo.add_submodule(sm_path, url=clone_url)
-    _fixup_submodule_dotgit_setup(ds, sm_path)
-    return subds
 
 
 class Install(Interface):
@@ -592,7 +405,10 @@ class Install(Interface):
             if description:
                 lgr.warning("Description can't be assigned recursively.")
             subs = destination_dataset.get_subdatasets(
-                recursive=True,
+                # yes, it does make sense to combine no recursion with
+                # recursion_limit: when the latter is 0 we get no subdatasets
+                # reported, otherwise we always get the 1st-level subs
+                recursive=False,
                 recursion_limit=recursion_limit,
                 absolute=False)
 
@@ -604,8 +420,10 @@ class Install(Interface):
                     subs,  # all at once
                     dataset=destination_dataset,
                     recursive=True,
-                    recursion_limit=recursion_limit,
-                    fulfill_datasets=get_data,
+                    # we need to decrease the recursion limit, relative to
+                    # subdatasets now
+                    recursion_limit=max(0, recursion_limit - 1) if isinstance(recursion_limit, int) else recursion_limit,
+                    get_data=get_data,
                     git_opts=git_opts,
                     annex_opts=annex_opts,
                     # TODO expose this

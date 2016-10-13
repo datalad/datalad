@@ -21,7 +21,7 @@ from datalad.api import get
 from datalad.api import install
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -29,16 +29,16 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import assert_re_in
 from datalad.utils import swallow_logs, with_pathsep
 from datalad.utils import chpwd
+from datalad.utils import assure_list
+from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..dataset import with_pathsep
 
 
 @with_tempfile(mkdir=True)
@@ -92,7 +92,9 @@ def test_get_invalid_call(path, file_outside):
 
     # warning on not existing file:
     with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get("NotExistingFile.txt")
+        with assert_raises(IncompleteResultsError) as cme:
+            ds.get("NotExistingFile.txt")
+        result = cme.exception.results
         eq_(len(result), 0)
         assert_in("could not find and ignored", cml.out)
 
@@ -149,7 +151,9 @@ def test_get_multiple_files(path, url, ds_dir):
     ok_(not any(ds.repo.file_has_content(file_list)))
 
     # get two plus an invalid one:
-    result = ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'])
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'])
+    result = cme.exception.results
     # explicitly given not existing file was skipped:
     # (see test_get_invalid_call)
     eq_(set([item.get('file') for item in result]),
@@ -214,7 +218,7 @@ def test_get_recurse_subdatasets(src, path):
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
-    subds1, subds2 = ds.get(['subm 1', 'subm 2'])
+    subds1, subds2 = ds.get(['subm 1', 'subm 2'], get_data=False)
 
     # there are 3 files to get: test-annex.dat within each dataset:
     rel_path_sub1 = opj(basename(subds1.path), 'test-annex.dat')
@@ -277,7 +281,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ds = install(path, source=src)
 
     # GIMME EVERYTHING
-    ds.get(['subm 1', 'subm 2'], fulfill_datasets=True)
+    ds.get(['subm 1', 'subm 2'])
 
     # We got all content in the subdatasets
     subds1, subds2 = [Dataset(d) for d in ds.get_subdatasets(absolute=True)]
@@ -373,7 +377,50 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)
-    # 'subsub' did not exist prior the get-call above, hence while it
-    # is now installed its file handles are not fulfilled
+    # all file handles are fulfilled by default
     ok_(Dataset(opj(ds.path, 'sub', 'subsub')).repo.file_has_content(
-        "file_in_annex.txt") is False)
+        "file_in_annex.txt") is True)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_recurse_existing(src, path):
+    # build dataset hierarchy
+    origin = Dataset(src).create()
+    origin_sub1 = origin.create('sub1')
+    origin_sub2 = origin_sub1.create('sub2')
+    with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content2')
+    origin_sub3 = origin_sub2.create('sub3')
+    with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
+        f.write('content3')
+    origin_sub4 = origin_sub3.create('sub4')
+    origin.save(recursive=True, auto_add_changes=True)
+
+    # make sure recursion_limit works as expected across a range of depths
+    for depth in range(5):
+        datasets = assure_list(
+            install(src, path, recursive=True, recursion_limit=depth))
+        # we expect one dataset per level
+        eq_(len(datasets), depth + 1)
+        rmtree(path)
+
+    # now install all but the last two levels, no data
+    root, sub1, sub2 = install(src, path, recursive=True, recursion_limit=2)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
+    sub3 = Dataset(opj(sub2.path, 'sub3'))
+    ok_(not sub3.is_installed())
+    # now get all content in all existing datasets, no new datasets installed
+    # in the process
+    files = root.get(curdir, recursive=True, recursion_limit='existing')
+    eq_(len(files), 1)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(not sub3.is_installed())
+    # now pull down all remaining datasets, no data
+    sub3, sub4 = root.get(curdir, recursive=True, get_data=False)
+    ok_(sub4.is_installed())
+    ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
+    # aaannd all data
+    files = root.get(curdir, recursive=True)
+    eq_(len(files), 1)
+    ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)

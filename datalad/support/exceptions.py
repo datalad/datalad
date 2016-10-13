@@ -174,6 +174,17 @@ class RemoteNotAvailableError(CommandError):
                "".format(self.remote, linesep, super_str)
 
 
+class IncompleteResultsError(RuntimeError):
+    """Exception to be raised whenever results are incomplete.
+
+    Any results produced nevertheless are to be passed as `results`,
+    and become available via the `results` attribute.
+    """
+    def __init__(self, results, **kwargs):
+        super(IncompleteResultsError, self).__init__(**kwargs)
+        self.results = results
+
+
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""
     pass

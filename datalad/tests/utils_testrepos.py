@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
 import tempfile
 
 from abc import ABCMeta, abstractmethod
@@ -41,6 +42,15 @@ class TestRepo(object):
         # swallow logs so we don't print all those about crippled FS etc
         with swallow_logs():
             self.repo = self.REPO_CLASS(path)
+            # For additional testing of our datalad remote to not interfer
+            # and manage to handle all http urls and requests:
+            if self.REPO_CLASS is AnnexRepo and \
+                    os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
+                self.repo.init_remote(
+                    'datalad',
+                    ['encryption=none', 'type=external', 'autoenable=true',
+                     'externaltype=datalad'])
+
         self.runner = Runner(cwd=self.repo.path)
         self._created = False
 
