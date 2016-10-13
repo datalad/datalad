@@ -17,6 +17,8 @@ env:
     - DATALAD_TESTS_SSH=1
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
+    # testing everything in direct mode:
+    - DATALAD_REPO_DIRECT=1
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
 #    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
@@ -75,9 +77,7 @@ matrix:
     - TMPDIR="/tmp/d i r"
   allow_failures:
   # To check current state of direct mode operation
-  - python: 2.7
-    env:
-    - DATALAD_REPO_DIRECT=1
+  - env: DATALAD_REPO_DIRECT=1
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
 #  - python: 3.5
