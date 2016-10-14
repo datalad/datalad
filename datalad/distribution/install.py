@@ -122,7 +122,7 @@ class Install(Interface):
             provided a destination path will be derived from a source URL
             similar to :command:`git clone`"""),
         source=Parameter(
-            args=('source',),
+            args=("-s", "--source"),
             metavar='SOURCE',
             doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
