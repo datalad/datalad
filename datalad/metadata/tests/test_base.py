@@ -16,7 +16,6 @@ import os
 from mock import patch
 from operator import itemgetter
 from os.path import join as opj, exists
-from six import PY2
 
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
@@ -30,6 +29,8 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
@@ -352,3 +353,33 @@ def test_cached_load_document(tdir):
             schema = _cached_load_document("http://schema.org/")
             assert_equal(schema, target_schema)
             assert_not_in("cannot load cache from", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_ignore_nondatasets(path):
+    # we want to ignore the version/commits for this test
+    def _kill_time(meta):
+        for m in meta:
+            for k in ('version', 'dcterms:modified'):
+                if k in m:
+                    del m[k]
+        return meta
+
+    ds = Dataset(path).create()
+    meta = _kill_time(get_metadata(ds))
+    n_subm = 0
+    # placing another repo in the dataset has no effect on metadata
+    for cls, subpath in ((GitRepo, 'subm'), (AnnexRepo, 'annex_subm')):
+        subm_path = opj(ds.path, subpath)
+        r = cls(subm_path, create=True)
+        with open(opj(subm_path, 'test'), 'w') as f:
+            f.write('test')
+        r.add('test')
+        r.commit('some')
+        assert_true(Dataset(subm_path).is_installed())
+        assert_equal(meta, _kill_time(get_metadata(ds)))
+        # making it a submodule has no effect either
+        ds.save(auto_add_changes=True)
+        assert_equal(len(ds.get_subdatasets()), n_subm + 1)
+        assert_equal(meta, _kill_time(get_metadata(ds)))
+        n_subm += 1

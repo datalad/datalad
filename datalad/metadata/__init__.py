@@ -146,6 +146,8 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     subdss = []
     # we only want immediate subdatasets
     for subds in subdatasets:
+        if subds.id is None:
+            continue
         submeta = {
             'location': relpath(subds.path, ds.path),
             'type': 'Dataset'}
