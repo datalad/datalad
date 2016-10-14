@@ -70,7 +70,32 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
+# manipulate GitPython's command call wrapper to provide persistent git options,
+# while attribute `_git_options` keeps its functionality (and will be reset by
+# GitPython after each git call):
+class PatchedGit(gitpy.Git):
+
+    __slots__ = gitpy.Git.__slots__ + ('_git_persistent_options',
+                                       '_git_temp_options')
+
+    def __init__(self, *args, **kwargs):
+        super(PatchedGit, self).__init__(*args, **kwargs)
+        self._git_persistent_options = []
+        self._git_temp_options = ()
+
+    def _git_options_get(self):
+        return self._git_persistent_options + [i for i in self._git_temp_options]
+
+    def _git_options_set(self, val):
+        self._git_temp_options = val
+
+    _git_options = property(_git_options_get, _git_options_set)
+
+gitpy.Repo.GitCommandWrapperType = PatchedGit
+
+
+# TODO: ignore leading and/or trailing underscore to allow for
+# python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -482,6 +507,9 @@ class GitRepo(object):
                         InvalidGitRepositoryError) as e:
                     lgr.error("%s: %s" % (type(e), str(e)))
                     raise
+
+        # inject git options into GitPython's git call wrapper:
+        self.repo.git._git_persistent_options = self._GIT_COMMON_OPTIONS
 
     def clone(self, url, path):
         """Clone url into path

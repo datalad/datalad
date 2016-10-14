@@ -956,3 +956,20 @@ def test_optimized_cloning(path):
         clone_inodes = _get_inodes(clone)
         eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
         rmtree(clonepath)
+
+
+@with_tempfile
+def test_GitRepo_gitpy_injection(path):
+
+    gr = GitRepo(path, create=True)
+    gr._GIT_COMMON_OPTIONS.extend(['test-option'])
+
+    with assert_raises(GitCommandError) as cme:
+        gr.repo.git.unknown_git_command()
+    assert_in('test-option', exc_str(cme.exception))
+
+    # once set, these option should be persistent across git calls:
+    with assert_raises(GitCommandError) as cme:
+        gr.repo.git.another_unknown_git_command()
+    assert_in('test-option', exc_str(cme.exception))
+
