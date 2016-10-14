@@ -124,6 +124,8 @@ class Search(Interface):
                   match, dataset)
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+            if ds.id is None:
+                raise NoDatasetArgumentFound
         except NoDatasetArgumentFound:
             exc_info = sys.exc_info()
             if dataset is None:
