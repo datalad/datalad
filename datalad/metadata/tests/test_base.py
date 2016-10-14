@@ -298,15 +298,19 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     subds = ds.create('sub', force=True, if_dirty='ignore')
     subds.repo.remove(opj('.datalad', 'config'))
     subds.save()
+    # subs is no longer a dataset now -> makes it and everything below
+    # vanish from metadata
     assert_false(exists(opj(subds.path, '.datalad', 'config')))
     subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+
     # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second native set for the topmost dataset
+    # should yield 3 meta data sets, one implicit, and two native ones for the
+    # mother
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+    assert_equal(len(meta), 3)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
         assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
@@ -317,14 +321,11 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     assert res1
 
     # and let's see now if we wouldn't fail if dataset is duplicate if we
-    # install the same dataset twice
+    # install the same non-dataset twice
     subds_clone = ds.install(source=subds.path, path="subds2")
     with swallow_outputs():
         res2 = list(search_('.', regex=True, dataset=ds))
-    assert_equal(len(res1) + 1, len(res2))
-    assert_equal(
-        set(map(itemgetter(0), res1)).union({subds_clone.path}),
-        set(map(itemgetter(0), res2)))
+    assert_equal(len(res1), len(res2))
 
 
 @with_tempfile(mkdir=True)

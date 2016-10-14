@@ -83,6 +83,8 @@ class AggregateMetaData(Interface):
                       recursive=False)]
         # anything below only works for installed subdatasets
         subdss = [d for d in subdss if d.is_installed()]
+        # if it's not kosher we ain't gonna have it
+        subdss = [d for d in subdss if d.id is not None]
 
         # recursive, depth first
         if recursive and (recursion_limit is None or recursion_limit):

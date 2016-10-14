@@ -261,7 +261,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     # for any subdataset that is actually registered (avoiding stale copies)
     for subds in subdss:
         subds_path = relpath(subds.path, ds.path)
-        if ignore_cache and subds.is_installed():
+        if ignore_cache and subds.is_installed() and subds.id:
             # simply pull meta data from actual subdataset and go to next part
             subds_meta = get_metadata(
                 subds, guess_type=guess_type,
@@ -301,7 +301,9 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             for md in subds_meta:
                 cand_id = md.get('dcterms:isPartOf', None)
                 if cand_id == ds_identifier and '@id' in md:
-                    has_part[subds_path]['@id'] = md['@id']
+                    partinfo = has_part.get(subds_path, {})
+                    partinfo['@id'] = md['@id']
+                    has_part[subds_path] = partinfo
                     break
 
         # hand over subdataset meta data
