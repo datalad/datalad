@@ -335,7 +335,10 @@ class Dataset(object):
         -------
         bool
         """
-        was_once_installed = self.path is not None and self.repo is not None
+        # do early check manually if path exists to not even ask git at all
+        was_once_installed = self.path is not None and \
+                             exists(self.path) and \
+                             self.repo is not None
 
         if was_once_installed and not exists(self.repo.repo.git_dir):
             # repo gone now, reset
