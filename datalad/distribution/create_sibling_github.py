@@ -183,6 +183,14 @@ class CreateSiblingGithub(Interface):
     other data sources (and siblings), publishing a dataset to Github can
     facilitate distribution and exchange, while still allowing any dataset
     consumer to obtain actual data content from alternative sources.
+
+    For Github authentication user credentials can be given as arguments.
+    Alternatively, they are obtained interactively or queried from the systems
+    credential store. Lastly, an *oauth* token stored in the Git
+    configuration under variable *hub.oauthtoken* will be used automatically.
+    Such a token can be obtained, for example, using the commandline Github
+    interface (https://github.com/sociomantic/git-hub) by running:
+    :kbd:`git hub setup`.
     """
 
     _params_ = dict(
