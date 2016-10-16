@@ -402,7 +402,7 @@ def _handle_possible_annex_dataset(dataset, reckless):
                 "sources, if possible (reckless)", dataset.path)
             dataset.config.add(
                 'annex.hardlink', 'true', where='local', reload=True)
-        lgr.info("Initializing annex repo at %s", dataset.path)
+        lgr.debug("Initializing annex repo at %s", dataset.path)
         repo = AnnexRepo(dataset.path, init=True)
         if reckless:
             repo._run_annex_command('untrust', annex_options=['here'])
