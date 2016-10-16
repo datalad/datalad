@@ -194,7 +194,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
             doc += '\n'
         doc += "Parameters\n----------\n"
         for i, arg in enumerate(args):
-            if arg == 'self':
+            if arg == 'self' or arg.startswith('_'):
                 continue
             # we need a parameter spec for each argument
             if not arg in params:
@@ -235,7 +235,7 @@ class Interface(object):
         if not defaults is None:
             ndefaults = len(defaults)
         for i, arg in enumerate(args):
-            if arg == 'self':
+            if arg == 'self' or arg.startswith('_'):
                 continue
             param = cls._params_[arg]
             defaults_idx = ndefaults - len(args) + i
