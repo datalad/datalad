@@ -334,8 +334,12 @@ class Get(Interface):
                         # a non-directory cannot have content underneath
                         continue
                     subds = Dataset(subdspath)
-                    lgr.info("Obtaining content in %s underneath %s recursively",
-                             subds, content_path)
+                    lgr.info(
+                        "Obtaining %s %s recursively",
+                        subds,
+                        ("underneath %s" % content_path
+                         if subds.path != content_path
+                         else ""))
                     cbysubds = _recursive_install_subds_underneath(
                         subds,
                         # `content_path` was explicitly given as input
