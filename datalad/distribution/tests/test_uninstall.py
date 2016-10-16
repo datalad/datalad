@@ -84,7 +84,7 @@ def test_uninstall_invalid(path):
     if hasattr(ds.repo, 'drop'):
         assert_raises(Exception, uninstall, dataset=ds, path='not_existent')
     else:
-        eq_(uninstall('not_existent', source=dataset=ds)), [])
+        eq_(uninstall(dataset=ds, path='not_existent'), [])
 
 
 @with_testrepos('basic_annex', flavors=['clone'])

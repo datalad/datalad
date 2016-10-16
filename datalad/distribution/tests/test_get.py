@@ -404,13 +404,13 @@ def test_recurse_existing(src, path):
     # make sure recursion_limit works as expected across a range of depths
     for depth in range(len(origin_ds)):
         datasets = assure_list(
-            install(src, path, recursive=True, recursion_limit=depth))
+            install(path, source=src, recursive=True, recursion_limit=depth))
         # we expect one dataset per level
         eq_(len(datasets), depth + 1)
         rmtree(path)
 
     # now install all but the last two levels, no data
-    root, sub1, sub2 = install(src, path, recursive=True, recursion_limit=2)
+    root, sub1, sub2 = install(path, source=src, recursive=True, recursion_limit=2)
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
     sub3 = Dataset(opj(sub2.path, 'sub3'))
     ok_(not sub3.is_installed())
@@ -434,7 +434,7 @@ def test_recurse_existing(src, path):
 @with_tempfile(mkdir=True)
 def test_get_in_unavailable_subdataset(src, path):
     origin_ds = _make_dataset_hierarchy(src)
-    root = install(src, path)
+    root = install(path, source=src)
     targetpath = opj('sub1', 'sub2')
     targetabspath = opj(root.path, targetpath)
     get(targetabspath)

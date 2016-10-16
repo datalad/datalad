@@ -43,7 +43,7 @@ def test_update_simple(origin, src_path, dst_path):
     source.repo.remove_remote("origin")
 
     # get a clone to update later on:
-    dest = install(dst_path, source=src_path), recursive=True)[0]
+    dest = install(dst_path, source=src_path, recursive=True)[0]
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)

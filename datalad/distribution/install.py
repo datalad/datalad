@@ -34,6 +34,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
+from datalad.support.network import PathRI
 from datalad.support.network import is_datalad_compat_ri
 from datalad.support.network import get_local_file_url
 from datalad.utils import assure_list
@@ -152,7 +153,7 @@ class Install(Interface):
     @staticmethod
     @datasetmethod(name='install')
     def __call__(
-            path,
+            path=None,
             source=None,
             dataset=None,
             get_data=False,
@@ -171,53 +172,86 @@ class Install(Interface):
         # python and nothing was passed into `path`
         if path == []:
             path = None
+        if path is None:
+            path = []
+        path = assure_list(path)
 
-        installed_items = []
+        if not source and not path:
+            raise InsufficientArgumentsError(
+                "Please provide at least a source or a path")
 
-        # handle calls with multiple paths first:
-        if path and isinstance(path, list):
-            if len(path) > 1:
-                if source is not None:
-                    raise ValueError("source argument not valid when "
-                                     "installing multiple datasets.")
-                else:
-                    for p in path:
-                        try:
-                            result = Install.__call__(
-                                path=p,
-                                source=None,
+        # switch into scenario without --source:
+        # XXX for now with len(path)>1 since there is still duplication
+        #     and need to figure out what is going one
+        if source is None and len(path)>1:
+            # we need to collect URLs and paths
+            to_install = []
+            to_get = []
+            for urlpath in path:
+                ri = RI(urlpath)
+                (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
+
+            installed_items = []
+
+            # first install, and then get
+            for s in to_install:
+                lgr.debug("Install passes into install source=%s", s)
+                result = Install.__call__(
+                                source=s,
                                 dataset=dataset,
                                 get_data=get_data,
                                 description=description,
                                 recursive=recursive,
                                 recursion_limit=recursion_limit,
-                                save=save,
                                 if_dirty=if_dirty,
+                                save=save,
+                                reckless=reckless,
                                 git_opts=git_opts,
                                 git_clone_opts=git_clone_opts,
                                 annex_opts=annex_opts,
                                 annex_init_opts=annex_init_opts
                             )
+                installed_items += assure_list(result)
 
-                            installed_items += assure_list(result)
-                        except Exception:
-                            # Note: We don't exactly know what was skipped but
-                            # the `path` requested to be installed, since it will be
-                            # resolved only within the recursive call of install.
-                            lgr.info("Installation of {0} skipped.".format(p))
+            if to_get:
+                lgr.debug("Install passes into get %d items", len(to_get))
+                # all commented out hint on inability to pass those options
+                # into underlying install-related calls.
+                # Also need to pass from get:
+                #  jobs
+                #  annex_get_opts
+                result = Get.__call__(
+                    to_get,
+                    dataset=dataset,
+                    get_data=get_data,
+                    # description=description,
+                    recursive=recursive,
+                    recursion_limit=recursion_limit,
+                    # if_dirty=if_dirty,
+                    # save=save,
+                    # reckless=reckless,
+                    git_opts=git_opts,
+                    # git_clone_opts=git_clone_opts,
+                    annex_opts=annex_opts,
+                    #annex_init_opts=annex_init_opts
+                )
+                installed_items += assure_list(result)
+            return installed_items
 
-                    if len(installed_items) == 1:
-                        return installed_items[0]
-                    else:
-                        return installed_items
-            else:
-                path = path[0]
+        # XXX  should not be necessary, just TEMP to match Michael's code expectations
+        if source is None:
+            source = path[0]
+            path = None
 
         # parameter constraints:
-
-        if not source and not path:
+        if not source:
             raise InsufficientArgumentsError(
-                "Please provide at least a source or a path")
+                "a `source` is required for installation")
+
+        if path is not None:
+            assert(isinstance(path, list) and len(path) == 1)
+            path = path[0]
+
         if source == path:
             # even if they turn out to be identical after resolving symlinks
             # and more sophisticated witchcraft, it would still happily say
@@ -427,6 +461,7 @@ class Install(Interface):
                     git_opts=git_opts,
                     annex_opts=annex_opts,
                     # TODO expose this
+                    # yoh: exactly!
                     #annex_get_opts=annex_get_opts,
                 )
                 # TODO do we want to filter this so `install` only returns
