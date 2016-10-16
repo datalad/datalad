@@ -27,6 +27,7 @@ from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import reckless_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
@@ -38,7 +39,6 @@ from datalad.support.network import PathRI
 from datalad.support.network import is_datalad_compat_ri
 from datalad.support.network import get_local_file_url
 from datalad.utils import assure_list
-from datalad.utils import knows_annex
 from datalad.dochelpers import exc_str
 
 from .dataset import Dataset
@@ -52,6 +52,7 @@ from .utils import _install_subds_from_flexible_source
 from .utils import _get_flexible_url_candidates
 from .utils import _get_tracking_source
 from .utils import _clone_from_any_source
+from .utils import _handle_possible_annex_dataset
 
 __docformat__ = 'restructuredtext'
 
@@ -136,15 +137,7 @@ class Install(Interface):
         recursion_limit=recursion_limit,
         if_dirty=if_dirty_opt,
         save=nosave_opt,
-        reckless=Parameter(
-            args=("--reckless",),
-            action="store_true",
-            doc="""Set up the dataset to be able to obtain content in the
-            cheapest/fastest possible way, even if this poses a potential
-            risk the data integrity (e.g. hardlink files from a local clone
-            of the dataset). Use with care, and limit to "read-only" use
-            cases. With this flag the installed dataset will be marked as
-            untrusted."""),
+        reckless=reckless_opt,
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
@@ -181,9 +174,7 @@ class Install(Interface):
                 "Please provide at least a source or a path")
 
         # switch into scenario without --source:
-        # XXX for now with len(path)>1 since there is still duplication
-        #     and need to figure out what is going one
-        if source is None and len(path)>1:
+        if source is None:
             # we need to collect URLs and paths
             to_install = []
             to_get = []
@@ -193,23 +184,31 @@ class Install(Interface):
 
             installed_items = []
 
+            # There should have been more of common options!
+            # since underneath get could do similar installs, but now they
+            # have duplicated implementations which differ (e.g. get does not
+            # annex init installed annexes)
+            common_kwargs = dict(
+                dataset=dataset,
+                get_data=get_data,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                git_opts=git_opts,
+                annex_opts=annex_opts,
+                reckless=reckless,
+            )
+
             # first install, and then get
             for s in to_install:
                 lgr.debug("Install passes into install source=%s", s)
                 result = Install.__call__(
                                 source=s,
-                                dataset=dataset,
-                                get_data=get_data,
                                 description=description,
-                                recursive=recursive,
-                                recursion_limit=recursion_limit,
                                 if_dirty=if_dirty,
                                 save=save,
-                                reckless=reckless,
-                                git_opts=git_opts,
                                 git_clone_opts=git_clone_opts,
-                                annex_opts=annex_opts,
-                                annex_init_opts=annex_init_opts
+                                annex_init_opts=annex_init_opts,
+                                **common_kwargs
                             )
                 installed_items += assure_list(result)
 
@@ -222,35 +221,25 @@ class Install(Interface):
                 #  annex_get_opts
                 result = Get.__call__(
                     to_get,
-                    dataset=dataset,
-                    get_data=get_data,
                     # description=description,
-                    recursive=recursive,
-                    recursion_limit=recursion_limit,
                     # if_dirty=if_dirty,
                     # save=save,
-                    # reckless=reckless,
-                    git_opts=git_opts,
                     # git_clone_opts=git_clone_opts,
-                    annex_opts=annex_opts,
-                    #annex_init_opts=annex_init_opts
+                    # annex_init_opts=annex_init_opts
+                    **common_kwargs
                 )
                 installed_items += assure_list(result)
-            return installed_items
 
-        # XXX  should not be necessary, just TEMP to match Michael's code expectations
-        if source is None:
-            source = path[0]
-            path = None
+            return installed_items[0] \
+                if len(installed_items) == 1 else installed_items
 
         # parameter constraints:
         if not source:
             raise InsufficientArgumentsError(
                 "a `source` is required for installation")
 
-        if path is not None:
-            assert(isinstance(path, list) and len(path) == 1)
-            path = path[0]
+        # code below deals with a single path only
+        path = path[0] if path else None
 
         if source == path:
             # even if they turn out to be identical after resolving symlinks
@@ -393,7 +382,8 @@ class Install(Interface):
             destination_dataset = _install_subds_from_flexible_source(
                 ds,
                 relativepath,
-                source)
+                source,
+                reckless)
         else:
             # FLOW GUIDE: 2.
             lgr.info("Installing dataset at: {0}".format(path))
@@ -407,22 +397,11 @@ class Install(Interface):
 
         # FLOW GUIDE: All four cases done.
         if not destination_dataset.is_installed():
+            # XXX  shouldn't we just fail!? (unless some explicit --skip-failing?)
             lgr.error("Installation failed.")
             return None
 
-        # in any case check whether we need to annex-init the installed thing:
-        if knows_annex(destination_dataset.path):
-            # init annex when traces of a remote annex can be detected
-            if reckless:
-                lgr.debug(
-                    "Instruct annex to hardlink content in %s from local "
-                    "sources, if possible (reckless)", destination_dataset.path)
-                destination_dataset.config.add(
-                    'annex.hardlink', 'true', where='local', reload=True)
-            lgr.info("Initializing annex repo at %s", destination_dataset.path)
-            repo = AnnexRepo(destination_dataset.path, init=True)
-            if reckless:
-                repo._run_annex_command('untrust', annex_options=['here'])
+        _handle_possible_annex_dataset(destination_dataset, reckless)
 
         lgr.debug("Installation of %s done.", destination_dataset)
 

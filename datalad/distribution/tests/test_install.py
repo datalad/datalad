@@ -238,7 +238,7 @@ def test_install_simple_local(src, path):
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
-        ds = install(url)
+        ds = install(source=url)
 
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())

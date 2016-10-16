@@ -24,6 +24,7 @@ from six.moves.urllib.parse import quote as urlquote
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
@@ -33,6 +34,7 @@ from datalad.support.network import is_url
 from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
+from datalad.utils import knows_annex
 from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import Dataset
@@ -102,7 +104,7 @@ def get_git_dir(path):
 
 # TODO: evolved to sth similar to get_containing_subdataset. Therefore probably
 # should move into this one as an option. But: consider circular imports!
-def install_necessary_subdatasets(ds, path):
+def install_necessary_subdatasets(ds, path, reckless):
     """Installs subdatasets of `ds`, that are necessary to obtain in order
     to have access to `path`.
 
@@ -116,6 +118,7 @@ def install_necessary_subdatasets(ds, path):
     ----------
     ds: Dataset
     path: str
+    reckless: bool
 
     Returns
     -------
@@ -147,14 +150,16 @@ def install_necessary_subdatasets(ds, path):
                  cur_subds,
                  ' in order to get %s' % path if cur_subds.path != path else '')
         # get submodule info
-        submodule = [sm for sm in cur_par_ds.repo.get_submodules()
+        submodules = cur_par_ds.repo.get_submodules()
+        submodule = [sm for sm in submodules
                      if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
         # install using helper that give some flexibility regarding where to
         # get the module from
         _install_subds_from_flexible_source(
             cur_par_ds,
             submodule.path,
-            submodule.url)
+            submodule.url,
+            reckless)
 
         cur_par_ds = cur_subds
 
@@ -191,7 +196,7 @@ def _get_git_url_from_source(source):
     return source
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url):
+def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
     """Tries to obtain a given subdataset from several meaningful locations"""
     # compose a list of candidate clone URLs
     clone_urls = []
@@ -237,6 +242,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url):
         # submodule is brand-new and previously unknown
         ds.repo.add_submodule(sm_path, url=clone_url)
     _fixup_submodule_dotgit_setup(ds, sm_path)
+    _handle_possible_annex_dataset(subds, reckless)
     return subds
 
 
@@ -351,7 +357,7 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
+def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None):
     content_by_ds = {}
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return content_by_ds
@@ -367,7 +373,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             try:
                 lgr.info("Installing subdataset %s", subds.path)
                 subds = _install_subds_from_flexible_source(
-                    ds, sub.path, sub.url)
+                    ds, sub.path, sub.url, reckless)
                 # we want the entire thing, but mark this subdataset
                 # as automatically installed
                 content_by_ds[subds.path] = [curdir]
@@ -382,6 +388,24 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             # we can skip the start expression, we know we are within
             content_by_ds.update(_recursive_install_subds_underneath(
                 subds,
-                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit
+                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
+                reckless=reckless
             ))
     return content_by_ds
+
+
+def _handle_possible_annex_dataset(dataset, reckless):
+    # in any case check whether we need to annex-init the installed thing:
+    if knows_annex(dataset.path):
+        # init annex when traces of a remote annex can be detected
+        if reckless:
+            lgr.debug(
+                "Instruct annex to hardlink content in %s from local "
+                "sources, if possible (reckless)", dataset.path)
+            dataset.config.add(
+                'annex.hardlink', 'true', where='local', reload=True)
+        lgr.info("Initializing annex repo at %s", dataset.path)
+        repo = AnnexRepo(dataset.path, init=True)
+        if reckless:
+            repo._run_annex_command('untrust', annex_options=['here'])
+

@@ -26,6 +26,7 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
 from datalad.interface.common_opts import jobs_opt
+from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureChoice
@@ -224,6 +225,7 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        reckless=reckless_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -243,6 +245,7 @@ class Get(Interface):
             recursive=False,
             recursion_limit=None,
             get_data=True,
+            reckless=False,
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
@@ -298,7 +301,7 @@ class Get(Interface):
             # any dataset at the very top
             assert ds.is_installed()
             # now actually obtain whatever is necessary to get to this path
-            containing_ds = install_necessary_subdatasets(ds, path)
+            containing_ds = install_necessary_subdatasets(ds, path, reckless)
             if containing_ds.path != ds.path:
                 lgr.debug("Installed %s to fulfill request for content for "
                           "path %s", containing_ds, path)
@@ -329,6 +332,7 @@ class Get(Interface):
                         # we count recursions from the input, hence we
                         # can start with the full number
                         recursion_limit,
+                        reckless,
                         # protect against magic marker misinterpretation
                         # only relevant for _get, hence replace here
                         start=content_path if content_path != curdir else None)
