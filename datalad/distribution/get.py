@@ -280,8 +280,11 @@ class Get(Interface):
             _sort_paths_into_datasets(resolved_paths,
                                       recursive=recursive,
                                       recursion_limit=recursion_limit)
-        lgr.debug("Found %i existing dataset(s) to get content in",
-                  len(content_by_ds))
+        lgr.debug(
+            "Found %i existing dataset(s) to get content in "
+            "and %d unavailable paths",
+            len(content_by_ds), len(unavailable_paths)
+        )
         # IMPORTANT NOTE re `content_by_ds`
         # each key is a subdataset that we need to get something in
         # if the value[0] is the subdataset's path, we want all of it
