@@ -116,7 +116,7 @@ def test_basic_metadata(path):
          'dcterms:hasPart', 'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
-    sibling = install(opj(path, 'sibling'), source=opj(path, 'origin')
+    sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
@@ -170,7 +170,7 @@ def test_aggregation(path):
     ds.save('with aggregated meta data', auto_add_changes=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
-    clone = install(opj(path, source=ds.path), 'clone')
+    clone = install(opj(path, 'clone'), source=ds.path)
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
@@ -192,7 +192,7 @@ def test_aggregation(path):
         subds.id)
 
     # now obtain a subdataset in the clone and the IDs should be updated
-    clone.install('sub')
+    clone.install(source='sub')  # TEMP -- should work without source=. get is still buggy somewhere!
     partial = get_metadata(clone, guess_type=False, ignore_cache=True)
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
@@ -267,7 +267,7 @@ def test_aggregation(path):
     # more tests on returned paths:
     assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
-    clone_sub = clone.install('sub')
+    clone_sub = clone.install(source='sub')  # TEMP should work without source!  somewhere get is still buggy
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
     # Test 'and' for multiple search entries

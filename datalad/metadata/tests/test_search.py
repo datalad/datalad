@@ -118,7 +118,7 @@ def _check_mocked_install(central_dspath, mock_install):
     assert_equal(
         list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
-    mock_install.assert_called_once_with('///', path=central_dspath)
+    mock_install.assert_called_once_with(central_dspath, source='///')
 
 
 @with_tempfile
