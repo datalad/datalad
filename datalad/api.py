@@ -47,6 +47,9 @@ def _generate_func_api():
         # update with provided kwarg args
         kwargs_.update(kwargs)
         assert (nargs == len(kwargs_))
+        # Get all arguments removing those possible ones used internally and
+        # which shouldn't be exposed outside anyways
+        [kwargs_.pop(k) for k in kwargs_ if k.startswith('_')]
         namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
         return namespace
 
