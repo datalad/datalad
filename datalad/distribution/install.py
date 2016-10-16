@@ -21,6 +21,7 @@ from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import git_clone_opts
 from datalad.interface.common_opts import annex_opts
@@ -141,7 +142,9 @@ class Install(Interface):
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
         annex_opts=annex_opts,
-        annex_init_opts=annex_init_opts)
+        annex_init_opts=annex_init_opts,
+        jobs=jobs_opt,
+    )
 
     @staticmethod
     @datasetmethod(name='install')
@@ -159,7 +162,8 @@ class Install(Interface):
             git_opts=None,
             git_clone_opts=None,
             annex_opts=None,
-            annex_init_opts=None):
+            annex_init_opts=None,
+            jobs=None):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
@@ -196,6 +200,7 @@ class Install(Interface):
                 git_opts=git_opts,
                 annex_opts=annex_opts,
                 reckless=reckless,
+                jobs=jobs,
             )
 
             # first install, and then get
@@ -217,7 +222,6 @@ class Install(Interface):
                 # all commented out hint on inability to pass those options
                 # into underlying install-related calls.
                 # Also need to pass from get:
-                #  jobs
                 #  annex_get_opts
                 content_by_ds = Get.__call__(
                     to_get,
