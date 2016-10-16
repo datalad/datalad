@@ -127,7 +127,6 @@ def test_super_symlink_resolution(path):
     # wipe out and replace with symlink
     rmtree(inside_path)
     os.symlink(opj(pardir, 'sub'), inside_path)
-    # I think this is what `get_superdataset()` wants, but it yields None
     eq_(Dataset(inside_path).get_superdataset(), real_super)
 
 

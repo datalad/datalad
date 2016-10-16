@@ -344,13 +344,16 @@ class Dataset(object):
         else:
             return was_once_installed
 
-    def get_superdataset(self, topmost=False):
+    def get_superdataset(self, topmost=False, stringent=True):
         """Get the dataset's superdataset
 
         Parameters
         ----------
         topmost : bool, optional
           Return the topmost super-dataset. Might then be the current one.
+        stringent : bool, optional
+          Be stringent in testing -- if superdataset is not containing sub-dataset
+          we came from as a submodule, it is not its super
 
         Returns
         -------
@@ -362,7 +365,7 @@ class Dataset(object):
         path = self.path
         sds_path = path if topmost else None
         while path:
-            par_path = opj(path, pardir)
+            par_path = normpath(opj(path, pardir))
             sds_path_ = GitRepo.get_toppath(par_path)
             if sds_path_ is None:
                 # no more parents, use previous found
@@ -372,6 +375,12 @@ class Dataset(object):
             # sds = Dataset(sds_path_)
             # if not sds.id:
             #     break
+
+            if stringent:
+                # verify that we contain this sub-dataset
+                submodules = GitRepo(sds_path_).get_submodules(sorted_=False)
+                if relpath(path, sds_path_) not in [s.path for s in submodules]:
+                    break
 
             # That was a good candidate
             sds_path = sds_path_
@@ -384,11 +393,14 @@ class Dataset(object):
             # None was found
             return None
 
-        if realpath(self.path) != self.path:
+        # and it is a subdirectory, not some fancy symlink somewhere outside
+        if realpath(self.path) != self.path and \
+            realpath(self.path).startswith(with_pathsep(realpath(sds_path))):
             # we had symlinks in the path but sds_path would have not
             # so let's get "symlinked" version of the superdataset path
             sds_relpath = relpath(sds_path, realpath(self.path))
             sds_path = normpath(opj(self.path, sds_relpath))
+
         return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):
