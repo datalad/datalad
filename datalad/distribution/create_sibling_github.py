@@ -87,7 +87,8 @@ def _get_github_entity(gh, cred, github_user, github_passwd, github_organization
 
 
 def _make_github_repos(
-        gh, github_user, github_passwd, github_organization, rinfo, existing, access_protocol):
+        gh, github_user, github_passwd, github_organization, rinfo, existing,
+        access_protocol, dryrun):
     cred = UserPassword('github', 'https://github.com/login')
 
     # determine the entity under which to create the repos
@@ -106,7 +107,8 @@ def _make_github_repos(
                 entity,
                 reponame,
                 existing,
-                access_protocol)
+                access_protocol,
+                dryrun)
             res.append((ds, access_url, existed))
         except gh.BadCredentialsException as e:
             # things blew up, wipe out cred store, if anything is in it
@@ -116,7 +118,7 @@ def _make_github_repos(
     return res
 
 
-def _make_github_repo(gh, entity, reponame, existing, access_protocol):
+def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
     repo = None
     try:
         repo = entity.get_repo(reponame)
@@ -133,12 +135,15 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol):
             access_url = getattr(repo, '{}_url'.format(access_protocol))
             return access_url, existing == 'skip'
         elif existing == 'error':
-            raise ValueError(
-                'repository "{}" already exists on Github'.format(reponame))
+            msg = 'repository "{}" already exists on Github'.format(reponame)
+            if dryrun:
+                lgr.error(msg)
+            else:
+                raise ValueError(msg)
         else:
             RuntimeError('to must not happen')
 
-    if repo is None:
+    if repo is None and not dryrun:
         try:
             repo = entity.create_repo(
                 reponame,
@@ -157,12 +162,15 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol):
                            if 'message' in err]))
             raise RuntimeError(msg)
 
-    if repo is None:
+    if repo is None and not dryrun:
         raise RuntimeError(
             'something went wrong, we got no Github repository')
 
-    # report URL for given access protocol
-    return getattr(repo, '{}_url'.format(access_protocol)), False
+    if dryrun:
+        return '{}:github/.../{}'.format(access_protocol, reponame), False
+    else:
+        # report URL for given access protocol
+        return getattr(repo, '{}_url'.format(access_protocol)), False
 
 
 # presently only implemented method to turn subdataset paths into Github
@@ -298,9 +306,12 @@ class CreateSiblingGithub(Interface):
         for d, mp in toprocess:
             if sibling_name in d.repo.get_remotes():
                 if existing == 'error':
-                    raise ValueError(
-                        '{} already had a configured sibling "{}"'.format(
-                            d, sibling_name))
+                    msg = '{} already had a configured sibling "{}"'.format(
+                        d, sibling_name)
+                    if dryrun:
+                        lgr.error(msg)
+                    else:
+                        raise ValueError(msg)
                 elif existing == 'skip':
                     continue
             gh_reponame = '{}{}{}'.format(
@@ -309,52 +320,38 @@ class CreateSiblingGithub(Interface):
                 template_fx(mp))
             filtered.append((d, gh_reponame))
 
-        # we know everything we need
-        if dryrun:
-            return filtered
-
         # actually make it happen on Github
         rinfo = _make_github_repos(
             gh, github_user, github_passwd, github_organization, filtered,
-            existing, access_protocol)
+            existing, access_protocol, dryrun)
 
         # lastly configure the local datasets
-        res = []
         for d, url, existed in rinfo:
-            AddSibling()(
-                dataset=d,
-                name=sibling_name,
-                url=url,
-                recursive=False,
-                # TODO fetch=True, maybe only if one existed already
-                force=existing in {'reconfigure'})
-            res.append((d, url))
+            if not dryrun:
+                AddSibling()(
+                    dataset=d,
+                    name=sibling_name,
+                    url=url,
+                    recursive=False,
+                    # TODO fetch=True, maybe only if one existed already
+                    force=existing in {'reconfigure'})
 
         # TODO let submodule URLs point to Github (optional)
-        return res
+        return rinfo
 
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         res = assure_list(res)
         if args.dryrun:
-            if not len(res):
-                ui.message("Would not have done anything")
-            else:
-                ui.message(
-                    "Would create Github repo(s) as sibling '{}' for the "
-                    "following datasets under the effective Github "
-                    "user/organization".format(args.sibling_name))
-                for d, rname in res:
-                    ui.message(
-                        "{} <- '{}'".format(rname, d))
+            ui.message('DRYRUN -- Anticipated results:')
+        if not len(res):
+            ui.message("Nothing done")
         else:
-            if not len(res):
-                ui.message("No Github repositories were created")
-            else:
+            for d, url, existed in res:
                 ui.message(
-                    "'{}' siblings are now available at the following "
-                    "Github repo(s)".format(args.sibling_name))
-                for d, url in res:
-                    ui.message(
-                        "{} <- '{}'".format(url, d))
+                    "'{}'{} configured as sibling '{}' for {}".format(
+                        url,
+                        " (existing repository)" if existed else '',
+                        args.sibling_name,
+                        d))
