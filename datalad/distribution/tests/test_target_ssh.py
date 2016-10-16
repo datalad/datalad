@@ -256,7 +256,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(src_path, source=origin), recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))

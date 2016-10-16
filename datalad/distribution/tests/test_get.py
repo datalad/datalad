@@ -345,7 +345,7 @@ def test_get_mixed_hierarchy(src, path):
     origin.save(auto_add_changes=True)
 
     # now, install that thing:
-    ds, subds = install(path, source=src), recursive=True)
+    ds, subds = install(path, source=src, recursive=True)
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:

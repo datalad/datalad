@@ -37,7 +37,7 @@ from datalad.tests.utils import ok_clean_git, swallow_outputs
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(src_path, source=origin), recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
