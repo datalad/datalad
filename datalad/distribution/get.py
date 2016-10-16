@@ -250,7 +250,14 @@ class Get(Interface):
             annex_opts=None,
             annex_get_opts=None,
             jobs=None,
-            verbose=False):
+            verbose=False,
+            # internal -- instead of returning 'get'ed items, return final
+            # content_by_ds, unavailable_paths.  To be used by the call from
+            # Install.__call__ and done so to avoid creating another reusable
+            # function which would need to duplicate all this heavy list of
+            # kwargs
+            _return_paths=False
+    ):
 
         dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
         path = assure_list(path)
@@ -360,10 +367,13 @@ class Get(Interface):
         results = list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
                  get_data=get_data)))
+        # ??? should we in _return_paths case just return both content_by_ds
+        # and unavailable_paths may be so we provide consistent across runs output
+        # and then issue outside similar IncompleteResultsError?
         if unavailable_paths:  # and likely other error flags
             raise IncompleteResultsError(results)
         else:
-            return results
+            return content_by_ds if _return_paths else results
 
     @staticmethod
     def result_renderer_cmdline(res, args):

@@ -125,8 +125,6 @@ def install_necessary_subdatasets(ds, path, reckless):
     Dataset
       the last (deepest) subdataset, that was installed
     """
-    from .install import _install_subds_from_flexible_source
-
     assert ds.is_installed()
 
     # figuring out what dataset to start with:

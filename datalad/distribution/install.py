@@ -219,16 +219,24 @@ class Install(Interface):
                 # Also need to pass from get:
                 #  jobs
                 #  annex_get_opts
-                result = Get.__call__(
+                content_by_ds = Get.__call__(
                     to_get,
                     # description=description,
                     # if_dirty=if_dirty,
                     # save=save,
                     # git_clone_opts=git_clone_opts,
                     # annex_init_opts=annex_init_opts
+                    _return_paths=True,
                     **common_kwargs
                 )
-                installed_items += assure_list(result)
+
+                # compose content_by_ds into result
+                for dspath in sorted(content_by_ds):
+                    ds_ = Dataset(dspath)
+                    if ds_.is_installed():
+                        installed_items.append(ds_)
+                    else:
+                        lgr.warning("%s was not installed", ds_)
 
             return installed_items[0] \
                 if len(installed_items) == 1 else installed_items

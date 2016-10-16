@@ -192,7 +192,7 @@ def test_aggregation(path):
         subds.id)
 
     # now obtain a subdataset in the clone and the IDs should be updated
-    clone.install(source='sub')  # TEMP -- should work without source=. get is still buggy somewhere!
+    clone.install('sub')
     partial = get_metadata(clone, guess_type=False, ignore_cache=True)
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
@@ -267,7 +267,7 @@ def test_aggregation(path):
     # more tests on returned paths:
     assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
-    clone_sub = clone.install(source='sub')  # TEMP should work without source!  somewhere get is still buggy
+    clone_sub = clone.install('sub')
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
     # Test 'and' for multiple search entries
