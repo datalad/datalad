@@ -107,8 +107,10 @@ requires.update({
         'nose-timer',
         'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
-        # keyring)
-        'dbus-python',
+        # keyring)  but not installable on travis, IIRC since it needs connectivity
+        # to the dbus whenever installed or smth like that, thus disabled here
+        # but you might need it
+        # 'dbus-python',
     ],
     'devel-neuroimaging': [
         # Specifically needed for tests here (e.g. example scripts testing)
