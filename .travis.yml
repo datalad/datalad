@@ -27,6 +27,10 @@ matrix:
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
+    - _DATALAD_UPSTREAM_GITPYTHON=1
+  - python: 2.7
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
   - python: 2.7
@@ -89,6 +93,8 @@ before_install:
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
   - npm install grunt-cli
+  # Install optionally upstream current development so we are sure that they break nothing important for us
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
