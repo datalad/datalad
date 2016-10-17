@@ -90,10 +90,10 @@ Dataset argument
 
 All commands which operate with/on datasets (e.g., `install`, `uninstall`, etc.)
 have `dataset` argument (`-d` or `--dataset` in command line) which takes path
-to the dataset you want to operate on. If you specify dataset explicitly,
-then any relative path you provide as argument to the command will be taken
+to the dataset you want to operate on. If you specify a dataset explicitly,
+then any relative path you provide as an argument to the command will be taken
 relative to the top directory of that dataset.  If no dataset argument is
-provided, relative paths are taken relative to current directory.
+provided, relative paths are taken relative to the current directory.
 
 There are also some "shortcut" values for dataset argument you might find useful:
 

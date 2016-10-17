@@ -231,12 +231,12 @@ class Install(Interface):
                     # save=save,
                     # git_clone_opts=git_clone_opts,
                     # annex_init_opts=annex_init_opts
-                    _return_paths=True,
+                    _return_datasets=True,
                     **common_kwargs
                 )
 
                 # compose content_by_ds into result
-                for dspath in sorted(content_by_ds):
+                for dspath in content_by_ds:
                     ds_ = Dataset(dspath)
                     if ds_.is_installed():
                         installed_items.append(ds_)

@@ -256,7 +256,7 @@ class Get(Interface):
             # Install.__call__ and done so to avoid creating another reusable
             # function which would need to duplicate all this heavy list of
             # kwargs
-            _return_paths=False
+            _return_datasets=False
     ):
 
         dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
@@ -371,13 +371,13 @@ class Get(Interface):
         results = list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
                  get_data=get_data)))
-        # ??? should we in _return_paths case just return both content_by_ds
+        # ??? should we in _return_datasets case just return both content_by_ds
         # and unavailable_paths may be so we provide consistent across runs output
         # and then issue outside similar IncompleteResultsError?
         if unavailable_paths:  # and likely other error flags
             raise IncompleteResultsError(results)
         else:
-            return content_by_ds if _return_paths else results
+            return sorted(content_by_ds) if _return_datasets else results
 
     @staticmethod
     def result_renderer_cmdline(res, args):
