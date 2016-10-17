@@ -67,7 +67,7 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 
     # correct ls_json command in hook content (path wrapped in quotes)
     ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -r --json file \'%s\'.*' % target_path,
+                        '.*datalad ls -a --json file \'%s\'.*' % target_path,
                         re_=True,
                         flags=re.DOTALL)
 
