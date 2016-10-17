@@ -167,10 +167,6 @@ class Install(Interface):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
-        if path == []:
-            path = None
-        if path is None:
-            path = []
         path = assure_list(path)
 
         if not source and not path:
@@ -244,6 +240,11 @@ class Install(Interface):
 
             return installed_items[0] \
                 if len(installed_items) == 1 else installed_items
+
+        if source and path and len(path) > 1:
+            raise ValueError(
+                "install needs a single PATH when source is provided.  "
+                "Was given mutliple PATHs: %s" % str(path))
 
         # parameter constraints:
         if not source:

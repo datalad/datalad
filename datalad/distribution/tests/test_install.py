@@ -125,6 +125,8 @@ def test_guess_dot_git():
 ######################
 
 def test_insufficient_args():
+    assert_raises(InsufficientArgumentsError, install)
+    assert_raises(InsufficientArgumentsError, install, description="some")
     assert_raises(InsufficientArgumentsError, install, None)
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
@@ -160,6 +162,12 @@ def test_install_crcns(tdir, ds_path):
         with chpwd('all-nonrecursive'):
             get("crcns")
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
+        # and we could repeat installation and get the same result
+        ds1 = install(_path_("all-nonrecursive/crcns"))
+        ds2 = Dataset('all-nonrecursive').install('crcns')
+        ok_(ds1.is_installed())
+        eq_(ds1, ds2)
+        eq_(ds1.path, ds2.path)  # to make sure they are a single dataset
 
     # again, but into existing dataset:
     ds = create(ds_path)
@@ -442,10 +450,10 @@ def test_implicit_install(src, dst):
     assert_raises(InstallFailedError, ds.install, source='obscure')
 
     # install 3rd level and therefore implicitly the 2nd:
-    result = ds.get(path=opj("sub", "subsub"))
+    result = ds.install(path=opj("sub", "subsub"))
     ok_(sub.is_installed())
     ok_(subsub.is_installed())
-    eq_(result, [subsub])
+    eq_(result, subsub)
 
     # fail on obscure non-existing one in subds
     assert_raises(InstallFailedError, ds.install, source=opj('sub', 'obscure'))
@@ -494,11 +502,19 @@ def test_install_list(path, top_path):
     ok_(not sub1.is_installed())
     ok_(not sub2.is_installed())
 
+    # fails, when `source` is passed:
+    assert_raises(ValueError, ds.install,
+                  path=['subm 1', 'subm 2'],
+                  source='something')
+
     # now should work:
-    result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
+    result = ds.install(path=['subm 1', 'subm 2'])
     ok_(sub1.is_installed())
     ok_(sub2.is_installed())
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
+    # and if we request it again via get, result should be empty
+    get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
+    eq_(get_result, [])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -546,8 +562,8 @@ def test_install_recursive_repeat(src, path):
     ok_(sub1.repo.file_has_content('sub1file.txt') is True)
     ok_(sub2.repo.file_has_content('sub2file.txt') is True)
 
-    # install sub1 again, recursively:
-    top_ds.get('sub 1', recursive=True)
+    # install sub1 again, recursively and with data
+    top_ds.install('sub 1', recursive=True, get_data=True)
     ok_(subsub.is_installed())
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 
@@ -562,8 +578,9 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # install a list with valid and invalid items:
     with swallow_logs(new_level=logging.WARNING) as cml:
         with assert_raises(IncompleteResultsError) as cme:
-            ds.get(path=['subm 1', 'not_existing', path_outside, 'subm 2'],
-                   get_data=False)
+            ds.install(
+                path=['subm 1', 'not_existing', path_outside, 'subm 2'],
+                get_data=False)
         result = cme.exception.results
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
             cml.assert_logged(msg="ignored non-existing paths: {}\n".format(
@@ -579,6 +596,8 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # return of get is always a list, even if just one thing was gotten
     # in this case 'subm1' was already obtained above, so this will get this
     # content of the subdataset
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.install(path=['subm 1', 'not_existing'])
     with assert_raises(IncompleteResultsError) as cme:
         ds.get(path=['subm 1', 'not_existing'])
     result = cme.exception.results
@@ -607,6 +626,7 @@ def test_install_skip_failed_recursive(src, path):
         cml.assert_logged(
             msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
             regex=False, level='WARNING')
+
 
 @with_tree(tree={'top_file.txt': 'some',
                  'sub 1': {'sub1file.txt': 'something else',
