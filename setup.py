@@ -109,6 +109,10 @@ requires.update({
         # necessary for accessing SecretStorage keyring (system wide Gnome
         # keyring)
         'dbus-python',
+    ],
+    'devel-neuroimaging': [
+        # Specifically needed for tests here (e.g. example scripts testing)
+        'nibabel',
     ]
 })
 requires['devel'] = sum(list(requires.values()), [])
