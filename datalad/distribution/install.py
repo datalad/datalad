@@ -173,6 +173,25 @@ class Install(Interface):
             raise InsufficientArgumentsError(
                 "Please provide at least a source or a path")
 
+
+        ## Common kwargs to pass to underlying git/install calls.
+        #  They might need adjustments (e.g. for recursion_limit, but
+        #  otherwise would be applicable throughout
+        #
+        # There should have been more of common options!
+        # since underneath get could do similar installs, but now they
+        # have duplicated implementations which differ (e.g. get does not
+        # annex init installed annexes)
+        common_kwargs = dict(
+            get_data=get_data,
+            recursive=recursive,
+            recursion_limit=recursion_limit,
+            git_opts=git_opts,
+            annex_opts=annex_opts,
+            reckless=reckless,
+            jobs=jobs,
+        )
+
         # switch into scenario without --source:
         if source is None:
             # we need to collect URLs and paths
@@ -183,21 +202,7 @@ class Install(Interface):
                 (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
 
             installed_items = []
-
-            # There should have been more of common options!
-            # since underneath get could do similar installs, but now they
-            # have duplicated implementations which differ (e.g. get does not
-            # annex init installed annexes)
-            common_kwargs = dict(
-                dataset=dataset,
-                get_data=get_data,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                git_opts=git_opts,
-                annex_opts=annex_opts,
-                reckless=reckless,
-                jobs=jobs,
-            )
+            common_kwargs['dataset'] = dataset
 
             # first install, and then get
             for s in to_install:
@@ -426,6 +431,11 @@ class Install(Interface):
         else:
             installed_items.append(destination_dataset)
 
+        # we need to decrease the recursion limit, relative to
+        # subdatasets now
+        subds_recursion_limit = max(0, recursion_limit - 1) \
+                                  if isinstance(recursion_limit, int) \
+                                  else recursion_limit
         # Now, recursive calls:
         if recursive:
             if description:
@@ -442,19 +452,16 @@ class Install(Interface):
                 lgr.debug("Obtaining subdatasets of %s: %s",
                           destination_dataset,
                           subs)
+
+                kwargs = common_kwargs.copy()
+                kwargs['recursion_limit'] = subds_recursion_limit
                 rec_installed = Get.__call__(
                     subs,  # all at once
                     dataset=destination_dataset,
-                    recursive=True,
-                    # we need to decrease the recursion limit, relative to
-                    # subdatasets now
-                    recursion_limit=max(0, recursion_limit - 1) if isinstance(recursion_limit, int) else recursion_limit,
-                    get_data=get_data,
-                    git_opts=git_opts,
-                    annex_opts=annex_opts,
                     # TODO expose this
                     # yoh: exactly!
                     #annex_get_opts=annex_get_opts,
+                    **kwargs
                 )
                 # TODO do we want to filter this so `install` only returns
                 # the datasets?
@@ -465,7 +472,9 @@ class Install(Interface):
 
         if get_data:
             lgr.debug("Getting data of {0}".format(destination_dataset))
-            destination_dataset.get(curdir)
+            kwargs = common_kwargs.copy()
+            kwargs['recursive'] = False
+            destination_dataset.get(curdir, **kwargs)
 
         # everything done => save changes:
         if save and ds is not None:
