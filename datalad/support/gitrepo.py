@@ -399,13 +399,8 @@ class GitRepo(object):
     overridden accidentally by AnnexRepo.
 
     """
-    __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    # Disable automatic garbage and autopacking
-    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    # actually no need with default GitPython db backend not in memory
-    # default_git_odbt but still allows for faster testing etc.
-    # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
+    __slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):
@@ -447,6 +442,12 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
+
+        # Disable automatic garbage and autopacking
+        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # actually no need with default GitPython db backend not in memory
+        # default_git_odbt but still allows for faster testing etc.
+        # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
         if git_opts:
             lgr.warning("TODO: options passed to git are currently ignored.\n"
@@ -509,7 +510,10 @@ class GitRepo(object):
                     raise
 
         # inject git options into GitPython's git call wrapper:
-        self.repo.git._git_persistent_options = self._GIT_COMMON_OPTIONS
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # calls above from being actually executed (DryRunProtocol)
+        if self.repo is not None:
+            self.repo.git._git_persistent_options = self._GIT_COMMON_OPTIONS
 
     def clone(self, url, path):
         """Clone url into path

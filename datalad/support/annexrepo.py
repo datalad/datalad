@@ -671,13 +671,13 @@ class AnnexRepo(GitRepo):
         (stdout, stderr)
             output of the command call
         """
+        # TODO: We probably don't need it anymore
 
         if not self.is_direct_mode():
             lgr.warning("proxy() called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd="git annex proxy",
                                            msg="Proxy doesn't make sense"
                                                " if not in direct mode.")
-        # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
                                        annex_options=['--'] + git_cmd,
                                        **kwargs)
@@ -753,7 +753,7 @@ class AnnexRepo(GitRepo):
         """
         objects = []
         if batch:
-            objects = self._batched.get('find', path=self.path)(files)
+            objects = self._batched.get('find', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(files)
         else:
             for f in files:
                 try:
@@ -936,7 +936,7 @@ class AnnexRepo(GitRepo):
                 # Since backend will be critical for non-existing files
                 'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
-                git_options=git_options,
+                git_options=self._GIT_COMMON_OPTIONS + git_options,
                 annex_options=options,  # --raw ?
                 path=self.path,
                 json=True
@@ -1080,7 +1080,7 @@ class AnnexRepo(GitRepo):
         if not batch:
             json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
         else:
-            json_objects = self._batched.get('dropkey', annex_options=options, json=True, path=self.path)(keys)
+            json_objects = self._batched.get('dropkey', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(keys)
         for j in json_objects:
             assert j.get('success', True)
 
@@ -1269,7 +1269,7 @@ class AnnexRepo(GitRepo):
         if not batch:
             json_objects = self._run_annex_command_json('info', args=options + files)
         else:
-            json_objects = self._batched.get('info', annex_options=options, json=True, path=self.path)(files)
+            json_objects = self._batched.get('info', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(files)
 
         # Some aggressive checks. ATM info can be requested only per file
         # json_objects is a generator, let's keep it that way
@@ -1422,7 +1422,7 @@ class AnnexRepo(GitRepo):
             except CommandError:
                 return ''
         else:
-            return self._batched.get('contentlocation', path=self.path)(key)
+            return self._batched.get('contentlocation', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key)
 
     @normalize_paths(serialize=True)
     def is_available(self, file_, remote=None, key=False, batch=False):
@@ -1467,7 +1467,7 @@ class AnnexRepo(GitRepo):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(':'.join(annex_cmd), annex_cmd, path=self.path)(key_)
+            out = self._batched.get(':'.join(annex_cmd), annex_cmd, git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key_)
             try:
                 return {
                     '': False,  # when remote is misspecified ... stderr carries the msg
@@ -1769,7 +1769,7 @@ class BatchedAnnex(object):
         # TODO -- should get all those options about --debug and --backend which are used/composed
         # in AnnexRepo class
         lgr.debug("Initiating a new process for %s" % repr(self))
-        cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
+        cmd = ['git'] + self.git_options + \
               ['annex'] + self.annex_cmd + self.annex_options + ['--batch']  # , '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
