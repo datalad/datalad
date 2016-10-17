@@ -152,7 +152,7 @@ some of which you could also install from PyPi using pip  (prior installation of
 might be necessary)
 
 ```sh
-pip install -r requirements.txt
+pip install -r requirements-devel.txt
 ```
 
 and you will need to install recent git-annex using appropriate for your

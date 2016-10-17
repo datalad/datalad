@@ -91,7 +91,27 @@ requires = {
         'PyYAML',  # very optional
     ]
 }
+
 requires['full'] = sum(list(requires.values()), [])
+
+# Now add additional ones useful for development
+requires.update({
+    'devel-docs': [
+        # used for converting README.md -> .rst for long_description
+        'pypandoc',
+        # Documentation
+        'sphinx',
+        'sphinx-rtd-theme',
+    ],
+    'devel-utils': [
+        'nose-timer',
+        'line-profiler',
+        # necessary for accessing SecretStorage keyring (system wide Gnome
+        # keyring)
+        'dbus-python',
+    ]
+})
+requires['devel'] = sum(list(requires.values()), [])
 
 
 # let's not build manpages and examples automatically (gh-896)
