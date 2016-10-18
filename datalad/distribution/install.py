@@ -478,9 +478,10 @@ class Install(Interface):
 
         # everything done => save changes:
         if save and ds is not None:
-            # Note: The only possible changes are installed subdatasets, we
+            # Note: The only possible change is the installed subdataset, we
             # didn't know before.
-            lgr.info("Saving changes to {0}".format(ds))
+            lgr.info("Saving possible change to {0} installed {1}".format(
+                ds, relpath(path, ds.path)))
             ds.save(
                 message='[DATALAD] installed subdataset{0}:{1}'.format(
                     "s" if len(installed_items) > 1 else "",

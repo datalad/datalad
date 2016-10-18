@@ -230,8 +230,9 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
         clone_url = _clone_from_any_source(clone_urls, subds.path)
     except GitCommandError as e:
         raise InstallFailedError(
-            "Failed to install dataset %s from %s (%s)",
-            subds, clone_urls, e)
+            msg="Failed to install dataset %s from %s (%s)" % (
+                subds, clone_urls, exc_str(e))
+            )
     # do fancy update
     if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))

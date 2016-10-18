@@ -31,6 +31,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import with_tree
@@ -369,6 +370,7 @@ def test_install_recursive_with_data(src, path):
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
+    ok_clean_git(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
     if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
@@ -384,6 +386,16 @@ def test_install_into_dataset(source, top_path):
     ds.save('addsub')
     # now it is:
     ok_clean_git(ds.path, annex=False)
+
+    # but we could also save while installing and there should be no side-effect
+    # of saving any other changes if we state to not auto-save changes
+    # Create a dummy change
+    create_tree(ds.path, {'dummy.txt': 'buga'})
+    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    subds_ = ds.install("sub2", source=source, if_dirty='ignore')
+    eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
+    ok_clean_git(ds.path, untracked=['dummy.txt'])
+
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
