@@ -166,8 +166,12 @@ class Save(Interface):
         # CWD-related
 
         if auto_add_changes:
-            # use the dataset's base path to indiciate that everything
+            # use the dataset's base path to indicate that everything
             # should be saved
+            if files:
+                lgr.warning(
+                    "List of paths was provided to save but auto_add_changes "
+                    "was specified, so list of paths was ignored")
             files = [ds.path]
         else:
             # make sure we apply the usual path interpretation logic
