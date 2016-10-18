@@ -369,6 +369,8 @@ class Dataset(object):
         path = self.path
         sds_path = path if topmost else None
         while path:
+            # normalize the path after adding .. so we guaranteed to not
+            # follow into original directory if path itself is a symlink
             par_path = normpath(opj(path, pardir))
             sds_path_ = GitRepo.get_toppath(par_path)
             if sds_path_ is None:
@@ -391,12 +393,9 @@ class Dataset(object):
             # None was found
             return None
 
-        # I think we might have accounted for it with use of normpath there??
-        # if realpath(self.path) != self.path:
-        #     # we had symlinks in the path but sds_path would have not
-        #     # so let's get "symlinked" version of the superdataset path
-        #     sds_relpath = relpath(sds_path, realpath(self.path))
-        #     sds_path = normpath(opj(self.path, sds_relpath))
+        # No postprocessing now should be necessary since get_toppath
+        # tries its best to not resolve symlinks now
+
         return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):
