@@ -375,7 +375,9 @@ class Get(Interface):
         # and unavailable_paths may be so we provide consistent across runs output
         # and then issue outside similar IncompleteResultsError?
         if unavailable_paths:  # and likely other error flags
-            raise IncompleteResultsError(results)
+            if _return_datasets:
+                results = sorted(set(content_by_ds).difference(unavailable_paths))
+            raise IncompleteResultsError(results, failed=unavailable_paths)
         else:
             return sorted(content_by_ds) if _return_datasets else results
 

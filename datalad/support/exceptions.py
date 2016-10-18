@@ -182,9 +182,10 @@ class IncompleteResultsError(RuntimeError):
     Any results produced nevertheless are to be passed as `results`,
     and become available via the `results` attribute.
     """
-    def __init__(self, results, **kwargs):
-        super(IncompleteResultsError, self).__init__(**kwargs)
+    def __init__(self, results=None, failed=None, msg=None):
+        super(IncompleteResultsError, self).__init__(msg)
         self.results = results
+        self.failed = failed
 
 
 class InstallFailedError(CommandError):

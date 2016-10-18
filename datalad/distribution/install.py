@@ -32,8 +32,9 @@ from datalad.interface.common_opts import reckless_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import InstallFailedError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI
@@ -41,6 +42,7 @@ from datalad.support.network import is_datalad_compat_ri
 from datalad.support.network import get_local_file_url
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import single_or_plural
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -194,6 +196,7 @@ class Install(Interface):
         )
 
         installed_items = []
+        failed_items = []
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -218,16 +221,21 @@ class Install(Interface):
             # first install, and then get
             for s in to_install:
                 lgr.debug("Install passes into install source=%s", s)
-                result = Install.__call__(
-                                source=s,
-                                description=description,
-                                if_dirty=if_dirty,
-                                save=save,
-                                git_clone_opts=git_clone_opts,
-                                annex_init_opts=annex_init_opts,
-                                **common_kwargs
-                            )
-                installed_items += assure_list(result)
+                try:
+                    result = Install.__call__(
+                                    source=s,
+                                    description=description,
+                                    if_dirty=if_dirty,
+                                    save=save,
+                                    git_clone_opts=git_clone_opts,
+                                    annex_init_opts=annex_init_opts,
+                                    **common_kwargs
+                                )
+                    installed_items += assure_list(result)
+                except InstallFailedError as exc:
+                    lgr.warning("Installation of %s has failed: %s",
+                                s, exc_str(exc))
+                    failed_items.append(s)
 
             if to_get:
                 lgr.debug("Install passes into get %d items", len(to_get))
@@ -235,19 +243,24 @@ class Install(Interface):
                 # into underlying install-related calls.
                 # Also need to pass from get:
                 #  annex_get_opts
-                content_by_ds = Get.__call__(
-                    to_get,
-                    # description=description,
-                    # if_dirty=if_dirty,
-                    # save=save,
-                    # git_clone_opts=git_clone_opts,
-                    # annex_init_opts=annex_init_opts
-                    _return_datasets=True,
-                    **common_kwargs
-                )
+                try:
+                    installed_datasets = Get.__call__(
+                        to_get,
+                        # description=description,
+                        # if_dirty=if_dirty,
+                        # save=save,
+                        # git_clone_opts=git_clone_opts,
+                        # annex_init_opts=annex_init_opts
+                        _return_datasets=True,
+                        **common_kwargs
+                    )
+                except IncompleteResultsError as exc:
+                    lgr.warning("Some items failed to get: %s", exc_str(exc))
+                    installed_datasets = exc.results
+                    failed_items.extend(exc.failed)
 
                 # compose content_by_ds into result
-                for dspath in content_by_ds:
+                for dspath in installed_datasets:
                     ds_ = Dataset(dspath)
                     if ds_.is_installed():
                         installed_items.append(ds_)
@@ -255,7 +268,7 @@ class Install(Interface):
                         lgr.warning("%s was not installed", ds_)
 
             return Install._handle_and_return_installed_items(
-                ds, installed_items, save)
+                ds, installed_items, failed_items, save)
 
         if source and path and len(path) > 1:
             raise ValueError(
@@ -477,12 +490,37 @@ class Install(Interface):
             destination_dataset.get(curdir, **kwargs)
 
         return Install._handle_and_return_installed_items(
-            ds, installed_items, save)
+            ds, installed_items, failed_items, save)
 
     @staticmethod
-    def _handle_and_return_installed_items(ds, installed_items, save):
+    def _handle_and_return_installed_items(ds, installed_items, failed_items, save):
         if save and ds is not None:
             _save_installed_datasets(ds, installed_items)
+        if failed_items:
+            msg = ''
+            for act, l in (("succeeded", installed_items), ("failed", failed_items)):
+                if not l:
+                    continue
+                if msg:
+                    msg += ', and '
+                msg += "%s %s" % (
+                  single_or_plural("dataset", "datasets", len(l),
+                                   include_count=True),
+                  act)
+                paths = [relpath(i.path, ds.path)
+                         if hasattr(i, 'path')
+                         else i if not i.startswith(ds.path) else relpath(i, ds.path)
+                         for i in l]
+                msg += " (%s)" % (", ".join(paths))
+            msg += ' to install'
+
+            # we were asked for multiple installations
+            if installed_items or len(failed_items) > 1:
+                raise IncompleteResultsError(
+                    results=installed_items, failed=failed_items, msg=msg)
+            else:
+                raise InstallFailedError(msg=msg)
+
         return installed_items[0] \
             if len(installed_items) == 1 else installed_items
 

@@ -274,7 +274,8 @@ def main(args=None):
                 # as usual, but exit with an error
                 if hasattr(cmdlineargs, 'result_renderer'):
                     cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                lgr.error('could not perform all requested actions')
+                lgr.error('could not perform all requested actions: %s',
+                          exc.message)
                 sys.exit(1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))

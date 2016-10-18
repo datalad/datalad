@@ -404,6 +404,35 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+@skip_if_no_network
+@use_cassette('test_install_crcns')
+@with_tempfile
+def test_failed_install_multiple(top_path):
+    ds = create(top_path)
+
+    create(_path_(top_path, 'ds1'))
+    create(_path_(top_path, 'ds3'))
+    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+
+    # specify install with multiple paths and one non-existing
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
+
+    ok_clean_git(ds.path, annex=False)
+    # those which succeeded should be saved now
+    eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
+    # and those which didn't -- listed
+    eq_(set(cme.exception.failed), {'///nonexisting', _path_(top_path, 'ds2')})
+
+    # but if there was only a single installation requested -- it will be
+    # InstallFailedError to stay consistent with single install behavior
+    # TODO: unify at some point
+    with assert_raises(InstallFailedError) as cme:
+        ds.install('ds2')
+    with assert_raises(InstallFailedError) as cme:
+        ds.install('///nonexisting')
+
+
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):
