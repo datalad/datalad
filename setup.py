@@ -91,7 +91,33 @@ requires = {
         'PyYAML',  # very optional
     ]
 }
+
 requires['full'] = sum(list(requires.values()), [])
+
+# Now add additional ones useful for development
+requires.update({
+    'devel-docs': [
+        # used for converting README.md -> .rst for long_description
+        'pypandoc',
+        # Documentation
+        'sphinx',
+        'sphinx-rtd-theme',
+    ],
+    'devel-utils': [
+        'nose-timer',
+        'line-profiler',
+        # necessary for accessing SecretStorage keyring (system wide Gnome
+        # keyring)  but not installable on travis, IIRC since it needs connectivity
+        # to the dbus whenever installed or smth like that, thus disabled here
+        # but you might need it
+        # 'dbus-python',
+    ],
+    'devel-neuroimaging': [
+        # Specifically needed for tests here (e.g. example scripts testing)
+        'nibabel',
+    ]
+})
+requires['devel'] = sum(list(requires.values()), [])
 
 
 # let's not build manpages and examples automatically (gh-896)
