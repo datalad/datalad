@@ -54,6 +54,7 @@ from .utils import _get_flexible_url_candidates
 from .utils import _get_tracking_source
 from .utils import _clone_from_any_source
 from .utils import _handle_possible_annex_dataset
+from .utils import _save_installed_datasets
 
 __docformat__ = 'restructuredtext'
 
@@ -192,6 +193,17 @@ class Install(Interface):
             jobs=jobs,
         )
 
+        installed_items = []
+
+        # did we explicitly get a dataset to install into?
+        # if we got a dataset, path will be resolved against it.
+        # Otherwise path will be resolved first.
+        ds = None
+        if dataset is not None:
+            ds = require_dataset(dataset, check_installed=True,
+                                 purpose='installation')
+            handle_dirty_dataset(ds, if_dirty)
+
         # switch into scenario without --source:
         if source is None:
             # we need to collect URLs and paths
@@ -201,7 +213,6 @@ class Install(Interface):
                 ri = RI(urlpath)
                 (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
 
-            installed_items = []
             common_kwargs['dataset'] = dataset
 
             # first install, and then get
@@ -243,8 +254,8 @@ class Install(Interface):
                     else:
                         lgr.warning("%s was not installed", ds_)
 
-            return installed_items[0] \
-                if len(installed_items) == 1 else installed_items
+            return Install._handle_and_return_installed_items(
+                ds, installed_items, save)
 
         if source and path and len(path) > 1:
             raise ValueError(
@@ -268,17 +279,6 @@ class Install(Interface):
                 "installation `source` and destination `path` are identical. "
                 "If you are trying to add a subdataset simply use `save` %s".format(
                     path))
-
-        installed_items = []
-
-        # did we explicitly get a dataset to install into?
-        # if we got a dataset, path will be resolved against it.
-        # Otherwise path will be resolved first.
-        ds = None
-        if dataset is not None:
-            ds = require_dataset(dataset, check_installed=True,
-                                 purpose='installation')
-            handle_dirty_dataset(ds, if_dirty)
 
         # resolve the target location (if local) against the provided dataset
         # or CWD:
@@ -476,23 +476,15 @@ class Install(Interface):
             kwargs['recursive'] = False
             destination_dataset.get(curdir, **kwargs)
 
-        # everything done => save changes:
-        if save and ds is not None:
-            # Note: The only possible change is the installed subdataset, we
-            # didn't know before.
-            lgr.info("Saving possible change to {0} installed {1}".format(
-                ds, relpath(path, ds.path)))
-            ds.save(
-                message='[DATALAD] installed subdataset{0}:{1}'.format(
-                    "s" if len(installed_items) > 1 else "",
-                    linesep + linesep.join([str(i) for i in installed_items])),
-                auto_add_changes=False,
-                recursive=False)
+        return Install._handle_and_return_installed_items(
+            ds, installed_items, save)
 
-        if len(installed_items) == 1:
-            return installed_items[0]
-        else:
-            return installed_items
+    @staticmethod
+    def _handle_and_return_installed_items(ds, installed_items, save):
+        if save and ds is not None:
+            _save_installed_datasets(ds, installed_items)
+        return installed_items[0] \
+            if len(installed_items) == 1 else installed_items
 
     @staticmethod
     def result_renderer_cmdline(res, args):

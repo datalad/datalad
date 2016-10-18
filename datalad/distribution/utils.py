@@ -408,3 +408,17 @@ def _handle_possible_annex_dataset(dataset, reckless):
         if reckless:
             repo._run_annex_command('untrust', annex_options=['here'])
 
+
+def _save_installed_datasets(ds, installed_datasets):
+    paths = [relpath(subds.path, ds.path) for subds in installed_datasets]
+    paths_str = ", ".join(paths)
+    msg = "installed subdataset{}: {}".format(
+        "s" if len(paths_str) > 1 else "", paths_str)
+    lgr.info("Saving possible changes to {0} - {1}".format(
+        ds, msg))
+    ds.save(
+        files=paths,
+        message='[DATALAD] ' + msg,
+        auto_add_changes=False,
+        recursive=False)
+

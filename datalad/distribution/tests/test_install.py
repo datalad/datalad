@@ -396,6 +396,12 @@ def test_install_into_dataset(source, top_path):
     eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
+    # and we should achieve the same behavior if we create a dataset
+    # and then decide to "add" it
+    create(_path_(top_path, 'sub3'), if_dirty='ignore')
+    ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
+    ds.install('sub3', if_dirty='ignore')
+    ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
