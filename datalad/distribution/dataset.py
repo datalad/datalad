@@ -240,6 +240,7 @@ class Dataset(object):
           If True, recurse into all subdatasets and report them too.
         recursion_limit: int or None
           If not None, set the number of subdataset levels to recurse into.
+
         Returns
         -------
         list(Dataset paths) or None
@@ -533,7 +534,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     dataset : None or path or Dataset
       Some value identifying a dataset or `None`. In the latter case
       a dataset will be searched based on the process working directory.
-    check_installed : boold, optional
+    check_installed : bool, optional
       If True, an optional check whether the resolved dataset is
       properly installed will be performed.
     purpose : str, optional

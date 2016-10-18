@@ -305,6 +305,9 @@ class Install(Interface):
                     "invalid path argument {}: ({})".format(path, exc_str(e)))
             try:
                 # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                # yoh: path should be a local path, and mapping note within
+                #      SSHRI about mapping localhost:path to path is kinda
+                #      a peculiar use-case IMHO
                 path = resolve_path(path_ri.localpath, dataset)
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
@@ -367,9 +370,18 @@ class Install(Interface):
             # this is where it was installed from
             track_name, track_url = _get_tracking_source(destination_dataset)
             if track_url in candidate_sources or get_local_file_url(track_url):
+                # TODO: this one breaks "promise" assumptions of the repeated
+                # invocations of install.
+                # yoh thinks that we actually should be the ones to run update
+                # (without merge) after basic
+                # check that it is clean and up-to-date with its super dataset
+                # and if so, not return here but continue with errands (recursive
+                # installation and get_data) so we could provide the same
+                # result if we rerun the same install twice.
                 lgr.info(
                     "%s was already installed from %s. Use `update` to obtain "
-                    "latest updates",
+                    "latest updates, or `get` or `install` with a path, not URL, "
+                    "to (re)fetch data and / or subdatasets",
                     destination_dataset, track_url)
                 return destination_dataset
             else:
@@ -452,7 +464,10 @@ class Install(Interface):
         # Now, recursive calls:
         if recursive:
             if description:
+                # yoh: why?  especially if we somehow allow for templating them
+                # with e.g. '%s' to catch the subdataset path
                 lgr.warning("Description can't be assigned recursively.")
+
             subs = destination_dataset.get_subdatasets(
                 # yes, it does make sense to combine no recursion with
                 # recursion_limit: when the latter is 0 we get no subdatasets
