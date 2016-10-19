@@ -429,7 +429,7 @@ class Install(Interface):
                 reckless)
         else:
             # FLOW GUIDE: 2.
-            lgr.info("Installing dataset at: {0}".format(path))
+            lgr.info("Installing dataset at {0} from {1}".format(path, source))
 
             # Currently assuming there is nothing at the target to deal with
             # and rely on failures raising from the git call ...
