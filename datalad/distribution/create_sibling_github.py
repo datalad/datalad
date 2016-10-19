@@ -37,7 +37,7 @@ lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 def _get_github_entity(gh, cred, github_user, github_passwd, github_organization):
     # figure out authentication
     if not (github_user and github_passwd):
-        # access to the system secrects
+        # access to the system secrets
         if github_user:
             # check that they keystore knows about this user
             if github_user != cred.get('user', github_user):
