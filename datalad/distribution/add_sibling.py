@@ -175,7 +175,6 @@ class AddSibling(Interface):
                                " URL for {1} dataset(s). {2}".format(
                                    name, len(conflicting), conflicting))
 
-        runner = Runner()
         successfully_added = list()
         for repo_name in repos:
             repo = repos[repo_name]['repo']
@@ -184,15 +183,12 @@ class AddSibling(Interface):
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
-                cmd = ["git", "remote", "set-url", name, repos[repo_name]['url']]
+                repo.set_remote_url(name, repos[repo_name]['url'])
             else:
                 # add the remote
                 repo.add_remote(name, repos[repo_name]['url'])
             if pushurl:
-                cmd = ["git", "remote", "set-url", "--push", name,
-                       repos[repo_name]['pushurl']]
-                runner.run(cmd, cwd=repo.path)
-
+                repo.set_remote_url(name, repos[repo_name]['pushurl'], push=True)
             if fetch:
                 # fetch the remote so we are up to date
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)

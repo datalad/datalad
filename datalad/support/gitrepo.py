@@ -1315,6 +1315,26 @@ class GitRepo(object):
             else:
                 return None
 
+    def set_remote_url(self, name, url, push=False):
+        """Set the URL a remote is pointing to
+
+        Sets the URL of the remote `name`. Requires the remote to already exist.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        url: str
+        push: bool
+          if True, set the push URL, otherwise the fetch URL
+        """
+
+        cmd = ["git", "remote", "set-url"]
+        if push:
+            cmd.append("--push")
+        cmd += [name, url]
+        return self._git_custom_command('', cmd)
+
     def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
