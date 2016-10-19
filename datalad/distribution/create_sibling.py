@@ -26,7 +26,8 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
+from datalad.distribution.dataset import EnsureDataset, Dataset, \
+    datasetmethod, require_dataset
 from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
@@ -157,23 +158,10 @@ class CreateSibling(Interface):
             as a sibling (needs at least a name)""")
 
         # shortcut
-        ds = dataset
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='creating a sibling')
 
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-        if ds is None:
-            # try to find a dataset at or above CWD
-            current_dspath = GitRepo.get_toppath(abspath(getpwd()))
-            if current_dspath is None:
-                raise ValueError("""No dataset found
-                                 at or above {0}.""".format(getpwd()))
-            ds = Dataset(current_dspath)
-            lgr.debug("Resolved dataset for target creation: {0}".format(ds))
-        assert(ds is not None and sshurl is not None)
-
-        if not ds.is_installed():
-            raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
-        assert(ds.repo is not None)
+        assert(ds is not None and sshurl is not None and ds.repo is not None)
 
         # determine target parameters:
         sshri = RI(sshurl)
