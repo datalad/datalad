@@ -492,6 +492,13 @@ class RI(object):
         else:
             return self._fields[item]
 
+    def __setattr__(self, item, value):
+        if item.startswith('_') or item not in self._FIELDS:
+            super(RI, self).__setattr__(item, value)
+        else:
+            self._fields[item] = value
+            self._str = None
+
 
 class URL(RI):
     """Universal resource locator
