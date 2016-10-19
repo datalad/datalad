@@ -125,7 +125,7 @@ class SSHConnection(object):
         if not exists(self.ctrl_path):
             # set control options
             ctrl_options = ["-o", "ControlMaster=auto",
-                            "-o", "ControlPersist=yes"] + self.ctrl_options
+                            "-o", "ControlPersist=15m"] + self.ctrl_options
             # create ssh control master command
             cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
 
