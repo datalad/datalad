@@ -187,8 +187,7 @@ class AddSibling(Interface):
                 cmd = ["git", "remote", "set-url", name, repos[repo_name]['url']]
             else:
                 # add the remote
-                cmd = ["git", "remote", "add", name, repos[repo_name]['url']]
-            runner.run(cmd, cwd=repo.path)
+                repo.add_remote(name, repos[repo_name]['url'])
             if pushurl:
                 cmd = ["git", "remote", "set-url", "--push", name,
                        repos[repo_name]['pushurl']]
