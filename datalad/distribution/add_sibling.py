@@ -158,7 +158,8 @@ class AddSibling(Interface):
         already_existing = list()
         conflicting = list()
         for repo_name in repos:
-            repo = repos[repo_name]['repo']
+            repoinfo = repos[repo_name]
+            repo = repoinfo['repo']
             if name in repo.get_remotes():
                 already_existing.append(repo_name)
                 lgr.debug("""Remote '{0}' already exists
@@ -168,9 +169,9 @@ class AddSibling(Interface):
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if repos[repo_name]['url'].rstrip('/') != existing_url.rstrip('/') \
+                if repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and
-                            repos[repo_name]['pushurl'].rstrip('/') !=
+                            repoinfo['pushurl'].rstrip('/') !=
                                     existing_pushurl.rstrip('/')) \
                         or (pushurl and not existing_pushurl):
                     conflicting.append(repo_name)
@@ -182,18 +183,19 @@ class AddSibling(Interface):
 
         successfully_added = list()
         for repo_name in repos:
-            repo = repos[repo_name]['repo']
+            repoinfo = repos[repo_name]
+            repo = repoinfo['repo']
             if repo_name in already_existing:
                 if repo_name not in conflicting:
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
-                repo.set_remote_url(name, repos[repo_name]['url'])
+                repo.set_remote_url(name, repoinfo['url'])
             else:
                 # add the remote
-                repo.add_remote(name, repos[repo_name]['url'])
+                repo.add_remote(name, repoinfo['url'])
             if pushurl:
-                repo.set_remote_url(name, repos[repo_name]['pushurl'], push=True)
+                repo.set_remote_url(name, repoinfo['pushurl'], push=True)
             if fetch:
                 # fetch the remote so we are up to date
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)
@@ -210,7 +212,7 @@ class AddSibling(Interface):
                              "could be a pure git" % name)
                     lgr.debug("Exception was: %s" % exc_str(exc))
                 if as_common_datasrc:
-                    ri = RI(repos[repo_name]['url'])
+                    ri = RI(repoinfo['url'])
                     if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
                         # XXX what if there is already a special remote
                         # of this name? Above check for remotes ignores special
@@ -224,7 +226,7 @@ class AddSibling(Interface):
                             annex_options=[
                                 as_common_datasrc,
                                 'type=git',
-                                'location={}'.format(repos[repo_name]['url']),
+                                'location={}'.format(repoinfo['url']),
                                 'autoenable=true'])
                     else:
                         lgr.info(
