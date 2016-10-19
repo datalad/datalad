@@ -26,6 +26,8 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import as_common_datasrc
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.cmd import CommandError
@@ -110,11 +112,7 @@ class CreateSibling(Interface):
                 purpose. As with `target_url`, templates (same set of
                 placeholders) are supported.\n""",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("--recursive", "-r"),
-            action="store_true",
-            doc="""recursively create the publication target for all
-                subdatasets of `dataset`""",),
+        recursive=recursion_flag,
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
@@ -139,14 +137,17 @@ class CreateSibling(Interface):
             doc="""publish a web interface for the dataset with an
             optional user-specified name for the html at publication
             target. defaults to `index.html` at dataset root""",
-            constraints=EnsureBool() | EnsureStr()),)
+            constraints=EnsureBool() | EnsureStr()),
+        as_common_datasrc=as_common_datasrc,
+    )
 
     @staticmethod
     @datasetmethod(name='create_sibling')
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 existing='error', shared=False, ui=False):
+                 existing='error', shared=False, ui=False,
+                 as_common_datasrc=None):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -342,7 +343,8 @@ class CreateSibling(Interface):
                          pushurl=target_pushurl,
                          recursive=recursive,
                          fetch=True,
-                         force=existing in {'replace'})
+                         force=existing in {'replace'},
+                         as_common_datasrc=as_common_datasrc)
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]

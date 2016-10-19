@@ -116,3 +116,11 @@ verbose = Parameter(
     args=("-v", "--verbose",),
     action="store_true",
     doc="""print out more detailed information while executing a command""")
+
+
+as_common_datasrc = Parameter(
+    args=("--as-common-datasrc",),
+    metavar='NAME',
+    doc="""configure the created sibling as a common data source of the
+    dataset that can be automatically used by all consumers of the
+    dataset (technical: git-annex auto-enabled special remote)""")

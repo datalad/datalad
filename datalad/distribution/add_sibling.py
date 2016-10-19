@@ -22,8 +22,12 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.network import RI
+from datalad.support.network import URL
 from datalad.cmd import Runner
 from ..interface.base import Interface
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import as_common_datasrc
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -71,11 +75,7 @@ class AddSibling(Interface):
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("--recursive", "-r"),
-            action="store_true",
-            doc="""recursively add the sibling `name` to all subdatasets of
-                `dataset`""",),
+        recursive=recursion_flag,
         fetch=Parameter(
             args=("--fetch",),
             action="store_true",
@@ -84,15 +84,20 @@ class AddSibling(Interface):
             args=("--force", "-f",),
             action="store_true",
             doc="""if sibling `name` exists already, force to (re-)configure its
-                URLs""",),)
+                URLs""",),
+        as_common_datasrc=as_common_datasrc,
+    )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(name=None, url=None, dataset=None,
-                 pushurl=None, recursive=False, fetch=False, force=False):
+                 pushurl=None, recursive=False, fetch=False, force=False,
+                 as_common_datasrc=None):
 
         # TODO: Detect malformed URL and fail?
 
+        # XXX possibly fail if fetch is False and as_common_datasrc
+        # not yet sure if that is an error
         if name is None or (url is None and pushurl is None):
             raise ValueError("""insufficient information to add a sibling
                 (needs at least a dataset, a name and an URL).""")
@@ -204,6 +209,28 @@ class AddSibling(Interface):
                     lgr.info("Failed to enable annex remote %s, "
                              "could be a pure git" % name)
                     lgr.debug("Exception was: %s" % exc_str(exc))
+                if as_common_datasrc:
+                    ri = RI(repos[repo_name]['url'])
+                    if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
+                        # XXX what if there is already a special remote
+                        # of this name? Above check for remotes ignores special
+                        # remotes. we need to `git annex dead REMOTE` on reconfigure
+                        # before we can init a new one
+                        # XXX except it is now enough
+
+                        # make special remote of type=git (see #335)
+                        repo._run_annex_command(
+                            'initremote',
+                            annex_options=[
+                                as_common_datasrc,
+                                'type=git',
+                                'location={}'.format(repos[repo_name]['url']),
+                                'autoenable=true'])
+                    else:
+                        lgr.info(
+                            'Not configuration "%s" as a common data source, '
+                            'URL protocol is not http or https',
+                            name)
             successfully_added.append(repo_name)
 
         return successfully_added
