@@ -16,23 +16,26 @@ from os.path import exists
 from os.path import isdir
 from os.path import join as opj
 from os.path import islink
+from os.path import isabs
 from os.path import relpath
-from os.path import pardir
 from os.path import curdir
+from os.path import normpath
 
 from six.moves.urllib.parse import quote as urlquote
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
-from datalad.support.network import is_url
+from datalad.support.network import PathRI
 from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
+from datalad.utils import knows_annex
 from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import Dataset
@@ -102,7 +105,7 @@ def get_git_dir(path):
 
 # TODO: evolved to sth similar to get_containing_subdataset. Therefore probably
 # should move into this one as an option. But: consider circular imports!
-def install_necessary_subdatasets(ds, path):
+def install_necessary_subdatasets(ds, path, reckless):
     """Installs subdatasets of `ds`, that are necessary to obtain in order
     to have access to `path`.
 
@@ -116,14 +119,13 @@ def install_necessary_subdatasets(ds, path):
     ----------
     ds: Dataset
     path: str
+    reckless: bool
 
     Returns
     -------
     Dataset
       the last (deepest) subdataset, that was installed
     """
-    from .install import _install_subds_from_flexible_source
-
     assert ds.is_installed()
 
     # figuring out what dataset to start with:
@@ -147,14 +149,16 @@ def install_necessary_subdatasets(ds, path):
                  cur_subds,
                  ' in order to get %s' % path if cur_subds.path != path else '')
         # get submodule info
-        submodule = [sm for sm in cur_par_ds.repo.get_submodules()
+        submodules = cur_par_ds.repo.get_submodules()
+        submodule = [sm for sm in submodules
                      if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
         # install using helper that give some flexibility regarding where to
         # get the module from
         _install_subds_from_flexible_source(
             cur_par_ds,
             submodule.path,
-            submodule.url)
+            submodule.url,
+            reckless)
 
         cur_par_ds = cur_subds
 
@@ -191,35 +195,11 @@ def _get_git_url_from_source(source):
     return source
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url):
+def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
     """Tries to obtain a given subdataset from several meaningful locations"""
     # compose a list of candidate clone URLs
-    clone_urls = []
-    # if we have a remote, let's check the location of that remote
-    # for the presence of the desired submodule
-    remote_name, remote_url = _get_tracking_source(ds)
-    # remember suffix
-    url_suffix = ''
-    if remote_url:
-        if remote_url.rstrip('/').endswith('/.git'):
-            url_suffix = '/.git'
-            remote_url = remote_url[:-5]
-        # attempt: submodule checkout at parent remote URL
-        # We might need to quote sm_path portion, e.g. for spaces etc
-        if isinstance(RI(remote_url), URL):
-            sm_path_url = urlquote(sm_path)
-        else:
-            sm_path_url = sm_path
-        clone_urls.append('{0}/{1}{2}'.format(
-            remote_url, sm_path_url, url_suffix))
-    # attempt: configured submodule URL
-    # TODO: consider supporting DataLadRI here?  or would confuse
-    #  git and we wouldn't want that (i.e. not allow pure git clone
-    #  --recursive)
-    clone_urls += _get_flexible_url_candidates(
-        sm_url,
-        remote_url if remote_url else ds.path,
-        url_suffix)
+    clone_urls = _get_flexible_source_candidates_for_submodule(
+        ds, sm_path, sm_url)
 
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
@@ -227,8 +207,9 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url):
         clone_url = _clone_from_any_source(clone_urls, subds.path)
     except GitCommandError as e:
         raise InstallFailedError(
-            "Failed to install dataset %s from %s (%s)",
-            subds, clone_urls, e)
+            msg="Failed to install %s from %s (%s)" % (
+                subds, clone_urls, exc_str(e))
+            )
     # do fancy update
     if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
@@ -237,6 +218,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url):
         # submodule is brand-new and previously unknown
         ds.repo.add_submodule(sm_path, url=clone_url)
     _fixup_submodule_dotgit_setup(ds, sm_path)
+    _handle_possible_annex_dataset(subds, reckless)
     return subds
 
 
@@ -257,40 +239,94 @@ def _get_tracking_source(ds):
     return remote_name, remote_url
 
 
-def _get_flexible_url_candidates(url, base_url=None, url_suffix=''):
+def _get_flexible_source_candidates(src, base_url=None):
+    """Get candidates to try cloning from.
+
+    Primarily to mitigate the problem that git doesn't append /.git
+    while cloning from non-bare repos over dummy protocol (http*).  Also to
+    simplify creation of urls whenever base url and relative path within it
+    provided
+
+    Parameters
+    ----------
+    src : string or RI
+      Full or relative (then considered within base_url if provided) path
+    base_url : string or RI, optional
+
+    Returns
+    -------
+    candidates : list of str
+      List of RIs (path, url, ssh targets) to try to install from
+    """
     candidates = []
-    if url.startswith('/') or is_url(url):
-        # this seems to be an absolute location -> take as is
-        candidates.append(url)
-        # additionally try to consider .git:
-        if not url.rstrip('/').endswith('/.git'):
-            candidates.append(
-                '{0}/.git'.format(url.rstrip('/')))
-    else:
-        # need to resolve relative URL
-        base_url_l = base_url.split('/')
-        url_l = url.split('/')
-        for i, c in enumerate(url_l):
-            if c == pardir:
-                base_url_l = base_url_l[:-1]
-            else:
-                candidates.append('{0}/{1}{2}'.format(
-                    '/'.join(base_url_l),
-                    '/'.join(url_l[i:]),
-                    url_suffix))
-                break
-    # TODO:
-    # here clone_urls might contain degenerate urls which should be
-    # normalized and not added into the pool of the ones to try if already
-    # there, e.g. I got
-    #  ['http://datasets.datalad.org/crcns/aa-1/.git', 'http://datasets.datalad.org/crcns/./aa-1/.git']
-    # upon  install aa-1
+
+    ri = RI(src)
+    if isinstance(ri, PathRI) and not isabs(ri.path) and base_url:
+        ri = RI(base_url)
+        if ri.path.endswith('/.git'):
+            base_path = ri.path[:-5]
+            base_suffix = '.git'
+        else:
+            base_path = ri.path
+            base_suffix = ''
+        ri.path = normpath(opj(base_path, src, base_suffix))
+
+    src = str(ri)
+
+    candidates.append(src)
+    if isinstance(ri, URL):
+        if ri.scheme in {'http', 'https'}:
+            # additionally try to consider .git:
+            if not src.rstrip('/').endswith('/.git'):
+                candidates.append(
+                    '{0}/.git'.format(src.rstrip('/')))
 
     # TODO:
     # We need to provide some error msg with InstallFailedError, since now
     # it just swallows everything.
+    # yoh: not sure if this comment applies here, but could be still applicable
+    # outisde
 
     return candidates
+
+
+def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
+    """Retrieve candidates from where to install the submodule
+
+    Even if url for submodule is provided explicitly -- first tries urls under
+    parent's module tracking branch remote.
+
+    TODO: reconsider?  yoh just maintained prev behavior for now
+    """
+    clone_urls = []
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+    remote_name, remote_url = _get_tracking_source(ds)
+
+    # Directly on parent's ds url
+    if remote_url:
+        # attempt: submodule checkout at parent remote URL
+        # We might need to quote sm_path portion, e.g. for spaces etc
+        if isinstance(RI(remote_url), URL):
+            sm_path_url = urlquote(sm_path)
+        else:
+            sm_path_url = sm_path
+
+        clone_urls += [
+            u for u in _get_flexible_source_candidates(sm_path_url, remote_url)
+            if u not in clone_urls
+            ]
+
+    # attempt: provided (configured?) submodule URL
+    # TODO: consider supporting DataLadRI here?  or would confuse
+    #  git and we wouldn't want that (i.e. not allow pure git clone
+    #  --recursive)
+    if sm_url:
+        clone_urls += _get_flexible_source_candidates(
+            sm_url,
+            remote_url if remote_url else ds.path)
+
+    return clone_urls
 
 
 def _clone_from_any_source(sources, dest):
@@ -351,7 +387,7 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
+def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None):
     content_by_ds = {}
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return content_by_ds
@@ -367,7 +403,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             try:
                 lgr.info("Installing subdataset %s", subds.path)
                 subds = _install_subds_from_flexible_source(
-                    ds, sub.path, sub.url)
+                    ds, sub.path, sub.url, reckless)
                 # we want the entire thing, but mark this subdataset
                 # as automatically installed
                 content_by_ds[subds.path] = [curdir]
@@ -382,6 +418,38 @@ def _recursive_install_subds_underneath(ds, recursion_limit, start=None):
             # we can skip the start expression, we know we are within
             content_by_ds.update(_recursive_install_subds_underneath(
                 subds,
-                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit
+                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
+                reckless=reckless
             ))
     return content_by_ds
+
+
+def _handle_possible_annex_dataset(dataset, reckless):
+    # in any case check whether we need to annex-init the installed thing:
+    if knows_annex(dataset.path):
+        # init annex when traces of a remote annex can be detected
+        if reckless:
+            lgr.debug(
+                "Instruct annex to hardlink content in %s from local "
+                "sources, if possible (reckless)", dataset.path)
+            dataset.config.add(
+                'annex.hardlink', 'true', where='local', reload=True)
+        lgr.debug("Initializing annex repo at %s", dataset.path)
+        repo = AnnexRepo(dataset.path, init=True)
+        if reckless:
+            repo._run_annex_command('untrust', annex_options=['here'])
+
+
+def _save_installed_datasets(ds, installed_datasets):
+    paths = [relpath(subds.path, ds.path) for subds in installed_datasets]
+    paths_str = ", ".join(paths)
+    msg = "installed subdataset{}: {}".format(
+        "s" if len(paths_str) > 1 else "", paths_str)
+    lgr.info("Saving possible changes to {0} - {1}".format(
+        ds, msg))
+    ds.save(
+        files=paths,
+        message='[DATALAD] ' + msg,
+        auto_add_changes=False,
+        recursive=False)
+

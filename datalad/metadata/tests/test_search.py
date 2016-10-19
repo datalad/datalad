@@ -118,7 +118,7 @@ def _check_mocked_install(central_dspath, mock_install):
     assert_equal(
         list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
-    mock_install.assert_called_once_with('///', path=central_dspath)
+    mock_install.assert_called_once_with(central_dspath, source='///')
 
 
 @with_tempfile
@@ -149,3 +149,12 @@ def test_our_metadataset_search(tdir):
         out = cmo.out
     assert yaml.load(out)
 
+
+@with_tempfile
+def test_search_non_dataset(tdir):
+    from datalad.support.gitrepo import GitRepo
+    GitRepo(tdir, create=True)
+    with assert_raises(NoDatasetArgumentFound) as cme:
+        list(search('smth', dataset=tdir))
+    # Should instruct user how that repo could become a datalad dataset
+    assert_in("datalad create --force", str(cme.exception))

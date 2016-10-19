@@ -267,14 +267,15 @@ def main(args=None):
             except InsufficientArgumentsError as exc:
                 # if the func reports inappropriate usage, give help output
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-                cmdlineargs.subparser.print_usage()
-                sys.exit(1)
+                cmdlineargs.subparser.print_usage(sys.stderr)
+                sys.exit(2)
             except IncompleteResultsError as exc:
                 # we didn't get everything we wanted: still present what we got
                 # as usual, but exit with an error
                 if hasattr(cmdlineargs, 'result_renderer'):
                     cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                lgr.error('could not perform all requested actions')
+                lgr.error('could not perform all requested actions: %s',
+                          exc.message)
                 sys.exit(1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))

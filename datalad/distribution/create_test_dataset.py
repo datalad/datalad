@@ -93,9 +93,10 @@ def _makeds(path, levels, ds=None):
         assert ds.is_installed()
         rpath = os.path.relpath(path, ds.path)
         out = install(
-            opj(os.curdir, rpath),
-            dataset=ds,
-            path=rpath)
+            rpath,
+            source=opj(os.curdir, rpath),
+            dataset=ds
+            )
         ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
 
     if not levels:

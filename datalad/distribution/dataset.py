@@ -240,6 +240,7 @@ class Dataset(object):
           If True, recurse into all subdatasets and report them too.
         recursion_limit: int or None
           If not None, set the number of subdataset levels to recurse into.
+
         Returns
         -------
         list(Dataset paths) or None
@@ -369,7 +370,9 @@ class Dataset(object):
         path = self.path
         sds_path = path if topmost else None
         while path:
-            par_path = opj(path, pardir)
+            # normalize the path after adding .. so we guaranteed to not
+            # follow into original directory if path itself is a symlink
+            par_path = normpath(opj(path, pardir))
             sds_path_ = GitRepo.get_toppath(par_path)
             if sds_path_ is None:
                 # no more parents, use previous found
@@ -391,11 +394,9 @@ class Dataset(object):
             # None was found
             return None
 
-        if realpath(self.path) != self.path:
-            # we had symlinks in the path but sds_path would have not
-            # so let's get "symlinked" version of the superdataset path
-            sds_relpath = relpath(sds_path, realpath(self.path))
-            sds_path = normpath(opj(self.path, sds_relpath))
+        # No postprocessing now should be necessary since get_toppath
+        # tries its best to not resolve symlinks now
+
         return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):
@@ -533,7 +534,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     dataset : None or path or Dataset
       Some value identifying a dataset or `None`. In the latter case
       a dataset will be searched based on the process working directory.
-    check_installed : boold, optional
+    check_installed : bool, optional
       If True, an optional check whether the resolved dataset is
       properly installed will be performed.
     purpose : str, optional

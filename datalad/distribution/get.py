@@ -26,6 +26,7 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
 from datalad.interface.common_opts import jobs_opt
+from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureChoice
@@ -224,6 +225,7 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        reckless=reckless_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -243,11 +245,19 @@ class Get(Interface):
             recursive=False,
             recursion_limit=None,
             get_data=True,
+            reckless=False,
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
             jobs=None,
-            verbose=False):
+            verbose=False,
+            # internal -- instead of returning 'get'ed items, return final
+            # content_by_ds, unavailable_paths.  To be used by the call from
+            # Install.__call__ and done so to avoid creating another reusable
+            # function which would need to duplicate all this heavy list of
+            # kwargs
+            _return_datasets=False
+    ):
 
         dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
         path = assure_list(path)
@@ -277,8 +287,11 @@ class Get(Interface):
             _sort_paths_into_datasets(resolved_paths,
                                       recursive=recursive,
                                       recursion_limit=recursion_limit)
-        lgr.debug("Found %i existing dataset(s) to get content in",
-                  len(content_by_ds))
+        lgr.debug(
+            "Found %i existing dataset(s) to get content in "
+            "and %d unavailable paths",
+            len(content_by_ds), len(unavailable_paths)
+        )
         # IMPORTANT NOTE re `content_by_ds`
         # each key is a subdataset that we need to get something in
         # if the value[0] is the subdataset's path, we want all of it
@@ -298,7 +311,7 @@ class Get(Interface):
             # any dataset at the very top
             assert ds.is_installed()
             # now actually obtain whatever is necessary to get to this path
-            containing_ds = install_necessary_subdatasets(ds, path)
+            containing_ds = install_necessary_subdatasets(ds, path, reckless)
             if containing_ds.path != ds.path:
                 lgr.debug("Installed %s to fulfill request for content for "
                           "path %s", containing_ds, path)
@@ -321,14 +334,19 @@ class Get(Interface):
                         # a non-directory cannot have content underneath
                         continue
                     subds = Dataset(subdspath)
-                    lgr.info("Obtaining content in %s underneath %s recursively",
-                             subds, content_path)
+                    lgr.info(
+                        "Obtaining %s %s recursively",
+                        subds,
+                        ("underneath %s" % content_path
+                         if subds.path != content_path
+                         else ""))
                     cbysubds = _recursive_install_subds_underneath(
                         subds,
                         # `content_path` was explicitly given as input
                         # we count recursions from the input, hence we
                         # can start with the full number
                         recursion_limit,
+                        reckless,
                         # protect against magic marker misinterpretation
                         # only relevant for _get, hence replace here
                         start=content_path if content_path != curdir else None)
@@ -353,10 +371,15 @@ class Get(Interface):
         results = list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
                  get_data=get_data)))
+        # ??? should we in _return_datasets case just return both content_by_ds
+        # and unavailable_paths may be so we provide consistent across runs output
+        # and then issue outside similar IncompleteResultsError?
         if unavailable_paths:  # and likely other error flags
-            raise IncompleteResultsError(results)
+            if _return_datasets:
+                results = sorted(set(content_by_ds).difference(unavailable_paths))
+            raise IncompleteResultsError(results, failed=unavailable_paths)
         else:
-            return results
+            return sorted(content_by_ds) if _return_datasets else results
 
     @staticmethod
     def result_renderer_cmdline(res, args):

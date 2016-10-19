@@ -125,7 +125,11 @@ class Search(Interface):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
-                raise NoDatasetArgumentFound
+                raise NoDatasetArgumentFound(
+                    "There seems to be a repository which lacks a DataLad's "
+                    "dataset id, thus not considered to be a dataset. "
+                    "You can use 'datalad create --force %s' command to "
+                    "'initiate' that repository as a DataLad dataset" % ds.path)
         except NoDatasetArgumentFound:
             exc_info = sys.exc_info()
             if dataset is None:
@@ -162,7 +166,7 @@ class Search(Interface):
                              "meta-dataset under %r?"
                              % LOCAL_CENTRAL_PATH):
                     from datalad.api import install
-                    central_ds = install('///', path=LOCAL_CENTRAL_PATH)
+                    central_ds = install(LOCAL_CENTRAL_PATH, source='///')
                     ui.message(
                         "You can in future refer to that dataset using -d///"
                     )

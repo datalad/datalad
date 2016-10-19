@@ -25,6 +25,7 @@ Commands and API
 .. toctree::
    :maxdepth: 2
 
+   basics
    cmdline
    modref
 

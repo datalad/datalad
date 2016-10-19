@@ -116,7 +116,7 @@ def test_basic_metadata(path):
          'dcterms:hasPart', 'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
-    sibling = install(opj(path, 'origin'), path=opj(path, 'sibling'), )
+    sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
@@ -170,7 +170,7 @@ def test_aggregation(path):
     ds.save('with aggregated meta data', auto_add_changes=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
-    clone = install(ds.path, path=opj(path, 'clone'))
+    clone = install(opj(path, 'clone'), source=ds.path)
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
