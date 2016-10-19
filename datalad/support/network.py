@@ -357,6 +357,10 @@ class RI(object):
             # RI class was used as a factory
             cls = _guess_ri_cls(ri)
 
+        if cls is RI:
+            # should we fail or just pretend we are nothing??? ;-) XXX
+            raise ValueError("Could not deduce RI type for %r" % (ri,))
+
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
         ri_obj._str = ri
