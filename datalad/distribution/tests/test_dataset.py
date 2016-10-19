@@ -298,17 +298,19 @@ def test_require_dataset(path):
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
     ds = Dataset(path)
+    assert_equal(ds.id, None)
+    ds.create()
     dsorigid = ds.id
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
     assert_equal(len(ds.id), 36)
-    # creating a new object for the same path (no ID on record)
-    # does not yields the same ID
+    # creating a new object for the same path
+    # yields the same ID
     newds = Dataset(path)
     assert_false(ds is newds)
-    assert_true(ds.id != newds.id)
+    assert_equal(ds.id, newds.id)
     # recreating the dataset does NOT change the id
-    ds.create(no_annex=True)
+    ds.create(no_annex=True, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
     ds.create(force=True)

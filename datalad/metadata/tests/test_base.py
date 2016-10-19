@@ -16,7 +16,6 @@ import os
 from mock import patch
 from operator import itemgetter
 from os.path import join as opj, exists
-from six import PY2
 
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
@@ -30,6 +29,8 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
@@ -104,7 +105,7 @@ def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()),
-                 ['@context', '@id', 'dcterms:conformsTo', 'type'])
+                 ['@context', 'dcterms:conformsTo', 'type'])
     ds.create(force=True, save=False)
     # with subdataset
     sub = ds.create('sub', force=True, if_dirty='ignore')
@@ -297,15 +298,19 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     subds = ds.create('sub', force=True, if_dirty='ignore')
     subds.repo.remove(opj('.datalad', 'config'))
     subds.save()
+    # subs is no longer a dataset now -> makes it and everything below
+    # vanish from metadata
     assert_false(exists(opj(subds.path, '.datalad', 'config')))
     subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+
     # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second native set for the topmost dataset
+    # should yield 3 meta data sets, one implicit, and two native ones for the
+    # mother
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+    assert_equal(len(meta), 3)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
         assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
@@ -316,14 +321,11 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     assert res1
 
     # and let's see now if we wouldn't fail if dataset is duplicate if we
-    # install the same dataset twice
+    # install the same non-dataset twice
     subds_clone = ds.install(source=subds.path, path="subds2")
     with swallow_outputs():
         res2 = list(search_('.', regex=True, dataset=ds))
-    assert_equal(len(res1) + 1, len(res2))
-    assert_equal(
-        set(map(itemgetter(0), res1)).union({subds_clone.path}),
-        set(map(itemgetter(0), res2)))
+    assert_equal(len(res1), len(res2))
 
 
 @with_tempfile(mkdir=True)
@@ -352,3 +354,33 @@ def test_cached_load_document(tdir):
             schema = _cached_load_document("http://schema.org/")
             assert_equal(schema, target_schema)
             assert_not_in("cannot load cache from", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_ignore_nondatasets(path):
+    # we want to ignore the version/commits for this test
+    def _kill_time(meta):
+        for m in meta:
+            for k in ('version', 'dcterms:modified'):
+                if k in m:
+                    del m[k]
+        return meta
+
+    ds = Dataset(path).create()
+    meta = _kill_time(get_metadata(ds))
+    n_subm = 0
+    # placing another repo in the dataset has no effect on metadata
+    for cls, subpath in ((GitRepo, 'subm'), (AnnexRepo, 'annex_subm')):
+        subm_path = opj(ds.path, subpath)
+        r = cls(subm_path, create=True)
+        with open(opj(subm_path, 'test'), 'w') as f:
+            f.write('test')
+        r.add('test')
+        r.commit('some')
+        assert_true(Dataset(subm_path).is_installed())
+        assert_equal(meta, _kill_time(get_metadata(ds)))
+        # making it a submodule has no effect either
+        ds.save(auto_add_changes=True)
+        assert_equal(len(ds.get_subdatasets()), n_subm + 1)
+        assert_equal(meta, _kill_time(get_metadata(ds)))
+        n_subm += 1

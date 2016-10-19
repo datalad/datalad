@@ -10,7 +10,6 @@
 """
 
 import logging
-import uuid
 from functools import wraps
 from os.path import abspath
 from os.path import commonprefix
@@ -151,15 +150,11 @@ class Dataset(object):
         Returns
         -------
         str
-          This is either a stored UUID, or if there is none: the UUID of the
-          dataset's annex, or a new generated UUID.
+          This is either a stored UUID, or `None`.
         """
         if self._id is None:
             # if we have one on record, stick to it!
             self._id = self.config.get('datalad.dataset.id', None)
-            if self._id is None:
-                # fall back on self-made ID
-                self._id = uuid.uuid1().urn.split(':')[-1]
         return self._id
 
     @property

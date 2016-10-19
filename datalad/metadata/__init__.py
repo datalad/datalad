@@ -72,13 +72,15 @@ def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
 
-    return {
+    meta = {
         "@context": "http://schema.org/",
-        "@id": ds_identifier,
         "type": "Dataset",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
+    if ds_identifier is not None:
+        meta["@id"] = ds_identifier
+    return meta
 
 
 def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
@@ -144,12 +146,13 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     subdss = []
     # we only want immediate subdatasets
     for subds in subdatasets:
-        subds_id = subds.id
+        if subds.id is None:
+            continue
         submeta = {
             'location': relpath(subds.path, ds.path),
             'type': 'Dataset'}
-        if not subds_id.startswith('_:'):
-            submeta['@id'] = subds_id
+        if subds.id:
+            submeta['@id'] = subds.id
         subdss.append(submeta)
     if len(subdss):
         if len(subdss) == 1:
@@ -258,7 +261,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     # for any subdataset that is actually registered (avoiding stale copies)
     for subds in subdss:
         subds_path = relpath(subds.path, ds.path)
-        if ignore_cache and subds.is_installed():
+        if ignore_cache and subds.is_installed() and subds.id:
             # simply pull meta data from actual subdataset and go to next part
             subds_meta = get_metadata(
                 subds, guess_type=guess_type,
@@ -298,7 +301,9 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             for md in subds_meta:
                 cand_id = md.get('dcterms:isPartOf', None)
                 if cand_id == ds_identifier and '@id' in md:
-                    has_part[subds_path]['@id'] = md['@id']
+                    partinfo = has_part.get(subds_path, {})
+                    partinfo['@id'] = md['@id']
+                    has_part[subds_path] = partinfo
                     break
 
         # hand over subdataset meta data
