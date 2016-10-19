@@ -187,7 +187,7 @@ class SSHManager(object):
         if self._socket_dir is None:
             # TODO: centralize AppDirs (=> datalad.config?)
             from appdirs import AppDirs
-            self._socket_dir = AppDirs('datalad', 'datalad.org').user_config_dir
+            self._socket_dir = AppDirs('datalad', 'datalad.org').user_cache_dir
             assure_dir(self._socket_dir)
         return self._socket_dir
 
