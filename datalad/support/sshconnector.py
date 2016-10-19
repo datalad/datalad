@@ -15,6 +15,7 @@ git calls to a ssh remote without the need to reauthenticate.
 
 import logging
 from os.path import exists
+from os.path import join as opj
 from subprocess import Popen
 from shlex import split as sh_split
 
@@ -112,9 +113,19 @@ class SSHConnection(object):
         connection, if it is not there already.
         """
 
+        if exists(self.ctrl_path):
+            # check whether controlmaster is still running:
+            cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.host]
+            out, err = self.runner.run(cmd)
+            if "Master running" not in out:
+                # master exists but isn't running
+                # => clean up:
+                self.close()
+
         if not exists(self.ctrl_path):
             # set control options
-            ctrl_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=yes"] + self.ctrl_options
+            ctrl_options = ["-o", "ControlMaster=auto",
+                            "-o", "ControlPersist=yes"] + self.ctrl_options
             # create ssh control master command
             cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
 
@@ -128,7 +139,7 @@ class SSHConnection(object):
         """
 
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop", "-S", self.ctrl_path, self.host]
+        cmd = ["ssh", "-O", "stop"] + self.ctrl_options + [self.host]
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
@@ -185,10 +196,14 @@ class SSHManager(object):
     @property
     def socket_dir(self):
         if self._socket_dir is None:
-            # TODO: centralize AppDirs (=> datalad.config?)
-            from appdirs import AppDirs
-            self._socket_dir = AppDirs('datalad', 'datalad.org').user_cache_dir
+            from ..config import ConfigManager
+            from os import chmod
+            cfg = ConfigManager()
+            self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
+                                   'sockets')
             assure_dir(self._socket_dir)
+            chmod(self._socket_dir, 0o700)
+
         return self._socket_dir
 
     def get_connection(self, url):
