@@ -16,6 +16,8 @@ from os.path import join as opj
 from os.path import isdir
 from os.path import exists
 from os.path import realpath
+from os.path import basename
+from os.path import dirname
 
 from mock import patch
 
@@ -697,3 +699,12 @@ def test_install_noautoget_data(src, path):
     # and none of those should have any data for their annexed files yet
     for ds in cdss:
         assert_false(any(ds.repo.file_has_content(ds.repo.get_annexed_files())))
+
+
+@with_tempfile
+@with_tempfile
+def test_install_source_relpath(src, dest):
+    ds1 = create(src)
+    src_ = basename(src)
+    with chpwd(dirname(src)):
+        ds2 = install(dest, source=src_)

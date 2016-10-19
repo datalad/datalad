@@ -18,7 +18,9 @@ from os.path import join as opj
 from os.path import islink
 from os.path import relpath
 from os.path import pardir
+from os.path import sep as psep
 from os.path import curdir
+from os.path import normpath
 
 from six.moves.urllib.parse import quote as urlquote
 
@@ -219,7 +221,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
     # TODO: consider supporting DataLadRI here?  or would confuse
     #  git and we wouldn't want that (i.e. not allow pure git clone
     #  --recursive)
-    clone_urls += _get_flexible_url_candidates(
+    clone_urls += _get_flexible_source_candidates(
         sm_url,
         remote_url if remote_url else ds.path,
         url_suffix)
@@ -262,28 +264,30 @@ def _get_tracking_source(ds):
     return remote_name, remote_url
 
 
-def _get_flexible_url_candidates(url, base_url=None, url_suffix=''):
+def _get_flexible_source_candidates(src, base_url=None, url_suffix=''):
     candidates = []
-    if url.startswith('/') or is_url(url):
-        # this seems to be an absolute location -> take as is
-        candidates.append(url)
-        # additionally try to consider .git:
-        if not url.rstrip('/').endswith('/.git'):
-            candidates.append(
-                '{0}/.git'.format(url.rstrip('/')))
+
+    if base_url:
+        ri = RI(base_url)
+        if ri.path.endswith('/.git'):
+            base_path = ri.path[:-5]
+            base_suffix = '.git'
+        else:
+            base_path = ri.path
+            base_suffix = ''
+        ri.path = normpath(opj(base_path, src, base_suffix))
     else:
-        # need to resolve relative URL
-        base_url_l = base_url.split('/')
-        url_l = url.split('/')
-        for i, c in enumerate(url_l):
-            if c == pardir:
-                base_url_l = base_url_l[:-1]
-            else:
-                candidates.append('{0}/{1}{2}'.format(
-                    '/'.join(base_url_l),
-                    '/'.join(url_l[i:]),
-                    url_suffix))
-                break
+        ri = RI(src)
+    src = str(ri)
+
+    candidates.append(src)
+    if isinstance(ri, URL):
+        if ri.scheme in {'http', 'https'}:
+            # additionally try to consider .git:
+            if not src.rstrip('/').endswith('/.git'):
+                candidates.append(
+                    '{0}/.git'.format(src.rstrip('/')))
+
     # TODO:
     # here clone_urls might contain degenerate urls which should be
     # normalized and not added into the pool of the ones to try if already

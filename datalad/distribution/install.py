@@ -52,7 +52,7 @@ from .dataset import EnsureDataset
 from .get import Get
 from .utils import _get_git_url_from_source
 from .utils import _install_subds_from_flexible_source
-from .utils import _get_flexible_url_candidates
+from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
 from .utils import _clone_from_any_source
 from .utils import _handle_possible_annex_dataset
@@ -365,7 +365,7 @@ class Install(Interface):
             # this should not be, check if this is an error, or a reinstall
             # from the same source
             # this is where we would have installed this from
-            candidate_sources = _get_flexible_url_candidates(
+            candidate_sources = _get_flexible_source_candidates(
                 source, destination_dataset.path)
             # this is where it was installed from
             track_name, track_url = _get_tracking_source(destination_dataset)
@@ -435,7 +435,7 @@ class Install(Interface):
             # and rely on failures raising from the git call ...
 
             # We possibly need to consider /.git URL
-            candidate_sources = _get_flexible_url_candidates(source)
+            candidate_sources = _get_flexible_source_candidates(source)
             _clone_from_any_source(candidate_sources, destination_dataset.path)
 
         # FLOW GUIDE: All four cases done.
