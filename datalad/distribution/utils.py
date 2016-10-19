@@ -16,9 +16,8 @@ from os.path import exists
 from os.path import isdir
 from os.path import join as opj
 from os.path import islink
+from os.path import isabs
 from os.path import relpath
-from os.path import pardir
-from os.path import sep as psep
 from os.path import curdir
 from os.path import normpath
 
@@ -32,7 +31,7 @@ from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
-from datalad.support.network import is_url
+from datalad.support.network import PathRI
 from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
@@ -264,10 +263,29 @@ def _get_tracking_source(ds):
     return remote_name, remote_url
 
 
-def _get_flexible_source_candidates(src, base_url=None, url_suffix=''):
+def _get_flexible_source_candidates(src, base_url=None):
+    """Get candidates to try cloning from.
+
+    Primarily to mitigate the problem that git doesn't append /.git
+    while cloning from non-bare repos over dummy protocol (http*).  Also to
+    simplify creation of urls whenever base url and relative path within it
+    provided
+
+    Parameters
+    ----------
+    src : string or RI
+      Full or relative (then considered within base_url if provided) path
+    base_url : string or RI, optional
+
+    Returns
+    -------
+    candidates : list of str
+      List of RIs (path, url, ssh targets) to try to install from
+    """
     candidates = []
 
-    if base_url:
+    ri = RI(src)
+    if isinstance(ri, PathRI) and not isabs(ri.path) and base_url:
         ri = RI(base_url)
         if ri.path.endswith('/.git'):
             base_path = ri.path[:-5]
@@ -276,8 +294,7 @@ def _get_flexible_source_candidates(src, base_url=None, url_suffix=''):
             base_path = ri.path
             base_suffix = ''
         ri.path = normpath(opj(base_path, src, base_suffix))
-    else:
-        ri = RI(src)
+
     src = str(ri)
 
     candidates.append(src)
@@ -289,15 +306,10 @@ def _get_flexible_source_candidates(src, base_url=None, url_suffix=''):
                     '{0}/.git'.format(src.rstrip('/')))
 
     # TODO:
-    # here clone_urls might contain degenerate urls which should be
-    # normalized and not added into the pool of the ones to try if already
-    # there, e.g. I got
-    #  ['http://datasets.datalad.org/crcns/aa-1/.git', 'http://datasets.datalad.org/crcns/./aa-1/.git']
-    # upon  install aa-1
-
-    # TODO:
     # We need to provide some error msg with InstallFailedError, since now
     # it just swallows everything.
+    # yoh: not sure if this comment applies here, but could be still applicable
+    # outisde
 
     return candidates
 

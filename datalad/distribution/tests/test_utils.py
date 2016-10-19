@@ -62,15 +62,19 @@ def test_get_flexible_source_candidates():
               ):
         eq_(_get_flexible_source_candidates(s), [s])
     # Now a few relative ones
-    eq_(f('../r', base_url='.'), ['../r'])
-    eq_(f('../r', base_url='ssh://host/path'), ['ssh://host/r'])
-    eq_(f('sub', base_url='ssh://host/path'), ['ssh://host/path/sub'])
-    eq_(f('../r', base_url='http://e.c/p'), ['http://e.c/r', 'http://e.c/r/.git'])
-    eq_(f('sub', base_url='http://e.c/p'), ['http://e.c/p/sub', 'http://e.c/p/sub/.git'])
+    eq_(f('../r', '.'), ['../r'])
+    eq_(f('../r', 'ssh://host/path'), ['ssh://host/r'])
+    eq_(f('sub', 'ssh://host/path'), ['ssh://host/path/sub'])
+    eq_(f('../r', 'http://e.c/p'), ['http://e.c/r', 'http://e.c/r/.git'])
+    eq_(f('sub', 'http://e.c/p'), ['http://e.c/p/sub', 'http://e.c/p/sub/.git'])
 
     # tricky ones
-    eq_(f('sub', base_url='http://e.c/p/.git'), ['http://e.c/p/sub/.git'])
-    eq_(f('../s1/s2', base_url='http://e.c/p/.git'), ['http://e.c/s1/s2/.git'])
+    eq_(f('sub', 'http://e.c/p/.git'), ['http://e.c/p/sub/.git'])
+    eq_(f('../s1/s2', 'http://e.c/p/.git'), ['http://e.c/s1/s2/.git'])
 
     # incorrect ones will stay incorrect
-    eq_(f('../s1/s2', base_url='http://e.c/.git'), ['http://e.c/../s1/s2/.git'])
+    eq_(f('../s1/s2', 'http://e.c/.git'), ['http://e.c/../s1/s2/.git'])
+
+    # when source is not relative, but base_url is specified as just the destination path,
+    # not really a "base url" as name was suggesting, then it should be ignored
+    eq_(f('http://e.c/p', '/path'), ['http://e.c/p', 'http://e.c/p/.git'])
