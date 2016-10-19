@@ -218,7 +218,7 @@ class AddSibling(Interface):
                         # of this name? Above check for remotes ignores special
                         # remotes. we need to `git annex dead REMOTE` on reconfigure
                         # before we can init a new one
-                        # XXX except it is now enough
+                        # XXX except it is not enough
 
                         # make special remote of type=git (see #335)
                         repo._run_annex_command(
