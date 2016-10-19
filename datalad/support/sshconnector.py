@@ -14,6 +14,7 @@ git calls to a ssh remote without the need to reauthenticate.
 """
 
 import logging
+from os.path import exists
 from subprocess import Popen
 from shlex import split as sh_split
 
@@ -111,15 +112,16 @@ class SSHConnection(object):
         connection, if it is not there already.
         """
 
-        # set control options
-        ctrl_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=yes"] + self.ctrl_options
-        # create ssh control master command
-        cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
+        if not exists(self.ctrl_path):
+            # set control options
+            ctrl_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=yes"] + self.ctrl_options
+            # create ssh control master command
+            cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
 
-        # start control master:
-        lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        proc = Popen(cmd)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
+            # start control master:
+            lgr.debug("Try starting control master by calling:\n%s" % cmd)
+            proc = Popen(cmd)
+            proc.communicate(input="\n")  # why the f.. this is necessary?
 
     def close(self):
         """Closes the connection.
