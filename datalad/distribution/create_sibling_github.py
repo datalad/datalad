@@ -58,7 +58,7 @@ def _get_github_entity(gh, cred, github_user, github_passwd, github_organization
             # still nothing, ask if necessary
             creds = cred()
             github_user = creds['user']
-            github_passwd = creds['user']
+            github_passwd = creds['password']
 
     # this will always succeed, but it might later throw an exception
     # if the credentials were wrong
