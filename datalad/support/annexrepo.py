@@ -297,6 +297,21 @@ class AnnexRepo(GitRepo):
                              " -S %s" % c.ctrl_path)
             writer.release()
 
+    def set_remote_url(self, name, url, push=False):
+        """Overrides method from GitRepo in order to set
+        remote.<name>.annex-ssh-options in case of a SSH remote."""
+
+        super(AnnexRepo, self).set_remote_url(name, url, push=push)
+        from datalad.support.network import is_ssh
+        if is_ssh(url):
+            c = ssh_manager.get_connection(url)
+            writer = self.repo.config_writer()
+            writer.set_value("remote \"%s\"" % name,
+                             "annex-ssh-options",
+                             "-o ControlMaster=auto"
+                             " -S %s" % c.ctrl_path)
+            writer.release()
+
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
@@ -467,7 +482,7 @@ class AnnexRepo(GitRepo):
         # fetched
 
         if '--key' not in options:
-            lgr.info("Obtaining information on what files need to be obtained")
+            lgr.debug("Determine what files need to be obtained")
             # Let's figure out first which files/keys and of what size to download
             expected_downloads = {}
             fetch_files = []

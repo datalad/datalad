@@ -39,11 +39,17 @@ def _generate_func_api():
         defaults = argspec.defaults
         nargs = len(argspec.args)
         assert (nargs >= len(defaults))
-        values = args + defaults[-(nargs - len(args)):]
-        assert (nargs == len(values))
-        kwargs_ = OrderedDict(zip(argspec.args, values))
+        # map any args to their name
+        argmap = list(zip(argspec.args[:len(args)], args))
+        # map defaults of kwargs to their names (update below)
+        argmap += list(zip(argspec.args[-len(defaults):], defaults))
+        kwargs_ = OrderedDict(argmap)
         # update with provided kwarg args
         kwargs_.update(kwargs)
+        assert (nargs == len(kwargs_))
+        # Get all arguments removing those possible ones used internally and
+        # which shouldn't be exposed outside anyways
+        [kwargs_.pop(k) for k in kwargs_ if k.startswith('_')]
         namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
         return namespace
 

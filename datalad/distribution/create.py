@@ -11,6 +11,7 @@
 """
 
 import logging
+import uuid
 
 from os import listdir
 from os.path import isdir, realpath, relpath
@@ -236,13 +237,16 @@ class Create(Interface):
             for nt in native_metadata_type:
                 tbds.config.add('datalad.metadata.nativetype', nt)
 
-        # record the ID of this repo for the afterlife
+        # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
         if id_var in tbds.config:
             # make sure we reset this variable completely, in case of a re-create
             tbds.config.unset(id_var, where='dataset')
-        tbds.config.add(id_var, tbds.id, where='dataset')
+        tbds.config.add(
+            id_var,
+            tbds.id if tbds.id is not None else uuid.uuid1().urn.split(':')[-1],
+            where='dataset')
 
         # save everthing
         tbds.repo.add('.datalad', git=True)

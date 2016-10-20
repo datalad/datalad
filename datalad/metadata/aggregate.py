@@ -25,7 +25,6 @@ from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath, is_implicit_metadata
 from datalad.support.json_py import dump as jsondump
-from datalad.config import ConfigManager
 
 
 def _store_json(path, meta):
@@ -71,10 +70,7 @@ class AggregateMetaData(Interface):
         # possible to decide what to save one level up
         _modified_flag = False
 
-        # check for OLD datasets without a configured ID, and save the current
-        # one it
-        dsonly_cfg = ConfigManager(dataset, dataset_only=True)
-        if 'datalad.dataset.id' not in dsonly_cfg:
+        if dataset.id is None:
             lgr.warning('%s has not configured ID, skipping.', dataset)
             return _modified_flag
 
@@ -95,7 +91,7 @@ class AggregateMetaData(Interface):
                     subds,
                     guess_native_type=guess_native_type,
                     recursive=recursive,
-                    recursion_limit=None if recursion_limit is None else recursion_limit - 1,
+                    recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
                     if_dirty=if_dirty
                 )
                 if subds_modified:
