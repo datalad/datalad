@@ -149,3 +149,12 @@ def test_our_metadataset_search(tdir):
         out = cmo.out
     assert yaml.load(out)
 
+
+@with_tempfile
+def test_search_non_dataset(tdir):
+    from datalad.support.gitrepo import GitRepo
+    GitRepo(tdir, create=True)
+    with assert_raises(NoDatasetArgumentFound) as cme:
+        list(search('smth', dataset=tdir))
+    # Should instruct user how that repo could become a datalad dataset
+    assert_in("datalad create --force", str(cme.exception))

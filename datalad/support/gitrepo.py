@@ -567,10 +567,15 @@ class GitRepo(object):
             ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
-    def get_toppath(cls, path):
+    def get_toppath(cls, path, follow_up=True):
         """Return top-level of a repository given the path.
 
-        If path has symlinks -- they get resolved.
+        Parameters
+        -----------
+        follow_up : bool
+          If path has symlinks -- they get resolved by git.  If follow_up is
+          True, we will follow original path up until we hit the same resolved
+          path.  If no such path found, resolved one would be returned.
 
         Return None if no parent directory contains a git repository.
         """
@@ -581,11 +586,23 @@ class GitRepo(object):
                     cwd=path,
                     log_stdout=True, log_stderr=True,
                     expect_fail=True, expect_stderr=True)
-                return toppath.rstrip('\n\r')
+                toppath = toppath.rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
-            return GitRepo.get_toppath(dirname(path))
+            toppath = GitRepo.get_toppath(dirname(path))
+
+        if follow_up:
+            path_ = path
+            path_prev = ""
+            while path_ and path_ != path_prev:  # on top /.. = /
+                if realpath(path_) == toppath:
+                    toppath = path_
+                    break
+                path_prev = path_
+                path_ = dirname(path_)
+
+        return toppath
 
     # classmethod so behavior could be tuned in derived classes
     @classmethod
