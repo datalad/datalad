@@ -328,6 +328,11 @@ class CreateSiblingGithub(Interface):
         # lastly configure the local datasets
         for d, url, existed in rinfo:
             if not dryrun:
+                # first make sure that annex doesn't touch this one
+                # but respect any existing config
+                ignore_var = 'remote.{}.annex-ignore'.format(sibling_name)
+                if not ignore_var in d.config:
+                    d.config.add(ignore_var, 'true', where='local')
                 AddSibling()(
                     dataset=d,
                     name=sibling_name,
