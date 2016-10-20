@@ -283,12 +283,10 @@ class Publish(Interface):
 
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                # Fetch first so we could investigate... actually it has a desired
-                # side-effect ATM -- merges git-annex of the remote so later push
-                # succeeds!
                 ds.repo.fetch(remote=dest_resolved)
+                ds.repo.merge_annex(dest_resolved)
                 _log_push_info(ds.repo.push(remote=dest_resolved,
-                                            refspec="+git-annex:git-annex"))
+                                            refspec="git-annex:git-annex"))
 
             # we need to fetch
             # TODO

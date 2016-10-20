@@ -6,26 +6,31 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS meta data parser """
+"""Test frictionless datapackage meta data parser """
 
+from os.path import join as opj
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
-from datalad.metadata.parsers.frictionless_datapackage import has_metadata, get_metadata
-from nose.tools import assert_true, assert_false, assert_raises, assert_equal
+from datalad.metadata.parsers.frictionless_datapackage import MetadataParser
+from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
 
 @with_tree(tree={'datapackage.json': '{"name": "some"}'})
 def test_has_metadata(path):
     ds = Dataset(path)
-    assert_true(has_metadata(ds))
+    p = MetadataParser(ds)
+    assert_true(p.has_metadata())
+    assert_equal(p.get_metadata_filenames(),
+                 [opj(path, 'datapackage.json')])
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
     ds = Dataset(path)
-    assert_false(has_metadata(ds))
-    assert_raises(ValueError, get_metadata, ds, 'ID')
+    p = MetadataParser(ds)
+    assert_false(p.has_metadata())
+    assert_equal(p.get_core_metadata_filenames(), [])
 
 
 # bits from examples and the specs
@@ -54,7 +59,8 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path)
-    meta = get_metadata(ds, 'ID')
+    p = MetadataParser(ds)
+    meta = p.get_metadata('ID')
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\

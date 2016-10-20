@@ -9,8 +9,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.error import HTTPError
 
 from os.path import join as opj
 from glob import glob
@@ -18,7 +16,6 @@ from .base import Interface
 from ..ui import ui
 from ..utils import rmtree, getpwd
 from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone
 from ..support.annexrepo import AnnexRepo
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
@@ -28,7 +25,9 @@ lgr = getLogger('datalad.api.clean')
 
 
 class Clean(Interface):
-    """Clean up after DataLad (e.g. extracted temporary archives, etc)
+    """Clean up after DataLad (possible temporary files etc.)
+
+    Removes extracted temporary archives, etc.
 
     Examples:
 
@@ -53,12 +52,13 @@ class Clean(Interface):
         if temp_archives_dirs:
             pl = len(temp_archives_dirs) > 1
             pl1, pl2 = ('s', 'ies') if pl else ('', 'y')
-            
+
             pwd = getpwd()
             # relative version if possible
-            rtopdir = topdir[len(pwd)+1:] if topdir.startswith(pwd) else topdir
+            rtopdir = topdir[len(pwd) + 1:] \
+                if topdir.startswith(pwd) else topdir
             ui.message("Removing %d temporary archive director%s under %s: %s"
                        % (len(temp_archives_dirs), pl2,
                           rtopdir,
-                          ", ".join(sorted([x[len(topdir)+1:] for x in temp_archives_dirs]))))
+                          ", ".join(sorted([x[len(topdir) + 1:] for x in temp_archives_dirs]))))
             rmtree(topdir)

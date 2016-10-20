@@ -12,6 +12,7 @@
 
 from nose.tools import assert_is_instance
 
+import os
 from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -21,6 +22,15 @@ from datalad.utils import getpwd, chpwd
 from ..gitrepo import *
 from ..gitrepo import _normalize_path
 from ..exceptions import FileNotInRepositoryError
+
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_invalid_path(path):
+    with chpwd(path):
+        assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
+        ok_(not exists(opj(path, "git:")))
+        assert_raises(ValueError, GitRepo, path="file://some/relative/path", create=True)
+        ok_(not exists(opj(path, "file:")))
 
 
 @assert_cwd_unchanged
@@ -900,3 +910,49 @@ def test_GitRepo_count_objects(repo_path):
     empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
                    'size': 0, 'size-garbage': 0, 'size-pack': 0}
     eq_(empty_count, repo.count_objects)
+
+
+@with_tempfile
+def test_get_deleted(path):
+    repo = GitRepo(path, create=True)
+    os.makedirs(opj(path, 'deep'))
+    with open(opj(path, 'test1'), 'w') as f:
+        f.write('some')
+    with open(opj(path, 'deep', 'test2'), 'w') as f:
+        f.write('some more')
+    repo.add('.', commit=True)
+    ok_clean_git(path, annex=False)
+    os.unlink(opj(path, 'test1'))
+    eq_(repo.get_deleted_files(), ['test1'])
+    rmtree(opj(path, 'deep'))
+    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
+
+
+@with_tempfile
+def test_optimized_cloning(path):
+    # make test repo with one fiel and one commit
+    originpath = opj(path, 'origin')
+    repo = GitRepo(originpath, create=True)
+    with open(opj(originpath, 'test'), 'w') as f:
+        f.write('some')
+    repo.add('test')
+    repo.commit('init')
+    ok_clean_git(originpath, annex=False)
+    from glob import glob
+
+    def _get_inodes(repo):
+        return dict(
+            [(os.path.join(*o.split(os.sep)[-2:]),
+              os.stat(o).st_ino)
+             for o in glob(os.path.join(repo.repo.git_dir,
+                                        'objects', '*', '*'))])
+
+    origin_inodes = _get_inodes(repo)
+    # now clone it in different ways and see what happens to the object storage
+    from datalad.support.network import get_local_file_url
+    clonepath = opj(path, 'clone')
+    for src in (originpath, get_local_file_url(originpath)):
+        clone = GitRepo(clonepath, url=src, create=True)
+        clone_inodes = _get_inodes(clone)
+        eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
+        rmtree(clonepath)

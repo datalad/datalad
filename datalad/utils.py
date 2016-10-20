@@ -8,14 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+import hashlib
 import re
 import six.moves.builtins as __builtin__
 import time
-
-from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
-from os.path import isdir
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
-from six import text_type, binary_type
 
 import logging
 import shutil
@@ -27,9 +23,21 @@ import platform
 import gc
 import glob
 
+from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+
+from os.path import sep as dirsep
+from os.path import commonprefix
+from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
+from os.path import isdir
+from os.path import relpath
+
+
+from six import text_type, binary_type
+
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 
@@ -39,17 +47,20 @@ lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-_platform_system = platform.system().lower()
-on_windows = _platform_system == 'windows'
-on_osx = _platform_system == 'darwin'
-on_linux = _platform_system == 'linux'
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+on_osx = platform_system == 'darwin'
+on_linux = platform_system == 'linux'
 try:
-    linux_distribution = platform.linux_distribution()
+    linux_distribution_name, linux_distribution_release \
+        = platform.linux_distribution()[:2]
     on_debian_wheezy = on_linux \
-                       and linux_distribution[0] == 'debian' \
-                       and linux_distribution[1].startswith('7.')
+                       and linux_distribution_name == 'debian' \
+                       and linux_distribution_release.startswith('7.')
 except:  # pragma: no cover
+    # MIH: IndexError?
     on_debian_wheezy = False
+    linux_distribution_name = linux_distribution_release = None
 
 #
 # Little helpers
@@ -58,7 +69,7 @@ except:  # pragma: no cover
 
 def get_func_kwargs_doc(func):
     """ Provides args for a function
-    
+
     Parameters
     ----------
     func: str
@@ -73,14 +84,6 @@ def get_func_kwargs_doc(func):
 
     # TODO: format error message with descriptions of args
     # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
-
-
-def assure_tuple_or_list(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
 
 
 def any_re_search(regexes, value):
@@ -105,7 +108,7 @@ def shortened_repr(value, l=30):
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s...>>" % (value_repr[:l-8])
+                value_repr = "<<%s...>>" % (value_repr[:l - 8])
             elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
                 raise ValueError("I hate those useless long reprs")
         else:
@@ -135,6 +138,7 @@ def __auto_repr__(obj):
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 
+
 def auto_repr(cls):
     """Decorator for a class to assign it an automagic quick and dirty __repr__
 
@@ -146,14 +150,12 @@ def auto_repr(cls):
     cls.__repr__ = __auto_repr__
     return cls
 
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
-
-
-import hashlib
 
 
 def md5sum(filename):
@@ -164,11 +166,10 @@ def md5sum(filename):
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
-    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
+    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
+                       for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-from os.path import sep as dirsep
 _VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
 _DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
@@ -231,6 +232,7 @@ def is_explicit_path(path):
         or path.startswith(os.curdir + os.sep) \
         or path.startswith(os.pardir + os.sep)
 
+
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
@@ -286,10 +288,10 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
 
-    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    It will not remove the temporary file/directory if DATALAD_TESTS_TEMP_KEEP
     environment variable is defined
     """
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         if not os.path.lexists(f):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
@@ -320,7 +322,7 @@ def file_basename(name, return_ext=False):
     bname = basename(name)
     fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
     if return_ext:
-        return fbname, bname[len(fbname)+1:]
+        return fbname, bname[len(fbname) + 1:]
     else:
         return fbname
 
@@ -371,6 +373,14 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
 def assure_list(s):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -381,6 +391,8 @@ def assure_list(s):
 
     if isinstance(s, list):
         return s
+    elif isinstance(s, tuple):
+        return list(s)
     elif s is None:
         return []
     else:
@@ -425,10 +437,15 @@ def assure_dict_from_str(s, **kwargs):
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
         if k in out:
-            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            err = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
             raise ValueError(err)
         out[k] = v
     return out
+
+
+def assure_unicode(s, encoding='utf-8'):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
+    return s.decode(encoding) if isinstance(s, binary_type) else s
 
 
 def unique(seq, key=None):
@@ -457,6 +474,31 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+#
+# Generators helpers
+#
+
+def saved_generator(gen):
+    """Given a generator returns two generators, where 2nd one just replays
+
+    So the first one would be going through the generated items and 2nd one
+    would be yielding saved items
+    """
+    saved = []
+
+    def gen1():
+        for x in gen:  # iterating over original generator
+            saved.append(x)
+            yield x
+
+    def gen2():
+        for x in saved:  # yielding saved entries
+            yield x
+
+    return gen1(), gen2()
+
 
 #
 # Decorators
@@ -492,11 +534,14 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
-    # operate on a copy of tkwargs to avoid any side-effects
-    tkwargs_ = tkwargs.copy()
+    if tkwargs is None:
+        tkwargs_ = {}
+    else:
+        # operate on a copy of tkwargs to avoid any side-effects
+        tkwargs_ = tkwargs.copy()
 
     # TODO: don't remember why I had this one originally
     # if len(targs)<2 and \
@@ -504,14 +549,14 @@ def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
         tkwargs_['prefix'] = '_'.join(
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
-            ([''] if (on_windows or not wrapped)
-                  else [wrapped.__name__]))
+            ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
-    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    directory = os.environ.get('DATALAD_TESTS_TEMP_DIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
     return tkwargs_
+
 
 @optional_args
 def line_profile(func):
@@ -533,7 +578,12 @@ def line_profile(func):
 # Context Managers
 #
 
-from contextlib import contextmanager
+
+@contextmanager
+def nothing_cm():
+    """Just a dummy cm to programmically switch context managers"""
+    yield
+
 
 @contextmanager
 def swallow_outputs():
@@ -549,7 +599,6 @@ def swallow_outputs():
     print function had desired effect
     """
 
-    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -587,8 +636,6 @@ def swallow_outputs():
             gc.collect()
             rmtemp(out_name)
             rmtemp(err_name)
-
-
 
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
@@ -647,6 +694,7 @@ def swallow_logs(new_level=None, file_=None):
                 out_file = file_
             # PY3 requires clearly one or another.  race condition possible
             self._out = open(out_file, 'a')
+            self._final_out = None
 
         def _read(self, h):
             with open(h.name) as f:
@@ -654,8 +702,12 @@ def swallow_logs(new_level=None, file_=None):
 
         @property
         def out(self):
-            self._out.flush()
-            return self._read(self._out)
+            if self._final_out is not None:
+                # we closed and cleaned up already
+                return self._final_out
+            else:
+                self._out.flush()
+                return self._read(self._out)
 
         @property
         def lines(self):
@@ -666,6 +718,8 @@ def swallow_logs(new_level=None, file_=None):
             return self._out
 
         def cleanup(self):
+            # store for access while object exists
+            self._final_out = self.out
             self._out.close()
             out_name = self._out.name
             del self._out
@@ -673,13 +727,53 @@ def swallow_logs(new_level=None, file_=None):
             if not file_:
                 rmtemp(out_name)
 
+        def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
+            """Provide assertion on either a msg was logged at a given level
+
+            If neither `msg` nor `level` provided, checks if anything was logged
+            at all.
+
+            Parameters
+            ----------
+            msg: str, optional
+              Message (as a regular expression, if `regex`) to be searched.
+              If no msg provided, checks if anything was logged at a given level.
+            level: str, optional
+              String representing the level to be logged
+            regex: bool, optional
+              If False, regular `assert_in` is used
+            **kwargs: str, optional
+              Passed to `assert_re_in` or `assert_in`
+            """
+            from datalad.tests.utils import assert_re_in
+            from datalad.tests.utils import assert_in
+
+            if regex:
+                match = '\[%s\] ' % level if level else "\[\S+\] "
+            else:
+                match = '[%s] ' % level if level else ''
+
+            if msg:
+                match += msg
+
+            if match:
+                (assert_re_in if regex else assert_in)(match, self.out, **kwargs)
+            else:
+                assert not kwargs, "no kwargs to be passed anywhere"
+                assert self.out, "Nothing was logged!?"
+
     adapter = StringIOAdapter()
     # TODO: it does store messages but without any formatting, i.e. even without
     # date/time prefix etc.  IMHO it should preserve formatting in case if file_ is
     # set
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    swallow_handler = logging.StreamHandler(adapter.handle)
+    # we want to log levelname so we could test against it
+    swallow_handler.setFormatter(
+        logging.Formatter('[%(levelname)s] %(message)s'))
+    lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
+
     if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
@@ -699,6 +793,8 @@ def swallow_logs(new_level=None, file_=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
+
+
 def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -734,6 +830,7 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+
 def updated(d, update):
     """Return a copy of the input with the 'update'
 
@@ -742,6 +839,7 @@ def updated(d, update):
     d = d.copy()
     d.update(update)
     return d
+
 
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
@@ -752,6 +850,7 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
 
 class chpwd(object):
     """Wrapper around os.chdir which also adjusts environ['PWD']
@@ -794,6 +893,37 @@ class chpwd(object):
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
+def with_pathsep(path):
+    """Little helper to guarantee that path ends with /"""
+    return path + sep if not path.endswith(sep) else path
+
+
+def get_path_prefix(path, pwd=None):
+    """Get path prefix (for current directory)
+
+    Returns relative path to the topdir, if we are under topdir, and if not
+    absolute path to topdir.  If `pwd` is not specified - current directory
+    assumed
+    """
+    pwd = pwd or getpwd()
+    if not isabs(path):
+        # if not absolute -- relative to pwd
+        path = opj(getpwd(), path)
+    path_ = with_pathsep(path)
+    pwd_ = with_pathsep(pwd)
+    common = commonprefix((path_, pwd_))
+    if common.endswith(sep) and common in {path_, pwd_}:
+        # we are in subdir or above the path = use relative path
+        location_prefix = relpath(path, pwd)
+        # if benign "here" - cut off
+        if location_prefix in (curdir, curdir + sep):
+            location_prefix = ''
+        return location_prefix
+    else:
+        # just return absolute path
+        return path
+
+
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
@@ -831,7 +961,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         '_').
 
     To change the used directory without providing keyword argument 'dir' set
-    DATALAD_TESTS_TEMPDIR.
+    DATALAD_TESTS_TEMP_DIR.
 
     Examples
     --------
@@ -850,7 +980,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
 
-    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # if DATALAD_TESTS_TEMP_DIR is set, use that as directory,
     # let mktemp handle it otherwise. However, an explicitly provided
     # dir=... will override this.
     mkdir = tkwargs_.pop('mkdir', False)
@@ -922,3 +1052,4 @@ def get_logfilename(dspath, cmd='datalad'):
 
 
 lgr.log(5, "Done importing datalad.utils")
+

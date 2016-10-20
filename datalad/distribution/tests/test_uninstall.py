@@ -30,6 +30,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
+from datalad.support.external_versions import external_versions
 
 from ..dataset import Dataset
 
@@ -135,7 +136,7 @@ def test_uninstall_git_file(path):
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
 
-    ds = install(path=dst, source=src, recursive=True)
+    ds = install(path=dst, source=src, recursive=True)[0]
     ok_(ds.is_installed())
     for subds_path in ds.get_subdatasets():
         subds = Dataset(opj(ds.path, subds_path))
@@ -156,6 +157,10 @@ def test_uninstall_subdataset(src, dst):
         # uninstall subds itself:
         assert_raises(ValueError, ds.uninstall,
                       path=subds_path, remove_handles=True, remove_history=True)
+        if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
+                and external_versions['git'] < '2.0.9':
+            raise SkipTest("Known problem with GitPython. See "
+                "https://github.com/gitpython-developers/GitPython/pull/521")
         res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True,
                            recursive=True)
         subds = Dataset(opj(ds.path, subds_path))
@@ -289,3 +294,45 @@ def test_remove_dataset_hierarchy(path):
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
+
+
+@with_tempfile()
+def test_careless_subdataset_uninstall(path):
+    # nested datasets
+    ds = Dataset(path).create()
+    subds1 = ds.create('deep1')
+    ds.create('deep2')
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    ok_clean_git(ds.path)
+    # now we kill the sub without the parent knowing
+    subds1.uninstall(remove_history=True, remove_handles=True)
+    ok_(not exists(subds1.path))
+    ok_(ds.repo.dirty)
+    # parent still knows the sub
+    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    # save the parent later on
+    ds.save(auto_add_changes=True)
+    # subds still gone
+    # subdataset appearance is normalized to an empty directory
+    ok_(exists(subds1.path))
+    # parent still knows the sub
+    eq_(ds.get_subdatasets(), ['deep1', 'deep2'])
+    # and they lived happily ever after
+    ok_clean_git(ds.path)
+
+
+@with_tempfile()
+def test_kill(path):
+    # nested datasets with load
+    ds = Dataset(path).create()
+    with open(opj(ds.path, "file.dat"), 'w') as f:
+        f.write("load")
+    ds.repo.add("file.dat")
+    subds1 = ds.create('deep1')
+    eq_(sorted(ds.get_subdatasets()), ['deep1'])
+    ok_clean_git(ds.path)
+
+    # and we fail to uninstall since content can't be dropped
+    assert_raises(CommandError, ds.uninstall)
+    eq_(ds.uninstall(kill=True), [path])
+    ok_(not exists(path))

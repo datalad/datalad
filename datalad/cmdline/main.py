@@ -142,7 +142,7 @@ def setup_parser(
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__)
+                    _intf.__doc__.strip())
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -181,13 +181,13 @@ def setup_parser(
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  - %s:  %s'
-                               % (cd[0],
+            cmd_summary.append('  - %-20s %s'
+                               % ((cd[0] + ':',
                                   textwrap.fill(
                                       cd[1].rstrip(' .'),
                                       75,
                                       #initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 8)))
+                                      subsequent_indent=' ' * 8))))
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
@@ -228,8 +228,20 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs = parser.parse_args(args)
-    if not cmdlineargs.change_path is None:
+    cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
+    if unparsed_args:
+        if has_func and cmdlineargs.func.__self__.__name__ != 'Export':
+            lgr.error('unknown argument{}: {}'.format(
+                's' if len(unparsed_args) > 1 else '',
+                unparsed_args if len(unparsed_args) > 1 else unparsed_args[0]))
+            cmdlineargs.subparser.print_usage()
+            sys.exit(1)
+        else:
+            # store all unparsed arguments
+            cmdlineargs.datalad_unparsed_args = unparsed_args
+
+    if cmdlineargs.change_path is not None:
         for path in cmdlineargs.change_path:
             chpwd(path)
 
@@ -241,23 +253,31 @@ def main(args=None):
         args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif cmdlineargs.common_debug or cmdlineargs.common_idebug:
-        # so we could see/stop clearly at the point of failure
-        setup_exceptionhook(ipython=cmdlineargs.common_idebug)
-        ret = cmdlineargs.func(cmdlineargs)
-    else:
-        # otherwise - guard and only log the summary. Postmortem is not
-        # as convenient if being caught in this ultimate except
-        try:
+    elif has_func:
+        if cmdlineargs.common_debug or cmdlineargs.common_idebug:
+            # so we could see/stop clearly at the point of failure
+            setup_exceptionhook(ipython=cmdlineargs.common_idebug)
             ret = cmdlineargs.func(cmdlineargs)
-        except InsufficientArgumentsError as exc:
-            # if the func reports inappropriate usage, give help output
-            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-            cmdlineargs.subparser.print_usage()
-            sys.exit(1)
-        except Exception as exc:
-            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-            sys.exit(1)
+        else:
+            # otherwise - guard and only log the summary. Postmortem is not
+            # as convenient if being caught in this ultimate except
+            try:
+                ret = cmdlineargs.func(cmdlineargs)
+            except InsufficientArgumentsError as exc:
+                # if the func reports inappropriate usage, give help output
+                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                cmdlineargs.subparser.print_usage()
+                sys.exit(1)
+            except Exception as exc:
+                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                sys.exit(1)
+    else:
+        # just let argparser spit out its error, since there is smth wrong
+        parser.parse_args(args)
+        # if that one didn't puke -- we should
+        parser.print_usage()
+        lgr.error("Please specify the command")
+        sys.exit(2)
     if hasattr(cmdlineargs, 'result_renderer'):
         cmdlineargs.result_renderer(ret, cmdlineargs)
 

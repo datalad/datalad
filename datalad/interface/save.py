@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 from os.path import join as opj, isdir, realpath, relpath
 
 from datalad.support.constraints import EnsureStr
@@ -24,9 +25,10 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.dataset import _with_sep
-from datalad.distribution.install import _install_subds_inplace
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.utils import assure_list
+from datalad.utils import with_pathsep as _with_sep
 
 from .base import Interface
 
@@ -57,11 +59,21 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
             _install_subds_inplace(
                 ds=ds,
                 path=utf_abspath,  # can be ignored, we don't need the return value
-                relativepath=utf,
+                relativepath=utf.rstrip(os.sep),
                 name=None)
             _modified_flag = True
 
     return _modified_flag
+
+
+def deinit_deleted_submodules(ds):
+    # helper to inspect a repo and `deinit` all submodules that are reported
+    # as present, but the mountpoint doesn't exist
+    deleted = ds.repo.get_deleted_files()
+    for subdspath in ds.get_subdatasets(absolute=False, recursive=False):
+        if subdspath in deleted:
+            lgr.debug('deinit deleted subdataset {} in {}'.format(subdspath, ds))
+            ds.repo.deinit_submodule(subdspath)
 
 
 class Save(Interface):
@@ -135,6 +147,14 @@ class Save(Interface):
             # take the easy one out
             return
 
+        # always yields list; empty if None
+        files = assure_list(files)
+
+        # before anything, let's deal with missing submodules that may have
+        # been rm'ed by the user
+        # this will not alter/amend the history of the dataset
+        deinit_deleted_submodules(ds)
+
         # XXX path resolution needs to happen on the input argument, not the
         # resolved dataset!
         # otherwise we will not be able to figure out, whether there was an
@@ -142,14 +162,14 @@ class Save(Interface):
         # automatically.
         # if files are provided but no dataset, we interpret them as
         # CWD-related
-        if not auto_add_changes and files is not None:
+
+        if auto_add_changes:
+            # use the dataset's base path to indiciate that everything
+            # should be saved
+            files = [ds.path]
+        else:
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
-
-        # use the dataset's base path to indiciate that everything
-        # should be saved
-        if auto_add_changes:
-            files = [ds.path]
 
         # track whether we modified anything, so it becomes
         # possible to decide when/what to save further down
@@ -157,7 +177,7 @@ class Save(Interface):
         _modified_flag = False
 
         _modified_flag = untracked_subdatasets_to_submodules(
-            ds, files)
+            ds, files) or _modified_flag
 
         # now we should have a complete list of submodules to potentially
         # recurse into

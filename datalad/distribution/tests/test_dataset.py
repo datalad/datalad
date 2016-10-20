@@ -15,7 +15,9 @@ from os.path import join as opj, abspath, normpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
+from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
+from datalad.utils import _path_
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -30,8 +32,10 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
 
 from datalad.api import install
+
 
 def test_EnsureDataset():
 
@@ -195,13 +199,19 @@ def test_subdatasets(path):
     eq_(ds.get_subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.install(path='test')
+    ds.add(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
+    # Assuming that tmp location was not under a super-dataset
+    eq_(ds.get_superdataset(), None)
+    eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
+    eq_(subds.get_superdataset(), ds)
+    eq_(subds.get_superdataset(topmost=True), ds)
+
     subdss = ds.get_subdatasets()
     eq_(len(subdss), 1)
     eq_(os.path.join(path, subdss[0]), subds.path)
@@ -214,6 +224,25 @@ def test_subdatasets(path):
     ds.recall_state(1)
     assert_true(ds.is_installed())
     eq_(ds.get_subdatasets(), [])
+
+    # very nested subdataset to test topmost
+    subsubds = subds.install(_path_('d1/subds'), source=path)
+    assert_true(subsubds.is_installed())
+    eq_(subsubds.get_superdataset(), subds)
+    eq_(subsubds.get_superdataset(topmost=True), ds)
+
+    # verify that '^' alias would work
+    with chpwd(subsubds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
+        # and while in the dataset we still can resolve into central one
+        dscentral = Dataset('///')
+        eq_(dscentral.path, LOCAL_CENTRAL_PATH)
+
+    with chpwd(ds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
+
     # TODO actual submodule checkout is still there
 
 
@@ -221,10 +250,12 @@ def test_subdatasets(path):
 def test_get_containing_subdataset(path):
 
     ds = create(path, force=True)
-    ds.install(path='test.txt')
+    ds.add(path='test.txt')
     ds.save("Initial commit")
     subds = ds.create("sub")
+    subsubds = subds.create("subsub")
 
+    eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
@@ -233,10 +264,11 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
-    assert_raises(ValueError, ds.get_containing_subdataset,
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
+                  outside_path)
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
                   opj(os.curdir, outside_path))
-    assert_raises(ValueError, ds.get_containing_subdataset,
+    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
                   abspath(outside_path))
 
 

@@ -21,7 +21,6 @@ import os
 import sys
 import time
 
-from six import PY2
 import getpass
 
 #!!! OPT adds >100ms to import time!!!
@@ -41,18 +40,18 @@ from .base import InteractiveUI
 # - docker has multiple simultaneous progressbars.  Apparently "navigation"
 #   is obtained with escape characters in the terminal.
 #   see docker/pkg/jsonmessage/jsonmessage.go or following snippet
-"""
-from time import sleep
-import sys
-
-out = sys.stderr
-for i in range(10):
-  diff = 2
-  if i:
-      out.write("%c[%dA" % (27, diff))
-  out.write("%d\n%d\n" % (i, i ** 2))
-  sleep(0.5)
-"""
+#
+#from time import sleep
+#import sys
+#
+#out = sys.stderr
+#for i in range(10):
+#  diff = 2
+#  if i:
+#      out.write("%c[%dA" % (27, diff))
+#  out.write("%d\n%d\n" % (i, i ** 2))
+#  sleep(0.5)
+#
 # They also use JSON representation for the message which might provide a nice abstraction
 # Other useful codes
 #         // <ESC>[2K = erase entire current line
@@ -60,7 +59,6 @@ for i in range(10):
 # and code in docker: pkg/progressreader/progressreader.go pkg/streamformatter/streamformatter.go
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
-
 
 
 @auto_repr
@@ -101,6 +99,10 @@ class ConsoleLog(object):
             pbar = progressbars[backend]
         return pbar(*args, out=self.out, **kwargs)
 
+    @property
+    def is_interactive(self):
+        return isinstance(self, InteractiveUI)
+
 
 def getpass_echo(prompt='Password: ', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
@@ -119,7 +121,7 @@ def getpass_echo(prompt='Password: ', stream=None):
         #         return
         #     stream.write(out)
         from mock import patch
-        with patch('termios.ECHO', 255**2):
+        with patch('termios.ECHO', 255 ** 2):
             #patch.object(stream, 'write', _no_emptyline_write(stream)):
             return getpass.getpass(prompt=prompt, stream=stream)
 
@@ -140,7 +142,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
                  default=None,
                  hidden=False):
         # Do initial checks first
-        if default and default not in choices:
+        if default and choices and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
                              % (default, choices))
 
@@ -158,14 +160,15 @@ class DialogUI(ConsoleLog, InteractiveUI):
 
         if choices is not None:
             msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
+        elif default is not None:
+            msg += '{} [{}]'.format(text, default)
         else:
             msg += text
-        """
-        Anaconda format:
-
-Question? [choice1|choice2]
-[default] >>> yes
-        """
+        # Like this:
+        #Anaconda format:
+        #
+        #Question? [choice1|choice2]
+        #[default] >>> yes
         attempt = 0
         while True:
             attempt += 1
@@ -202,7 +205,7 @@ Question? [choice1|choice2]
 # poor man thingie for now
 @auto_repr
 class UnderAnnexUI(DialogUI):
-    def __init__(self, **kwargs):
+    def __init__(self, specialremote=None, **kwargs):
         if 'out' not in kwargs:
             # to avoid buffering
             # http://stackoverflow.com/a/181654/1265472
@@ -210,6 +213,18 @@ class UnderAnnexUI(DialogUI):
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
         super(UnderAnnexUI, self).__init__(**kwargs)
+        self.specialremote = specialremote
+
+    def set_specialremote(self, specialremote):
+        self.specialremote = specialremote
+
+    def get_progressbar(self, *args, **kwargs):
+        if self.specialremote:
+            kwargs = kwargs.copy()
+            kwargs['backend'] = 'annex-remote'
+            kwargs['remote'] = self.specialremote
+        return super(UnderAnnexUI, self).get_progressbar(
+                *args, **kwargs)
 
 
 @auto_repr

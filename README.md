@@ -19,12 +19,11 @@ management, however, remains with the original data providers.
 
 # Status
 
-DataLad is under rapid development to establish core functionality.  While
-the code base is still growing the focus is increasingly shifting towards
-robust and safe operation with a sensible API. There has been no major public
-release yet, as organization and configuration are still subject of
-considerable reorganization and standardization. However, DataLad is, in fact,
-usable today and user feedback is always welcome.
+DataLad is under rapid development.  While the code base is still growing,
+the focus is increasingly shifting towards robust and safe operation 
+with a sensible API. Organization and configuration are still subject of 
+considerable reorganization and standardization.  However, DataLad is, 
+in fact, usable today and user feedback is always welcome.
 
 # DataLad 101
 
@@ -32,14 +31,14 @@ A growing number of datasets is made available from http://datasets.datalad.org 
 Those datasets are just regular git/git-annex repositories organized into
 a hierarchy using git submodules mechanism.  So you can use regular
 git/git-annex commands to work with them, but might need `datalad` to be
-installed to provide additional necessary functionality (e.g. fetching from
+installed to provide additional functionality (e.g., fetching from
 portals requiring authentication such as CRCNS, HCP; or accessing data
 originally distributed in tarballs).  But datalad aims to provide higher
 level interface on top of git/git-annex to simplify consumption and sharing
 of new or derived datasets.  To that end, you can install **all** of
 those datasets using
 
-    datalad install -r datasets ///
+    datalad install -r ///
 
 which will `git clone` all of those datasets under `datasets.datalad.org`
 sub-directory. This command will not fetch any large data files, but will
@@ -50,24 +49,33 @@ be installed, e.g.
 
     datalad install ///openfmri/ds000113
 
-or install top level dataset by omitting `-r datasets` option and then calling
-`datalad install` for specific sub-datasets you want to be installed, e.g.
+or install top level dataset by omitting `-r` option and then calling
+`datalad install` for specific sub-datasets you want to have installed,
+possibly with `-r` to install their sub-datasets as well, e.g.
 
     datalad install ///
     cd datasets.datalad.org
-    datalad install openfmri indi/fcon1000
+    datalad install -r openfmri/ds000001 indi/fcon1000
 
 You can navigate datasets you have installed in your terminal or browser,
 while fetching necessary files or installing new sub-datasets using the
-same `datalad install [FILENAMES]` command.
+`datalad get [FILE|DIR]` command.  DataLad will take care about
+downloading, extracting, and possibly authenticating (would ask you for
+credentials) in a uniform fashion regardless of the original data location
+or distribution serialization (e.g., a tarball).  Since it is using git
+and git-annex underneath, you can be assured that you are getting **exact**
+correct version of the data.
 
-You can find more documentation at http://datalad.readthedocs.io .
+Use-cases DataLad covers are not limited to "consumption" of data.
+DataLad aims also to help publishing original or derived data, thus facilitating
+more efficient data management when collaborating or simply sharing your data.
+You can find more documentation at http://docs.datalad.org .
 
 
 # Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in
-internals and/or contributing to the project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
+contributing to the project.
 
 # Installation
 
@@ -78,7 +86,7 @@ from which we provide recent releases of DataLad.  datalad package recommends
 some relatively heavy packages (e.g. scrapy) which are useful only if you are
 interested in using `crawl` functionality.  If you need just the base
 functionality of the datalad, install without recommended packages
-(e.g. `apt-get install --no-install-recommends datalad`)
+(e.g., `apt-get install --no-install-recommends datalad`)
 
 ## Other Linux'es, OSX (Windows yet TODO) via pip
 
@@ -87,12 +95,12 @@ allowing for managing datasets etc.  Additional installation schemes
 are available, so you could provide enhanced installation via
 `pip install datalad[SCHEME]` where `SCHEME` could be
 
-- crawl
-     to also install scrapy which is used in some crawling constructs
-- tests
+- `crawl`
+     to also install `scrapy` which is used in some crawling constructs
+- `tests`
      to also install dependencies used by unit-tests battery of the datalad
-- full
-     to install all of possible dependencies.
+- `full`
+     to install all dependencies.
 
 For installation through `pip` you would need some external dependencies
 not shipped from it (e.g. `git-annex`, etc.) for which please refer to
@@ -100,13 +108,13 @@ the next section.
 
 ## Dependencies
 
-Our [setup.py] and accompanying packaging describes all necessary dependencies.
+Our [setup.py] and accompanying packaging describe all necessary dependencies.
 On Debian-based systems we recommend to enable [NeuroDebian]
 since we use it to provide backports of recent fixed external modules we
-depend upon, and up-to-date [Git-annex] necessary for proper operation of
-DataLad packaged from a standalone build.  Additionally, if you would
-like to develop and run our tests battery see [CONTRIBUTING.md](CONTRIBUTING.md)
-regarding additional dependencies.
+depend upon, and up-to-date [Git-annex] is necessary for proper operation of
+DataLad packaged (install `git-annex-standalone` from NeuroDebian repository).
+Additionally, if you would like to develop and run our tests battery see
+[CONTRIBUTING.md](CONTRIBUTING.md) regarding additional dependencies.
 
 Later we will provide bundled installations of DataLad across popular
 platforms.

@@ -23,23 +23,20 @@ except ImportError:
 
 import logging
 
-from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
+from os.path import dirname, lexists
 from git.exc import InvalidGitRepositoryError
 
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
-from .support.gitrepo import GitRepo
-from .support.exceptions import CommandError
-from .cmd import Runner
 from .cmdline.helpers import get_repo_instance
 
-from .utils import swallow_outputs
 lgr = logging.getLogger("datalad.auto")
 
 
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""
     pass
+
 
 class AutomagicIO(object):
     """Class to proxy commonly used API for accessing files so they get automatically fetched
@@ -159,12 +156,12 @@ class AutomagicIO(object):
             # might fail.  TODO: troubleshoot when it does e.g.
             # datalad/tests/test_auto.py:test_proxying_open_testrepobased
             under_annex = annex.is_under_annex(filepath, batch=True)
-        except:
+        except:  # MIH: really? what if MemoryError
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.get(filepath, log_online=self._log_online)
+            annex.get(filepath)
 
     def activate(self):
         # Some beasts (e.g. tornado used by IPython) override outputs, and
@@ -174,7 +171,7 @@ class AutomagicIO(object):
             if self._log_online:
                 sys.stdout.fileno()
                 sys.stderr.fileno()
-        except:
+        except:  # MIH: IOError?
             self._log_online = False
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
@@ -198,7 +195,7 @@ class AutomagicIO(object):
         try:
             if self._active:
                 self.deactivate()
-        except:
+        except:  # MIH: IOError?
             pass
         try:
             super(self.__class__, self).__del__()

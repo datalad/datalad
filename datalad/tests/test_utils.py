@@ -1,4 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -10,12 +11,14 @@
 
 """
 
+import inspect
 import os
 import shutil
 import sys
 import logging
 from mock import patch
 from six import PY3
+from six import text_type
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -27,6 +30,7 @@ from ..utils import updated
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import getpwd, chpwd
+from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
 from ..utils import line_profile
@@ -50,6 +54,7 @@ from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
+from .utils import assure_unicode
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
@@ -58,9 +63,9 @@ from .utils import skip_if_no_module
 
 
 def test_get_func_kwargs_doc():
-    from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
-    eq_(get_func_kwargs_doc(pipeline), output)
+    def some_func(arg1, kwarg1=None, kwarg2="bu"):
+        return
+    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
 
 
 @with_tempfile(mkdir=True)
@@ -110,14 +115,46 @@ def test_swallow_logs(logfile):
         lgr.log(8, "very heavy debug")
         eq_(cm.out, '')  # not even visible at level 9
         lgr.log(9, "debug1")
-        eq_(cm.out, 'debug1\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')  # not even visible at level 9
     with swallow_logs(new_level=9, file_=logfile) as cm:
         eq_(cm.out, '')
         lgr.info("next info")
     from datalad.tests.utils import ok_file_has_content
-    ok_file_has_content(logfile, "next info", strip=True)
+    ok_file_has_content(logfile, "[INFO] next info", strip=True)
+
+
+def test_swallow_logs_assert():
+    lgr = logging.getLogger('datalad.tests')
+    with swallow_logs(new_level=9) as cm:
+        # nothing was logged so should fail
+        assert_raises(AssertionError, cm.assert_logged)
+        lgr.info("something")
+        cm.assert_logged("something")
+        cm.assert_logged(level="INFO")
+        cm.assert_logged("something", level="INFO")
+
+        # even with regex = False should match above
+        cm.assert_logged("something", regex=False)
+        cm.assert_logged(level="INFO", regex=False)
+        cm.assert_logged("something", level="INFO", regex=False)
+
+        # different level
+        assert_raises(AssertionError,
+                      cm.assert_logged, "something", level="DEBUG")
+        assert_raises(AssertionError, cm.assert_logged, "else")
+
+        cm.assert_logged("some.hing", level="INFO")  # regex ;-)
+        # does match
+        assert_raises(AssertionError,
+                      cm.assert_logged, "ome.hing", level="INFO")
+        # but we can change it
+        cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we can continue doing checks after we left the cm block
+    cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we indeed logged something
+    cm.assert_logged(match=False)
 
 
 def _check_setup_exceptionhook(interactive):
@@ -447,3 +484,49 @@ def test_get_timestamp_suffix():
             assert(get_timestamp_suffix().startswith('-'))
     finally:
         time.tzset()
+
+
+def test_memoized_generator():
+    called = [0]
+
+    def g1(n):
+        """a generator"""
+        called[0] += 1
+        for i in range(n):
+            yield i
+
+    from ..utils import saved_generator
+    ok_generator(g1(3))
+    g1_, g2_ = saved_generator(g1(3))
+    ok_generator(g1_)
+    ok_generator(g2_)
+    target = list(g1(3))
+    eq_(called[0], 1)
+    eq_(target, list(g1_))
+    eq_(called[0], 2)
+    eq_(target, list(g2_))
+    eq_(called[0], 2)  # no new call to make a generator
+    # but we can't (ab)use 2nd time
+    eq_([], list(g2_))
+
+
+def test_assure_unicode():
+    ok_(isinstance(assure_unicode("m"), text_type))
+    ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
+    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
+    eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+
+
+@with_tempfile(mkdir=True)
+def test_path_prefix(tdir):
+    eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
+    # so we are under /d1/d2 so path prefix is ..
+    eq_(get_path_prefix('/d1/d2', '/d1/d2/d3'), '..')
+    eq_(get_path_prefix('/d1/d2/d3', '/d1/d2'), 'd3')
+    # but if outside -- full path
+    eq_(get_path_prefix('/d1/d2', '/d1/d20/d3'), '/d1/d2')
+    with chpwd(tdir):
+        eq_(get_path_prefix('.'), '')
+        eq_(get_path_prefix('d1'), 'd1')
+        eq_(get_path_prefix('d1', 'd2'), opj(tdir, 'd1'))
+        eq_(get_path_prefix('..'), '..')

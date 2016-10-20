@@ -7,17 +7,29 @@
         <link rel="stylesheet" type="text/css" href=".git/datalad/web/assets/css/jquery.dataTables-1.10.12.css">
         <style type="text/css">
           body{ max-width: 1200px; margin: 2em auto; }
+          span.breadcrumb { font-size: 13pt; position: absolute; top: 0.25em; left: 0;}
+          span.breadcrumb a { text-decoration: none; }
+          span.cwd { font-weight: bold; color: #777777; }
+          span.dir { font-weight: bold; color: #00A1CB; }
+          span.git { font-weight: bold; color: #00BA88; }
+          span.annex { font-weight: bold; color: #EC6C20; }
+          span.gittag { font-size: 70%; font-weight: normal;  vertical-align: super;}
+
           td.dir { font-weight: bold; color: #00A1CB; }
           td.git { font-weight: bold; color: #00BA88; }
+          td.uninitialized { font-weight: bold; color: #00BA88; text-decoration: line-through; }
           td.annex { font-weight: bold; color: #EC6C20; }
           td.link-broken { color:#E53B51; }
           td.link { color: #FFD03C; }
           td.file { color: #67CDDC; }
+
+          #installation { font-size: 90%; background-color: #fcfcfc; padding: 0.5em; margin: 0.5em; }
+          .command { font-family: monospace; font-weight: bold; color: darkgray; padding-left: 2em;}
         </style>
     </head>
     <body>
         <h1><a href="http://www.datalad.org" alt="DataLad website"><img src=".git/datalad/web/assets/images/datalad_banner.svg" width="196" alt="Datalad Repository"></a></h1>
-        <table id="directory" class="display"></table>
+        <div id="content"></div>
 	<noscript>
 	  <div style="border: 2px solid #E53B51; padding: 10px">
 	    <span style="font-weight:bold">Javascript is not enabled!</span>

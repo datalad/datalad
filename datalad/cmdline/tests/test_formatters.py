@@ -20,8 +20,8 @@ except ImportError:  # pragma: no cover
     if not exists('formatters.py'):
         raise SkipTest
 
-from datalad.cmdline.main import setup_parser
-from .utils import assert_equal, ok_, assert_raises, assert_in, ok_startswith
+from ..main import setup_parser
+from datalad.tests.utils import ok_, assert_in, ok_startswith
 
 demo_example = """
 #!/bin/sh

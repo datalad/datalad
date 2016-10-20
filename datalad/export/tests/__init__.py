@@ -6,7 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Interfaces tests
 
-def pprint_indent(l, indent="", fmt='%s'):
-    return indent + ('\n%s' % indent).join([fmt % x for x in l])
+"""
 
+__docformat__ = 'restructuredtext'

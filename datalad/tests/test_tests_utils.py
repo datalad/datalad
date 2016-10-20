@@ -49,6 +49,7 @@ from .utils import run_under_dir
 from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
+from .utils import with_testsui
 
 #
 # Test with_tempfile, especially nested invocations
@@ -62,7 +63,7 @@ def _with_tempfile_decorated_dummy(path):
 def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
         filename = _with_tempfile_decorated_dummy()
         ok_startswith(filename, target)
 
@@ -151,7 +152,7 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         ok_(not os.path.exists(dnames[0]))  # got removed
 
 
@@ -185,7 +186,7 @@ def test_get_most_obscure_supported_name():
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []
@@ -198,7 +199,7 @@ def test_keeptemp_via_env_variable():
     with patch.dict('os.environ', {}):
         check()
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_KEEPTEMP': '1'}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_KEEP': '1'}):
         check()
 
     eq_(len(files), 2)
@@ -528,3 +529,28 @@ def test_assert_dict_equal():
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
+
+
+def test_testsui():
+    # just one for now to test conflicting arguments
+    with assert_raises(ValueError):
+        @with_testsui(responses='some', interactive=False)
+        def some_func():   # pragma: no cover
+            pass
+
+    from datalad.ui import ui
+
+    @with_testsui(responses=['yes', "maybe so"])
+    def func2(x):
+        assert x == 1
+        eq_(ui.yesno("title"), True)
+        eq_(ui.question("title2"), "maybe so")
+        assert_raises(AssertionError, ui.question, "asking more than we know")
+        return x*2
+    eq_(func2(1), 2)
+
+    @with_testsui(interactive=False)
+    def func3(x):
+        assert_false(ui.is_interactive)
+        return x*3
+    eq_(func3(2), 6)

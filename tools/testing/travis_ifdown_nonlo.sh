@@ -7,9 +7,9 @@ if [ $1 = "down" ]; then
         echo "I: bringing down $i" >&2
         sudo ifdown $i >&2
     done
-    echo "export DATALAD_NONLO='$NONLO'"
+    echo "export DATALAD_TESTS_NONLO='$NONLO'"
 elif [ $1 = "up" ]; then
-    for i in ${DATALAD_NONLO}; do
+    for i in ${DATALAD_TESTS_NONLO}; do
         echo "I: bringing up $i" >&2
         sudo ifup $i >&2
     done

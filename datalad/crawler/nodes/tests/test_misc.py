@@ -54,11 +54,13 @@ from nose import SkipTest
 # TODO: redo on a local example
 # TODO: seems vcr fetches entire response not just the header which makes this test url
 #       in particular not appropriate
-@skip_if_no_network
-@use_cassette('brain-map.org-1', return_body='')
+#@skip_if_no_network
+#@use_cassette('brain-map.org-1', return_body='')
 def test_get_disposition_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    output = list(get_disposition_filename(input))
+    with patch('datalad.crawler.nodes.misc.get_url_disposition_filename',
+               return_value="T1.nii.gz"):
+        output = list(get_disposition_filename(input))
     eq_(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
 
@@ -463,7 +465,7 @@ def _test_debug(msg, args=()):
         with swallow_logs(new_level=logging.INFO) as cml:
             list(d1(data))
             set_trace.assert_called_once_with()
-            assert_re_in(msg, cml.out)
+            cml.assert_logged(msg, level='INFO')
 
 
 def test_debug():

@@ -11,7 +11,9 @@ from os import linesep
 
 from ...version import __version__
 from ..external_versions import ExternalVersions, StrictVersion
+from ..exceptions import CommandError
 
+from mock import patch
 from nose.tools import assert_true, assert_false
 from nose.tools import assert_equal, assert_greater_equal, assert_greater
 from nose.tools import assert_raises
@@ -109,3 +111,16 @@ def test_custom_versions():
     ev.CUSTOM = {'bogus': lambda: 1/0}
     assert_equal(ev['bogus'], None)
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
+
+
+def test_ancient_annex():
+
+    class _runner(object):
+        def run(self, cmd):
+            if '--raw' in cmd:
+                raise CommandError
+            return "git-annex version: 0.1", ""
+
+    ev = ExternalVersions()
+    with patch('datalad.support.external_versions._runner', _runner()):
+        assert_equal(ev['cmd:annex'], '0.1')

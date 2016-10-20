@@ -29,34 +29,36 @@ backends = ['archive']
 def setup_parser(backend):
 
     suffix, desc = {
-     'datalad': ('',
-                 "download content from various URLs (http{,s}, s3, etc) possibly "
-                 "requiring authentication or custom access mechanisms using "
-                 "DataLad's downloaders"),
-     'archive': ('-archive',
-                 "extract content from archives (.tar{,.gz}, .zip, etc) which are "
-                 "in turn managed by git-annex.  See `datalad add-archive-content` "
-                 "command")
-     }[backend]
+        'datalad': (
+            '',
+            "download content from various URLs (http{,s}, s3, etc) possibly "
+            "requiring authentication or custom access mechanisms using "
+            "DataLad's downloaders"),
+        'archive': (
+            '-archive',
+            "extract content from archives (.tar{,.gz}, .zip, etc) which are "
+            "in turn managed by git-annex.  See `datalad add-archive-content` "
+            "command")
+    }[backend]
     # setup cmdline args parser
     # main parser
     # TODO: should be encapsulated for resharing with the main datalad's
     parser = argparse.ArgumentParser(
-                    fromfile_prefix_chars='@',
-                    # usage="%(prog)s ...",
-                    description="%s\n\n" % m__doc__ +
-     "git-annex-remote-datalad%s is a git-annex custom special remote to %s" % (suffix, desc),
-                    epilog='"DataLad\'s git-annex very special remote"',
-                    formatter_class=argparse.RawDescriptionHelpFormatter,
-                    add_help=False,
-                )
+        fromfile_prefix_chars='@',
+        # usage="%(prog)s ...",
+        description="%s\n\n" % m__doc__ +
+                    "git-annex-remote-datalad%s is a git-annex custom special remote to %s" % (suffix, desc),
+        epilog='"DataLad\'s git-annex very special remote"',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
     # common options
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
-    helpers.parser_add_common_opt(parser,
-                                  'version',
-                                  version='datalad %s\n\n%s' % (m__version__,
-                                                              _license_info()))
+    helpers.parser_add_common_opt(
+        parser,
+        'version',
+        version='datalad %s\n\n%s' % (m__version__, _license_info()))
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
@@ -97,10 +99,10 @@ def _main(args, backend=None):
         print(remote.url_prefix)
     elif args.command is None:
         # If no command - run the special remote
-        if 'DATALAD_USECASSETTE' in os.environ:
+        if 'DATALAD_TESTS_USECASSETTE' in os.environ:
             # optionally feeding it a cassette, used by tests
             from ..support.vcr_ import use_cassette
-            with use_cassette(os.environ['DATALAD_USECASSETTE']):
+            with use_cassette(os.environ['DATALAD_TESTS_USECASSETTE']):
                 remote.main()
         else:
             remote.main()

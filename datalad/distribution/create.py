@@ -30,14 +30,13 @@ from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import to_options
 from datalad.utils import getpwd
+from datalad.utils import with_pathsep
 
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
 from .dataset import resolve_path
-from .dataset import _with_sep
 
 
 __docformat__ = 'restructuredtext'
@@ -191,13 +190,13 @@ class Create(Interface):
         assert(path is not None)
 
         # check for sane subdataset path
-        real_targetpath = _with_sep(realpath(path))  # realpath OK
+        real_targetpath = with_pathsep(realpath(path))  # realpath OK
         if dataset is not None:
             # make sure we get to an expected state
             if dataset.is_installed():
                 handle_dirty_dataset(dataset, if_dirty)
             if not real_targetpath.startswith(  # realpath OK
-                    _with_sep(realpath(dataset.path))):  # realpath OK
+                    with_pathsep(realpath(dataset.path))):  # realpath OK
                 raise ValueError("path {} outside {}".format(path, dataset))
 
         # important to use the given Dataset object to avoid spurious ID
@@ -258,7 +257,7 @@ class Create(Interface):
         if dataset is not None and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            from .install import _install_subds_inplace
+            from datalad.distribution.utils import _install_subds_inplace
             subdsrelpath = relpath(realpath(tbds.path), realpath(dataset.path))  # realpath OK
             _install_subds_inplace(ds=dataset, path=tbds.path,
                                    relativepath=subdsrelpath)

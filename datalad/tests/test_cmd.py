@@ -42,7 +42,7 @@ def test_runner_dry(tempfile):
     cmd = 'echo Testing dry run > %s' % tempfile
     with swallow_logs(new_level=logging.DEBUG) as cml:
         ret = runner.run(cmd)
-        assert_equal(cml.out.rstrip(), "{DryRunProtocol} Running: %s" % cmd)
+        cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
     assert_equal(("DRY", "DRY"), ret,
                  "Output of dry run (%s): %s" % (cmd, ret))
     assert_equal(shlex.split(cmd, posix=not on_windows), dry[0]['command'])
@@ -146,14 +146,16 @@ def test_runner_log_stdout():
             kw['shell'] = True
         with swallow_logs(logging.DEBUG) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
-            eq_(cm.lines[0], "Running: %s" % cmd)
-            if not on_windows:
-                # we can just count on sanity
-                eq_(cm.lines[1], "stdout| stdout-"
-                                 "Message should be logged")
-            else:
-                # echo outputs quoted lines for some reason, so relax check
-                ok_("stdout-Message should be logged" in cm.lines[1])
+            cm.assert_logged("Running: %s" % cmd, level='DEBUG', regex=False)
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False):
+                if not on_windows:
+                    # we can just count on sanity
+                    cm.assert_logged("stdout| stdout-"
+                                     "Message should be logged", regex=False)
+                else:
+                    # echo outputs quoted lines for some reason, so relax check
+                    ok_("stdout-Message should be logged" in cm.lines[1])
 
     cmd = 'echo stdout-Message should not be logged'
     with swallow_outputs() as cmo:

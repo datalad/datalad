@@ -19,13 +19,15 @@ from hashlib import md5
 from six.moves.urllib.parse import urlsplit
 from six import string_types
 from os.path import join as opj, exists, relpath
+from os.path import dirname
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
+from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
-from datalad import cfg as dlcfg
+from datalad import cfg
 
 
 # common format
@@ -51,17 +53,17 @@ def get_metadata_type(ds, guess=False):
       Metadata type labels or `None` if no type setting is found and and
       optional auto-detection yielded no results
     """
-    cfg = ds.config
-    if cfg and cfg.has_section('metadata'):
-        if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype').split()
+    cfg_ = ds.config
+    if cfg_ and cfg_.has_section('metadata'):
+        if cfg_.has_option('metadata', 'nativetype'):
+            return cfg_.get_value('metadata', 'nativetype').split()
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
-            if pmod.has_metadata(ds):
+            if pmod.MetadataParser(ds).has_metadata():
                 mtypes.append(mtype)
     return mtypes if len(mtypes) else None
 
@@ -118,7 +120,7 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
-            repo_info = ds.repo.repo_info()
+            repo_info = ds.repo.repo_info(fast=True)
         annex_meta = []
         for src in ('trusted repositories',
                     'semitrusted repositories',
@@ -134,9 +136,9 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
                 # XXX maybe report which one is local? Available in anx['here']
                 # XXX maybe report the type of annex remote?
                 annex_meta.append(anx_meta)
-            if len(annex_meta) == 1:
-                annex_meta = annex_meta[0]
-            meta['availableFrom'] = annex_meta
+        if len(annex_meta) == 1:
+            annex_meta = annex_meta[0]
+        meta['availableFrom'] = annex_meta
 
     ## metadata on all subdataset
     subdss = []
@@ -198,7 +200,7 @@ def _adjust_subdataset_location(meta, subds_relpath):
             if not isinstance(parts, list):
                 parts = [parts]
             for p in parts:
-                if not 'location' in p:
+                if 'location' not in p:
                     continue
                 loc = p.get('location', subds_relpath)
                 if loc != subds_relpath:
@@ -313,27 +315,41 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
 
 def _cached_load_document(url):
-    from pyld.jsonld import load_document
-    cache_dir = opj(
-        dlcfg.dirs.user_cache_dir,
-        'schema')
-    doc_fname = opj(
-        cache_dir,
-        '{}-{}'.format(
-            urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest()))
+    """Loader of pyld document from a url, which caches loaded instance on disk
+    """
+    doc_fname = _get_schema_url_cache_filename(url)
 
+    doc = None
     if os.path.exists(doc_fname):
-        lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
-        doc = pickle.load(open(doc_fname))
-    else:
+        try:
+            lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
+            doc = pickle.load(open(doc_fname, 'rb'))
+        except Exception as e:  # it is OK to ignore any error and fall back on the true source
+            lgr.warning(
+                "cannot load cache from '%s', fall back on schema download: %s",
+                doc_fname, exc_str(e))
+
+    if doc is None:
+        from pyld.jsonld import load_document
         doc = load_document(url)
-        if not exists(cache_dir):
-            os.makedirs(cache_dir)
+        assure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
-        pickle.dump(doc, open(doc_fname, 'w'))
+        pickle.dump(doc, open(doc_fname, 'wb'))
         lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
     return doc
+
+
+def _get_schema_url_cache_filename(url):
+    """Return a filename where to cache schema doc from a url"""
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
+    doc_fname = opj(
+        cache_dir,
+        '{}-{}.p{}'.format(
+            urlsplit(url).netloc,
+            md5(url.encode('utf-8')).hexdigest(),
+            pickle.HIGHEST_PROTOCOL)
+    )
+    return doc_fname
 
 
 def flatten_metadata_graph(obj):
@@ -378,7 +394,7 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
         try:
-            native_meta = pmod.get_metadata(ds, ds_identifier)
+            native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
             lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
             continue

@@ -14,8 +14,11 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..cmdline.main import main
-from .utils import assert_equal, ok_, assert_raises, in_, ok_startswith
+from ..main import main
+from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_re_in
+
 
 def run_main(args, exit_code=0, expect_stderr=False):
     """Run main() of the datalad, do basic checks and provide outputs
@@ -41,9 +44,9 @@ def run_main(args, exit_code=0, expect_stderr=False):
             assert_equal(cm.exception.code, exit_code)  # exit code must be 0
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
-            if expect_stderr == False:
+            if expect_stderr is False:
                 assert_equal(stderr, "")
-            elif expect_stderr == True:
+            elif expect_stderr is True:
                 # do nothing -- just return
                 pass
             else:
@@ -83,7 +86,42 @@ def test_help_np():
                   'General information',
                   'Global options'})
 
+    # none of the lines must be longer than 80 chars
+    # TODO: decide on   create-sibling and possibly
+    # rewrite-urls
+    long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
+                  if len(l) > 80 and '{' not in l  # on nd70 summary line is unsplit
+                  ]
+    if long_lines:
+        raise AssertionError(
+            "Following lines in --help output were longer than 80 chars:\n%s"
+            % '\n'.join(long_lines)
+        )
+
 
 def test_usage_on_insufficient_args():
     stdout, stderr = run_main(['install'], exit_code=1)
     ok_startswith(stdout, 'usage:')
+
+
+def test_subcmd_usage_on_unknown_args():
+    stdout, stderr = run_main(['install', '--murks'], exit_code=1)
+    in_('install', stdout)
+
+
+def check_incorrect_option(opts, err_str):
+    stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    out = stdout + stderr
+    assert_in("usage: ", out)
+    assert_re_in(err_str, out, match=False)
+
+
+def test_incorrect_options():
+    # apparently a bit different if following a good one so let's do both
+    err_invalid = "error: (invalid|too few arguments)"
+    yield check_incorrect_option, ('--buga',), err_invalid
+    yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
+
+    err_insufficient = err_invalid # "specify"
+    yield check_incorrect_option, ('--dbg',), err_insufficient
+    yield check_incorrect_option, tuple(), err_insufficient

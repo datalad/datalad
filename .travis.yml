@@ -2,35 +2,54 @@
 # travis-ci.org definition for DataLad build
 language: python
 
+python:
+  - 2.7
+  - 3.3
+  - 3.4
+
 cache:
   - apt
 
+env:
+  global:
+    # will be used in the matrix, where neither other variable is used
+    - BOTO_CONFIG=/tmp/nowhere
+    - DATALAD_TESTS_SSH=1
+    # Special settings/helper for combined coverage from special remotes execution
+    - COVERAGE=coverage
+# Disabled since old folks don't want to change workflows of submitting through central authority
+#    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
+#    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
+
 matrix:
   include:
-  - python: 2.7
-    env:
-    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
-    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
-  # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
-  #- python: 2.7
-  #  env:
-  #  - NOSE_WRAPPER="tools/eval_under_testloopfs"
+  # Additional custom ones
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
-    - DATALAD_LOGLEVEL=INFO
+    - _DATALAD_UPSTREAM_GITPYTHON=1
+  - python: 2.7
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
+    - DATALAD_LOG_LEVEL=INFO
+    - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
-    - DATALAD_LOGLEVEL=2
-    - DATALAD_LOGTARGET=/dev/null
+    - DATALAD_LOG_LEVEL=2
+    - DATALAD_LOG_TARGET=/dev/null
+    - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
+    - DATALAD_API_ALWAYSRENDER=1
+    - DATALAD_TESTS_PROTOCOLREMOTE=1
+    - DATALAD_TESTS_DATALADREMOTE=1
+    - DATALAD_LOG_OUTPUTS=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
-    - unset -v DATALAD_TESTS_SSH
+    - DATALAD_TESTS_SSH=0
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
@@ -48,26 +67,23 @@ matrix:
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
   - python: 2.7
+    # apparently moving symlink outside has different effects on abspath
+    # see  https://github.com/datalad/datalad/issues/878
+    env:
+    - TMPDIR="/var/tmp/sym link"
+  - python: 2.7
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
-  - python: 3.3
-  - python: 3.4
-  # Those aren't yet ready since lxml I believe fails to install
-  #- python: pypy
-  #- python: pypy3
-# not there -- don't try!
-# - python: 3.5
-# can't since coverage doesn't support it yet: https://bitbucket.org/ned/coveragepy/issues/391/getargspec-was-finally-removed-will-not-be
-# - python: nightly
-
-env:
-  # to overcome problem with system-wide installed boto on travis
-  # see https://github.com/travis-ci/travis-ci/issues/5246
-  - BOTO_CONFIG=/tmp/nowhere
-  - DATALAD_TESTS_SSH=1
+# Causes complete laptop or travis instance crash atm, but survives in a docker
+# need to figure it out (looks like some PID explosion)
+#  - python: 3.5
+#    # we would need to migrate to boto3 to test it fully, but SSH should work
+#    env:
+#    - DATALAD_TESTS_SSH=1
+#    - UNSET_S3_SECRETS=1
 
 before_install:
   # The ultimate one-liner setup for NeuroDebian repository
@@ -77,47 +93,47 @@ before_install:
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
   - npm install grunt-cli
+  # Install optionally upstream current development so we are sure that they break nothing important for us
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo apt-get install git-annex-standalone zip
-  # For Python3 compatibility needs never-released master
-  - pip install https://github.com/niltonvolpato/python-progressbar/archive/master.zip
+  - travis_retry sudo apt-get install git-annex-standalone zip pandoc
+  - travis_retry sudo apt-get install shunit2
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
-  - git submodule update --init --recursive
   - cd ..; pip install -q codecov; cd -
-  - pip install -r requirements.txt
-  # Verify that setup.py build doesn't puke
-  - python setup.py build
-  - pip install -e .
+  - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
-  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
-  - pip install sphinx
-  - pip install sphinx_rtd_theme
   # TMPDIRs
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/sym link" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-  - if [ ! -z "$TMPDIR" ] && [ "$TMPDIR" = "/tmp/d i r" ]; then mkdir -p "$TMPDIR"; fi
+  - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
+  - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
+  # S3
+  - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit
 
 script:
-  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
-  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
+  # Verify that setup.py build doesn't puke
+  - python setup.py build
+  # Run tests
+  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
+  # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
+  - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
+  - coverage combine -a /tmp/.coverage-entrypoints-*
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
 # for a particular debugging
 #after_failure:
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-#  - DATALAD_LOGLEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=DEBUG
+#  - DATALAD_LOG_LEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=DEBUG
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi

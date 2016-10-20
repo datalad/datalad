@@ -19,7 +19,7 @@ import os
 import shlex
 import tempfile
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename, abspath
+from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
 from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
@@ -31,7 +31,7 @@ from .base import Interface
 from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
+from ..support.constraints import EnsureStr, EnsureNone
 
 from ..support.annexrepo import AnnexRepo
 from ..support.strings import apply_replacement_rules
@@ -42,7 +42,6 @@ from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 
 from six import string_types
-from six.moves.urllib.parse import urlparse
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
@@ -305,7 +304,7 @@ class AddArchiveContent(Interface):
                     annex_options = shlex.split(annex_options)
 
             leading_dir = earchive.get_leading_directory(
-                    depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
+                depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
                 if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 

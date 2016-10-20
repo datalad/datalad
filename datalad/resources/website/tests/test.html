@@ -76,20 +76,61 @@
 	  assert.equal(getParameterByName('dir', 'example.com/d1/d2/d3'), null,
 		       'null if parameter does not exist');
       });
-      QUnit.test("jQuery Ajax", function(assert) {
-	  sinon.spy(jQuery, "ajax");
-	  jQuery.getJSON("/some/resource");
-
-	  assert.ok(jQuery.ajax.calledOnce);
-	  assert.equal(jQuery.ajax.getCall(0).args[0].url, "/some/resource");
-	  assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
-      });
       QUnit.test("Click Handler", function(assert) {
 	  loc = sinon.stub().returns({pathname: '/ds1/', href: '/ds1/?dir=/d1/'});
 	  assert.deepEqual(click_handler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
 	  assert.deepEqual(click_handler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
 	  assert.deepEqual(click_handler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
 	  assert.deepEqual(click_handler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
+      });
+      QUnit.test("Size Rendering", function(assert) {
+	assert.equal(size_renderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
+	assert.equal(size_renderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
+	assert.equal(size_renderer({}), "-", "no sizes in sizes json");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
+	assert.equal(size_renderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
+      });
+      QUnit.test("parent_metadata", function(assert) {
+	// setup variables, mock method
+	loc = sinon.stub().returns({pathname: '/ds2/', href: '/ds2/?dir=/d1/'});
+	var metadata_loc = "/.git/datalad/metadata/6666cd76f96956469e7be39d750cc7d9";
+	//parent_url = sinon.stub().returns('/ds1');
+	url_exists = sinon.stub().returns(true);
+	sinon.spy(jQuery, "ajax");
+	// function to test
+	parent_json(jQuery, md5);
+	// spy
+	assert.ok(jQuery.ajax.calledOnce);
+	assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds2" + metadata_loc);
+	assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
+      });
+      QUnit.test("Bread2crumbs", function(assert) {
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"cwd\">datasets.datalad.org</span></a>"],
+			 "base case, root directory in breadcrumbs");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"cwd\">ds1</span></a>"],
+			 "breadcrumbs to server root even if root ds a subdirectory");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir='});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>"],
+			 "empty 'dir' get parameter");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir=/d1'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1><span class=\"cwd\">d1</span></a>"],
+			 "single sub-directory in 'dir' get parameter");
+
+	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1/?dir=/d1/d2'});
+	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"dir\">datasets.datalad.org</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1><span class=\"dir\">ds1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1><span class=\"dir\">d1</span></a>",
+					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1/d2><span class=\"cwd\">d2</span></a>"],
+			 "multiple sub-directories in 'dir' get parameter");
       });
     </script>
   </body>

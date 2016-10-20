@@ -14,8 +14,6 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureBool
 
 
 dataset_description = Parameter(
@@ -40,6 +38,12 @@ git_opts = Parameter(
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git` calls""")
+
+git_clone_opts = Parameter(
+    args=("--git-clone-opts",),
+    metavar='STRING',
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :command:`git clone` calls""")
 
 annex_opts = Parameter(
     args=("--annex-opts",),
@@ -91,3 +95,14 @@ nosave_opt = Parameter(
     action="store_false",
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
+
+jobs_opt = Parameter(
+    args=("-J", "--jobs"),
+    metavar="NJOBS",
+    constraints=EnsureInt() | EnsureNone(),
+    doc="""how many parallel jobs (where possible) to use.""")
+
+verbose = Parameter(
+    args=("-v", "--verbose",),
+    action="store_true",
+    doc="""print out more detailed information while executing a command""")
