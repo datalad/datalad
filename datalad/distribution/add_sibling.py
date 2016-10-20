@@ -19,7 +19,7 @@ from os.path import join as opj, abspath, basename
 
 from datalad.dochelpers import exc_str
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import RI
@@ -169,7 +169,7 @@ class AddSibling(Interface):
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
+                if (not existing_url or repoinfo['url'].rstrip('/') != existing_url.rstrip('/')) \
                         or (pushurl and existing_pushurl and
                             repoinfo['pushurl'].rstrip('/') !=
                                     existing_pushurl.rstrip('/')) \
@@ -206,7 +206,12 @@ class AddSibling(Interface):
                 # we need to check if added sibling an annex, and try to enable it
                 # another part of the fix for #463 and #432
                 try:
-                    repo.enable_remote(name)
+                    if not ds.config.obtain(
+                            'remote.{}.annex-ignore'.format(name),
+                            default=False,
+                            valtype=EnsureBool(),
+                            store=False):
+                        repo.enable_remote(name)
                 except CommandError as exc:
                     lgr.info("Failed to enable annex remote %s, "
                              "could be a pure git" % name)
