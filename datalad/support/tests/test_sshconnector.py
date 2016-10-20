@@ -9,18 +9,21 @@
 
 """
 
+import logging
 import os
 from os.path import exists, isdir, getmtime, join as opj
 
-from nose.tools import ok_, assert_is_instance
-
-from datalad.support.sshconnector import SSHConnection, SSHManager
-from datalad.tests.utils import assert_raises, eq_
-from datalad.tests.utils import skip_ssh, with_tempfile, get_most_obscure_supported_name
+from datalad.tests.utils import assert_raises
+from datalad.tests.utils import eq_
+from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import ok_
+from datalad.tests.utils import assert_is_instance
 
-import logging
+from ..sshconnector import SSHConnection, SSHManager
 
 
 @skip_ssh
@@ -45,7 +48,7 @@ def test_ssh_get_connection():
 
 
 @skip_ssh
-@with_tempfile(suffix=" \"`suffix:;& ", # get_most_obscure_supported_name(),
+@with_tempfile(suffix=" \"`suffix:;& ",  # get_most_obscure_supported_name(),
                content="1")
 def test_ssh_open_close(tfile1):
 
@@ -58,7 +61,8 @@ def test_ssh_open_close(tfile1):
 
     # use connection to execute remote command:
     out, err = c1(['ls', '-a'])
-    remote_ls = [entry for entry in out.splitlines() if entry != '.' and entry != '..']
+    remote_ls = [entry for entry in out.splitlines()
+                 if entry != '.' and entry != '..']
     local_ls = os.listdir(os.path.expanduser('~'))
     eq_(set(remote_ls), set(local_ls))
 
@@ -89,6 +93,7 @@ def test_ssh_manager_close():
 
 def test_ssh_manager_close_no_throw():
     manager = SSHManager()
+
     class bogus:
         def close(self):
             raise Exception("oh I am so bad")
@@ -125,7 +130,8 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
-    ssh.copy(sourcedir, opj(remote_url, targetdir), recursive=True, preserve_attrs=True)
+    ssh.copy(sourcedir, opj(remote_url, targetdir),
+             recursive=True, preserve_attrs=True)
 
     # check if sourcedir copied to remote_url:targetdir
     ok_(isdir(targetdir))

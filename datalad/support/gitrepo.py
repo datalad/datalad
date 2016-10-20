@@ -495,6 +495,14 @@ class GitRepo(object):
         path : str
         """
 
+        if is_ssh(url):
+            cnct = ssh_manager.get_connection(url)
+            cnct.open()
+            # TODO: with git <= 2.3 keep old mechanism:
+            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+        else:
+            env = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -502,6 +510,7 @@ class GitRepo(object):
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
                                                   url,
                                                   path,
+                                                  env=env,
                                                   odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
@@ -1305,6 +1314,26 @@ class GitRepo(object):
                 return cfg_reader.get('url')
             else:
                 return None
+
+    def set_remote_url(self, name, url, push=False):
+        """Set the URL a remote is pointing to
+
+        Sets the URL of the remote `name`. Requires the remote to already exist.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        url: str
+        push: bool
+          if True, set the push URL, otherwise the fetch URL
+        """
+
+        cmd = ["git", "remote", "set-url"]
+        if push:
+            cmd.append("--push")
+        cmd += [name, url]
+        return self._git_custom_command('', cmd)
 
     def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
