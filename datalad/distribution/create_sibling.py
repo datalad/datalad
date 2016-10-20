@@ -346,7 +346,7 @@ class CreateSibling(Interface):
             lgr.debug("Adding the siblings")
             if target_url is None:
                 target_url = sshurl
-            if target_pushurl is None:
+            if target_pushurl is None and sshurl != target_url:
                 target_pushurl = sshurl
             AddSibling()(dataset=ds,
                          name=target,
