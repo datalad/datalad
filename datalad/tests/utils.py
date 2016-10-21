@@ -195,10 +195,10 @@ def ok_clean_git(path, annex=True, head_modified=[], index_modified=[], untracke
             if head_modified:
                 # we did ask for interrogating changes
                 head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                assert(head_modified_, head_modified)
+                eq_(head_modified_, head_modified)
             if index_modified:
                 index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                assert(index_modified_, index_modified)
+                eq_(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):

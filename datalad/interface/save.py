@@ -225,6 +225,7 @@ class Save(Interface):
                                 git=True)
                     _modified_flag = True
 
+        ds_files = []
         if files:  # could still be none without auto add changes
             subdatasets_paths = {
                 opj(ds.path, f) for f in ds.get_subdatasets(recursive=False)
@@ -252,7 +253,7 @@ class Save(Interface):
                 working_tree=False,
                 untracked_files=False,
                 submodules=True):
-            ds.repo.commit(message, _datalad_msg=_datalad_msg)
+            ds.repo.commit(message, options=ds_files, _datalad_msg=_datalad_msg)
             _modified_flag = True
         elif not auto_add_changes:
             lgr.info(
