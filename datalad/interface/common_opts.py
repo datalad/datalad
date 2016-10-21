@@ -130,7 +130,9 @@ publish_depends = Parameter(
     args=("--publish-depends",),
     metavar='SIBLINGNAME',
     doc="""add a dependency such that the given exsiting sibling is
-    always published prior to the new sibling. [PY: Multiple dependencies can be
-    given as a list of sibling names PY][CMD: This option can be given
-    more than once to configure multiple dependencies CMD]""",
+    always published prior to the new sibling. This equals setting a
+    configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
+    [PY: Multiple dependencies can be given as a list of sibling names
+    PY][CMD: This option can be given more than once to configure multiple
+    dependencies CMD]""",
     action='append')
