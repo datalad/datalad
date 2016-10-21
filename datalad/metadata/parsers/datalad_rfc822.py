@@ -17,7 +17,7 @@ i.e. can be composed from scratch, by hand, in an editor -- with a good
 chance of producing syntax-compliant content with the first attempt.
 """
 
-import rfc822
+import email
 from os.path import join as opj
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.interface.base import dedent_docstring
@@ -49,7 +49,9 @@ class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = [opj('.datalad', 'control')]
 
     def _get_metadata(self, ds_identifier, meta, full):
-        spec = rfc822.Message(open(self.get_core_metadata_filenames()[0]))
+        spec = email.parser.Parser().parse(
+            open(self.get_core_metadata_filenames()[0]),
+            headersonly=True)
 
         # loop over all recognized headers and translate them
         for header, dataladterm in \
