@@ -15,7 +15,8 @@ __docformat__ = 'restructuredtext'
 import logging
 
 import os
-from os.path import join as opj, isdir, realpath, relpath
+from os.path import join as opj, isdir, realpath, relpath, pardir
+from os.path import isabs
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -41,10 +42,10 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
     # those need to become submodules now, as they are otherwise added
     # without an entry in .gitmodules, and subsequently break Git's
     # submodule functionality completely
-    _modified_flag = False
+    new_modules = []
     if not consider_paths:
         # nothing to test
-        return False
+        return new_modules
 
     for utf in ds.repo.repo.untracked_files:
         utf_abspath = opj(ds.path, utf)
@@ -62,19 +63,22 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
                 path=utf_abspath,  # can be ignored, we don't need the return value
                 relativepath=utf.rstrip(os.sep),
                 name=None)
-            _modified_flag = True
+            new_modules.append(utf.rstrip(os.sep))
 
-    return _modified_flag
+    return new_modules
 
 
 def deinit_deleted_submodules(ds):
     # helper to inspect a repo and `deinit` all submodules that are reported
     # as present, but the mountpoint doesn't exist
     deleted = ds.repo.get_deleted_files()
+    deinited = []
     for subdspath in ds.get_subdatasets(absolute=False, recursive=False):
         if subdspath in deleted:
             lgr.debug('deinit deleted subdataset {} in {}'.format(subdspath, ds))
             ds.repo.deinit_submodule(subdspath)
+            deinited.append(subdspath)
+    return deinited
 
 
 class Save(Interface):
@@ -152,6 +156,12 @@ class Save(Interface):
         # always yields list; empty if None
         files = assure_list(files)
 
+        # track what to be committed, so it becomes
+        # possible to decide when/what to save further down
+        # and one level up
+        orig_hexsha = ds.repo.get_hexsha()
+        to_commit = []
+
         # before anything, let's deal with missing submodules that may have
         # been rm'ed by the user
         # this will not alter/amend the history of the dataset
@@ -177,13 +187,13 @@ class Save(Interface):
             # make sure we apply the usual path interpretation logic
             files = [resolve_path(p, dataset) for p in files]
 
-        # track whether we modified anything, so it becomes
-        # possible to decide when/what to save further down
-        # and one level up
-        _modified_flag = False
-
-        _modified_flag = untracked_subdatasets_to_submodules(
-            ds, files) or _modified_flag
+        new_submodules = untracked_subdatasets_to_submodules(ds, files)
+        if new_submodules:
+            # make sure that .gitmodules is added to the list of files
+            # to be committed.  Adding to index might not be enough iff
+            # custom files was provided
+            to_commit.append('.gitmodules')
+        to_commit.extend(new_submodules)
 
         # now we should have a complete list of submodules to potentially
         # recurse into
@@ -192,27 +202,42 @@ class Save(Interface):
             subdss = []
             if auto_add_changes:
                 # all installed 1st-level ones
-                # we only want immediate subdatasets, higher depths will come via
-                # recursion
+                # we only want immediate subdatasets, higher depths will come
+                # via recursion
                 subdss = [Dataset(opj(ds.path, subds_path))
                           for subds_path in ds.get_subdatasets(
                               recursive=False)]
             elif files is not None:
                 # only subdatasets that contain any of the to-be-considered
                 # paths
+                # TODO:  the same deductions will be redone later again
+                #  very inefficient.  Should be just sorted into subds
+                #  once!
                 subdss = [ds.get_containing_subdataset(
                     p, recursion_limit=1) for p in files]
+
             # skip anything that isn't installed, or this dataset
             subdss = [d for d in subdss if d.is_installed() and d != ds]
 
             prop_recursion_limit = \
                 None if recursion_limit is None else max(recursion_limit - 1, 0)
+
             for subds in subdss:
+                # TODO: just make use of get._sort_paths_into_datasets
+                # currently it is very inefficient since for the same ds
+                # it asks about subdatasets for every file!
+                subds_files = []  # files belonging to the subds
+                todo_files = []   # leftover files
+                for f in files:
+                    if ds.get_containing_subdataset(f, recursion_limit=1) == subds:
+                        subds_files.append(f)
+                    else:
+                        todo_files.append(f)
+                files = todo_files
+
                 subds_modified = Save.__call__(
                     message=message,
-                    files=[f for f in files
-                           if ds.get_containing_subdataset(
-                               f, recursion_limit=1) == subds],
+                    files=subds_files,
                     dataset=subds,
                     auto_add_changes=auto_add_changes,
                     version_tag=version_tag,
@@ -221,60 +246,103 @@ class Save(Interface):
                 )
                 if subds_modified:
                     # stage changes in this submodule
-                    ds.repo.add(relpath(subds.path, ds.path),
-                                git=True)
-                    _modified_flag = True
+                    subdspath = relpath(subds.path, ds.path)
+                    ds.repo.add(subdspath, git=True)
+                    to_commit.append(subdspath)
 
-        ds_files = []
         if files:  # could still be none without auto add changes
+            ds_subdatasets = ds.get_subdatasets(recursive=False)
             subdatasets_paths = {
-                opj(ds.path, f) for f in ds.get_subdatasets(recursive=False)
+                opj(ds.path, f) for f in ds_subdatasets
             }
+            # TODO: also use some centralized sorting into sub-datasets
+            # e.g. one used in get
             ds_files = [
                 f for f in files
-                if f in subdatasets_paths or \
+                if f in subdatasets_paths or
                     ds.get_containing_subdataset(f, recursion_limit=1) == ds
             ]
             if len(ds_files):
                 # XXX Is there a better way to handle files in mixed repos?
                 ds.repo.add(ds_files)
                 ds.repo.add(ds_files, git=True)
+                to_commit.extend(ds_files)
+            # it might be that the file itself is the submodule, so we might
+            # need to commit .gitmodules
+            for f in files:
+                for subds in subdatasets_paths:
+                    if subds.rstrip('/') == f.rstrip('/'):
+                        to_commit.append('.gitmodules')
+                        break
 
         _datalad_msg = False
         if not message:
             message = 'Recorded existing changes'
             _datalad_msg = True
 
+        # extend with files yet to be committed in this dataset
+        to_commit.extend(files)
+
         # anything should be staged by now
         # however, staged submodule changes are not considered as
         # `index`, hence `submodules` needs to be True too
+        # we can have an explicit list of stuff to save or (if no `files`
+        # provided) have staged stuff
         if ds.repo.repo.is_dirty(
                 index=True,
                 working_tree=False,
                 untracked_files=False,
                 submodules=True):
-            ds.repo.commit(message, options=ds_files, _datalad_msg=_datalad_msg)
-            _modified_flag = True
+
+            # Analyze list of known to be committed files/submodules,
+            # see if nothing points outside, and then convert to relative paths
+            to_commit_rel = []
+            if to_commit:
+                repopath = ds.repo.path
+                for f in to_commit:
+                    if isabs(f):
+                        frel = relpath(f, repopath)
+                        if frel.startswith(pardir):
+                            # XXX may be just a warning and skip?
+                            raise RuntimeError(
+                                "Path %s outside of the dataset %s. Can't commit"
+                                % (f, ds)
+                            )
+                        f = frel
+                    to_commit_rel.append(f)
+                to_commit_rel = sorted(set(to_commit_rel))
+                if '.' in to_commit_rel:
+                    # we need to commit everything
+                    to_commit_rel = []
+
+            ds.repo.commit(message, options=to_commit_rel, _datalad_msg=_datalad_msg)
+        elif to_commit:
+            lgr.warning(
+                "Was instructed to commit %s files but repository is not dirty",
+                to_commit)
         elif not auto_add_changes:
             lgr.info(
                 'Nothing to save, consider auto-detection of changes, '
                 'if this is unexpected.')
+
         # MIH: let's tag even if there was nothing commit. I'd forget this
         # option too often...
         if version_tag:
             ds.repo.tag(version_tag)
 
+        _was_modified = ds.repo.get_hexsha() != orig_hexsha
+
         # and now we could consider saving our changes within super-datasets
         # Let's float up until we get to a non-dataset
         if super_datasets:
-            if _modified_flag:
+            if _was_modified:
                 if version_tag:
                     lgr.info("Version tag %s will not be applied to super datasets",
                              version_tag)
                 superds = ds
                 while True:
                     supersubds = superds
-                    superds = superds.get_superdataset()
+                    superds = superds.get_superdataset(datalad_only=True)
                     if not superds:
                         break
                     Save.__call__(
@@ -292,7 +360,7 @@ class Save(Interface):
 
         # TODO: figure out what we should return for recursive/super_datasets
         # shouldn't we return all commits???
-        return ds.repo.repo.head.commit if _modified_flag else None
+        return ds.repo.repo.head.commit if _was_modified else None
 
     @staticmethod
     def result_renderer_cmdline(res, args):
