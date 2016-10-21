@@ -61,6 +61,9 @@ def _get_github_entity(gh, cred, github_user, github_passwd, github_organization
             github_user = creds['user']
             github_passwd = creds['password']
 
+    if not github_user:
+        raise gh.BadCredentialsException(403, 'no user specified')
+
     # this will always succeed, but it might later throw an exception
     # if the credentials were wrong
     # XXX make sure to wipe out known credentials if that happens
@@ -322,6 +325,10 @@ class CreateSiblingGithub(Interface):
                 '-' if mp else '',
                 template_fx(mp))
             filtered.append((d, gh_reponame))
+
+        if not filtered:
+            # all skipped
+            return []
 
         # actually make it happen on Github
         rinfo = _make_github_repos(

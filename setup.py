@@ -75,6 +75,7 @@ requires = {
     ],
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
+        'PyGithub',          # nice to have
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
