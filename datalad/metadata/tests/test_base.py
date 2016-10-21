@@ -29,6 +29,7 @@ from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import skip_if_no_network
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from nose import SkipTest
@@ -131,6 +132,7 @@ def test_basic_metadata(path):
                   'location': 'sub'})
 
 
+@skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
@@ -290,6 +292,7 @@ def test_aggregation(path):
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
 
+@skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata

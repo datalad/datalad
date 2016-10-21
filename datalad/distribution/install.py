@@ -232,7 +232,7 @@ class Install(Interface):
                                     **common_kwargs
                                 )
                     installed_items += assure_list(result)
-                except InstallFailedError as exc:
+                except Exception as exc:
                     lgr.warning("Installation of %s has failed: %s",
                                 s, exc_str(exc))
                     failed_items.append(s)
@@ -255,7 +255,9 @@ class Install(Interface):
                         **common_kwargs
                     )
                 except IncompleteResultsError as exc:
-                    lgr.warning("Some items failed to get: %s", exc_str(exc))
+                    exc_str_ = ': ' + exc_str(exc) if exc.results else ''
+                    lgr.warning("Some items failed to install: %s",
+                                exc_str_)
                     installed_datasets = exc.results
                     failed_items.extend(exc.failed)
 
@@ -522,11 +524,14 @@ class Install(Interface):
                   single_or_plural("dataset", "datasets", len(l),
                                    include_count=True),
                   act)
-                paths = [relpath(i.path, ds.path)
-                         if hasattr(i, 'path')
-                         else i if not i.startswith(ds.path) else relpath(i, ds.path)
-                         for i in l]
-                msg += " (%s)" % (", ".join(paths))
+                if ds:
+                    paths = [relpath(i.path, ds.path)
+                             if hasattr(i, 'path')
+                             else i if not i.startswith(ds.path) else relpath(i, ds.path)
+                             for i in l]
+                else:
+                    paths = l
+                msg += " (%s)" % (", ".join(map(str, paths)))
             msg += ' to install'
 
             # we were asked for multiple installations

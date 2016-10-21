@@ -27,6 +27,8 @@ from os.path import join as opj
 from datalad.api import search
 from datalad.metadata import search as search_mod
 
+from datalad.tests.utils import skip_if_no_network
+
 
 @with_testsui(interactive=False)
 @with_tempfile(mkdir=True)
@@ -121,6 +123,7 @@ def _check_mocked_install(central_dspath, mock_install):
     mock_install.assert_called_once_with(central_dspath, source='///')
 
 
+@skip_if_no_network
 @with_tempfile
 def test_our_metadataset_search(tdir):
     # smoke test for basic search operations on our super-megadataset
