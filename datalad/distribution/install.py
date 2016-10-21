@@ -232,7 +232,7 @@ class Install(Interface):
                                     **common_kwargs
                                 )
                     installed_items += assure_list(result)
-                except InstallFailedError as exc:
+                except Exception as exc:
                     lgr.warning("Installation of %s has failed: %s",
                                 s, exc_str(exc))
                     failed_items.append(s)
