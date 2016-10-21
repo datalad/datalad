@@ -34,7 +34,7 @@ def test_has_no_metadata(path):
 
 
 @with_tree(tree={'.datalad': {'meta.rfc822': """\
-Package: studyforrest_phase2
+Name: studyforrest_phase2
 Version: 1.0.0-rc3
 Description: Basic summary
  A text with arbitrary length and content that can span multiple
@@ -51,6 +51,13 @@ License: CC0
 Maintainer: Mike One <mike@example.com>,
             Anna Two <anna@example.com>,
 Homepage: http://studyforrest.org
+Funding: BMBFGQ1411, NSF 1429999
+Issue-Tracker: https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues
+Cite-As: Cool (2016)
+Donation: in beer
+DOI: 10.5281/zenodo.48421
+Registration: info@studyforrest.org
+
 """}})
 def test_get_metadata(path):
 

@@ -55,7 +55,7 @@ class MetadataParser(BaseMetadataParser):
 
         # loop over all recognized headers and translate them
         for header, dataladterm in \
-                (('package', 'name'),
+                (('name', 'name'),
                  ('license', 'license'),
                  ('maintainer', 'author'),
                  #('homepage', 'citation'),
