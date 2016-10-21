@@ -792,7 +792,7 @@ class GitRepo(object):
             try:
                 return self.repo.active_branch.object.hexsha
             except ValueError as exc:
-                if exc.message.endswith('does not exist'):
+                if 'does not exist' in str(exc):
                     return None
                 raise
 
