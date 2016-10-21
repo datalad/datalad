@@ -148,6 +148,7 @@ class AnnexRepo(GitRepo):
 
         # initialize
         self._uuid = None
+        self._annex_common_options = []
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -168,36 +169,13 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
-        # Note: set ssh options before any possible invocation of git-annex
-        # Temporary approach to ssh connection sharing:
-        # Register every ssh remote with the corresponding control master.
-        # Issues:
-        # - currently overwrites existing ssh config of the remote
-        # - request SSHConnection instance and write config even if no
-        #   connection needed (but: connection is not actually created/opened)
-        # - no solution for a ssh url of a file (annex addurl)
-        from datalad.support.network import is_ssh
+        # check for possible SSH URLs of the remotes in order to set up
+        # shared connections:
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
                 if url is not None:
-                    if is_ssh(url):
-                        c = ssh_manager.get_connection(url)
-                        ssh_cfg_var = "remote.{0}.annex-ssh-options".format(r)
-                        cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
-                        cfg_string_old = self.config.get(ssh_cfg_var, None)
-
-                        if cfg_string_old and cfg_string_old != cfg_string:
-                            lgr.warning("Found conflicting annex-ssh-options "
-                                        "for remote '{0}':\n{1}\n"
-                                        "Did not touch it.".format(
-                                            r, cfg_string_old))
-                            continue
-
-                        # Note for conflicting resolution: was "if write"
-                        if cfg_string_old is None:
-                            self.config.set(ssh_cfg_var, cfg_string,
-                                            where='local', reload=True)
+                    self._set_shared_connection(r, url)
 
         self.always_commit = always_commit
 
@@ -259,6 +237,49 @@ class AnnexRepo(GitRepo):
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
+    def _set_shared_connection(self, remote_name, url):
+        """Make sure a remote with SSH URL uses shared connections.
+
+        Set ssh options for annex on a per call basis, using
+        '-c remote.<name>.annex-sshoptions'.
+
+        Note
+        ----
+        There's currently no solution for using these connections, if the SSH
+        URL is just connected to a file instead of a remote
+        (`annex addurl` for example).
+
+        Parameters
+        ----------
+        remote_name: str
+        url: str
+        """
+        from datalad.support.network import is_ssh
+        # Note:
+        #
+        # before any possible invocation of git-annex
+        # Temporary approach to ssh connection sharing:
+        # Register every ssh remote with the corresponding control master.
+        # Issues:
+        # - currently overwrites existing ssh config of the remote
+        # - request SSHConnection instance and write config even if no
+        #   connection needed (but: connection is not actually created/opened)
+        # - no solution for a ssh url of a file (annex addurl)
+
+        if is_ssh(url):
+            c = ssh_manager.get_connection(url)
+            ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
+            # options to add:
+            cfg_string = " -o ControlMaster=auto -S %s" % c.ctrl_path
+            # read user-defined options from .git/config:
+            cfg_string_old = self.config.get(ssh_cfg_var, None)
+
+            self._annex_common_options += \
+                ['-c', 'remote.{0}.annex-ssh-options="{1}{2}"'
+                       ''.format(remote_name,
+                                 cfg_string_old if cfg_string_old else "",
+                                 cfg_string)]
+
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
@@ -312,30 +333,14 @@ class AnnexRepo(GitRepo):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options if options else [])
-        from datalad.support.network import is_ssh
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            writer = self.repo.config_writer()
-            writer.set_value("remote \"%s\"" % name,
-                             "annex-ssh-options",
-                             "-o ControlMaster=auto"
-                             " -S %s" % c.ctrl_path)
-            writer.release()
+        self._set_shared_connection(name, url)
 
     def set_remote_url(self, name, url, push=False):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
 
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
-        from datalad.support.network import is_ssh
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            writer = self.repo.config_writer()
-            writer.set_value("remote \"%s\"" % name,
-                             "annex-ssh-options",
-                             "-o ControlMaster=auto"
-                             " -S %s" % c.ctrl_path)
-            writer.release()
+        self._set_shared_connection(name, url)
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -372,6 +377,8 @@ class AnnexRepo(GitRepo):
 
         git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
         annex_options = annex_options[:] if annex_options else []
+        if self._annex_common_options:
+            annex_options = self._annex_common_options + annex_options
 
         if not self.always_commit:
             git_options += ['-c', 'annex.alwayscommit=false']
@@ -430,13 +437,13 @@ class AnnexRepo(GitRepo):
         True if on crippled filesystem, False otherwise
         """
 
-        try:
-            return self.repo.config_reader().get_value("annex",
-                                                       "crippledfilesystem")
-        except (NoOptionError, NoSectionError):
-            # If .git/config lacks an entry "crippledfilesystem",
-            # it's actually not crippled.
-            return False
+        #try:
+        self.config.reload()
+        return self.config.getbool("annex", "crippledfilesystem", False)
+        #except (NoOptionError, NoSectionError):
+        #    # If .git/config lacks an entry "crippledfilesystem",
+        #    # it's actually not crippled.
+        #    return False
 
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
@@ -916,6 +923,7 @@ class AnnexRepo(GitRepo):
         # TODO: figure out consistent way for passing options + document
 
         self._run_annex_command('initremote', annex_options=[name] + options)
+        self.config.reload()
 
     def enable_remote(self, name):
         """Enables use of an existing special remote
@@ -927,6 +935,7 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('enableremote', annex_options=[name])
+        self.config.reload()
 
     def merge_annex(self, remote=None):
         """Call git annex merge to merge git-annex branch
@@ -1414,7 +1423,8 @@ class AnnexRepo(GitRepo):
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
         since they might still need to flush their changes into index
         """
-        self._batched.close()
+        if self._batched is not None:
+            self._batched.close()
         super(AnnexRepo, self).precommit()
 
     def commit(self, msg=None, options=None, _datalad_msg=False):
@@ -1805,6 +1815,9 @@ class BatchedAnnexes(dict):
         """
         for p in self.values():
             p.close()
+
+    def __del__(self):
+        self.close()
 
 
 def readline_rstripped(stdout):
