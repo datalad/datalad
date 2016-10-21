@@ -173,11 +173,12 @@ class Publish(Interface):
             # out for pushing annex branch anyway and we might as well fail
             # right here.
 
-            track_remote, track_branch = ds.repo.get_tracking_branch()
+            track_remote, track_branch = None, None
 
             # keep `to` in case it's None for passing to recursive calls:
             dest_resolved = to
             if to is None:
+                track_remote, track_branch = ds.repo.get_tracking_branch()
                 if track_remote:
                     dest_resolved = track_remote
                 else:
