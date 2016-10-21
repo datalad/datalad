@@ -256,7 +256,7 @@ class Install(Interface):
                     )
                 except IncompleteResultsError as exc:
                     exc_str_ = ': ' + exc_str(exc) if exc.results else ''
-                    lgr.warning("Some items failed to get%s",
+                    lgr.warning("Some items failed to install: %s",
                                 exc_str_)
                     installed_datasets = exc.results
                     failed_items.extend(exc.failed)
