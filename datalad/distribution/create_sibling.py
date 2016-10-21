@@ -26,7 +26,10 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import as_common_datasrc
+from datalad.distribution.dataset import EnsureDataset, Dataset, \
+    datasetmethod, require_dataset
 from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
@@ -109,11 +112,7 @@ class CreateSibling(Interface):
                 purpose. As with `target_url`, templates (same set of
                 placeholders) are supported.\n""",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("--recursive", "-r"),
-            action="store_true",
-            doc="""recursively create the publication target for all
-                subdatasets of `dataset`""",),
+        recursive=recursion_flag,
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
@@ -138,14 +137,17 @@ class CreateSibling(Interface):
             doc="""publish a web interface for the dataset with an
             optional user-specified name for the html at publication
             target. defaults to `index.html` at dataset root""",
-            constraints=EnsureBool() | EnsureStr()),)
+            constraints=EnsureBool() | EnsureStr()),
+        as_common_datasrc=as_common_datasrc,
+    )
 
     @staticmethod
     @datasetmethod(name='create_sibling')
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 existing='error', shared=False, ui=False):
+                 existing='error', shared=False, ui=False,
+                 as_common_datasrc=None):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -157,23 +159,10 @@ class CreateSibling(Interface):
             as a sibling (needs at least a name)""")
 
         # shortcut
-        ds = dataset
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='creating a sibling')
 
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-        if ds is None:
-            # try to find a dataset at or above CWD
-            current_dspath = GitRepo.get_toppath(abspath(getpwd()))
-            if current_dspath is None:
-                raise ValueError("""No dataset found
-                                 at or above {0}.""".format(getpwd()))
-            ds = Dataset(current_dspath)
-            lgr.debug("Resolved dataset for target creation: {0}".format(ds))
-        assert(ds is not None and sshurl is not None)
-
-        if not ds.is_installed():
-            raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
-        assert(ds.repo is not None)
+        assert(ds is not None and sshurl is not None and ds.repo is not None)
 
         # determine target parameters:
         sshri = RI(sshurl)
@@ -354,7 +343,8 @@ class CreateSibling(Interface):
                          pushurl=target_pushurl,
                          recursive=recursive,
                          fetch=True,
-                         force=existing in {'replace'})
+                         force=existing in {'replace'},
+                         as_common_datasrc=as_common_datasrc)
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]

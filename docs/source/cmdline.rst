@@ -26,6 +26,7 @@ Dataset operations
    generated/man/datalad-create
    generated/man/datalad-get
    generated/man/datalad-create-sibling
+   generated/man/datalad-create-sibling-github
    generated/man/datalad-install
    generated/man/datalad-rewrite-urls
    generated/man/datalad-publish

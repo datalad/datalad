@@ -15,15 +15,20 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from collections import OrderedDict
-from os.path import join as opj, abspath, basename
+from os.path import join as opj, basename
 
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.support.network import RI
+from datalad.support.network import URL
 from ..interface.base import Interface
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import as_common_datasrc
+from datalad.interface.common_opts import publish_depends
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -71,11 +76,7 @@ class AddSibling(Interface):
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("--recursive", "-r"),
-            action="store_true",
-            doc="""recursively add the sibling `name` to all subdatasets of
-                `dataset`""",),
+        recursive=recursion_flag,
         fetch=Parameter(
             args=("--fetch",),
             action="store_true",
@@ -84,15 +85,21 @@ class AddSibling(Interface):
             args=("--force", "-f",),
             action="store_true",
             doc="""if sibling `name` exists already, force to (re-)configure its
-                URLs""",),)
+                URLs""",),
+        as_common_datasrc=as_common_datasrc,
+        publish_depends=publish_depends,
+    )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(name=None, url=None, dataset=None,
-                 pushurl=None, recursive=False, fetch=False, force=False):
+                 pushurl=None, recursive=False, fetch=False, force=False,
+                 as_common_datasrc=None, publish_depends=None):
 
         # TODO: Detect malformed URL and fail?
 
+        # XXX possibly fail if fetch is False and as_common_datasrc
+        # not yet sure if that is an error
         if name is None or (url is None and pushurl is None):
             raise ValueError("""insufficient information to add a sibling
                 (needs at least a dataset, a name and an URL).""")
@@ -149,25 +156,30 @@ class AddSibling(Interface):
                     if pushurl:
                         repo['pushurl'] = _urljoin(repo['pushurl'], repo_name[len(ds_basename) + 1:])
 
+        # define config var name for potential publication dependencies
+        depvar = 'remote.{}.datalad-publish-depends'.format(name)
+
         # collect existing remotes:
         already_existing = list()
         conflicting = list()
         for repo_name in repos:
-            repo = repos[repo_name]['repo']
+            repoinfo = repos[repo_name]
+            repo = repoinfo['repo']
             if name in repo.get_remotes():
                 already_existing.append(repo_name)
-                lgr.debug("""Remote '{0}' already exists
-                          in '{1}'.""".format(name, repo_name))
+                lgr.debug("Remote '{0}' already exists "
+                          "in '{1}'.""".format(name, repo_name))
 
                 existing_url = repo.get_remote_url(name)
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if repos[repo_name]['url'].rstrip('/') != existing_url.rstrip('/') \
+                if (not existing_url or repoinfo['url'].rstrip('/') != existing_url.rstrip('/')) \
                         or (pushurl and existing_pushurl and
-                            repos[repo_name]['pushurl'].rstrip('/') !=
+                            repoinfo['pushurl'].rstrip('/') !=
                                     existing_pushurl.rstrip('/')) \
-                        or (pushurl and not existing_pushurl):
+                        or (pushurl and not existing_pushurl) \
+                        or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                     conflicting.append(repo_name)
 
         if not force and conflicting:
@@ -177,33 +189,73 @@ class AddSibling(Interface):
 
         successfully_added = list()
         for repo_name in repos:
-            repo = repos[repo_name]['repo']
+            repoinfo = repos[repo_name]
+            repo = repoinfo['repo']
             if repo_name in already_existing:
                 if repo_name not in conflicting:
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
-                repo.set_remote_url(name, repos[repo_name]['url'])
+                repo.set_remote_url(name, repoinfo['url'])
             else:
                 # add the remote
-                repo.add_remote(name, repos[repo_name]['url'])
+                repo.add_remote(name, repoinfo['url'])
             if pushurl:
-                repo.set_remote_url(name, repos[repo_name]['pushurl'], push=True)
+                repo.set_remote_url(name, repoinfo['pushurl'], push=True)
             if fetch:
                 # fetch the remote so we are up to date
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)
                 repo.fetch(name)
+
+            if publish_depends:
+                if depvar in ds.config:
+                    # config vars are incremental, so make sure we start from
+                    # scratch
+                    ds.config.unset(depvar, where='local', reload=False)
+                for d in assure_list(publish_depends):
+                    lgr.info(
+                        'Configure additional publication dependency on "%s"',
+                        d)
+                    ds.config.add(depvar, d, where='local', reload=False)
+                ds.config.reload()
 
             assert isinstance(repo, GitRepo)  # just against silly code
             if isinstance(repo, AnnexRepo):
                 # we need to check if added sibling an annex, and try to enable it
                 # another part of the fix for #463 and #432
                 try:
-                    repo.enable_remote(name)
+                    if not ds.config.obtain(
+                            'remote.{}.annex-ignore'.format(name),
+                            default=False,
+                            valtype=EnsureBool(),
+                            store=False):
+                        repo.enable_remote(name)
                 except CommandError as exc:
                     lgr.info("Failed to enable annex remote %s, "
                              "could be a pure git" % name)
                     lgr.debug("Exception was: %s" % exc_str(exc))
+                if as_common_datasrc:
+                    ri = RI(repoinfo['url'])
+                    if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
+                        # XXX what if there is already a special remote
+                        # of this name? Above check for remotes ignores special
+                        # remotes. we need to `git annex dead REMOTE` on reconfigure
+                        # before we can init a new one
+                        # XXX except it is not enough
+
+                        # make special remote of type=git (see #335)
+                        repo._run_annex_command(
+                            'initremote',
+                            annex_options=[
+                                as_common_datasrc,
+                                'type=git',
+                                'location={}'.format(repoinfo['url']),
+                                'autoenable=true'])
+                    else:
+                        lgr.info(
+                            'Not configuration "%s" as a common data source, '
+                            'URL protocol is not http or https',
+                            name)
             successfully_added.append(repo_name)
 
         return successfully_added
