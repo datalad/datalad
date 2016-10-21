@@ -25,10 +25,12 @@ class CommandError(RuntimeError):
         self.stderr = stderr
 
     def __str__(self):
-        to_str = "%s: command '%s'" % (self.__class__.__name__, self.cmd)
+        to_str = "%s: " % self.__class__.__name__
+        if self.cmd:
+            to_str += "command '%s'" % (self.cmd,)
         if self.code:
             to_str += " failed with exitcode %d" % self.code
-        to_str += ".\n%s" % self.msg
+        to_str += "\n%s" % self.msg
         return to_str
 
 
@@ -172,6 +174,18 @@ class RemoteNotAvailableError(CommandError):
         super_str = super(RemoteNotAvailableError, self).__str__()
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
+
+
+class IncompleteResultsError(RuntimeError):
+    """Exception to be raised whenever results are incomplete.
+
+    Any results produced nevertheless are to be passed as `results`,
+    and become available via the `results` attribute.
+    """
+    def __init__(self, results=None, failed=None, msg=None):
+        super(IncompleteResultsError, self).__init__(msg)
+        self.results = results
+        self.failed = failed
 
 
 class InstallFailedError(CommandError):

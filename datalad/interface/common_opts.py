@@ -102,6 +102,16 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
+reckless_opt = Parameter(
+    args=("--reckless",),
+    action="store_true",
+    doc="""Set up the dataset to be able to obtain content in the
+    cheapest/fastest possible way, even if this poses a potential
+    risk the data integrity (e.g. hardlink files from a local clone
+    of the dataset). Use with care, and limit to "read-only" use
+    cases. With this flag the installed dataset will be marked as
+    untrusted.""")
+
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
     metavar="NJOBS",

@@ -124,6 +124,12 @@ class Search(Interface):
                   match, dataset)
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
+            if ds.id is None:
+                raise NoDatasetArgumentFound(
+                    "There seems to be a repository which lacks a DataLad's "
+                    "dataset id, thus not considered to be a dataset. "
+                    "You can use 'datalad create --force %s' command to "
+                    "'initiate' that repository as a DataLad dataset" % ds.path)
         except NoDatasetArgumentFound:
             exc_info = sys.exc_info()
             if dataset is None:
