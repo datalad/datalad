@@ -1585,7 +1585,14 @@ class GitRepo(object):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            branch = self.get_active_branch()
+            try:
+                branch = self.get_active_branch()
+            except TypeError as e:
+                if "HEAD is a detached symbolic reference" in str(e):
+                    lgr.debug("detached HEAD in {0}".format(self))
+                    return None, None
+                else:
+                    raise 
 
         cfg_reader = self.repo.config_reader()
         sct = "branch \"{0}\"".format(branch)
