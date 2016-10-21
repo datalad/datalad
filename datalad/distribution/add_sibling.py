@@ -15,8 +15,9 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from collections import OrderedDict
-from os.path import join as opj, abspath, basename
+from os.path import join as opj, basename
 
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
@@ -24,10 +25,10 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import RI
 from datalad.support.network import URL
-from datalad.cmd import Runner
 from ..interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
+from datalad.interface.common_opts import publish_depends
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -86,13 +87,14 @@ class AddSibling(Interface):
             doc="""if sibling `name` exists already, force to (re-)configure its
                 URLs""",),
         as_common_datasrc=as_common_datasrc,
+        publish_depends=publish_depends,
     )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(name=None, url=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
-                 as_common_datasrc=None):
+                 as_common_datasrc=None, publish_depends=None):
 
         # TODO: Detect malformed URL and fail?
 
@@ -154,6 +156,9 @@ class AddSibling(Interface):
                     if pushurl:
                         repo['pushurl'] = _urljoin(repo['pushurl'], repo_name[len(ds_basename) + 1:])
 
+        # define config var name for potential publication dependencies
+        depvar = 'remote.{}.datalad-publish-depends'.format(name)
+
         # collect existing remotes:
         already_existing = list()
         conflicting = list()
@@ -162,8 +167,8 @@ class AddSibling(Interface):
             repo = repoinfo['repo']
             if name in repo.get_remotes():
                 already_existing.append(repo_name)
-                lgr.debug("""Remote '{0}' already exists
-                          in '{1}'.""".format(name, repo_name))
+                lgr.debug("Remote '{0}' already exists "
+                          "in '{1}'.""".format(name, repo_name))
 
                 existing_url = repo.get_remote_url(name)
                 existing_pushurl = \
@@ -173,7 +178,8 @@ class AddSibling(Interface):
                         or (pushurl and existing_pushurl and
                             repoinfo['pushurl'].rstrip('/') !=
                                     existing_pushurl.rstrip('/')) \
-                        or (pushurl and not existing_pushurl):
+                        or (pushurl and not existing_pushurl) \
+                        or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                     conflicting.append(repo_name)
 
         if not force and conflicting:
@@ -200,6 +206,18 @@ class AddSibling(Interface):
                 # fetch the remote so we are up to date
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)
                 repo.fetch(name)
+
+            if publish_depends:
+                if depvar in ds.config:
+                    # config vars are incremental, so make sure we start from
+                    # scratch
+                    ds.config.unset(depvar, where='local', reload=False)
+                for d in assure_list(publish_depends):
+                    lgr.info(
+                        'Configure additional publication dependency on "%s"',
+                        d)
+                    ds.config.add(depvar, d, where='local', reload=False)
+                ds.config.reload()
 
             assert isinstance(repo, GitRepo)  # just against silly code
             if isinstance(repo, AnnexRepo):

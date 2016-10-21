@@ -124,3 +124,13 @@ as_common_datasrc = Parameter(
     doc="""configure the created sibling as a common data source of the
     dataset that can be automatically used by all consumers of the
     dataset (technical: git-annex auto-enabled special remote)""")
+
+
+publish_depends = Parameter(
+    args=("--publish-depends",),
+    metavar='SIBLINGNAME',
+    doc="""add a dependency such that the given exsiting sibling is
+    always published prior to the new sibling. [PY: Multiple dependencies can be
+    given as a list of sibling names PY][CMD: This option can be given
+    more than once to configure multiple dependencies CMD]""",
+    action='append')

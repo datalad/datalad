@@ -19,6 +19,7 @@ from os.path import join as opj
 from datalad import cfg
 
 from datalad.interface.common_opts import recursion_flag, recursion_limit
+from datalad.interface.common_opts import publish_depends
 from datalad.downloaders.credentials import UserPassword
 from datalad.dochelpers import exc_str
 from datalad.utils import assure_list
@@ -251,6 +252,7 @@ class CreateSiblingGithub(Interface):
             args=("--access-protocol",),
             constraints=EnsureChoice('git', 'ssh'),
             doc="""Which access protocol/URL to configure for the sibling"""),
+        publish_depends=publish_depends,
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
@@ -273,6 +275,7 @@ class CreateSiblingGithub(Interface):
             github_passwd=None,
             github_organization=None,
             access_protocol='git',
+            publish_depends=None,
             dryrun=False):
         try:
             # this is an absolute leaf package, import locally to avoid
@@ -339,7 +342,8 @@ class CreateSiblingGithub(Interface):
                     url=url,
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
-                    force=existing in {'reconfigure'})
+                    force=existing in {'reconfigure'},
+                    publish_depends=publish_depends)
 
         # TODO let submodule URLs point to Github (optional)
         return rinfo
