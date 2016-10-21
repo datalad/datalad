@@ -319,8 +319,8 @@ def test_get_install_missing_subdataset(src, path):
     ok_(all([not sub.is_installed() for sub in subs]))
 
     # but we do, whenever a given path is contained in such a subdataset:
-    file = opj(subs[0].path, 'test-annex.dat')
-    ds.get(file)
+    file_ = opj(subs[0].path, 'test-annex.dat')
+    ds.get(file_)
     ok_(subs[0].is_installed())
     ok_(subs[0].repo.file_has_content('test-annex.dat') is True)
 
