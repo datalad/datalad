@@ -11,11 +11,13 @@
 import sys
 from os import linesep
 from six import string_types
+from six import binary_type
 
 from distutils.version import StrictVersion, LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
+from .exceptions import CommandError
 
 __all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
 
@@ -43,8 +45,12 @@ _runner = Runner()
 
 def _get_annex_version():
     """Return version of available git-annex"""
-    return _runner.run('git annex version --raw'.split())[0]
-
+    try:
+        return _runner.run('git annex version --raw'.split())[0]
+    except CommandError:
+        # fall back on method that could work with older installations
+        out, err = _runner.run(['git', 'annex', 'version'])
+        return out.split('\n')[0].split(':')[1].strip()
 
 def _get_git_version():
     """Return version of available git"""
@@ -88,6 +94,8 @@ class ExternalVersions(object):
             version = ".".join(str(x) for x in version)
 
         if version:
+            if isinstance(version, binary_type):
+                version = version.decode()
             try:
                 return StrictVersion(version)
             except ValueError:

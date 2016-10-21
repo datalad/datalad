@@ -19,9 +19,11 @@ from hashlib import md5
 from six.moves.urllib.parse import urlsplit
 from six import string_types
 from os.path import join as opj, exists, relpath
+from os.path import dirname
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
+from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -70,13 +72,15 @@ def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
 
-    return {
+    meta = {
         "@context": "http://schema.org/",
-        "@id": ds_identifier,
         "type": "Dataset",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
+    if ds_identifier is not None:
+        meta["@id"] = ds_identifier
+    return meta
 
 
 def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
@@ -134,20 +138,19 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
                 # XXX maybe report which one is local? Available in anx['here']
                 # XXX maybe report the type of annex remote?
                 annex_meta.append(anx_meta)
-            if len(annex_meta) == 1:
-                annex_meta = annex_meta[0]
-            meta['availableFrom'] = annex_meta
+        if len(annex_meta) == 1:
+            annex_meta = annex_meta[0]
+        meta['availableFrom'] = annex_meta
 
     ## metadata on all subdataset
     subdss = []
     # we only want immediate subdatasets
     for subds in subdatasets:
-        subds_id = subds.id
         submeta = {
             'location': relpath(subds.path, ds.path),
             'type': 'Dataset'}
-        if not subds_id.startswith('_:'):
-            submeta['@id'] = subds_id
+        if subds.id:
+            submeta['@id'] = subds.id
         subdss.append(submeta)
     if len(subdss):
         if len(subdss) == 1:
@@ -313,25 +316,41 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 
 
 def _cached_load_document(url):
-    from pyld.jsonld import load_document
+    """Loader of pyld document from a url, which caches loaded instance on disk
+    """
+    doc_fname = _get_schema_url_cache_filename(url)
+
+    doc = None
+    if os.path.exists(doc_fname):
+        try:
+            lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
+            doc = pickle.load(open(doc_fname, 'rb'))
+        except Exception as e:  # it is OK to ignore any error and fall back on the true source
+            lgr.warning(
+                "cannot load cache from '%s', fall back on schema download: %s",
+                doc_fname, exc_str(e))
+
+    if doc is None:
+        from pyld.jsonld import load_document
+        doc = load_document(url)
+        assure_dir(dirname(doc_fname))
+        # use pickle to store the entire request result dict
+        pickle.dump(doc, open(doc_fname, 'wb'))
+        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+    return doc
+
+
+def _get_schema_url_cache_filename(url):
+    """Return a filename where to cache schema doc from a url"""
     cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
     doc_fname = opj(
         cache_dir,
-        '{}-{}'.format(
+        '{}-{}.p{}'.format(
             urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest()))
-
-    if os.path.exists(doc_fname):
-        lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
-        doc = pickle.load(open(doc_fname))
-    else:
-        doc = load_document(url)
-        if not exists(cache_dir):
-            os.makedirs(cache_dir)
-        # use pickle to store the entire request result dict
-        pickle.dump(doc, open(doc_fname, 'w'))
-        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
-    return doc
+            md5(url.encode('utf-8')).hexdigest(),
+            pickle.HIGHEST_PROTOCOL)
+    )
+    return doc_fname
 
 
 def flatten_metadata_graph(obj):

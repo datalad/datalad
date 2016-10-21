@@ -9,6 +9,19 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+## 0.3.2 (Oct ??, 2016) -- will be better than ever
+
+???
+
+### Fixes
+
+???
+
+### Enhancements and new features
+
+???
+
+
 ## 0.3.1 (Oct 1, 2016) -- what a wonderful week
 
 Primarily bugfixes but also a number of enhancements and core
@@ -51,7 +64,6 @@ refactorings
   custom remotes, code-base formatting, downloaders, etc
 - completely switched to `tqdm` library (`progressbar` is no longer
   used/supported)
-
 
 
 ## 0.3 (Sep 23, 2016) -- winter is coming

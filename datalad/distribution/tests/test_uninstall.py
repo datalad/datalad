@@ -30,6 +30,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
+from datalad.support.external_versions import external_versions
 
 from ..dataset import Dataset
 
@@ -135,7 +136,7 @@ def test_uninstall_git_file(path):
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
 
-    ds = install(path=dst, source=src, recursive=True)[0]
+    ds = install(dst, source=src, recursive=True)[0]
     ok_(ds.is_installed())
     for subds_path in ds.get_subdatasets():
         subds = Dataset(opj(ds.path, subds_path))
@@ -156,6 +157,10 @@ def test_uninstall_subdataset(src, dst):
         # uninstall subds itself:
         assert_raises(ValueError, ds.uninstall,
                       path=subds_path, remove_handles=True, remove_history=True)
+        if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
+                and external_versions['git'] < '2.0.9':
+            raise SkipTest("Known problem with GitPython. See "
+                "https://github.com/gitpython-developers/GitPython/pull/521")
         res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True,
                            recursive=True)
         subds = Dataset(opj(ds.path, subds_path))

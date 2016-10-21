@@ -14,8 +14,10 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..cmdline.main import main
-from .utils import assert_equal, assert_raises, in_, ok_startswith
+from ..main import main
+from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_re_in
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -98,10 +100,28 @@ def test_help_np():
 
 
 def test_usage_on_insufficient_args():
-    stdout, stderr = run_main(['install'], exit_code=1)
-    ok_startswith(stdout, 'usage:')
+    stdout, stderr = run_main(['install'], exit_code=2, expect_stderr=True)
+    ok_startswith(stderr, 'usage:')
 
 
 def test_subcmd_usage_on_unknown_args():
-    stdout, stderr = run_main(['install', '--murks'], exit_code=1)
-    in_('install', stdout)
+    stdout, stderr = run_main(['get', '--murks'], exit_code=1)
+    in_('get', stdout)
+
+
+def check_incorrect_option(opts, err_str):
+    stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    out = stdout + stderr
+    assert_in("usage: ", out)
+    assert_re_in(err_str, out, match=False)
+
+
+def test_incorrect_options():
+    # apparently a bit different if following a good one so let's do both
+    err_invalid = "error: (invalid|too few arguments)"
+    yield check_incorrect_option, ('--buga',), err_invalid
+    yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
+
+    err_insufficient = err_invalid # "specify"
+    yield check_incorrect_option, ('--dbg',), err_insufficient
+    yield check_incorrect_option, tuple(), err_insufficient

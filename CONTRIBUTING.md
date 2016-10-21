@@ -152,7 +152,7 @@ some of which you could also install from PyPi using pip  (prior installation of
 might be necessary)
 
 ```sh
-pip install -r requirements.txt
+pip install -r requirements-devel.txt
 ```
 
 and you will need to install recent git-annex using appropriate for your
@@ -328,11 +328,18 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_TESTS_TEMP_KEEP*: 
-  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- *DATALAD_LOG_OUTPUTS*: 
+  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
+- *DATALAD_LOG_TIMESTAMP*:
+  Used to add timestamp to datalad logs
+- *DATALAD_LOG_TRACEBACK*: 
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
+  This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- *DATALAD_TESTS_TEMP_KEEP*: 
+  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_TESTS_TEMP_DIR*: 
   Create a temporary directory at location specified by this flag.
   It is used by tests to create a temporary git directory while testing git annex archives etc
@@ -341,27 +348,13 @@ Refer datalad/config.py for information on how to add these environment variable
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
-- *DATALAD_API_ALWAYSRENDER*: 
-  Would make api functions always use a version with cmdline output renderer
-  (i.e. the one with `_` suffix)
-- *DATALAD_LOG_TRACEBACK*: 
-  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
-  This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
 - *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
-- *DATALAD_CMD_PROTOCOL*: 
-  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
-  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
-  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
-- *DATALAD_CMD_PROTOCOL_PREFIX*: 
-  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
 - *DATALAD_TESTS_PROTOCOLREMOTE*:
   Binary flag to specify whether to test protocol interactions of custom remote with annex
-- *DATALAD_LOG_TIMESTAMP*:
-  Used to add timestamp to datalad logs
 - *DATALAD_TESTS_RUNCMDLINE*:
   Binary flag to specify if shell testing using shunit2 to be carried out
 - *DATALAD_TESTS_TEMP_FS*:
@@ -370,3 +363,12 @@ Refer datalad/config.py for information on how to add these environment variable
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.
+- *DATALAD_API_ALWAYSRENDER*: 
+  Would make api functions always use a version with cmdline output renderer
+  (i.e. the one with `_` suffix)
+- *DATALAD_CMD_PROTOCOL*: 
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
+  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
+- *DATALAD_CMD_PROTOCOL_PREFIX*: 
+  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.

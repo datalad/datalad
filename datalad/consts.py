@@ -21,6 +21,10 @@ CRAWLER_META_VERSIONS_DIR = join(CRAWLER_META_DIR, 'versions')
 # TODO: RENAME THIS UGLINESS?
 CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
 
+# Make use of those in datalad.metadata
+METADATA_DIR = join(HANDLE_META_DIR, 'meta')
+METADATA_FILENAME = 'meta.json'
+
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 DATALAD_GIT_DIR = join('.git', 'datalad')

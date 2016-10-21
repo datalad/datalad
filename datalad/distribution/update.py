@@ -95,8 +95,9 @@ class Update(Interface):
                                 ds.get_subdatasets(recursive=True)]
 
         for repo in repos_to_update:
-            # get all remotes:
-            remotes = repo.get_remotes()
+            # get all remotes which have references (would exclude
+            # special remotes)
+            remotes = repo.get_remotes(with_refs_only=True)
             if name and name not in remotes:
                 lgr.warning("'%s' not known to dataset %s.\nSkipping" %
                             (name, repo.path))

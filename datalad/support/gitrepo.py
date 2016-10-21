@@ -495,6 +495,14 @@ class GitRepo(object):
         path : str
         """
 
+        if is_ssh(url):
+            cnct = ssh_manager.get_connection(url)
+            cnct.open()
+            # TODO: with git <= 2.3 keep old mechanism:
+            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+        else:
+            env = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -502,6 +510,7 @@ class GitRepo(object):
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
                                                   url,
                                                   path,
+                                                  env=env,
                                                   odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
@@ -558,10 +567,15 @@ class GitRepo(object):
             ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
-    def get_toppath(cls, path):
+    def get_toppath(cls, path, follow_up=True):
         """Return top-level of a repository given the path.
 
-        If path has symlinks -- they get resolved.
+        Parameters
+        -----------
+        follow_up : bool
+          If path has symlinks -- they get resolved by git.  If follow_up is
+          True, we will follow original path up until we hit the same resolved
+          path.  If no such path found, resolved one would be returned.
 
         Return None if no parent directory contains a git repository.
         """
@@ -572,11 +586,23 @@ class GitRepo(object):
                     cwd=path,
                     log_stdout=True, log_stderr=True,
                     expect_fail=True, expect_stderr=True)
-                return toppath.rstrip('\n\r')
+                toppath = toppath.rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
-            return GitRepo.get_toppath(dirname(path))
+            toppath = GitRepo.get_toppath(dirname(path))
+
+        if follow_up:
+            path_ = path
+            path_prev = ""
+            while path_ and path_ != path_prev:  # on top /.. = /
+                if realpath(path_) == toppath:
+                    toppath = path_
+                    break
+                path_prev = path_
+                path_ = dirname(path_)
+
+        return toppath
 
     # classmethod so behavior could be tuned in derived classes
     @classmethod
@@ -860,8 +886,35 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self):
-        return [remote.name for remote in self.repo.remotes]
+    def get_remotes(self, with_refs_only=False):
+        """
+
+        Parameters
+        ----------
+        with_refs_only : bool, optional
+          return only remotes with any refs.  E.g. annex special remotes
+          would not have any refs
+
+        Returns
+        -------
+        remotes : list of str
+          List of names of the remotes
+        """
+        if with_refs_only:
+            # older versions of GitPython might not tolerate remotes without
+            # any references at all, so we need to catch
+            remotes = []
+            for remote in self.repo.remotes:
+                try:
+                    if len(remote.refs):
+                        remotes.append(remote.name)
+                except AssertionError as exc:
+                    if "not have any references" not in str(exc):
+                        # was some other reason
+                        raise
+            return remotes
+        else:
+            return [remote.name for remote in self.repo.remotes]
 
     def get_files(self, branch=None):
         """Get a list of files in git.
@@ -1278,6 +1331,26 @@ class GitRepo(object):
                 return cfg_reader.get('url')
             else:
                 return None
+
+    def set_remote_url(self, name, url, push=False):
+        """Set the URL a remote is pointing to
+
+        Sets the URL of the remote `name`. Requires the remote to already exist.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        url: str
+        push: bool
+          if True, set the push URL, otherwise the fetch URL
+        """
+
+        cmd = ["git", "remote", "set-url"]
+        if push:
+            cmd.append("--push")
+        cmd += [name, url]
+        return self._git_custom_command('', cmd)
 
     def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
