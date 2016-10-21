@@ -1,10 +1,10 @@
-datalad (0.3.1+git207-g6b02e70-1) UNRELEASED; urgency=medium
+datalad (0.3.1+git214-g6f9948e-1) UNRELEASED; urgency=medium
 
   * New upstream snapshot from 0.3.1-207-g6b02e70 
   * debian/control
     - add python-secretstorage into build-depends for keyring >= 9.2
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 21 Oct 2016 01:02:23 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 21 Oct 2016 18:48:13 -0400
 
 datalad (0.3.1-1) unstable; urgency=medium
 
