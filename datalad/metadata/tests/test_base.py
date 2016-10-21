@@ -149,7 +149,7 @@ def test_aggregation(path):
     assert_equal(len(meta), 7)
     # same schema
     assert_equal(
-        7, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
+            7, sum([s.get('@context', {'@vocab': None})['@vocab'] == 'http://schema.org/' for s in meta]))
     # three different IDs
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets

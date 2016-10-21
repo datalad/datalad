@@ -57,22 +57,34 @@ class MetadataParser(BaseMetadataParser):
         for header, dataladterm in \
                 (('name', 'name'),
                  ('license', 'license'),
-                 ('maintainer', 'author'),
-                 #('homepage', 'citation'),
-                 #('Funding', 'foaf:fundedBy'),
-                 ('description', 'description')):
+                 ('author', 'author'),
+                 ('maintainer', 'doap:maintainer'),
+                 ('audience', 'doap:audience'),
+                 ('homepage', 'doap:homepage'),
+                 ('version', 'doap:Version'),
+                 ('funding', 'foaf:fundedBy'),
+                 ('issue-tracker', 'bug-database'),
+                 ('cita-as', 'citation'),
+                 ('doi', 'sameAs'),
+                 ('description', None)):
             if not header in spec:
                 continue
             content = spec[header]
-            if header in ('description', 'license'):
-                title, content = _beautify_multiline_field(content)
+            if header == 'description':
+                short, long = _beautify_multiline_field(content)
+                meta['doap:shortdesc'] = short
+                meta['description'] = long
+            elif header == 'license':
                 # TODO if title looks like a URL, use it as @id
-                if title:
-                    meta[dataladterm] = [title, content]
+                label, desc = _beautify_multiline_field(content)
+                if label:
+                    meta[dataladterm] = [label, desc]
                 else:
-                    meta[dataladterm] = content
-            elif header in ('maintainer',):
+                    meta[dataladterm] = desc
+            elif header in ('maintainer', 'author'):
                 meta[dataladterm] = _split_list_field(content)
+            elif header == 'doi':
+                meta[dataladterm] = 'http://dx.doi.org/{}'.format(content)
             else:
                 meta[dataladterm] = content
 
