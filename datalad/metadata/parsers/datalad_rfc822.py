@@ -46,7 +46,7 @@ def _beautify_multiline_field(content):
 
 class MetadataParser(BaseMetadataParser):
     _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
-    _core_metadata_filenames = [opj('.datalad', 'control')]
+    _core_metadata_filenames = [opj('.datalad', 'meta.rfc822')]
 
     def _get_metadata(self, ds_identifier, meta, full):
         spec = email.parser.Parser().parse(

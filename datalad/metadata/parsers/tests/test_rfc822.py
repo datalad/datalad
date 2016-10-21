@@ -16,13 +16,13 @@ from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
 
-@with_tree(tree={'.datalad': {'control': ''}})
+@with_tree(tree={'.datalad': {'meta.rfc822': ''}})
 def test_has_metadata(path):
     ds = Dataset(path)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
     assert_equal(p.get_core_metadata_filenames(),
-                 [opj(path, '.datalad', 'control')])
+                 [opj(path, '.datalad', 'meta.rfc822')])
 
 
 @with_tempfile(mkdir=True)
@@ -33,7 +33,7 @@ def test_has_no_metadata(path):
     assert_equal(p.get_core_metadata_filenames(), [])
 
 
-@with_tree(tree={'.datalad': {'control': """\
+@with_tree(tree={'.datalad': {'meta.rfc822': """\
 Package: studyforrest_phase2
 Version: 1.0.0-rc3
 Description: Basic summary
