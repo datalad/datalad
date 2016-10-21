@@ -128,12 +128,13 @@ def test_recursive_save(path):
     assert subsubds.repo.dirty
     # and indexed files didn't change
     assert_equal(indexed_files, subds.repo.get_indexed_files())
+    ok_clean_git(subds.repo, untracked=['testnew'], index_modified=['subsub'])
     subsubds.save(message="saving", super_datasets=True,
                   auto_add_changes=True)
-    assert not subsubds.repo.dirty
+    ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
     # not the file we created
-    assert subds.repo.dirty
+    ok_clean_git(subds.repo, untracked=['testnew'])
 
     # check commits to have correct messages
     assert_equal(next(ds.repo.get_branch_commits('master')).message,

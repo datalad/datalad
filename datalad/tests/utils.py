@@ -164,11 +164,15 @@ def ok_clean_git_annex_proxy(path):
     )
 
 
-def ok_clean_git(path, annex=True, untracked=[]):
+def ok_clean_git(path, annex=True, head_modified=[], index_modified=[], untracked=[]):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
     """
+    from datalad.support.gitrepo import GitRepo
+    if isinstance(path, GitRepo):
+        path = path.path
+
     ok_(exists(path))
     ok_(exists(join(path, '.git')))
     if annex:
@@ -178,14 +182,23 @@ def ok_clean_git(path, annex=True, untracked=[]):
     if repo.index.entries.keys():
         ok_(repo.head.is_valid())
 
-        # get string representations of diffs with index to ease
-        # troubleshooting
-        index_diffs = [str(d) for d in repo.index.diff(None)]
-        head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-
         eq_(sorted(repo.untracked_files), sorted(untracked))
-        eq_(index_diffs, [])
-        eq_(head_diffs, [])
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
+        else:
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                assert(head_modified_, head_modified)
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                assert(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
