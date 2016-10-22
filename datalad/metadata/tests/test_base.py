@@ -253,8 +253,8 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['type']))),
-        set([('name', 'type')])
+                             report=['schema:type']))),
+        set([('name', 'schema:type')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))
