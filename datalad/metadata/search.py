@@ -166,8 +166,8 @@ class Search(Interface):
                     from datalad.api import install
                     central_ds = install(LOCAL_CENTRAL_PATH, source='///')
                     ui.message(
-                        "From now on you can refer to this dataset using the
-                        label '///'"
+                        "From now on you can refer to this dataset using the "
+                        "label '///'"
                     )
                 else:
                     reraise(*exc_info)
