@@ -37,9 +37,16 @@ def test_add_sibling(origin, repo_path):
 
     # prepare src
     source = install(repo_path, source=origin, recursive=True)[0]
+    # pollute config
+    depvar = 'remote.test-remote.datalad-publish-depends'
+    source.config.add(depvar, 'stupid', where='local')
 
     res = add_sibling(dataset=source, name="test-remote",
-                      url="http://some.remo.te/location")
+                      url="http://some.remo.te/location",
+                      publish_depends=['r1', 'r2'],
+                      force=True)
+    eq_(source.config.get(depvar, None), ('r1', 'r2'))
+
     eq_(res, [basename(source.path)])
     assert_in("test-remote", source.repo.get_remotes())
     eq_("http://some.remo.te/location",
