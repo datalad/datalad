@@ -9,18 +9,31 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.3.2 (Oct ??, 2016) -- will be better than ever
+## 0.4 (Oct 22, 2016) -- Paris is waiting
 
-???
+Primarily it is a bugfix release but because of significant refactoring
+of the [install] and [get] implementation, it gets a new minor release. 
 
 ### Fixes
 
-???
+- be able to [get] or [install] while providing paths while being 
+  outside of a dataset
+- remote annex datasets get properly initialized
+- robust detection of outdated [git-annex]
 
 ### Enhancements and new features
 
-???
-
+- interface changes
+    - [get] `--recursion-limit=existing` to not recurse into not-installed
+       subdatasets
+    - [get] `-n` to possibly install sub-datasets without getting any data
+    - [install] `--jobs|-J` to specify number of parallel jobs for annex 
+      [get] call could use (ATM would not work when data comes from archives)
+- more (unit-)testing
+- documentation: see http://docs.datalad.org/en/latest/basics.html
+  for basic principles and useful shortcuts in referring to datasets
+- various webface improvements:  breadcrumb paths, instructions how
+  to install dataset, show version from the tags, etc.
 
 ## 0.3.1 (Oct 1, 2016) -- what a wonderful week
 
@@ -117,6 +130,7 @@ publishing
 [FCON1000]: http://fcon_1000.projects.nitrc.org
 [OpenfMRI]: http://openfmri.org
 
+[git-annex]: http://git-annex.branchable.com/ 
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
