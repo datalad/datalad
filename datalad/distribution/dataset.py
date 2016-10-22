@@ -359,11 +359,14 @@ class Dataset(object):
         else:
             return was_once_installed
 
-    def get_superdataset(self, topmost=False):
+    def get_superdataset(self, datalad_only=False, topmost=False):
         """Get the dataset's superdataset
 
         Parameters
         ----------
+        datalad_only : bool, optional
+          Either to consider only "datalad datasets" (with non-None
+          id), or (if False, which is default) - any git repository
         topmost : bool, optional
           Return the topmost super-dataset. Might then be the current one.
 
@@ -371,7 +374,6 @@ class Dataset(object):
         -------
         Dataset or None
         """
-
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
         path = self.path
@@ -384,11 +386,15 @@ class Dataset(object):
             if sds_path_ is None:
                 # no more parents, use previous found
                 break
-            # TODO:?
-            # test if current git is actually a dataset?
-            # sds = Dataset(sds_path_)
-            # if not sds.id:
-            #     break
+
+            if datalad_only:
+                # test if current git is actually a dataset?
+                sds = Dataset(sds_path_)
+                # can't use ATM since we just autogenerate and ID, see
+                # https://github.com/datalad/datalad/issues/986
+                # if not sds.id:
+                if not sds.config.get('datalad.dataset.id', None):
+                    break
 
             # That was a good candidate
             sds_path = sds_path_

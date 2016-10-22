@@ -789,7 +789,13 @@ class GitRepo(object):
         # TODO: support not only a branch but any treeish
         #       Note: repo.tree(treeish).hexsha
         if branch is None:
-            return self.repo.active_branch.object.hexsha
+            try:
+                return self.repo.active_branch.object.hexsha
+            except ValueError as exc:
+                if 'does not exist' in str(exc):
+                    return None
+                raise
+
         for b in self.repo.branches:
             if b.name == branch:
                 return b.object.hexsha
