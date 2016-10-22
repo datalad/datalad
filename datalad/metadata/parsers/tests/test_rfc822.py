@@ -71,6 +71,7 @@ def test_get_metadata(path):
   },
   "@id": "ID",
   "bug-database": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
+  "citation": "Cool (2016)",
   "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
   "description": "A text with arbitrary length and content that can span multiple\\nparagraphs (this is a new one)",
   "doap:Version": "1.0.0-rc3",

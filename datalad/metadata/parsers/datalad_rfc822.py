@@ -64,7 +64,7 @@ class MetadataParser(BaseMetadataParser):
                  ('version', 'doap:Version'),
                  ('funding', 'foaf:fundedBy'),
                  ('issue-tracker', 'bug-database'),
-                 ('cita-as', 'citation'),
+                 ('cite-as', 'citation'),
                  ('doi', 'sameAs'),
                  ('description', None)):
             if not header in spec:
