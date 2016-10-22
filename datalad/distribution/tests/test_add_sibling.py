@@ -9,26 +9,14 @@
 
 """
 
-import os
-from os.path import join as opj, abspath, basename
-from ..dataset import Dataset
+from os.path import join as opj, basename
 from datalad.api import install, add_sibling
-from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_is_instance
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_not_in
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
-from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import with_tempfile, assert_in, with_testrepos
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module, skip_if, skip_if_on_windows
-from datalad.tests.utils import ok_clean_git
+
+from nose.tools import eq_, ok_
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
