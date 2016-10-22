@@ -265,7 +265,7 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            if not mds.get('type', None) == 'Dataset':
+            if not mds.get('type', mds.get('schema:type', None)) == 'Dataset':
                 # we are presently only dealing with datasets
                 continue
             # TODO consider the possibility of nested and context/graph dicts
