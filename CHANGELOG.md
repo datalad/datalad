@@ -9,6 +9,19 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+## 0.4.1 (Oct ??, 2016) -- will be better than ever
+
+???
+
+### Fixes
+
+???
+
+### Enhancements and new features
+
+???
+
+
 ## 0.4 (Oct 22, 2016) -- Paris is waiting
 
 Primarily it is a bugfix release but because of significant refactoring
