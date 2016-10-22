@@ -126,20 +126,17 @@ class Search(Interface):
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
                 raise NoDatasetArgumentFound(
-                    "There seems to be a repository which lacks a DataLad's "
-                    "dataset id, thus not considered to be a dataset. "
-                    "You can use 'datalad create --force %s' command to "
-                    "'initiate' that repository as a DataLad dataset" % ds.path)
+                    "This does not seem to be a dataset (no DataLad dataset ID "
+                    "found). 'datalad create --force %s' can initialize "
+                    "this repository as a DataLad dataset" % ds.path)
         except NoDatasetArgumentFound:
             exc_info = sys.exc_info()
             if dataset is None:
                 if not ui.is_interactive:
                     raise NoDatasetArgumentFound(
-                        "No DataLad dataset found at current location and "
-                        "current UI is not interactive to assist in installing "
-                        "one. Please either run `search` command interactively,"
-                        " or under an existing DataLad dataset, or using -d/// "
-                        "to refer to central installation."
+                        "No DataLad dataset found. Specify a dataset to be "
+                        "searched, or run interactively to get assistance "
+                        "installing a queriable superdataset."
                     )
                 # none was provided so we could ask user either he possibly wants
                 # to install our beautiful mega-duper-super-dataset?
@@ -149,32 +146,34 @@ class Search(Interface):
                     if central_ds.is_installed():
                         if ui.yesno(
                             title="No DataLad dataset found at current location",
-                            text="Would you like to search within DataLad "
-                                 "meta-dataset under % r and search within it?"
+                            text="Would you like to search the DataLad "
+                                 "superdataset at %r?"
                                   % LOCAL_CENTRAL_PATH):
                             pass
                         else:
                             reraise(*exc_info)
                     else:
                         raise NoDatasetArgumentFound(
-                            "No DataLad dataset found at current location and "
-                            "%r already exists but does not contain an "
-                            "installed dataset." % LOCAL_CENTRAL_PATH)
+                            "No DataLad dataset found at current location. "
+                            "The DataLad superdataset location %r exists, "
+                            "but does not contain an dataset."
+                            % LOCAL_CENTRAL_PATH)
                 elif ui.yesno(
                         title="No DataLad dataset found at current location",
-                        text="Would you like to install stock DataLad "
-                             "meta-dataset under %r?"
+                        text="Would you like to install the DataLad "
+                             "superdataset at %r?"
                              % LOCAL_CENTRAL_PATH):
                     from datalad.api import install
                     central_ds = install(LOCAL_CENTRAL_PATH, source='///')
                     ui.message(
-                        "You can in future refer to that dataset using -d///"
+                        "From now on you can refer to this dataset using the "
+                        "label '///'"
                     )
                 else:
                     reraise(*exc_info)
 
                 lgr.info(
-                    "Performing search using central dataset %r",
+                    "Performing search using DataLad superdataset %r",
                     central_ds.path
                 )
                 for res in central_ds.search(
