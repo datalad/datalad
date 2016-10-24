@@ -18,6 +18,8 @@ from git.exc import GitCommandError
 from mock import patch
 
 from datalad.log import LoggerHelper
+from datalad import cfg
+from datalad.support.constraints import EnsureBool
 
 from datalad.tests.utils import with_tempfile, ok_, assert_equal
 
@@ -44,8 +46,12 @@ def test_logging_to_a_file(dst):
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
     # .* is added to swallow possible traceback logs
-    ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\](\s+\S+\s*)? %s" % msg,
-                 line))
+    if EnsureBool()(cfg.get('datalad.log.timestamp', True)):
+        ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\](\s+\S+\s*)? %s" % msg,
+                    line))
+    else:
+        ok_(re.match("\[ERROR\](\s+\S+\s*)? %s" % msg,
+                    line))
 
 
 @with_tempfile

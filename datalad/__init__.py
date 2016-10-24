@@ -9,21 +9,17 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
-lgr.log(5, "Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
 
-lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 
 import atexit
 atexit.register(ssh_manager.close, allow_fail=False)
-atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
@@ -54,6 +50,7 @@ _test_states = {
 
 
 def setup_package():
+    from .log import lgr
     import os
 
     # To overcome pybuild overriding HOME but us possibly wanting our
@@ -86,6 +83,7 @@ def setup_package():
 
 
 def teardown_package():
+    from .log import lgr
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
@@ -106,5 +104,3 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
-
-lgr.log(5, "Done importing main __init__")
