@@ -4,6 +4,7 @@ Datalad |---| data management and distribution suite: Documentation
 .. toctree::
    :maxdepth: 1
 
+   gettingstarted
    acknowledgements
 
 Concepts and technologies
