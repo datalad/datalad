@@ -185,14 +185,18 @@ function click_handler(data, url) {
  * construct path to metadata json of node to be rendered
  * @param {object} md5 the md5 library object, used to compute metadata hash name of current node
  * @param {bool} parent if parent, find metadata json of parent directory instead
+ * @param {string} path if path, find metadata json relative to node at path
  * @return {string} path to the current node's metadata json
  */
-function metadata_locator(md5, parent) {
-  var start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
+function metadata_locator(md5, parent, path) {
+  // set start location if path to node explicitly given
+  var start_loc = typeof path !== 'undefined' ? path : false;
+  // else find absolute path to current location
+  if (!start_loc)
+    start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
 
-  if (start_loc === '/' && parent) {
+  if (start_loc === '/' && parent)
     return "";
-  }
 
   // if parent argument set, find metadata json of parent directory instead
   var find_parent_ds = typeof parent !== 'undefined' ? parent : false;
@@ -224,34 +228,39 @@ function metadata_locator(md5, parent) {
 }
 
 /**
- * Retrieve metadata json of parent if exists
+ * Retrieve metadata json of current(or parent) node at path if exists
  * @param {string} jQuery jQuery library object
  * @param {string} md5 path of current dataset
+ * @param {bool} parent if to retrieve path of parent
+ * @param {string} path if path, find metadata json relative to node at path
  * @return {object} return metadata json object of parent if parent exists
  */
-function parent_json(jQuery, md5) {
-  var parent_metadata = metadata_locator(md5, true);
+function load_json(jQuery, md5, parent, path) {
+  var parent_json = typeof parent !== 'undefined' ? parent : false;
+  // set metadata_path if path explicitly given, else get path to metadata wrt current node
+  var node_path = typeof path !== 'undefined' ? path : false;
+  var metadata_path = metadata_locator(md5, parent_json, node_path);
 
   // if parent dataset or parent metadata directory doesn't exist, return error code
-  if (parent_metadata === '' || !url_exists(parent_metadata))
+  if (metadata_path === '' || !url_exists(metadata_path))
     return {};
 
   // else return required info for parent row from parent metadata json
-  var parent_json_ = {};
+  var meta_json = {};
   jQuery.ajax({
-    url: parent_metadata,
+    url: metadata_path,
     dataType: 'json',
     async: false,
     success: function(data) {
-      parent_json_ = {name: '..',
-                      date: data.date || '-',
-                      path: data.path || '-',
-                      type: data.type || 'dir',
-                      description: data.description || '',
-                      size: size_renderer(data.size || null)};
+      meta_json = {name: '..',
+                   date: data.date || '-',
+                   path: data.path || '-',
+                   type: data.type || 'dir',
+                   description: data.description || '',
+                   size: size_renderer(data.size || null)};
     }
   });
-  return parent_json_;
+  return meta_json;
 }
 
 /**
@@ -373,7 +382,7 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parent_meta = parent_json(jQuery, md5);
+        var parent_meta = load_json(jQuery, md5, true);
         if (!jQuery.isEmptyObject(parent_meta))
           api.row.add(parent_meta).draw();
       }
