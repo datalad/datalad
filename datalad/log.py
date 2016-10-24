@@ -124,10 +124,9 @@ class ColorFormatter(logging.Formatter):
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
-        # TODO: config log.timestamp=True
         from datalad import cfg
         from datalad.config import anything2bool
-        show_timestamps = anything2bool(cfg.get('datalad.log.timestamp', True))
+        show_timestamps = anything2bool(cfg.get('datalad.log.timestamp', False))
         return (("" if not show_timestamps else "$BOLD%(asctime)-15s$RESET ") +
                 ("%(name)-15s " if log_name else "") +
                 ("{%(process)d}" if log_pid else "") +

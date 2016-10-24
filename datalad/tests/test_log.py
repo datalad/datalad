@@ -46,7 +46,7 @@ def test_logging_to_a_file(dst):
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
     # .* is added to swallow possible traceback logs
-    if EnsureBool()(cfg.get('datalad.log.timestamp', True)):
+    if EnsureBool()(cfg.get('datalad.log.timestamp', False)):
         ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\](\s+\S+\s*)? %s" % msg,
                     line))
     else:
