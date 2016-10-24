@@ -15,11 +15,14 @@ distribution with the convenience of git-annex repositories as a backend."""
 from .config import ConfigManager
 cfg = ConfigManager()
 
+from .log import lgr
+lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 
 import atexit
 atexit.register(ssh_manager.close, allow_fail=False)
+atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
