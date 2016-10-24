@@ -107,3 +107,5 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
+
+lgr.log(5, "Done importing main __init__")
