@@ -140,12 +140,12 @@ class AnnexRepo(GitRepo):
         # initialize
         self._uuid = None
 
-        if git_opts or annex_opts or annex_init_opts:
-            lgr.warning("TODO: options passed to git, git-annex and/or "
+        if annex_opts or annex_init_opts:
+            lgr.warning("TODO: options passed to git-annex and/or "
                         "git-annex-init are currently ignored.\n"
                         "options received:\n"
-                        "git: %s\ngit-annex: %s\ngit-annex-init: %s" %
-                        (git_opts, annex_opts, annex_init_opts))
+                        "git-annex: %s\ngit-annex-init: %s" %
+                        (annex_opts, annex_init_opts))
 
         fix_it = False
         try:

@@ -13,7 +13,8 @@
 __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
+from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr, \
+    EnsureChoice
 
 
 dataset_description = Parameter(
@@ -32,6 +33,15 @@ recursion_limit = Parameter(
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
+
+shared_access_opt = Parameter(
+    args=('--shared-access',),
+    metavar='MODE',
+    constraints=EnsureChoice(
+        'false', 'true', 'umask', 'group', 'all',
+        'world', 'everybody', '0xxx') | EnsureNone(),
+    doc="""configure shared access to a dataset, see `git init --shared`
+    documentation for complete details on the supported scenarios""")
 
 super_datasets_flag = Parameter(
     args=("-S", "--super-datasets",),

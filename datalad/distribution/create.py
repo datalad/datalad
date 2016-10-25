@@ -24,6 +24,7 @@ from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.common_opts import shared_access_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -129,6 +130,7 @@ class Create(Interface):
             doc="""Metadata type label. Must match the name of the respective
             parser implementation in Datalad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
+        shared_access=shared_access_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
@@ -147,6 +149,7 @@ class Create(Interface):
             annex_backend='MD5E',
             native_metadata_type=None,
             if_dirty='save-before',
+            shared_access=None,
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
@@ -158,6 +161,9 @@ class Create(Interface):
         #    desired location, either at `path` or PWD
 
         # sanity check first
+        if git_opts:
+            lgr.warning(
+                "`git_opts` argument is presently ignored, please complain!")
         if no_annex:
             if description:
                 raise ValueError("Incompatible arguments: cannot specify "
@@ -189,6 +195,12 @@ class Create(Interface):
 
         # we know that we need to create a dataset at `path`
         assert(path is not None)
+
+        if git_opts is None:
+            git_opts = {}
+        if shared_access:
+            # configure `git --shared` value
+            git_opts['shared'] = shared_access
 
         # check for sane subdataset path
         real_targetpath = with_pathsep(realpath(path))  # realpath OK
