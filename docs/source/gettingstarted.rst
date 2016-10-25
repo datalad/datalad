@@ -42,6 +42,20 @@ package::
 
 .. _neurodebian: http://neuro.debian.net
 
+MacOSX
+------
+
+A simple way to get things installed is the homebrew_ package manager, which in
+itself is fairly easy to install. Git-annex is installed by the command::
+
+  brew install git-annex
+
+Once Git-annex is available, datalad can be installed via ``pip`` as described
+above. ``pip`` comes with Python distributions like anaconda_.
+
+.. _homebrew: http://brew.sh
+.. _anaconda: https://www.continuum.io/downloads
+
 
 First steps
 ===========
