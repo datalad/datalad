@@ -53,7 +53,6 @@ _test_states = {
 
 
 def setup_package():
-    from .log import lgr
     import os
 
     # To overcome pybuild overriding HOME but us possibly wanting our
@@ -86,7 +85,6 @@ def setup_package():
 
 
 def teardown_package():
-    from .log import lgr
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
