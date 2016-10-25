@@ -33,7 +33,7 @@ from ...tests.utils import swallow_logs
 from ...utils import chpwd, getpwd, rmtemp
 from ...utils import find_files
 from ...utils import rmtree
-from ... import lgr
+from datalad.log import lgr
 from ...api import add_archive_content, clean
 
 
