@@ -81,7 +81,6 @@ def _get_base_dataset_metadata(ds_identifier):
             "@vocab": "http://schema.org/",
             "doap": "http://usefulinc.com/ns/doap#",
         },
-        "type": "Dataset",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
@@ -238,6 +237,8 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     implicit_meta = _get_implicit_metadata(
         ds, ds_identifier, subdatasets=subdss)
     # create a lookup dict to find parts by subdataset mountpoint
+    if ds.id:
+        implicit_meta['type'] = "Dataset"
     has_part = implicit_meta.get('dcterms:hasPart', [])
     if not isinstance(has_part, list):
         has_part = [has_part]
@@ -393,6 +394,10 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     meta = []
     # get native metadata
     nativetypes = get_metadata_type(ds, guess=guess_type)
+    # always look for ower own aggregate meta data
+    from datalad.metadata.parsers import aggregate as agg_parser
+    if agg_parser.MetadataParser(ds).has_metadata():
+        nativetypes.append('aggregate')
     if not nativetypes:
         return meta
 
@@ -406,7 +411,13 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
         except Exception as e:
             lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
             continue
-        # TODO here we could apply a "patch" to the native metadata, if desired
-        meta.append(native_meta)
+        if native_meta:
+            # TODO here we could apply a "patch" to the native metadata, if desired
+
+            # try hard to keep things a simple non-nested list
+            if isinstance(native_meta, list):
+                meta.extend(native_meta)
+            else:
+                meta.append(native_meta)
 
     return meta

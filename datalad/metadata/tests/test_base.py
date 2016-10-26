@@ -105,7 +105,7 @@ def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()),
-                 ['@context', 'dcterms:conformsTo', 'type'])
+                 ['@context', 'dcterms:conformsTo'])
     ds.create(force=True, save=False)
     # with subdataset
     sub = ds.create('sub', force=True, if_dirty='ignore')
