@@ -49,11 +49,12 @@ def get_metadata_type(ds, guess=False):
 
     Returns
     -------
-    list(str) or None
-      Metadata type labels or `None` if no type setting is found and and
+    list(str)
+      Metadata type labels or an empty list if no type setting is found and
       optional auto-detection yielded no results
     """
     cfg_ = ds.config
+    # TODO give cfg name datalad prefix
     if cfg_ and cfg_.has_section('metadata'):
         if cfg_.has_option('metadata', 'nativetype'):
             return cfg_.get_value('metadata', 'nativetype').split()
@@ -64,8 +65,11 @@ def get_metadata_type(ds, guess=False):
         for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
             if pmod.MetadataParser(ds).has_metadata():
+                lgr.debug('Predicted presence of "%s" meta data', mtype)
                 mtypes.append(mtype)
-    return mtypes if len(mtypes) else None
+            else:
+                lgr.debug('No evidence for "%s" meta data', mtype)
+    return mtypes
 
 
 def _get_base_dataset_metadata(ds_identifier):
