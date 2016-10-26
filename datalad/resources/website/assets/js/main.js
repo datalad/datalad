@@ -1,5 +1,6 @@
 /* global window XMLHttpRequest */
 var metadata_dir = '.git/datalad/metadata/';
+var nt_cache = {};   // node_path: type cache[dictionary]
 
 /**
  * check if url exists
@@ -257,7 +258,8 @@ function load_json(jQuery, md5, parent, path) {
                    path: data.path || '-',
                    type: data.type || 'dir',
                    description: data.description || '',
-                   size: size_renderer(data.size || null)};
+                   size: size_renderer(data.size || null),
+                   nodes: data.nodes || '-'};
     }
   });
   return meta_json;
@@ -291,6 +293,34 @@ function error_msg(jQuery, msg) {
     jQuery('#content').prepend(
       "<P> ERROR: " + msg + "</P>"
     );
+/**
+ * get (and cache) the node type given its path and associated metadata json
+ * @param {object} jQuery jQuery library object
+ * @param {object} md5 md5 library object
+ * @param {string} path leaf path to start caching from upto root
+ * @param {object} json metadata json object
+ * @return {string} returns the type of the node at path
+ */
+function get_nodetype(jQuery, md5, path, json) {
+  // get meta_json of node if no json object explictly passed
+  var meta_json = typeof json !== 'undefined' ? json : false;
+  if (!meta_json) {
+    var meta_path = metadata_locator(md5, false, path);
+    meta_json = load_json(jQuery, md5, false, meta_path);
+  }
+
+  // cache node path:type pair if not cached
+  if (!(meta_json.path in nt_cache)) {
+    nt_cache[meta_json.path] = meta_json.type;
+
+    // cache node's children path:type pairs too
+    meta_json.nodes.forEach(function(child) {
+      if (!(child.path in nt_cache))
+        nt_cache[child.path] = child.type;
+    });
+  }
+
+  return nt_cache[meta_json.path].type;
 }
 
 /**
@@ -383,6 +413,7 @@ function directory(jQuery, md5) {
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
         var parent_meta = load_json(jQuery, md5, true);
+        delete parent_meta.nodes;
         if (!jQuery.isEmptyObject(parent_meta))
           api.row.add(parent_meta).draw();
       }
