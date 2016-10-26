@@ -76,6 +76,5 @@ def test_get_metadata(path):
   "description": "Some description",
   "foaf:fundedBy": "We got money from collecting plastic bottles",
   "license": "PDDL",
-  "name": "studyforrest_phase2",
-  "type": "Dataset"
+  "name": "studyforrest_phase2"
 }""")

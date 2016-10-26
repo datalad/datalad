@@ -18,7 +18,7 @@ else:
 from hashlib import md5
 from six.moves.urllib.parse import urlsplit
 from six import string_types
-from os.path import join as opj, exists, relpath
+from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
@@ -147,22 +147,6 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
         if len(annex_meta) == 1:
             annex_meta = annex_meta[0]
         meta['availableFrom'] = annex_meta
-
-    ## metadata on all subdataset
-    subdss = []
-    # we only want immediate subdatasets
-    for subds in subdatasets:
-        submeta = {
-            'location': relpath(subds.path, ds.path),
-            'type': 'Dataset'}
-        if subds.id:
-            submeta['@id'] = subds.id
-        subdss.append(submeta)
-    if len(subdss):
-        if len(subdss) == 1:
-            subdss = subdss[0]
-        meta['dcterms:hasPart'] = subdss
-
     return meta
 
 
@@ -178,6 +162,7 @@ def _simplify_meta_data_structure(meta):
     if isinstance(meta, list) and len(meta) == 1:
         # simplify structure
         meta = meta[0]
+    # XXX condition below is outdated (DOAP...), still needed?
     if isinstance(meta, dict) \
             and sorted(meta.keys()) == ['@context', '@graph'] \
             and meta.get('@context') == 'http://schema.org/':
@@ -192,26 +177,6 @@ def _simplify_meta_data_structure(meta):
         raise NotImplementedError(
             'got some unforseens meta data structure')
     return meta
-
-
-def _adjust_subdataset_location(meta, subds_relpath):
-    # find implicit meta data for all contained subdatasets
-    for m in meta:
-        # skip non-implicit
-        if not is_implicit_metadata(m):
-            continue
-        # prefix all subdataset location information with the relpath of this
-        # subdataset
-        if 'dcterms:hasPart' in m:
-            parts = m['dcterms:hasPart']
-            if not isinstance(parts, list):
-                parts = [parts]
-            for p in parts:
-                if 'location' not in p:
-                    continue
-                loc = p.get('location', subds_relpath)
-                if loc != subds_relpath:
-                    p['location'] = opj(subds_relpath, loc)
 
 
 # XXX might become its own command
@@ -264,61 +229,15 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         # all done now
         return meta
 
-    # for any subdataset that is actually registered (avoiding stale copies)
-    for subds in subdss:
-        subds_path = relpath(subds.path, ds.path)
-        if ignore_cache and subds.is_installed():
-            # simply pull meta data from actual subdataset and go to next part
-            subds_meta = get_metadata(
-                subds, guess_type=guess_type,
-                ignore_subdatasets=False,
-                ignore_cache=True)
-            _adjust_subdataset_location(subds_meta, subds_path)
-            meta.extend(subds_meta)
-            continue
-
-        # we need to look for any aggregated meta data
-        subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
-        if not exists(subds_meta_fname):
-            # nothing -> skip
-            lgr.info(
-                'no cached meta data for subdataset at {}, ignoring'.format(
-                    subds_path))
-            continue
-
-        # load aggregated meta data
-        subds_meta = jsonload(subds_meta_fname)
-        # we cannot simply append, or we get weired nested graphs
-        # proper way would be to expand the JSON-LD, extend the list and
-        # compact/flatten at the end. However assuming a single context
-        # we can cheat.
-        subds_meta = _simplify_meta_data_structure(subds_meta)
-        _adjust_subdataset_location(subds_meta, subds_path)
-
-        # make sure we have a meaningful @id for any subdataset in hasPart,
-        # regardless of whether it is installed or not. This is needed to
-        # be able to connect super and subdatasets in the graph of a new clone
-        # we a new UUID
-        if not subds.is_installed():
-            # the ID for this one is not identical to the one referenced
-            # in the aggregated meta -> sift through all meta data sets
-            # look for a meta data set that knows about being part
-            # of this dataset, so we can use its @id
-            for md in subds_meta:
-                cand_id = md.get('dcterms:isPartOf', None)
-                if cand_id == ds_identifier and '@id' in md:
-                    has_part[subds_path]['@id'] = md['@id']
-                    break
-
-        # hand over subdataset meta data
-        meta.extend(subds_meta)
-
-    # reassign modified 'hasPart; term
-    parts = list(has_part.values())
-    if len(parts) == 1:
-        parts = parts[0]
-    if len(parts):
-        implicit_meta['dcterms:hasPart'] = parts
+    from datalad.metadata.parsers.aggregate import MetadataParser as AggregateParser
+    agg_parser = AggregateParser(ds)
+    if agg_parser.has_metadata():
+        agg_meta = agg_parser.get_metadata(ds_identifier)
+        # try hard to keep things a simple non-nested list
+        if isinstance(agg_meta, list):
+            meta.extend(agg_meta)
+        else:
+            meta.append(agg_meta)
 
     return meta
 
@@ -394,10 +313,6 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     meta = []
     # get native metadata
     nativetypes = get_metadata_type(ds, guess=guess_type)
-    # always look for ower own aggregate meta data
-    from datalad.metadata.parsers import aggregate as agg_parser
-    if agg_parser.MetadataParser(ds).has_metadata():
-        nativetypes.append('aggregate')
     if not nativetypes:
         return meta
 
