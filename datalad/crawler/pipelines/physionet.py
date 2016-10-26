@@ -27,30 +27,32 @@ from ...support.strings import get_replacement_dict
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.kaggle")
 
-#
-# def superdataset_pipeline():
-#     lgr.info("Creating a CRCNS collection pipeline")
-#     # Should return a list representing a pipeline
-#     annex = Annexificator(no_annex=True)
-#     return [
-#         crawl_url("http://crcns.org/data-sets",
-#             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
-# #                      a_href_match('.*/data-sets/[\S+/\S+'),]),
-#         # TODO:  such matchers don't have state so if they get to the same url from multiple
-#         # pages they pass that content twice.  Implement state to remember yielded results +
-#         # .reset() for nodes with state so we could first get through the pipe elements and reset
-#         # them all
-#         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
-#         # http://crcns.org/data-sets/vc/pvc-1
-#         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-#         annex.initiate_dataset(
-#             template="crcns",
-#             data_fields=['dataset_category', 'dataset'],
-#             # branch='incoming',  # there will be archives etc
-#             existing='skip',
-#             # further any additional options
-#         )
-#     ]
+topurl = 'http://physionet.org'
+
+
+def superdataset_pipeline():
+    lgr.info("Creating a PhysioNet collection pipeline")
+    # Should return a list representing a pipeline
+    annex = Annexificator(no_annex=True)
+    return [
+        crawl_url("%s/physiobank/database/" % topurl,
+            matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
+#                      a_href_match('.*/data-sets/[\S+/\S+'),]),
+        # TODO:  such matchers don't have state so if they get to the same url from multiple
+        # pages they pass that content twice.  Implement state to remember yielded results +
+        # .reset() for nodes with state so we could first get through the pipe elements and reset
+        # them all
+        a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
+        # http://crcns.org/data-sets/vc/pvc-1
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
+            template="crcns",
+            data_fields=['dataset_category', 'dataset'],
+            # branch='incoming',  # there will be archives etc
+            existing='skip',
+            # further any additional options
+        )
+    ]
 #
 #
 # def extract_readme(data):
@@ -74,7 +76,7 @@ def pipeline(dataset,
              backend='MD5E'):
     """Pipeline to crawl/annex a physionet dataset"""
 
-    url = "http://physionet.org/%s" % dataset
+    url = "%s/%s" % (topurl, dataset)
     if not isinstance(leading_dirs_depth, int):
         leading_dirs_depth = int(leading_dirs_depth)
 
