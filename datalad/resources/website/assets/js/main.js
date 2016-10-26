@@ -315,6 +315,19 @@ function directory(jQuery, md5) {
   // Embed the table placeholder
   jQuery('#content').prepend('<table id="directory" class="display"></table>');
 
+  // add HOWTO install
+  var ri = uri2installri();
+  if (ri) {
+    jQuery('#content').prepend(
+        '<div id="installation">' +
+        '<P>To install this dataset in your current directory use</P>' +
+        '<span class="command">datalad install ' + ri + '</span>' +
+        '<P>To install with all subdatasets and all data</P>' +
+        '<span class="command">datalad install -r -g ' + ri + '</span>' +
+        '<P style="font-size: 90%;">For more information about DataLad and installation instructions visit <a href="http://datalad.org">datalad.org</a></P>' +
+        '</div>');
+  }
+
   var table = jQuery('#directory').dataTable({
     async: true,    // async get json
     paging: false,  // ensure scrolling instead of pages
@@ -385,18 +398,6 @@ function directory(jQuery, md5) {
         else if (traverse.type === 'search')
           window.location.search = traverse.next;
       });
-      // add HOWTO install
-      var ri = uri2installri();
-      if (ri) {
-        jQuery('#content').prepend(
-            '<div id="installation">' +
-            '<P>To install this dataset in your current directory use</P>' +
-            '<span class="command">datalad install ' + ri + '</span>' +
-            '<P>To install with all subdatasets and all data</P>' +
-            '<span class="command">datalad install -r -g ' + ri + '</span>' +
-            '<P style="font-size: 90%;">For more information about DataLad and installation instructions visit <a href="http://datalad.org">datalad.org</a></P>' +
-            '</div>');
-      }
       // add breadcrumbs
       jQuery('#directory_filter').prepend('<span class="breadcrumb">' +
                                            bread2crumbs().join(' / ') +
