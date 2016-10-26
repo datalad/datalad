@@ -109,31 +109,31 @@ function bread2crumbs() {
  * @return {string} RI to install current dataset from
  */
 function uri2installri() {
-  /// TODO -- RF to centralize common logic with bread2crumbs
+  // TODO -- RF to centralize common logic with bread2crumbs
   var raw_crumbs = loc().href.split('/');
   var span_class = '<span class="dir">';
   var ri_ = '';
-  /// poor Yarik knows no JS
-  /// TODO:  now check for the last dataset is crippled, we would need
-  /// meld logic with breadcrumbs I guess, whenever they would get idea
-  /// of where dataset boundary is
+  // poor Yarik knows no JS
+  // TODO:  now check for the last dataset is crippled, we would need
+  // meld logic with breadcrumbs I guess, whenever they would get idea
+  // of where dataset boundary is
   var ri = null;
   for (var index = 0; index < raw_crumbs.length; index++) {
     if (raw_crumbs[index] === '?dir=')
       continue;
     if (ri_)
-      ri_ += '/'
+      ri_ += '/';
     ri_ += raw_crumbs[index];
     if (url_exists(ri_ + '/' + metadata_dir)) {
       ri = ri_;
     }
   }
-  /// possible shortcuts
+  // possible shortcuts
   if (ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
   }
-  return ri
+  return ri;
 }
 
 /**
@@ -289,10 +289,17 @@ function size_renderer(size) {
     return size.ondisk + "/" + size.total;
 }
 
+/**
+ * render error message to html div
+ * @param {object} jQuery jQuery library object
+ * @param {string} msg message to be displayed on page
+ */
 function error_msg(jQuery, msg) {
-    jQuery('#content').prepend(
-      "<P> ERROR: " + msg + "</P>"
-    );
+  jQuery('#content').prepend(
+    "<P> ERROR: " + msg + "</P>"
+  );
+}
+
 /**
  * get (and cache) the node type given its path and associated metadata json
  * @param {object} jQuery jQuery library object
@@ -371,7 +378,7 @@ function directory(jQuery, md5) {
          var meta = data.metadata;
          if (!meta) { return ''; }
          var desc = meta[0].name;
-         if (desc) { return desc; } else { return '';}
+         if (desc) { return desc; } else { return ''; }
        }},
       {data: "type", title: "Type", className: "dt-center", visible: false},
       {data: "path", title: "Path", className: "dt-center", visible: false},
@@ -379,11 +386,11 @@ function directory(jQuery, md5) {
        render: function(data) {
          return (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized');
        }},
-      /// make metadata searchable right there!
+      // make metadata searchable right there!
       {data: null, title: "Metadata", visible: false,
         render: function(data) {
           var meta = data.metadata;
-          if (meta) { return JSON.stringify(meta); } else {return "";}
+          if (meta) { return JSON.stringify(meta); } else { return ""; }
         }}
     ],
     createdRow: function(row, data, index) {
@@ -397,10 +404,10 @@ function directory(jQuery, md5) {
       if (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized') {
         var orig = jQuery('td', row).eq(0).html();
         orig = '<a>' + orig + '/</a>';
-         if (data.tags) {
-           orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
-         }
-         jQuery('td', row).eq(0).html(orig);
+        if (data.tags) {
+          orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
+        }
+        jQuery('td', row).eq(0).html(orig);
       }
       if (data.name === '..')
         jQuery('td', row).eq(2).html('');
