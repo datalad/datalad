@@ -87,33 +87,36 @@ def pipeline(dataset,
         backend=backend,
         statusdb='json',
         special_remotes=special_remotes,
+        skip_problematic=True,
         options=["-c",
-                 "annex.largefiles=exclude=README*"
+                 "annex.largefiles="
+                 "exclude=README*"
                  " and exclude=LICENSE* and exclude=*.txt and exclude=*.json"
                  " and exclude=*.cfg"
                  " and exclude=*.edf.event"
+                 " and exclude=DOI"
+                 " and exclude=ANNOTATORS"
                  ]
     )
 
     def printnode(data):
-        print data['url']
+        print(data['url'], data.get('path'), data.get('filename'))
 
-    crawler = crawl_url(url)
+    crawler = crawl_url(
+        url,
+        matchers=[
+            a_href_match('%s.*/[^.].*/$' % url)
+            #a_href_match('%s.*/S001.*/$' % url)
+        ]
+    )
     return [  # Download all the archives found on the project page
-        crawler,
         [
-            xpath_match('//img[@src="/icons/blank.gif"]/..'),
-            a_href_match(a_href_match_, min_count=1),
-            continue_if({'url': url + '/[^#?].*'}, re=True),
-            [
-                {'output': 'outputs'},
-                continue_if({'url': '.*/$'}, re=True),
-                crawler.recurse,
-                a_href_match(a_href_match_, min_count=1),
-                continue_if({'url': url.rstrip('/') + '/.*/[^#?/].*$'}, re=True),
-            ],
+            crawler,
+            a_href_match(url +'(/(?P<path>.*))?/[^/]*$'), #, min_count=1),
+            # skip those which have # or ? in last component
+            continue_if({'url': url.rstrip('/') + '(/.*)?/[^#?/][^/]*$'}, re=True),
             annex,
-            # printnode,
+            #printnode,
         ],
         annex.finalize(cleanup=True)
     ]

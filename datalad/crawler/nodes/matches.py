@@ -59,6 +59,9 @@ class ExtractorMatch(object):
         raise NotImplementedError
 
     def __call__(self, data):
+        if self._input not in data:
+            lgr.warning("No %r field within data, skipping" % self._input)
+            return
         input = data.pop(self._input) if self._pop_input else data[self._input]
 
         if isinstance(input, Response):
