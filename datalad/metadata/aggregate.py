@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface for managing metadata
+"""Interface for aggregating metadata
 """
 
 __docformat__ = 'restructuredtext'
@@ -36,6 +36,12 @@ def _store_json(path, meta):
 
 class AggregateMetaData(Interface):
     """Aggregate meta data of a dataset for later query.
+
+    By default meta data is aggregated across all configured native meta data
+    sources. Optionally, the type of available meta data can guessed, if no
+    types are configures. Moreover, it is possible to aggregate meta data from
+    any subdatasets into the superdataset, in order to facilitate data
+    discovery without having to obtain any subdataset.
     """
 
     _params_ = dict(
