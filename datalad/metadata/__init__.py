@@ -21,7 +21,6 @@ from six import string_types
 from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
-from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
@@ -89,7 +88,7 @@ def _get_base_dataset_metadata(ds_identifier):
     return meta
 
 
-def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
+def _get_implicit_metadata(ds, ds_identifier=None):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
@@ -101,8 +100,6 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     """
     if ds_identifier is None:
         ds_identifier = ds.id
-    if subdatasets is None:
-        subdatasets = []
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
@@ -190,24 +187,12 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
 
-    # pregenerate Dataset objects for all relevants subdataset
-    # needed to get consistent IDs across the entire meta data graph
-    # we need these, even if we `ignore_subdatasets`, as we still want
-    # to list the parts of this dataset, even without additional meta data
-    # about it
-    subdss = [Dataset(opj(ds.path, p)) for p in ds.get_subdatasets(recursive=False)]
     # start with the implicit meta data, currently there is no cache for
     # this type of meta data, as it will change with every clone.
     # In contrast, native meta data is cached.
-    implicit_meta = _get_implicit_metadata(
-        ds, ds_identifier, subdatasets=subdss)
-    # create a lookup dict to find parts by subdataset mountpoint
+    implicit_meta = _get_implicit_metadata(ds, ds_identifier)
     if ds.id:
         implicit_meta['type'] = "Dataset"
-    has_part = implicit_meta.get('dcterms:hasPart', [])
-    if not isinstance(has_part, list):
-        has_part = [has_part]
-    has_part = {hp['location']: hp for hp in has_part}
 
     meta.append(implicit_meta)
 
