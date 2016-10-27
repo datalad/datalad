@@ -274,6 +274,24 @@ class Publish(Interface):
                 # unknown remote
                 raise ValueError("No sibling '%s' found." % dest_resolved)
 
+            # publishing of `dest_resolved` might depend on publishing other
+            # remote(s) first:
+            # define config var name for potential publication dependencies
+            depvar = 'remote.{}.datalad-publish-depends'.format(dest_resolved)
+            for d in ds.config.get(depvar, []):
+                lgr.info("Dependency detected: '%s'" % d)
+                # Note: Additional info on publishing the dep. comes from within
+                # `ds.publish`.
+                ds.publish(path=path,
+                           to=d,
+                           since=since,
+                           skip_failing=skip_failing,
+                           recursive=recursive,
+                           recursion_limit=recursion_limit,
+                           git_opts=git_opts,
+                           annex_opts=annex_opts,
+                           annex_copy_opts=annex_copy_opts)
+
             lgr.info("Publishing dataset {0} to sibling {1} "
                      "...".format(ds, dest_resolved))
 
@@ -282,6 +300,7 @@ class Publish(Interface):
                                         refspec=ds.repo.get_active_branch(),
                                         set_upstream=set_upstream))
 
+            # TODO: annex-ignore
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
                 ds.repo.fetch(remote=dest_resolved)
