@@ -92,7 +92,9 @@ def _get_implicit_metadata(ds, ds_identifier=None):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
-    encoded in the dataset repository itself.
+    encoded in the dataset repository itself. This does not include information
+    on submodules, however. Meta data on subdatasets is provided by a dedicated
+    parser implementation for "aggregate" meta data.
 
     Returns
     -------
@@ -107,6 +109,10 @@ def _get_implicit_metadata(ds, ds_identifier=None):
         # everything else comes from a repo
         return meta
 
+    if ds.id:
+        # it has an ID, so we consider it a proper dataset
+        meta['type'] = "Dataset"
+
     # shortcut
     repo = ds.repo.repo
     if repo.head.is_valid():
@@ -114,18 +120,22 @@ def _get_implicit_metadata(ds, ds_identifier=None):
         # maybe use something like git-describe instead -- but tag-references
         # might changes...
         meta['version'] = repo.head.commit.hexsha
+    _add_annex_metadata(ds.repo, meta)
+    return meta
 
+
+def _add_annex_metadata(repo, meta):
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
     # need annex repo instance
     # TODO refactor to use ds.uuid when #701 is addressed
-    if hasattr(ds.repo, 'repo_info'):
+    if hasattr(repo, 'repo_info'):
         # get all other annex ids, and filter out this one, origin and
         # non-specific remotes
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
-            repo_info = ds.repo.repo_info(fast=True)
+            repo_info = repo.repo_info(fast=True)
         annex_meta = []
         for src in ('trusted repositories',
                     'semitrusted repositories',
@@ -144,7 +154,6 @@ def _get_implicit_metadata(ds, ds_identifier=None):
         if len(annex_meta) == 1:
             annex_meta = annex_meta[0]
         meta['availableFrom'] = annex_meta
-    return meta
 
 
 def is_implicit_metadata(meta):
@@ -191,9 +200,6 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     # this type of meta data, as it will change with every clone.
     # In contrast, native meta data is cached.
     implicit_meta = _get_implicit_metadata(ds, ds_identifier)
-    if ds.id:
-        implicit_meta['type'] = "Dataset"
-
     meta.append(implicit_meta)
 
     # from cache?
