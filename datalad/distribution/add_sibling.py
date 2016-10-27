@@ -252,8 +252,8 @@ class AddSibling(Interface):
                                 'location={}'.format(repoinfo['url']),
                                 'autoenable=true'])
                     else:
-                        lgr.info(
-                            'Not configuration "%s" as a common data source, '
+                        lgr.warning(
+                            'Not configuring "%s" as a common data source, '
                             'URL protocol is not http or https',
                             name)
             successfully_added.append(repo_name)

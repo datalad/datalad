@@ -9,10 +9,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
-import os
 from mock import patch
 from datalad import cfg
-from datalad.api import Dataset, aggregate_metadata, install
+from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
 from datalad.tests.utils import assert_in
@@ -22,10 +21,10 @@ from datalad.tests.utils import with_testsui
 from datalad.tests.utils import SkipTest
 from datalad.support.exceptions import NoDatasetArgumentFound
 
-from os.path import join as opj
-
 from datalad.api import search
 from datalad.metadata import search as search_mod
+
+from datalad.tests.utils import skip_if_no_network
 
 
 @with_testsui(interactive=False)
@@ -35,7 +34,7 @@ def test_search_outside1_noninteractive_ui(tdir):
     with chpwd(tdir):
         with assert_raises(NoDatasetArgumentFound) as cme:
             list(search("bu"))
-        assert_in('UI is not interactive', str(cme.exception))
+        assert_in('run interactively', str(cme.exception))
 
 
 @with_tempfile(mkdir=True)
@@ -121,6 +120,7 @@ def _check_mocked_install(central_dspath, mock_install):
     mock_install.assert_called_once_with(central_dspath, source='///')
 
 
+@skip_if_no_network
 @with_tempfile
 def test_our_metadataset_search(tdir):
     # smoke test for basic search operations on our super-megadataset

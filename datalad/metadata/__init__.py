@@ -73,7 +73,10 @@ def _get_base_dataset_metadata(ds_identifier):
     """
 
     meta = {
-        "@context": "http://schema.org/",
+        "@context": {
+            "@vocab": "http://schema.org/",
+            "doap": "http://usefulinc.com/ns/doap#",
+        },
         "type": "Dataset",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",

@@ -130,6 +130,7 @@ def test_is_installed(src, path):
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
+    subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
