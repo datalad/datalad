@@ -222,7 +222,7 @@ class AnnexRepo(GitRepo):
         if is_ssh(url):
             c = ssh_manager.get_connection(url)
             # options to add:
-            cfg_string = " -o ControlMaster=auto -S %s" % c.ctrl_path
+            cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
             # read user-defined options from .git/config:
             # TODO: ConfigManager.obtain() instead?
             reader = self.repo.config_reader()
@@ -234,9 +234,9 @@ class AnnexRepo(GitRepo):
                 cfg_string_old = None
 
             self._annex_common_options += \
-                ['-c', 'remote.{0}.annex-ssh-options="{1}{2}"'
+                ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
                        ''.format(remote_name,
-                                 cfg_string_old if cfg_string_old else "",
+                                 (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
     @classmethod
