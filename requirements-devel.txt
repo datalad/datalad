@@ -1,0 +1,4 @@
+# Theoretically we don't want -e here but ATM pip would puke if just .[full] is provided
+# Since we use requirements.txt ATM only for development IMHO it is ok but
+# we need to figure out/complaint to pip folks
+-e .[devel]

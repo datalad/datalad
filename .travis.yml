@@ -30,6 +30,10 @@ matrix:
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
+    - _DATALAD_UPSTREAM_GITPYTHON=1
+  - python: 2.7
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
   - python: 2.7
@@ -95,26 +99,19 @@ before_install:
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
   - npm install grunt-cli
+  # Install optionally upstream current development so we are sure that they break nothing important for us
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo apt-get install git-annex-standalone zip
+  - travis_retry sudo apt-get install git-annex-standalone zip pandoc
   - travis_retry sudo apt-get install shunit2
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
-  - git submodule update --init --recursive
   - cd ..; pip install -q codecov; cd -
-  - pip install -r requirements.txt
-  # Verify that setup.py build doesn't puke
-  - python setup.py build
-  - pip install -e .
+  - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
-  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
-  - pip install sphinx
-  - pip install sphinx_rtd_theme
-  # Specifically needed for tests here (e.g. example scripts testing)
-  - pip install nibabel
   # TMPDIRs
   - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
@@ -125,24 +122,19 @@ install:
   - npm install grunt-contrib-qunit
 
 script:
-  - echo "Running tests"
+  # Verify that setup.py build doesn't puke
+  - python setup.py build
+  # Run tests
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
-  # Run doc examples "tests"
-  # but for that we need first to install the beast and minimal installation
-  # must be sufficient
-  - pip install .
   # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
   - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
-  - /bin/ls -l /tmp/.coverage-entry*
-  - echo "BEFORE combining"; coverage report --show-missing
   - coverage combine -a /tmp/.coverage-entrypoints-*
-  - echo "AFTER combining"; coverage report --show-missing
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary

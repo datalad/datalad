@@ -174,6 +174,13 @@ def alter_interface_docs_for_cmdline(docs):
     return docs
 
 
+def is_api_arg(arg):
+    """Return True if argument is our API argument or self or used for internal
+    purposes
+    """
+    return arg != 'self' and not arg.startswith('_')
+
+
 def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
     """Generate a useful docstring from a parameter spec
 
@@ -194,7 +201,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
             doc += '\n'
         doc += "Parameters\n----------\n"
         for i, arg in enumerate(args):
-            if arg == 'self':
+            if not is_api_arg(arg):
                 continue
             # we need a parameter spec for each argument
             if not arg in params:
@@ -235,7 +242,7 @@ class Interface(object):
         if not defaults is None:
             ndefaults = len(defaults)
         for i, arg in enumerate(args):
-            if arg == 'self':
+            if not is_api_arg(arg):
                 continue
             param = cls._params_[arg]
             defaults_idx = ndefaults - len(args) + i
@@ -291,7 +298,7 @@ class Interface(object):
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
-        kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
+        kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
         try:
             return cls.__call__(**kwargs)
         except KeyboardInterrupt as exc:

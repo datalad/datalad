@@ -11,11 +11,11 @@ collaborative research, and new data providers are becoming available all the
 time.
 
 However, despite the increased availability of data, their accessibility is far
-from optimal. Potential consumers of these public datasets have to manually
-browse various disconnected warehouses with heterogeneous interfaces.  Once
-obtained, data is disconnected from its origin and data versioning is often
-ad-hoc or completely absent. If data consumers can be reliably informed about
-data updates at all, review of changes is difficult, and re-deployment is
+from being optimal. Potential consumers of these public datasets have to
+manually browse various disconnected warehouses with heterogeneous interfaces.
+Once obtained, data is disconnected from its origin and data versioning is
+often ad-hoc or completely absent. If data consumers can be reliably informed
+about data updates at all, review of changes is difficult, and re-deployment is
 tedious and error-prone. This leads to wasteful friction caused by outdated or
 faulty data.
 

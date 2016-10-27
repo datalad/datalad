@@ -139,6 +139,7 @@ definitions = {
     'datalad.log.timestamp': {
         'ui': ('yesno', {
                'title': 'Used to add timestamp to datalad logs'}),
+        'default': False,
         'type': EnsureBool(),
     },
     'datalad.log.traceback': {

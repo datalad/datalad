@@ -65,7 +65,10 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": "http://schema.org/",
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
   "@id": "ID",
   "author": "Jane Doe <noemail@example.com>",
   "contributors": [

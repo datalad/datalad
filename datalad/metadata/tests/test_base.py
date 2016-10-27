@@ -29,6 +29,7 @@ from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import skip_if_no_network
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from nose import SkipTest
@@ -104,7 +105,7 @@ def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()),
-                 ['@context', '@id', 'dcterms:conformsTo', 'type'])
+                 ['@context', 'dcterms:conformsTo', 'type'])
     ds.create(force=True, save=False)
     # with subdataset
     sub = ds.create('sub', force=True, if_dirty='ignore')
@@ -131,6 +132,7 @@ def test_basic_metadata(path):
                   'location': 'sub'})
 
 
+@skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
@@ -149,7 +151,7 @@ def test_aggregation(path):
     assert_equal(len(meta), 7)
     # same schema
     assert_equal(
-        7, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
+            7, sum([s.get('@context', {'@vocab': None})['@vocab'] == 'http://schema.org/' for s in meta]))
     # three different IDs
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
@@ -253,8 +255,8 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['type']))),
-        set([('name', 'type')])
+                             report=['schema:type']))),
+        set([('name', 'schema:type')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))
@@ -290,6 +292,7 @@ def test_aggregation(path):
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
 
+@skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata

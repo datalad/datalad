@@ -9,14 +9,13 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
-lgr.log(5, "Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
 
+from .log import lgr
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()

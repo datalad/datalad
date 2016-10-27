@@ -33,6 +33,12 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
+super_datasets_flag = Parameter(
+    args=("-S", "--super-datasets",),
+    action="store_true",
+    doc="""if set, traverse and save stats corresponding to the change
+    within super-datasets""")
+
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',
@@ -96,6 +102,16 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
+reckless_opt = Parameter(
+    args=("--reckless",),
+    action="store_true",
+    doc="""Set up the dataset to be able to obtain content in the
+    cheapest/fastest possible way, even if this poses a potential
+    risk the data integrity (e.g. hardlink files from a local clone
+    of the dataset). Use with care, and limit to "read-only" use
+    cases. With this flag the installed dataset will be marked as
+    untrusted.""")
+
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
     metavar="NJOBS",
@@ -106,3 +122,23 @@ verbose = Parameter(
     args=("-v", "--verbose",),
     action="store_true",
     doc="""print out more detailed information while executing a command""")
+
+
+as_common_datasrc = Parameter(
+    args=("--as-common-datasrc",),
+    metavar='NAME',
+    doc="""configure the created sibling as a common data source of the
+    dataset that can be automatically used by all consumers of the
+    dataset (technical: git-annex auto-enabled special remote)""")
+
+
+publish_depends = Parameter(
+    args=("--publish-depends",),
+    metavar='SIBLINGNAME',
+    doc="""add a dependency such that the given exsiting sibling is
+    always published prior to the new sibling. This equals setting a
+    configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
+    [PY: Multiple dependencies can be given as a list of sibling names
+    PY][CMD: This option can be given more than once to configure multiple
+    dependencies CMD]""",
+    action='append')
