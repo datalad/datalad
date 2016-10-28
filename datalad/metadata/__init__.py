@@ -62,6 +62,9 @@ def get_metadata_type(ds, guess=False):
         # keep local, who knows what some parsers might pull in
         from . import parsers
         for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
+            if mtype == 'aggregate':
+                # skip, runs anyway, but later
+                continue
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
             if pmod.MetadataParser(ds).has_metadata():
                 lgr.debug('Predicted presence of "%s" meta data', mtype)
@@ -196,20 +199,21 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
 
-    # start with the implicit meta data, currently there is no cache for
-    # this type of meta data, as it will change with every clone.
-    # In contrast, native meta data is cached.
-    implicit_meta = _get_implicit_metadata(ds, ds_identifier)
-    meta.append(implicit_meta)
-
     # from cache?
     if ignore_cache or not exists(main_meta_fname):
+        # start with the implicit meta data, currently there is no cache for
+        # this type of meta data, as it will change with every clone.
+        # In contrast, native meta data is cached.
+        implicit_meta = _get_implicit_metadata(ds, ds_identifier)
+        meta.append(implicit_meta)
+        # and any native meta data
         meta.extend(
             get_native_metadata(
                 ds,
                 guess_type=guess_type,
                 ds_identifier=ds_identifier))
     else:
+        # from cache
         cached_meta = jsonload(main_meta_fname)
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
@@ -310,6 +314,10 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     # keep local, who knows what some parsers might pull in
     from . import parsers
     for nativetype in nativetypes:
+        if nativetype == 'aggregate':
+            # this is special and needs to be ignored here, even if it was
+            # configured. reason: this parser runs anyway in get_metadata()
+            continue
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
         try:

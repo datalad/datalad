@@ -33,7 +33,8 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from nose import SkipTest
-from nose.tools import assert_true, assert_equal, assert_raises, assert_false
+from nose.tools import assert_true, assert_equal, assert_raises, \
+    assert_false, assert_not_equal
 
 try:
     import pyld
@@ -186,7 +187,10 @@ def test_aggregation(path):
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
     assert_equal(clonemeta[0]['@id'], ds.id)
-    assert_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
+    # the actual repos necessarily advanced from the point of the meta data cache
+    # because the cache itself was commited
+    assert_equal(clone.repo.get_hexsha(), ds.repo.get_hexsha())
+    assert_not_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
     # all but the implicit is identical
     assert_equal(clonemeta[1:], meta[1:])
     # the implicit md of the clone should list a dataset ID for its subds,
@@ -313,7 +317,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
-        assert_false(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
+        assert_true(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
 
     # but search should not fail
     with swallow_outputs():
