@@ -133,8 +133,9 @@ class Runner(object):
                 self.__log_outputs = \
                     cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
-                # could be too early, then log!
-                return True
+                # could be too early, then DON'T log since might be sensitive!
+                # information
+                return False
         return self.__log_outputs
 
     # Two helpers to encapsulate formatting/output
