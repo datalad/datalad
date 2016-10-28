@@ -15,6 +15,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 import json
 import logging
 import math
+import os
 import re
 import shlex
 
@@ -269,6 +270,11 @@ class AnnexRepo(GitRepo):
             return None
         return int(size_str) if size_str.isdigit() else None
 
+    @normalize_path
+    def get_file_size(self, path):
+        fpath = opj(self.path, path)
+        return 0 if not exists(fpath) else os.stat(fpath).st_size
+
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository"""
@@ -316,7 +322,7 @@ class AnnexRepo(GitRepo):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
-                           backend=None, **kwargs):
+                           backend=None, jobs=None, **kwargs):
         """Helper to run actual git-annex calls
 
         Unifies annex command calls.
@@ -333,6 +339,7 @@ class AnnexRepo(GitRepo):
             backend to be used by this command; Currently this can also be
             achieved by having an item '--backend=XXX' in annex_options.
             This may change.
+        jobs : int
         **kwargs
             these are passed as additional kwargs to datalad.cmd.Runner.run()
 
@@ -354,6 +361,9 @@ class AnnexRepo(GitRepo):
             cmd_list = ['git'] + git_options + ['annex']
         else:
             cmd_list = ['git-annex']
+        if jobs:
+            annex_options += ['-J%d' % jobs]
+
         cmd_list += [annex_cmd] + backend + debug + annex_options
 
         try:
@@ -482,31 +492,8 @@ class AnnexRepo(GitRepo):
         # fetched
 
         if '--key' not in options:
-            lgr.debug("Determine what files need to be obtained")
-            # Let's figure out first which files/keys and of what size to download
-            expected_downloads = {}
-            fetch_files = []
-            keys_seen = set()
-            unknown_sizes = []  # unused atm
-
-            # for now just record total size, and
-            for j in self._run_annex_command_json(
-                'find', args=['--json', '--not', '--in', 'here'] + files
-                ):
-                key = j['key']
-                size = j.get('bytesize')
-                if key in keys_seen:
-                    # multiple files could point to the same key.  no need to
-                    # request multiple times
-                    continue
-                keys_seen.add(key)
-                assert j['file']
-                fetch_files.append(j['file'])
-                if size and size.isdigit():
-                    expected_downloads[key] = int(size)
-                else:
-                    expected_downloads[key] = None
-                    unknown_sizes.append(j['file'])
+            expected_downloads, fetch_files = self._get_expected_downloads(
+                files)
         else:
             fetch_files = files
             assert(len(files) == 1)
@@ -534,9 +521,6 @@ class AnnexRepo(GitRepo):
         if self.git_annex_version >= '6.20160923':
             # options  might be the '--key' which should go last
             options = ['--json-progress'] + options
-        if jobs:
-            options = ['-J%d' % jobs] + options
-
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
@@ -556,17 +540,59 @@ class AnnexRepo(GitRepo):
         # failed to download
         with cm:
             results = self._run_annex_command_json(
-                'get', args=options + fetch_files, **run_kwargs)
+                'get', args=options + fetch_files,
+                jobs=jobs, **run_kwargs)
         results_list = list(results)
         progress_indicators.finish()
         # TODO:  should we here compare fetch_files against result_list
         # and womit an exception of incomplete download????
         return results_list
 
+    def _get_expected_downloads(self, files):
+        """Given a list of files, figure out what to be downloaded
+
+        Parameters
+        ----------
+        files
+
+        Returns
+        -------
+        expected_downloads : dict
+          key -> size
+        fetch_files : list
+          files to be fetched
+        """
+        lgr.debug("Determine what files need to be obtained")
+        # Let's figure out first which files/keys and of what size to download
+        expected_downloads = {}
+        fetch_files = []
+        keys_seen = set()
+        unknown_sizes = []  # unused atm
+        # for now just record total size, and
+        for j in self._run_annex_command_json(
+                'find', args=['--json', '--not', '--in', 'here'] + files
+        ):
+            key = j['key']
+            size = j.get('bytesize')
+            if key in keys_seen:
+                # multiple files could point to the same key.  no need to
+                # request multiple times
+                continue
+            keys_seen.add(key)
+            assert j['file']
+            fetch_files.append(j['file'])
+            if size and size.isdigit():
+                expected_downloads[key] = int(size)
+            else:
+                expected_downloads[key] = None
+                unknown_sizes.append(j['file'])
+        return expected_downloads, fetch_files
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
-            msg=None, git_options=None, annex_options=None, _datalad_msg=False):
+            msg=None, dry_run=False,
+            jobs=None,
+            git_options=None, annex_options=None, _datalad_msg=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -582,6 +608,9 @@ class AnnexRepo(GitRepo):
           the list of files that were added, is created by default.
         backend:
         options:
+        dry_run : bool, optional
+          Calls git add with --dry-run -N --ignore-missing, to just output list
+          of files to be added
 
         Returns
         -------
@@ -589,38 +618,65 @@ class AnnexRepo(GitRepo):
         """
 
         if git_options:
+            # TODO: note that below we would use 'add with --dry-run
+            # so passed here options might need to be passed into it??
             lgr.warning("git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
-
+        git_options = []
+        if dry_run:
+            git_options += ['--dry-run', '-N', '--ignore-missing']
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
         if git:
             # add to git instead of annex
             if self.is_direct_mode():
-                self.proxy(['git', 'add'] + options + files)
+                # TODO:  may be there should be a generic decorator to avoid
+                # duplication and just augment how git commands are called (i.e.
+                # with proxy
+                add_out = self.proxy(['git', 'add'] + options + git_options + files)
+                return_list = self._process_git_get_output(*add_out)
 
                 # Note/TODO:
                 # There was a reason to use the following instead of self.proxy:
                 #cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
                 #           files
                 #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
-
-                # currently simulating return value, assuming success
-                # for all files:
-                return_list = [{u'file': f, u'success': True} for f in files]
-                # TODO: use options with git_add instead!
             else:
-                return_list = super(AnnexRepo, self).add(files)
+                return_list = super(AnnexRepo, self).add(files, git_options=git_options)
 
         else:
+            # Theoretically we could have done for git, if it could have been
+            # batched
+            # Figure out what actually will be added
+            to_be_added_recs = self.add(files, git=True, dry_run=True)
+            # collect their sizes for the progressbar
+            expected_downloads = {
+                rec['file']: self.get_file_size(rec['file'])
+                for rec in to_be_added_recs
+            }
+            progress_indicators = ProcessAnnexProgressIndicators(
+                expected=expected_downloads,
+            )
+            run_kwargs = dict(
+                log_stdout=progress_indicators,
+                log_stderr='offline',  # False, # to avoid lock down
+                log_online=True
+            )
             return_list = list(self._run_annex_command_json(
-                'add', args=options + files, backend=backend, expect_fail=True,
-                expect_stderr=True))
+                'add',
+                args=options + files,
+                backend=backend,
+                expect_fail=True,
+                jobs=jobs,
+                **run_kwargs
+                #expect_stderr=True
+            ))
+            progress_indicators.finish()
 
         if commit:
             if msg is None:
@@ -942,6 +998,7 @@ class AnnexRepo(GitRepo):
             return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
+                 jobs=None,
                  git_options=None, annex_options=None):
         """Downloads each url to its own file, which is added to the annex.
 
@@ -1080,12 +1137,14 @@ class AnnexRepo(GitRepo):
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
-    def _run_annex_command_json(self, command, args=None, **kwargs):
+    def _run_annex_command_json(self, command, args=None, jobs=None, **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
         """
         try:
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
+            if jobs:
+                annex_options += ['-J%d' % jobs]
             if args:
                 annex_options += args
             out, err = self._run_annex_command(

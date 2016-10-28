@@ -113,7 +113,9 @@ def test_add_recursive(path):
     assert_raises(CommandError, ds.add, opj('dir', 'testindir'),
                   recursive=True, recursion_limit=0)
 
-    ds.add(opj('dir', 'testindir'), recursive=True)
+    # add while also instructing annex to add in parallel 2 jobs (smoke testing
+    # for that effect ATM)
+    ds.add(opj('dir', 'testindir'), recursive=True, jobs=2)
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
 
     ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
