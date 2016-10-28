@@ -763,23 +763,23 @@ def test_AnnexRepo_get(src, dst):
 
     called = []
     # for some reason yoh failed mock to properly just call original func
-    orig_run = annex._run_annex_command_json
+    orig_run = annex._run_annex_command
 
-    def check_run(cmd, args, **kwargs):
+    def check_run(cmd, annex_options, **kwargs):
         called.append(cmd)
         if cmd == 'find':
-            assert_not_in('-J5', args)
+            assert_not_in('-J5', annex_options)
         elif cmd == 'get':
-            assert_in('-J5', args)
+            assert_in('-J5', annex_options)
         else:
             raise AssertionError(
                 "no other commands so far should be ran. Got %s, %s" %
-                (cmd, args)
+                (cmd, annex_options)
             )
-        return orig_run(cmd, args, **kwargs)
+        return orig_run(cmd, annex_options=annex_options, **kwargs)
 
     annex.drop(testfile)
-    with patch.object(AnnexRepo, '_run_annex_command_json',
+    with patch.object(AnnexRepo, '_run_annex_command',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
