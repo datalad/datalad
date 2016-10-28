@@ -509,14 +509,6 @@ class AnnexRepo(GitRepo):
         # TODO:  check annex version and issue a one time warning if not
         # old enough for --json-progress
 
-        progress_indicators = ProcessAnnexProgressIndicators(
-            expected=expected_downloads,
-        )
-        run_kwargs = dict(
-            log_stdout=progress_indicators,
-            log_stderr='offline',  # False, # to avoid lock down
-            log_online=True
-        )
         # Without up to date annex, we would still report total! ;)
         if self.git_annex_version >= '6.20160923':
             # options  might be the '--key' which should go last
@@ -541,9 +533,9 @@ class AnnexRepo(GitRepo):
         with cm:
             results = self._run_annex_command_json(
                 'get', args=options + fetch_files,
-                jobs=jobs, **run_kwargs)
+                jobs=jobs,
+                expected_entries=expected_downloads)
         results_list = list(results)
-        progress_indicators.finish()
         # TODO:  should we here compare fetch_files against result_list
         # and womit an exception of incomplete download????
         return results_list
@@ -650,33 +642,24 @@ class AnnexRepo(GitRepo):
                 return_list = super(AnnexRepo, self).add(files, git_options=git_options)
 
         else:
-            # Theoretically we could have done for git, if it could have been
-            # batched
-            # Figure out what actually will be added
+            # Theoretically we could have done for git as well, if it could have
+            # been batched
+            # 1. Figure out what actually will be added
             to_be_added_recs = self.add(files, git=True, dry_run=True)
             # collect their sizes for the progressbar
-            expected_downloads = {
+            expected_additions = {
                 rec['file']: self.get_file_size(rec['file'])
                 for rec in to_be_added_recs
             }
-            progress_indicators = ProcessAnnexProgressIndicators(
-                expected=expected_downloads,
-            )
-            run_kwargs = dict(
-                log_stdout=progress_indicators,
-                log_stderr='offline',  # False, # to avoid lock down
-                log_online=True
-            )
             return_list = list(self._run_annex_command_json(
                 'add',
                 args=options + files,
                 backend=backend,
                 expect_fail=True,
                 jobs=jobs,
-                **run_kwargs
-                #expect_stderr=True
+                expected_entries=expected_additions,
+                expect_stderr=True
             ))
-            progress_indicators.finish()
 
         if commit:
             if msg is None:
@@ -1137,10 +1120,28 @@ class AnnexRepo(GitRepo):
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
-    def _run_annex_command_json(self, command, args=None, jobs=None, **kwargs):
+    def _run_annex_command_json(self, command, args=None, jobs=None,
+                                expected_entries=None, **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
+
+        Parameters
+        ----------
+        expected_entries : dict, optional
+          If provided `filename/key: size` dictionary, will be used to create
+          ProcessAnnexProgressIndicators to display progress
         """
+        progress_indicators = None
         try:
+            if expected_entries:
+                progress_indicators = ProcessAnnexProgressIndicators(
+                    expected=expected_entries
+                )
+                kwargs = kwargs.copy()
+                kwargs.update(dict(
+                    log_stdout=progress_indicators,
+                    log_stderr='offline',  # False, # to avoid lock down
+                    log_online=True
+                ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
             if jobs:
@@ -1222,6 +1223,9 @@ class AnnexRepo(GitRepo):
             # failure in keys 'success' and 'note'
             if out is None:
                 raise e
+        finally:
+            if progress_indicators:
+                progress_indicators.finish()
 
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
