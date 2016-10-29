@@ -48,7 +48,7 @@ def test_BasicAnnexTestRepo_random_location_generated():
 
 @with_tempfile()
 def test_BasicAnnexTestRepo(path):
-    yield _test_BasicAnnexTestRepo, path
+    _test_BasicAnnexTestRepo(path)
 
 
 @with_tempfile()
