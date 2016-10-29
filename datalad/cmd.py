@@ -56,9 +56,9 @@ class Runner(object):
     able to record calls and allows for dry runs.
     """
 
-    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol', '__log_outputs']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol', '_log_outputs']
 
-    def __init__(self, cwd=None, env=None, protocol=None):
+    def __init__(self, cwd=None, env=None, protocol=None, log_outputs=None):
         """
         Parameters
         ----------
@@ -70,6 +70,9 @@ class Runner(object):
              call via env option
         protocol: ProtocolInterface
              Protocol object to write to.
+        log_outputs : bool, optional
+             Switch to instruct either outputs should be logged or not.  If not
+             set (default), config 'datalad.log outputs' would be consulted
         """
 
         self.cwd = cwd
@@ -92,7 +95,7 @@ class Runner(object):
                 atexit.register(functools.partial(protocol.write_to_file, filename))
 
         self.protocol = protocol
-        self.__log_outputs = None  # we don't know yet either we need ot log every output or not
+        self._log_outputs = log_outputs  # we don't know yet either we need ot log every output or not
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -126,24 +129,24 @@ class Runner(object):
                             "nor a list nor a callable.")
 
     @property
-    def _log_outputs(self):
-        if self.__log_outputs is None:
+    def log_outputs(self):
+        if self._log_outputs is None:
             try:
                 from . import cfg
-                self.__log_outputs = \
+                self._log_outputs = \
                     cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
-                # could be too early, then log!
+                # could be too early, then DON'T log!
                 return True
-        return self.__log_outputs
+        return self._log_outputs
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
-        if line and self._log_outputs:
+        if line and self.log_outputs:
             self.log("stdout| " + line.rstrip('\n'))
 
     def _log_err(self, line, expected=False):
-        if line and self._log_outputs:
+        if line and self.log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
                      level={True: logging.DEBUG,
                             False: logging.ERROR}[expected])
