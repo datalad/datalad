@@ -41,6 +41,7 @@ from git.objects.blob import Blob
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
 from datalad.dochelpers import exc_str
+from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -632,18 +633,20 @@ class GitRepo(object):
           has to be always true.
         """
 
-        if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
-
         # needs to be True - see docstring:
         assert(git)
 
         files = _remove_empty_items(files)
+        out = []
+
         if files:
             try:
 
-                self._git_custom_command(files, ['git', 'add'])
+                add_out = self._git_custom_command(
+                    files, ['git', 'add'] + assure_list(git_options))
 
+                # get all the entries
+                out = self._process_git_get_output(*add_out)
                 # Note: as opposed to git cmdline, force is True by default in
                 #       gitpython, which would lead to add things, that are
                 #       ignored or excluded otherwise
@@ -678,7 +681,17 @@ class GitRepo(object):
         # currently simulating similar return value, assuming success
         # for all files:
         # TODO: Make return values consistent across both *Repo classes!
-        return [{u'file': f, u'success': True} for f in files]
+        return out
+
+    @staticmethod
+    def _process_git_get_output(stdout, stderr=None):
+        """Given both outputs (stderr is ignored atm) of git add - process it
+
+        Primarily to centralize handling in both indirect annex and direct
+        modes when ran through proxy
+        """
+        return [{u'file': f, u'success': True}
+                for f in re.findall("'([^']*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):

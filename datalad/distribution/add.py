@@ -22,6 +22,7 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
@@ -118,7 +119,9 @@ class Add(Interface):
         if_dirty=if_dirty_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
-        annex_add_opts=annex_add_opts)
+        annex_add_opts=annex_add_opts,
+        jobs=jobs_opt
+    )
 
     @staticmethod
     @datasetmethod(name='add')
@@ -133,7 +136,8 @@ class Add(Interface):
             if_dirty='ignore',
             git_opts=None,
             annex_opts=None,
-            annex_add_opts=None):
+            annex_add_opts=None,
+            jobs=None):
 
         # parameter constraints:
         if not path and not source:
@@ -275,6 +279,7 @@ class Add(Interface):
                     return_values.extend(
                         ds.repo.add(calls[dspath]['a_add'],
                                     git=False,
+                                    jobs=jobs,
                                     git_options=git_opts,
                                     annex_options=annex_opts,
                                     options=annex_add_opts
@@ -299,7 +304,8 @@ class Add(Interface):
                                          options=annex_add_opts,
                                          # TODO: extra parameter for addurl?
                                          git_options=git_opts,
-                                         annex_options=annex_opts
+                                         annex_options=annex_opts,
+                                         jobs=jobs,
                                          )
                     )
                 else:
