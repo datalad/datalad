@@ -113,13 +113,10 @@ class AggregateMetaData(Interface):
             #          within the dataset
             #
             # pull out meta data from subds only (no subdatasets)
-            subds_meta = get_metadata(
+            _within_metadata_store(
                 subds,
-                guess_type=guess_native_type,
-                ignore_subdatasets=True,
-                ignore_cache=True)
-            # cache implicit and native meta data
-            _store_json(subds, metapath, subds_meta)
+                guess_native_type,
+                metapath)
             #
             # Phase 2: store everything that is in the look up and belongs into
             #          this dataset
@@ -142,13 +139,10 @@ class AggregateMetaData(Interface):
 
         lgr.info('aggregating meta data for %s', ds)
         # pull out meta data from parent only (no subdatasets)
-        meta = get_metadata(
+        _within_metadata_store(
             ds,
-            guess_type=guess_native_type,
-            ignore_subdatasets=True,
-            ignore_cache=True)
-        metapath = opj(ds.path, metadata_basepath)
-        _store_json(ds, metapath, meta)
+            guess_native_type,
+            opj(ds.path, metadata_basepath))
         # and lastly the subdatasets of the parent
         _dump_submeta(ds, ds_meta, '', save, modified_ds)
         # everything should be stored somewhere by now
@@ -156,6 +150,24 @@ class AggregateMetaData(Interface):
 
         # save the parent
         modified_ds = _save_helper(ds, save, modified_ds)
+
+
+def _within_metadata_store(ds, guess_native_type, metapath):
+    meta = get_metadata(
+        ds,
+        guess_type=guess_native_type,
+        ignore_subdatasets=True,
+        ignore_cache=True)
+    # strip git-based version info from the meta data that is cached
+    # in the dataset itself -- this will be outdated the second we
+    # commit below
+    for m in meta:
+        if not is_implicit_metadata(m):
+            continue
+        for prop in ('dcterms:modified', 'version'):
+            if prop in m:
+                del m[prop]
+    _store_json(ds, metapath, meta)
 
 
 def _save_helper(ds, save, modified_ds):

@@ -219,6 +219,14 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             meta.extend(cached_meta)
         else:
             meta.append(cached_meta)
+        # cached meta data doesn't have version info for the top-level
+        # dataset -> look for the item and update it
+        for m in meta:
+            if not is_implicit_metadata(m):
+                continue
+            if m.get('@id', None) == ds_identifier:
+                m.update(_get_implicit_metadata(ds, ds_identifier))
+                break
 
     if ignore_subdatasets:
         # all done now
