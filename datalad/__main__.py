@@ -89,6 +89,7 @@ def main(argv=None):
         }
         # Since used explicitly -- activate the beast
         aio = AutomagicIO(activate=True)
+        lgr.info("Running code of %s", progname)
         runctx(code, globs, globs)
         # TODO: see if we could hide our presence from the final tracebacks if execution fails
     except IOError as err:
