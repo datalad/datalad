@@ -183,6 +183,11 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
             # still we would have all the versions present -- we need to restrict only to the current one!
             annex.remove_other_versions('incoming',
                                         remove_unversioned=True,
+                                        # ds001.tar.gz  could then become ds0000001.zip
+                                        fpath_subs=[
+                                            ('^ds0*', '^ds'),
+                                            ('\.(zip|tgz|tar\.gz)$', '.ext')
+                                        ],
                                         overlay=versions_overlay_level,  # use major.minor to define overlays
                                         exclude='(README|changelog).*'),
             [   # Pipeline to augment content of the incoming and commit it to master
