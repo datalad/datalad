@@ -84,13 +84,14 @@ def test_create_curdir(path, path2):
 @with_tempfile
 def test_create(path):
     ds = Dataset(path)
-    ds.create(description="funny", native_metadata_type=['bim', 'bam', 'bum'])
+    ds.create(description="funny", native_metadata_type=['bim', 'bam', 'bum'],
+              shared_access='world')
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=True)
 
     # check default backend
-    eq_(ds.repo.repo.config_reader().get_value("annex", "backends"),
-        'MD5E')
+    eq_(ds.config.get("annex.backends"), 'MD5E')
+    eq_(ds.config.get("core.sharedrepository"), '2')
     runner = Runner()
     # check description in `info`
     cmd = ['git-annex', 'info']

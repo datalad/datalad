@@ -33,6 +33,13 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
+shared_access_opt = Parameter(
+    args=('--shared-access',),
+    metavar='MODE',
+    doc="""configure shared access to a dataset, see `git init --shared`
+    documentation for complete details on the supported scenarios. Possible
+    values include: 'false', 'true', 'group', and 'all'""")
+
 super_datasets_flag = Parameter(
     args=("-S", "--super-datasets",),
     action="store_true",

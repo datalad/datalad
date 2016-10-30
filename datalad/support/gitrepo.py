@@ -423,10 +423,10 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
-
-        if git_opts:
-            lgr.warning("TODO: options passed to git are currently ignored.\n"
-                        "options received: %s" % git_opts)
+        if git_opts is None:
+            git_opts = {}
+        if kwargs:
+            git_opts.update(kwargs)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
@@ -465,11 +465,14 @@ class GitRepo(object):
 
         if create and not GitRepo.is_valid_repo(path):
             try:
-                lgr.debug("Initialize empty Git repository at {0}".format(path))
+                lgr.debug(
+                    "Initialize empty Git repository at '%s'%s",
+                    path,
+                    ' %s' % git_opts if git_opts else '')
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
                                                   mkdir=True,
                                                   odbt=default_git_odbt,
-                                                  **kwargs)
+                                                  **git_opts)
             except GitCommandError as e:
                 lgr.error(exc_str(e))
                 raise
