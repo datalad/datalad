@@ -110,13 +110,11 @@ JSON-LD meta data format
 ========================
 
 Datalad uses JSON-LD_ as its primary meta data format. By default, the
-following context is used for any meta data item:
+following context (available from `here <schema.json>`_
+is used for any meta data item:
 
-.. doctest::
-
-    >>> from datalad.metadata import _get_base_dataset_metadata
-    >>> print(_get_base_dataset_metadata(None)['@context'])
-    {'@vocab': 'http://schema.org/', 'doap': 'http://usefulinc.com/ns/doap#'}
+.. literalinclude:: _extras/schema.json
+   :language: json
 
 While it is technically possible to mix different contexts across items this
 has not been fully tested yet.
