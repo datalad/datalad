@@ -30,6 +30,12 @@ try:
 except ImportError:
     h5py = None
 
+try:
+    import nibabel as nib
+    import numpy as np
+except ImportError:
+    nib = None
+
 # somewhat superseeded by  test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -79,12 +85,12 @@ def test_proxying_open_testrepobased(repo):
 @with_tempfile(mkdir=True)
 def _test_proxying_open(generate_load, verify_load, repo):
     annex = AnnexRepo(repo, create=True)
-    fpath1 = opj(repo, "test.dat")
-    fpath2 = opj(repo, 'd1', 'd2', 'test2.dat')
+    fpath1 = opj(repo, "test")
+    fpath2 = opj(repo, 'd1', 'd2', 'test2')
     # generate load
-    generate_load(fpath1)
+    fpath1 = generate_load(fpath1) or fpath1
     os.makedirs(dirname(fpath2))
-    generate_load(fpath2)
+    fpath2 = generate_load(fpath2) or fpath2
     annex.add([fpath1, fpath2])
     verify_load(fpath1)
     verify_load(fpath2)
@@ -156,3 +162,22 @@ def test_proxying_open_regular():
             eq_(f.read(), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat
+
+
+def test_proxying_open_nibabel():
+    if not nib:
+        raise SkipTest("No nibabel found")
+
+    d = np.empty((3, 3, 3))
+    d[1, 1, 1] = 99
+
+    def generate_nii(f):
+        f = f + '.nii.gz'
+        nib.Nifti1Image(d.copy(), np.eye(4)).to_filename(f)
+        return f
+
+    def verify_nii(f, mode="r"):
+        ni = nib.load(f)
+        ok_(np.all(ni.get_data() == d))
+
+    yield _test_proxying_open, generate_nii, verify_nii
