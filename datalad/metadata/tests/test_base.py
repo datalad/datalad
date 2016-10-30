@@ -151,7 +151,7 @@ def test_aggregation(path):
     # same schema
     assert_equal(
         10,
-        sum([s.get('@context', {'@vocab': None})['@vocab'] == 'http://schema.org/'
+        sum([s.get('@context', None) == 'http://schema.datalad.org/'
              for s in meta]))
     # three different IDs
     assert_equal(3, len(set([s.get('@id') for s in meta])))
@@ -259,8 +259,8 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['schema:type']))),
-        set([('name', 'schema:type')])
+                             report=['type']))),
+        set([('name', 'type')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))

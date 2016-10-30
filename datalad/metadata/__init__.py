@@ -79,10 +79,7 @@ def _get_base_dataset_metadata(ds_identifier):
     """
 
     meta = {
-        "@context": {
-            "@vocab": "http://schema.org/",
-            "doap": "http://usefulinc.com/ns/doap#",
-        },
+        "@context": "http://schema.datalad.org/",
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
@@ -174,7 +171,7 @@ def _simplify_meta_data_structure(meta):
     # XXX condition below is outdated (DOAP...), still needed?
     if isinstance(meta, dict) \
             and sorted(meta.keys()) == ['@context', '@graph'] \
-            and meta.get('@context') == 'http://schema.org/':
+            and meta.get('@context') == 'http://schema.datalad.org':
         meta = meta['@graph']
     elif isinstance(meta, dict):
         meta = [meta]
@@ -294,7 +291,7 @@ def flatten_metadata_graph(obj):
     jsonld.set_document_loader(_cached_load_document)
     # TODO cache entire graphs to prevent repeated term resolution for
     # subsequent calls
-    return jsonld.flatten(obj, ctx={"@context": "http://schema.org/"})
+    return jsonld.flatten(obj, ctx={"@context": "http://schema.datalad.org/"})
 
 
 def get_native_metadata(ds, guess_type=False, ds_identifier=None):

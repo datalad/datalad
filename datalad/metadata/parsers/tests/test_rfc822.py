@@ -65,10 +65,7 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
+  "@context": "http://schema.datalad.org/",
   "@id": "ID",
   "bug-database": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
   "citation": "Cool (2016)",
