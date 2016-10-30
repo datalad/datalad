@@ -21,6 +21,7 @@ from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.misc import skip_if
 from ..nodes.misc import debug
+from ..nodes.misc import fix_permissions
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
@@ -181,14 +182,26 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
                                skip_no_changes=skip_no_changes
                                ),
             # still we would have all the versions present -- we need to restrict only to the current one!
+            # TODO:  we often need ability to augment next node options by checks etc in the previous ones
+            # e.g. ehere overlay option depending on which dataset/version being processed
             annex.remove_other_versions('incoming',
                                         remove_unversioned=True,
                                         # ds001.tar.gz  could then become ds0000001.zip
                                         fpath_subs=[
+                                            # ad-hoc fixups for some datasets
+                                            ('ds005\.tgz', 'ds005_raw.tgz'),
+                                            # had it split into this one with derived data separately and then joined
+                                            ('ds007_01-20\.tgz', 'ds007_raw.tgz'),
+                                            # generic
                                             ('^ds0*', '^ds'),
                                             ('\.(zip|tgz|tar\.gz)$', '.ext')
                                         ],
-                                        overlay=versions_overlay_level,  # use major.minor to define overlays
+                                        # Had manually to do this for this one since there was a switch from
+                                        # overlay layout to even bigger single one within a minor 2.0.1 "release"
+                                        overlay=None
+                                            if dataset in ('ds000007', 'ds000114', 'ds000119')
+                                            else versions_overlay_level,  # use major.minor to define overlays
+                                        #overlay=None, # use major.minor to define overlays
                                         exclude='(README|changelog).*'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
@@ -204,6 +217,10 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
                     default=add_archive_content(),
                     re=True,
                 ),
+            ],
+            [
+                find_files("(\.(tsv|csv|txt|json|gz|bval|bvec|hdr|img|m|mat|pdf|png|zip|nii|jpg|fif|fig)|README|CHANGES)$"),
+                fix_permissions(executable=False)
             ],
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True, allow_unrelated=True),
