@@ -363,3 +363,16 @@ def test_remove_other_versions(repo_path):
     check('3', remaining={'d_3'}, overlay=1)
     check('3', remaining={'d_3'}, overlay=2)
     check('3', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.1.1', 'd_3'}, overlay=0)
+
+    # if name changes
+    version_db.versions['2.1.1'] = {'c00.dat': 'c00_2.1.1'}
+    # if we don't do anything special, it would have its own life:
+    check('2.1.1', remaining={'c00_2.1.1'})
+    check('2.1.1', remaining={'c00_2.1.1'}, overlay=2)
+    check('2.1.1', remaining={'b_2.0.0', 'c_2.0.1', 'c00_2.1.1'}, overlay=1)
+    check('2.1.1', remaining={'a_1.0.0', 'b_2.0.0', 'c_2.0.1', 'c00_2.1.1'}, overlay=0)
+    # but we should be able to specify to "unify" unversioned name more by providing
+    # replacement pattern
+    kw = dict(fpath_subs=[('c00', 'c'), ('\.dat', '')])
+    check('2.1.1', remaining={'b_2.0.0', 'c00_2.1.1'}, overlay=1, **kw)
+    check('2.1.1', remaining={'a_1.0.0', 'b_2.0.0', 'c00_2.1.1'}, overlay=0, **kw)
