@@ -52,6 +52,7 @@ Here is an example:
   Cite-As: Mike Author (2016). We made it. The breakthrough journal of unlikely
     events. 1, 23-453.
   DOI: 10.0000/nothere.48421
+  Keywords: free, demo, fictional
 
 The following fields are supported:
 
@@ -76,6 +77,8 @@ The following fields are supported:
 ``Issue-tracker``:
   A URL to an issue tracker where known problems are documented and/or new
   reports can be submitted.
+``Keywords``:
+  A comma-separated list of keywords.
 ``License``:
   A description of the license or terms of use for the dataset. The first
   lines should contain a list of license labels (e.g. CC0, PPDL) for standard

@@ -61,6 +61,7 @@ class MetadataParser(BaseMetadataParser):
                  ('maintainer', 'Maintainer'),
                  ('audience', 'Audience'),
                  ('homepage', 'Homepage'),
+                 ('keywords', 'Keywords'),
                  ('version', 'Version'),
                  ('funding', 'fundedBy'),
                  ('issue-tracker', 'IssueTracker'),
@@ -82,6 +83,8 @@ class MetadataParser(BaseMetadataParser):
                 else:
                     meta[dataladterm] = desc
             elif header in ('maintainer', 'author'):
+                meta[dataladterm] = _split_list_field(content)
+            elif header == 'keywords':
                 meta[dataladterm] = _split_list_field(content)
             elif header == 'doi':
                 meta[dataladterm] = 'http://dx.doi.org/{}'.format(content)
