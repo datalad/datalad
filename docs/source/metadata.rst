@@ -116,6 +116,16 @@ is used for any meta data item:
 .. literalinclude:: _extras/schema.json
    :language: json
 
+Naming rules for extending the context are:
+
+* Namespace prefixes are lower-case (e.g. "doap")
+
+* Noun properties are capitalized (camel-casing for compound terms, such as
+  "IssueTracker")
+
+* Predicates starting with a verb start lower-case and use camel-casing if
+  necessary, e.g. "isPartOf"
+
 While it is technically possible to mix different contexts across items this
 has not been fully tested yet.
 
