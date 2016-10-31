@@ -9,7 +9,7 @@
 """Metadata parser base class"""
 
 from os.path import exists, join as opj
-from datalad.metadata import _get_base_dataset_metadata
+from datalad.metadata import _get_base_metadata_dict
 
 
 class BaseMetadataParser(object):
@@ -61,7 +61,7 @@ class BaseMetadataParser(object):
         """
         if dsid is None:
             dsid = self.ds.id
-        meta = _get_base_dataset_metadata(dsid)
+        meta = _get_base_metadata_dict(dsid)
         if self.has_metadata():
             meta = self._get_metadata(dsid, meta, full)
         return meta

@@ -74,8 +74,8 @@ def get_metadata_type(ds, guess=False):
     return mtypes
 
 
-def _get_base_dataset_metadata(ds_identifier):
-    """Return base metadata as dict for a given ds_identifier
+def _get_base_metadata_dict(identifier):
+    """Return base metadata dictionary for any identifier
     """
 
     meta = {
@@ -83,8 +83,8 @@ def _get_base_dataset_metadata(ds_identifier):
         # increment when changes to meta data representation are done
         "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
-    if ds_identifier is not None:
-        meta["@id"] = ds_identifier
+    if identifier is not None:
+        meta["@id"] = identifier
     return meta
 
 
@@ -103,7 +103,7 @@ def _get_implicit_metadata(ds, ds_identifier=None):
     if ds_identifier is None:
         ds_identifier = ds.id
 
-    meta = _get_base_dataset_metadata(ds_identifier)
+    meta = _get_base_metadata_dict(ds_identifier)
 
     if not ds.repo:
         # everything else comes from a repo

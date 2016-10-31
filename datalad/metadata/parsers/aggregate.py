@@ -15,7 +15,7 @@ from datalad.support.json_py import load as jsonload
 from datalad.metadata import _simplify_meta_data_structure
 from datalad.metadata import is_implicit_metadata
 from datalad.metadata.parsers.base import BaseMetadataParser
-from datalad.metadata import _get_base_dataset_metadata
+from datalad.metadata import _get_base_metadata_dict
 
 
 # XXX could be moved to aggregate parser...
@@ -50,7 +50,7 @@ class MetadataParser(BaseMetadataParser):
             dirs=False))
 
     def get_metadata(self, dsid=None, full=False):
-        base_meta = _get_base_dataset_metadata(dsid if dsid else self.ds.id)
+        base_meta = _get_base_metadata_dict(dsid if dsid else self.ds.id)
         meta = [base_meta]
         basepath = opj(self.ds.path, '.datalad', 'meta')
         parts = []
