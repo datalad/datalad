@@ -110,8 +110,8 @@ JSON-LD meta data format
 ========================
 
 Datalad uses JSON-LD_ as its primary meta data format. By default, the
-following context (available from `here <schema.json>`_
-is used for any meta data item:
+following context (available from `here <schema.json>`_) is used for any meta
+data item:
 
 .. literalinclude:: _extras/schema.json
    :language: json
