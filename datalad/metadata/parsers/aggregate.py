@@ -13,30 +13,23 @@ from os.path import join as opj
 from datalad.utils import find_files
 from datalad.support.json_py import load as jsonload
 from datalad.metadata import _simplify_meta_data_structure
-from datalad.metadata import is_implicit_metadata
+from datalad.metadata import _is_versioned_dataset_item
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.metadata import _get_base_metadata_dict
 
 
-# XXX could be moved to aggregate parser...
 def _adjust_subdataset_location(meta, subds_relpath):
     # find implicit meta data for all contained subdatasets
     for m in meta:
-        # skip non-implicit
-        if not is_implicit_metadata(m):
+        if not _is_versioned_dataset_item(m):
             continue
         # prefix all subdataset location information with the relpath of this
         # subdataset
-        if 'hasPart' in m:
-            parts = m['hasPart']
-            if not isinstance(parts, list):
-                parts = [parts]
-            for p in parts:
-                if 'Location' not in p:
-                    continue
-                loc = p.get('Location', subds_relpath)
-                if loc != subds_relpath:
-                    p['Location'] = opj(subds_relpath, loc)
+        if 'Location' not in m:
+            continue
+        loc = m.get('Location', subds_relpath)
+        if loc != subds_relpath:
+            m['Location'] = opj(subds_relpath, loc)
 
 
 class MetadataParser(BaseMetadataParser):
@@ -51,7 +44,7 @@ class MetadataParser(BaseMetadataParser):
 
     def get_metadata(self, dsid=None, full=False):
         base_meta = _get_base_metadata_dict(dsid if dsid else self.ds.id)
-        meta = [base_meta]
+        meta = []
         basepath = opj(self.ds.path, '.datalad', 'meta')
         parts = []
         for subds_meta_fname in self.get_core_metadata_filenames():
@@ -62,8 +55,6 @@ class MetadataParser(BaseMetadataParser):
                 # this is a potentially existing cache of the native meta data
                 # of the superdataset, not for us...
                 continue
-            submeta_info = {
-                'Location': subds_path}
             # load aggregated meta data
             subds_meta = jsonload(subds_meta_fname)
             # we cannot simply append, or we get weired nested graphs
@@ -75,18 +66,18 @@ class MetadataParser(BaseMetadataParser):
             # sift through all meta data sets look for a meta data set that
             # knows about being part of this dataset, so we record its @id as
             # part
-            for md in subds_meta:
-                cand_id = md.get('isPartOf', None)
-                if cand_id == dsid and '@id' in md:
-                    submeta_info['@id'] = md['@id']
+            for md in [i for i in subds_meta
+                       if _is_versioned_dataset_item(i)
+                       and 'isPartOf' in i
+                       and 'Location' in i]:
+                if md['Location'] == subds_path and '@id' in md:
+                    parts.append({'@id': md['@id']})
                     break
-
             if subds_meta:
                 meta.extend(subds_meta)
-            parts.append(submeta_info)
         if len(parts):
             if len(parts) == 1:
                 parts = parts[0]
             base_meta['hasPart'] = parts
 
-        return meta
+        return [base_meta] + meta if len(meta) else []

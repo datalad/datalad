@@ -17,7 +17,6 @@ else:
     import pickle
 from hashlib import md5
 from six.moves.urllib.parse import urlsplit
-from six import string_types
 from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
@@ -88,79 +87,54 @@ def _get_base_metadata_dict(identifier):
     return meta
 
 
-def _get_implicit_metadata(ds, ds_identifier=None):
-    """Convert git/git-annex info into metadata
+def _is_versioned_dataset_item(m):
+    return 'isVersionOf' in m and m.get('Type', None) == 'Dataset'
 
-    Anything that doesn't come as metadata in dataset **content**, but is
-    encoded in the dataset repository itself. This does not include information
-    on submodules, however. Meta data on subdatasets is provided by a dedicated
-    parser implementation for "aggregate" meta data.
 
-    Returns
-    -------
-    dict
-    """
-    if ds_identifier is None:
-        ds_identifier = ds.id
-
-    meta = _get_base_metadata_dict(ds_identifier)
-
-    if not ds.repo:
-        # everything else comes from a repo
-        return meta
+def _get_implicit_metadata(ds, identifier):
+    meta = _get_base_metadata_dict(identifier)
+    # maybe use something like git-describe instead -- but tag-references
+    # might changes...
+    meta['modified'] = ds.repo.repo.head.commit.authored_datetime.isoformat()
 
     if ds.id:
         # it has an ID, so we consider it a proper dataset
         meta['Type'] = "Dataset"
+        meta['isVersionOf'] = {'@id': ds.id}
 
-    # shortcut
-    repo = ds.repo.repo
-    if repo.head.is_valid():
-        meta['modified'] = repo.head.commit.authored_datetime.isoformat()
-        # maybe use something like git-describe instead -- but tag-references
-        # might changes...
-        meta['Version'] = repo.head.commit.hexsha
-    _add_annex_metadata(ds.repo, meta)
+    annex_meta = _get_annex_metadata(ds.repo)
+    if len(annex_meta):
+        meta['availableFrom'] = [{'@id': m['@id']} for m in annex_meta]
     return meta
 
 
-def _add_annex_metadata(repo, meta):
-    # look for known remote annexes, doesn't need configured
-    # remote to be meaningful
-    # need annex repo instance
-    # TODO refactor to use ds.uuid when #701 is addressed
-    if hasattr(repo, 'repo_info'):
-        # get all other annex ids, and filter out this one, origin and
-        # non-specific remotes
-        with swallow_logs():
-            # swallow logs, because git annex complains about every remote
-            # for which no UUID is configured -- many special remotes...
-            repo_info = repo.repo_info(fast=True)
-        annex_meta = []
-        for src in ('trusted repositories',
-                    'semitrusted repositories',
-                    'untrusted repositories'):
-            for anx in repo_info.get(src, []):
-                anxid = anx.get('uuid', '00000000-0000-0000-0000-0000000000')
-                if anxid.startswith('00000000-0000-0000-0000-000000000'):
-                    # ignore special
-                    continue
-                anx_meta = {'@id': anxid}
-                if 'description' in anx:
-                    anx_meta['description'] = anx['description']
-                # XXX maybe report which one is local? Available in anx['here']
-                # XXX maybe report the type of annex remote?
-                annex_meta.append(anx_meta)
-        if len(annex_meta) == 1:
-            annex_meta = annex_meta[0]
-        meta['availableFrom'] = annex_meta
-
-
-def is_implicit_metadata(meta):
-    """Return whether a meta data set looks like our own implicit meta data"""
-    std_spec = meta.get('conformsTo', '')
-    return isinstance(std_spec, string_types) \
-        and std_spec.startswith('http://docs.datalad.org/metadata.html#v')
+def _get_annex_metadata(repo):
+    meta = []
+    if not hasattr(repo, 'repo_info'):
+        return meta
+    # get all other annex ids, and filter out this one, origin and
+    # non-specific remotes
+    with swallow_logs():
+        # swallow logs, because git annex complains about every remote
+        # for which no UUID is configured -- many special remotes...
+        repo_info = repo.repo_info(fast=True)
+    for src in ('trusted repositories',
+                'semitrusted repositories',
+                'untrusted repositories'):
+        for anx in repo_info.get(src, []):
+            anxid = anx.get('uuid', '00000000-0000-0000-0000-0000000000')
+            if anxid.startswith('00000000-0000-0000-0000-000000000'):
+                # ignore special
+                continue
+            anx_meta = _get_base_metadata_dict(anxid)
+            # TODO find a better type; define in context
+            anx_meta['Type'] = 'Annex'
+            if 'description' in anx:
+                anx_meta['Description'] = anx['description']
+            # XXX maybe report which one is local? Available in anx['here']
+            # XXX maybe report the type of annex remote?
+            meta.append(anx_meta)
+    return meta
 
 
 def _simplify_meta_data_structure(meta):
@@ -208,21 +182,28 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
       available yet. Such meta data can be produced by the
       `aggregate_metadata` command.
     """
-    # common identifier
-    ds_identifier = ds.id
-    # metadata receptacle
-    meta = []
+    if not ds.repo or not ds.repo.repo.head.is_valid():
+        # not a single commit
+        return []
+    repo = ds.repo.repo
+    ds_identifier = repo.head.commit.hexsha
     # where things are
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
+    # metadata receptacle
+    meta = []
 
     # from cache?
     if from_native or not exists(main_meta_fname):
-        # start with the implicit meta data, currently there is no cache for
-        # this type of meta data, as it will change with every clone.
-        # In contrast, native meta data is cached.
-        implicit_meta = _get_implicit_metadata(ds, ds_identifier)
-        meta.append(implicit_meta)
+        if ds.id:
+            # create a separate item for the abstract (unversioned) dataset
+            # just to say that this ID belongs to a dataset
+            dm = _get_base_metadata_dict(ds.id)
+            dm['Type'] = 'Dataset'
+            meta.append(dm)
+        # define known annexes by ID
+        meta.extend(_get_annex_metadata(ds.repo))
+        meta.append(_get_implicit_metadata(ds, ds_identifier))
         # and any native meta data
         meta.extend(
             get_native_metadata(
@@ -236,12 +217,13 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             meta.extend(cached_meta)
         else:
             meta.append(cached_meta)
-        # cached meta data doesn't have version info for the top-level
+        # cached meta data doesn't have proper version info for the top-level
         # dataset -> look for the item and update it
-        for m in [i for i in meta if is_implicit_metadata(i)]:
-            if m.get('@id', None) == ds_identifier:
+        for m in [i for i in meta if i.get('@id', None) == 'THISDATASET!']:
+            if _is_versioned_dataset_item(m):
                 m.update(_get_implicit_metadata(ds, ds_identifier))
-                break
+            else:
+                m['@id'] = ds_identifier
 
     if ignore_subdatasets:
         # all done now

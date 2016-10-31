@@ -25,7 +25,8 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from ..log import lgr
-from . import get_metadata, metadata_filename, metadata_basepath, is_implicit_metadata
+from . import get_metadata, metadata_filename, metadata_basepath, \
+    _is_versioned_dataset_item
 from datalad.support.json_py import dump as jsondump
 
 
@@ -161,12 +162,15 @@ def _within_metadata_store(ds, guess_native_type, metapath):
     # strip git-based version info from the meta data that is cached
     # in the dataset itself -- this will be outdated the second we
     # commit below
+    # NOTE next line should not need protection, as we only process registered
+    # subdatasets
+    ds_identifier = ds.repo.repo.head.commit.hexsha
     for m in meta:
-        if not is_implicit_metadata(m):
+        if not m.get('@id', None) == ds_identifier:
             continue
-        for prop in ('modified', 'Version'):
-            if prop in m:
-                del m[prop]
+        m['@id'] = 'THISDATASET!'
+        if 'modified' in m:
+            del m['modified']
     _store_json(ds, metapath, meta)
 
 
@@ -191,11 +195,9 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
         subds_relpath = relpath(p, matchpath)
         # inject proper inter-dataset relationships
         for m in smeta:
-            # skip non-implicit
-            if not is_implicit_metadata(m):
-                continue
-            if 'isPartOf' not in m and m.get('Type', None) == 'Dataset':
-                m['isPartOf'] = ds.id
+            if _is_versioned_dataset_item(m) and 'isPartOf' not in m:
+                m['isPartOf'] = ds.repo.get_hexsha()
+                m['Location'] = subds_relpath
         sp = opj(ds.path, metadata_basepath, subds_relpath)
         _store_json(ds, sp, smeta)
         # stage potential changes in the subdataset

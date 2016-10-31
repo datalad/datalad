@@ -31,7 +31,8 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
 from ..log import lgr
-from . import get_metadata, flatten_metadata_graph, pickle
+from . import get_metadata, flatten_metadata_graph, pickle, \
+    _is_versioned_dataset_item
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
@@ -264,7 +265,7 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            if not mds.get('Type', mds.get('schema:type', None)) == 'Dataset':
+            if not _is_versioned_dataset_item(mds):
                 # we are presently only dealing with datasets
                 continue
             # TODO consider the possibility of nested and context/graph dicts
