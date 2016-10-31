@@ -67,22 +67,22 @@ def test_get_metadata(path):
 {
   "@context": "http://schema.datalad.org/",
   "@id": "ID",
-  "bug-database": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
-  "citation": "Cool (2016)",
-  "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
-  "description": "A text with arbitrary length and content that can span multiple\\nparagraphs (this is a new one)",
-  "doap:Version": "1.0.0-rc3",
-  "doap:homepage": "http://studyforrest.org",
-  "doap:maintainer": [
-    "Mike One <mike@example.com>",
-    "Anna Two <anna@example.com>"
-  ],
-  "doap:shortdesc": "Basic summary",
-  "foaf:fundedBy": "BMBFGQ1411, NSF 1429999",
-  "license": [
+  "Citation": "Cool (2016)",
+  "Description": "A text with arbitrary length and content that can span multiple\\nparagraphs (this is a new one)",
+  "Homepage": "http://studyforrest.org",
+  "IssueTracker": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
+  "License": [
     "CC0",
     "The person who associated a work with this deed has dedicated the work to the public domain by waiving all of his or her rights to the work worldwide under copyright law, including all related and neighboring rights, to the extent allowed by law.\\nYou can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission."
   ],
-  "name": "studyforrest_phase2",
+  "Maintainer": [
+    "Mike One <mike@example.com>",
+    "Anna Two <anna@example.com>"
+  ],
+  "Name": "studyforrest_phase2",
+  "ShortDescription": "Basic summary",
+  "Version": "1.0.0-rc3",
+  "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+  "fundedBy": "BMBFGQ1411, NSF 1429999",
   "sameAs": "http://dx.doi.org/10.5281/zenodo.48421"
 }""")

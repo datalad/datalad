@@ -164,7 +164,7 @@ def _within_metadata_store(ds, guess_native_type, metapath):
     for m in meta:
         if not is_implicit_metadata(m):
             continue
-        for prop in ('dcterms:modified', 'version'):
+        for prop in ('modified', 'Version'):
             if prop in m:
                 del m[prop]
     _store_json(ds, metapath, meta)
@@ -194,8 +194,8 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
             # skip non-implicit
             if not is_implicit_metadata(m):
                 continue
-            if 'dcterms:isPartOf' not in m and m.get('type', None) == 'Dataset':
-                m['dcterms:isPartOf'] = ds.id
+            if 'isPartOf' not in m and m.get('Type', None) == 'Dataset':
+                m['isPartOf'] = ds.id
         sp = opj(ds.path, metadata_basepath, subds_relpath)
         _store_json(ds, sp, smeta)
         # stage potential changes in the subdataset

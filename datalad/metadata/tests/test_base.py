@@ -106,7 +106,7 @@ def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()),
-                 ['@context', 'dcterms:conformsTo'])
+                 ['@context', 'conformsTo'])
     ds.create(force=True, save=False)
     # with subdataset
     sub = ds.create('sub', force=True, if_dirty='ignore')
@@ -114,9 +114,9 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[0].keys()),
-        ['@context', '@id', 'availableFrom', 'dcterms:conformsTo',
-         'dcterms:modified', 'type', 'version'])
-    assert_equal(meta[0]['type'], 'Dataset')
+        ['@context', '@id', 'Type', 'Version', 'availableFrom', 'conformsTo',
+         'modified'])
+    assert_equal(meta[0]['Type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
@@ -128,7 +128,7 @@ def test_basic_metadata(path):
                  [m['@id'] for m in sibling_meta[0]['availableFrom']])
     meta = get_metadata(ds, guess_type=True)
     # without aggregation there is not trace of subdatasets in the metadata
-    assert_not_in('dcterms:hasPart', meta[0])
+    assert_not_in('hasPart', meta[0])
 
 
 @skip_if_no_network
@@ -157,17 +157,17 @@ def test_aggregation(path):
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
-        assert_true(sum([s.get('name', None) == assure_unicode(name) for s in meta]))
+        assert_true(sum([s.get('Name', None) == assure_unicode(name) for s in meta]))
     #print(meta)
     assert_equal(
         # first implicit, then two natives, then aggregate
-        meta[3]['dcterms:hasPart']['@id'],
+        meta[3]['hasPart']['@id'],
         subds.id)
     success = False
     for m in meta:
-        p = m.get('dcterms:hasPart', {})
+        p = m.get('hasPart', {})
         if p.get('@id', None) == subsubds.id:
-            assert_equal(opj('sub', 'subsub'), p.get('location', None))
+            assert_equal(opj('sub', 'subsub'), p.get('Location', None))
             success = True
     assert_true(success)
 
@@ -188,13 +188,13 @@ def test_aggregation(path):
     assert_equal(clonemeta[0]['@id'], clone.id)
     assert_equal(clonemeta[0]['@id'], ds.id)
     assert_equal(clone.repo.get_hexsha(), ds.repo.get_hexsha())
-    assert_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
+    assert_equal(clonemeta[0]['Version'], ds.repo.get_hexsha())
     # all but the implicit is identical
     assert_equal(clonemeta[1:], meta[1:])
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
-        clonemeta[3]['dcterms:hasPart']['@id'],
+        clonemeta[3]['hasPart']['@id'],
         subds.id)
 
     # now obtain a subdataset in the clone and the IDs should be updated
@@ -203,7 +203,7 @@ def test_aggregation(path):
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
-    assert_equal(partial[1]['dcterms:hasPart']['@id'],
+    assert_equal(partial[1]['hasPart']['@id'],
                  partial[2]['@id'])
 
     # query smoke test
@@ -253,14 +253,14 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(x[1].keys()),
                 clone.search('child', report_matched=True))),
-        set([('name',)])
+        set([('Name',)])
     )
     # and the additional field we might have asked with report
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['type']))),
-        set([('name', 'type')])
+                             report=['Type']))),
+        set([('Name', 'Type')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))
@@ -315,7 +315,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
         ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
-        assert_true(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
+        assert_true(sum([s.get('Name', '') == assure_unicode(name) for s in meta]))
 
     # but search should not fail
     with swallow_outputs():
@@ -346,7 +346,7 @@ def test_cached_load_document(tdir):
     with patch('datalad.metadata._get_schema_url_cache_filename',
                return_value=cache_filename):
         with patch('pyld.jsonld.load_document', return_value=target_schema), \
-            swallow_logs(new_level=logging.WARNING) as cml:
+                swallow_logs(new_level=logging.WARNING) as cml:
             schema = _cached_load_document("http://schema.org/")
             assert_equal(schema, target_schema)
             cml.assert_logged("cannot load cache from", level="WARNING")
@@ -367,7 +367,7 @@ def test_ignore_nondatasets(path):
     # we want to ignore the version/commits for this test
     def _kill_time(meta):
         for m in meta:
-            for k in ('version', 'dcterms:modified'):
+            for k in ('Version', 'modified'):
                 if k in m:
                     del m[k]
         return meta

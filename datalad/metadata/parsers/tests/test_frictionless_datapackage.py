@@ -67,24 +67,24 @@ def test_get_metadata(path):
 {
   "@context": "http://schema.datalad.org/",
   "@id": "ID",
-  "author": "Jane Doe <noemail@example.com>",
-  "contributors": [
+  "Author": "Jane Doe <noemail@example.com>",
+  "Contributors": [
     "Joe Bloggs <joe@example.com> (http://www.example.com)"
   ],
-  "dcterms:conformsTo": [
-    "http://specs.frictionlessdata.io/data-packages",
-    "http://docs.datalad.org/metadata.html#v0-1"
-  ],
-  "description": "Annual Consumer Price Index (CPI) for most countries in the world. Reference year is 2005.",
-  "keywords": [
+  "Description": "Annual Consumer Price Index (CPI) for most countries in the world. Reference year is 2005.",
+  "Keywords": [
     "CPI",
     "World",
     "Consumer Price Index",
     "Annual Data",
     "The World Bank"
   ],
-  "license": "http://opendatacommons.org/licenses/pddl/",
-  "name": "cpi",
-  "title": "Annual Consumer Price Index (CPI)",
-  "version": "2.0.0"
+  "License": "http://opendatacommons.org/licenses/pddl/",
+  "Name": "cpi",
+  "ShortDescription": "Annual Consumer Price Index (CPI)",
+  "Version": "2.0.0",
+  "conformsTo": [
+    "http://specs.frictionlessdata.io/data-packages",
+    "http://docs.datalad.org/metadata.html#v0-1"
+  ]
 }""")

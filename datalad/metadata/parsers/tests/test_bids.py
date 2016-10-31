@@ -59,19 +59,19 @@ def test_get_metadata(path):
 {
   "@context": "http://schema.datalad.org/",
   "@id": "ID",
-  "author": [
+  "Author": [
     "Mike One",
     "Anna Two"
   ],
-  "citation": [
+  "Citation": [
     "http://studyforrest.org"
   ],
-  "dcterms:conformsTo": [
+  "Description": "Some description",
+  "License": "PDDL",
+  "Name": "studyforrest_phase2",
+  "conformsTo": [
     "http://docs.datalad.org/metadata.html#v0-1",
     "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf"
   ],
-  "description": "Some description",
-  "foaf:fundedBy": "We got money from collecting plastic bottles",
-  "license": "PDDL",
-  "name": "studyforrest_phase2"
+  "fundedBy": "We got money from collecting plastic bottles"
 }""")

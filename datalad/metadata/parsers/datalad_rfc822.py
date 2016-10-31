@@ -55,16 +55,16 @@ class MetadataParser(BaseMetadataParser):
 
         # loop over all recognized headers and translate them
         for header, dataladterm in \
-                (('name', 'name'),
-                 ('license', 'license'),
-                 ('author', 'author'),
-                 ('maintainer', 'doap:maintainer'),
-                 ('audience', 'doap:audience'),
-                 ('homepage', 'doap:homepage'),
-                 ('version', 'doap:Version'),
-                 ('funding', 'foaf:fundedBy'),
-                 ('issue-tracker', 'bug-database'),
-                 ('cite-as', 'citation'),
+                (('name', 'Name'),
+                 ('license', 'License'),
+                 ('author', 'Author'),
+                 ('maintainer', 'Maintainer'),
+                 ('audience', 'Audience'),
+                 ('homepage', 'Homepage'),
+                 ('version', 'Version'),
+                 ('funding', 'fundedBy'),
+                 ('issue-tracker', 'IssueTracker'),
+                 ('cite-as', 'Citation'),
                  ('doi', 'sameAs'),
                  ('description', None)):
             if not header in spec:
@@ -72,8 +72,8 @@ class MetadataParser(BaseMetadataParser):
             content = spec[header]
             if header == 'description':
                 short, long = _beautify_multiline_field(content)
-                meta['doap:shortdesc'] = short
-                meta['description'] = long
+                meta['ShortDescription'] = short
+                meta['Description'] = long
             elif header == 'license':
                 # TODO if title looks like a URL, use it as @id
                 label, desc = _beautify_multiline_field(content)
@@ -88,5 +88,5 @@ class MetadataParser(BaseMetadataParser):
             else:
                 meta[dataladterm] = content
 
-        meta['dcterms:conformsTo'] = self._metadata_compliance
+        meta['conformsTo'] = self._metadata_compliance
         return meta

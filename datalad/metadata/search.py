@@ -216,7 +216,7 @@ class Search(Interface):
                 meta = [meta]
 
             # sort entries by location (if present)
-            sort_keys = ('location', 'description', 'id')
+            sort_keys = ('Location', 'Description', 'id')
             meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
@@ -264,7 +264,7 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            if not mds.get('type', mds.get('schema:type', None)) == 'Dataset':
+            if not mds.get('Type', mds.get('schema:type', None)) == 'Dataset':
                 # we are presently only dealing with datasets
                 continue
             # TODO consider the possibility of nested and context/graph dicts
@@ -297,7 +297,7 @@ class Search(Interface):
                         break
 
             if hit:
-                location = mds.get('location', '.')
+                location = mds.get('Location', '.')
                 report_ = matched_fields.union(report if report else {}) \
                     if report_matched else report
                 if report_ == ['*']:

@@ -27,16 +27,16 @@ def _adjust_subdataset_location(meta, subds_relpath):
             continue
         # prefix all subdataset location information with the relpath of this
         # subdataset
-        if 'dcterms:hasPart' in m:
-            parts = m['dcterms:hasPart']
+        if 'hasPart' in m:
+            parts = m['hasPart']
             if not isinstance(parts, list):
                 parts = [parts]
             for p in parts:
-                if 'location' not in p:
+                if 'Location' not in p:
                     continue
-                loc = p.get('location', subds_relpath)
+                loc = p.get('Location', subds_relpath)
                 if loc != subds_relpath:
-                    p['location'] = opj(subds_relpath, loc)
+                    p['Location'] = opj(subds_relpath, loc)
 
 
 class MetadataParser(BaseMetadataParser):
@@ -63,7 +63,7 @@ class MetadataParser(BaseMetadataParser):
                 # of the superdataset, not for us...
                 continue
             submeta_info = {
-                'location': subds_path}
+                'Location': subds_path}
             # load aggregated meta data
             subds_meta = jsonload(subds_meta_fname)
             # we cannot simply append, or we get weired nested graphs
@@ -76,7 +76,7 @@ class MetadataParser(BaseMetadataParser):
             # knows about being part of this dataset, so we record its @id as
             # part
             for md in subds_meta:
-                cand_id = md.get('dcterms:isPartOf', None)
+                cand_id = md.get('isPartOf', None)
                 if cand_id == dsid and '@id' in md:
                     submeta_info['@id'] = md['@id']
                     break
@@ -87,6 +87,6 @@ class MetadataParser(BaseMetadataParser):
         if len(parts):
             if len(parts) == 1:
                 parts = parts[0]
-            base_meta['dcterms:hasPart'] = parts
+            base_meta['hasPart'] = parts
 
         return meta

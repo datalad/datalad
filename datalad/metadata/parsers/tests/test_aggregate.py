@@ -26,11 +26,11 @@ def test_basic(path):
     os.makedirs(mpath)
     assert_false(p.has_metadata())
     with open(opj(mpath, 'meta.json'), 'w') as fp:
-        fp.write('{"name": "testmonkey", "dcterms:isPartOf": "%s", "@id": "unique"}' % ds.id)
+        fp.write('{"Name": "testmonkey", "isPartOf": "%s", "@id": "unique"}' % ds.id)
     assert_true(p.has_metadata())
     #from datalad.metadata import get_metadata
     #from json import dumps
     #print(dumps(get_metadata(ds), indent=1))
     #assert_equal(
     #    p.get_metadata(),
-    #    [{'dcterms:hasPart': {'location': 'something/deep'}}])
+    #    [{'hasPart': {'Location': 'something/deep'}}])

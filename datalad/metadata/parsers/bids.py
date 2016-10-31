@@ -21,12 +21,12 @@ class MetadataParser(BaseMetadataParser):
 
         # TODO maybe normalize labels of standard licenses to definition URIs
         # perform mapping
-        for bidsterm, dataladterm in (('Name', 'name'),
-                                      ('License', 'license'),
-                                      ('Authors', 'author'),
-                                      ('ReferencesAndLinks', 'citation'),
-                                      ('Funding', 'foaf:fundedBy'),
-                                      ('Description', 'description')):
+        for bidsterm, dataladterm in (('Name', 'Name'),
+                                      ('License', 'License'),
+                                      ('Authors', 'Author'),
+                                      ('ReferencesAndLinks', 'Citation'),
+                                      ('Funding', 'fundedBy'),
+                                      ('Description', 'Description')):
             if bidsterm in bids:
                 meta[dataladterm] = bids[bidsterm]
         compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
@@ -37,5 +37,5 @@ class MetadataParser(BaseMetadataParser):
                     bids['BIDSVersion'].strip()))
         else:
             compliance.append('http://bids.neuroimaging.io')
-        meta['dcterms:conformsTo'] = compliance
+        meta['conformsTo'] = compliance
         return meta

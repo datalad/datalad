@@ -81,7 +81,7 @@ def _get_base_dataset_metadata(ds_identifier):
     meta = {
         "@context": "http://schema.datalad.org/",
         # increment when changes to meta data representation are done
-        "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+        "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
     if ds_identifier is not None:
         meta["@id"] = ds_identifier
@@ -111,15 +111,15 @@ def _get_implicit_metadata(ds, ds_identifier=None):
 
     if ds.id:
         # it has an ID, so we consider it a proper dataset
-        meta['type'] = "Dataset"
+        meta['Type'] = "Dataset"
 
     # shortcut
     repo = ds.repo.repo
     if repo.head.is_valid():
-        meta['dcterms:modified'] = repo.head.commit.authored_datetime.isoformat()
+        meta['modified'] = repo.head.commit.authored_datetime.isoformat()
         # maybe use something like git-describe instead -- but tag-references
         # might changes...
-        meta['version'] = repo.head.commit.hexsha
+        meta['Version'] = repo.head.commit.hexsha
     _add_annex_metadata(ds.repo, meta)
     return meta
 
@@ -158,7 +158,7 @@ def _add_annex_metadata(repo, meta):
 
 def is_implicit_metadata(meta):
     """Return whether a meta data set looks like our own implicit meta data"""
-    std_spec = meta.get('dcterms:conformsTo', '')
+    std_spec = meta.get('conformsTo', '')
     return isinstance(std_spec, string_types) \
         and std_spec.startswith('http://docs.datalad.org/metadata.html#v')
 
