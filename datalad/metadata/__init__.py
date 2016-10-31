@@ -187,7 +187,27 @@ def _simplify_meta_data_structure(meta):
 
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                 ignore_cache=False):
+                 from_native=False):
+    """Return a list of meta data items for the given dataset
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to query for meta data
+    guess_type : bool
+      Flag whether to make an attempt to guess the native meta data format
+      if none is configured
+    ignore_subdatasets : bool
+      Flag whether to consider meta data for any potential subdatasets
+    from_native : bool
+      Flag whether to ignore any pre-processed meta data in the given dataset
+      (except for those of subdatasets), and (re)read meta data from it native
+      format(s). The success of reading from a native format depends on the
+      local availability of the respective file(s). Meta data is read from
+      native sources anyway when no pre-processed/aggregated meta data is
+      available yet. Such meta data can be produced by the
+      `aggregate_metadata` command.
+    """
     # common identifier
     ds_identifier = ds.id
     # metadata receptacle
@@ -197,7 +217,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     main_meta_fname = opj(meta_path, metadata_filename)
 
     # from cache?
-    if ignore_cache or not exists(main_meta_fname):
+    if from_native or not exists(main_meta_fname):
         # start with the implicit meta data, currently there is no cache for
         # this type of meta data, as it will change with every clone.
         # In contrast, native meta data is cached.
@@ -218,9 +238,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             meta.append(cached_meta)
         # cached meta data doesn't have version info for the top-level
         # dataset -> look for the item and update it
-        for m in meta:
-            if not is_implicit_metadata(m):
-                continue
+        for m in [i for i in meta if is_implicit_metadata(i)]:
             if m.get('@id', None) == ds_identifier:
                 m.update(_get_implicit_metadata(ds, ds_identifier))
                 break

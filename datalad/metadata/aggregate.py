@@ -135,7 +135,7 @@ class AggregateMetaData(Interface):
                 subds,
                 guess_type=False,
                 ignore_subdatasets=False,
-                ignore_cache=False)
+                from_native=False)
 
         lgr.info('aggregating meta data for %s', ds)
         # pull out meta data from parent only (no subdatasets)
@@ -157,7 +157,7 @@ def _within_metadata_store(ds, guess_native_type, metapath):
         ds,
         guess_type=guess_native_type,
         ignore_subdatasets=True,
-        ignore_cache=True)
+        from_native=True)
     # strip git-based version info from the meta data that is cached
     # in the dataset itself -- this will be outdated the second we
     # commit below

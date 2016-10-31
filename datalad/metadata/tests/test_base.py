@@ -146,7 +146,7 @@ def test_aggregation(path):
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
     assert_equal(len(meta), 10)
     # same schema
     assert_equal(
@@ -182,7 +182,7 @@ def test_aggregation(path):
     # get fresh meta data, the implicit one for the top-most datasets should
     # differ, but the rest not
     clonemeta = get_metadata(
-        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False)
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
@@ -199,7 +199,7 @@ def test_aggregation(path):
 
     # now obtain a subdataset in the clone and the IDs should be updated
     clone.install('sub')
-    partial = get_metadata(clone, guess_type=False, ignore_cache=True)
+    partial = get_metadata(clone, guess_type=False, from_native=True)
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
@@ -312,7 +312,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
         assert_true(sum([s.get('Name', '') == assure_unicode(name) for s in meta]))

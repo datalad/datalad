@@ -206,7 +206,7 @@ class Search(Interface):
                 os.makedirs(cache_dir)
 
             meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                                ignore_cache=False)
+                                from_native=False)
             # merge all info on datasets into a single dict per dataset
             meta = flatten_metadata_graph(meta)
             # extract graph, if any
