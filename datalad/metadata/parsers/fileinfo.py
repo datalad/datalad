@@ -33,12 +33,10 @@ class MetadataParser(BaseMetadataParser):
         # TODO RF to do this with one annex call
         keys = [repo.get_file_key(f) for f in files]
         for key, file_ in zip(keys, files):
-            finfo = {
-                '@id': key,
-                'Type': 'File',
-                'Location': file_,
-                'FileSize': repo.get_size_from_key(key),
-            }
+            finfo = _get_base_metadata_dict(key)
+            finfo['Type'] = 'File'
+            finfo['Location'] = file_
+            finfo['FileSize'] = repo.get_size_from_key(key)
             # TODO actually insert a "magic"-based description, and
             # maybe a mimetype
             meta.append(finfo)
