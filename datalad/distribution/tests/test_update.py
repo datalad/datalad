@@ -12,7 +12,7 @@
 import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
-from datalad.api import update, install
+from datalad.api import update, install, uninstall
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -77,6 +77,11 @@ def test_update_simple(origin, src_path, dst_path):
     # it's known to annex, but has no content yet:
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
+
+    # smoke-test if recursive update doesn't fail if submodule is removed
+    dest.uninstall('subm 1', kill=True)
+    dest.update(recursive=True)
+    dest.update(merge=True, recursive=True)
 
 
 def test_update_recursive():
