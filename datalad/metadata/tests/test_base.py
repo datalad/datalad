@@ -36,6 +36,7 @@ from datalad.support.annexrepo import AnnexRepo
 
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
+from nose.tools import assert_not_equal
 
 try:
     import pyld
@@ -400,3 +401,21 @@ def test_ignore_nondatasets(path):
         assert_equal(len(ds.get_subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
+
+
+@with_tempfile()
+def test_idempotent_aggregate(path):
+    # a hierarchy of three (super/sub)datasets
+    ds = Dataset(path).create()
+    subds = ds.create('sub')
+    subds.create('subsub')
+    ds.save(auto_add_changes=True)
+    origstate = ds.repo.get_hexsha()
+    # aggregate from bottom to top, guess native data, no compacting of graph
+    aggregate_metadata(ds, guess_native_type=False, recursive=True)
+    aggstate = ds.repo.get_hexsha()
+    # aggregation did something
+    assert_not_equal(origstate, aggstate)
+    # reaggration doesn't change anything
+    aggregate_metadata(ds, guess_native_type=False, recursive=True)
+    assert_equal(ds.repo.get_hexsha(), aggstate)
