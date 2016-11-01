@@ -1,12 +1,14 @@
 {
   "@context": {
     "@vocab": "http://schema.org/",
+    "adms": "http://www.w3.org/ns/adms#",
     "doap": "http://usefulinc.com/ns/doap#",
     "Author": {"@id": "schema:author"},
     "Audience": {"@id": "doap:audience"},
     "Citation": {"@id": "schema:citation"},
     "Contributors": {"@id": "schema:contributor"},
     "Description": {"@id": "schema:description"},
+    "File": {"@id": "adms:AssetDistribution"},
     "Homepage": {"@id": "doap:homepage"},
     "IssueTracker": {"@id": "doap:bug-database"},
     "Keywords": {"@id": "schema:keywords"},
