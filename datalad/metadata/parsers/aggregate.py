@@ -21,7 +21,7 @@ from datalad.metadata import _get_base_metadata_dict
 def _adjust_subdataset_location(meta, subds_relpath):
     # find implicit meta data for all contained subdatasets
     for m in meta:
-        if not _is_versioned_dataset_item(m):
+        if not (_is_versioned_dataset_item(m) or m.get('Type', None) == 'File'):
             continue
         # prefix all subdataset location information with the relpath of this
         # subdataset
