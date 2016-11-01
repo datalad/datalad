@@ -5,6 +5,7 @@
     "doap": "http://usefulinc.com/ns/doap#",
     "Author": {"@id": "schema:author"},
     "Audience": {"@id": "doap:audience"},
+    "Annex": {"@id": "adms:AssetRepository"},
     "Citation": {"@id": "schema:citation"},
     "Contributors": {"@id": "schema:contributor"},
     "Description": {"@id": "schema:description"},

@@ -132,6 +132,16 @@ Naming rules for extending the context are:
 While it is technically possible to mix different contexts across items this
 has not been fully tested yet.
 
+Four types of objects are described:
+
+* :term:`Dataset` -- of which there are two:
+
+  1. General dataset description (UUID identifier)
+  2. Particular (versioned) instance of a dataset (hexsha identified)
+
+* File
+* :term:`Annex`
+
 The following sections describe details and changes in the meta data
 specifications implemented in datalad.
 
