@@ -196,7 +196,7 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
         # inject proper inter-dataset relationships
         for m in smeta:
             if _is_versioned_dataset_item(m) and 'isPartOf' not in m:
-                m['isPartOf'] = ds.repo.get_hexsha()
+                m['isPartOf'] = 'THISDATASET!'
                 m['Location'] = subds_relpath
         sp = opj(ds.path, metadata_basepath, subds_relpath)
         _store_json(ds, sp, smeta)

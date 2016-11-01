@@ -43,7 +43,7 @@ class MetadataParser(BaseMetadataParser):
             dirs=False))
 
     def get_metadata(self, dsid=None, full=False):
-        base_meta = _get_base_metadata_dict(dsid if dsid else self.ds.id)
+        base_meta = _get_base_metadata_dict(dsid)
         meta = []
         basepath = opj(self.ds.path, '.datalad', 'meta')
         parts = []
@@ -71,6 +71,7 @@ class MetadataParser(BaseMetadataParser):
                        and 'isPartOf' in i
                        and 'Location' in i]:
                 if md['Location'] == subds_path and '@id' in md:
+                    md['isPartOf'] = dsid
                     parts.append({'@id': md['@id']})
                     break
             if subds_meta:
