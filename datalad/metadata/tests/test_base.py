@@ -18,7 +18,7 @@ from operator import itemgetter
 from os.path import join as opj, exists
 
 from datalad.api import Dataset, aggregate_metadata, install
-from datalad.metadata import get_metadata_type, get_metadata
+from datalad.metadata import get_enabled_metadata_parsers, get_metadata
 from datalad.metadata import _cached_load_document
 from datalad.metadata import _is_versioned_dataset_item
 from datalad.utils import swallow_logs
@@ -71,25 +71,27 @@ _dataset_hierarchy_template = {
 
 
 @with_tempfile(mkdir=True)
-def test_get_metadata_type(path):
+def test_get_enabled_metadata_parsers(path):
     # nothing set, nothing found
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
-    open(opj(path, '.datalad', 'config'), 'w').write('[metadata]\n')
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata.parsers"]\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     # minimal setting
-    open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata.parsers"]\n\tenable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tenable = metoo!\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo', 'metoo!'])
 
 
 @with_tree(tree={
     'dataset_description.json': "{}",
     'datapackage.json': '{"name": "some"}'
 })
-def test_get_multiple_metadata_types(path):
+def test_get_multiple_enabled_parsers(path):
     assert_equal(
-        sorted(get_metadata_type(Dataset(path), guess=True)),
+        sorted(get_enabled_metadata_parsers(Dataset(path), guess=True)),
         ['bids', 'frictionless_datapackage'])
 
 

@@ -23,6 +23,7 @@ from importlib import import_module
 from datalad.consts import METADATA_CURRENT_VERSION
 from datalad.utils import swallow_logs
 from datalad.utils import assure_dir
+from datalad.utils import assure_list
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -35,43 +36,45 @@ metadata_basepath = opj('.datalad', 'meta')
 
 
 # XXX Could become dataset method
-def get_metadata_type(ds, guess=False):
-    """Return the metadata type(s)/scheme(s) of a dataset
+def get_enabled_metadata_parsers(ds, guess=False):
+    """Return the names of meta data parsers enabled in the configuration
+
+    The configuration variable ``datalad.metadata.parsers.enable`` is queried.
 
     Parameters
     ----------
     ds : Dataset
       Dataset instance to be inspected
     guess : bool
-      Whether to try to auto-detect the type if no metadata type setting is
-      found. All supported metadata schemes are tested in alphanumeric order.
+      Whether to try to auto-detect relevant parsers if no configuration
+      setting is found. All supported metadata schemes are tested in
+      alphanumeric order.
 
     Returns
     -------
     list(str)
-      Metadata type labels or an empty list if no type setting is found and
-      optional auto-detection yielded no results
+      Parser names or an empty list if no configuration is found and optional
+      auto-detection yielded no results
     """
     cfg_ = ds.config
-    # TODO give cfg name datalad prefix
-    if cfg_ and cfg_.has_section('metadata'):
-        if cfg_.has_option('metadata', 'nativetype'):
-            return cfg_.get_value('metadata', 'nativetype').split()
-    mtypes = []
+    enabled = cfg_.get('datalad.metadata.parsers.enable', None)
+    if enabled is not None:
+        return assure_list(enabled)
+    enabled = []
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
-            if mtype == 'aggregate':
+        for pname in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
+            if pname == 'aggregate':
                 # skip, runs anyway, but later
                 continue
-            pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
+            pmod = import_module('.%s' % (pname,), package=parsers.__package__)
             if pmod.MetadataParser(ds).has_metadata():
-                lgr.debug('Predicted presence of "%s" meta data', mtype)
-                mtypes.append(mtype)
+                lgr.debug('Predicted presence of "%s" meta data', pname)
+                enabled.append(pname)
             else:
-                lgr.debug('No evidence for "%s" meta data', mtype)
-    return mtypes
+                lgr.debug('No evidence for "%s" meta data', pname)
+    return enabled
 
 
 def _get_base_metadata_dict(identifier):
@@ -313,24 +316,23 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     # dataset, and we want to quickly collect them without having to do potentially
     # complex graph merges
     meta = []
-    # get native metadata
-    nativetypes = get_metadata_type(ds, guess=guess_type)
-    if not nativetypes:
+    enabled_parsers = get_enabled_metadata_parsers(ds, guess=guess_type)
+    if not enabled_parsers:
         return meta
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
-    for nativetype in nativetypes:
-        if nativetype == 'aggregate':
+    for pname in enabled_parsers:
+        if pname == 'aggregate':
             # this is special and needs to be ignored here, even if it was
             # configured. reason: this parser runs anyway in get_metadata()
             continue
-        pmod = import_module('.{}'.format(nativetype),
+        pmod = import_module('.{}'.format(pname),
                              package=parsers.__package__)
         try:
             native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
-            lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
+            lgr.error('failed to get native metadata ({}): {}'.format(pname, exc_str(e)))
             continue
         if native_meta:
             # TODO here we could apply a "patch" to the native metadata, if desired
