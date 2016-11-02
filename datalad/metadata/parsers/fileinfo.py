@@ -16,6 +16,7 @@ from datalad.metadata.parsers.base import BaseMetadataParser
 
 class MetadataParser(BaseMetadataParser):
     _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
+    cfg_section = 'datalad.metadata.parser.fileinfo.report'
 
     def has_metadata(self):
         # could check if there is at least one annexed file, but hey...
@@ -28,7 +29,10 @@ class MetadataParser(BaseMetadataParser):
         parts = []
         if not self.has_metadata():
             return meta
+        # shortcuts
+        cfg = self.ds.config
         repo = self.ds.repo
+        cfg_section = self.cfg_section
         files = repo.get_annexed_files()
         # TODO RF to do this with one annex call
         keys = [repo.get_file_key(f) for f in files]
@@ -36,7 +40,8 @@ class MetadataParser(BaseMetadataParser):
             finfo = _get_base_metadata_dict(key)
             finfo['Type'] = 'File'
             finfo['Location'] = file_
-            finfo['FileSize'] = repo.get_size_from_key(key)
+            if cfg.getbool(cfg_section, 'filesize', True):
+                finfo['FileSize'] = repo.get_size_from_key(key)
             # TODO actually insert a "magic"-based description, and
             # maybe a mimetype
             meta.append(finfo)

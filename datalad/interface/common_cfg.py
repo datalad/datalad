@@ -75,6 +75,12 @@ definitions = {
                'title': 'Meta data parsers to enable for this dataset',
                'text': 'Parser names?'}),
     },
+    'datalad.metadata.parsers.fileinfo.report.filesize': {
+        'ui': ('yesno', {
+               'title': 'Include the size of files in the meta data report',
+               'question': 'Enable?'}),
+        'type': EnsureBool(),
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

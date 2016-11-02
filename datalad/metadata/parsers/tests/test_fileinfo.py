@@ -12,7 +12,7 @@ from simplejson import dumps
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.metadata.parsers.fileinfo import MetadataParser
-from nose.tools import assert_true, assert_false, assert_equal
+from nose.tools import assert_true, assert_false, assert_equal, assert_not_in
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.support.gitrepo import GitRepo
 
@@ -58,3 +58,10 @@ def test_get_metadata(path):
   ]
  }
 ]""")
+    ds.config.add(
+        'datalad.metadata.parser.fileinfo.report.filesize',
+        'false',
+        where='dataset')
+    meta = MetadataParser(ds).get_metadata('ID')
+    for m in meta:
+        assert_not_in('FileSize', m)
