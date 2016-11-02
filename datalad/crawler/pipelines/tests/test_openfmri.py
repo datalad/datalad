@@ -262,8 +262,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     eq_(len(commits_l['incoming']), 3)
     eq_(len(commits['incoming-processed']), 6)
     eq_(len(commits_l['incoming-processed']), 4)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 12)  # all commits out there -- dataset init, crawler init + 3*(incoming, processed, meta data aggregation, merge)
-    eq_(len(commits_l['master']), 6)
+    eq_(len(commits['master']), 14)  # all commits out there -- dataset init, crawler init + 3*(incoming, processed, meta data aggregation (each time due to changed file content), merge)
+    eq_(len(commits_l['master']), 8)
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
@@ -280,10 +280,11 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
                                                              commits_l['incoming'][0].hexsha))
     eq_(hexsha(commits_l['incoming-processed'][2].parents), (commits_l['incoming'][2].hexsha,))
 
-    eq_(hexsha(commits_l['master'][0].parents), (commits_l['master'][1].hexsha,
+    # the last commit after each merge is from meta data aggregation
+    eq_(hexsha(commits_l['master'][1].parents), (commits_l['master'][2].hexsha,
                                                  commits_l['incoming-processed'][0].hexsha))
 
-    eq_(hexsha(commits_l['master'][1].parents), (commits_l['master'][2].hexsha,
+    eq_(hexsha(commits_l['master'][3].parents), (commits_l['master'][4].hexsha,
                                                  commits_l['incoming-processed'][1].hexsha))
 
     with chpwd(outd):
