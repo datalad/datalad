@@ -151,25 +151,28 @@ def test_aggregation(path):
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
         ds, guess_type=False, ignore_subdatasets=False, from_native=False)
-    # 3 dataset UUID definitions
-    # 3 annex definitions
-    # 3 version dataset items
-    # 4 native metadata set
-    # 2 subdataset relationship items
-    assert_equal(len(meta), 15)
+    # 3 dataset UUID definitions +
+    # 3 annex definitions +
+    # 3 version dataset items +
+    # 4 native metadata set +
+    # 2 subdataset relationship items +
+    # 4 files (one for each metadata source) +
+    # 3 dataset file parts (one for each dataset) +
+    assert_equal(len(meta), 22)
     # same schema
     assert_equal(
-        15,
+        22,
         sum([s.get('@context', None) == 'http://schema.datalad.org/'
              for s in meta]))
     # three different IDs per type (annex, dataset, versioned dataset)
-    assert_equal(9, len(set([s.get('@id') for s in meta])))
+    # plus fours different file keys
+    assert_equal(13, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(sum([s.get('Name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         # first implicit, then two natives, then aggregate
-        meta[5]['hasPart']['@id'],
+        meta[8]['hasPart']['@id'],
         subds.repo.get_hexsha())
     success = False
     for m in meta:
@@ -203,7 +206,7 @@ def test_aggregation(path):
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
-        clonemeta[5]['hasPart']['@id'],
+        clonemeta[8]['hasPart']['@id'],
         subds.repo.get_hexsha())
 
     # now obtain a subdataset in the clone and the IDs should be updated
