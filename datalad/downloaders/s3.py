@@ -106,13 +106,15 @@ class S3DownloaderSession(DownloaderSession):
                     pass  # do not let pbar spoil our fun
 
         headers = {}
-        kwargs = dict(headers=headers, cb=pbar_callback)
+        # report for every % for files > 10MB, otherwise every 10%
+        kwargs = dict(headers=headers, cb=pbar_callback,
+                      num_cb=100 if self.key.size > 10*(1024**2) else 10)
         if size:
             headers['Range'] = 'bytes=0-%d' % (size - 1)
         if f:
             # TODO: May be we could use If-Modified-Since
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            self.key.get_contents_to_file(f, num_cb=0, **kwargs)
+            self.key.get_contents_to_file(f, **kwargs)
         else:
             return self.key.get_contents_as_string(encoding='utf-8', **kwargs)
 
