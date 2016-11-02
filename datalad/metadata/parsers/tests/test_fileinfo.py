@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test file info meta data parser """
 
-from os.path import join as opj
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
@@ -41,10 +40,12 @@ def test_get_metadata(path):
         """\
 [
  {
+  "@context": "http://schema.datalad.org/",
   "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv",
   "FileSize": 6,
   "Location": "test/subfile.tsv",
-  "Type": "File"
+  "Type": "File",
+  "conformsTo": "http://docs.datalad.org/metadata.html#v0-1"
  },
  {
   "@context": "http://schema.datalad.org/",
