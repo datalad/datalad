@@ -10,20 +10,14 @@
 
 """
 
-import mock
 from functools import partial
 from os import mkdir
+from shutil import copyfile
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
-from shutil import copyfile
-from nose.tools import assert_is_instance
 
-from datalad.utils import linux_distribution_name
 from datalad.tests.utils import *
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.exceptions import OutdatedExternalDependency
-
 # imports from same module:
 from ..annexrepo import *
 
@@ -1047,11 +1041,24 @@ def test_annex_remove(path1, path2):
 
 
 @with_tempfile
-def test_repo_version(path):
-    annex = AnnexRepo(path, create=True, version=6)
-    ok_clean_git(path, annex=True)
+@with_tempfile
+@with_tempfile
+def test_repo_version(path1, path2, path3):
+    annex = AnnexRepo(path1, create=True, version=6)
+    ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
     eq_(version, 6)
+
+    # default from config item (via env var):
+    with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
+        annex = AnnexRepo(path2, create=True)
+        version = annex.repo.config_reader().get_value('annex', 'version')
+        eq_(version, 6)
+
+        # parameter `version` still has priority over default config:
+        annex = AnnexRepo(path3, create=True, version=5)
+        version = annex.repo.config_reader().get_value('annex', 'version')
+        eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -1165,7 +1172,7 @@ def test_is_available(batch, direct, p):
     # it is on the 'web'
     assert is_available(fname, remote='web') is True
     # not effective somehow :-/  may be the process already running or smth
-    #with swallow_logs(), swallow_outputs():  # it will complain!
+    # with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 

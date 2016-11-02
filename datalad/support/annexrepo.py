@@ -47,6 +47,7 @@ from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
 from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
+from datalad.config import ConfigManager
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -80,7 +81,8 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode', '_uuid']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
+                                     '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -90,7 +92,7 @@ class AnnexRepo(GitRepo):
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True,
+                 direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None):
         """Creates representation of git-annex repository at `path`.
@@ -201,6 +203,18 @@ class AnnexRepo(GitRepo):
                             writer.release()
 
         self.always_commit = always_commit
+
+        # Note: Not sure yet, whether 'dataset=self' is appropriate, but we need
+        # to be able to read dataset's config in case we don't create a brand
+        # new one here.
+        cfg = ConfigManager(dataset=self)
+
+        if version is None:
+            try:
+                version = cfg["datalad.repo.version"]
+            except KeyError:
+                pass
+
         if fix_it:
             self._init(version=version, description=description)
             self.fsck()
@@ -221,10 +235,20 @@ class AnnexRepo(GitRepo):
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
 
-        # only force direct mode; don't force indirect mode
+        # - only force direct mode; don't force indirect mode
+        # - parameter `direct` has priority over config
+        if direct is None:
+            direct = (create or init) and \
+                     cfg.getbool("datalad", "repo.direct", default=False)
         self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
-            self.set_direct_mode()
+            if self.repo.config_reader().get_value('annex', 'version') < 6:
+                lgr.debug("Switching to direct mode (%s)." % self)
+                self.set_direct_mode()
+            else:
+                # TODO: This may change to either not being a warning and/or
+                # to use 'git annex unlock' instead.
+                lgr.warning("direct mode not available for %s. Ignored." % self)
 
         # set default backend for future annex commands:
         # TODO: Should the backend option of __init__() also migrate
@@ -446,6 +470,13 @@ class AnnexRepo(GitRepo):
         # For paranoid we will just re-request
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
+
+        if self.is_direct_mode():
+            # adjust git options for plain git calls on this repo:
+            # Note: Not sure yet, whether this solves the issue entirely or we
+            # still need 'annex proxy' in some cases ...
+            if 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
+                self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
@@ -694,13 +725,13 @@ class AnnexRepo(GitRepo):
         (stdout, stderr)
             output of the command call
         """
+        # TODO: We probably don't need it anymore
 
         if not self.is_direct_mode():
             lgr.warning("proxy() called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd="git annex proxy",
                                            msg="Proxy doesn't make sense"
                                                " if not in direct mode.")
-        # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
                                        annex_options=['--'] + git_cmd,
                                        **kwargs)
@@ -776,7 +807,7 @@ class AnnexRepo(GitRepo):
         """
         objects = []
         if batch:
-            objects = self._batched.get('find', path=self.path)(files)
+            objects = self._batched.get('find', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(files)
         else:
             for f in files:
                 try:
@@ -959,7 +990,7 @@ class AnnexRepo(GitRepo):
                 # Since backend will be critical for non-existing files
                 'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
-                git_options=git_options,
+                git_options=self._GIT_COMMON_OPTIONS + git_options,
                 annex_options=options,  # --raw ?
                 path=self.path,
                 json=True
@@ -1104,7 +1135,7 @@ class AnnexRepo(GitRepo):
         if not batch:
             json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
         else:
-            json_objects = self._batched.get('dropkey', annex_options=options, json=True, path=self.path)(keys)
+            json_objects = self._batched.get('dropkey', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(keys)
         for j in json_objects:
             assert j.get('success', True)
 
@@ -1316,7 +1347,7 @@ class AnnexRepo(GitRepo):
         if not batch:
             json_objects = self._run_annex_command_json('info', args=options + files)
         else:
-            json_objects = self._batched.get('info', annex_options=options, json=True, path=self.path)(files)
+            json_objects = self._batched.get('info', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(files)
 
         # Some aggressive checks. ATM info can be requested only per file
         # json_objects is a generator, let's keep it that way
@@ -1469,7 +1500,7 @@ class AnnexRepo(GitRepo):
             except CommandError:
                 return ''
         else:
-            return self._batched.get('contentlocation', path=self.path)(key)
+            return self._batched.get('contentlocation', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key)
 
     @normalize_paths(serialize=True)
     def is_available(self, file_, remote=None, key=False, batch=False):
@@ -1514,7 +1545,7 @@ class AnnexRepo(GitRepo):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(':'.join(annex_cmd), annex_cmd, path=self.path)(key_)
+            out = self._batched.get(':'.join(annex_cmd), annex_cmd, git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key_)
             try:
                 return {
                     '': False,  # when remote is misspecified ... stderr carries the msg
@@ -1816,7 +1847,7 @@ class BatchedAnnex(object):
         # TODO -- should get all those options about --debug and --backend which are used/composed
         # in AnnexRepo class
         lgr.debug("Initiating a new process for %s" % repr(self))
-        cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
+        cmd = ['git'] + self.git_options + \
               ['annex'] + self.annex_cmd + self.annex_options + ['--batch']  # , '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug

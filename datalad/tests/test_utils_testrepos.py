@@ -9,16 +9,17 @@
 """Tests for test repositories
 
 """
-from os.path import join as pathjoin
+from os.path import join as opj
 
 from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo
 from .utils import with_tempfile, assert_true, ok_clean_git, \
-    ok_clean_git_annex_proxy, eq_
+    ok_clean_git_annex_proxy, eq_, ok_
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
 from .utils import on_windows
 from .utils import SkipTest
 
+# TODO: still true?
 if on_windows:
     raise SkipTest("experiencing issues on windows -- disabled for now")
 
@@ -33,12 +34,10 @@ def _test_BasicAnnexTestRepo(repodir):
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'INFO.txt')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
-    if not trepo.repo.is_crippled_fs():
-        ok_broken_symlink(pathjoin(trepo.path, 'test-annex.dat'))
+    ok_(trepo.repo.file_has_content('test-annex.dat') is False)
     with swallow_outputs():
         trepo.repo.get('test-annex.dat')
-    if not trepo.repo.is_crippled_fs():
-        ok_good_symlink(pathjoin(trepo.path, 'test-annex.dat'))
+    ok_(trepo.repo.file_has_content('test-annex.dat'))
 
 
 # Use of @with_tempfile() apparently is not friendly to test generators yet
@@ -49,7 +48,7 @@ def test_BasicAnnexTestRepo_random_location_generated():
 
 @with_tempfile()
 def test_BasicAnnexTestRepo(path):
-    yield _test_BasicAnnexTestRepo, path
+    _test_BasicAnnexTestRepo(path)
 
 
 @with_tempfile()

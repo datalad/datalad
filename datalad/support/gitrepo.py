@@ -71,7 +71,8 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
+# TODO: ignore leading and/or trailing underscore to allow for
+# python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -375,13 +376,8 @@ class GitRepo(object):
     overridden accidentally by AnnexRepo.
 
     """
-    __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    # Disable automatic garbage and autopacking
-    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    # actually no need with default GitPython db backend not in memory
-    # default_git_odbt but still allows for faster testing etc.
-    # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
+    __slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):
@@ -423,6 +419,13 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
+
+        # Disable automatic garbage and autopacking
+        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # actually no need with default GitPython db backend not in memory
+        # default_git_odbt but still allows for faster testing etc.
+        # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
+
         if git_opts is None:
             git_opts = {}
         if kwargs:
@@ -486,6 +489,12 @@ class GitRepo(object):
                         InvalidGitRepositoryError) as e:
                     lgr.error("%s: %s" % (type(e), str(e)))
                     raise
+
+        # inject git options into GitPython's git call wrapper:
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # calls above from being actually executed (DryRunProtocol)
+        if self.repo is not None:
+            self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
     def clone(self, url, path):
         """Clone url into path

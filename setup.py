@@ -55,7 +55,7 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.0.8',
+        'GitPython>=2.1.0',
         'iso8601',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
