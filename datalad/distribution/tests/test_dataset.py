@@ -100,18 +100,27 @@ def test_register_sibling(remote, path):
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
-    eq_(set(ds.get_subdatasets()), {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True)),
-        {'sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1',
-         'sub dataset1/sub sub dataset1/subm 2', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2', 'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=0)),
-        set([]))
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=1)),
-        {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=2)),
-        {'sub dataset1', 'sub dataset1/sub sub dataset1', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2'})
+    eq_(ds.get_subdatasets(), ['sub dataset1'])
+    eq_(ds.get_subdatasets(recursive=True),
+        [
+            'sub dataset1/sub sub dataset1/subm 1',
+            'sub dataset1/sub sub dataset1/subm 2',
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/subm 1',
+            'sub dataset1/subm 2',
+            'sub dataset1'
+        ])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=0),
+        [])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=1),
+        ['sub dataset1'])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=2),
+        [
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/subm 1',
+            'sub dataset1/subm 2',
+            'sub dataset1',
+        ])
 
     # TODO:  More Flavors!
 

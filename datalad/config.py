@@ -138,12 +138,15 @@ class ConfigManager(object):
         self._store = {}
         self._dataset = dataset
         self._dataset_only = dataset_only
+        # Since configs could contain sensitive information, to prevent
+        # any "facilitated" leakage -- just disable loging of outputs for
+        # this runner
+        run_kwargs = dict(log_outputs=False)
         if dataset is not None:
             # make sure we run the git config calls in the dataset
             # to pick up the right config files
-            self._runner = Runner(cwd=dataset.path)
-        else:
-            self._runner = Runner()
+            run_kwargs['cwd'] = dataset.path
+        self._runner = Runner(**run_kwargs)
         self.reload()
 
     def reload(self):

@@ -109,8 +109,18 @@ packages <http://specs.frictionlessdata.io/data-packages>`_
 JSON-LD meta data format
 ========================
 
-This sections will describe the linked data meta data format used by datalad
-for aggregation and meta data query.
+Datalad uses JSON-LD_ as its primary meta data format. By default, the
+following context (available from `here <schema.json>`_
+is used for any meta data item:
+
+.. literalinclude:: _extras/schema.json
+   :language: json
+
+While it is technically possible to mix different contexts across items this
+has not been fully tested yet.
+
+The following sections describe details and changes in the meta data
+specifications implemented in datalad.
 
 .. _0.1:
 

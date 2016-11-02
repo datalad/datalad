@@ -12,6 +12,7 @@ via Annexificator class, which could be used to add files, checkout branches, et
 """
 
 import os
+import re
 import time
 from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
@@ -1073,7 +1074,9 @@ class Annexificator(object):
         return _commit_versions
 
     def remove_other_versions(self, name=None, db=None,
-                              overlay=None, remove_unversioned=False, exclude=None):
+                              overlay=None, remove_unversioned=False,
+                              fpath_subs=None,
+                              exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
@@ -1094,6 +1097,11 @@ class Annexificator(object):
           If a callable, it would be used to augment versions before identifying
           non-overlayable version component.  So in other words `overlay=2`
           should be identical to `overlay=lambda v: '.'.join(v.split('.')[:2])`
+        fpath_subs : list of (from, to), optional
+          Regex substitutions to apply to (versioned but with version part removed)
+          filenames before considering.  To be used whenever file names at some point
+          were changed
+          (e.g., `ds001_R1.0.1.tgz` one lucky day became `ds000001_R1.0.2.zip`)
         remove_unversioned: bool, optional
           If there is a version defined now, remove those files which are unversioned
           i.e. not listed associated with any version
@@ -1152,10 +1160,24 @@ class Annexificator(object):
                     # the same overlay but before current version
                     # we need to track the last known within overlay and if
                     # current updates, remove older version
+                    fpaths_considered = {}
                     for fpath, vfpath in fpaths.items():
+                        if fpath_subs:
+                            fpath_orig = fpath
+                            for from_, to_ in fpath_subs:
+                                fpath = re.sub(from_, to_, fpath)
+                            if fpath in fpaths_considered:
+                                # May be it is not that severe, but for now we will
+                                # crash if there is a collision
+                                raise ValueError(
+                                    "Multiple files (%s, %s) collided into the same name %s",
+                                    fpaths_considered[fpath], fpath_orig, fpath
+                                )
+                            fpaths_considered[fpath] = fpath_orig
                         if fpath in tracked_files:
                             files_to_remove.append(tracked_files[fpath])
                         tracked_files[fpath] = vfpath  # replace with current one
+
                     if version == current_version:
                         # just clean out those tracked_files with the most recent versions
                         # and remove nothing
