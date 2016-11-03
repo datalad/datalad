@@ -83,6 +83,8 @@ def test_get_enabled_metadata_parsers(path):
     assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo'])
     open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tenable = metoo!\n')
     assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo', 'metoo!'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tdisable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['metoo!'])
 
 
 @with_tree(tree={

@@ -57,10 +57,9 @@ def get_enabled_metadata_parsers(ds, guess=False):
     """
     cfg_ = ds.config
     enabled = cfg_.get('datalad.metadata.parsers.enable', None)
-    if enabled is not None:
-        return assure_list(enabled)
-    enabled = []
-    if guess:
+    if enabled is None and guess:
+        lgr.debug('Trying to guess compatible meta data parsers')
+        enabled = []
         # keep local, who knows what some parsers might pull in
         from . import parsers
         for pname in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
@@ -73,7 +72,13 @@ def get_enabled_metadata_parsers(ds, guess=False):
                 enabled.append(pname)
             else:
                 lgr.debug('No evidence for "%s" meta data', pname)
-    return enabled
+    if enabled is None:
+        return []
+    enabled = set(assure_list(enabled))
+    for disabled in assure_list(cfg_.get('datalad.metadata.parsers.disable', [])):
+        enabled.discard(disabled)
+    lgr.debug('Enabled meta data parsers: %s', enabled)
+    return sorted(list(enabled))
 
 
 def _get_base_metadata_dict(identifier):
