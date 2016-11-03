@@ -52,6 +52,7 @@ from datalad.utils import updated
 from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
 
@@ -1435,12 +1436,18 @@ class GitRepo(object):
           only its hexsha
         """
 
+        try:
+            _branch = self.repo.branches[branch]
+        except IndexError:
+            raise MissingBranchError(self, branch,
+                                     [b.name for b in self.repo.branches])
+
         fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
 
         if not limit:
             def gen():
                 # traverse doesn't yield original commit
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 yield co
                 for co_ in co.traverse():
                     yield co_
@@ -1448,7 +1455,7 @@ class GitRepo(object):
             # we need a custom implementation since couldn't figure out how to
             # do with .traversal
             def gen():
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 while co:
                     yield co
                     co = co.parents[0] if co.parents else None

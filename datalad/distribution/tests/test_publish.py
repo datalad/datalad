@@ -14,6 +14,7 @@ import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import publish, install
+from datalad.dochelpers import exc_str
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -107,7 +108,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
         publish(dataset=source, to="target", recursive=True)
-    assert_in("No sibling 'target' found.", str(cm.exception))
+    assert_in("No sibling 'target' found.", exc_str(cm.exception))
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
@@ -206,7 +207,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # TODO: Figure out, when to fetch things in general; Alternatively:
     # Is there an option for push, that prevents GitPython from failing?
     source.repo.fetch("target")
-
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
     eq_(res, ([source, 'test-annex.dat'], []))
 
