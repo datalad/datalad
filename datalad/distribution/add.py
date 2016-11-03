@@ -14,6 +14,8 @@ import logging
 
 from os import curdir
 from os.path import isdir
+from os.path import join as opj
+from os.path import relpath
 from collections import defaultdict
 
 from datalad.interface.base import Interface
@@ -345,6 +347,10 @@ class Add(Interface):
                     )
             return_values = None  # to avoid mis-use
 
+        # XXX or we could return entire datasets_return_values, could be useful
+        # that way.  But then should be unified with the rest of commands, e.g.
+        # get etc
+        return_values_flat = []
         for dspath, return_values in datasets_return_values.items():
             if save and len(return_values):
                 # we got something added -> save
@@ -354,12 +360,19 @@ class Add(Interface):
                     dataset=ds,
                     auto_add_changes=False,
                     recursive=False)
+            # TODO: you feels that this is some common logic we already have somewhere
+            dsrelpath = relpath(dspath, dataset.path)
+            if dsrelpath != curdir:
+                # we need ot adjust 'file' entry in each record
+                for return_value in return_values:
+                    if 'file' in return_value:
+                        return_value['file'] = opj(dsrelpath, return_value['file'])
+                    return_values_flat.append(return_value)
+            else:
+                return_values_flat.extend(return_values)
 
-        # XXX or we could return entire datasets_return_values, could be useful
-        # that way.  But then should be unified with the rest of commands, e.g.
-        # get etc
-        return_values = sum(datasets_return_values.values(), [])
-        return return_values
+
+        return return_values_flat
 
     @staticmethod
     def result_renderer_cmdline(res, args):
