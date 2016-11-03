@@ -117,8 +117,9 @@ def test_GitRepo_add(src, path):
     filename = get_most_obscure_supported_name()
     with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
-    gr.add(filename)
+    added = gr.add(filename)
 
+    assert_equal(added, {'success': True, 'file': filename})
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
@@ -131,7 +132,8 @@ def test_GitRepo_add(src, path):
     assert_raises(AssertionError, gr.add, filename, git=None)
 
     # include committing:
-    gr.add(filename, commit=True, msg="Add two files.")
+    added2 = gr.add(filename, commit=True, msg="Add two files.")
+    assert_equal(added2, {'success': True, 'file': filename})
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
