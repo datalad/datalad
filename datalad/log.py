@@ -192,6 +192,12 @@ class LoggerHelper(object):
             log_level = getattr(logging, level.upper())
 
         self.lgr.setLevel(log_level)
+        # and set other related/used loggers to the same level to prevent their
+        # talkativity, if they are not yet known to this python session, so we
+        # have little chance to "override" possibly set outside levels
+        for dep in ('git',):
+            if dep not in logging.Logger.manager.loggerDict:
+                logging.getLogger(dep).setLevel(log_level)
 
     def get_initialized_logger(self, logtarget=None):
         """Initialize and return the logger

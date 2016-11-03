@@ -925,6 +925,7 @@ def ignore_nose_capturing_stdout(func):
                 raise
     return newfunc
 
+
 def skip_httpretty_on_problematic_pythons(func):
     """As discovered some httpretty bug causes a side-effect
     on other tests on some Pythons.  So we skip the test if such
@@ -955,6 +956,13 @@ def with_batch_direct(t):
 
     return newfunc
 
+
+def dump_graph(graph, flatten=False):
+    from json import dumps
+    if flatten:
+        from datalad.metadata import flatten_metadata_graph
+        graph = flatten_metadata_graph(graph)
+    return dumps(graph, indent=1)
 
 
 # List of most obscure filenames which might or not be supported by different

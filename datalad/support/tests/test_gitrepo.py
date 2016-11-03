@@ -812,7 +812,7 @@ def test_git_custom_calls(path, path2):
     # Note: 'path2' doesn't contain a git repository
     with assert_raises(GitCommandError) as cm:
         repo._gitpy_custom_call('status', git_options={'C': path2})
-    assert_in("git -C %s status" % path2, str(cm.exception))
+    assert_in("-C %s status" % path2, str(cm.exception))
     assert_in("fatal: Not a git repository", str(cm.exception))
 
     # TODO: How to test 'env'?
@@ -959,3 +959,27 @@ def test_optimized_cloning(path):
         clone_inodes = _get_inodes(clone)
         eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
         rmtree(clonepath)
+
+
+@with_tempfile
+@with_tempfile
+def test_GitRepo_gitpy_injection(path, path2):
+
+    gr = GitRepo(path, create=True)
+    gr._GIT_COMMON_OPTIONS.extend(['test-option'])
+
+    with assert_raises(GitCommandError) as cme:
+        gr.repo.git.unknown_git_command()
+    assert_in('test-option', exc_str(cme.exception))
+
+    # once set, these option should be persistent across git calls:
+    with assert_raises(GitCommandError) as cme:
+        gr.repo.git.another_unknown_git_command()
+    assert_in('test-option', exc_str(cme.exception))
+
+    # but other repos should not be affected:
+    gr2 = GitRepo(path2, create=True)
+    with assert_raises(GitCommandError) as cme:
+        gr2.repo.git.unknown_git_command()
+    assert_not_in('test-option', exc_str(cme.exception))
+

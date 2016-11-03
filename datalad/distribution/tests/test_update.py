@@ -12,7 +12,7 @@
 import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
-from datalad.api import update, install
+from datalad.api import update, install, uninstall
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -23,10 +23,10 @@ from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
+from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git, swallow_outputs
 
@@ -78,9 +78,23 @@ def test_update_simple(origin, src_path, dst_path):
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
+    # smoke-test if recursive update doesn't fail if submodule is removed
+    dest.uninstall('subm 1', kill=True)
+    dest.update(recursive=True)
+    dest.update(merge=True, recursive=True)
+
+    # and now test recursive update with merging in differences
+    create_tree(opj(source.path, 'subm 2'), {'load.dat': 'heavy'})
+    source.save(message="saving changes within subm2",
+                recursive=True, auto_add_changes=True)
+    dest.update(merge=True, recursive=True)
+    # and now we can get new file
+    dest.get('subm 2/load.dat')
+    ok_file_has_content(opj(dest.path, 'subm 2', 'load.dat'), 'heavy')
+
 
 def test_update_recursive():
-    raise SkipTest("TODO")
+    raise SkipTest("TODO more tests to add to above ones")
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])

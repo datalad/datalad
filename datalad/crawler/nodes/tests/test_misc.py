@@ -73,7 +73,7 @@ def test_fix_permissions(outdir):
     with open(filepath, 'w'), open(filepath2, 'w'), open(filepath3, 'w'):
         pass
 
-    gen = fix_permissions('.txt', True, 'filename')
+    gen = fix_permissions('\.(txt|csv)', True, 'filename')
 
     # make file executable for those that can read it
     filename = opj(outdir, 'myfile.txt')
@@ -97,7 +97,7 @@ def test_fix_permissions(outdir):
     nopath = opj(outdir, 'nopath.txt')
     chmod(nopath, 0o643)
     datafile = {'url': 'http://mapping.org/docs/?num=45', 'filename': 'nopath.txt'}
-    gen = fix_permissions('.txt', True, 'filename', outdir)
+    gen = fix_permissions('\.txt', True, 'filename', outdir)
     eq_(list(gen(datafile)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': 'nopath.txt'}])
     eq_(oct(os.stat(filename)[ST_MODE])[-3:], '753')
 

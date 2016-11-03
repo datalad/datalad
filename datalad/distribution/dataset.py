@@ -224,7 +224,7 @@ class Dataset(object):
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None):
 
-        """Get names/paths of all known dataset_datasets (subdatasets),
+        """Get names/paths of all known subdatasets (sorted depth-first)
         optionally matching a specific name pattern.
 
 
@@ -285,7 +285,6 @@ class Dataset(object):
                          and recursion_limit > 1)):
             rsm = []
             for sm in submodules:
-                rsm.append(sm)
                 sdspath = opj(self._path, sm)
                 rsm.extend(
                     [opj(sm, sdsh)
@@ -294,6 +293,7 @@ class Dataset(object):
                          recursive=recursive,
                          recursion_limit=(recursion_limit - 1)
                          if isinstance(recursion_limit, int) else recursion_limit)])
+                rsm.append(sm)
             submodules = rsm
 
         if absolute:

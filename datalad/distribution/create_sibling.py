@@ -282,7 +282,7 @@ class CreateSibling(Interface):
             if remote_git_version and remote_git_version >= "2.4":
                 # allow for pushing to checked out branch
                 try:
-                    ssh(["git", "-C", path] + GitRepo._GIT_COMMON_OPTIONS +
+                    ssh(["git", "-C", path] +
                         ["config", "receive.denyCurrentBranch", "updateInstead"])
                 except CommandError as e:
                     lgr.error("git config failed at remote location %s.\n"
@@ -379,7 +379,7 @@ class CreateSibling(Interface):
         try:
             # options to disable all auto so we don't trigger them while testing
             # for absent changes
-            out, err = ssh(["git"] + GitRepo._GIT_COMMON_OPTIONS + ["version"])
+            out, err = ssh(["git"] + ["version"])
             assert out.strip().startswith("git version")
             git_version = out.strip().split()[2]
             lgr.debug("Detected git version on server: %s" % git_version)
