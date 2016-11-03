@@ -45,12 +45,12 @@ def test_get_metadata(path):
   "FileSize": 6,
   "Location": "test/subfile.tsv",
   "Type": "File",
-  "conformsTo": "http://docs.datalad.org/metadata.html#v0-1"
+  "conformsTo": "http://docs.datalad.org/metadata.html#v0-2"
  },
  {
   "@context": "http://schema.datalad.org/",
   "@id": "ID",
-  "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+  "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
   "hasPart": [
    {
     "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv"
