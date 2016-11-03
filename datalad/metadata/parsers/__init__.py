@@ -14,3 +14,4 @@ from . import bids
 from . import frictionless_datapackage
 from . import datalad_rfc822
 from . import fileinfo
+from . import knownannexes

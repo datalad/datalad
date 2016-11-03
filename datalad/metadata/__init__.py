@@ -21,7 +21,6 @@ from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
 from datalad.consts import METADATA_CURRENT_VERSION
-from datalad.utils import swallow_logs
 from datalad.utils import assure_dir
 from datalad.utils import assure_list
 from datalad.support.json_py import load as jsonload
@@ -107,38 +106,6 @@ def _get_implicit_metadata(ds, identifier):
         meta['Type'] = "Dataset"
         meta['isVersionOf'] = {'@id': ds.id}
 
-    annex_meta = _get_annex_metadata(ds.repo)
-    if len(annex_meta):
-        meta['availableFrom'] = [{'@id': m['@id']} for m in annex_meta]
-    return meta
-
-
-def _get_annex_metadata(repo):
-    meta = []
-    if not hasattr(repo, 'repo_info'):
-        return meta
-    # get all other annex ids, and filter out this one, origin and
-    # non-specific remotes
-    with swallow_logs():
-        # swallow logs, because git annex complains about every remote
-        # for which no UUID is configured -- many special remotes...
-        repo_info = repo.repo_info(fast=True)
-    for src in ('trusted repositories',
-                'semitrusted repositories',
-                'untrusted repositories'):
-        for anx in repo_info.get(src, []):
-            anxid = anx.get('uuid', '00000000-0000-0000-0000-0000000000')
-            if anxid.startswith('00000000-0000-0000-0000-000000000'):
-                # ignore special
-                continue
-            anx_meta = _get_base_metadata_dict(anxid)
-            # TODO find a better type; define in context
-            anx_meta['Type'] = 'Annex'
-            if 'description' in anx:
-                anx_meta['Description'] = anx['description']
-            # XXX maybe report which one is local? Available in anx['here']
-            # XXX maybe report the type of annex remote?
-            meta.append(anx_meta)
     return meta
 
 
@@ -206,8 +173,6 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             dm = _get_base_metadata_dict(ds.id)
             dm['Type'] = 'Dataset'
             meta.append(dm)
-        # define known annexes by ID
-        meta.extend(_get_annex_metadata(ds.repo))
         meta.append(_get_implicit_metadata(ds, ds_identifier))
         # and any native meta data
         meta.extend(

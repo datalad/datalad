@@ -117,17 +117,16 @@ def test_basic_metadata(path):
     ds.save()
     meta = get_metadata(ds)
     assert_equal(
-        sorted(meta[2].keys()),
-        ['@context', '@id', 'Type', 'availableFrom', 'conformsTo', 'isVersionOf',
-         'modified'])
+        sorted(meta[1].keys()),
+        ['@context', '@id', 'Type', 'conformsTo', 'isVersionOf', 'modified'])
     assert_equal(meta[0]['Type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
-    sibling_meta = get_metadata(sibling)
+    sibling_meta = get_metadata(sibling, guess_type=True)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
-    meta = get_metadata(ds)
+    meta = get_metadata(ds, guess_type=True)
     assert_equal([m['@id'] for m in meta[-1]['availableFrom']],
                  [m['@id'] for m in sibling_meta[-1]['availableFrom']])
     meta = get_metadata(ds, guess_type=True)
@@ -153,15 +152,16 @@ def test_aggregation(path):
         ds, guess_type=False, ignore_subdatasets=False, from_native=False)
     # 3 dataset UUID definitions +
     # 3 annex definitions +
+    # 3 annex/dataset relations +
     # 3 version dataset items +
     # 4 native metadata set +
     # 2 subdataset relationship items +
     # 4 files (one for each metadata source) +
     # 3 dataset file parts (one for each dataset) +
-    assert_equal(len(meta), 22)
+    assert_equal(len(meta), 25)
     # same schema
     assert_equal(
-        22,
+        25,
         sum([s.get('@context', None) == 'http://schema.datalad.org/'
              for s in meta]))
     # three different IDs per type (annex, dataset, versioned dataset)
@@ -172,7 +172,7 @@ def test_aggregation(path):
         assert_true(sum([s.get('Name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         # first implicit, then two natives, then aggregate
-        meta[8]['hasPart']['@id'],
+        meta[9]['hasPart']['@id'],
         subds.repo.get_hexsha())
     success = False
     for m in meta:
@@ -206,7 +206,7 @@ def test_aggregation(path):
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
-        clonemeta[8]['hasPart']['@id'],
+        clonemeta[9]['hasPart']['@id'],
         subds.repo.get_hexsha())
 
     # now obtain a subdataset in the clone and the IDs should be updated
@@ -216,10 +216,10 @@ def test_aggregation(path):
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
-    assert_equal(partial[4]['hasPart']['@id'],
-                 partial[7]['@id'])
-    assert_equal(partial[7]['Location'], ploc)
-    assert_equal(partial[7]['@id'], psub.repo.get_hexsha())
+    assert_equal(partial[2]['hasPart']['@id'],
+                 partial[4]['@id'])
+    assert_equal(partial[4]['Location'], ploc)
+    assert_equal(partial[4]['@id'], psub.repo.get_hexsha())
 
     # query smoke test
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
