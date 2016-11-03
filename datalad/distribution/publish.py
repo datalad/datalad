@@ -35,6 +35,7 @@ __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
+# TODO: make consistent configurable output
 
 def _log_push_info(pi_list):
     from git.remote import PushInfo as PI
@@ -202,6 +203,16 @@ class Publish(Interface):
         subds_prev_hexsha = {}
         if recursive:
             all_subdatasets = ds.get_subdatasets(fulfilled=True)
+
+            # TODO: dest_resolved => to?
+            # Note: This is a bug anyway, since in actual recursive call `to` is
+            # passed in order to be resolved by the subdatasets themselves
+            # (might be None), but when considering what subdatasets to be
+            # published, we assume `dest_resolved` is the same for all of them.
+
+            # ==> TODO: RF to consider `since` only for the current ds and then go on
+            # recursively.
+
             subds_to_consider = \
                 Publish._get_changed_datasets(
                     ds.repo, all_subdatasets, dest_resolved, since=since) \
@@ -301,6 +312,7 @@ class Publish(Interface):
 
             # we now know where to push to:
             # TODO: what to push? default: git push --mirror if nothing configured?
+            # consider also: --follow-tags, --tags, --atomic
             _log_push_info(ds.repo.push(remote=dest_resolved,
                                         refspec=ds.repo.get_active_branch(),
                                         set_upstream=set_upstream))
@@ -317,8 +329,9 @@ class Publish(Interface):
             # we need to fetch
             # TODO
             # Note: This is about a gitpython issue as well as something about
-            # annex -> might mean, that we need to do it in case we pushed an annex branch only.
-            # Apparently, we can annex copy new files only, after this fetch. Figure it out!
+            # annex -> might mean, that we need to do it in case we pushed an
+            # annex branch only. Apparently, we can annex copy new files only,
+            # after this fetch. Figure it out!
             ds.repo.fetch(remote=dest_resolved)
 
             published.append(ds)
@@ -377,6 +390,10 @@ class Publish(Interface):
             # so we figure out what was the last update
             # XXX here we assume one to one mapping of names from local branches
             # to the remote
+            # TODO: This seems to be the only thing left, that we need to know the
+            # remote `to` for (if not explicitly specified anyway). Otherwise
+            # we could figure it out at GitRepo level instead, which makes
+            # things easier, cleaner and more in line with git push.
             active_branch = repo.get_active_branch()
             since = '%s/%s' % (to, active_branch)
 
