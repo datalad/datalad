@@ -28,6 +28,8 @@ from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
+from datalad.interface.common_opts import publish_by_default
+from datalad.interface.common_opts import publish_depends
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.cmd import CommandError
@@ -139,6 +141,8 @@ class CreateSibling(Interface):
             target. defaults to `index.html` at dataset root""",
             constraints=EnsureBool() | EnsureStr()),
         as_common_datasrc=as_common_datasrc,
+        publish_depends=publish_depends,
+        publish_by_default=publish_by_default,
     )
 
     @staticmethod
@@ -147,7 +151,8 @@ class CreateSibling(Interface):
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
                  existing='error', shared=False, ui=False,
-                 as_common_datasrc=None):
+                 as_common_datasrc=None,
+                 publish_by_default=None):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -344,7 +349,9 @@ class CreateSibling(Interface):
                          recursive=recursive,
                          fetch=True,
                          force=existing in {'replace'},
-                         as_common_datasrc=as_common_datasrc)
+                         as_common_datasrc=as_common_datasrc,
+                         publish_by_default=publish_by_default,
+                         publish_depends=publish_depends)
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]

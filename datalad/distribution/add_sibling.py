@@ -29,6 +29,7 @@ from ..interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
+from datalad.interface.common_opts import publish_by_default
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -88,13 +89,15 @@ class AddSibling(Interface):
                 URLs""",),
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
+        publish_by_default=publish_by_default,
     )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(name=None, url=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
-                 as_common_datasrc=None, publish_depends=None):
+                 as_common_datasrc=None, publish_depends=None,
+                 publish_by_default=None):
 
         # TODO: Detect malformed URL and fail?
 
@@ -219,6 +222,15 @@ class AddSibling(Interface):
                     ds.config.add(depvar, d, where='local', reload=False)
                 ds.config.reload()
 
+            if publish_by_default:
+                for refspec in assure_list(publish_by_default):
+                    lgr.info(
+                        'Configure additional default publication refspec "%s"',
+                        refspec)
+                    ds.config.add("remote.{}.push".format(name), refspec,
+                                  'local')
+                ds.config.reload()
+
             assert isinstance(repo, GitRepo)  # just against silly code
             if isinstance(repo, AnnexRepo):
                 # we need to check if added sibling an annex, and try to enable it
@@ -256,6 +268,7 @@ class AddSibling(Interface):
                             'Not configuring "%s" as a common data source, '
                             'URL protocol is not http or https',
                             name)
+
             successfully_added.append(repo_name)
 
         return successfully_added
