@@ -280,15 +280,38 @@ class Publish(Interface):
             skipped += skipped_
 
         if publish_this:
-            # upstream branch needed for update (merge) and subsequent push,
-            # in case there is no.
-            # no tracking branch yet?
-            set_upstream = track_branch is None
 
             # is `to` an already known remote?
             if dest_resolved not in ds.repo.get_remotes():
                 # unknown remote
                 raise ValueError("No sibling '%s' found." % dest_resolved)
+
+            # in order to be able to use git's config to determine what to push,
+            # we need to annex merge first. Otherwise a git push might be
+            # rejected if involving all matching branches for example.
+            # Once at it, also push the annex branch right here.
+
+            # Q: Do we need to respect annex-ignore here? Does it make sense to
+            # publish to a remote without pushing the annex branch
+            # (if there is any)?
+            if isinstance(ds.repo, AnnexRepo):
+                ds.repo.fetch(remote=dest_resolved)
+                ds.repo.merge_annex(dest_resolved)
+                _log_push_info(ds.repo.push(remote=dest_resolved,
+                                            refspec="git-annex:git-annex"))
+
+            # we need to fetch
+            # TODO: Probably not needed anymore
+            # Note: This is about a gitpython issue as well as something about
+            # annex -> might mean, that we need to do it in case we pushed an
+            # annex branch only. Apparently, we can annex copy new files only,
+            # after this fetch. Figure it out!
+            ds.repo.fetch(remote=dest_resolved)
+
+            # upstream branch needed for update (merge) and subsequent push,
+            # in case there is no.
+            # no tracking branch yet?
+            set_upstream = track_branch is None
 
             # publishing of `dest_resolved` might depend on publishing other
             # remote(s) first:
@@ -313,26 +336,17 @@ class Publish(Interface):
             # we now know where to push to:
             # TODO: what to push? default: git push --mirror if nothing configured?
             # consider also: --follow-tags, --tags, --atomic
+
+            # Note: git's push.default is 'matching', which possibly doesn't
+            # work for first
+            # time publication (a branch, that doesn't exist on remote yet)
+            # But if we want to respect remote.*.push entries, etc. we need to
+            # not pass a specific refspec (like active branch) to `git push`
+            # by default.
+
             _log_push_info(ds.repo.push(remote=dest_resolved,
                                         refspec=ds.repo.get_active_branch(),
                                         set_upstream=set_upstream))
-
-            # push annex branch:
-            # Q: Do we need to respect annex-ignore here? Does it make sense to
-            # publish to a remote without pushing the annex branch (if there is any)?
-            if isinstance(ds.repo, AnnexRepo):
-                ds.repo.fetch(remote=dest_resolved)
-                ds.repo.merge_annex(dest_resolved)
-                _log_push_info(ds.repo.push(remote=dest_resolved,
-                                            refspec="git-annex:git-annex"))
-
-            # we need to fetch
-            # TODO
-            # Note: This is about a gitpython issue as well as something about
-            # annex -> might mean, that we need to do it in case we pushed an
-            # annex branch only. Apparently, we can annex copy new files only,
-            # after this fetch. Figure it out!
-            ds.repo.fetch(remote=dest_resolved)
 
             published.append(ds)
 
