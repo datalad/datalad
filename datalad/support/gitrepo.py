@@ -1260,9 +1260,24 @@ class GitRepo(object):
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all_=False,
+    def push(self, remote=None, refspec=None, progress=None, all_remotes=False,
              **kwargs):
-        """See fetch
+        """Push to remote repository
+
+        Parameters:
+        -----------
+        remote: str
+          name of the remote to push to
+        refspec: str
+          specify what to push
+        progress:
+          TODO
+        all_remotes: bool
+          if set to True push to all remotes. Conflicts with `remote` not being
+          None.
+        kwargs: dict
+          options to pass to `git push`
+
         Returns
         -------
         list
@@ -1276,21 +1291,37 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
-            if all_:
+            if all_remotes:
                 remotes_to_push = self.repo.remotes
             else:
-                # No explicit remote to fetch.
-                # => get tracking branch:
-                tb = self.repo.active_branch.tracking_branch().name
-                if tb:
-                    tb_remote, refspec = split_remote_branch(tb)
-                    remotes_to_push = [self.repo.remote(tb_remote)]
-                else:
-                    # No remote, no tracking branch
-                    # => fail
-                    raise ValueError("No remote specified to fetch from nor a "
-                                     "tracking branch is set up.")
+                # Nothing explicitly specified. Just call `git push` and let git
+                # decide what to do would be an option. But:
+                # - without knowing the remote and its URL we cannot provide
+                #   shared SSH connection
+                # - we lose ability to use GitPython's progress info and return
+                #   values
+                #   (the latter would be solvable:
+                #    Provide a Repo.push() method for GitPython, copying
+                #    Remote.push() for similar return value and progress
+                #    (also: fetch, pull)
+
+                # Do what git would do:
+                # 1. branch.*.remote for current branch or 'origin' as default
+                #    if config is missing
+                # 2. remote.*.push or push.default
+
+                # get the remote to push to:
+                # TODO: Use ConfigManager when RF'ing GitRepo
+                tb_remote, tb_branch = self.get_tracking_branch()
+                if tb_remote is None:
+                    tb_remote = 'origin'
+                remotes_to_push = [self.repo.remote(tb_remote)]
+                # no refspec, let git find remote.*.push/push.default on its own
+
         else:
+            if all_remotes:
+                lgr.warning("Option 'all_remotes' conflicts with specified "
+                            "remote '%s'. Option ignored.")
             remotes_to_push = [self.repo.remote(remote)]
 
         pi_list = []
