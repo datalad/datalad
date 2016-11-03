@@ -300,14 +300,6 @@ class Publish(Interface):
                 _log_push_info(ds.repo.push(remote=dest_resolved,
                                             refspec="git-annex:git-annex"))
 
-            # we need to fetch
-            # TODO: Probably not needed anymore
-            # Note: This is about a gitpython issue as well as something about
-            # annex -> might mean, that we need to do it in case we pushed an
-            # annex branch only. Apparently, we can annex copy new files only,
-            # after this fetch. Figure it out!
-            ds.repo.fetch(remote=dest_resolved)
-
             # upstream branch needed for update (merge) and subsequent push,
             # in case there is no.
             # no tracking branch yet?

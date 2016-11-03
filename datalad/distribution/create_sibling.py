@@ -152,7 +152,8 @@ class CreateSibling(Interface):
                  dataset=None, recursive=False,
                  existing='error', shared=False, ui=False,
                  as_common_datasrc=None,
-                 publish_by_default=None):
+                 publish_by_default=None,
+                 publish_depends=None):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
