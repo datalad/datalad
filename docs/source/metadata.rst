@@ -140,7 +140,7 @@ specifications implemented in datalad.
 v0.2
 ----
 
-* Use a datalad-specific JSON-LD context to streamline make further
+* Use a datalad-specific JSON-LD context to streamline further
   extensions.
 
 * Use repository hexsha strings as ``@id`` for JSON-LD items, to be

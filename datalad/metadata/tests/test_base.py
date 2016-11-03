@@ -281,7 +281,7 @@ def test_aggregation(path):
     )
 
     # more tests on returned paths:
-    #assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
+    assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
     clone_sub = clone.install('sub')
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
