@@ -185,6 +185,10 @@ class Publish(Interface):
             # keep `to` in case it's None for passing to recursive calls:
             dest_resolved = to
             if to is None:
+                # TODO: If possible, avoid resolution herein and rely and git
+                # (or GitRepo respectively), meaning: Just pass `None`
+                # ATM conflicts with _get_changed_datasets => figure it out
+
                 track_remote, track_branch = ds.repo.get_tracking_branch()
                 if track_remote:
                     dest_resolved = track_remote
@@ -295,12 +299,14 @@ class Publish(Interface):
             lgr.info("Publishing {0} to {1}".format(ds, dest_resolved))
 
             # we now know where to push to:
+            # TODO: what to push? default: git push --mirror if nothing configured?
             _log_push_info(ds.repo.push(remote=dest_resolved,
                                         refspec=ds.repo.get_active_branch(),
                                         set_upstream=set_upstream))
 
-            # TODO: annex-ignore
             # push annex branch:
+            # Q: Do we need to respect annex-ignore here? Does it make sense to
+            # publish to a remote without pushing the annex branch (if there is any)?
             if isinstance(ds.repo, AnnexRepo):
                 ds.repo.fetch(remote=dest_resolved)
                 ds.repo.merge_annex(dest_resolved)
@@ -318,9 +324,16 @@ class Publish(Interface):
 
             if publish_files or annex_copy_opts:
                 if not isinstance(ds.repo, AnnexRepo):
+                    # TODO: better exception. tell what is 'something' (not the dataset, but given path for example)
                     raise RuntimeError(
                         "Cannot publish content of something, that is not "
                         "part of an annex. ({0})".format(ds))
+                if ds.config.get('remote.{}.annex-ignore', False):
+                    # Q: Do we need a --force option here? annex allows to
+                    # ignore the ignore setting
+                    # TODO: exception
+                    raise RuntimeError("TEMP ERROR: annex-ignore is set for"
+                                       "remote '%s'" % dest_resolved)
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
                 published += ds.repo.copy_to(files=publish_files,
