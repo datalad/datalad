@@ -305,7 +305,7 @@ class Search(Interface):
                         continue
                     # so we have a hit, no need to track
                     observed_properties = None
-                if isinstance(v, dict) or isinstance(v, list):
+                if isinstance(v, (dict, list, int, float)) or v is None:
                     v = text_type(v)
                 for imatcher, matcher in enumerate(matchers):
                     if matcher(v):
