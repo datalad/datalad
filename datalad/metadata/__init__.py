@@ -20,6 +20,7 @@ from six.moves.urllib.parse import urlsplit
 from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
+from datalad.consts import METADATA_CURRENT_VERSION
 from datalad.utils import swallow_logs
 from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
@@ -80,7 +81,8 @@ def _get_base_metadata_dict(identifier):
     meta = {
         "@context": "http://schema.datalad.org/",
         # increment when changes to meta data representation are done
-        "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
+        "conformsTo": "http://docs.datalad.org/metadata.html#v%s"
+                      % METADATA_CURRENT_VERSION.replace('.', '-'),
     }
     if identifier is not None:
         meta["@id"] = identifier
