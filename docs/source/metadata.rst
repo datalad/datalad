@@ -135,6 +135,20 @@ has not been fully tested yet.
 The following sections describe details and changes in the meta data
 specifications implemented in datalad.
 
+.. _0.2:
+
+v0.2
+----
+
+* Use a datalad-specific JSON-LD context to streamline make further
+  extensions.
+
+* Use repository hexsha strings as ``@id`` for JSON-LD items, to be
+  able to distinguish multiple installations of the same dataset with
+  different versions at different locations. Previously, the meta data
+  would only be able to express the presence of multiple versions at
+  multiple locations, but not which version at which location.
+
 .. _0.1:
 
 v0.1

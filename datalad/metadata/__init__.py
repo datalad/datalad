@@ -80,7 +80,7 @@ def _get_base_metadata_dict(identifier):
     meta = {
         "@context": "http://schema.datalad.org/",
         # increment when changes to meta data representation are done
-        "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+        "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
     }
     if identifier is not None:
         meta["@id"] = identifier

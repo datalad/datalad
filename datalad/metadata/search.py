@@ -15,6 +15,7 @@ import os
 import re
 import sys
 
+from distutils.version import LooseVersion
 from operator import itemgetter
 from os.path import join as opj, exists
 from six import string_types
@@ -217,7 +218,7 @@ class Search(Interface):
                 meta = [meta]
 
             # sort entries by location (if present)
-            sort_keys = ('Location', 'Description', 'id')
+            sort_keys = ('Location', 'location', 'Description', 'id')
             meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
@@ -265,9 +266,28 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            if not _is_versioned_dataset_item(mds):
-                # we are presently only dealing with datasets
+            # be more relaxed in terms of what to consider a discoverable
+            # item. Looking for some shape of 'location' will work with meta
+            # data of any age. Once file-based meta data comes around and
+            # we decide that we don't want to be able to discover files with
+            # this command, we have to reconsider the conditions
+            location = mds.get('Location', mds.get('location', None))
+            type_ = mds.get('Type', mds.get('type', None))
+            if location is None and type_ != 'Dataset':
+                # we know nothing about location, and it cannot be a top-level
+                # superdataset
                 continue
+            # figure out what this meta data item is compliant with
+            # be ultra-robust wrt to possible locations, considering the possibilities
+            # of outdatated meta data, outdated schema caches, ...
+            compliance = mds.get('conformsTo', mds.get('dcterms:conformsTo', mds.get('http://purl.org/dc/terms/conformsTo', [])))
+            compliance = [LooseVersion(i.split('#')[-1][1:].replace('-', '.')) for i in assure_list(compliance)
+                          if i.startswith('http://docs.datalad.org/metadata.html#v')]
+            if any([v >= LooseVersion("0.2") for v in compliance]):
+                if type_ == 'Dataset' and not 'isVersionOf' in mds:
+                    # this is just a generic Dataset definition, and no actual dataset instance
+                    continue
+
             # TODO consider the possibility of nested and context/graph dicts
             # but so far we were trying to build simple lists of dicts, as much
             # as possible
@@ -298,7 +318,7 @@ class Search(Interface):
                         break
 
             if hit:
-                location = mds.get('Location', '.')
+                location = mds.get('Location', mds.get('location', '.'))
                 report_ = matched_fields.union(report if report else {}) \
                     if report_matched else report
                 if report_ == ['*']:
