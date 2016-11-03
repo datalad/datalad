@@ -22,6 +22,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import exc_str
 from datalad.utils import assure_list
 
@@ -324,16 +325,21 @@ class Publish(Interface):
 
             if publish_files or annex_copy_opts:
                 if not isinstance(ds.repo, AnnexRepo):
-                    # TODO: better exception. tell what is 'something' (not the dataset, but given path for example)
-                    raise RuntimeError(
-                        "Cannot publish content of something, that is not "
-                        "part of an annex. ({0})".format(ds))
+                    # incomplete, since `git push` was done already:
+                    raise IncompleteResultsError(
+                        (published, skipped),
+                        failed=publish_files,
+                        msg="Cannot publish content of something, that is not "
+                            "an annex. ({0})".format(ds))
                 if ds.config.get('remote.{}.annex-ignore', False):
                     # Q: Do we need a --force option here? annex allows to
                     # ignore the ignore setting
-                    # TODO: exception
-                    raise RuntimeError("TEMP ERROR: annex-ignore is set for"
-                                       "remote '%s'" % dest_resolved)
+                    raise IncompleteResultsError(
+                        (published, skipped),
+                        failed=publish_files,
+                        msg="Sibling '{0}' of {1} is configured to be ignored "
+                            "by annex. No content was published."
+                            % (dest_resolved, ds))
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
                 published += ds.repo.copy_to(files=publish_files,
