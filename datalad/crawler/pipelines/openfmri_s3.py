@@ -73,7 +73,7 @@ def collection_pipeline(prefix=None):
 
 # TODO: make a unittest for all of this on a simple bucket
 
-def pipeline(prefix=None):
+def pipeline(prefix=None, tag=True):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
     lgr.info("Creating a pipeline for the openfmri bucket")
@@ -91,7 +91,7 @@ def pipeline(prefix=None):
         sub_s3_to_http,
         switch('datalad_action',
                {
-                   'commit': annex.finalize(tag=True),
+                   'commit': annex.finalize(tag=tag),
                    'remove': annex.remove,
                    'annex':  annex,
                })

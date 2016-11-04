@@ -9,6 +9,7 @@
 """A pipeline for crawling openfmri dataset"""
 
 import os
+import re
 from os.path import lexists
 
 # Import necessary nodes
@@ -25,7 +26,12 @@ from ..nodes.misc import fix_permissions
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
-from ...consts import ARCHIVES_SPECIAL_REMOTE
+from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
+
+# For S3 crawling
+from ..nodes.s3 import crawl_s3
+from .openfmri_s3 import pipeline as s3_pipeline
+from datalad.api import ls
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -96,12 +102,23 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
     versions_overlay_level = int(versions_overlay_level)
     dataset_url = '%s%s/' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
+
+    special_remotes = [ARCHIVES_SPECIAL_REMOTE]
+    # some datasets available (fresh enough or old) from S3, so let's sense if this one is
+    s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)
+    if ls('s3://openfmri/%s' % s3_prefix):
+        # actually not needed here since we are remapping them to public http urls
+        # special_remotes += [DATALAD_SPECIAL_REMOTE]
+        pass
+    else:
+        s3_prefix = None  # not there
+
     annex = Annexificator(
         create=False,  # must be already initialized etc
         # leave in Git only obvious descriptors and code snippets -- the rest goes to annex
         # so may be eventually we could take advantage of git tags for changing layout
         statusdb='json',
-        special_remotes=[ARCHIVES_SPECIAL_REMOTE],
+        special_remotes=special_remotes,
         # all .txt and .json in root directory (only) go into git!
         options=["-c",
                  "annex.largefiles="
@@ -113,6 +130,19 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
                  " and (exclude=*.json or include=*/*.json)"
                  " and (exclude=*.tsv or include=*/*.tsv)"
                  ])
+
+    if s3_prefix:
+        # a sub-pipeline to crawl s3 bucket
+        s3_pipeline_here = \
+            [
+                [
+                    annex.switch_branch('incoming-s3'),
+                    s3_pipeline(s3_prefix, tag=False),
+                    annex.switch_branch('master'),
+                ]
+            ]
+    else:
+        s3_pipeline_here = []
 
     # common kwargs which would later would be tuned up
     def add_archive_content(**kw):
@@ -129,7 +159,8 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
         # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
         )
 
-    return [
+    return s3_pipeline_here + [
+        # optionally "log" to annex extracted content available on openfmri S3
         annex.switch_branch('incoming'),
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
             # but then we would still return to 'master' branch
