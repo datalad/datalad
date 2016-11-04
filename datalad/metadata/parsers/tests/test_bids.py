@@ -73,5 +73,8 @@ def test_get_metadata(path):
     "http://docs.datalad.org/metadata.html#v0-1",
     "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf"
   ],
+  "describedby": {
+    "@id": "%s"
+  },
   "fundedBy": "We got money from collecting plastic bottles"
-}""")
+}""" % (MetadataParser.get_parser_id(),))

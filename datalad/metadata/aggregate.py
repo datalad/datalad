@@ -73,6 +73,18 @@ class AggregateMetaData(Interface):
         if_dirty=if_dirty_opt,
     )
 
+    # dear future self: if you want to reintroduce meta data graph flattening
+    # at aggregation time re-consider this:
+    # - flattening makes it impossible to discern what the source of a
+    #   particular meta data item is, in particular the 'conformsTo' properties
+    #   become essentially pointless, and it will be harder to deal with
+    #   "outdated" (compliant with an older meta data standard version) but
+    #   aggregated meta data. this is something we are not doing at all (as of
+    #   now), but it would be possible.
+    # - flattening folds the context information out of the actual graph nodes.
+    #   this could be good (more compact), or bad (could become harder to merge
+    #   graphs with different contexts) -- the latter is speculation and
+    #   untested (as of now), but should be kept in mind
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
     def __call__(

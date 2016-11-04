@@ -15,13 +15,12 @@ from datalad.support.json_py import load as jsonload
 from datalad.metadata import _simplify_meta_data_structure
 from datalad.metadata import _is_versioned_dataset_item
 from datalad.metadata.parsers.base import BaseMetadataParser
-from datalad.metadata import _get_base_metadata_dict
 
 
 def _adjust_subdataset_location(meta, subds_relpath):
     # find implicit meta data for all contained subdatasets
     for m in meta:
-        if not _is_versioned_dataset_item(m):
+        if not (_is_versioned_dataset_item(m) or m.get('Type', None) == 'File'):
             continue
         # prefix all subdataset location information with the relpath of this
         # subdataset
@@ -43,7 +42,7 @@ class MetadataParser(BaseMetadataParser):
             dirs=False))
 
     def get_metadata(self, dsid=None, full=False):
-        base_meta = _get_base_metadata_dict(dsid)
+        base_meta = self._get_base_metadata_dict(dsid)
         meta = []
         basepath = opj(self.ds.path, '.datalad', 'meta')
         parts = []

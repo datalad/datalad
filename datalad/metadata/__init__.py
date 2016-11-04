@@ -20,12 +20,14 @@ from six.moves.urllib.parse import urlsplit
 from os.path import join as opj, exists
 from os.path import dirname
 from importlib import import_module
-from datalad.utils import swallow_logs
+from datalad.consts import METADATA_CURRENT_VERSION
 from datalad.utils import assure_dir
+from datalad.utils import assure_list
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
 from datalad import cfg
+from datalad import __version__
 
 
 # common format
@@ -34,56 +36,67 @@ metadata_basepath = opj('.datalad', 'meta')
 
 
 # XXX Could become dataset method
-def get_metadata_type(ds, guess=False):
-    """Return the metadata type(s)/scheme(s) of a dataset
+def get_enabled_metadata_parsers(ds, guess=False):
+    """Return the names of meta data parsers enabled in the configuration
+
+    The configuration variable ``datalad.metadata.parsers.enable`` is queried.
 
     Parameters
     ----------
     ds : Dataset
       Dataset instance to be inspected
     guess : bool
-      Whether to try to auto-detect the type if no metadata type setting is
-      found. All supported metadata schemes are tested in alphanumeric order.
+      Whether to try to auto-detect relevant parsers if no configuration
+      setting is found. All supported metadata schemes are tested in
+      alphanumeric order.
 
     Returns
     -------
     list(str)
-      Metadata type labels or an empty list if no type setting is found and
-      optional auto-detection yielded no results
+      Parser names or an empty list if no configuration is found and optional
+      auto-detection yielded no results
     """
     cfg_ = ds.config
-    # TODO give cfg name datalad prefix
-    if cfg_ and cfg_.has_section('metadata'):
-        if cfg_.has_option('metadata', 'nativetype'):
-            return cfg_.get_value('metadata', 'nativetype').split()
-    mtypes = []
-    if guess:
+    enabled = cfg_.get('datalad.metadata.parsers.enable', None)
+    if enabled is None and guess:
+        lgr.debug('Trying to guess compatible meta data parsers')
+        enabled = []
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
-            if mtype == 'aggregate':
+        for pname in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
+            if pname == 'aggregate':
                 # skip, runs anyway, but later
                 continue
-            pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
+            pmod = import_module('.%s' % (pname,), package=parsers.__package__)
             if pmod.MetadataParser(ds).has_metadata():
-                lgr.debug('Predicted presence of "%s" meta data', mtype)
-                mtypes.append(mtype)
+                lgr.debug('Predicted presence of "%s" meta data', pname)
+                enabled.append(pname)
             else:
-                lgr.debug('No evidence for "%s" meta data', mtype)
-    return mtypes
+                lgr.debug('No evidence for "%s" meta data', pname)
+    if enabled is None:
+        return []
+    enabled = set(assure_list(enabled))
+    for disabled in assure_list(cfg_.get('datalad.metadata.parsers.disable', [])):
+        enabled.discard(disabled)
+    lgr.debug('Enabled meta data parsers: %s', enabled)
+    return sorted(list(enabled))
 
 
-def _get_base_metadata_dict(identifier):
+def _get_base_metadata_dict(identifier, describedby=None):
     """Return base metadata dictionary for any identifier
     """
 
     meta = {
         "@context": "http://schema.datalad.org/",
         # increment when changes to meta data representation are done
-        "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
+        "conformsTo": "http://docs.datalad.org/metadata.html#v%s"
+                      % METADATA_CURRENT_VERSION.replace('.', '-'),
     }
     if identifier is not None:
         meta["@id"] = identifier
+    if describedby:
+        id_ = 'datalad_{}_parser_{}'.format(__version__, describedby)
+        meta['describedby'] = {'@id': id_}
     return meta
 
 
@@ -92,7 +105,7 @@ def _is_versioned_dataset_item(m):
 
 
 def _get_implicit_metadata(ds, identifier):
-    meta = _get_base_metadata_dict(identifier)
+    meta = _get_base_metadata_dict(identifier, 'base')
     # maybe use something like git-describe instead -- but tag-references
     # might changes...
     meta['modified'] = ds.repo.repo.head.commit.authored_datetime.isoformat()
@@ -102,38 +115,6 @@ def _get_implicit_metadata(ds, identifier):
         meta['Type'] = "Dataset"
         meta['isVersionOf'] = {'@id': ds.id}
 
-    annex_meta = _get_annex_metadata(ds.repo)
-    if len(annex_meta):
-        meta['availableFrom'] = [{'@id': m['@id']} for m in annex_meta]
-    return meta
-
-
-def _get_annex_metadata(repo):
-    meta = []
-    if not hasattr(repo, 'repo_info'):
-        return meta
-    # get all other annex ids, and filter out this one, origin and
-    # non-specific remotes
-    with swallow_logs():
-        # swallow logs, because git annex complains about every remote
-        # for which no UUID is configured -- many special remotes...
-        repo_info = repo.repo_info(fast=True)
-    for src in ('trusted repositories',
-                'semitrusted repositories',
-                'untrusted repositories'):
-        for anx in repo_info.get(src, []):
-            anxid = anx.get('uuid', '00000000-0000-0000-0000-0000000000')
-            if anxid.startswith('00000000-0000-0000-0000-000000000'):
-                # ignore special
-                continue
-            anx_meta = _get_base_metadata_dict(anxid)
-            # TODO find a better type; define in context
-            anx_meta['Type'] = 'Annex'
-            if 'description' in anx:
-                anx_meta['Description'] = anx['description']
-            # XXX maybe report which one is local? Available in anx['here']
-            # XXX maybe report the type of annex remote?
-            meta.append(anx_meta)
     return meta
 
 
@@ -198,11 +179,9 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         if ds.id:
             # create a separate item for the abstract (unversioned) dataset
             # just to say that this ID belongs to a dataset
-            dm = _get_base_metadata_dict(ds.id)
+            dm = _get_base_metadata_dict(ds.id, 'base')
             dm['Type'] = 'Dataset'
             meta.append(dm)
-        # define known annexes by ID
-        meta.extend(_get_annex_metadata(ds.repo))
         meta.append(_get_implicit_metadata(ds, ds_identifier))
         # and any native meta data
         meta.extend(
@@ -311,24 +290,23 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     # dataset, and we want to quickly collect them without having to do potentially
     # complex graph merges
     meta = []
-    # get native metadata
-    nativetypes = get_metadata_type(ds, guess=guess_type)
-    if not nativetypes:
+    enabled_parsers = get_enabled_metadata_parsers(ds, guess=guess_type)
+    if not enabled_parsers:
         return meta
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
-    for nativetype in nativetypes:
-        if nativetype == 'aggregate':
+    for pname in enabled_parsers:
+        if pname == 'aggregate':
             # this is special and needs to be ignored here, even if it was
             # configured. reason: this parser runs anyway in get_metadata()
             continue
-        pmod = import_module('.{}'.format(nativetype),
+        pmod = import_module('.{}'.format(pname),
                              package=parsers.__package__)
         try:
             native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
-            lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
+            lgr.error('failed to get native metadata ({}): {}'.format(pname, exc_str(e)))
             continue
         if native_meta:
             # TODO here we could apply a "patch" to the native metadata, if desired

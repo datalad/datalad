@@ -34,6 +34,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import with_pathsep
+from datalad.utils import assure_list
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -244,10 +245,14 @@ class Create(Interface):
                 annex_init_opts=annex_init_opts)
 
         if native_metadata_type is not None:
-            if not isinstance(native_metadata_type, list):
-                native_metadata_type = [native_metadata_type]
+            native_metadata_type = assure_list(native_metadata_type)
             for nt in native_metadata_type:
-                tbds.config.add('datalad.metadata.nativetype', nt)
+                tbds.config.add(
+                    'datalad.metadata.parsers.enable',
+                    nt,
+                    where='dataset',
+                    reload=False)
+            tbds.config.reload()
 
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children

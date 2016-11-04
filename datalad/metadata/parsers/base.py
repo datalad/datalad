@@ -27,6 +27,19 @@ class BaseMetadataParser(object):
 
         self.ds = ds
 
+    @classmethod
+    def get_parser_id(cls):
+        # keep mostly for the tests
+        return _get_base_metadata_dict(
+            None,
+            describedby=cls.__module__.split('.')[-1])['describedby']['@id']
+
+    @classmethod
+    def _get_base_metadata_dict(cls, id_):
+        return _get_base_metadata_dict(
+            id_,
+            describedby=cls.__module__.split('.')[-1])
+
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
         # default implementation, override with more efficient, if possible
@@ -61,7 +74,7 @@ class BaseMetadataParser(object):
         """
         if dsid is None:
             dsid = self.ds.id
-        meta = _get_base_metadata_dict(dsid)
+        meta = self._get_base_metadata_dict(dsid)
         if self.has_metadata():
             meta = self._get_metadata(dsid, meta, full)
         return meta

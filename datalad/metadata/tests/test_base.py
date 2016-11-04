@@ -18,7 +18,7 @@ from operator import itemgetter
 from os.path import join as opj, exists
 
 from datalad.api import Dataset, aggregate_metadata, install
-from datalad.metadata import get_metadata_type, get_metadata
+from datalad.metadata import get_enabled_metadata_parsers, get_metadata
 from datalad.metadata import _cached_load_document
 from datalad.metadata import _is_versioned_dataset_item
 from datalad.utils import swallow_logs
@@ -71,25 +71,29 @@ _dataset_hierarchy_template = {
 
 
 @with_tempfile(mkdir=True)
-def test_get_metadata_type(path):
+def test_get_enabled_metadata_parsers(path):
     # nothing set, nothing found
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
-    open(opj(path, '.datalad', 'config'), 'w').write('[metadata]\n')
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata.parsers"]\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     # minimal setting
-    open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata.parsers"]\n\tenable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tenable = metoo!\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo', 'metoo!'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tdisable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['metoo!'])
 
 
 @with_tree(tree={
     'dataset_description.json': "{}",
     'datapackage.json': '{"name": "some"}'
 })
-def test_get_multiple_metadata_types(path):
+def test_get_multiple_enabled_parsers(path):
     assert_equal(
-        sorted(get_metadata_type(Dataset(path), guess=True)),
+        sorted(get_enabled_metadata_parsers(Dataset(path), guess=True)),
         ['bids', 'frictionless_datapackage'])
 
 
@@ -115,17 +119,17 @@ def test_basic_metadata(path):
     ds.save()
     meta = get_metadata(ds)
     assert_equal(
-        sorted(meta[2].keys()),
-        ['@context', '@id', 'Type', 'availableFrom', 'conformsTo', 'isVersionOf',
-         'modified'])
+        sorted(meta[1].keys()),
+        ['@context', '@id', 'Type', 'conformsTo', 'describedby',
+         'isVersionOf', 'modified'])
     assert_equal(meta[0]['Type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
-    sibling_meta = get_metadata(sibling)
+    sibling_meta = get_metadata(sibling, guess_type=True)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
-    meta = get_metadata(ds)
+    meta = get_metadata(ds, guess_type=True)
     assert_equal([m['@id'] for m in meta[-1]['availableFrom']],
                  [m['@id'] for m in sibling_meta[-1]['availableFrom']])
     meta = get_metadata(ds, guess_type=True)
@@ -149,25 +153,34 @@ def test_aggregation(path):
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
         ds, guess_type=False, ignore_subdatasets=False, from_native=False)
-    # 3 dataset UUID definitions
-    # 3 annex definitions
-    # 3 version dataset items
-    # 4 native metadata set
-    # 2 subdataset relationship items
-    assert_equal(len(meta), 15)
+    # 3 dataset UUID definitions +
+    # 3 annex definitions +
+    # 3 annex/dataset relations +
+    # 3 version dataset items +
+    # 4 native metadata set +
+    # 2 subdataset relationship items +
+    # 4 files (one for each metadata source) +
+    # 3 dataset file parts (one for each dataset) +
+    assert_equal(len(meta), 25)
     # same schema
     assert_equal(
-        15,
+        25,
         sum([s.get('@context', None) == 'http://schema.datalad.org/'
              for s in meta]))
+    # all with parser being identified
+    assert_equal(
+        25,
+        sum([s['describedby']['@id'].startswith('datalad_')
+             for s in meta]))
     # three different IDs per type (annex, dataset, versioned dataset)
-    assert_equal(9, len(set([s.get('@id') for s in meta])))
+    # plus fours different file keys
+    assert_equal(13, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(sum([s.get('Name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         # first implicit, then two natives, then aggregate
-        meta[5]['hasPart']['@id'],
+        meta[9]['hasPart']['@id'],
         subds.repo.get_hexsha())
     success = False
     for m in meta:
@@ -201,7 +214,7 @@ def test_aggregation(path):
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
-        clonemeta[5]['hasPart']['@id'],
+        clonemeta[9]['hasPart']['@id'],
         subds.repo.get_hexsha())
 
     # now obtain a subdataset in the clone and the IDs should be updated
@@ -211,10 +224,10 @@ def test_aggregation(path):
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
-    assert_equal(partial[4]['hasPart']['@id'],
-                 partial[7]['@id'])
-    assert_equal(partial[7]['Location'], ploc)
-    assert_equal(partial[7]['@id'], psub.repo.get_hexsha())
+    assert_equal(partial[2]['hasPart']['@id'],
+                 partial[4]['@id'])
+    assert_equal(partial[4]['Location'], ploc)
+    assert_equal(partial[4]['@id'], psub.repo.get_hexsha())
 
     # query smoke test
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
@@ -281,7 +294,7 @@ def test_aggregation(path):
     )
 
     # more tests on returned paths:
-    #assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
+    assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
     clone_sub = clone.install('sub')
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)

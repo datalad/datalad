@@ -89,6 +89,9 @@ def test_get_metadata(path):
   "ShortDescription": "Basic summary",
   "Version": "1.0.0-rc3",
   "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+  "describedby": {
+    "@id": "%s"
+  },
   "fundedBy": "BMBFGQ1411, NSF 1429999",
   "sameAs": "http://dx.doi.org/10.5281/zenodo.48421"
-}""")
+}""" % (MetadataParser.get_parser_id(),))
