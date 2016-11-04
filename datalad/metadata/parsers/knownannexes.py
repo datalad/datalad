@@ -9,7 +9,6 @@
 """Metadata parser for general information on available annexes"""
 
 from datalad.utils import swallow_logs
-from datalad.metadata import _get_base_metadata_dict
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 
@@ -36,7 +35,7 @@ class MetadataParser(BaseMetadataParser):
                 if anxid.startswith('00000000-0000-0000-0000-000000000'):
                     # ignore special
                     continue
-                anx_meta = _get_base_metadata_dict(anxid)
+                anx_meta = self._get_base_metadata_dict(anxid)
                 # TODO find a better type; define in context
                 anx_meta['Type'] = 'Annex'
                 if 'description' in anx:
@@ -46,7 +45,7 @@ class MetadataParser(BaseMetadataParser):
                 meta.append(anx_meta)
 
         if len(meta):
-            dsmeta = _get_base_metadata_dict(dsid)
+            dsmeta = self._get_base_metadata_dict(dsid)
             dsmeta['availableFrom'] = [{'@id': m['@id']} for m in meta]
             meta.append(dsmeta)
         return meta

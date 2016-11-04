@@ -86,5 +86,8 @@ def test_get_metadata(path):
   "conformsTo": [
     "http://specs.frictionlessdata.io/data-packages",
     "http://docs.datalad.org/metadata.html#v0-1"
-  ]
-}""")
+  ],
+  "describedby": {
+    "@id": "%s"
+  }
+}""" % (MetadataParser.get_parser_id(),))

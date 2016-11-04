@@ -9,7 +9,6 @@
 """Parser for generic file-based information (mime types, etc...)
 """
 
-from datalad.metadata import _get_base_metadata_dict
 from datalad.support.annexrepo import AnnexRepo
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -25,7 +24,7 @@ class MetadataParser(BaseMetadataParser):
 
     def get_metadata(self, dsid=None, full=False):
         meta = []
-        ds_meta = _get_base_metadata_dict(dsid)
+        ds_meta = self._get_base_metadata_dict(dsid)
         parts = []
         if not self.has_metadata():
             return meta
@@ -37,7 +36,7 @@ class MetadataParser(BaseMetadataParser):
         # TODO RF to do this with one annex call
         keys = [repo.get_file_key(f) for f in files]
         for key, file_ in zip(keys, files):
-            finfo = _get_base_metadata_dict(key)
+            finfo = self._get_base_metadata_dict(key)
             finfo['Type'] = 'File'
             finfo['Location'] = file_
             if cfg.getbool(cfg_section, 'filesize', True):

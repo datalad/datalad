@@ -81,7 +81,7 @@ def get_enabled_metadata_parsers(ds, guess=False):
     return sorted(list(enabled))
 
 
-def _get_base_metadata_dict(identifier):
+def _get_base_metadata_dict(identifier, describedby=None):
     """Return base metadata dictionary for any identifier
     """
 
@@ -93,6 +93,8 @@ def _get_base_metadata_dict(identifier):
     }
     if identifier is not None:
         meta["@id"] = identifier
+    if describedby:
+        meta['describedby'] = {'@id': describedby}
     return meta
 
 
