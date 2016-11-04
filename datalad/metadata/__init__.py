@@ -27,6 +27,7 @@ from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
 from datalad import cfg
+from datalad import __version__
 
 
 # common format
@@ -94,7 +95,8 @@ def _get_base_metadata_dict(identifier, describedby=None):
     if identifier is not None:
         meta["@id"] = identifier
     if describedby:
-        meta['describedby'] = {'@id': describedby}
+        id_ = 'datalad_{}_parser_{}'.format(__version__, describedby)
+        meta['describedby'] = {'@id': id_}
     return meta
 
 
@@ -103,7 +105,7 @@ def _is_versioned_dataset_item(m):
 
 
 def _get_implicit_metadata(ds, identifier):
-    meta = _get_base_metadata_dict(identifier)
+    meta = _get_base_metadata_dict(identifier, 'base')
     # maybe use something like git-describe instead -- but tag-references
     # might changes...
     meta['modified'] = ds.repo.repo.head.commit.authored_datetime.isoformat()
@@ -177,7 +179,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         if ds.id:
             # create a separate item for the abstract (unversioned) dataset
             # just to say that this ID belongs to a dataset
-            dm = _get_base_metadata_dict(ds.id)
+            dm = _get_base_metadata_dict(ds.id, 'base')
             dm['Type'] = 'Dataset'
             meta.append(dm)
         meta.append(_get_implicit_metadata(ds, ds_identifier))

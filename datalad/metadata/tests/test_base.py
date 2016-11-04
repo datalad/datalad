@@ -120,7 +120,8 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[1].keys()),
-        ['@context', '@id', 'Type', 'conformsTo', 'isVersionOf', 'modified'])
+        ['@context', '@id', 'Type', 'conformsTo', 'describedby',
+         'isVersionOf', 'modified'])
     assert_equal(meta[0]['Type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
@@ -165,6 +166,11 @@ def test_aggregation(path):
     assert_equal(
         25,
         sum([s.get('@context', None) == 'http://schema.datalad.org/'
+             for s in meta]))
+    # all with parser being identified
+    assert_equal(
+        25,
+        sum([s['describedby']['@id'].startswith('datalad_')
              for s in meta]))
     # three different IDs per type (annex, dataset, versioned dataset)
     # plus fours different file keys

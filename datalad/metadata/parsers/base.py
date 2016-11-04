@@ -10,7 +10,6 @@
 
 from os.path import exists, join as opj
 from datalad.metadata import _get_base_metadata_dict
-from datalad import __version__
 
 
 class BaseMetadataParser(object):
@@ -30,16 +29,16 @@ class BaseMetadataParser(object):
 
     @classmethod
     def get_parser_id(cls):
-        """Returns a string that identifies the parser implementation
+        # keep mostly for the tests
+        return _get_base_metadata_dict(
+            None,
+            describedby=cls.__module__.split('.')[-1])['describedby']['@id']
 
-        datalad_VERSION_parser_PARSERNAME
-        """
-        return 'datalad_{}_parser_{}'.format(
-            __version__,
-            cls.__module__.split('.')[-1])
-
-    def _get_base_metadata_dict(self, id_):
-        return _get_base_metadata_dict(id_, describedby=self.get_parser_id())
+    @classmethod
+    def _get_base_metadata_dict(cls, id_):
+        return _get_base_metadata_dict(
+            id_,
+            describedby=cls.__module__.split('.')[-1])
 
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
