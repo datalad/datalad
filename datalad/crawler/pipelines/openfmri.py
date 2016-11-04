@@ -106,6 +106,12 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
     special_remotes = [ARCHIVES_SPECIAL_REMOTE]
     # some datasets available (fresh enough or old) from S3, so let's sense if this one is
     s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)
+    if dataset == 'ds000017':
+        # we had some custom prefixing going on
+        assert(prefix)
+        suf = prefix[-3]
+        assert suf in 'AB'
+        s3_prefix = 'ds017' + suf
     if ls('s3://openfmri/%s' % s3_prefix):
         # actually not needed here since we are remapping them to public http urls
         # special_remotes += [DATALAD_SPECIAL_REMOTE]
@@ -137,7 +143,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
             [
                 [
                     annex.switch_branch('incoming-s3'),
-                    s3_pipeline(s3_prefix, tag=False),
+                    s3_pipeline(s3_prefix, tag=False), # for 31 ;) skip_problematic=True),
                     annex.switch_branch('master'),
                 ]
             ]
