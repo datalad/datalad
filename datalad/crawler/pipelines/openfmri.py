@@ -27,11 +27,13 @@ from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
+from datalad.downloaders.providers import Providers
 
 # For S3 crawling
 from ..nodes.s3 import crawl_s3
 from .openfmri_s3 import pipeline as s3_pipeline
 from datalad.api import ls
+from datalad.dochelpers import exc_str
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -78,9 +80,12 @@ def extract_readme(data):
            }
 
 
-def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
+def pipeline(dataset,
+             versioned_urls=True, topurl=TOPURL,
              versions_overlay_level=2,
-             leading_dirs_depth=1, prefix=''):
+             leading_dirs_depth=1,
+             prefix='',
+             s3_prefix=None):
     """Pipeline to crawl/annex an openfmri dataset
 
     Parameters
@@ -93,8 +98,14 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
     topurl: str, optional
       Top level URL to the datasets.
     prefix: str, optional
-      Prefix regular expression in urls to identifying subgroup of data to be fetched in the dataset
+      Prefix regular expression in urls to identifying subgroup of data to be
+      fetched in the dataset
       (e.g. in case of ds000017 there is A and B)
+    s3_prefix: str or None, optional
+      Either to crawl per-dataset subdirectory in the bucket into incoming-s3
+      branch, to also annex also all the extracted files available from openfmri
+      bucket.  If None -- we determine depending on availability of the
+      sub-directory on S3 bucket
     """
     skip_no_changes = True    # to redo incoming-processed, would finish dirty in incoming-processed
                               # when commit would fail since nothing to commit
@@ -104,20 +115,34 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL,
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
 
     special_remotes = [ARCHIVES_SPECIAL_REMOTE]
-    # some datasets available (fresh enough or old) from S3, so let's sense if this one is
-    s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)
-    if dataset == 'ds000017':
-        # we had some custom prefixing going on
-        assert(prefix)
-        suf = prefix[-3]
-        assert suf in 'AB'
-        s3_prefix = 'ds017' + suf
-    if ls('s3://openfmri/%s' % s3_prefix):
-        # actually not needed here since we are remapping them to public http urls
+
+    if s3_prefix is None:
+        # some datasets available (fresh enough or old) from S3, so let's sense if this one is
+        s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)
+        if dataset == 'ds000017':
+            # we had some custom prefixing going on
+            assert(prefix)
+            suf = prefix[-3]
+            assert suf in 'AB'
+            s3_prefix = 'ds017' + suf
+
+        openfmri_s3_prefix = 's3://openfmri/'
+        try:
+            if not ls('%s%s' % (openfmri_s3_prefix, s3_prefix)):
+                s3_prefix = None  # not there
+        except Exception as exc:
+            lgr.warning(
+                "Failed to access %s, not attempting to crawl S3: %s",
+                s3_prefix, exc_str(exc)
+            )
+            s3_prefix = None
+
+    if s3_prefix:
+        # actually not needed here since we are remapping them to public http
+        #  urls
         # special_remotes += [DATALAD_SPECIAL_REMOTE]
         pass
-    else:
-        s3_prefix = None  # not there
+
 
     annex = Annexificator(
         create=False,  # must be already initialized etc
