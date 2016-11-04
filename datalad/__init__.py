@@ -83,12 +83,18 @@ def setup_package():
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
 
+    # Set to non-interactive UI
+    from datalad.ui import ui
+    _test_states['ui_backend'] = ui.backend
+    ui.set_backend('tests-noninteractive')
+
 
 def teardown_package():
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
-
+    from datalad.ui import ui
+    ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
         if _test_states['DATALAD_LOG_LEVEL'] is None:
