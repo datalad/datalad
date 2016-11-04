@@ -99,6 +99,12 @@ class Search(Interface):
             doc="""flag to report those fields which have matches. If `report`
              option values are provided, union of matched and those in `report`
              will be output"""),
+        what=Parameter(
+            args=('--what',),
+            action='append',
+            doc="""type of object to be searched. This can be anything, but
+            common values are "dataset", and "file" (case insensitive).[CMD:
+            This option can be given multiple times. CMD]"""),
         # Theoretically they should be CMDLINE specific I guess?
         format=Parameter(
             args=('-f', '--format'),
@@ -119,6 +125,7 @@ class Search(Interface):
                  search=None,
                  report=None,
                  report_matched=False,
+                 what='dataset',
                  format='custom',
                  regex=False):
 
@@ -180,9 +187,12 @@ class Search(Interface):
                 )
                 for res in central_ds.search(
                         match,
-                        search=search, report=report,
+                        search=search,
+                        report=report,
                         report_matched=report_matched,
-                        format=format, regex=regex):
+                        what=what,
+                        format=format,
+                        regex=regex):
                     yield res
                 return
             else:
@@ -190,6 +200,8 @@ class Search(Interface):
 
         cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
         mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+
+        what = set([w.lower() for w in assure_list(what)])
 
         meta = None
         if os.path.exists(mcache_fname):
@@ -266,14 +278,14 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            # be more relaxed in terms of what to consider a discoverable
-            # item. Looking for some shape of 'location' will work with meta
-            # data of any age. Once file-based meta data comes around and
-            # we decide that we don't want to be able to discover files with
-            # this command, we have to reconsider the conditions
+            type_ = mds.get('Type', mds.get('type', '')).lower()
+            if type_ not in what:
+                # not what we are looking for
+                continue
+            # Looking for some shape of 'location' will work with meta
+            # data of any age.
             location = mds.get('Location', mds.get('location', None))
-            type_ = mds.get('Type', mds.get('type', None))
-            if location is None and type_ != 'Dataset':
+            if location is None and type_ != 'dataset':
                 # we know nothing about location, and it cannot be a top-level
                 # superdataset
                 continue
@@ -284,7 +296,7 @@ class Search(Interface):
             compliance = [LooseVersion(i.split('#')[-1][1:].replace('-', '.')) for i in assure_list(compliance)
                           if i.startswith('http://docs.datalad.org/metadata.html#v')]
             if any([v >= LooseVersion("0.2") for v in compliance]):
-                if type_ == 'Dataset' and not 'isVersionOf' in mds:
+                if type_ == 'dataset' and not 'isVersionOf' in mds:
                     # this is just a generic Dataset definition, and no actual dataset instance
                     continue
 
