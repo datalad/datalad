@@ -367,6 +367,28 @@ def split_remote_branch(branch):
         "branch name with trailing / is invalid. (%s)" % branch
     return branch.split('/', 1)
 
+from weakref import WeakValueDictionary
+
+
+class WeakSingletonRepo(type):
+
+    def __call__(self, path, *args, **kwargs):
+
+        # TODO: Not sure yet, if and where to resolve symlinks or use abspath
+        # and whether to pass the resolved path. May be have an additional
+        # layer, where we can address the same repo with different paths (links).
+        # For now just make sure it's a "singleton" if addressed the same way.
+        # When caring for this, consider symlinked submodules ...
+        # look for issue by mih
+        _path = normpath(path)
+
+        if _path in self._unique_repos:
+            return self._unique_repos[_path]
+        else:
+            repo = type.__call__(self, path, *args, **kwargs)  # or `_path`?
+            self._unique_repos[_path] = repo
+            return repo
+
 
 class GitRepo(object):
     """Representation of a git repository
@@ -377,7 +399,10 @@ class GitRepo(object):
 
     """
 
-    __slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
+    __metaclass__ = WeakSingletonRepo
+    _unique_repos = WeakValueDictionary()
+
+    #__slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):

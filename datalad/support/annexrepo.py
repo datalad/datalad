@@ -70,6 +70,7 @@ from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
+from .gitrepo import WeakSingletonRepo, WeakValueDictionary
 
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
@@ -81,8 +82,12 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
-                                     '_direct_mode', '_uuid']
+    __metaclass__ = WeakSingletonRepo
+    _unique_repos = WeakValueDictionary()
+
+
+    #__slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
+    #                                 '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
