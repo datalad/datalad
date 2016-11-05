@@ -32,10 +32,7 @@ class MetadataParser(BaseMetadataParser):
         cfg = self.ds.config
         repo = self.ds.repo
         cfg_section = self.cfg_section
-        files = repo.get_annexed_files()
-        # TODO RF to do this with one annex call
-        keys = [repo.get_file_key(f) for f in files]
-        for key, file_ in zip(keys, files):
+        for key, file_ in self.get_filekey_mapping().items():
             finfo = self._get_base_metadata_dict(key)
             finfo['Type'] = 'File'
             finfo['Location'] = file_

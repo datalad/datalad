@@ -40,6 +40,17 @@ class BaseMetadataParser(object):
             id_,
             describedby=cls.__module__.split('.')[-1])
 
+    def get_filekey_mapping(self):
+        """Returns a dictionary with a file keys to file name mapping"""
+        repo = self.ds.repo
+        if not repo or not hasattr(repo, 'get_annexed_files'):
+            return {}
+        # TODO consider non-annexed files too
+        files = repo.get_annexed_files()
+        # TODO RF to do this with one annex call
+        keys = [repo.get_file_key(f) for f in files]
+        return dict(zip(keys, files))
+
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
         # default implementation, override with more efficient, if possible
