@@ -9,6 +9,7 @@
 """Parser for generic file-based information (mime types, etc...)
 """
 
+from mimetypes import guess_type as guess_mimetype
 from datalad.support.annexrepo import AnnexRepo
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -38,8 +39,13 @@ class MetadataParser(BaseMetadataParser):
             finfo['Location'] = file_
             if cfg.getbool(cfg_section, 'filesize', True):
                 finfo['FileSize'] = repo.get_size_from_key(key)
-            # TODO actually insert a "magic"-based description, and
-            # maybe a mimetype
+            if cfg.getbool(cfg_section, 'mimetype', True):
+                mtype, encoding = guess_mimetype(file_, strict=False)
+                if mtype:
+                    finfo['contentType'] = mtype
+                if encoding:
+                    finfo['encodingType'] = encoding
+            # TODO insert a "magic"-based description, and
             meta.append(finfo)
             parts.append({'@id': key})
         if len(parts):

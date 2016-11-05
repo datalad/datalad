@@ -28,7 +28,7 @@ def test_has_metadata(path):
     assert_true(p.has_metadata())
 
 
-@with_tree(tree={'test': {'subfile.tsv': "0\t1\t2\n"}})
+@with_tree(tree={'test': {'subfile.tsv.gz': "0\t1\t2\n"}})
 def test_get_metadata(path):
     ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_metadata('ID')
@@ -41,14 +41,16 @@ def test_get_metadata(path):
 [
  {
   "@context": "http://schema.datalad.org/",
-  "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv",
+  "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv.gz",
   "FileSize": 6,
-  "Location": "test/subfile.tsv",
+  "Location": "test/subfile.tsv.gz",
   "Type": "File",
   "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
+  "contentType": "text/tab-separated-values",
   "describedby": {
    "@id": "%s"
-  }
+  },
+  "encodingType": "gzip"
  },
  {
   "@context": "http://schema.datalad.org/",
@@ -59,7 +61,7 @@ def test_get_metadata(path):
   },
   "hasPart": [
    {
-    "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv"
+    "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv.gz"
    }
   ]
  }
