@@ -14,6 +14,8 @@ from datalad.utils import find_files
 from datalad.support.json_py import load as jsonload
 from datalad.metadata import _simplify_meta_data_structure
 from datalad.metadata import _is_versioned_dataset_item
+from datalad.metadata import _remove_items_by_parser
+from datalad.metadata import get_disabled_metadata_parsers
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 
@@ -42,6 +44,8 @@ class MetadataParser(BaseMetadataParser):
             dirs=False))
 
     def get_metadata(self, dsid=None, full=False):
+        # check if any parsers are disabled and filter items accordingly
+        disabled_parsers = get_disabled_metadata_parsers(self.ds)
         base_meta = self._get_base_metadata_dict(dsid)
         meta = []
         basepath = opj(self.ds.path, '.datalad', 'meta')
@@ -61,6 +65,8 @@ class MetadataParser(BaseMetadataParser):
             # compact/flatten at the end. However assuming a single context
             # we can cheat.
             subds_meta = _simplify_meta_data_structure(subds_meta)
+            # filter out any undesired items
+            subds_meta = _remove_items_by_parser(subds_meta, disabled_parsers)
             _adjust_subdataset_location(subds_meta, subds_path)
             # sift through all meta data sets look for a meta data set that
             # knows about being part of this dataset, so we record its @id as

@@ -146,9 +146,7 @@ def test_aggregation(path):
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True, if_dirty='ignore')
     subsubds = subds.create('subsub', force=True, if_dirty='ignore')
-    # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second natiev set for the topmost dataset
+    # aggregate from bottom to top, guess native data
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
@@ -432,3 +430,50 @@ def test_idempotent_aggregate(path):
     # reaggration doesn't change anything
     aggregate_metadata(ds, guess_native_type=False, recursive=True)
     assert_equal(ds.repo.get_hexsha(), aggstate)
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+def test_aggregation_with_disabled_parsers(path):
+    # a hierarchy of three (super/sub)datasets, each with some native metadata
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    subds = ds.create('sub', force=True, if_dirty='ignore')
+    subds.create('subsub', force=True, if_dirty='ignore')
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
+    # no only ask the top superdataset, no recursion, just reading from the cache
+    meta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
+    assert_equal(len(meta), 25)
+    # some file info
+    fileinfo_items = sum([s['describedby']['@id'].endswith('parser_fileinfo')
+                         for s in meta])
+    assert_equal(fileinfo_items, 7)
+    # some annex info
+    annex_items = sum([s['describedby']['@id'].endswith('parser_knownannexes')
+                      for s in meta])
+    assert_equal(annex_items, 6)
+    # now we configure the superdataset to disregard both types of info
+    # and first we do it in a clone that has none of the subdatasets installed
+    clone = install(source=ds.path, path=opj(path, 'clone'))
+    clone.config.add('datalad.metadata.parsers.disable', 'fileinfo')
+    clone.config.add('datalad.metadata.parsers.disable', 'knownannexes')
+    clonemeta = get_metadata(
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False)
+
+    def _checkmeta(testmeta):
+        # check that unwanted pieces are gone
+        assert_equal(0,
+                     sum([s['describedby']['@id'].endswith('parser_knownannexes')
+                          for s in testmeta]))
+        assert_equal(0,
+                     sum([s['describedby']['@id'].endswith('parser_fileinfo')
+                          for s in testmeta]))
+        # but the rest is still there
+        assert_equal(len(testmeta), len(meta) - fileinfo_items - annex_items)
+    _checkmeta(clonemeta)
+    # and now the same with the original dataset (that has all local subdatasets)
+    # and also cached meta data at every level
+    ds.config.add('datalad.metadata.parsers.disable', 'fileinfo')
+    ds.config.add('datalad.metadata.parsers.disable', 'knownannexes')
+    newmeta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
+    _checkmeta(newmeta)

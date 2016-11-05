@@ -35,6 +35,29 @@ metadata_filename = 'meta.json'
 metadata_basepath = opj('.datalad', 'meta')
 
 
+def get_disabled_metadata_parsers(ds, guess=False):
+    """Return the names of meta data parsers disabled in the configuration
+
+    The configuration variable ``datalad.metadata.parsers.disabled`` is queried.
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to be inspected
+
+    Returns
+    -------
+    set(str)
+      Parser names or an empty set if no configuration is found.
+    """
+    disabled_parsers = [
+        p.lower() for p in assure_list(
+            ds.config.get('datalad.metadata.parsers.disable', []))]
+    # do not disable essential info
+    disabled_parsers = set([p for p in disabled_parsers if p != 'base'])
+    return disabled_parsers
+
+
 # XXX Could become dataset method
 def get_enabled_metadata_parsers(ds, guess=False):
     """Return the names of meta data parsers enabled in the configuration
@@ -76,10 +99,21 @@ def get_enabled_metadata_parsers(ds, guess=False):
     if enabled is None:
         return []
     enabled = set(assure_list(enabled))
-    for disabled in assure_list(cfg_.get('datalad.metadata.parsers.disable', [])):
-        enabled.discard(disabled)
+    enabled = enabled.difference(get_disabled_metadata_parsers(ds))
     lgr.debug('Enabled meta data parsers: %s', enabled)
     return sorted(list(enabled))
+
+
+def _remove_items_by_parser(meta, parsers):
+    out = []
+    for m in meta:
+        describedby = m.get('describedby', {}).get('@id', '').split('_')
+        if len(describedby) \
+                and describedby[0] == 'datalad' \
+                and describedby[-1] in parsers:
+            continue
+        out.append(m)
+    return out
 
 
 def _get_base_metadata_dict(identifier, describedby=None):
@@ -192,6 +226,10 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     else:
         # from cache
         cached_meta = jsonload(main_meta_fname)
+        # discard anything that isn't wanted anymore
+        cached_meta = _remove_items_by_parser(
+            cached_meta, get_disabled_metadata_parsers(ds))
+
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
         else:
