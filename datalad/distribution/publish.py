@@ -98,6 +98,8 @@ class Publish(Interface):
             If empty argument is provided, then we will always run publish command.
             By default, would take from the previously published to that remote/sibling
             state (for the current branch)"""),
+        # since: commit => .gitmodules diff to head => submodules to publish
+
         skip_failing=Parameter(
             args=("--skip-failing",),
             action="store_true",
