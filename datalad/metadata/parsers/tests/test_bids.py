@@ -98,11 +98,11 @@ def test_get_metadata(path):
   },
   {
     "@context": "http://schema.datalad.org/",
-    "@id": "MD5E-s6--085724c672c3bc054d1c266613d17803.nii.gz",
-    "ShortDescription": "T2-weighted MRI 3D image",
+    "@id": "MD5E-s5--a2e4822a98337283e39f7b60acf85ec9.nii.gz",
+    "ShortDescription": "T1-weighted MRI 3D image",
     "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
     "contentType": {
-      "@id": "neurolex:nlx_156812"
+      "@id": "neurolex:nlx_156813"
     },
     "describedby": {
       "@id": "%s"
@@ -110,11 +110,11 @@ def test_get_metadata(path):
   },
   {
     "@context": "http://schema.datalad.org/",
-    "@id": "MD5E-s5--a2e4822a98337283e39f7b60acf85ec9.nii.gz",
-    "ShortDescription": "T1-weighted MRI 3D image",
+    "@id": "MD5E-s6--085724c672c3bc054d1c266613d17803.nii.gz",
+    "ShortDescription": "T2-weighted MRI 3D image",
     "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
     "contentType": {
-      "@id": "neurolex:nlx_156813"
+      "@id": "neurolex:nlx_156812"
     },
     "describedby": {
       "@id": "%s"

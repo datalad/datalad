@@ -71,7 +71,7 @@ class MetadataParser(BaseMetadataParser):
         keywords = set()
         parts = set()
         file_meta = []
-        for key, file_ in self.get_filekey_mapping().items():
+        for key, file_ in self.get_filekey_mapping():
             # check any defined property definition
             for prop in props:
                 if prop.match(file_):

@@ -33,7 +33,7 @@ class MetadataParser(BaseMetadataParser):
         cfg = self.ds.config
         repo = self.ds.repo
         cfg_section = self.cfg_section
-        for key, file_ in self.get_filekey_mapping().items():
+        for key, file_ in self.get_filekey_mapping():
             finfo = self._get_base_metadata_dict(key)
             finfo['Type'] = 'File'
             finfo['Location'] = file_
