@@ -32,8 +32,7 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..support.constraints import EnsureChoice
 from ..log import lgr
-from . import get_metadata, flatten_metadata_graph, pickle, \
-    _is_versioned_dataset_item
+from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
@@ -41,6 +40,49 @@ from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support import ansi_colors
 from datalad.ui import ui
+
+
+def get_searchoptimized_metadata(ds):
+    cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
+    mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+
+    meta = None
+    if os.path.exists(mcache_fname):
+        lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
+        meta, checksum = pickle.load(open(mcache_fname, 'rb'))
+        # TODO add more sophisticated tests to decide when the cache is no longer valid
+        if checksum != ds.repo.get_hexsha():
+            # errrr, try again below
+            meta = None
+
+    # don't put in 'else', as yet to be written tests above might fail and require
+    # regenerating meta data
+    if meta is None:
+        lgr.info("Loading and caching local meta-data... might take a few seconds")
+        if not exists(cache_dir):
+            os.makedirs(cache_dir)
+
+        meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
+                            from_native=False)
+        # merge all info on datasets into a single dict per dataset
+        meta = flatten_metadata_graph(meta)
+        # extract graph, if any
+        meta = meta.get('@graph', meta)
+        # build simple queriable representation
+        if not isinstance(meta, list):
+            meta = [meta]
+
+        # sort entries by location (if present)
+        sort_keys = ('Location', 'location', 'Description', 'id')
+        meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
+
+        # use pickle to store the optimized graph in the cache
+        pickle.dump(
+            # graph plus checksum from what it was built
+            (meta, ds.repo.get_hexsha()),
+            open(mcache_fname, 'wb'))
+        lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
+    return meta
 
 
 class Search(Interface):
@@ -198,47 +240,10 @@ class Search(Interface):
             else:
                 raise
 
-        cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
-        mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+        # obtain meta data from best source
+        meta = get_searchoptimized_metadata(ds)
 
         what = set([w.lower() for w in assure_list(what)])
-
-        meta = None
-        if os.path.exists(mcache_fname):
-            lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
-            # TODO add more sophisticated tests to decide when the cache is no longer valid
-            if checksum != ds.repo.get_hexsha():
-                # errrr, try again below
-                meta = None
-
-        # don't put in 'else', as yet to be written tests above might fail and require
-        # regenerating meta data
-        if meta is None:
-            lgr.info("Loading and caching local meta-data... might take a few seconds")
-            if not exists(cache_dir):
-                os.makedirs(cache_dir)
-
-            meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                                from_native=False)
-            # merge all info on datasets into a single dict per dataset
-            meta = flatten_metadata_graph(meta)
-            # extract graph, if any
-            meta = meta.get('@graph', meta)
-            # build simple queriable representation
-            if not isinstance(meta, list):
-                meta = [meta]
-
-            # sort entries by location (if present)
-            sort_keys = ('Location', 'location', 'Description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
-
-            # use pickle to store the optimized graph in the cache
-            pickle.dump(
-                # graph plus checksum from what it was built
-                (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'wb'))
-            lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
 
         if report in ('', ['']):
             report = []
