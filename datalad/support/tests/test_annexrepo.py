@@ -164,6 +164,13 @@ def test_AnnexRepo_get_file_key(src, annex_path):
         ar.get_file_key("test-annex.dat"),
         'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
 
+    # and should take a list with an empty string as result, if a file wasn't
+    # in annex:
+    assert_equal(
+        ar.get_file_key(["filenotpresent.wtf", "test-annex.dat"]),
+        ['', 'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat']
+    )
+
     # test.dat is actually in git
     # should raise Exception; also test for polymorphism
     assert_raises(IOError, ar.get_file_key, "test.dat")
@@ -172,6 +179,8 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+
 
 
 @with_tempfile(mkdir=True)

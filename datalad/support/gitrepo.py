@@ -635,7 +635,7 @@ class GitRepo(object):
         Parameters
         ----------
         files: list
-            list of paths to add
+          list of paths to add
         commit: bool
           whether or not to directly commit
         msg: str
@@ -654,10 +654,11 @@ class GitRepo(object):
 
         if files:
             try:
-
+                # without --verbose git 2.9.3  add does not return anything
                 add_out = self._git_custom_command(
-                    files, ['git', 'add'] + assure_list(git_options))
-
+                    files,
+                    ['git', 'add'] + assure_list(git_options) + ['--verbose']
+                )
                 # get all the entries
                 out = self._process_git_get_output(*add_out)
                 # Note: as opposed to git cmdline, force is True by default in
@@ -704,7 +705,7 @@ class GitRepo(object):
         modes when ran through proxy
         """
         return [{u'file': f, u'success': True}
-                for f in re.findall("'([^']*)'[\n$]", stdout)]
+                for f in re.findall("'(.*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):

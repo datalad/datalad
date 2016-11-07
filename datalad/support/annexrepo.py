@@ -721,57 +721,69 @@ class AnnexRepo(GitRepo):
                                        annex_options=['--'] + git_cmd,
                                        **kwargs)
 
-    @normalize_path
-    def get_file_key(self, file_):
+    @normalize_paths
+    def get_file_key(self, files):
         """Get key of an annexed file.
 
         Parameters
         ----------
-        file_: str
-            file to look up
+        files: str or list
+            file(s) to look up
 
         Returns
         -------
-        str
-            keys used by git-annex for each of the files
+        str or list
+            keys used by git-annex for each of the files;
+            in case of a list an empty string is returned if there was no key
+            for that file
         """
 
-        cmd_str = 'git annex lookupkey %s' % file_  # have a string for messages
+        if len(files) > 1:
+            return self._batched.get('lookupkey',
+                                     git_options=self._GIT_COMMON_OPTIONS,
+                                     path=self.path)(files)
+        else:
+            files = files[0]
+            # single file
+            # keep current implementation
+            # TODO: This should change, but involves more RF'ing and an
+            # alternative regarding FileNotInAnnexError
+            cmd_str = 'git annex lookupkey %s' % files  # have a string for messages
 
-        try:
-            out, err = self._run_annex_command('lookupkey',
-                                               annex_options=[file_],
-                                               expect_fail=True)
-        except CommandError as e:
-            if e.code == 1:
-                if not exists(opj(self.path, file_)):
-                    raise IOError(e.code, "File not found.", file_)
-                # XXX you don't like me because I can be real slow!
-                elif file_ in self.get_indexed_files():
-                    # if we got here, the file is present and in git,
-                    # but not in the annex
-                    raise FileInGitError(cmd=cmd_str,
-                                         msg="File not in annex, but git: %s"
-                                             % file_,
-                                         filename=file_)
+            try:
+                out, err = self._run_annex_command('lookupkey',
+                                                   annex_options=[files],
+                                                   expect_fail=True)
+            except CommandError as e:
+                if e.code == 1:
+                    if not exists(opj(self.path, files)):
+                        raise IOError(e.code, "File not found.", files)
+                    # XXX you don't like me because I can be real slow!
+                    elif files in self.get_indexed_files():
+                        # if we got here, the file is present and in git,
+                        # but not in the annex
+                        raise FileInGitError(cmd=cmd_str,
+                                             msg="File not in annex, but git: %s"
+                                                 % files,
+                                             filename=files)
+                    else:
+                        raise FileNotInAnnexError(cmd=cmd_str,
+                                                  msg="File not in annex: %s"
+                                                      % files,
+                                                  filename=files)
                 else:
-                    raise FileNotInAnnexError(cmd=cmd_str,
-                                              msg="File not in annex: %s"
-                                                  % file_,
-                                              filename=file_)
-            else:
-                # Not sure, whether or not this can actually happen
-                raise e
+                    # Not sure, whether or not this can actually happen
+                    raise e
 
-        entries = out.rstrip(linesep).splitlines()
-        # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
-        entries = list(filter(lambda x: not x.startswith('('), entries))
-        if len(entries) > 1:
-            lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
-                        % (str(entries)))
-        elif not entries:
-            raise FileNotInAnnexError("Could not get a key for a file %s -- empty output" % file_)
-        return entries[0]
+            entries = out.rstrip(linesep).splitlines()
+            # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
+            entries = list(filter(lambda x: not x.startswith('('), entries))
+            if len(entries) > 1:
+                lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
+                            % (str(entries)))
+            elif not entries:
+                raise FileNotInAnnexError("Could not get a key for a file(s) %s -- empty output" % files)
+            return entries[0]
 
     @normalize_paths(map_filenames_back=True)
     def find(self, files, batch=False):
