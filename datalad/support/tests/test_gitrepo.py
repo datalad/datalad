@@ -48,9 +48,9 @@ def test_GitRepo_instance_from_clone(src, dst):
     # already a git-repo at that path and therefore can't clone to `dst`
     # Note: Since GitRepo is now a WeakSingletonRepo, this is prevented from
     # happening atm. Disabling for now:
-    raise SkipTest("Disabled for RF: WeakSingletonRepo")
-    #with swallow_logs() as logs:
-    #    assert_raises(GitCommandError, GitRepo, dst, src)
+#    raise SkipTest("Disabled for RF: WeakSingletonRepo")
+    with swallow_logs() as logs:
+        assert_raises(GitCommandError, GitRepo, dst, src)
 
 
 @assert_cwd_unchanged
@@ -964,8 +964,8 @@ def test_optimized_cloning(path):
         clone_inodes = _get_inodes(clone)
         eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
         rmtree(clonepath)
-        del clone
-        gc.collect()
+#        del clone
+#        gc.collect()
         # Note: del needed, since otherwise WeakSingletonRepo would just
         # return the original object in second run
 
@@ -993,21 +993,21 @@ def test_GitRepo_gitpy_injection(path, path2):
     assert_not_in('test-option', exc_str(cme.exception))
 
 
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_WeakSingletonRepo(path1, path2):
-
-    repo1 = GitRepo(path1, create=True)
-    # instantiate again:
-    repo2 = GitRepo(path1, create=False)
-    # the very same object:
-    ok_(repo1 is repo2)
-
-    # reference the same in an different way:
-    with chpwd(path1):
-        repo3 = GitRepo(relpath(path1, start=path2), create=False)
-    # currently not the same object (might change):
-    ok_(repo1 is not repo3)
-
-    # but path attribute is absolute, so they are still equal:
-    ok_(repo1 == repo3)
+# @with_tempfile(mkdir=True)
+# @with_tempfile(mkdir=True)
+# def test_WeakSingletonRepo(path1, path2):
+#
+#     repo1 = GitRepo(path1, create=True)
+#     # instantiate again:
+#     repo2 = GitRepo(path1, create=False)
+#     # the very same object:
+#     ok_(repo1 is repo2)
+#
+#     # reference the same in an different way:
+#     with chpwd(path1):
+#         repo3 = GitRepo(relpath(path1, start=path2), create=False)
+#     # currently not the same object (might change):
+#     ok_(repo1 is not repo3)
+#
+#     # but path attribute is absolute, so they are still equal:
+#     ok_(repo1 == repo3)

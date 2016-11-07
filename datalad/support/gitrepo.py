@@ -367,6 +367,7 @@ def split_remote_branch(branch):
         "branch name with trailing / is invalid. (%s)" % branch
     return branch.split('/', 1)
 
+
 from weakref import WeakValueDictionary
 
 
@@ -374,13 +375,27 @@ class WeakSingletonRepo(type):
 
     def __call__(self, path, *args, **kwargs):
 
+
+        # Wir brauchen realpath als singleton, aber addressierbar auf versch. weise (=> Dataset normpath?)
+        #
+        # - real path  => git dir?
+        # - address path => work tree?
+        # - name (submodule) => submodule name (or basename?)
+
+        # Clonen in metaklasse moven => classmethod? clone(), falls Parameter src(url) vorhanden
+
+
+
+
+        # TODO: argument src determines cloning, which wouldn't even be tried now, if something is already (or still) pointing to the target
+
         # TODO: Not sure yet, if and where to resolve symlinks or use abspath
         # and whether to pass the resolved path. May be have an additional
         # layer, where we can address the same repo with different paths (links).
         # For now just make sure it's a "singleton" if addressed the same way.
         # When caring for this, consider symlinked submodules ...
         # look for issue by mih
-        _path = normpath(path)
+        _path = normpath(RI(path).localpath)
 
         if _path in self._unique_repos:
             return self._unique_repos[_path]
@@ -399,7 +414,7 @@ class GitRepo(object):
 
     """
 
-    __metaclass__ = WeakSingletonRepo
+    #__metaclass__ = WeakSingletonRepo
     _unique_repos = WeakValueDictionary()
 
     #__slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
@@ -456,6 +471,7 @@ class GitRepo(object):
         if kwargs:
             git_opts.update(kwargs)
 
+        # TODO: Probably can go into metaclass:
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
         # if it is not a local thing:

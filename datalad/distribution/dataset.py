@@ -71,8 +71,13 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
+from datalad.support.gitrepo import WeakSingletonRepo, WeakValueDictionary
+
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id', '_cfg']
+
+    __metaclass__ = WeakSingletonRepo
+    _unique_repos = WeakValueDictionary()
+    #__slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):
         # Custom handling for few special abbreviations
