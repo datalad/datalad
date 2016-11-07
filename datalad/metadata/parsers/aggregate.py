@@ -13,21 +13,15 @@ from os.path import join as opj
 from datalad.utils import find_files
 from datalad.support.json_py import load as jsonload
 from datalad.metadata import _simplify_meta_data_structure
-from datalad.metadata import _is_versioned_dataset_item
 from datalad.metadata import _remove_items_by_parser
 from datalad.metadata import get_disabled_metadata_parsers
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 
-def _adjust_subdataset_location(meta, subds_relpath):
+def _adjust_location(meta, subds_relpath):
     # find implicit meta data for all contained subdatasets
     for m in meta:
-        if not (_is_versioned_dataset_item(m) or m.get('@type', None) == 'File'):
-            continue
-        # prefix all subdataset location information with the relpath of this
-        # subdataset
-        if 'Location' not in m:
-            continue
+        # prefix all location information with the relpath of this subdataset
         loc = m.get('Location', subds_relpath)
         if loc != subds_relpath:
             m['Location'] = opj(subds_relpath, loc)
@@ -67,13 +61,15 @@ class MetadataParser(BaseMetadataParser):
             subds_meta = _simplify_meta_data_structure(subds_meta)
             # filter out any undesired items
             subds_meta = _remove_items_by_parser(subds_meta, disabled_parsers)
-            _adjust_subdataset_location(subds_meta, subds_path)
+            _adjust_location(subds_meta, subds_path)
             # sift through all meta data sets look for a meta data set that
             # knows about being part of this dataset, so we record its @id as
             # part
             for md in [i for i in subds_meta
-                       if _is_versioned_dataset_item(i)
+                       if i.get('@type', None) == 'Dataset'
                        and 'isPartOf' in i
+                       # we know that it is "Location" if there was any location
+                       # after _adjust_subdataset_location ran
                        and 'Location' in i]:
                 if md['Location'] == subds_path and '@id' in md:
                     md['isPartOf'] = dsid
