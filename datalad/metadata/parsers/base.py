@@ -10,6 +10,7 @@
 
 from os.path import exists, join as opj
 from datalad.metadata import _get_base_metadata_dict
+from datalad.utils import assure_list
 
 
 class BaseMetadataParser(object):
@@ -17,6 +18,9 @@ class BaseMetadataParser(object):
     # to check
     _core_metadata_filenames = []
 
+    # TODO: add argument to provide callable to obtain cached key2filename
+    # mapping to speed up cases where multiple parsers need to look up keys
+    # for the same set of files
     def __init__(self, ds):
         """
         Parameters
@@ -46,9 +50,10 @@ class BaseMetadataParser(object):
         if not repo or not hasattr(repo, 'get_annexed_files'):
             return {}
         # TODO consider non-annexed files too
-        files = repo.get_annexed_files()
-        # TODO RF to do this with one annex call
-        keys = [repo.get_file_key(f) for f in files]
+        files = assure_list(repo.get_annexed_files())
+        if not len(files):
+            return []
+        keys = assure_list(repo.get_file_key(files))
         return zip(keys, files)
 
     def has_metadata(self):
