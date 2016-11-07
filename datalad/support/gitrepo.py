@@ -376,15 +376,17 @@ class WeakSingletonRepo(type):
     def __call__(self, path, *args, **kwargs):
 
         if len(args) >= 1 or ('url' in kwargs and kwargs['url'] is not None):
-            # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing
-            # raise RuntimeError("RF: call clone() instead!")
-
-            if args:
-                url = args[0]
-                args = args[1:]
-            else:
-                url = kwargs.pop('url')
-            return self.clone(url, path, *args, **kwargs)
+            # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing;
+            # keep in master when merging and remove in second PR, so other PRs
+            # benefit from it, when merging/rebasing atm
+            raise RuntimeError("RF: call clone() instead!")
+        #
+        #     if args:
+        #         url = args[0]
+        #         args = args[1:]
+        #     else:
+        #         url = kwargs.pop('url')
+        #     return self.clone(url, path, *args, **kwargs)
         else:
             return type.__call__(self, path, *args, **kwargs)
 

@@ -339,7 +339,7 @@ def _clone_from_any_source(sources, dest):
             lgr.debug("Retrieving a dataset from URL: "
                       "{0}".format(source_))
             with swallow_logs():
-                GitRepo(dest, url=source_, create=True)
+                GitRepo.clone(path=dest, url=source_, create=True)
             return source_  # do not bother with other sources if succeeded
         except GitCommandError as e:
             lgr.debug("Failed to retrieve from URL: "

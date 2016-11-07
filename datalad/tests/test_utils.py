@@ -436,7 +436,7 @@ def test_knows_annex(here, there):
     assert_false(knows_annex(here))
     AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    GitRepo(path=there, url=here, create=True)
+    GitRepo.clone(path=there, url=here, create=True)
     assert_true(knows_annex(there))
 
 

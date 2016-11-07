@@ -67,7 +67,7 @@ def test_initiate_dataset(path, path2):
     # and even if we clone it -- nope -- since persistence is set by Annexificator
     # so we don't need to explicitly to commit it just in master since that might
     # not be the branch we will end up working in
-    annex2 = AnnexRepo(path2, url=dataset_path)
+    annex2 = AnnexRepo.clone(path=path2, url=dataset_path)
     annex3 = put_file_under_git(path2, 'test2.dat', content="test2", annexed=True)
     eq_(annex3.get_file_backend('test2.dat'), 'MD5E')
 

@@ -88,9 +88,9 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo(d2, d,
-                           runner=_get_custom_runner(d2),
-                           direct=direct)
+    cloned_annex = AnnexRepo.clone(d, d2,
+                                   runner=_get_custom_runner(d2),
+                                   direct=direct)
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 

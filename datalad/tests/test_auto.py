@@ -98,7 +98,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
 
     # clone to another repo
     repo2 = repo + "_2"
-    annex2 = AnnexRepo(repo2, repo)
+    annex2 = AnnexRepo.clone(repo, repo2)
     # verify that can't access
     fpath1_2 = fpath1.replace(repo, repo2)
     fpath2_2 = fpath2.replace(repo, repo2)

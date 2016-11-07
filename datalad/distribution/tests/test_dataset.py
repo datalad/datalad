@@ -134,7 +134,7 @@ def test_is_installed(src, path):
     assert_false(ds.is_installed())
 
     # get a clone:
-    AnnexRepo(path, src)
+    AnnexRepo.clone(src, path)
     ok_(ds.is_installed())
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
