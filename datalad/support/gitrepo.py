@@ -376,6 +376,18 @@ class WeakSingletonRepo(type):
     def __call__(self, path, *args, **kwargs):
 
 
+        if len(args) >= 1 or 'url' in kwargs:
+            # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing
+            # raise RuntimeError("RF: call clone() instead!")
+
+            if args:
+                url = args[0]
+            else:
+                url = kwargs['url']
+            return self.clone(url, path)
+        else:
+            return type.__call__(self, path, *args, **kwargs)
+
         # Wir brauchen realpath als singleton, aber addressierbar auf versch. weise (=> Dataset normpath?)
         #
         # - real path  => git dir?
@@ -395,14 +407,14 @@ class WeakSingletonRepo(type):
         # For now just make sure it's a "singleton" if addressed the same way.
         # When caring for this, consider symlinked submodules ...
         # look for issue by mih
-        _path = normpath(RI(path).localpath)
-
-        if _path in self._unique_repos:
-            return self._unique_repos[_path]
-        else:
-            repo = type.__call__(self, path, *args, **kwargs)  # or `_path`?
-            self._unique_repos[_path] = repo
-            return repo
+        # _path = normpath(RI(path).localpath)
+        #
+        # if _path in self._unique_repos:
+        #     return self._unique_repos[_path]
+        # else:
+        #     repo = type.__call__(self, path, *args, **kwargs)  # or `_path`?
+        #     self._unique_repos[_path] = repo
+        #     return repo
 
 
 class GitRepo(object):
@@ -414,7 +426,7 @@ class GitRepo(object):
 
     """
 
-    #__metaclass__ = WeakSingletonRepo
+    __metaclass__ = WeakSingletonRepo
     _unique_repos = WeakValueDictionary()
 
     #__slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
@@ -477,16 +489,6 @@ class GitRepo(object):
         # if it is not a local thing:
         path = RI(path).localpath
 
-        # try to get a local path from `url`:
-        if url is not None:
-            try:
-                if not isinstance(url, RI):
-                    url = RI(url).localpath
-                else:
-                    url = url.localpath
-            except ValueError:
-                pass
-
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
@@ -537,7 +539,8 @@ class GitRepo(object):
         if self.repo is not None:
             self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
-    def clone(self, url, path):
+    @classmethod
+    def clone(cls, url, path):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -548,6 +551,16 @@ class GitRepo(object):
         url : str
         path : str
         """
+
+        # try to get a local path from `url`:
+        if url is not None:
+            try:
+                if not isinstance(url, RI):
+                    url = RI(url).localpath
+                else:
+                    url = url.localpath
+            except ValueError:
+                pass
 
         if is_ssh(url):
             cnct = ssh_manager.get_connection(url)
@@ -561,11 +574,8 @@ class GitRepo(object):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
-                                                  url,
-                                                  path,
-                                                  env=env,
-                                                  odbt=default_git_odbt)
+                repo = gitpy.Repo.clone_from(url, path, env=env,
+                                             odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
                 # TODO: more arguments possible: ObjectDB etc.
@@ -593,6 +603,12 @@ class GitRepo(object):
                         999,  # good number
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
+
+        gr = GitRepo(path=path)
+        gr.repo = repo
+        # TODO: this is inefficient since a gitpy.Repo instance is built twice
+        # now. Let GitRepo.__init__ take a gitpy.Repo optionally
+        return gr
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))

@@ -75,8 +75,8 @@ from datalad.support.gitrepo import WeakSingletonRepo, WeakValueDictionary
 
 class Dataset(object):
 
-    __metaclass__ = WeakSingletonRepo
-    _unique_repos = WeakValueDictionary()
+    #__metaclass__ = WeakSingletonRepo
+    #_unique_repos = WeakValueDictionary()
     #__slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):

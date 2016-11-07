@@ -82,7 +82,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    #__metaclass__ = WeakSingletonRepo
+    __metaclass__ = WeakSingletonRepo
     _unique_repos = WeakValueDictionary()
 
 
