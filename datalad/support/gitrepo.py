@@ -382,9 +382,10 @@ class WeakSingletonRepo(type):
 
             if args:
                 url = args[0]
+                args = args[1:]
             else:
-                url = kwargs['url']
-            return self.clone(url, path)
+                url = kwargs.pop('url')
+            return self.clone(url, path, *args, **kwargs)
         else:
             return type.__call__(self, path, *args, **kwargs)
 
@@ -472,6 +473,9 @@ class GitRepo(object):
 
         """
 
+        if url is not None:
+            RuntimeError("RF: url passed to init()")
+
         # Disable automatic garbage and autopacking
         self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         # actually no need with default GitPython db backend not in memory
@@ -540,7 +544,7 @@ class GitRepo(object):
             self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
     @classmethod
-    def clone(cls, url, path):
+    def clone(cls, url, path, *args, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -604,7 +608,7 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
-        gr = GitRepo(path=path)
+        gr = cls(path=path, *args, **kwargs)
         gr.repo = repo
         # TODO: this is inefficient since a gitpy.Repo instance is built twice
         # now. Let GitRepo.__init__ take a gitpy.Repo optionally
