@@ -37,7 +37,7 @@ class MetadataParser(BaseMetadataParser):
                     continue
                 anx_meta = self._get_base_metadata_dict(anxid)
                 # TODO find a better type; define in context
-                anx_meta['Type'] = 'Annex'
+                anx_meta['@type'] = 'Annex'
                 if 'description' in anx:
                     anx_meta['Description'] = anx['description']
                 # XXX maybe report which one is local? Available in anx['here']

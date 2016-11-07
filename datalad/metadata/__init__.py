@@ -135,7 +135,7 @@ def _get_base_metadata_dict(identifier, describedby=None):
 
 
 def _is_versioned_dataset_item(m):
-    return 'isVersionOf' in m and m.get('Type', None) == 'Dataset'
+    return 'isVersionOf' in m and m.get('@type', None) == 'Dataset'
 
 
 def _get_implicit_metadata(ds, identifier):
@@ -146,7 +146,7 @@ def _get_implicit_metadata(ds, identifier):
 
     if ds.id:
         # it has an ID, so we consider it a proper dataset
-        meta['Type'] = "Dataset"
+        meta['@type'] = "Dataset"
         meta['isVersionOf'] = {'@id': ds.id}
 
     return meta
@@ -214,7 +214,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             # create a separate item for the abstract (unversioned) dataset
             # just to say that this ID belongs to a dataset
             dm = _get_base_metadata_dict(ds.id, 'base')
-            dm['Type'] = 'Dataset'
+            dm['@type'] = 'Dataset'
             meta.append(dm)
         meta.append(_get_implicit_metadata(ds, ds_identifier))
         # and any native meta data

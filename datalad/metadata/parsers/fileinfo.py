@@ -35,7 +35,7 @@ class MetadataParser(BaseMetadataParser):
         cfg_section = self.cfg_section
         for key, file_ in self.get_filekey_mapping():
             finfo = self._get_base_metadata_dict(key)
-            finfo['Type'] = 'File'
+            finfo['@type'] = 'File'
             finfo['Location'] = file_
             if cfg.getbool(cfg_section, 'filesize', True):
                 finfo['FileSize'] = repo.get_size_from_key(key)

@@ -40,6 +40,6 @@ def test_get_metadata(path):
             # knows both annexes
             assert_equal(len(avail), 2)
         else:
-            assert_equal(m.get('Type'), 'Annex')
+            assert_equal(m.get('@type'), 'Annex')
             desc = m.get('Description')
             assert 'annexorigin' in desc or 'annexclone' in desc

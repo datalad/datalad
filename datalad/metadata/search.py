@@ -297,7 +297,7 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            type_ = mds.get('Type', mds.get('type', '')).lower()
+            type_ = mds.get('@type', mds.get('type', '')).lower()
             if type_ not in what:
                 # not what we are looking for
                 continue

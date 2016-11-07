@@ -42,9 +42,9 @@ def test_get_metadata(path):
  {
   "@context": "http://schema.datalad.org/",
   "@id": "MD5E-s6--1064e995efbe81d12fbdccf5e32954bf.tsv.gz",
+  "@type": "File",
   "FileSize": 6,
   "Location": "test/subfile.tsv.gz",
-  "Type": "File",
   "conformsTo": "http://docs.datalad.org/metadata.html#v0-2",
   "contentType": "text/tab-separated-values",
   "describedby": {

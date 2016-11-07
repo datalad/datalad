@@ -120,9 +120,9 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[1].keys()),
-        ['@context', '@id', 'Type', 'conformsTo', 'describedby',
+        ['@context', '@id', '@type', 'conformsTo', 'describedby',
          'isVersionOf', 'modified'])
-    assert_equal(meta[0]['Type'], 'Dataset')
+    assert_equal(meta[0]['@type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling, guess_type=True)
@@ -280,8 +280,8 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['Type']))),
-        set([('Name', 'Type')])
+                             report=['@type']))),
+        set([('@type', 'Name')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))
