@@ -86,6 +86,12 @@ definitions = {
                'question': 'Enable?'}),
         'type': EnsureBool(),
     },
+    'datalad.metadata.search.cache.compress': {
+        'ui': ('yesno', {
+               'title': 'Compression of meta data cache for search can improve load time on slow networked storage',
+               'question': 'Compress meta data cache?'}),
+        'type': EnsureBool(),
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

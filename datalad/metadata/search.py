@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 import sys
+import gzip
 
 from distutils.version import LooseVersion
 from operator import itemgetter
@@ -47,13 +48,23 @@ def get_searchoptimized_metadata(ds):
     mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
 
     meta = None
+    checksum = None
     if os.path.exists(mcache_fname):
         lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-        meta, checksum = pickle.load(open(mcache_fname, 'rb'))
-        # TODO add more sophisticated tests to decide when the cache is no longer valid
-        if checksum != ds.repo.get_hexsha():
-            # errrr, try again below
-            meta = None
+        for method in (open, gzip.open):
+            try:
+                meta, checksum = pickle.load(method(mcache_fname, 'rb'))
+                break
+            except IOError:
+                lgr.debug("Failed to read %s using %s.%s",
+                          mcache_fname,
+                          method.__module__,
+                          method.__name__)
+
+    # TODO add more sophisticated tests to decide when the cache is no longer valid
+    if checksum != ds.repo.get_hexsha():
+        # errrr, try again below
+        meta = None
 
     # don't put in 'else', as yet to be written tests above might fail and require
     # regenerating meta data
@@ -76,11 +87,14 @@ def get_searchoptimized_metadata(ds):
         sort_keys = ('Location', 'location', 'Description', 'id')
         meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
 
-        # use pickle to store the optimized graph in the cache
+        if ds.config.get('datalad.metadata.search.cache.compress', False):
+            method = gzip.open
+        else:
+            method = open
         pickle.dump(
             # graph plus checksum from what it was built
             (meta, ds.repo.get_hexsha()),
-            open(mcache_fname, 'wb'))
+            method(mcache_fname, 'wb'))
         lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
     return meta
 
