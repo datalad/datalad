@@ -182,41 +182,27 @@ class AnnexRepo(GitRepo):
                 if url is not None:
                     if is_ssh(url):
                         c = ssh_manager.get_connection(url)
+                        ssh_cfg_var = "remote.{0}.annex-ssh-options".format(r)
                         cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
-                        sct = "remote \"%s\"" % r
-                        opt = "annex-ssh-options"
-                        reader = self.repo.config_reader()
+                        cfg_string_old = self.config.get(ssh_cfg_var, None)
 
-                        # we write only, if there's nothing already
-                        write = False
-                        try:
-                            cfg_string_old = reader.get_value(section=sct,
-                                                              option=opt)
-                        except NoOptionError:
-                            write = True
-                            cfg_string_old = None
                         if cfg_string_old and cfg_string_old != cfg_string:
                             lgr.warning("Found conflicting annex-ssh-options "
                                         "for remote '{0}':\n{1}\n"
                                         "Did not touch it.".format(
                                             r, cfg_string_old))
                             continue
-                        if write:
-                            writer = self.repo.config_writer()
-                            writer.set_value(section=sct, option=opt,
-                                             value=cfg_string)
-                            writer.release()
+
+                        # Note for conflicting resolution: was "if write"
+                        if cfg_string_old is None:
+                            self.config.set(ssh_cfg_var, cfg_string,
+                                            where='local', reload=True)
 
         self.always_commit = always_commit
 
-        # Note: Not sure yet, whether 'dataset=self' is appropriate, but we need
-        # to be able to read dataset's config in case we don't create a brand
-        # new one here.
-        cfg = ConfigManager(dataset=self)
-
         if version is None:
             try:
-                version = cfg["datalad.repo.version"]
+                version = self.config["datalad.repo.version"]
             except KeyError:
                 pass
 
@@ -244,10 +230,10 @@ class AnnexRepo(GitRepo):
         # - parameter `direct` has priority over config
         if direct is None:
             direct = (create or init) and \
-                     cfg.getbool("datalad", "repo.direct", default=False)
+                     self.config.getbool("datalad", "repo.direct", default=False)
         self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
-            if self.repo.config_reader().get_value('annex', 'version') < 6:
+            if self.config.get_value('annex', 'version') < 6:
                 lgr.debug("Switching to direct mode (%s)." % self)
                 self.set_direct_mode()
             else:
@@ -263,9 +249,11 @@ class AnnexRepo(GitRepo):
             # Must be done with explicit release, otherwise on Python3 would end up
             # with .git/config wiped out
             # see https://github.com/gitpython-developers/GitPython/issues/333#issuecomment-126633757
-            writer = self.repo.config_writer()
-            writer.set_value("annex", "backends", backend)
-            writer.release()
+
+            # TODO: 'annex.backends' actually is a space separated list.
+            # Figure out, whether we want to allow for a list here or what to
+            # do, if there is sth in that setting already
+            self.config.set('annex.backends', backend, where='local')
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
@@ -1720,8 +1708,7 @@ class AnnexRepo(GitRepo):
         if not self._uuid:
             if not self.repo:
                 return None
-            repocfg = self.repo.config_reader()
-            self._uuid = repocfg.get_value('annex', 'uuid', default='')
+            self._uuid = self.config.get_value('annex', 'uuid', default='')
             if not self._uuid:
                 self._uuid = None
         return self._uuid

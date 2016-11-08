@@ -41,6 +41,7 @@ from git.objects.blob import Blob
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
 from datalad.dochelpers import exc_str
+from datalad.config import ConfigManager
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -508,11 +509,13 @@ class GitRepo(object):
         #       to the same location
 
         self.repo = None
-        if url is not None and not (url == path):
-            # TODO: What to do, in case url is given, but path exists already?
-            # Just rely on whatever clone_from() does, independently on value
-            # of create argument?
-            self.clone(url, path)
+        self._cfg = None
+
+#        if url is not None and not (url == path):
+#            # TODO: What to do, in case url is given, but path exists already?
+#            # Just rely on whatever clone_from() does, independently on value
+#            # of create argument?
+#            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -629,6 +632,23 @@ class GitRepo(object):
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git', 'objects'))
+
+    @property
+    def config(self):
+        """Get an instance of the parser for the persistent repository
+        configuration.
+
+        Note: This allows to also read/write .datalad/config,
+        not just .git/config
+
+        Returns
+        -------
+        ConfigManager
+        """
+        if self._cfg is None:
+            # associate with this dataset and read the entire config hierarchy
+            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+        return self._cfg
 
     def is_with_annex(self, only_remote=False):
         """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
@@ -1198,7 +1218,9 @@ class GitRepo(object):
             cmd += options
         cmd += [name, url]
 
-        return self._git_custom_command('', cmd)
+        result = self._git_custom_command('', cmd)
+        self.config.reload()
+        return result
 
     def remove_remote(self, name):
         """Remove existing remote
@@ -1414,17 +1436,9 @@ class GitRepo(object):
         push: bool
           if True, get the pushurl instead of the fetch url.
         """
-        cfg_reader = self.repo.remote(name).config_reader
-        if push:
-            if cfg_reader.has_option('pushurl'):
-                return cfg_reader.get('pushurl')
-            else:
-                return None
-        else:
-            if cfg_reader.has_option('url'):
-                return cfg_reader.get('url')
-            else:
-                return None
+
+        var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
+        return self.config.get(var, None)
 
     def set_remote_url(self, name, url, push=False):
         """Set the URL a remote is pointing to
@@ -1440,11 +1454,10 @@ class GitRepo(object):
           if True, set the push URL, otherwise the fetch URL
         """
 
-        cmd = ["git", "remote", "set-url"]
-        if push:
-            cmd.append("--push")
-        cmd += [name, url]
-        return self._git_custom_command('', cmd)
+        var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
+        #if var in self.config:  # git-config unset exits non-zero otherwise
+        #    self.config.unset(var, where='local', reload=False)
+        self.config.set(var, url, where='local', reload=True)
 
     def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
@@ -1681,20 +1694,8 @@ class GitRepo(object):
         if branch is None:
             branch = self.get_active_branch()
 
-        cfg_reader = self.repo.config_reader()
-        sct = "branch \"{0}\"".format(branch)
-        track_remote = cfg_reader.get_value(section=sct,
-                                            option="remote",
-                                            default="DATALAD_DEFAULT")
-        if track_remote == "DATALAD_DEFAULT":
-            # we have no "tracking remote"
-            track_remote = None
-        track_branch = cfg_reader.get_value(section=sct,
-                                            option="merge",
-                                            default="DATALAD_DEFAULT")
-        if track_branch == "DATALAD_DEFAULT":
-            # we have no tracking branch
-            track_branch = None
+        track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
+        track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
 
         return track_remote, track_branch
 
