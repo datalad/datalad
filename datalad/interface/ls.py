@@ -864,7 +864,9 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
         max_length = max((len(e.name) for e in prefix_all_versions))
         max_size_length = max((len(str(getattr(e, 'size', 0))) for e in prefix_all_versions))
 
+    results = []
     for e in prefix_all_versions:
+        results.append(e)
         if isinstance(e, Prefix):
             ui.message("%s" % (e.name, ),)
             continue
@@ -916,3 +918,4 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
                 ui.message('')
         else:
             ui.message(base_msg + " " + str(type(e)).split('.')[-1].rstrip("\"'>"))
+    return results
