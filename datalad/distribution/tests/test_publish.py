@@ -108,7 +108,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
         publish(dataset=source, to="target", recursive=True)
-    assert_in("No sibling 'target' found.", exc_str(cm.exception))
+    assert_in("No sibling 'target' found", exc_str(cm.exception))
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
