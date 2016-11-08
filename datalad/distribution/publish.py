@@ -286,7 +286,8 @@ class Publish(Interface):
             # is `to` an already known remote?
             if dest_resolved not in ds.repo.get_remotes():
                 # unknown remote
-                raise ValueError("No sibling '%s' found." % dest_resolved)
+                raise ValueError("No sibling '{0}' found for {1}."
+                                 "".format(dest_resolved, ds))
 
             # in order to be able to use git's config to determine what to push,
             # we need to annex merge first. Otherwise a git push might be
