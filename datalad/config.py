@@ -475,7 +475,7 @@ class ConfigManager(object):
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
     @_where_reload
-    def set(self, var, value, where='dataset', reload=True):
+    def set(self, var, value, where='dataset', reload=True, force=False):
         """Set a variable to a value.
 
         In opposition to `add`, this replaces the value of `var` if there is
@@ -488,9 +488,15 @@ class ConfigManager(object):
           'core.editor'
         value : str
           Variable value
+        force: bool
+          if set, replaces all occurrences of `var` by a single one with the
+          given `value`. Otherwise raise if multiple entries for `var` exist
+          already
         %s"""
+        from datalad.support.gitrepo import to_options
 
-        self._run([var, value], where=where, reload=reload, log_stderr=True)
+        self._run(to_options(replace_all=force) + [var, value],
+                  where=where, reload=reload, log_stderr=True)
 
     @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):

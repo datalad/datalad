@@ -124,13 +124,23 @@ def test_something(path, new_home):
     assert_true('mike.wants.to' in cfg)
     assert_equal(len(cfg['mike.wants.to']), 2)
 
-    # set instead of add:
+    # set a new one:
     cfg.set('mike.should.have', 'known')
     assert_in('mike.should.have', cfg)
     assert_equal(cfg['mike.should.have'], 'known')
-    # set replaces:
+    # set an existing one:
     cfg.set('mike.should.have', 'known better')
     assert_equal(cfg['mike.should.have'], 'known better')
+    # set, while there are several matching ones already:
+    cfg.add('mike.should.have', 'a meal')
+    assert_equal(len(cfg['mike.should.have']), 2)
+    # raises with force=False
+    assert_raises(CommandError,
+                  cfg.set, 'mike.should.have', 'a beer', force=False)
+    assert_equal(len(cfg['mike.should.have']), 2)
+    # replaces all matching ones with force=True
+    cfg.set('mike.should.have', 'a beer', force=True)
+    assert_equal(cfg['mike.should.have'], 'a beer')
 
     # fails unknown location
     assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
