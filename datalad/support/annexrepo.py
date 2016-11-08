@@ -201,10 +201,7 @@ class AnnexRepo(GitRepo):
         self.always_commit = always_commit
 
         if version is None:
-            try:
-                version = self.config["datalad.repo.version"]
-            except KeyError:
-                pass
+            version = self.config.get("datalad.repo.version", None)
 
         if fix_it:
             self._init(version=version, description=description)
@@ -233,7 +230,11 @@ class AnnexRepo(GitRepo):
                      self.config.getbool("datalad", "repo.direct", default=False)
         self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
-            if self.config.get_value('annex', 'version') < 6:
+            # direct mode is available below version 6 repos only.
+            # Note: If 'annex.version' is missing in .git/config for some
+            # reason, we need to try to set direct mode:
+            repo_version = self.config.getint("annex", "version")
+            if (repo_version is None) or (repo_version < 6):
                 lgr.debug("Switching to direct mode (%s)." % self)
                 self.set_direct_mode()
             else:
@@ -403,13 +404,10 @@ class AnnexRepo(GitRepo):
         -------
         True if in direct mode, False otherwise.
         """
-
-        try:
-            return self.repo.config_reader().get_value("annex", "direct")
-        except (NoOptionError, NoSectionError):
-            # If .git/config lacks an entry "direct",
-            # it's actually indirect mode.
-            return False
+        # If .git/config lacks an entry "direct",
+        # it's actually indirect mode.
+        self.config.reload()
+        return self.config.getbool("annex", "direct", False)
 
     def is_direct_mode(self):
         """Return True if annex is in direct mode
@@ -460,6 +458,8 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('direct' if enable_direct_mode else 'indirect',
                                 expect_stderr=True)
+        self.config.reload()
+
         # For paranoid we will just re-request
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
@@ -492,6 +492,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('init', annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
+        self.config.reload()
 
     @normalize_paths
     def get(self, files, options=None, jobs=None):
@@ -524,8 +525,8 @@ class AnnexRepo(GitRepo):
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if not fetch_files:
-             lgr.debug("No files found needing fetching.")
-             return []
+            lgr.debug("No files found needing fetching.")
+            return []
 
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
@@ -964,8 +965,6 @@ class AnnexRepo(GitRepo):
 
         options = options[:] if options else []
         git_options = []
-        #if file_ == 'about.txt':
-        #    import pdb; pdb.set_trace()
         kwargs = dict(backend=backend)
         if not batch:
             self._run_annex_command('addurl',
@@ -1708,9 +1707,7 @@ class AnnexRepo(GitRepo):
         if not self._uuid:
             if not self.repo:
                 return None
-            self._uuid = self.config.get_value('annex', 'uuid', default='')
-            if not self._uuid:
-                self._uuid = None
+            self._uuid = self.config.get('annex.uuid', default=None)
         return self._uuid
 
     def get_description(self, uuid=None):
@@ -1745,17 +1742,19 @@ class AnnexRepo(GitRepo):
             return matches[0]
         elif len(matches) == 2:
             lgr.warning(
-                "Found multiple hits while sarching. Returning first among: %s",
+                "Found multiple hits while searching. Returning first among: %s",
                 str(matches)
             )
             return matches[0]
         else:
             return None
 
+
 # TODO: Why was this commented out?
 # @auto_repr
 class BatchedAnnexes(dict):
-    """Class to contain the registry of active batch'ed instances of annex for a repository
+    """Class to contain the registry of active batch'ed instances of annex for
+    a repository
     """
     def __init__(self, batch_size=0):
         self.batch_size = batch_size
@@ -1771,11 +1770,14 @@ class BatchedAnnexes(dict):
 
         if codename not in self:
             # Create a new git-annex process we will keep around
-            self[codename] = BatchedAnnex(annex_cmd, git_options=git_options, **kwargs)
+            self[codename] = BatchedAnnex(annex_cmd,
+                                          git_options=git_options,
+                                          **kwargs)
         return self[codename]
 
     def clear(self):
-        """Override just to make sure we don't rely on __del__ to close all the pipes"""
+        """Override just to make sure we don't rely on __del__ to close all
+        the pipes"""
         self.close()
         super(BatchedAnnexes, self).clear()
 
