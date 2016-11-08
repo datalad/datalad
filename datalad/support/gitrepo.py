@@ -618,6 +618,11 @@ class GitRepo(object):
         # now. Let GitRepo.__init__ take a gitpy.Repo optionally
         return gr
 
+    def __del__(self):
+        # unbind possibly bound ConfigManager, to prevent all kinds of weird
+        # stalls etc
+        self._cfg = None
+
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
 
