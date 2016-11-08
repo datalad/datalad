@@ -475,6 +475,24 @@ class ConfigManager(object):
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
     @_where_reload
+    def set(self, var, value, where='dataset', reload=True):
+        """Set a variable to a value.
+
+        In opposition to `add`, this replaces the value of `var` if there is
+        one already.
+
+        Parameters
+        ----------
+        var : str
+          Variable name including any section like `git config` expects them, e.g.
+          'core.editor'
+        value : str
+          Variable value
+        %s"""
+
+        self._run([var, value], where=where, reload=reload, log_stderr=True)
+
+    @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):
         """Rename a configuration section
 

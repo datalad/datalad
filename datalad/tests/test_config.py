@@ -124,7 +124,15 @@ def test_something(path, new_home):
     assert_true('mike.wants.to' in cfg)
     assert_equal(len(cfg['mike.wants.to']), 2)
 
-    # fails unkown location
+    # set instead of add:
+    cfg.set('mike.should.have', 'known')
+    assert_in('mike.should.have', cfg)
+    assert_equal(cfg['mike.should.have'], 'known')
+    # set replaces:
+    cfg.set('mike.should.have', 'known better')
+    assert_equal(cfg['mike.should.have'], 'known better')
+
+    # fails unknown location
     assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
 
     # very carefully test non-local config
