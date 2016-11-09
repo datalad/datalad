@@ -206,6 +206,10 @@ def test_aggregation(path):
     assert_equal(clonemeta[0]['@id'], ds.id)
     assert_equal(clone.repo.get_hexsha(), ds.repo.get_hexsha())
     assert_equal(clonemeta[2]['@id'], ds.repo.get_hexsha())
+    # for the reset pull all the annexed meta data
+    clonemeta = get_metadata(
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False,
+        obtain_files=True)
     # all but the implicit is identical
     assert_equal([i for i in clonemeta if not _is_versioned_dataset_item(i)],
                  [i for i in meta if not _is_versioned_dataset_item(i)])
@@ -457,7 +461,8 @@ def test_aggregation_with_disabled_parsers(path):
     clone.config.add('datalad.metadata.parsers.disable', 'fileinfo')
     clone.config.add('datalad.metadata.parsers.disable', 'knownannexes')
     clonemeta = get_metadata(
-        clone, guess_type=False, ignore_subdatasets=False, from_native=False)
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False,
+        obtain_files=True)
 
     def _checkmeta(testmeta):
         # check that unwanted pieces are gone

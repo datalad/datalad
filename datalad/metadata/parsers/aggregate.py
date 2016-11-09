@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Parser for datalad's own aggregated metadata"""
 
-from os.path import join as opj
+from os.path import join as opj, dirname, exists
 
 from datalad.utils import find_files
 from datalad.support.json_py import load as jsonload
@@ -30,7 +30,7 @@ def _adjust_location(meta, subds_relpath):
 class MetadataParser(BaseMetadataParser):
     def get_core_metadata_filenames(self):
         return list(find_files(
-            'meta\.json',
+            r'.*\.json',
             topdir=opj(self.ds.path, '.datalad', 'meta'),
             exclude=None,
             exclude_vcs=False,
@@ -45,9 +45,16 @@ class MetadataParser(BaseMetadataParser):
         basepath = opj(self.ds.path, '.datalad', 'meta')
         parts = []
         for subds_meta_fname in self.get_core_metadata_filenames():
+            # XXX RF file_has_content() to make pre-condition test obsolete
+            if not exists(subds_meta_fname) \
+                    or (hasattr(self.ds.repo, 'is_under_annex')
+                        and self.ds.repo.is_under_annex(subds_meta_fname)
+                        and not self.ds.repo.file_has_content(subds_meta_fname)):
+                # ignore anything that is not actually present
+                continue
             # get the part between the 'meta' dir and the filename
             # which is the subdataset mountpoint
-            subds_path = subds_meta_fname[len(basepath) + 1:-10]
+            subds_path = dirname(subds_meta_fname)[len(basepath) + 1:]
             if not subds_path:
                 # this is a potentially existing cache of the native meta data
                 # of the superdataset, not for us...

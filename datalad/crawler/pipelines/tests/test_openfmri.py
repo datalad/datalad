@@ -298,7 +298,10 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 
     target_files = {
         './.datalad/config',
-        './.datalad/meta/meta.json',
+        './.datalad/meta/base.json',
+        './.datalad/meta/fileinfo.json',
+        './.datalad/meta/knownannexes.json',
+        './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/crawl.cfg',
         # no more!
         # './.datalad/config.ttl', './.datalad/datalad.ttl',

@@ -16,6 +16,7 @@ if PY2:
 else:
     import pickle
 from hashlib import md5
+from glob import glob
 from six.moves.urllib.parse import urlsplit
 from os.path import join as opj, exists
 from os.path import dirname
@@ -28,10 +29,10 @@ from datalad.dochelpers import exc_str
 from datalad.log import lgr
 from datalad import cfg
 from datalad import __version__
+from datalad.distribution.get import Get
 
 
 # common format
-metadata_filename = 'meta.json'
 metadata_basepath = opj('.datalad', 'meta')
 
 
@@ -174,9 +175,23 @@ def _simplify_meta_data_structure(meta):
     return meta
 
 
+def _load_cached_metadata(ds):
+    meta_path = opj(ds.path, metadata_basepath)
+    meta = []
+    for fname in glob(opj(meta_path, '*.json')):
+        # XXX RF file_has_content() to make pre-condition test obsolete
+        if hasattr(ds.repo, 'is_under_annex') \
+                and ds.repo.is_under_annex(fname) \
+                and not ds.repo.file_has_content(fname):
+            lgr.debug("Skipping %s, file content not available", fname)
+            break
+        meta.extend(assure_list(jsonload(fname)))
+    return meta
+
+
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                 from_native=False):
+                 from_native=False, obtain_files=False):
     """Return a list of meta data items for the given dataset
 
     Parameters
@@ -196,20 +211,22 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
       native sources anyway when no pre-processed/aggregated meta data is
       available yet. Such meta data can be produced by the
       `aggregate_metadata` command.
+    obtain_files : bool
+      If True, will make an attempt to obtain files with any available cached
+      extra (or non-essential, such as file-based) meta data from, possibly
+      online, resources. Only relevant when `from_native` is disabled.
     """
     if not ds.repo or not ds.repo.repo.head.is_valid():
         # not a single commit
         return []
     repo = ds.repo.repo
     ds_identifier = repo.head.commit.hexsha
-    # where things are
     meta_path = opj(ds.path, metadata_basepath)
-    main_meta_fname = opj(meta_path, metadata_filename)
     # metadata receptacle
     meta = []
 
     # from cache?
-    if from_native or not exists(main_meta_fname):
+    if from_native or not exists(meta_path):
         if ds.id:
             # create a separate item for the abstract (unversioned) dataset
             # just to say that this ID belongs to a dataset
@@ -224,8 +241,10 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 guess_type=guess_type,
                 ds_identifier=ds_identifier))
     else:
+        if obtain_files and exists(meta_path):
+            Get.__call__(meta_path, dataset=ds)
         # from cache
-        cached_meta = jsonload(main_meta_fname)
+        cached_meta = _load_cached_metadata(ds)
         # discard anything that isn't wanted anymore
         cached_meta = _remove_items_by_parser(
             cached_meta, get_disabled_metadata_parsers(ds))

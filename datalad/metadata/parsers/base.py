@@ -50,7 +50,10 @@ class BaseMetadataParser(object):
         if not repo or not hasattr(repo, 'get_annexed_files'):
             return {}
         # TODO consider non-annexed files too
-        files = assure_list(repo.get_annexed_files())
+        files = [f for f in assure_list(repo.get_annexed_files())
+                 # exclude any annexed files that we are using for internal
+                 # purposes (eg meta data caches)
+                 if not f.startswith('.datalad')]
         if not len(files):
             return []
         keys = assure_list(repo.get_file_key(files))
