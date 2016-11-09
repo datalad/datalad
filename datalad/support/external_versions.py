@@ -82,16 +82,19 @@ class ExternalVersions(object):
         self._versions = {}
 
     @classmethod
-    def _deduce_version(klass, module):
+    def _deduce_version(klass, value):
         version = None
         for attr in ('__version__', 'version'):
-            if hasattr(module, attr):
-                version = getattr(module, attr)
+            if hasattr(value, attr):
+                version = getattr(value, attr)
                 break
 
         if isinstance(version, tuple) or isinstance(version, list):
             #  Generate string representation
             version = ".".join(str(x) for x in version)
+
+        if version is None and isinstance(value, string_types):
+            version = value
 
         if version:
             if isinstance(version, binary_type):
@@ -122,6 +125,7 @@ class ExternalVersions(object):
             if modname in self.CUSTOM:
                 try:
                     version = self.CUSTOM[modname]()
+                    version = self._deduce_version(version)
                 except Exception as exc:
                     lgr.debug("Failed to deduce version of %s due to %s"
                               % (modname, exc_str(exc)))
