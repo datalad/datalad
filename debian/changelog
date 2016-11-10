@@ -1,3 +1,11 @@
+datalad (0.4.1-1) unstable; urgency=medium
+
+  * New upstream release
+  * debian/control
+    - require python-git >| 2.1~
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 10 Nov 2016 15:14:24 -0500
+
 datalad (0.4-1) unstable; urgency=medium
 
   * New upstream release
