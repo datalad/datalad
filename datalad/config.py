@@ -9,14 +9,11 @@
 """
 """
 
-import logging
 from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
 import re
 import os
 from os.path import join as opj, exists
-
-lgr = logging.getLogger('datalad.config')
 
 cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
@@ -80,6 +77,21 @@ def _parse_env(store):
     return store
 
 
+def anything2bool(val):
+    if hasattr(val, 'lower'):
+        val = val.lower()
+    if val in {"off", "no", "false", "0"} or not bool(val):
+        return False
+    elif val in {"on", "yes", "true", True} \
+            or (hasattr(val, 'isdigit') and val.isdigit() and int(val)) \
+            or isinstance(val, int) and val:
+        return True
+    else:
+        raise TypeError(
+            "Got value %s which could not be interpreted as a boolean"
+            % repr(val))
+
+
 class ConfigManager(object):
     """Thin wrapper around `git-config` with support for a dataset configuration.
 
@@ -126,12 +138,15 @@ class ConfigManager(object):
         self._store = {}
         self._dataset = dataset
         self._dataset_only = dataset_only
+        # Since configs could contain sensitive information, to prevent
+        # any "facilitated" leakage -- just disable loging of outputs for
+        # this runner
+        run_kwargs = dict(log_outputs=False)
         if dataset is not None:
             # make sure we run the git config calls in the dataset
             # to pick up the right config files
-            self._runner = Runner(cwd=dataset.path)
-        else:
-            self._runner = Runner()
+            run_kwargs['cwd'] = dataset.path
+        self._runner = Runner(**run_kwargs)
         self.reload()
 
     def reload(self):
@@ -148,14 +163,14 @@ class ConfigManager(object):
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
             if exists(dscfg_fname):
                 stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
-                                           log_stderr=False)
+                                           log_stderr=True)
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store = _parse_gitconfig_dump(
                     stdout, self._store, replace=False)
 
         if not self._dataset_only:
-            stdout, stderr = self._run(['-z', '-l'], log_stderr=False)
+            stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
             self._store = _parse_gitconfig_dump(
                 stdout, self._store, replace=True)
 
@@ -217,7 +232,9 @@ class ConfigManager(object):
             _value = self[var]
         elif store is False and default is not None:
             # nothing will be stored, and we have a default -> no user confirmation
-            lgr.debug('using default {} for config setting {}'.format(default, var))
+            # we cannot use logging, because we want to use the config to confiugre
+            # the logging
+            #lgr.debug('using default {} for config setting {}'.format(default, var))
             _value = default
 
         if _value is not None:
@@ -358,18 +375,7 @@ class ConfigManager(object):
         TypeError is raised for other values.
         """
         val = self.get_value(section, option, default=default)
-        if hasattr(val, 'lower'):
-            val = val.lower()
-        if val in {"off", "no", "false", "0"} or not bool(val):
-            return False
-        elif val in {"on", "yes", "true", True} \
-                or (hasattr(val, 'isdigit') and val.isdigit() and int(val)) \
-                or isinstance(val, int) and val:
-            return True
-        else:
-            raise TypeError(
-                "Got config value %s which should be interpreted as bool"
-                % repr(val))
+        return anything2bool(val)
 
     def getfloat(self, section, option):
         """A convenience method which coerces the option value to a float"""

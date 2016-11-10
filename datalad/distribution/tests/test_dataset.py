@@ -100,18 +100,27 @@ def test_register_sibling(remote, path):
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
-    eq_(set(ds.get_subdatasets()), {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True)),
-        {'sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1',
-         'sub dataset1/sub sub dataset1/subm 2', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2', 'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=0)),
-        set([]))
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=1)),
-        {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=2)),
-        {'sub dataset1', 'sub dataset1/sub sub dataset1', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2'})
+    eq_(ds.get_subdatasets(), ['sub dataset1'])
+    eq_(ds.get_subdatasets(recursive=True),
+        [
+            'sub dataset1/sub sub dataset1/subm 1',
+            'sub dataset1/sub sub dataset1/subm 2',
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/subm 1',
+            'sub dataset1/subm 2',
+            'sub dataset1'
+        ])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=0),
+        [])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=1),
+        ['sub dataset1'])
+    eq_(ds.get_subdatasets(recursive=True, recursion_limit=2),
+        [
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/subm 1',
+            'sub dataset1/subm 2',
+            'sub dataset1',
+        ])
 
     # TODO:  More Flavors!
 
@@ -130,6 +139,7 @@ def test_is_installed(src, path):
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
+    subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would

@@ -266,8 +266,7 @@ class Publish(Interface):
                 # unknown remote
                 raise ValueError("No sibling '%s' found." % dest_resolved)
 
-            lgr.info("Publishing dataset {0} to sibling {1} "
-                     "...".format(ds, dest_resolved))
+            lgr.info("Publishing {0} to {1}".format(ds, dest_resolved))
 
             # we now know where to push to:
             _log_push_info(ds.repo.push(remote=dest_resolved,

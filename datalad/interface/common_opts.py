@@ -33,6 +33,19 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
+shared_access_opt = Parameter(
+    args=('--shared-access',),
+    metavar='MODE',
+    doc="""configure shared access to a dataset, see `git init --shared`
+    documentation for complete details on the supported scenarios. Possible
+    values include: 'false', 'true', 'group', and 'all'""")
+
+super_datasets_flag = Parameter(
+    args=("-S", "--super-datasets",),
+    action="store_true",
+    doc="""if set, traverse and save stats corresponding to the change
+    within super-datasets""")
+
 git_opts = Parameter(
     args=("--git-opts",),
     metavar='STRING',
@@ -116,3 +129,23 @@ verbose = Parameter(
     args=("-v", "--verbose",),
     action="store_true",
     doc="""print out more detailed information while executing a command""")
+
+
+as_common_datasrc = Parameter(
+    args=("--as-common-datasrc",),
+    metavar='NAME',
+    doc="""configure the created sibling as a common data source of the
+    dataset that can be automatically used by all consumers of the
+    dataset (technical: git-annex auto-enabled special remote)""")
+
+
+publish_depends = Parameter(
+    args=("--publish-depends",),
+    metavar='SIBLINGNAME',
+    doc="""add a dependency such that the given exsiting sibling is
+    always published prior to the new sibling. This equals setting a
+    configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
+    [PY: Multiple dependencies can be given as a list of sibling names
+    PY][CMD: This option can be given more than once to configure multiple
+    dependencies CMD]""",
+    action='append')

@@ -124,8 +124,10 @@ class ColorFormatter(logging.Formatter):
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
-        # TODO: config log.timestamp=True
-        return (("" if not int(os.environ.get("DATALAD_LOG_TIMESTAMP", True)) else "$BOLD%(asctime)-15s$RESET ") +
+        from datalad import cfg
+        from datalad.config import anything2bool
+        show_timestamps = anything2bool(cfg.get('datalad.log.timestamp', False))
+        return (("" if not show_timestamps else "$BOLD%(asctime)-15s$RESET ") +
                 ("%(name)-15s " if log_name else "") +
                 ("{%(process)d}" if log_pid else "") +
                 "[%(levelname)s] "
@@ -190,6 +192,12 @@ class LoggerHelper(object):
             log_level = getattr(logging, level.upper())
 
         self.lgr.setLevel(log_level)
+        # and set other related/used loggers to the same level to prevent their
+        # talkativity, if they are not yet known to this python session, so we
+        # have little chance to "override" possibly set outside levels
+        for dep in ('git',):
+            if dep not in logging.Logger.manager.loggerDict:
+                logging.getLogger(dep).setLevel(log_level)
 
     def get_initialized_logger(self, logtarget=None):
         """Initialize and return the logger

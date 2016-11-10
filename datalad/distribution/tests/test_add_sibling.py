@@ -9,26 +9,14 @@
 
 """
 
-import os
-from os.path import join as opj, abspath, basename
-from ..dataset import Dataset
+from os.path import join as opj, basename
 from datalad.api import install, add_sibling
-from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_is_instance
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_not_in
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
-from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import with_tempfile, assert_in, with_testrepos
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module, skip_if, skip_if_on_windows
-from datalad.tests.utils import ok_clean_git
+
+from nose.tools import eq_, ok_
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -37,9 +25,16 @@ def test_add_sibling(origin, repo_path):
 
     # prepare src
     source = install(repo_path, source=origin, recursive=True)[0]
+    # pollute config
+    depvar = 'remote.test-remote.datalad-publish-depends'
+    source.config.add(depvar, 'stupid', where='local')
 
     res = add_sibling(dataset=source, name="test-remote",
-                      url="http://some.remo.te/location")
+                      url="http://some.remo.te/location",
+                      publish_depends=['r1', 'r2'],
+                      force=True)
+    eq_(source.config.get(depvar, None), ('r1', 'r2'))
+
     eq_(res, [basename(source.path)])
     assert_in("test-remote", source.repo.get_remotes())
     eq_("http://some.remo.te/location",

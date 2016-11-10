@@ -164,11 +164,15 @@ def ok_clean_git_annex_proxy(path):
     )
 
 
-def ok_clean_git(path, annex=True, untracked=[]):
+def ok_clean_git(path, annex=True, head_modified=[], index_modified=[], untracked=[]):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
     """
+    from datalad.support.gitrepo import GitRepo
+    if isinstance(path, GitRepo):
+        path = path.path
+
     ok_(exists(path))
     ok_(exists(join(path, '.git')))
     if annex:
@@ -178,14 +182,23 @@ def ok_clean_git(path, annex=True, untracked=[]):
     if repo.index.entries.keys():
         ok_(repo.head.is_valid())
 
-        # get string representations of diffs with index to ease
-        # troubleshooting
-        index_diffs = [str(d) for d in repo.index.diff(None)]
-        head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-
         eq_(sorted(repo.untracked_files), sorted(untracked))
-        eq_(index_diffs, [])
-        eq_(head_diffs, [])
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
+        else:
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                eq_(head_modified_, head_modified)
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                eq_(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -912,6 +925,7 @@ def ignore_nose_capturing_stdout(func):
                 raise
     return newfunc
 
+
 def skip_httpretty_on_problematic_pythons(func):
     """As discovered some httpretty bug causes a side-effect
     on other tests on some Pythons.  So we skip the test if such
@@ -942,6 +956,13 @@ def with_batch_direct(t):
 
     return newfunc
 
+
+def dump_graph(graph, flatten=False):
+    from json import dumps
+    if flatten:
+        from datalad.metadata import flatten_metadata_graph
+        graph = flatten_metadata_graph(graph)
+    return dumps(graph, indent=1)
 
 
 # List of most obscure filenames which might or not be supported by different

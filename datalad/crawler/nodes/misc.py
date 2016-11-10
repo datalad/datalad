@@ -43,7 +43,7 @@ class fix_permissions(object):
             Parameters
             ----------
             file_re : str, optional
-              Regular expression str to which the filename must match
+              Regular expression str to which the filename must contain (re.search)
             executable : boolean, optional
               If false, sets file to allow no one to execute. If true, sets file
               to be executable to those already allowed to read it
@@ -63,7 +63,7 @@ class fix_permissions(object):
         filename = data.get(self.input)
 
         # check that file matches regex
-        if not filename.endswith(self.file_re):
+        if not re.search(self.file_re, filename):
             yield data
             return  # early termination since nothing to do
 

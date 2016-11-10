@@ -10,20 +10,14 @@
 
 """
 
-import mock
 from functools import partial
 from os import mkdir
+from shutil import copyfile
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
-from shutil import copyfile
-from nose.tools import assert_is_instance
 
-from datalad.utils import linux_distribution_name
 from datalad.tests.utils import *
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.exceptions import OutdatedExternalDependency
-
 # imports from same module:
 from ..annexrepo import *
 
@@ -170,6 +164,13 @@ def test_AnnexRepo_get_file_key(src, annex_path):
         ar.get_file_key("test-annex.dat"),
         'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
 
+    # and should take a list with an empty string as result, if a file wasn't
+    # in annex:
+    assert_equal(
+        ar.get_file_key(["filenotpresent.wtf", "test-annex.dat"]),
+        ['', 'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat']
+    )
+
     # test.dat is actually in git
     # should raise Exception; also test for polymorphism
     assert_raises(IOError, ar.get_file_key, "test.dat")
@@ -178,6 +179,8 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+
 
 
 @with_tempfile(mkdir=True)
@@ -763,23 +766,23 @@ def test_AnnexRepo_get(src, dst):
 
     called = []
     # for some reason yoh failed mock to properly just call original func
-    orig_run = annex._run_annex_command_json
+    orig_run = annex._run_annex_command
 
-    def check_run(cmd, args, **kwargs):
+    def check_run(cmd, annex_options, **kwargs):
         called.append(cmd)
         if cmd == 'find':
-            assert_not_in('-J5', args)
+            assert_not_in('-J5', annex_options)
         elif cmd == 'get':
-            assert_in('-J5', args)
+            assert_in('-J5', annex_options)
         else:
             raise AssertionError(
                 "no other commands so far should be ran. Got %s, %s" %
-                (cmd, args)
+                (cmd, annex_options)
             )
-        return orig_run(cmd, args, **kwargs)
+        return orig_run(cmd, annex_options=annex_options, **kwargs)
 
     annex.drop(testfile)
-    with patch.object(AnnexRepo, '_run_annex_command_json',
+    with patch.object(AnnexRepo, '_run_annex_command',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
@@ -1047,11 +1050,24 @@ def test_annex_remove(path1, path2):
 
 
 @with_tempfile
-def test_repo_version(path):
-    annex = AnnexRepo(path, create=True, version=6)
-    ok_clean_git(path, annex=True)
+@with_tempfile
+@with_tempfile
+def test_repo_version(path1, path2, path3):
+    annex = AnnexRepo(path1, create=True, version=6)
+    ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
     eq_(version, 6)
+
+    # default from config item (via env var):
+    with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
+        annex = AnnexRepo(path2, create=True)
+        version = annex.repo.config_reader().get_value('annex', 'version')
+        eq_(version, 6)
+
+        # parameter `version` still has priority over default config:
+        annex = AnnexRepo(path3, create=True, version=5)
+        version = annex.repo.config_reader().get_value('annex', 'version')
+        eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -1165,7 +1181,7 @@ def test_is_available(batch, direct, p):
     # it is on the 'web'
     assert is_available(fname, remote='web') is True
     # not effective somehow :-/  may be the process already running or smth
-    #with swallow_logs(), swallow_outputs():  # it will complain!
+    # with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 

@@ -57,7 +57,10 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": "http://schema.org/",
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
   "@id": "ID",
   "author": [
     "Mike One",
@@ -73,6 +76,5 @@ def test_get_metadata(path):
   "description": "Some description",
   "foaf:fundedBy": "We got money from collecting plastic bottles",
   "license": "PDDL",
-  "name": "studyforrest_phase2",
-  "type": "Dataset"
+  "name": "studyforrest_phase2"
 }""")

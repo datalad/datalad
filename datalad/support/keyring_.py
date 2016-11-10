@@ -25,7 +25,7 @@ class Keyring(object):
         if self.__keyring is None:
             # Setup logging for keyring if we are debugging, althought keyring's logging
             # is quite scarce ATM
-            from .. import lgr
+            from datalad.log import lgr
             import logging
             lgr_level = lgr.getEffectiveLevel()
             if lgr_level < logging.DEBUG:
