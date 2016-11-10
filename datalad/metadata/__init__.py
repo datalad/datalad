@@ -178,7 +178,7 @@ def _simplify_meta_data_structure(meta):
 def _load_cached_metadata(ds):
     meta_path = opj(ds.path, metadata_basepath)
     meta = []
-    for fname in glob(opj(meta_path, '*.json')):
+    for fname in sorted(glob(opj(meta_path, '*.json'))):
         # XXX RF file_has_content() to make pre-condition test obsolete
         if hasattr(ds.repo, 'is_under_annex') \
                 and ds.repo.is_under_annex(fname) \
@@ -353,7 +353,7 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
-    for pname in enabled_parsers:
+    for pname in sorted(enabled_parsers):
         if pname == 'aggregate':
             # this is special and needs to be ignored here, even if it was
             # configured. reason: this parser runs anyway in get_metadata()

@@ -200,7 +200,8 @@ def test_aggregation(path):
     # differ, but the rest not
     clonemeta = get_metadata(
         clone, guess_type=False, ignore_subdatasets=False, from_native=False)
-
+    from datalad.tests.utils import dump_graph
+    print(dump_graph(clonemeta))
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
     assert_equal(clonemeta[0]['@id'], ds.id)
