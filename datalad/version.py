@@ -13,7 +13,7 @@ import sys
 from os.path import lexists, dirname, join as opj, curdir
 
 # Hard coded version, to be done by release process
-__version__ = '0.4.0.dev1'
+__version__ = '0.4.1'
 
 # NOTE: might cause problems with "python setup.py develop" deployments
 #  so I have even changed buildbot to use  pip install -e .
