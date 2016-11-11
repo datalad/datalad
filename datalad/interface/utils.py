@@ -70,7 +70,8 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None):
     """Sort a list of paths per dataset they are contained in.
 
-    Any paths that are not part of a dataset are ignored.
+    Any paths that are not part of a dataset, or presently unavailable are
+    reported.
 
     Parameter
     ---------
@@ -90,9 +91,10 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
 
     Returns
     -------
-    Tuple(dict, list)
-      Dict of `existing dataset path`: `path` mappings, and the list of currently
-      non-existing paths (possibly matching currently uninstalled datasets).
+    Tuple(dict, list, list)
+      Dict of `existing dataset path`: `path` mappings, the list of currently
+      non-existing paths (possibly matching currently uninstalled datasets),
+      and any paths that are not part of any dataset
 
     """
     # sort paths into the respective datasets
@@ -102,6 +104,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
         out = {}
     # paths that don't exist (yet)
     unavailable_paths = []
+    nondataset_paths = []
     for path in paths:
         if not lexists(path):
             # not there yet, impossible to say which ds it will actually
@@ -121,7 +124,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
         dspath = dir_lookup.get(d, GitRepo.get_toppath(d))
         dir_lookup[d] = dspath
         if not dspath:
-            lgr.warning("%s is not part of a dataset, ignored.", path)
+            nondataset_paths.append(path)
             continue
         if isdir(path):
             ds = Dataset(dspath)
@@ -151,4 +154,4 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         # this subdataset has been processed before
                         out[subdspath] = out.get(subdspath, [subdspath])
         out[dspath] = out.get(dspath, []) + [path]
-    return out, unavailable_paths
+    return out, unavailable_paths, nondataset_paths

@@ -217,7 +217,7 @@ class Get(Interface):
 
         # sort paths into the respective datasets
         dir_lookup = {}
-        content_by_ds, unavailable_paths = \
+        content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(resolved_paths,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit,
@@ -291,13 +291,19 @@ class Get(Interface):
         ## we have now done everything we could to obtain whatever subdataset
         ## to get something on the file system for previously unavailable paths
         ## check and sort one last
-        content_by_ds, unavailable_paths = \
+        content_by_ds, unavailable_paths, nondataset_paths2 = \
             get_paths_by_dataset(
                 unavailable_paths,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 out=content_by_ds,
                 dir_lookup=dir_lookup)
+
+        nondataset_paths.extend(nondataset_paths2)
+        if nondataset_paths:
+            lgr.warning(
+                "ignored paths that do not belong to any dataset: %s",
+                nondataset_paths)
 
         if unavailable_paths:
             lgr.warning('ignored non-existing paths: %s', unavailable_paths)
