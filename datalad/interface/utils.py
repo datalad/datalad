@@ -22,8 +22,10 @@ from os.path import dirname
 # avoid import from API to not get into circular imports
 from datalad.interface.save import Save
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
+from datalad.utils import assure_list
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import resolve_path
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -155,3 +157,38 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         out[subdspath] = out.get(subdspath, [subdspath])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
+
+
+def get_normalized_path_arguments(paths, dataset=None, default=None):
+    """Apply standard resolution to path arguments
+
+    This is nothing more than a helper to standardize path argument
+    preprocessing.
+
+    Parameter
+    ---------
+    paths : sequence or single path
+      Path(s) to normalize
+    dataset : path or Dataset or None
+      Optional dataset identifying something against which to resolve input
+      path arguments
+    default: sequence of paths or single path or None
+      If `paths` is empty, use this instead
+
+    Returns
+    -------
+    tuple(list(paths), path)
+      Normalized paths and path to a potential dataset against which paths were
+      resolved.
+    """
+    dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
+    if not paths and default:
+        paths = default
+    paths = assure_list(paths)
+    # resolve path(s):
+    resolved_paths = [resolve_path(p, dataset) for p in paths]
+    if dataset:
+        # guarantee absolute paths
+        resolved_paths = [opj(dataset_path, p) for p in resolved_paths]
+    lgr.debug('Resolved input path arguments: %s', resolved_paths)
+    return resolved_paths, dataset_path

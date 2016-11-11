@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os import curdir
-from os.path import join as opj
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -24,11 +23,10 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import resolve_path
+from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
-from datalad.utils import assure_list
 
 from .base import Interface
 
@@ -71,17 +69,8 @@ class Unlock(Interface):
                 "insufficient arguments for unlocking: needs at least "
                 "a dataset or a path to unlock.")
 
-        dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        path = assure_list(path)
-        if not path:
-            path = [curdir]
-
-        # resolve path(s):
-        resolved_paths = [resolve_path(p, dataset) for p in path]
-        if dataset:
-            # guarantee absolute paths
-            resolved_paths = [opj(dataset_path, p) for p in resolved_paths]
-        lgr.debug('Resolved targets to get: %s', resolved_paths)
+        resolved_paths, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=curdir)
 
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(resolved_paths,

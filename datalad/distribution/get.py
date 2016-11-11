@@ -20,6 +20,7 @@ from os.path import relpath
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
@@ -37,12 +38,10 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
-from datalad.utils import assure_list
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import resolve_path
 from .utils import install_necessary_subdatasets
 from .utils import _recursive_install_subds_underneath
 
@@ -191,13 +190,6 @@ class Get(Interface):
             # kwargs
             _return_datasets=False
     ):
-
-        dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        path = assure_list(path)
-        if not path:
-            raise InsufficientArgumentsError(
-                "`get` needs at least one path as argument")
-
         # IMPLEMENTATION CONCEPT:
         #
         # 1. turn all input paths into absolute paths
@@ -208,12 +200,13 @@ class Get(Interface):
         # 5. Shoot info of which handles to get in each subdataset to,
         #    git-annex, once at the very end
 
-        # resolve path(s):
-        resolved_paths = [resolve_path(p, dataset) for p in path]
-        if dataset:
-            # guarantee absolute paths relative to any given dataset
-            resolved_paths = [opj(dataset_path, p) for p in resolved_paths]
-        lgr.debug('Resolved targets to get: %s', resolved_paths)
+        # TODO: consider allowing an empty `path` argument, as with other commands,
+        # to indicate CWD
+        resolved_paths, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=None)
+        if not resolved_paths:
+            raise InsufficientArgumentsError(
+                "`get` needs at least one path as argument")
 
         # sort paths into the respective datasets
         dir_lookup = {}
