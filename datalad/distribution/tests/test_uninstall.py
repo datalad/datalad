@@ -61,10 +61,7 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
-    assert_raises(ValueError, ds.uninstall, 'one', remove_handles=True,
-                  remove_history=True)
-    res = ds.uninstall('one', remove_handles=True, remove_history=True,
-                       recursive=True)
+    res = ds.uninstall('one', remove_handles=True, kill=True)
     eq_(res, [subds1])
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
@@ -77,14 +74,8 @@ def test_clean_subds_removal(path):
 @with_testrepos('.*basic.*', flavors=['local'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
-    # makes no sense to call uninstall, but ask it to do nothing
-    assert_raises(ValueError, uninstall, remove_handles=False, remove_data=False)
     ds = Dataset(path)
-    # TODO make these two cases uniform
-    if hasattr(ds.repo, 'drop'):
-        assert_raises(Exception, uninstall, dataset=ds, path='not_existent')
-    else:
-        eq_(uninstall(dataset=ds, path='not_existent'), [])
+    assert_raises(Exception, uninstall, dataset=ds, path='not_existent')
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -146,8 +137,7 @@ def test_uninstall_subdataset(src, dst):
         subds.repo.get(annexed_files)
 
         # uninstall data of subds:
-        assert_raises(ValueError, ds.uninstall, path=subds_path)
-        res = ds.uninstall(path=subds_path, recursive=True)
+        res = ds.uninstall(path=subds_path)
         ok_(all([f in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
         # subdataset is still known
@@ -155,13 +145,11 @@ def test_uninstall_subdataset(src, dst):
 
     for subds_path in ds.get_subdatasets():
         # uninstall subds itself:
-        assert_raises(ValueError, ds.uninstall,
-                      path=subds_path, remove_handles=True, remove_history=True)
         if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
                 and external_versions['git'] < '2.0.9':
             raise SkipTest("Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds_path, remove_handles=True, remove_history=True,
+        res = ds.uninstall(path=subds_path, remove_handles=True,
                            recursive=True)
         subds = Dataset(opj(ds.path, subds_path))
         eq_(res[0], subds)
@@ -186,7 +174,6 @@ def test_uninstall_multiple_paths(path):
     # must not work without recursive
     topfile = 'kill'
     deepfile = opj('deep', 'dir', 'kill')
-    assert_raises(ValueError, ds.uninstall, [topfile, deepfile], check=False)
     # use a tuple not a list! should also work
     ds.uninstall((topfile, deepfile), recursive=True, check=False)
     ok_clean_git(ds.path)
@@ -215,9 +202,8 @@ def test_uninstall_dataset(path):
     # actually same as this, for cmdline compat reasons
     ds.uninstall(path=[])
     ok_clean_git(ds.path)
-    # removing all handles equal removal of entire dataset, needs safety switch
-    assert_raises(ValueError, ds.uninstall, remove_handles=True)
-    ds.uninstall(remove_handles=True, remove_history=True)
+    # removing all handles equal removal of entire dataset
+    ds.uninstall(remove_handles=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -238,7 +224,7 @@ def test_remove_file_handle_only(path):
     path_two = opj(ds.path, 'two')
     ok_(exists(path_two))
     # remove one handle, should not affect the other
-    ds.uninstall('two', remove_data=False, remove_handles=True)
+    ds.uninstall('two', remove_handles=True, check=False)
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
@@ -258,8 +244,6 @@ def test_uninstall_recursive(path):
     target_fname = opj('deep', 'dir', 'test')
     # sane starting point
     ok_(exists(opj(ds.path, target_fname)))
-    # uninstallation fails without --recursive
-    assert_raises(ValueError, ds.uninstall, target_fname)
     # doesn't have the minimum number of copies for a safe drop
     # TODO: better exception
     assert_raises(CommandError, ds.uninstall, target_fname, recursive=True)
@@ -272,7 +256,6 @@ def test_uninstall_recursive(path):
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
     # now same with actual handle removal
-    assert_raises(ValueError, ds.uninstall, target_fname, remove_handles=True)
     # content is dropped already, so no checks in place anyway
     ds.uninstall(target_fname, check=True, remove_handles=True, recursive=True)
     ok_(not exists(lname) and not lexists(lname))
@@ -286,11 +269,9 @@ def test_remove_dataset_hierarchy(path):
     ds.create('deep')
     ds.save(auto_add_changes=True)
     ok_clean_git(ds.path)
-    # fail on missing `remove_handles`, always needs to come with `remove_handles`
-    assert_raises(ValueError, ds.uninstall, remove_history=True)
     # fail on missing --recursive because subdataset is present
-    assert_raises(ValueError, ds.uninstall, remove_handles=True, remove_history=True)
-    ds.uninstall(remove_history=True, remove_handles=True, recursive=True)
+    assert_raises(ValueError, ds.uninstall, remove_handles=True)
+    ds.uninstall(remove_handles=True, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -305,7 +286,7 @@ def test_careless_subdataset_uninstall(path):
     eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
     ok_clean_git(ds.path)
     # now we kill the sub without the parent knowing
-    subds1.uninstall(remove_history=True, remove_handles=True)
+    subds1.uninstall(remove_handles=True)
     ok_(not exists(subds1.path))
     ok_(ds.repo.dirty)
     # parent still knows the sub
@@ -328,11 +309,11 @@ def test_kill(path):
     with open(opj(ds.path, "file.dat"), 'w') as f:
         f.write("load")
     ds.repo.add("file.dat")
-    subds1 = ds.create('deep1')
+    ds.create('deep1')
     eq_(sorted(ds.get_subdatasets()), ['deep1'])
     ok_clean_git(ds.path)
 
     # and we fail to uninstall since content can't be dropped
     assert_raises(CommandError, ds.uninstall)
-    eq_(ds.uninstall(kill=True), [path])
+    eq_(ds.uninstall(kill=True), [ds])
     ok_(not exists(path))
