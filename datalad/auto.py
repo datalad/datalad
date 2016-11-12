@@ -26,8 +26,11 @@ import os
 
 from os.path import dirname, lexists, realpath
 from os.path import exists
+from os.path import isabs
+from os.path import join as opj
 from git.exc import InvalidGitRepositoryError
 
+from .utils import getpwd
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .cmdline.helpers import get_repo_instance
@@ -161,6 +164,11 @@ class AutomagicIO(object):
         if not isinstance(annex, AnnexRepo):
             # not an annex -- can do nothing
             return
+
+        # since Git/AnnexRepo functionality treats relative paths relative to the
+        # top of the repository and might be outside, get a full path
+        if not isabs(filepath):
+            filepath = opj(getpwd(), filepath)
 
         # "quick" check first if under annex at all
         try:
