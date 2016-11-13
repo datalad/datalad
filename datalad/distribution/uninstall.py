@@ -123,6 +123,55 @@ def _record_change_in_subdatasets(ds, ds2save, kill):
 class Uninstall(Interface):
     """Uninstall a dataset component or entire dataset(s)
 
+    This command can be used to remove any installed dataset content. This
+    includes the content of files, as well as file handles, subdatasets, and
+    datasets themselves.
+
+    As datasets are relatively lightweight already the default mode of
+    operation is to drop file content only, which could be re-installed later
+    on, given an available remote source. The availability of at least one
+    remote copy is verified, by default, before file content is dropped. As
+    these checks could lead to slow operation (network latencies, etc), they
+    can be disabled.
+
+    Removing the handle of a subdataset will cause all corresponding file
+    content to be dropped, and all contained file handles to be removed.
+    However, the uninstalled subdataset remains registered in a potential
+    superdataset. Via the optional kill switch this association can be removed
+    as well, in which case the former subdataset is no longer part of the
+    superdataset, and cannot be reinstalled via a dataset handle again.
+
+    In contrast, the uninstallation of file handles immediately yields their
+    complete removal from the corresponding dataset without the need of an
+    additional kill switch.
+
+    Any number of paths to process can be given as input. Recursion into
+    subdatasets needs to be explicitly enabled, while recursion in
+    subdirectories within a dataset as always done automatically. An optional
+    recursion limit is applied relative to each given input path.
+
+    The result of all handle removal operations is automatically saved in the
+    respective datasets.
+
+    Examples
+    --------
+
+    Drop all file content in a dataset::
+
+      ~/some/dataset$ datalad uninstall
+
+    Drop all file content in a dataset and all its subdatasets::
+
+      ~/some/dataset$ datalad uninstall --recursive
+
+    Deinstall a subdataset (undo installation)::
+
+      ~/some/dataset$ datalad uninstall --remove-handles somesubdataset1
+
+    Permanently remove a subdataset from a datatset and wipe out the subdataset
+    association too::
+
+      ~/some/dataset$ datalad uninstall --kill somesubdataset1
 
     """
 
@@ -132,7 +181,7 @@ class Uninstall(Interface):
             metavar="DATASET",
             doc="""specify the dataset to perform the uninstall operation on.
             If no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            based on the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
@@ -142,25 +191,23 @@ class Uninstall(Interface):
             constraints=EnsureStr() | EnsureNone()),
         remove_handles=Parameter(
             args=("--remove-handles",),
-            doc="""if given, matching file handles are removed. This flag is required
-            for deleting entire datasets""",
+            doc="""if given, matching file handles are removed. This flag is
+            required for uninstalling entire datasets""",
             action="store_true"),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         check=Parameter(
             args=("--nocheck",),
-            doc="""whether to perform checks to assure the configured minimum number
-            (remote) source for data to be uninstalled.[CMD:  Give this option to skip
-            checks CMD]""",
+            doc="""whether to perform checks to assure the configured minimum
+            number (remote) source for data to be uninstalled.[CMD:  Give this
+            option to skip checks CMD]""",
             action="store_false",
             dest='check'),
         kill=Parameter(
             args=("--kill",),
             action="store_true",
-            doc="""**WARNING -- extremely dangerous**. It will simply force remove,
-            without consideration of being a dataset, a file, or a directory or
-            any other option given to uninstall.  To be used only with full
-            awareness of its consequences"""
+            doc="""when applied to a subdataset handle, remove the subdataset
+            completely and also unregister it from its superdataset"""
         ),
         if_dirty=if_dirty_opt,
     )
@@ -177,19 +224,6 @@ class Uninstall(Interface):
             kill=False,
             if_dirty='save-before'):
 
-        #1115 uninstall saved originating repository while I was trying to
-        #     "drop" a file under some git-annex repo underneath
-        #1105 uninstall is to picky with subdatasets (require --recursives
-        #     too often)
-        #1079 uninstall cannot be used (without --kill) to merely de-init
-        #     sub-datasets
-        #1078 uninstall is not usable to uninstall correctly super-datasets
-        #     (with or without sub-datasets installed)
-        #1046 uninstall --kill must reincarnate the directory of the repository
-        #     if it is a submodule of supermodule
-        #970  uninstall would fail uninstall submodule with special remotes!
-        #863  uninstall mode of operation which doesn't deinit submodule
-
         # upfront check prior any resolution attempt to avoid disaster
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
@@ -203,7 +237,6 @@ class Uninstall(Interface):
 
         if kill:
             remove_handles = True
-            check = False
 
         path, dataset_path = get_normalized_path_arguments(
             path, dataset, default=curdir)
