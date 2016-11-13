@@ -16,19 +16,20 @@ import os
 import logging
 
 from os.path import relpath, split as psplit
+from os.path import curdir
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
-    datasetmethod, resolve_path, require_dataset
+    datasetmethod, require_dataset
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
+from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.utils import rmtree
 from datalad.utils import getpwd
-from datalad.utils import assure_list
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -170,7 +171,7 @@ class Uninstall(Interface):
             if_dirty='save-before'):
 
         # upfront check prior any resolution attempt to avoid disaster
-        if dataset is None and not path:
+        if path is None and dataset is None:
             raise InsufficientArgumentsError(
                 "insufficient information for uninstallation (needs at "
                 "least a dataset or a path. To uninstall an entire dataset "
@@ -182,20 +183,10 @@ class Uninstall(Interface):
         if not remove_data and not remove_handles:
             raise ValueError("instructed to neither drop data, nor remove handles: cannot perform")
 
+        path, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=curdir)
+
         results = []
-
-        ds = require_dataset(
-            dataset, check_installed=True, purpose='uninstall')
-
-        # always yields list; empty if None
-        path = assure_list(path)
-        if not len(path):
-            # AKA "everything"
-            path.append(ds.path)
-
-        # XXX Important to resolve against `dataset` input argument, and
-        # not against the `ds` resolved dataset
-        path = [resolve_path(p, dataset) for p in path]
 
         if kill:
             lgr.warning("Force-removing %d paths", len(path))
@@ -204,6 +195,8 @@ class Uninstall(Interface):
                 results.append(p)
             return results
 
+        ds = require_dataset(
+            dataset, check_installed=True, purpose='uninstall')
         # make sure we get to an expected state
         handle_dirty_dataset(ds, if_dirty)
 
