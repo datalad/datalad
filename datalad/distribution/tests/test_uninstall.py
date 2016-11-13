@@ -129,6 +129,7 @@ def test_uninstall_subdataset(src, dst):
 
     ds = install(dst, source=src, recursive=True)[0]
     ok_(ds.is_installed())
+    known_subdss = ds.get_subdatasets()
     for subds_path in ds.get_subdatasets():
         subds = Dataset(opj(ds.path, subds_path))
         ok_(subds.is_installed())
@@ -143,18 +144,23 @@ def test_uninstall_subdataset(src, dst):
         # subdataset is still known
         assert_in(subds_path, ds.get_subdatasets())
 
+    eq_(ds.get_subdatasets(), known_subdss)
+
     for subds_path in ds.get_subdatasets():
         # uninstall subds itself:
         if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
                 and external_versions['git'] < '2.0.9':
-            raise SkipTest("Known problem with GitPython. See "
+            raise SkipTest(
+                "Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds_path, remove_handles=True,
-                           recursive=True)
+        res = ds.uninstall(path=subds_path, remove_handles=True)
         subds = Dataset(opj(ds.path, subds_path))
         eq_(res[0], subds)
         ok_(not subds.is_installed())
-        ok_(not exists(subds.path))
+        # just a deinit must not remove the subdataset registration
+        eq_(ds.get_subdatasets(), known_subdss)
+        # mountpoint of subdataset should still be there
+        ok_(exists(subds.path))
 
 
 @with_tree({

@@ -49,6 +49,7 @@ def _uninstall_dataset(ds, remove_handles, check, kill=False):
         # remove data when asked, but not if handles will go and checks are
         # disabled
         if hasattr(ds.repo, 'drop'):
+            lgr.debug("Dropping content from %s", ds)
             opts = ['--force'] if not check else []
             results.extend(
                 assure_list(
@@ -99,12 +100,19 @@ def _record_change_in_subdatasets(ds, ds2save, kill):
             # add this change to the parent, but don't save,
             # will do elsewhere, use relpath
             subds_relpath = subds_path[len(dstestpath):]
-            if kill and ds2save[subds_path]:
+            if ds2save[subds_path]:
                 # kill requested and entire dataset is gone
                 # remove submodule reference
                 submodule = [sm for sm in ds.repo.repo.submodules
                              if sm.path == subds_relpath][0]
-                submodule.remove()
+                if kill:
+                    lgr.debug("Unregister subdataset '%s' from %s",
+                              subds_relpath, ds)
+                    submodule.remove()
+                else:
+                    # put back empty dir as mount point
+                    os.makedirs(subds_path)
+                    ds.repo.add(subds_relpath, git=True)
             else:
                 ds.repo.add(subds_relpath, git=True)
         else:
