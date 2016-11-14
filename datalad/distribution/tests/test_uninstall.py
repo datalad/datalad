@@ -321,5 +321,5 @@ def test_kill(path):
 
     # and we fail to uninstall since content can't be dropped
     assert_raises(CommandError, ds.uninstall)
-    eq_(ds.uninstall(kill=True), [ds])
+    eq_(ds.uninstall(kill=True, check=False), [ds])
     ok_(not exists(path))
