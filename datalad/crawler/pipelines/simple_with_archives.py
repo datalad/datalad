@@ -70,7 +70,8 @@ def pipeline(url,
              use_current_dir=False,
              leading_dirs_depth=1,
              rename=None,
-             backend='MD5E'):
+             backend='MD5E',
+             add_archive_leading_dir=False):
     """Pipeline to crawl/annex an crcns dataset"""
 
     if not isinstance(leading_dirs_depth, int):
@@ -123,6 +124,7 @@ def pipeline(url,
                     use_current_dir=use_current_dir,
                     rename=rename,
                     exclude='.*__MACOSX.*',  # some junk penetrates
+                    add_archive_leading_dir=add_archive_leading_dir
                 ),
             ],
         ],

@@ -9,7 +9,7 @@
 """A pipeline for crawling openfmri s3 bucket"""
 
 import os
-from os.path import lexists
+from os.path import lexists, join as opj
 
 # Import necessary nodes
 from ..nodes.misc import switch, assign, sub
@@ -31,69 +31,87 @@ lgr = getLogger("datalad.crawler.pipelines.openfmri")
 # for crawling any S3 bucket.
 # Right away think about having an 'incoming' branch and handling of versioned files
 sub_s3_to_http = sub({
-        'url': {'^s3://openfmri/': 'http://openfmri.s3.amazonaws.com/'}
+        'url': {'^s3://([^/]*)/': r'http://\1.s3.amazonaws.com/'}
     },
     ok_missing=True
 )
 
 
-def collection_pipeline(prefix=None):
-    """Pipeline to crawl/annex an entire openfmri bucket"""
-
-    lgr.info("Creating a pipeline for the openfmri bucket")
-    annex = Annexificator(
-        create=False,  # must be already initialized etc
-        # Primary purpose of this one is registration of all URLs with our
-        # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
-    )
-
-    return [
-        crawl_s3('openfmri', prefix=prefix, recursive=False, strategy='commit-versions', repo=annex.repo),
-        sub_s3_to_http,
-        switch('datalad_action',
-               {  # TODO: we should actually deal with subdirs primarily
-                   'commit': annex.finalize(tag=True),
-                   # should we bother removing anything? not sure
-                   # 'remove': annex.remove,
-                   'annex':  annex,
-                   'directory': [
-                       # for initiate_dataset we should replicate filename as handle_name, prefix
-                       assign({'prefix': '%(filename)s/', 'handle_name': '%(filename)s'}, interpolate=True),
-                       annex.initiate_dataset(
-                           template='openfmri_s3',
-                           data_fields=['prefix'],
-                       )
-                   ]
-               },
-               missing='skip', # ok to not remove
-              )
-    ]
-
-
 # TODO: make a unittest for all of this on a simple bucket
+# TODO:   branch option
+def pipeline(bucket, no_annex=False, prefix=None, tag=True, skip_problematic=False, to_http=False,
+             directory=None,
+             backend='MD5'):
+    """Pipeline to crawl/annex an arbitrary bucket
 
-def pipeline(prefix=None, tag=True, skip_problematic=False):
-    """Pipeline to crawl/annex an entire openfmri bucket"""
+    Parameters
+    ----------
+    bucket : str
+    prefix : str, optional
+      prefix within the bucket
+    tag : bool, optional
+      tag "versions"
+    skip_problematic : bool, optional
+      pass to Annexificator
+    to_http : bool, optional
+      Convert s3:// urls to corresponding generic http:// . So to be used for resources
+      which are publicly available via http
+    directory : {subdataset}, optional
+      What to do when encountering a directory.  'subdataset' would initiate a new sub-dataset
+      at that directory
+    """
 
-    lgr.info("Creating a pipeline for the openfmri bucket")
+    lgr.info("Creating a pipeline for the %s bucket", bucket)
+
+    annex_kw = {}
+    if not to_http:
+        annex_kw['special_remotes'] = [DATALAD_SPECIAL_REMOTE]
+
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        #special_remotes=[DATALAD_SPECIAL_REMOTE],
-        backend='MD5E',
+        backend=backend,
+        no_annex=no_annex,
         skip_problematic=skip_problematic,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
         # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        **annex_kw
     )
 
-    return [
-        crawl_s3('openfmri', prefix=prefix, strategy='commit-versions', repo=annex.repo, recursive=True),
-        sub_s3_to_http,
-        switch('datalad_action',
-               {
-                   'commit': annex.finalize(tag=tag),
-                   'remove': annex.remove,
-                   'annex':  annex,
-               })
+    s3_actions = {'commit': annex.finalize(tag=tag), 'annex': annex}
+    s3_switch_kw = {}
+    recursive=True
+    if directory:
+        if directory == 'subdataset':
+            new_prefix = '%(filename)s/'
+            if prefix:
+                new_prefix = opj(prefix, new_prefix)
+            s3_actions['directory'] = [
+                   # for initiate_dataset we should replicate filename as handle_name, prefix
+                   assign({'prefix': new_prefix, 'dataset_name': '%(filename)s'}, interpolate=True),
+                   annex.initiate_dataset(
+                       template='simple_s3',
+                       data_fields=['prefix'],
+                       add_fields={
+                           'bucket': bucket,
+                           'to_http': to_http,
+                           'skip_problematic': skip_problematic,
+                       }
+                   )
+            ]
+            s3_switch_kw['missing'] = 'skip'  # ok to not remove
+            recursive = False
+        else:
+            raise ValueError("Do not know how to treat %s" % directory)
+    else:
+        s3_actions['remove'] = annex.remove
+
+    pipeline = [
+        crawl_s3(bucket, prefix=prefix, strategy='commit-versions', repo=annex.repo, recursive=recursive),
     ]
+
+    if to_http:
+        pipeline.append(sub_s3_to_http)
+
+    pipeline.append(switch('datalad_action', s3_actions, **s3_switch_kw))
+    return pipeline
