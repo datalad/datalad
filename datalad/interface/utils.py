@@ -14,10 +14,14 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os import curdir
+from os import pardir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
 from os.path import dirname
+from os.path import relpath
+from os.path import split as psplit
+from itertools import chain
 
 # avoid import from API to not get into circular imports
 from datalad.interface.save import Save
@@ -192,3 +196,34 @@ def get_normalized_path_arguments(paths, dataset=None, default=None):
         resolved_paths = [opj(dataset_path, p) for p in resolved_paths]
     lgr.debug('Resolved input path arguments: %s', resolved_paths)
     return resolved_paths, dataset_path
+
+
+def path_is_under(values, path=None):
+    """Whether a given path is a subdirectory of any of the given test values
+
+    Parameters
+    ----------
+    values : sequence or dict
+      Paths to be tested against. This can be a dictionary in which case
+      all values from all keys will be tested against.
+    path : path or None
+      Test path. If None is given, the process' working directory is
+      used.
+
+    Returns
+    -------
+    bool
+    """
+    if path is None:
+        from datalad.utils import getpwd
+        pwd = getpwd()
+    if isinstance(values, dict):
+        values = chain(*values.values())
+    for p in values:
+        rpath = relpath(p, start=pwd)
+        if rpath == curdir \
+                or rpath == pardir \
+                or set(psplit(rpath)) == {pardir}:
+            # first match is enough
+            return True
+    return False

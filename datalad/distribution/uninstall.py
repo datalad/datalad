@@ -14,9 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 import logging
-from itertools import chain
 
-from os.path import relpath, split as psplit
+from os.path import split as psplit
 from os.path import curdir
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
@@ -31,8 +30,8 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import path_is_under
 from datalad.utils import rmtree
-from datalad.utils import getpwd
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 
@@ -249,16 +248,10 @@ class Uninstall(Interface):
             get_paths_by_dataset(path,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit)
-        if remove_handles:
+        if remove_handles and path_is_under(content_by_ds):
             # behave like `rm -r` and refuse to remove where we are
-            pwd = getpwd()
-            for p in chain(*content_by_ds.values()):
-                rpath = relpath(p, start=pwd)
-                if rpath == os.curdir \
-                        or rpath == os.pardir \
-                        or set(psplit(rpath)) == {os.pardir}:
-                    raise ValueError(
-                        "refusing to remove current or parent directory")
+            raise ValueError(
+                "refusing to remove current or parent directory")
 
         if dataset_path and not content_by_ds:
             # we got a dataset, but there is nothing actually installed
