@@ -15,15 +15,16 @@ __docformat__ = 'restructuredtext'
 import os
 import logging
 
-from os.path import split as psplit
 from os.path import curdir
+from os.path import exists
+from os.path import relpath
+from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
-from datalad.interface.save import Save
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -31,229 +32,120 @@ from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import path_is_under
+from datalad.interface.save import Save
 from datalad.utils import rmtree
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
+from datalad.support.gitrepo import GitRepo
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
+dataset_argument = Parameter(
+    args=("-d", "--dataset"),
+    metavar="DATASET",
+    doc="""specify the dataset to perform the operation on.
+    If no dataset is given, an attempt is made to identify a dataset
+    based on the `path` given""",
+    constraints=EnsureDataset() | EnsureNone())
 
-def _uninstall_dataset(ds, remove_handles, check, kill=False):
+
+check_argument = Parameter(
+    args=("--nocheck",),
+    doc="""whether to perform checks to assure the configured minimum
+    number (remote) source for data.[CMD:  Give this
+    option to skip checks CMD]""",
+    action="store_false",
+    dest='check')
+
+
+def _uninstall_dataset(ds, check, has_super):
     results = []
-    if not kill and remove_handles and ds.get_subdatasets(fulfilled=True):
-        raise ValueError(
-            "{} still has present subdatasets, will not remove "
-            "it (missing --recursive?)".format(ds))
-    if not (remove_handles and not check):
-        # remove data when asked, but not if handles will go and checks are
-        # disabled
-        if hasattr(ds.repo, 'drop'):
-            lgr.debug("Dropping content from %s", ds)
-            opts = ['--force'] if not check else []
-            results.extend(
-                assure_list(
-                    ds.repo.drop(curdir, options=opts)))
-        elif not remove_handles:
-            lgr.warning("cannot uninstall data only, not an annex dataset")
-
-    if not remove_handles:
-        # we are done here
-        return results
-
-    # TODO: Check that branch(es) are pushed somewhere before the kill
-    rmtree(ds.path)
+    if check and ds.is_installed():
+        results.extend(_drop_files(ds, curdir, check=True))
+    # TODO: uninstall of a subdataset that has a local URL
+    #       (e.g. ./anything) implies cannot be undone, decide how, and
+    #       if to check for that
+    if ds.is_installed():
+        rmtree(ds.path)
+    if has_super and not exists(ds.path):
+        # recreate an empty mountpoint to make Git happier
+        os.makedirs(ds.path)
     results.append(ds)
-
     return results
 
 
-def _uninstall_files(ds, files, remove_handles, check):
+def _drop_files(ds, files, check):
     results = []
-    if not (remove_handles and not check):
-        # remove data when asked, but not if handles will go and checks are
-        # disabled (AKA kill)
-        if hasattr(ds.repo, 'drop'):
-            opts = ['--force'] if not check else []
-            results.extend(ds.repo.drop(files, options=opts))
-        elif not remove_handles:
-            lgr.warning("cannot uninstall data only, not an annex dataset")
-
-    if not remove_handles:
-        # we are done here
-        return results
-
-    # and now make the handles disappear
-    # always recurse into directories
-    results.extend(ds.repo.remove(files, r=True))
-
+    if hasattr(ds.repo, 'drop'):
+        opts = ['--force'] if not check else []
+        # TODO capture for which files it fails and report them properly
+        # not embedded in a command error
+        dropped = ds.repo.drop(files, options=opts)
+        results.extend([opj(ds.path, f) for f in dropped])
+    else:
+        # TODO think how to handle this best, when called `through` remove
+        # and it hits a plain git repo somewhere down below
+        raise ValueError("cannot uninstall, not an annex dataset")
     return results
 
 
-def _record_change_in_subdatasets(ds, ds2save, kill):
-    # deal with any datasets that have changed in
-    # the process already
-    out = {}
-    for subds_path in ds2save:
-        dstestpath = _with_sep(ds.path)
-        if subds_path.startswith(dstestpath):
-            # add this change to the parent, but don't save,
-            # will do elsewhere, use relpath
-            subds_relpath = subds_path[len(dstestpath):]
-            if ds2save[subds_path]:
-                # kill requested and entire dataset is gone
-                # remove submodule reference
-                submodule = [sm for sm in ds.repo.repo.submodules
-                             if sm.path == subds_relpath][0]
-                if kill:
-                    lgr.debug("Unregister subdataset '%s' from %s",
-                              subds_relpath, ds)
-                    submodule.remove()
-                else:
-                    # put back empty dir as mount point
-                    os.makedirs(subds_path)
-                    ds.repo.add(subds_relpath, git=True)
-            else:
-                ds.repo.add(subds_relpath, git=True)
-        else:
-            out[subds_path] = ds2save[subds_path]
-    return out
-
-
-class Uninstall(Interface):
-    """Uninstall a dataset component or entire dataset(s)
-
-    This command can be used to remove any installed dataset content. This
-    includes the content of files, as well as file handles, subdatasets, and
-    datasets themselves.
-
-    As datasets are relatively lightweight already the default mode of
-    operation is to drop file content only, which could be re-installed later
-    on, given an available remote source. The availability of at least one
-    remote copy is verified, by default, before file content is dropped. As
-    these checks could lead to slow operation (network latencies, etc), they
-    can be disabled.
-
-    Removing the handle of a subdataset will cause all corresponding file
-    content to be dropped, and all contained file handles to be removed.
-    However, the uninstalled subdataset remains registered in a potential
-    superdataset. Via the optional kill switch this association can be removed
-    as well, in which case the former subdataset is no longer part of the
-    superdataset, and cannot be reinstalled via a dataset handle again.
-
-    In contrast, the uninstallation of file handles immediately yields their
-    complete removal from the corresponding dataset without the need of an
-    additional kill switch.
-
-    Any number of paths to process can be given as input. Recursion into
-    subdatasets needs to be explicitly enabled, while recursion in
-    subdirectories within a dataset as always done automatically. An optional
-    recursion limit is applied relative to each given input path.
-
-    The result of all handle removal operations is automatically saved in the
-    respective datasets.
-
-    Examples
-    --------
-
-    Drop all file content in a dataset::
-
-      ~/some/dataset$ datalad uninstall
-
-    Drop all file content in a dataset and all its subdatasets::
-
-      ~/some/dataset$ datalad uninstall --recursive
-
-    Deinstall a subdataset (undo installation)::
-
-      ~/some/dataset$ datalad uninstall --remove-handles somesubdataset1
-
-    Permanently remove a subdataset from a datatset and wipe out the subdataset
-    association too::
-
-      ~/some/dataset$ datalad uninstall --kill somesubdataset1
-
-    """
-
-    _params_ = dict(
-        dataset=Parameter(
-            args=("-d", "--dataset"),
-            metavar="DATASET",
-            doc="""specify the dataset to perform the uninstall operation on.
-            If no dataset is given, an attempt is made to identify the dataset
-            based on the `path` given""",
-            constraints=EnsureDataset() | EnsureNone()),
-        path=Parameter(
-            args=("path",),
-            metavar="PATH",
-            doc="path/name of the component to be uninstalled",
-            nargs="*",
-            constraints=EnsureStr() | EnsureNone()),
-        remove_handles=Parameter(
-            args=("--remove-handles",),
-            doc="""if given, matching file handles are removed. This flag is
-            required for uninstalling entire datasets""",
-            action="store_true"),
-        recursive=recursion_flag,
-        recursion_limit=recursion_limit,
-        check=Parameter(
-            args=("--nocheck",),
-            doc="""whether to perform checks to assure the configured minimum
-            number (remote) source for data to be uninstalled.[CMD:  Give this
-            option to skip checks CMD]""",
-            action="store_false",
-            dest='check'),
-        kill=Parameter(
-            args=("--kill",),
-            action="store_true",
-            doc="""when applied to a subdataset handle, remove the subdataset
-            completely and also unregister it from its superdataset"""
-        ),
-        if_dirty=if_dirty_opt,
-    )
+class _Cinderella(Interface):
+    """"""
+# keep at copy/paste material for later
+#    Uninstall a dataset component or entire dataset(s)
+#
+#    This command can be used to remove any installed dataset content. This
+#    includes the content of files, as well as file handles, subdatasets, and
+#    datasets themselves.
+#
+#    By default, the availability of at least one remote copy is verified, by
+#    default, before file content is dropped. As these checks could lead to slow
+#    operation (network latencies, etc), they can be disabled.
+#
+#    Any number of paths to process can be given as input. Recursion into
+#    subdatasets needs to be explicitly enabled, while recursion in
+#    subdirectories within a dataset as always done automatically. An optional
+#    recursion limit is applied relative to each given input path.
+#
+#    Examples
+#    --------
+#
+#    Drop all file content in a dataset::
+#
+#      ~/some/dataset$ datalad uninstall
+#
+#    Drop all file content in a dataset and all its subdatasets::
+#
+#      ~/some/dataset$ datalad uninstall --recursive
+#
+#    Deinstall a subdataset (undo installation)::
+#
+#      ~/some/dataset$ datalad uninstall --remove-handles somesubdataset1
+#
+#    Permanently remove a subdataset from a datatset and wipe out the subdataset
+#    association too::
+#
+#      ~/some/dataset$ datalad uninstall --kill somesubdataset1
+#
+#    """
 
     @staticmethod
-    @datasetmethod(name='uninstall')
-    def __call__(
+    def _prep(
             path=None,
             dataset=None,
-            remove_handles=False,
             recursive=False,
-            recursion_limit=None,
-            check=True,
-            kill=False,
-            if_dirty='save-before'):
+            recursion_limit=None):
 
         # upfront check prior any resolution attempt to avoid disaster
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
-                "insufficient information for uninstallation (needs at "
-                "least a dataset or a path. To uninstall an entire dataset "
-                "it needs to be given explicitly.")
-
-        if remove_handles and recursion_limit is not None:
-            raise ValueError(
-                "impossible to remove handles recursively with recursion limit")
-
-        if kill:
-            remove_handles = True
+                "at least a dataset or a path must be given")
 
         path, dataset_path = get_normalized_path_arguments(
             path, dataset, default=curdir)
-
-        # collect paths that got uninstalled for reporting
-        results = []
-
-        # if recursivecontent_by_ds will
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(path,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit)
-        if remove_handles and path_is_under(content_by_ds):
-            # behave like `rm -r` and refuse to remove where we are
-            raise ValueError(
-                "refusing to remove current or parent directory")
-
-        if dataset_path and not content_by_ds:
+        if dataset_path and not content_by_ds and not unavailable_paths:
             # we got a dataset, but there is nothing actually installed
             nondataset_paths.append(dataset_path)
         # complain about nondataset and non-existing paths
@@ -261,75 +153,241 @@ class Uninstall(Interface):
             raise ValueError(
                 "will not touch paths outside of installed datasets: %s"
                 % nondataset_paths)
-        if unavailable_paths:
-            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
+        return content_by_ds, unavailable_paths
 
-        if dataset_path:
-            dataset = require_dataset(
-                dataset, check_installed=True, purpose='uninstall')
-        else:
-            dataset = None
-
-        ds2save = {}
-        # iterate over all datasets, starting at the bottom
-        for ds_path in sorted(content_by_ds, reverse=True):
-            ds = Dataset(ds_path)
-            paths = content_by_ds[ds_path]
-
-            if remove_handles:
-                ds2save = _record_change_in_subdatasets(ds, ds2save, kill)
-
-            # make sure we get to an expected state
-            if not kill:
-                handle_dirty_dataset(ds, if_dirty)
-
-            if ds_path in paths:
-                # the dataset itself is to be uninstalled
-                res = _uninstall_dataset(
-                    ds,
-                    remove_handles=remove_handles,
-                    check=check,
-                    kill=kill)
-                ds2save[ds.path] = True
-            else:
-                # uninstall content in a dataset, but not the entire dataset
-                res = _uninstall_files(
-                    ds,
-                    paths,
-                    remove_handles=remove_handles,
-                    check=check)
-                ds2save[ds.path] = False
-                if remove_handles:  # save removed handles
-                    Save.__call__(
-                        message='[DATALAD] uninstalled handles',
-                        dataset=ds,
-                        auto_add_changes=False,
-                        recursive=False)
-            results.extend(res)
-
-        if dataset and dataset.is_installed() and remove_handles:
-            _record_change_in_subdatasets(dataset, ds2save, kill)
-            # we have a parent and have removed handles
-            Save.__call__(
-                message='[DATALAD] uninstalled content',
-                dataset=dataset,
-                auto_add_changes=False,
-                recursive=False)
-
-        return results
-
-    @staticmethod
-    def result_renderer_cmdline(res, args):
+    @classmethod
+    def result_renderer_cmdline(cls, res, args):
         from datalad.ui import ui
         if not res:
-            ui.message("Nothing was uninstalled")
+            ui.message("Nothing was {}".format(cls._passive))
             return
-        msg = "{n} {obj} uninstalled:\n".format(
+        msg = "{n} {obj} {action}:\n".format(
             obj='items were' if len(res) > 1 else 'item was',
-            n=len(res))
+            n=len(res),
+            action=cls._passive)
         for item in res:
             if isinstance(item, Dataset):
                 msg += "Dataset: %s\n" % item.path
             else:
                 msg += "File: %s\n" % item
         ui.message(msg)
+
+
+class Drop(_Cinderella):
+    """
+    """
+    _action = 'drop'
+    _passive = 'dropped'
+
+    _params_ = dict(
+        dataset=dataset_argument,
+        path=Parameter(
+            args=("path",),
+            metavar="PATH",
+            doc="path/name of the component to be dropped",
+            nargs="*",
+            constraints=EnsureStr() | EnsureNone()),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        check=check_argument,
+        if_dirty=if_dirty_opt,
+    )
+
+    @staticmethod
+    @datasetmethod(name=_action)
+    def __call__(
+            path=None,
+            dataset=None,
+            recursive=False,
+            recursion_limit=None,
+            check=True,
+            if_dirty='save-before'):
+
+        content_by_ds, unavailable_paths = _Cinderella._prep(
+            path=path,
+            dataset=dataset,
+            recursive=recursive,
+            recursion_limit=recursion_limit)
+
+        results = []
+
+        # iterate over all datasets, order doesn't matter
+        for ds_path in content_by_ds:
+            ds = Dataset(ds_path)
+            paths = content_by_ds[ds_path]
+            handle_dirty_dataset(ds, if_dirty)
+            res = _drop_files(ds, paths, check=check)
+            results.extend(res)
+        return results
+
+
+class Uninstall(_Cinderella):
+    """
+    """
+    _action = 'uninstall'
+    _passive = 'uninstalled'
+
+    _params_ = dict(
+        dataset=dataset_argument,
+        path=Parameter(
+            args=("path",),
+            metavar="PATH",
+            doc="path/name of the component to be uninstalled",
+            nargs="*",
+            constraints=EnsureStr() | EnsureNone()),
+        recursive=recursion_flag,
+        check=check_argument,
+        if_dirty=if_dirty_opt,
+    )
+
+    @staticmethod
+    @datasetmethod(name=_action)
+    def __call__(
+            path=None,
+            dataset=None,
+            recursive=False,
+            check=True,
+            if_dirty='save-before'):
+
+        content_by_ds, unavailable_paths = _Cinderella._prep(
+            path=path,
+            dataset=dataset,
+            recursive=recursive)
+        if unavailable_paths:
+            lgr.warning('ignored non-installed paths: %s', unavailable_paths)
+
+        if path_is_under(content_by_ds.keys()):
+            # behave like `rm` and refuse to remove where we are
+            raise ValueError(
+                "refusing to uninstall current or parent directory")
+
+        results = []
+
+        # iterate over all datasets, starting at the bottom
+        # to deinit contained submodules first
+        for ds_path in sorted(content_by_ds, reverse=True):
+            ds = Dataset(ds_path)
+            paths = content_by_ds[ds_path]
+            handle_dirty_dataset(ds, if_dirty)
+            if ds_path in paths:
+                has_super = ds.get_superdataset(
+                    datalad_only=False,
+                    topmost=False)
+                results.extend(
+                    _uninstall_dataset(ds, check=check, has_super=has_super))
+            else:
+                lgr.warning(
+                    "will not act on files at %s (consider the `drop` command)",
+                    paths)
+        return results
+
+
+class Remove(_Cinderella):
+    """
+    """
+    _action = 'remove'
+    _passive = 'removed'
+
+    _params_ = dict(
+        dataset=dataset_argument,
+        path=Parameter(
+            args=("path",),
+            metavar="PATH",
+            doc="path/name of the component to be removed",
+            nargs="*",
+            constraints=EnsureStr() | EnsureNone()),
+        recursive=recursion_flag,
+        check=check_argument,
+        if_dirty=if_dirty_opt,
+    )
+
+    @staticmethod
+    @datasetmethod(name=_action)
+    def __call__(
+            path=None,
+            dataset=None,
+            recursive=False,
+            check=True,
+            if_dirty='save-before'):
+        # we don't want to know about subdatasets under to-be-removed
+        # paths, because those will not have to be removed, but rather
+        # get dropped/uninstalled -- and we need to know the difference
+        content_by_ds, unavailable_paths = _Cinderella._prep(
+            path=path,
+            dataset=dataset,
+            recursive=False)
+
+        nonexistent_paths = []
+        for p in unavailable_paths:
+            # we need to check whether any of these correspond
+            # to a known subdataset, and add those to the list of
+            # things to be removed
+            toppath = GitRepo.get_toppath(p)
+            if not toppath:
+                nonexistent_paths.append(p)
+                continue
+            if p in Dataset(toppath).get_subdatasets(
+                    recursive=False, absolute=True):
+                # this is a known subdataset that needs to be removed
+                pl = content_by_ds.get(p, [])
+                pl.append(p)
+                content_by_ds[p] = pl
+        if nonexistent_paths:
+            lgr.warning("ignoring non-existent path(s): %s",
+                        nonexistent_paths)
+
+        if path_is_under(content_by_ds):
+            # behave like `rm` and refuse to remove where we are
+            raise ValueError(
+                "refusing to uninstall current or parent directory")
+
+        ds2save = set()
+        results = []
+        # iterate over all datasets, starting at the bottom
+        # to make the removal of dataset content known upstairs
+        for ds_path in sorted(content_by_ds, reverse=True):
+            ds = Dataset(ds_path)
+            paths = content_by_ds[ds_path]
+            if ds.is_installed():
+                handle_dirty_dataset(ds, if_dirty)
+            if ds_path in paths:
+                # entire dataset needs to go
+                superds = ds.get_superdataset(
+                    datalad_only=False,
+                    topmost=False)
+                res = _uninstall_dataset(
+                    ds,
+                    check=check,
+                    has_super=not superds is None)
+                results.extend(res)
+                if not superds:
+                    continue
+                subds_relpath = relpath(ds_path, start=superds.path)
+                # remove submodule reference
+                submodule = [sm for sm in superds.repo.repo.submodules
+                             if sm.path == subds_relpath]
+                # there can only be one!
+                assert(len(submodule) == 1)
+                submodule = submodule[0]
+                submodule.remove()
+            else:
+                if check and hasattr(ds.repo, 'drop'):
+                    _drop_files(ds, paths, check=True)
+                results.extend(ds.repo.remove(paths, r=True))
+                ds2save.add(ds.path)
+            if ds_path in ds2save:
+                Save.__call__(
+                    message='[DATALAD] removed content',
+                    dataset=ds,
+                    auto_add_changes=False,
+                    recursive=False)
+                ds2save.discard(ds_path)
+        # commit removal in all superdatasets that have not been touch on the
+        # way up yet
+        for ds_path in ds2save:
+            Save.__call__(
+                message='[DATALAD] removed content',
+                dataset=Dataset(ds_path),
+                auto_add_changes=False,
+                recursive=False)
+        return results
