@@ -20,6 +20,7 @@ from os.path import lexists
 from os.path import isdir
 from os.path import dirname
 from os.path import relpath
+from os.path import sep
 from os.path import split as psplit
 from itertools import chain
 
@@ -27,6 +28,7 @@ from itertools import chain
 from datalad.interface.save import Save
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
+from datalad.utils import get_trace
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
@@ -70,6 +72,80 @@ def handle_dirty_dataset(ds, mode, msg=None):
         Save.__call__(dataset=ds, message=msg, auto_add_changes=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
+
+
+def save_dataset_hierarchy(
+        dpaths,
+        base=None,
+        message='[DATALAD] saved changes',
+        auto_add_changes=False):
+    """Save a (disjoint) hierarchy of dataset.
+
+    Saving is done in an order that guarantees that all to be saved
+    datasets reflect any possible change of any other to be saved
+    subdataset, before they are saved themselves.
+
+    Parameters
+    ----------
+    dpaths : sequence
+      Absolute paths of datasets to be saved
+    base : path or None, optional
+      Common super dataset that should also be saved.
+    message : str
+      Message to be used for saving individual datasets
+    auto_add_changes : bool
+      Whether to auto include any modifications in a dataset.
+    """
+    if base:
+        # just a convenience...
+        dpaths = assure_list(dpaths)
+        dpaths.append(base)
+    dpaths_ws = [_with_sep(d) for d in dpaths]
+    # sort all datasets under their potential superdatasets
+    superdss = {}
+    # start from the top to get all subdatasets down the line
+    # and collate them into as few superdatasets as possible
+    for s in sorted(dpaths_ws):
+        if any([s.startswith(d) for d in superdss]):
+            # this path is already covered by a known superdataset
+            continue
+        # find all subdatasets
+        subs = [d for d in dpaths if d.startswith(s)]
+        superdss[s] = subs
+    # for each "superdataset" check the tree of subdatasets and make sure
+    # we gather all datasets between the super and any subdataset
+    # so we can save them all bottom-up in order to be able to properly
+    # save the superdataset
+    tosave = set(dpaths)
+    for superds_path in superdss:
+        target_subs = superdss[superds_path]
+        subds_graph = Dataset(superds_path).get_subdatasets(
+            absolute=True, recursive=True, edges=True)
+        for t in target_subs:
+            trace = get_trace(
+                subds_graph,
+                # need to strip separator to make `==` work
+                superds_path.rstrip(sep),
+                t)
+            if trace:
+                tosave = tosave.union(trace)
+    # iterate over all datasets, starting at the bottom
+    for dpath in sorted(tosave, reverse=True):
+        ds = Dataset(dpath)
+        Save.__call__(
+            dataset=ds,
+            message=message,
+            auto_add_changes=auto_add_changes,
+            recursive=False)
+        superds = ds.get_superdataset(
+            datalad_only=False,
+            topmost=False)
+        if superds and superds.path in tosave:
+            # stage the new state known in a superdataset, but only if it is
+            # to be saved
+            superds.repo.add(
+                relpath(dpath, start=superds.path),
+                git=True)
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
