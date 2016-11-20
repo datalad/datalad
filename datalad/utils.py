@@ -1051,5 +1051,61 @@ def get_logfilename(dspath, cmd='datalad'):
     return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
+def get_trace(edges, start, end, trace=None):
+    """Return the trace/path to reach a node in a tree.
+
+    Parameters
+    ----------
+    edges : sequence(2-tuple)
+      The tree given by a sequence of edges (parent, child) tuples. The
+      nodes can be identified by any value and data type that supports
+      the '==' operation.
+    start :
+      Identifier of the start node. Must be present as a value in the parent
+      location of an edge tuple in order to be found.
+    end :
+      Identifier of the target/end node. Must be present as a value in the child
+      location of an edge tuple in order to be found.
+    trace : list
+      Mostly useful for recursive calls, and used internally.
+
+    Returns
+    -------
+    None or list
+      Returns a list with the trace to the target (the starts and the target
+      are not included in the trace, hence if start and end are directly connected
+      an empty list is returned), or None when no trace to the target can be found,
+      or start and end are identical.
+    """
+    # the term trace is used to avoid confusion with a path in the sense
+    # of a filesystem path, but the analogy fits and nodes can be paths
+    if trace is None:
+        trace = []
+    if not edges:
+        raise ValueError("no edges given")
+    for cand in edges:
+        cand_super, cand_sub = cand
+        if cand_sub in trace:
+            # only DAGs, skip any cyclic traces
+            continue
+        if trace and cand_super != trace[-1]:
+            # only consider edges that lead off the end of the trace
+            continue
+        if not trace and cand_super != start:
+            # we got nothing yet, and this edges is not matching the start
+            continue
+        if cand_sub == end:
+            return trace
+        # dive into potential subnodes
+        cand_trace = get_trace(
+            edges,
+            start,
+            end,
+            trace + [cand_sub])
+        if cand_trace:
+            return cand_trace
+    return None
+
+
 lgr.log(5, "Done importing datalad.utils")
 
