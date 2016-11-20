@@ -304,7 +304,8 @@ class Dataset(object):
 
         if absolute:
             if edges:
-                return [(opj(self._path, ds), opj(self._path, sm))
+                return [(self._path if ds == curdir else opj(self._path, ds),
+                         opj(self._path, sm))
                         for ds, sm in submodules]
             else:
                 return [opj(self._path, sm) for sm in submodules]
