@@ -8,8 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import exists
+from requests.exceptions import InvalidURL
+
 from ....utils import chpwd
+from ....dochelpers import exc_str
 from ....tests.utils import assert_true, assert_raises, assert_false
+from ....tests.utils import SkipTest
 from ....tests.utils import with_tempfile, skip_if_no_network, use_cassette
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from datalad.crawler.pipelines.fcptable import *
@@ -51,11 +55,18 @@ def _test_dataset(dataset, error, create, skip, tmpdir):
             ]
         ]
 
+        try:
+            run_pipeline(pipe)
+        except InvalidURL as exc:
+            raise SkipTest(
+                "This version of requests considers %s to be invalid.  "
+                "See https://github.com/kennethreitz/requests/issues/3683#issuecomment-261947670 : %s"
+                % (TOPURL, exc_str(exc)))
+
         if error:
             assert_raises(RuntimeError, run_pipeline, pipe)
             return
 
-        run_pipeline(pipe)
         if skip:
             assert_false(exists("README.txt"))
             return
