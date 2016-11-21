@@ -58,6 +58,12 @@ def handle_dirty_dataset(ds, mode, msg=None):
         return
     if msg is None:
         msg = '[DATALAD] auto-saved changes'
+
+    # make sure that all pending changes (batched annex operations, etc.)
+    # are actually reflected in Git
+    if ds.repo:
+        ds.repo.precommit()
+
     if mode == 'ignore':
         return
     elif mode == 'fail':
@@ -99,7 +105,7 @@ def save_dataset_hierarchy(
     if base:
         # just a convenience...
         dpaths = assure_list(dpaths)
-        dpaths.append(base)
+        dpaths.append(base.path if isinstance(base, Dataset) else base)
     dpaths_ws = [_with_sep(d) for d in dpaths]
     # sort all datasets under their potential superdatasets
     superdss = {}
@@ -120,7 +126,7 @@ def save_dataset_hierarchy(
     for superds_path in superdss:
         target_subs = superdss[superds_path]
         subds_graph = Dataset(superds_path).get_subdatasets(
-            absolute=True, recursive=True, edges=True)
+            absolute=True, recursive=True, edges=True, fulfilled=True)
         for t in target_subs:
             trace = get_trace(
                 subds_graph,
