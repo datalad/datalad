@@ -65,7 +65,7 @@ try:
         _default_pbar_params = \
             dict(smoothing=0, miniters=1, mininterval=0) \
             if external_versions['tqdm'] < '4.10.0' \
-            else {}
+            else dict(mininterval=0)
 
         def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
             super(tqdmProgressBar, self).__init__(maxval=maxval)
