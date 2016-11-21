@@ -29,9 +29,10 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.utils import get_normalized_path_arguments
-from datalad.interface.utils import handle_dirty_dataset
+from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import path_is_under
+from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.save import Save
 from datalad.utils import rmtree
 from datalad.support.gitrepo import GitRepo
@@ -63,6 +64,9 @@ def _uninstall_dataset(ds, check, has_super):
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
+    # TODO check that the relevant branched are pushed to a remote
+    if ds.get_subdatasets(fulfilled=True):
+        raise ValueError('to be uninstalled dataset has present subdatasets, forgot --recursive?')
     if ds.is_installed():
         rmtree(ds.path)
     if has_super and not exists(ds.path):
@@ -208,6 +212,8 @@ class Drop(_Cinderella):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        handle_dirty_datasets(
+            content_by_ds.keys(), mode=if_dirty, base=dataset)
 
         results = []
 
@@ -215,9 +221,9 @@ class Drop(_Cinderella):
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            handle_dirty_dataset(ds, if_dirty)
             res = _drop_files(ds, paths, check=check)
             results.extend(res)
+        # there is nothing to save at the end
         return results
 
 
@@ -261,6 +267,9 @@ class Uninstall(_Cinderella):
             raise ValueError(
                 "refusing to uninstall current or parent directory")
 
+        handle_dirty_datasets(
+            content_by_ds.keys(), mode=if_dirty, base=dataset)
+
         results = []
 
         # iterate over all datasets, starting at the bottom
@@ -268,7 +277,6 @@ class Uninstall(_Cinderella):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            handle_dirty_dataset(ds, if_dirty)
             if ds_path in paths:
                 has_super = ds.get_superdataset(
                     datalad_only=False,
@@ -279,6 +287,7 @@ class Uninstall(_Cinderella):
                 lgr.warning(
                     "will not act on files at %s (consider the `drop` command)",
                     paths)
+        # there is nothing to save at the end
         return results
 
 
@@ -309,13 +318,16 @@ class Remove(_Cinderella):
             recursive=False,
             check=True,
             if_dirty='save-before'):
-        # we don't want to know about subdatasets under to-be-removed
-        # paths, because those will not have to be removed, but rather
-        # get dropped/uninstalled -- and we need to know the difference
+        if dataset:
+            dataset = require_dataset(
+                dataset, check_installed=False, purpose='removal')
+            if not dataset.is_installed() and not path:
+                # all done already
+                return []
         content_by_ds, unavailable_paths = _Cinderella._prep(
             path=path,
             dataset=dataset,
-            recursive=False)
+            recursive=recursive)
 
         nonexistent_paths = []
         for p in unavailable_paths:
@@ -341,6 +353,9 @@ class Remove(_Cinderella):
             raise ValueError(
                 "refusing to uninstall current or parent directory")
 
+        handle_dirty_datasets(
+            content_by_ds.keys(), mode=if_dirty, base=dataset)
+
         ds2save = set()
         results = []
         # iterate over all datasets, starting at the bottom
@@ -348,18 +363,16 @@ class Remove(_Cinderella):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            if ds.is_installed():
-                handle_dirty_dataset(ds, if_dirty)
             if ds_path in paths:
                 # entire dataset needs to go
                 superds = ds.get_superdataset(
                     datalad_only=False,
                     topmost=False)
-                res = _uninstall_dataset(
-                    ds,
-                    check=check,
-                    has_super=not superds is None)
+                res = _uninstall_dataset(ds, check=check, has_super=False)
                 results.extend(res)
+                if ds.path in ds2save:
+                    # we just uninstalled it, no need to save anything
+                    ds2save.discard(ds.path)
                 if not superds:
                     continue
                 subds_relpath = relpath(ds_path, start=superds.path)
@@ -370,24 +383,16 @@ class Remove(_Cinderella):
                 assert(len(submodule) == 1)
                 submodule = submodule[0]
                 submodule.remove()
+                ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):
                     _drop_files(ds, paths, check=True)
                 results.extend(ds.repo.remove(paths, r=True))
                 ds2save.add(ds.path)
-            if ds_path in ds2save:
-                Save.__call__(
-                    message='[DATALAD] removed content',
-                    dataset=ds,
-                    auto_add_changes=False,
-                    recursive=False)
-                ds2save.discard(ds_path)
-        # commit removal in all superdatasets that have not been touch on the
-        # way up yet
-        for ds_path in ds2save:
-            Save.__call__(
-                message='[DATALAD] removed content',
-                dataset=Dataset(ds_path),
-                auto_add_changes=False,
-                recursive=False)
+
+        save_dataset_hierarchy(
+            list(ds2save),
+            base=dataset.path if dataset.is_installed() else None,
+            message='[DATALAD] removed content',
+            auto_add_changes=False)
         return results

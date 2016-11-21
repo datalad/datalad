@@ -80,6 +80,51 @@ def handle_dirty_dataset(ds, mode, msg=None):
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
 
+def handle_dirty_datasets(dpaths,
+                          mode,
+                          base=None,
+                          msg='[DATALAD] auto-saved changes'):
+    """Detect and treat unsaved changes as instructed by `mode`
+
+    Parameters
+    ----------
+    dpaths : sequence(path)
+      Dataset to be inspected. Does nothing if `None`.
+    mode : {'fail', 'ignore', 'save-before'}
+      How to act upon discovering unsaved changes.
+    base : path or None, optional
+      Path of a common super dataset that should also be handled.
+    msg : str
+      Custom message to use for a potential saved state.
+
+    Returns
+    -------
+    None
+    """
+    if mode == 'save-before':
+        save_dataset_hierarchy(
+            dpaths,
+            base=base,
+            message=msg,
+            auto_add_changes=True)
+    elif mode == 'ignore':
+        return
+    elif mode == 'fail':
+        for dpath in dpaths:
+            ds = Dataset(dpath)
+            if not ds.repo:
+                continue
+            ds.repo.precommit()
+            if ds.repo.repo.is_dirty(index=True,
+                                     working_tree=True,
+                                     untracked_files=True,
+                                     submodules=True):
+                raise RuntimeError(
+                    'dataset {} has unsaved changes'.format(ds))
+    else:
+        raise ValueError("unknown if-dirty mode '{}'".format(mode))
+
+
 def save_dataset_hierarchy(
         dpaths,
         base=None,
@@ -138,11 +183,12 @@ def save_dataset_hierarchy(
     # iterate over all datasets, starting at the bottom
     for dpath in sorted(tosave, reverse=True):
         ds = Dataset(dpath)
-        Save.__call__(
-            dataset=ds,
-            message=message,
-            auto_add_changes=auto_add_changes,
-            recursive=False)
+        if ds.is_installed():
+            Save.__call__(
+                dataset=ds,
+                message=message,
+                auto_add_changes=auto_add_changes,
+                recursive=False)
         superds = ds.get_superdataset(
             datalad_only=False,
             topmost=False)
