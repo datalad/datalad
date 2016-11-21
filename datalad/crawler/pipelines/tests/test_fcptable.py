@@ -55,6 +55,10 @@ def _test_dataset(dataset, error, create, skip, tmpdir):
             ]
         ]
 
+        if error:
+            assert_raises((InvalidURL, RuntimeError), run_pipeline, pipe)
+            return
+
         try:
             run_pipeline(pipe)
         except InvalidURL as exc:
@@ -62,10 +66,6 @@ def _test_dataset(dataset, error, create, skip, tmpdir):
                 "This version of requests considers %s to be invalid.  "
                 "See https://github.com/kennethreitz/requests/issues/3683#issuecomment-261947670 : %s"
                 % (TOPURL, exc_str(exc)))
-
-        if error:
-            assert_raises(RuntimeError, run_pipeline, pipe)
-            return
 
         if skip:
             assert_false(exists("README.txt"))
