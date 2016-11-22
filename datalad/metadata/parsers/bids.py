@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
-from os.path import join as opj
+from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -31,11 +31,12 @@ class MetadataParser(BaseMetadataParser):
             if bidsterm in bids:
                 meta[dataladterm] = bids[bidsterm]
 
-        if 'description' not in meta:
+        README_fname = opj(self.ds.path, 'README')
+        if not meta.get('description') and exists(README_fname):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            meta['description'] = open(opj(self.ds.path, 'README')).read().strip()
+            meta['description'] = open(README_fname).read().strip()
 
         compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
 
