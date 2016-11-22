@@ -43,23 +43,27 @@ class MetadataParser(BaseMetadataParser):
         foreign = jsonload(
             self.get_core_metadata_filenames()[0])
 
-        for term in (
-                'name', 'title', 'description', 'keywords', 'version',
-                'homepage'):
+        for term, dataladterm in (
+                ('name', 'Name'),
+                ('title', 'ShortDescription'),
+                ('description', 'Description'),
+                ('keywords', 'Keywords'),
+                ('version', 'Version'),
+                ('homepage', 'Homepage')):
             if term in foreign:
-                meta[term] = foreign[term]
+                meta[dataladterm] = foreign[term]
         if 'author' in foreign:
-            meta['author'] = _compact_author(foreign['author'])
+            meta['Author'] = _compact_author(foreign['author'])
         if 'contributors' in foreign:
-            meta['contributors'] = [_compact_author(c)
+            meta['Contributors'] = [_compact_author(c)
                                     for c in foreign['contributors']]
         # two license terms were supported at some point
         if 'license' in foreign:
-            meta['license'] = _compact_license(foreign['license'])
+            meta['License'] = _compact_license(foreign['license'])
         if 'licenses' in foreign:
-            meta['license'] = [_compact_license(l) for l in foreign['licenses']]
+            meta['License'] = [_compact_license(l) for l in foreign['licenses']]
 
-        meta['dcterms:conformsTo'] = [
+        meta['conformsTo'] = [
             'http://specs.frictionlessdata.io/data-packages',
             'http://docs.datalad.org/metadata.html#v0-1']
 

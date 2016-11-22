@@ -9,7 +9,8 @@
 """Metadata parser base class"""
 
 from os.path import exists, join as opj
-from datalad.metadata import _get_base_dataset_metadata
+from datalad.metadata import _get_base_metadata_dict
+from datalad.utils import assure_list
 
 
 class BaseMetadataParser(object):
@@ -17,6 +18,9 @@ class BaseMetadataParser(object):
     # to check
     _core_metadata_filenames = []
 
+    # TODO: add argument to provide callable to obtain cached key2filename
+    # mapping to speed up cases where multiple parsers need to look up keys
+    # for the same set of files
     def __init__(self, ds):
         """
         Parameters
@@ -26,6 +30,34 @@ class BaseMetadataParser(object):
         """
 
         self.ds = ds
+
+    @classmethod
+    def get_parser_id(cls):
+        # keep mostly for the tests
+        return _get_base_metadata_dict(
+            None,
+            describedby=cls.__module__.split('.')[-1])['describedby']['@id']
+
+    @classmethod
+    def _get_base_metadata_dict(cls, id_):
+        return _get_base_metadata_dict(
+            id_,
+            describedby=cls.__module__.split('.')[-1])
+
+    def get_filekey_mapping(self):
+        """Returns a list of (key, filename) tuples"""
+        repo = self.ds.repo
+        if not repo or not hasattr(repo, 'get_annexed_files'):
+            return {}
+        # TODO consider non-annexed files too
+        files = [f for f in assure_list(repo.get_annexed_files())
+                 # exclude any annexed files that we are using for internal
+                 # purposes (eg meta data caches)
+                 if not f.startswith('.datalad')]
+        if not len(files):
+            return []
+        keys = assure_list(repo.get_file_key(files))
+        return zip(keys, files)
 
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
@@ -61,7 +93,7 @@ class BaseMetadataParser(object):
         """
         if dsid is None:
             dsid = self.ds.id
-        meta = _get_base_dataset_metadata(dsid)
+        meta = self._get_base_metadata_dict(dsid)
         if self.has_metadata():
             meta = self._get_metadata(dsid, meta, full)
         return meta

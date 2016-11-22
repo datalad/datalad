@@ -1,0 +1,54 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Parser for generic file-based information (mime types, etc...)
+"""
+
+from mimetypes import guess_type as guess_mimetype
+from datalad.support.annexrepo import AnnexRepo
+from datalad.metadata.parsers.base import BaseMetadataParser
+
+
+class MetadataParser(BaseMetadataParser):
+    _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
+    cfg_section = 'datalad.metadata.parser.fileinfo.report'
+
+    def has_metadata(self):
+        # could check if there is at least one annexed file, but hey...
+        repo = self.ds.repo
+        return repo and isinstance(repo, AnnexRepo)
+
+    def get_metadata(self, dsid=None, full=False):
+        meta = []
+        ds_meta = self._get_base_metadata_dict(dsid)
+        parts = []
+        if not self.has_metadata():
+            return meta
+        # shortcuts
+        cfg = self.ds.config
+        repo = self.ds.repo
+        cfg_section = self.cfg_section
+        for key, file_ in self.get_filekey_mapping():
+            finfo = self._get_base_metadata_dict(key)
+            finfo['@type'] = 'File'
+            finfo['Location'] = file_
+            if cfg.getbool(cfg_section, 'filesize', True):
+                finfo['FileSize'] = repo.get_size_from_key(key)
+            if cfg.getbool(cfg_section, 'mimetype', True):
+                mtype, encoding = guess_mimetype(file_, strict=False)
+                if mtype:
+                    finfo['contentType'] = mtype
+                if encoding:
+                    finfo['encodingType'] = encoding
+            # TODO insert a "magic"-based description, and
+            meta.append(finfo)
+            parts.append({'@id': key})
+        if len(parts):
+            ds_meta['hasPart'] = parts
+            meta.append(ds_meta)
+        return meta

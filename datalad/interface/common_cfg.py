@@ -70,6 +70,28 @@ definitions = {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
     },
+    'datalad.metadata.parsers.enable': {
+        'ui': ('question', {
+               'title': 'Meta data parsers to enable for this dataset',
+               'text': 'Parser names?'}),
+    },
+    'datalad.metadata.parsers.disable': {
+        'ui': ('question', {
+               'title': 'Meta data parsers to disable for this dataset',
+               'text': 'Parser names?'}),
+    },
+    'datalad.metadata.parsers.fileinfo.report.filesize': {
+        'ui': ('yesno', {
+               'title': 'Include the size of files in the meta data report',
+               'question': 'Enable?'}),
+        'type': EnsureBool(),
+    },
+    'datalad.metadata.search.cache.compress': {
+        'ui': ('yesno', {
+               'title': 'Compression of meta data cache for search can improve load time on slow networked storage',
+               'question': 'Compress meta data cache?'}),
+        'type': EnsureBool(),
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

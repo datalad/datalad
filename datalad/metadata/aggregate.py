@@ -12,30 +12,77 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import join as opj, exists, relpath, dirname
+from os.path import join as opj, exists, relpath, dirname, lexists
 from datalad.interface.base import Interface
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import assure_list
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     Dataset, require_dataset
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from ..log import lgr
-from . import get_metadata, metadata_filename, metadata_basepath, is_implicit_metadata
+from . import get_metadata, metadata_basepath, _is_versioned_dataset_item
 from datalad.support.json_py import dump as jsondump
 
 
 def _store_json(ds, path, meta):
-    if not exists(path):
-        os.makedirs(path)
-    fname = opj(path, metadata_filename)
-    jsondump(meta, fname)
-    # stage potential changes
-    ds.repo.add(fname, git=True)
+    byparser = _sort_by_parser(meta)
+    for category in byparser:
+        cmeta = byparser[category]
+        fname = '{}.json'.format(category)
+        if category != 'base':
+            git = ds.config.get('datalad.metadata.aggregate.storeingit', False)
+        else:
+            git = True
+        fname = opj(path, fname)
+        # we want a writable location.
+        if lexists(fname):
+            # the simplest way is the kill whatever occupies this spot
+            ds.repo.remove(fname)
+        if not exists(path):
+            os.makedirs(path)
+        jsondump(cmeta, fname)
+        # stage potential changes
+        ds.repo.add(fname, git=git)
+
+
+def _sort_by_parser(meta):
+    meta = assure_list(meta)
+    byparser = {}
+    for m in meta:
+        desc = assure_list(m.get('describedby', ''))
+        processed = False
+        if not desc:
+            pass
+            # we have no clue where this is coming from
+        elif m.get('@type', None) == 'Dataset' \
+                and desc[0].get('@id', '').startswith('datalad'):
+            # anything from datalad that describes a dataset
+            p = byparser.get('base', [])
+            p.append(m)
+            byparser['base'] = p
+            processed = True
+        else:
+            for d in desc:
+                pid = d.get('@id', '')
+                if not pid.startswith('datalad_'):
+                    continue
+                pname = pid.split('_')[-1]
+                p = byparser.get(pname, [])
+                p.append(m)
+                byparser[pname] = p
+                processed = True
+        if not processed:
+            # make sure to put unknowns somewhere
+            p = byparser.get('other', [])
+            p.append(m)
+            byparser['other'] = p
+    return byparser
 
 
 class AggregateMetaData(Interface):
@@ -72,6 +119,18 @@ class AggregateMetaData(Interface):
         if_dirty=if_dirty_opt,
     )
 
+    # dear future self: if you want to reintroduce meta data graph flattening
+    # at aggregation time re-consider this:
+    # - flattening makes it impossible to discern what the source of a
+    #   particular meta data item is, in particular the 'conformsTo' properties
+    #   become essentially pointless, and it will be harder to deal with
+    #   "outdated" (compliant with an older meta data standard version) but
+    #   aggregated meta data. this is something we are not doing at all (as of
+    #   now), but it would be possible.
+    # - flattening folds the context information out of the actual graph nodes.
+    #   this could be good (more compact), or bad (could become harder to merge
+    #   graphs with different contexts) -- the latter is speculation and
+    #   untested (as of now), but should be kept in mind
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
     def __call__(
@@ -135,7 +194,7 @@ class AggregateMetaData(Interface):
                 subds,
                 guess_type=False,
                 ignore_subdatasets=False,
-                ignore_cache=False)
+                from_native=False)
 
         lgr.info('aggregating meta data for %s', ds)
         # pull out meta data from parent only (no subdatasets)
@@ -157,16 +216,19 @@ def _within_metadata_store(ds, guess_native_type, metapath):
         ds,
         guess_type=guess_native_type,
         ignore_subdatasets=True,
-        ignore_cache=True)
+        from_native=True)
     # strip git-based version info from the meta data that is cached
     # in the dataset itself -- this will be outdated the second we
     # commit below
+    # NOTE next line should not need protection, as we only process registered
+    # subdatasets
+    ds_identifier = ds.repo.repo.head.commit.hexsha
     for m in meta:
-        if not is_implicit_metadata(m):
+        if not m.get('@id', None) == ds_identifier:
             continue
-        for prop in ('dcterms:modified', 'version'):
-            if prop in m:
-                del m[prop]
+        m['@id'] = 'THISDATASET!'
+        if 'modified' in m:
+            del m['modified']
     _store_json(ds, metapath, meta)
 
 
@@ -191,11 +253,9 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
         subds_relpath = relpath(p, matchpath)
         # inject proper inter-dataset relationships
         for m in smeta:
-            # skip non-implicit
-            if not is_implicit_metadata(m):
-                continue
-            if 'dcterms:isPartOf' not in m and m.get('type', None) == 'Dataset':
-                m['dcterms:isPartOf'] = ds.id
+            if _is_versioned_dataset_item(m) and 'isPartOf' not in m:
+                m['isPartOf'] = 'THISDATASET!'
+                m['Location'] = subds_relpath
         sp = opj(ds.path, metadata_basepath, subds_relpath)
         _store_json(ds, sp, smeta)
         # stage potential changes in the subdataset

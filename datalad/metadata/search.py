@@ -14,7 +14,9 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 import sys
+import gzip
 
+from distutils.version import LooseVersion
 from operator import itemgetter
 from os.path import join as opj, exists
 from six import string_types
@@ -39,6 +41,62 @@ from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support import ansi_colors
 from datalad.ui import ui
+
+
+def get_searchoptimized_metadata(ds):
+    cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
+    mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+
+    meta = None
+    checksum = None
+    if os.path.exists(mcache_fname):
+        lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
+        for method in (open, gzip.open):
+            try:
+                meta, checksum = pickle.load(method(mcache_fname, 'rb'))
+                break
+            except IOError:
+                lgr.debug("Failed to read %s using %s.%s",
+                          mcache_fname,
+                          method.__module__,
+                          method.__name__)
+
+    # TODO add more sophisticated tests to decide when the cache is no longer valid
+    if checksum != ds.repo.get_hexsha():
+        # errrr, try again below
+        meta = None
+
+    # don't put in 'else', as yet to be written tests above might fail and require
+    # regenerating meta data
+    if meta is None:
+        lgr.info("Loading and caching local meta-data... might take a few seconds")
+        if not exists(cache_dir):
+            os.makedirs(cache_dir)
+
+        meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
+                            from_native=False)
+        # merge all info on datasets into a single dict per dataset
+        meta = flatten_metadata_graph(meta)
+        # extract graph, if any
+        meta = meta.get('@graph', meta)
+        # build simple queriable representation
+        if not isinstance(meta, list):
+            meta = [meta]
+
+        # sort entries by location (if present)
+        sort_keys = ('Location', 'location', 'Description', 'id')
+        meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
+
+        if ds.config.get('datalad.metadata.search.cache.compress', False):
+            method = gzip.open
+        else:
+            method = open
+        pickle.dump(
+            # graph plus checksum from what it was built
+            (meta, ds.repo.get_hexsha()),
+            method(mcache_fname, 'wb'))
+        lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
+    return meta
 
 
 class Search(Interface):
@@ -97,6 +155,12 @@ class Search(Interface):
             doc="""flag to report those fields which have matches. If `report`
              option values are provided, union of matched and those in `report`
              will be output"""),
+        what=Parameter(
+            args=('--what',),
+            action='append',
+            doc="""type of object to be searched. This can be anything, but
+            common values are "dataset", and "file" (case insensitive).[CMD:
+            This option can be given multiple times. CMD]"""),
         # Theoretically they should be CMDLINE specific I guess?
         format=Parameter(
             args=('-f', '--format'),
@@ -117,6 +181,7 @@ class Search(Interface):
                  search=None,
                  report=None,
                  report_matched=False,
+                 what='dataset',
                  format='custom',
                  regex=False):
 
@@ -178,53 +243,21 @@ class Search(Interface):
                 )
                 for res in central_ds.search(
                         match,
-                        search=search, report=report,
+                        search=search,
+                        report=report,
                         report_matched=report_matched,
-                        format=format, regex=regex):
+                        what=what,
+                        format=format,
+                        regex=regex):
                     yield res
                 return
             else:
                 raise
 
-        cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
-        mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+        # obtain meta data from best source
+        meta = get_searchoptimized_metadata(ds)
 
-        meta = None
-        if os.path.exists(mcache_fname):
-            lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
-            # TODO add more sophisticated tests to decide when the cache is no longer valid
-            if checksum != ds.repo.get_hexsha():
-                # errrr, try again below
-                meta = None
-
-        # don't put in 'else', as yet to be written tests above might fail and require
-        # regenerating meta data
-        if meta is None:
-            lgr.info("Loading and caching local meta-data... might take a few seconds")
-            if not exists(cache_dir):
-                os.makedirs(cache_dir)
-
-            meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                                ignore_cache=False)
-            # merge all info on datasets into a single dict per dataset
-            meta = flatten_metadata_graph(meta)
-            # extract graph, if any
-            meta = meta.get('@graph', meta)
-            # build simple queriable representation
-            if not isinstance(meta, list):
-                meta = [meta]
-
-            # sort entries by location (if present)
-            sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
-
-            # use pickle to store the optimized graph in the cache
-            pickle.dump(
-                # graph plus checksum from what it was built
-                (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'wb'))
-            lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
+        what = set([w.lower() for w in assure_list(what)])
 
         if report in ('', ['']):
             report = []
@@ -264,9 +297,28 @@ class Search(Interface):
             hit = False
             hits = [False] * len(matchers)
             matched_fields = set()
-            if not mds.get('type', mds.get('schema:type', None)) == 'Dataset':
-                # we are presently only dealing with datasets
+            type_ = mds.get('@type', mds.get('type', '')).lower()
+            if type_ not in what:
+                # not what we are looking for
                 continue
+            # Looking for some shape of 'location' will work with meta
+            # data of any age.
+            location = mds.get('Location', mds.get('location', None))
+            if location is None and type_ != 'dataset':
+                # we know nothing about location, and it cannot be a top-level
+                # superdataset
+                continue
+            # figure out what this meta data item is compliant with
+            # be ultra-robust wrt to possible locations, considering the possibilities
+            # of outdatated meta data, outdated schema caches, ...
+            compliance = mds.get('conformsTo', mds.get('dcterms:conformsTo', mds.get('http://purl.org/dc/terms/conformsTo', [])))
+            compliance = [LooseVersion(i.split('#')[-1][1:].replace('-', '.')) for i in assure_list(compliance)
+                          if i.startswith('http://docs.datalad.org/metadata.html#v')]
+            if any([v >= LooseVersion("0.2") for v in compliance]):
+                if type_ == 'dataset' and not 'isVersionOf' in mds:
+                    # this is just a generic Dataset definition, and no actual dataset instance
+                    continue
+
             # TODO consider the possibility of nested and context/graph dicts
             # but so far we were trying to build simple lists of dicts, as much
             # as possible
@@ -284,7 +336,7 @@ class Search(Interface):
                         continue
                     # so we have a hit, no need to track
                     observed_properties = None
-                if isinstance(v, dict) or isinstance(v, list):
+                if isinstance(v, (dict, list, int, float)) or v is None:
                     v = text_type(v)
                 for imatcher, matcher in enumerate(matchers):
                     if matcher(v):
@@ -297,7 +349,7 @@ class Search(Interface):
                         break
 
             if hit:
-                location = mds.get('location', '.')
+                location = mds.get('Location', mds.get('location', '.'))
                 report_ = matched_fields.union(report if report else {}) \
                     if report_matched else report
                 if report_ == ['*']:

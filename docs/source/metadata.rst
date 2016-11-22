@@ -52,6 +52,7 @@ Here is an example:
   Cite-As: Mike Author (2016). We made it. The breakthrough journal of unlikely
     events. 1, 23-453.
   DOI: 10.0000/nothere.48421
+  Keywords: free, demo, fictional
 
 The following fields are supported:
 
@@ -76,6 +77,8 @@ The following fields are supported:
 ``Issue-tracker``:
   A URL to an issue tracker where known problems are documented and/or new
   reports can be submitted.
+``Keywords``:
+  A comma-separated list of keywords.
 ``License``:
   A description of the license or terms of use for the dataset. The first
   lines should contain a list of license labels (e.g. CC0, PPDL) for standard
@@ -110,17 +113,51 @@ JSON-LD meta data format
 ========================
 
 Datalad uses JSON-LD_ as its primary meta data format. By default, the
-following context (available from `here <schema.json>`_
-is used for any meta data item:
+following context (available from `here <schema.json>`_) is used for any meta
+data item:
 
 .. literalinclude:: _extras/schema.json
    :language: json
 
+Naming rules for extending the context are:
+
+* Namespace prefixes are lower-case (e.g. "doap")
+
+* Noun properties are capitalized (camel-casing for compound terms, such as
+  "IssueTracker")
+
+* Predicates starting with a verb start lower-case and use camel-casing if
+  necessary, e.g. "isPartOf"
+
 While it is technically possible to mix different contexts across items this
 has not been fully tested yet.
 
+Four types of objects are described:
+
+* :term:`Dataset` -- of which there are two:
+
+  1. General dataset description (UUID identifier)
+  2. Particular (versioned) instance of a dataset (hexsha identified)
+
+* File
+* :term:`Annex`
+
 The following sections describe details and changes in the meta data
 specifications implemented in datalad.
+
+.. _0.2:
+
+v0.2
+----
+
+* Use a datalad-specific JSON-LD context to streamline further
+  extensions.
+
+* Use repository hexsha strings as ``@id`` for JSON-LD items, to be
+  able to distinguish multiple installations of the same dataset with
+  different versions at different locations. Previously, the meta data
+  would only be able to express the presence of multiple versions at
+  multiple locations, but not which version at which location.
 
 .. _0.1:
 

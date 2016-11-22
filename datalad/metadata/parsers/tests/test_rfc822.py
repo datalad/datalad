@@ -55,6 +55,7 @@ Funding: BMBFGQ1411, NSF 1429999
 Issue-Tracker: https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues
 Cite-As: Cool (2016)
 DOI: 10.5281/zenodo.48421
+Keywords: awesome, the best, no
 
 """}})
 def test_get_metadata(path):
@@ -65,27 +66,32 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
+  "@context": "http://schema.datalad.org/",
   "@id": "ID",
-  "bug-database": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
-  "citation": "Cool (2016)",
-  "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
-  "description": "A text with arbitrary length and content that can span multiple\\nparagraphs (this is a new one)",
-  "doap:Version": "1.0.0-rc3",
-  "doap:homepage": "http://studyforrest.org",
-  "doap:maintainer": [
-    "Mike One <mike@example.com>",
-    "Anna Two <anna@example.com>"
+  "Citation": "Cool (2016)",
+  "Description": "A text with arbitrary length and content that can span multiple\\nparagraphs (this is a new one)",
+  "Homepage": "http://studyforrest.org",
+  "IssueTracker": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
+  "Keywords": [
+    "awesome",
+    "the best",
+    "no"
   ],
-  "doap:shortdesc": "Basic summary",
-  "foaf:fundedBy": "BMBFGQ1411, NSF 1429999",
-  "license": [
+  "License": [
     "CC0",
     "The person who associated a work with this deed has dedicated the work to the public domain by waiving all of his or her rights to the work worldwide under copyright law, including all related and neighboring rights, to the extent allowed by law.\\nYou can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission."
   ],
-  "name": "studyforrest_phase2",
+  "Maintainer": [
+    "Mike One <mike@example.com>",
+    "Anna Two <anna@example.com>"
+  ],
+  "Name": "studyforrest_phase2",
+  "ShortDescription": "Basic summary",
+  "Version": "1.0.0-rc3",
+  "conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
+  "describedby": {
+    "@id": "%s"
+  },
+  "fundedBy": "BMBFGQ1411, NSF 1429999",
   "sameAs": "http://dx.doi.org/10.5281/zenodo.48421"
-}""")
+}""" % (MetadataParser.get_parser_id(),))

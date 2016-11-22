@@ -101,7 +101,7 @@ def test_create(path):
     eq_(ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
     assert_equal(
-        ds.config.get_value('datalad.metadata', 'nativetype'),
+        ds.config.get_value('datalad.metadata.parsers', 'enable'),
         ('bim', 'bam', 'bum'))
 
 

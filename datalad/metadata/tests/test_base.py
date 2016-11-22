@@ -18,8 +18,9 @@ from operator import itemgetter
 from os.path import join as opj, exists
 
 from datalad.api import Dataset, aggregate_metadata, install
-from datalad.metadata import get_metadata_type, get_metadata
+from datalad.metadata import get_enabled_metadata_parsers, get_metadata
 from datalad.metadata import _cached_load_document
+from datalad.metadata import _is_versioned_dataset_item
 from datalad.utils import swallow_logs
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
@@ -35,6 +36,7 @@ from datalad.support.annexrepo import AnnexRepo
 
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises, assert_false
+from nose.tools import assert_not_equal
 
 try:
     import pyld
@@ -69,25 +71,29 @@ _dataset_hierarchy_template = {
 
 
 @with_tempfile(mkdir=True)
-def test_get_metadata_type(path):
+def test_get_enabled_metadata_parsers(path):
     # nothing set, nothing found
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
-    open(opj(path, '.datalad', 'config'), 'w').write('[metadata]\n')
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata.parsers"]\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), [])
     # minimal setting
-    open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata.parsers"]\n\tenable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tenable = metoo!\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['mamboschwambo', 'metoo!'])
+    open(opj(path, '.datalad', 'config'), 'a').write('[datalad "metadata.parsers"]\n\tdisable = mamboschwambo\n')
+    assert_equal(get_enabled_metadata_parsers(Dataset(path)), ['metoo!'])
 
 
 @with_tree(tree={
     'dataset_description.json': "{}",
     'datapackage.json': '{"name": "some"}'
 })
-def test_get_multiple_metadata_types(path):
+def test_get_multiple_enabled_parsers(path):
     assert_equal(
-        sorted(get_metadata_type(Dataset(path), guess=True)),
+        sorted(get_enabled_metadata_parsers(Dataset(path), guess=True)),
         ['bids', 'frictionless_datapackage'])
 
 
@@ -105,30 +111,30 @@ def test_get_multiple_metadata_types(path):
 def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
-    assert_equal(sorted(meta[0].keys()),
-                 ['@context', 'dcterms:conformsTo'])
+    # no dataset on disk -> no meta data
+    assert_equal(meta, [])
     ds.create(force=True, save=False)
     # with subdataset
     sub = ds.create('sub', force=True, if_dirty='ignore')
     ds.save()
     meta = get_metadata(ds)
     assert_equal(
-        sorted(meta[0].keys()),
-        ['@context', '@id', 'availableFrom', 'dcterms:conformsTo',
-         'dcterms:modified', 'type', 'version'])
-    assert_equal(meta[0]['type'], 'Dataset')
+        sorted(meta[1].keys()),
+        ['@context', '@id', '@type', 'conformsTo', 'describedby',
+         'isVersionOf', 'modified'])
+    assert_equal(meta[0]['@type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
-    sibling_meta = get_metadata(sibling)
+    sibling_meta = get_metadata(sibling, guess_type=True)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
-    meta = get_metadata(ds)
-    assert_equal([m['@id'] for m in meta[0]['availableFrom']],
-                 [m['@id'] for m in sibling_meta[0]['availableFrom']])
+    meta = get_metadata(ds, guess_type=True)
+    assert_equal([m['@id'] for m in meta[-1]['availableFrom']],
+                 [m['@id'] for m in sibling_meta[-1]['availableFrom']])
     meta = get_metadata(ds, guess_type=True)
     # without aggregation there is not trace of subdatasets in the metadata
-    assert_not_in('dcterms:hasPart', meta[0])
+    assert_not_in('hasPart', meta[0])
 
 
 @skip_if_no_network
@@ -140,34 +146,45 @@ def test_aggregation(path):
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True, if_dirty='ignore')
     subsubds = subds.create('subsub', force=True, if_dirty='ignore')
-    # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second natiev set for the topmost dataset
+    # aggregate from bottom to top, guess native data
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
-    assert_equal(len(meta), 10)
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
+    # 3 dataset UUID definitions +
+    # 3 annex definitions +
+    # 3 annex/dataset relations +
+    # 3 version dataset items +
+    # 4 native metadata set +
+    # 2 subdataset relationship items +
+    # 4 files (one for each metadata source) +
+    # 3 dataset file parts (one for each dataset) +
+    assert_equal(len(meta), 25)
     # same schema
     assert_equal(
-        10,
-        sum([s.get('@context', {'@vocab': None})['@vocab'] == 'http://schema.org/'
+        25,
+        sum([s.get('@context', None) == 'http://schema.datalad.org/'
              for s in meta]))
-    # three different IDs
-    assert_equal(3, len(set([s.get('@id') for s in meta])))
+    # all with parser being identified
+    assert_equal(
+        25,
+        sum([s['describedby']['@id'].startswith('datalad_')
+             for s in meta]))
+    # three different IDs per type (annex, dataset, versioned dataset)
+    # plus fours different file keys
+    assert_equal(13, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
-        assert_true(sum([s.get('name', None) == assure_unicode(name) for s in meta]))
-    #print(meta)
+        assert_true(sum([s.get('Name', None) == assure_unicode(name) for s in meta]))
     assert_equal(
         # first implicit, then two natives, then aggregate
-        meta[3]['dcterms:hasPart']['@id'],
-        subds.id)
+        meta[9]['hasPart']['@id'],
+        subds.repo.get_hexsha())
     success = False
     for m in meta:
-        p = m.get('dcterms:hasPart', {})
-        if p.get('@id', None) == subsubds.id:
-            assert_equal(opj('sub', 'subsub'), p.get('location', None))
+        loc = m.get('Location', None)
+        if m.get('@id', None) == subsubds.repo.get_hexsha() and loc:
+            assert_equal(opj('sub', 'subsub'), loc)
             success = True
     assert_true(success)
 
@@ -182,29 +199,38 @@ def test_aggregation(path):
     # get fresh meta data, the implicit one for the top-most datasets should
     # differ, but the rest not
     clonemeta = get_metadata(
-        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
-
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False)
+    from datalad.tests.utils import dump_graph
+    print(dump_graph(clonemeta))
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
     assert_equal(clonemeta[0]['@id'], ds.id)
     assert_equal(clone.repo.get_hexsha(), ds.repo.get_hexsha())
-    assert_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
+    assert_equal(clonemeta[2]['@id'], ds.repo.get_hexsha())
+    # for the reset pull all the annexed meta data
+    clonemeta = get_metadata(
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False,
+        obtain_files=True)
     # all but the implicit is identical
-    assert_equal(clonemeta[1:], meta[1:])
+    assert_equal([i for i in clonemeta if not _is_versioned_dataset_item(i)],
+                 [i for i in meta if not _is_versioned_dataset_item(i)])
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
-        clonemeta[3]['dcterms:hasPart']['@id'],
-        subds.id)
+        clonemeta[9]['hasPart']['@id'],
+        subds.repo.get_hexsha())
 
     # now obtain a subdataset in the clone and the IDs should be updated
-    clone.install('sub')
-    partial = get_metadata(clone, guess_type=False, ignore_cache=True)
+    ploc = 'sub'
+    psub = clone.install(ploc)
+    partial = get_metadata(clone, guess_type=False, from_native=True)
     # ids don't change
     assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
     # datasets are properly connected
-    assert_equal(partial[1]['dcterms:hasPart']['@id'],
-                 partial[2]['@id'])
+    assert_equal(partial[2]['hasPart']['@id'],
+                 partial[4]['@id'])
+    assert_equal(partial[4]['Location'], ploc)
+    assert_equal(partial[4]['@id'], psub.repo.get_hexsha())
 
     # query smoke test
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
@@ -253,14 +279,14 @@ def test_aggregation(path):
     assert_equal(
         set(map(lambda x: tuple(x[1].keys()),
                 clone.search('child', report_matched=True))),
-        set([('name',)])
+        set([('Name',)])
     )
     # and the additional field we might have asked with report
     assert_equal(
         set(map(lambda x: tuple(sorted(x[1].keys())),
                 clone.search('child', report_matched=True,
-                             report=['schema:type']))),
-        set([('name', 'schema:type')])
+                             report=['@type']))),
+        set([('@type', 'Name')])
     )
     # and if we ask report to be 'empty', we should get no fields
     child_res_empty = list(clone.search('child', report=''))
@@ -312,10 +338,10 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
     # and we know nothing subsub
     for name in ('grandchild_äöü東',):
-        assert_true(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
+        assert_true(sum([s.get('Name', '') == assure_unicode(name) for s in meta]))
 
     # but search should not fail
     with swallow_outputs():
@@ -346,7 +372,7 @@ def test_cached_load_document(tdir):
     with patch('datalad.metadata._get_schema_url_cache_filename',
                return_value=cache_filename):
         with patch('pyld.jsonld.load_document', return_value=target_schema), \
-            swallow_logs(new_level=logging.WARNING) as cml:
+                swallow_logs(new_level=logging.WARNING) as cml:
             schema = _cached_load_document("http://schema.org/")
             assert_equal(schema, target_schema)
             cml.assert_logged("cannot load cache from", level="WARNING")
@@ -367,9 +393,10 @@ def test_ignore_nondatasets(path):
     # we want to ignore the version/commits for this test
     def _kill_time(meta):
         for m in meta:
-            for k in ('version', 'dcterms:modified'):
-                if k in m:
-                    del m[k]
+            if 'isVersionOf' in m:
+                m['@id'] = 'CENSORED'
+                if 'modified' in m:
+                    del m['modified']
         return meta
 
     ds = Dataset(path).create()
@@ -390,3 +417,69 @@ def test_ignore_nondatasets(path):
         assert_equal(len(ds.get_subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
+
+
+@with_tempfile()
+def test_idempotent_aggregate(path):
+    # a hierarchy of three (super/sub)datasets
+    ds = Dataset(path).create()
+    subds = ds.create('sub')
+    subds.create('subsub')
+    ds.save(auto_add_changes=True)
+    origstate = ds.repo.get_hexsha()
+    # aggregate from bottom to top, guess native data, no compacting of graph
+    aggregate_metadata(ds, guess_native_type=False, recursive=True)
+    aggstate = ds.repo.get_hexsha()
+    # aggregation did something
+    assert_not_equal(origstate, aggstate)
+    # reaggration doesn't change anything
+    aggregate_metadata(ds, guess_native_type=False, recursive=True)
+    assert_equal(ds.repo.get_hexsha(), aggstate)
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+def test_aggregation_with_disabled_parsers(path):
+    # a hierarchy of three (super/sub)datasets, each with some native metadata
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    subds = ds.create('sub', force=True, if_dirty='ignore')
+    subds.create('subsub', force=True, if_dirty='ignore')
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
+    # no only ask the top superdataset, no recursion, just reading from the cache
+    meta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
+    assert_equal(len(meta), 25)
+    # some file info
+    fileinfo_items = sum([s['describedby']['@id'].endswith('parser_fileinfo')
+                         for s in meta])
+    assert_equal(fileinfo_items, 7)
+    # some annex info
+    annex_items = sum([s['describedby']['@id'].endswith('parser_knownannexes')
+                      for s in meta])
+    assert_equal(annex_items, 6)
+    # now we configure the superdataset to disregard both types of info
+    # and first we do it in a clone that has none of the subdatasets installed
+    clone = install(source=ds.path, path=opj(path, 'clone'))
+    clone.config.add('datalad.metadata.parsers.disable', 'fileinfo')
+    clone.config.add('datalad.metadata.parsers.disable', 'knownannexes')
+    clonemeta = get_metadata(
+        clone, guess_type=False, ignore_subdatasets=False, from_native=False,
+        obtain_files=True)
+
+    def _checkmeta(testmeta):
+        # check that unwanted pieces are gone
+        assert_equal(0,
+                     sum([s['describedby']['@id'].endswith('parser_knownannexes')
+                          for s in testmeta]))
+        assert_equal(0,
+                     sum([s['describedby']['@id'].endswith('parser_fileinfo')
+                          for s in testmeta]))
+        # but the rest is still there
+        assert_equal(len(testmeta), len(meta) - fileinfo_items - annex_items)
+    _checkmeta(clonemeta)
+    # and now the same with the original dataset (that has all local subdatasets)
+    # and also cached meta data at every level
+    ds.config.add('datalad.metadata.parsers.disable', 'fileinfo')
+    ds.config.add('datalad.metadata.parsers.disable', 'knownannexes')
+    newmeta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, from_native=False)
+    _checkmeta(newmeta)

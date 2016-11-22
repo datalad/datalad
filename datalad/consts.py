@@ -24,6 +24,8 @@ CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
 # Make use of those in datalad.metadata
 METADATA_DIR = join(HANDLE_META_DIR, 'meta')
 METADATA_FILENAME = 'meta.json'
+METADATA_CURRENT_VERSION = '0.2'
+METADATA_MIN_VERSION = '0.1'
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
