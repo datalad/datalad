@@ -24,6 +24,7 @@ from ..auto import AutomagicIO
 from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
+from .utils import chpwd
 
 try:
     import h5py
@@ -80,6 +81,19 @@ def test_proxying_open_testrepobased(repo):
             with open(fpath2) as f:
                 content = f.read()
                 eq_(content, TEST_CONTENT)
+
+    annex.drop(fpath2)
+    assert_raises(IOError, open, fpath2)
+
+    # Let's use relative path
+    with chpwd(opj(repo, 'd1')):
+        # Let's use context manager form
+        with AutomagicIO() as aio, \
+                swallow_outputs(), \
+                open(opj('d2', 'test2.dat')) as f:
+                    content = f.read()
+                    eq_(content, TEST_CONTENT)
+
 
 # TODO: RF to allow for quick testing of various scenarios/backends without duplication
 @with_tempfile(mkdir=True)

@@ -12,11 +12,13 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 from os.path import join as opj
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import ok_clean_git
 from datalad.interface.utils import handle_dirty_dataset
+from datalad.interface.utils import get_paths_by_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.api import save
 
@@ -74,3 +76,31 @@ def test_dirty(path):
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.get_subdatasets(), ['subds'])
+
+
+@with_tempfile(mkdir=True)
+def test_paths_by_dataset(path):
+    ds = Dataset(path).create()
+    subds = ds.create('one')
+    subsubds = subds.create('two')
+    d, ua, ne = get_paths_by_dataset([path])
+    for t in (ua, ne):
+        assert_equal(t, [])
+    assert_equal(d, {ds.path: [ds.path]})
+
+    d, ua, ne = get_paths_by_dataset([path], recursive=True)
+    for t in (ua, ne):
+        assert_equal(t, [])
+    for t in (ds, subds, subsubds):
+        assert_equal(d[t.path], [t.path])
+
+    os.makedirs(opj(ds.path, 'one', 'some'))
+    hidden = subds.create(opj('some', 'deep'))
+    testpath = opj(subds.path, 'some')
+    d, ua, ne = get_paths_by_dataset([testpath], recursive=True)
+    for t in (ua, ne):
+        assert_equal(t, [])
+    # must contain the containing dataset, and the testpath exactly
+    assert_equal(d[subds.path], [testpath])
+    # and also the subdataset underneath
+    assert_equal(d[hidden.path], [hidden.path])

@@ -303,8 +303,11 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         info_batched = ar.info(testfile, batch=True, fast=fast)
         assert_equal(info, info_batched)
         # while at it ;)
-        assert_equal(ar.info('nonexistent', batch=False), None)
-        assert_equal(ar.info('nonexistent', batch=True), None)
+        with swallow_outputs() as cmo:
+            assert_equal(ar.info('nonexistent', batch=False), None)
+            assert_equal(ar.info('nonexistent-batch', batch=True), None)
+            eq_(cmo.out, '')
+            eq_(cmo.err, '')
 
     # annex repo info
     repo_info = ar.repo_info(fast=False)

@@ -18,6 +18,7 @@ import math
 import os
 import re
 import shlex
+import tempfile
 
 from itertools import chain
 from os import linesep
@@ -1359,7 +1360,11 @@ class AnnexRepo(GitRepo):
         if not batch:
             json_objects = self._run_annex_command_json('info', args=options + files)
         else:
-            json_objects = self._batched.get('info', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(files)
+            json_objects = self._batched.get(
+                'info',
+                git_options=self._GIT_COMMON_OPTIONS,
+                annex_options=options, json=True, path=self.path
+            )(files)
 
         # Some aggressive checks. ATM info can be requested only per file
         # json_objects is a generator, let's keep it that way
@@ -1854,6 +1859,8 @@ class BatchedAnnex(object):
             output_proc = readline_json if json else readline_rstripped
         self.output_proc = output_proc
         self._process = None
+        self._stderr_out = None
+        self._stderr_out_fname = None
 
     def _initialize(self):
         # TODO -- should get all those options about --debug and --backend which are used/composed
@@ -1868,8 +1875,9 @@ class BatchedAnnex(object):
         # while avoid deadlocks etc.  We would need to start a thread/subprocess
         # to timeout etc
         # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
+        self._stderr_out, self._stderr_out_fname = tempfile.mkstemp()
         self._process = Popen(
-            cmd, stdin=PIPE, stdout=PIPE,  # stderr=PIPE
+            cmd, stdin=PIPE, stdout=PIPE,  stderr=self._stderr_out,
             env=GitRunner.get_git_environ_adjusted(),
             cwd=self.path,
             bufsize=1,
@@ -1944,6 +1952,14 @@ class BatchedAnnex(object):
 
     def close(self):
         """Close communication and wait for process to terminate"""
+        if self._stderr_out:
+            # close possibly still open fd
+            os.fdopen(self._stderr_out).close()
+            self._stderr_out = None
+        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            # remove the file where we kept dumping stderr
+            os.unlink(self._stderr_out_fname)
+            self._stderr_out_fname = None
         if self._process:
             process = self._process
             lgr.debug("Closing stdin of %s and waiting process to finish", process)
