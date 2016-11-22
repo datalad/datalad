@@ -136,10 +136,10 @@ class ConfigManager(object):
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
-        self._dataset = dataset
+        self._dataset_path = dataset.path if dataset else None
         self._dataset_only = dataset_only
         # Since configs could contain sensitive information, to prevent
-        # any "facilitated" leakage -- just disable loging of outputs for
+        # any "facilitated" leakage -- just disable logging of outputs for
         # this runner
         run_kwargs = dict(log_outputs=False)
         if dataset is not None:
@@ -158,9 +158,9 @@ class ConfigManager(object):
         # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
-        if self._dataset:
+        if self._dataset_path:
             # now any dataset config
-            dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
+            dscfg_fname = opj(self._dataset_path, '.datalad', 'config')
             if exists(dscfg_fname):
                 stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
                                            log_stderr=True)
@@ -442,18 +442,18 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._dataset:
+            if not self._dataset_path:
                 raise ValueError(
                     'ConfigManager cannot store to configuration to dataset, none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset.path, '.datalad')
+            dscfg_dirname = opj(self._dataset_path, '.datalad')
             dscfg_fname = opj(dscfg_dirname, 'config')
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(dscfg_fname):
                 open(dscfg_fname, 'w').close()
-            args.extend(['--file', opj(self._dataset.path, '.datalad', 'config')])
+            args.extend(['--file', opj(self._dataset_path, '.datalad', 'config')])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':
