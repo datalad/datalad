@@ -141,6 +141,8 @@ class Save(Interface):
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
 
+        ds.repo.precommit()
+
         if not ds.repo.repo.is_dirty(
                 index=True,
                 working_tree=True,

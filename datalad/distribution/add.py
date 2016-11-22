@@ -346,6 +346,9 @@ class Add(Interface):
                          for f in calls[dspath]['addurl_f']]
                     )
             return_values = None  # to avoid mis-use
+            # close batched annex calls to make sure
+            # changes are actually finished.
+            ds.repo.precommit()
 
         # XXX or we could return entire datasets_return_values, could be useful
         # that way.  But then should be unified with the rest of commands, e.g.
@@ -354,10 +357,11 @@ class Add(Interface):
         for dspath, return_values in datasets_return_values.items():
             if save and len(return_values):
                 # we got something added -> save
-                # everything we care about at this point should be staged already
+                # everything we care about at this point should be staged
+                # already
                 Save.__call__(
                     message='[DATALAD] added content',
-                    dataset=ds,
+                    dataset=dspath,
                     auto_add_changes=False,
                     recursive=False)
             # TODO: you feels that this is some common logic we already have somewhere
@@ -370,7 +374,6 @@ class Add(Interface):
                     return_values_flat.append(return_value)
             else:
                 return_values_flat.extend(return_values)
-
 
         return return_values_flat
 
