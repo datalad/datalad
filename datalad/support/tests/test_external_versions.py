@@ -10,7 +10,7 @@
 from os import linesep
 
 from ...version import __version__
-from ..external_versions import ExternalVersions, StrictVersion
+from ..external_versions import ExternalVersions, StrictVersion, LooseVersion
 from ..exceptions import CommandError
 
 from mock import patch
@@ -106,9 +106,10 @@ def test_custom_versions():
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
     assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
+    assert(isinstance(ev['cmd:git'], (LooseVersion, StrictVersion)))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
-    ev.CUSTOM = {'bogus': lambda: 1/0}
+    ev.CUSTOM = {'bogus': lambda: 1 / 0}
     assert_equal(ev['bogus'], None)
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 

@@ -106,9 +106,13 @@ class Update(Interface):
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(with_refs_only=True)
+            if not remotes:
+                lgr.debug("No siblings known to dataset at %s\nSkipping",
+                          repo.path)
+                continue
             if name and name not in remotes:
-                lgr.warning("'%s' not known to dataset %s.\nSkipping" %
-                            (name, repo.path))
+                lgr.warning("'%s' not known to dataset %s\nSkipping",
+                            name, repo.path)
                 continue
 
             # Currently '--merge' works for single remote only:

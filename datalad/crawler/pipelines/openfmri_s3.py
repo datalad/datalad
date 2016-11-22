@@ -73,14 +73,15 @@ def collection_pipeline(prefix=None):
 
 # TODO: make a unittest for all of this on a simple bucket
 
-def pipeline(prefix=None):
+def pipeline(prefix=None, tag=True, skip_problematic=False):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
     lgr.info("Creating a pipeline for the openfmri bucket")
     annex = Annexificator(
         create=False,  # must be already initialized etc
         special_remotes=[DATALAD_SPECIAL_REMOTE],
-        backend='MD5E'
+        backend='MD5E',
+        skip_problematic=skip_problematic,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
         # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
@@ -91,7 +92,7 @@ def pipeline(prefix=None):
         sub_s3_to_http,
         switch('datalad_action',
                {
-                   'commit': annex.finalize(tag=True),
+                   'commit': annex.finalize(tag=tag),
                    'remove': annex.remove,
                    'annex':  annex,
                })

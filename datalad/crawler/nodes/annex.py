@@ -48,6 +48,7 @@ from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
+from ...support.exceptions import AnnexBatchCommandError
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -57,6 +58,7 @@ from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
+from datalad.dochelpers import exc_str
 
 from logging import getLogger
 
@@ -518,7 +520,14 @@ class Annexificator(object):
             if self.mode == 'full' and url_status and url_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(url_status.size), url))
-            out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+            try:
+                out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+            except AnnexBatchCommandError as exc:
+                if self.skip_problematic:
+                    lgr.warning("Skipping %s due to %s", url, exc_str(exc))
+                    return
+                else:
+                    raise
             added_to_annex = 'key' in out_json
 
             if self.mode == 'full' or not added_to_annex:
@@ -1385,7 +1394,10 @@ class Annexificator(object):
         # TODO: not sure if we should may be check if exists, and skip/just complain if not
         if stats:
             _call(stats.increment, 'removed')
-        _call(self.repo.remove, filename)
+        if lexists(opj(self.repo.path, filename)):
+            _call(self.repo.remove, filename)
+        else:
+            lgr.warning("Was asked to remove non-existing path %s", filename)
         yield data
 
     def initiate_dataset(self, *args, **kwargs):

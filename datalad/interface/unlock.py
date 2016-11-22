@@ -13,19 +13,20 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from os.path import commonprefix
-from os.path import abspath
+from os import curdir
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.utils import getpwd
+from datalad.interface.utils import get_normalized_path_arguments
+from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
 
 from .base import Interface
 
@@ -50,80 +51,57 @@ class Unlock(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory. If the latter fails, an
             attempt is made to identify the dataset based on `path` """,
-            constraints=EnsureDataset() | EnsureNone()),)
+            constraints=EnsureDataset() | EnsureNone()),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+    )
 
     @staticmethod
     @datasetmethod(name='unlock')
-    def __call__(path=None, dataset=None):
-        # shortcut
-        ds = dataset
+    def __call__(
+            path=None,
+            dataset=None,
+            recursive=False,
+            recursion_limit=None):
 
-        if isinstance(path, list):
-            if not len(path):
-                # normalize value to expected state when nothing was provided
-                path = None
-            elif len(path) == 1:
-                # we can simply continue with the function as called with a
-                # single argument
-                path = path[0]
+        if path is None and dataset is None:
+            raise InsufficientArgumentsError(
+                "insufficient arguments for unlocking: needs at least "
+                "a dataset or a path to unlock.")
 
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
+        resolved_paths, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=curdir)
 
-        if ds is None:
-            # try CWD:
-            dspath = GitRepo.get_toppath(getpwd())
-            if not dspath:
-                if path is None:
-                    raise InsufficientArgumentsError(
-                        "insufficient arguments for unlocking: needs at least "
-                        "a dataset or a path to unlock.")
-                # if we still have no dataset, try deriving it from path(s):
-                if isinstance(path, list):
-                    # several paths and no dataset given;
-                    # paths have to be absolute and have to have common prefix
-                    # in order to be able to find a dataset
+        content_by_ds, unavailable_paths, nondataset_paths = \
+            get_paths_by_dataset(resolved_paths,
+                                 recursive=recursive,
+                                 recursion_limit=recursion_limit)
 
-                    # TODO: maybe consider realpath?
-                    prefix = commonprefix(path)
-                    if not prefix:
-                        raise InsufficientArgumentsError(
-                            "insufficient information for unlocking: no "
-                            "dataset given and paths don't have a common base "
-                            "to check for a dataset")
-                    dspath = GitRepo.get_toppath(abspath(prefix))
-                else:
-                    # single path
-                    dspath = GitRepo.get_toppath(abspath(path))
+        if nondataset_paths:
+            lgr.warning(
+                "ignored paths that do not belong to any dataset: %s",
+                nondataset_paths)
+        if unavailable_paths:
+            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
 
-            if dspath is None:
-                raise InsufficientArgumentsError(
-                    "insufficient information for unlocking: no "
-                    "dataset given and none could be derived "
-                    "from given path(s) or current working directory")
+        unlocked = []
+        for ds_path in sorted(content_by_ds.keys()):
+            ds = Dataset(ds_path)
 
-            ds = Dataset(dspath)
+            if not isinstance(ds.repo, AnnexRepo):
+                lgr.debug("'%s' has no annex, nothing to unlock",
+                          ds)
+                continue
 
-        assert ds
-        assert ds.repo
+            files = content_by_ds[ds_path]
 
-        if not isinstance(ds.repo, AnnexRepo):
-            # TODO: Introduce NoAnnexError
-            raise ValueError("No annex found in dataset (%s)." % ds.path)
+            std_out, std_err = ds.repo._annex_custom_command(
+                files, ['git', 'annex', 'unlock'])
 
-        # TODO: AnnexRepo().unlock() with proper return value
-        if not path:
-            files = []
-        elif isinstance(path, list):
-            files = path
-        else:
-            files = [path]
-
-        std_out, std_err = ds.repo._annex_custom_command(
-            files, ['git', 'annex', 'unlock'])
-
-        return [line.split()[1] for line in std_out.splitlines()
-                if line.strip().endswith('ok')]
+            unlocked.extend(
+                [line.split()[1] for line in std_out.splitlines()
+                 if line.strip().endswith('ok')])
+        return unlocked
 
     @staticmethod
     def result_renderer_cmdline(res, args):

@@ -248,7 +248,13 @@ class crawl_s3(object):
                 update_versiondb(e)
             elif isinstance(e, DeleteMarker):
                 if strategy == 'commit-versions':
-                    yield updated(data, {'filename': filename, 'datalad_action': 'remove'})
+                    # Since git doesn't care about empty directories for us makes sense only
+                    # in the case when DeleteMarker is not pointing to the subdirectory
+                    if not filename.endswith('/'):
+                        yield updated(data, {'filename': filename, 'datalad_action': 'remove'})
+                    else:
+                        lgr.info("Ignoring DeleteMarker for %s", filename)
+
                 update_versiondb(e)
             elif isinstance(e, Prefix):
                 # so  we were provided a directory (in non-recursive traversal)

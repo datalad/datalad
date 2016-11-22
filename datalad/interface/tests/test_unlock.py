@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 from os import geteuid
 from os.path import join as opj
 
@@ -23,18 +24,19 @@ from datalad.support.exceptions import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import eq_, ok_
+from datalad.tests.utils import eq_
 from datalad.tests.utils import getpwd
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import on_windows, skip_if
+from datalad.utils import swallow_logs
 
 
 @assert_cwd_unchanged
 @with_tempfile(mkdir=True)
-@with_tempfile
+@with_tempfile(mkdir=True)
 @with_tempfile
 def test_unlock_raises(path, path2, path3):
 
@@ -46,22 +48,21 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(InsufficientArgumentsError,
                   unlock, dataset=None, path=None)
     # no dataset and path not within a dataset:
-    assert_raises(InsufficientArgumentsError,
-                  unlock, dataset=None, path=path2)
-    # no dataset and inconsistent paths:
-    assert_raises(InsufficientArgumentsError,
-                  unlock, dataset=None, path=[path2, path3])
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        unlock(dataset=None, path=path2)
+        assert_in("ignored paths that do not belong to any dataset: ['{0}'".format(path2),
+                  cml.out)
 
-    # let's be in a dataset,which is no annex:
     create(path=path, no_annex=True)
     ds = Dataset(path)
-    assert_raises(ValueError, ds.unlock)
+    # no complaints
+    ds.unlock()
 
     # make it annex, but call unlock with invalid path:
     AnnexRepo(path, create=True)
-    with assert_raises(CommandError) as cm:
+    with swallow_logs(new_level=logging.WARNING) as cml:
         ds.unlock(path="notexistent.txt")
-        assert_in("git-annex: notexistent.txt not found", str(cm.exception))
+        assert_in("ignored non-existing paths", cml.out)
 
     chpwd(_cwd)
 
