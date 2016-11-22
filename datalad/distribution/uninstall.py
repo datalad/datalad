@@ -178,7 +178,7 @@ class _Cinderella(Interface):
 
 
 class Drop(_Cinderella):
-    """
+    """Drop
     """
     _action = 'drop'
     _passive = 'dropped'
@@ -228,7 +228,7 @@ class Drop(_Cinderella):
 
 
 class Uninstall(_Cinderella):
-    """
+    """Uninstall
     """
     _action = 'uninstall'
     _passive = 'uninstalled'
@@ -292,7 +292,7 @@ class Uninstall(_Cinderella):
 
 
 class Remove(_Cinderella):
-    """
+    """Remove
     """
     _action = 'remove'
     _passive = 'removed'
