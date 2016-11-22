@@ -399,9 +399,6 @@ class WeakSingletonRepo(type):
 
         # Clonen in metaklasse moven => classmethod? clone(), falls Parameter src(url) vorhanden
 
-
-
-
         # TODO: argument src determines cloning, which wouldn't even be tried now, if something is already (or still) pointing to the target
 
         # TODO: Not sure yet, if and where to resolve symlinks or use abspath
@@ -622,6 +619,11 @@ class GitRepo(object):
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
         self._cfg = None
+        # Make sure to flush pending changes, especially close batch processes
+        # (internal `git cat-file --batch` by GitPython)
+        if self.repo is not None:
+            self.repo.git.clear_cache()
+        self.precommit()
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -837,8 +839,9 @@ class GitRepo(object):
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        # flush possibly cached in GitPython changes to index:
-        self.repo.index.write()
+        if self.repo is not None:
+            # flush possibly cached in GitPython changes to index:
+            self.repo.index.write()
 
     @staticmethod
     def _get_prefixed_commit_msg(msg):
