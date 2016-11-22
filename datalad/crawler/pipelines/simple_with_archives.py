@@ -63,7 +63,7 @@ lgr = getLogger("datalad.crawler.pipelines.kaggle")
 #     yield {'filename': "README.txt"}
 #
 
-def pipeline(url,
+def pipeline(url=None,
              a_href_match_='.*/download/.*\.(tgz|tar.*|zip)',
              tarballs=True,
              datalad_downloader=False,
@@ -71,7 +71,9 @@ def pipeline(url,
              leading_dirs_depth=1,
              rename=None,
              backend='MD5E',
-             add_archive_leading_dir=False):
+             add_archive_leading_dir=False,
+             annex=None,
+             incoming_pipeline=None):
     """Pipeline to crawl/annex an crcns dataset"""
 
     if not isinstance(leading_dirs_depth, int):
@@ -79,36 +81,43 @@ def pipeline(url,
 
     if not tarballs:
         raise NotImplementedError("yet to simplify for no tarballs case")
+
     lgr.info("Creating a pipeline to crawl data files from %s", url)
-    special_remotes = []
-    if tarballs:
-        special_remotes.append(ARCHIVES_SPECIAL_REMOTE)
-    if datalad_downloader:
-        special_remotes.append(DATALAD_SPECIAL_REMOTE)
-    annex = Annexificator(
-        create=False,  # must be already initialized etc
-        backend=backend,
-        statusdb='json',
-        special_remotes=special_remotes,
-        options=["-c", "annex.largefiles=exclude=README* and exclude=LICENSE* and exclude=*.txt and exclude=*.json"
-                 " and exclude=*.cfg"]
-    )
+    if annex is None:
+        # if no annex to use was provided -- let's just make one
+        special_remotes = []
+        if tarballs:
+            special_remotes.append(ARCHIVES_SPECIAL_REMOTE)
+        if datalad_downloader:
+            special_remotes.append(DATALAD_SPECIAL_REMOTE)
+        annex = Annexificator(
+            create=False,  # must be already initialized etc
+            backend=backend,
+            statusdb='json',
+            special_remotes=special_remotes,
+            options=["-c", "annex.largefiles=exclude=README* and exclude=LICENSE*"]
+        )
 
-    crawler = crawl_url(url)
-    urls_pipe = [ # Download all the archives found on the project page
-        crawler,
-        a_href_match(a_href_match_, min_count=1),
-    ]
+    if url:
+        assert not incoming_pipeline
+        crawler = crawl_url(url)
+        incoming_pipeline = [ # Download all the archives found on the project page
+            crawler,
+            a_href_match(a_href_match_, min_count=1),
+        ]
+        if rename:
+            incoming_pipeline += [sub({'filename': get_replacement_dict(rename)})]
+        incoming_pipeline += [annex]
+    else:
+        # no URL -- nothing to crawl -- but then should have been provided
+        assert incoming_pipeline
 
-    if rename:
-        urls_pipe += [sub({'filename': get_replacement_dict(rename)})]
 
+    # TODO: we could just extract archives processing setup into a separate pipeline template
     return [
-        annex.switch_branch('incoming'),
+        annex.switch_branch('incoming', parent='master'),
         [
-            urls_pipe + [
-                annex,
-            ],
+            incoming_pipeline,
         ],
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged

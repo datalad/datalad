@@ -16,6 +16,9 @@ from ..nodes.misc import switch, assign, sub
 from ..nodes.s3 import crawl_s3
 from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE
+from ...support.strings import get_replacement_dict
+
+from .simple_with_archives import pipeline as swa_pipeline
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -39,9 +42,15 @@ sub_s3_to_http = sub({
 
 # TODO: make a unittest for all of this on a simple bucket
 # TODO:   branch option
-def pipeline(bucket, no_annex=False, prefix=None, tag=True, skip_problematic=False, to_http=False,
+def pipeline(bucket,
+             prefix=None,
+             no_annex=False,
+             tag=True, skip_problematic=False, to_http=False,
+             rename=None,
              directory=None,
-             backend='MD5'):
+             archives=False,
+             backend='MD5E',
+             **kwargs):
     """Pipeline to crawl/annex an arbitrary bucket
 
     Parameters
@@ -78,7 +87,10 @@ def pipeline(bucket, no_annex=False, prefix=None, tag=True, skip_problematic=Fal
         **annex_kw
     )
 
-    s3_actions = {'commit': annex.finalize(tag=tag), 'annex': annex}
+    s3_actions = {
+        'commit': annex.finalize(tag=tag),
+        'annex': annex
+    }
     s3_switch_kw = {}
     recursive=True
     if directory:
@@ -87,17 +99,17 @@ def pipeline(bucket, no_annex=False, prefix=None, tag=True, skip_problematic=Fal
             if prefix:
                 new_prefix = opj(prefix, new_prefix)
             s3_actions['directory'] = [
-                   # for initiate_dataset we should replicate filename as handle_name, prefix
-                   assign({'prefix': new_prefix, 'dataset_name': '%(filename)s'}, interpolate=True),
-                   annex.initiate_dataset(
-                       template='simple_s3',
-                       data_fields=['prefix'],
-                       add_fields={
-                           'bucket': bucket,
-                           'to_http': to_http,
-                           'skip_problematic': skip_problematic,
-                       }
-                   )
+                # for initiate_dataset we should replicate filename as handle_name, prefix
+                assign({'prefix': new_prefix, 'dataset_name': '%(filename)s'}, interpolate=True),
+                annex.initiate_dataset(
+                    template='simple_s3',
+                    data_fields=['prefix'],
+                    add_fields={
+                        'bucket': bucket,
+                        'to_http': to_http,
+                        'skip_problematic': skip_problematic,
+                    }
+                )
             ]
             s3_switch_kw['missing'] = 'skip'  # ok to not remove
             recursive = False
@@ -106,12 +118,23 @@ def pipeline(bucket, no_annex=False, prefix=None, tag=True, skip_problematic=Fal
     else:
         s3_actions['remove'] = annex.remove
 
-    pipeline = [
+    incoming_pipeline = [
         crawl_s3(bucket, prefix=prefix, strategy='commit-versions', repo=annex.repo, recursive=recursive),
     ]
 
+    from ..nodes.misc import debug
     if to_http:
-        pipeline.append(sub_s3_to_http)
+        incoming_pipeline.append(sub_s3_to_http)
 
-    pipeline.append(switch('datalad_action', s3_actions, **s3_switch_kw))
+    if rename:
+        incoming_pipeline += [sub({'filename': get_replacement_dict(rename)},
+                                  ok_missing=True)]
+
+    incoming_pipeline.append(switch('datalad_action', s3_actions, **s3_switch_kw))
+
+    if archives:
+        pipeline = swa_pipeline(incoming_pipeline=incoming_pipeline, annex=annex,
+                                **kwargs)
+    else:
+        pipeline = incoming_pipeline
     return pipeline
