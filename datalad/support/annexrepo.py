@@ -237,6 +237,11 @@ class AnnexRepo(GitRepo):
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
+    def __del__(self):
+        if hasattr(self, '_batched') and self._batched is not None:
+            self._batched.close()
+        super(AnnexRepo, self).__del__()
+
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.
 
@@ -279,6 +284,15 @@ class AnnexRepo(GitRepo):
                        ''.format(remote_name,
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
+
+    @property
+    def dirty(self):
+        """Returns true if there are uncommitted changes or files not known to
+        index"""
+        # flush pending changes, especially close batched annex processes to
+        # make sure their changes are registered
+        self.precommit()
+        return super(AnnexRepo, self).dirty
 
     @classmethod
     def _check_git_annex_version(cls):
