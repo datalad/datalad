@@ -79,7 +79,7 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
 
 
-@with_testrepos('.*basic.*', flavors=['local'])
+@with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_invalid(path):
     ds = Dataset(path).create(force=True)
     for method in (uninstall, remove, drop):
