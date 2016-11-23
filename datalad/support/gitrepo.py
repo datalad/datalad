@@ -376,6 +376,12 @@ class WeakSingletonRepo(type):
 
     def __call__(self, path, *args, **kwargs):
 
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+
+
         if len(args) >= 1 or ('url' in kwargs and kwargs['url'] is not None):
             # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing;
             # keep in master when merging and remove in second PR, so other PRs
@@ -486,33 +492,10 @@ class GitRepo(object):
         if kwargs:
             git_opts.update(kwargs)
 
-        # TODO: Probably can go into metaclass:
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        # TODO: Concept of when to set to "dry".
-        #       Includes: What to do in gitrepo class?
-        #       Now: setting "dry" means to give a dry-runner to constructor.
-        #       => Do it similar in gitrepo/dataset.
-        #       Still we need a concept of when to set it and whether this
-        #       should be a single instance collecting everything or more
-        #       fine grained.
-
-        # TODO: somehow do more extensive checks that url and path don't point
-        #       to the same location
-
         self.repo = None
         self._cfg = None
-
-#        if url is not None and not (url == path):
-#            # TODO: What to do, in case url is given, but path exists already?
-#            # Just rely on whatever clone_from() does, independently on value
-#            # of create argument?
-#            self.clone(url, path)
 
         if create and not GitRepo.is_valid_repo(path):
             try:
@@ -558,14 +541,13 @@ class GitRepo(object):
         """
 
         # try to get a local path from `url`:
-        if url is not None:
-            try:
-                if not isinstance(url, RI):
-                    url = RI(url).localpath
-                else:
-                    url = url.localpath
-            except ValueError:
-                pass
+        try:
+            if not isinstance(url, RI):
+                url = RI(url).localpath
+            else:
+                url = url.localpath
+        except ValueError:
+            pass
 
         if is_ssh(url):
             cnct = ssh_manager.get_connection(url)
@@ -583,7 +565,6 @@ class GitRepo(object):
                                              odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
-                # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
                 e_str = exc_str(e)
@@ -611,8 +592,6 @@ class GitRepo(object):
 
         gr = cls(path=path, *args, **kwargs)
         gr.repo = repo
-        # TODO: this is inefficient since a gitpy.Repo instance is built twice
-        # now. Let GitRepo.__init__ take a gitpy.Repo optionally
         return gr
 
     def __del__(self):
@@ -621,9 +600,11 @@ class GitRepo(object):
         self._cfg = None
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
-        if self.repo is not None:
+        if hasattr(self, 'repo') and self.repo is not None \
+                and exists(self.path):  # gc might be late, so the (temporary)
+                                        # repo doesn't exist on FS anymore
             self.repo.git.clear_cache()
-        self.precommit()
+            self.repo.index.write()
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -1303,9 +1284,8 @@ class GitRepo(object):
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
-                tb = self.repo.active_branch.tracking_branch().name
-                if tb:
-                    tb_remote, refspec = split_remote_branch(tb)
+                tb_remote, refspec = self.get_tracking_branch()
+                if tb_remote is not None:
                     remotes_to_fetch = [self.repo.remote(tb_remote)]
                 else:
                     # No remote, no tracking branch
@@ -1349,15 +1329,15 @@ class GitRepo(object):
                                  refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
-            tb = self.repo.active_branch.tracking_branch().name
-            if tb:
-                tb_remote, refspec = split_remote_branch(tb)
+            tb_remote, refspec = self.get_tracking_branch()
+            if tb_remote is not None:
                 remote = self.repo.remote(tb_remote)
             else:
                 # No remote, no tracking branch
                 # => fail
-                raise ValueError("No remote specified to fetch from nor a "
+                raise ValueError("No remote specified to pull from nor a "
                                  "tracking branch is set up.")
+
         else:
             remote = self.repo.remote(remote)
 
@@ -1397,16 +1377,15 @@ class GitRepo(object):
             if all_:
                 remotes_to_push = self.repo.remotes
             else:
-                # No explicit remote to fetch.
+                # No explicit remote to push to.
                 # => get tracking branch:
-                tb = self.repo.active_branch.tracking_branch().name
-                if tb:
-                    tb_remote, refspec = split_remote_branch(tb)
+                tb_remote, refspec = self.get_tracking_branch()
+                if tb_remote is not None:
                     remotes_to_push = [self.repo.remote(tb_remote)]
                 else:
                     # No remote, no tracking branch
                     # => fail
-                    raise ValueError("No remote specified to fetch from nor a "
+                    raise ValueError("No remote specified to push to nor a "
                                      "tracking branch is set up.")
         else:
             remotes_to_push = [self.repo.remote(remote)]
