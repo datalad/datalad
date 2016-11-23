@@ -74,7 +74,7 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
 
 
-@with_testrepos('.*basic.*', flavors=['local'])
+@with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_invalid(path):
     assert_raises(InsufficientArgumentsError, uninstall)
     # makes no sense to call uninstall, but ask it to do nothing
