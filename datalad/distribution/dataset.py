@@ -180,8 +180,11 @@ class Dataset(object):
         ConfigManager
         """
         if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            if self.repo is None:
+                # associate with this dataset and read the entire config hierarchy
+                self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            else:
+                self._cfg = self.repo.config
         return self._cfg
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
