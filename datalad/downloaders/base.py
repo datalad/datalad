@@ -20,6 +20,7 @@ from abc import ABCMeta, abstractmethod
 from os.path import exists, join as opj, isdir
 from six import PY2
 from six import binary_type, PY3
+from six import add_metaclass
 
 
 from .. import cfg
@@ -55,13 +56,12 @@ class DownloaderSession(object):
 
 
 @auto_repr
+@add_metaclass(ABCMeta)
 class BaseDownloader(object):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
     _DOWNLOAD_SIZE_TO_VERIFY_AUTH = 10000
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, credential=None, authenticator=None):
         """
