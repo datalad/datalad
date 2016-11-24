@@ -376,6 +376,8 @@ class WeakSingletonRepo(type):
 
     def __call__(self, path, *args, **kwargs):
 
+        lgr.debug("__call__ was invoked.")
+
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
         # if it is not a local thing:
@@ -476,6 +478,8 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
+
+        lgr.debug("__init__ was invoked with path=%s" % path)
 
         if url is not None:
             RuntimeError("RF: url passed to init()")

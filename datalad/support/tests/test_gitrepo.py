@@ -27,6 +27,16 @@ from ..exceptions import FileNotInRepositoryError
 @with_tempfile(mkdir=True)
 def test_GitRepo_invalid_path(path):
     with chpwd(path):
+        # TEMP/DEBUG:
+        from six import PY2, PY3, PY34
+        import logging
+        lgr = logging.getLogger('datalad.test_gitrepo')
+        lgr.debug("PY2: %s\tPY3: %s\tPY34: %s" % (PY2, PY3, PY34))
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
+            #GitRepo(path="git://some/url", create=True)
+            cml.assert_logged("__init__ was invoked with path=%s" % path, level='DEBUG')
+            cml.assert_logged("__call__ was invoked.", level='DEBUG')
         assert_raises(ValueError, GitRepo, path="git://some/url", create=True)
         ok_(not exists(opj(path, "git:")))
         assert_raises(ValueError, GitRepo, path="file://some/relative/path", create=True)
