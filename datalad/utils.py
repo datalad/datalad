@@ -376,7 +376,7 @@ else:
 def assure_tuple_or_list(obj):
     """Given an object, wrap into a tuple if not list or tuple
     """
-    if isinstance(obj, list) or isinstance(obj, tuple):
+    if isinstance(obj, (list, tuple)):
         return obj
     return (obj,)
 
@@ -391,7 +391,9 @@ def assure_list(s):
 
     if isinstance(s, list):
         return s
-    elif isinstance(s, tuple):
+    elif isinstance(s, text_type):
+        return [s]
+    elif hasattr(s, '__iter__'):
         return list(s)
     elif s is None:
         return []
