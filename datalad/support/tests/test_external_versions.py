@@ -125,3 +125,23 @@ def test_ancient_annex():
     ev = ExternalVersions()
     with patch('datalad.support.external_versions._runner', _runner()):
         assert_equal(ev['cmd:annex'], '0.1')
+
+
+def _test_list_tuple(thing):
+    version = ExternalVersions._deduce_version(thing)
+    assert_greater(version, '0.0.1')
+    assert_greater('0.2', version)
+    assert_equal('0.1', version)
+    assert_equal(version, '0.1')
+
+
+def test_list_tuple():
+
+    class thing_with_tuple_version:
+        __version__ = (0, 1)
+
+    class thing_with_list_version:
+        __version__ = [0, 1]
+
+    for v in thing_with_list_version, thing_with_tuple_version, '0.1', (0, 1), [0, 1]:
+        yield _test_list_tuple, v

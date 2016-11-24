@@ -52,6 +52,7 @@ def _get_annex_version():
         out, err = _runner.run(['git', 'annex', 'version'])
         return out.split('\n')[0].split(':')[1].strip()
 
+
 def _get_git_version():
     """Return version of available git"""
     return _runner.run('git version'.split())[0].split()[2]
@@ -84,25 +85,33 @@ class ExternalVersions(object):
     @classmethod
     def _deduce_version(klass, value):
         version = None
+
+        # see if it is something containing a version
         for attr in ('__version__', 'version'):
             if hasattr(value, attr):
                 version = getattr(value, attr)
                 break
 
-        if isinstance(version, tuple) or isinstance(version, list):
-            #  Generate string representation
-            version = ".".join(str(x) for x in version)
-
-        if version is None and isinstance(value, string_types):
+        # assume that value is the version
+        if version is None:
             version = value
 
+        # do type analysis
+        if isinstance(version, (tuple, list)):
+            #  Generate string representation
+            version = ".".join(str(x) for x in version)
+        elif isinstance(version, binary_type):
+            version = version.decode()
+        elif isinstance(version, string_types):
+            pass
+        else:
+            version = None
+
         if version:
-            if isinstance(version, binary_type):
-                version = version.decode()
             try:
                 return StrictVersion(version)
             except ValueError:
-                # let's then go with Loose one
+                # let's then go with a Loose one
                 return LooseVersion(version)
         else:
             return klass.UNKNOWN
