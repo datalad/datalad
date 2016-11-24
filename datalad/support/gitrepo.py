@@ -29,8 +29,11 @@ from os.path import basename
 from os.path import curdir
 from os.path import pardir
 from os.path import sep
+from weakref import WeakValueDictionary
+
 
 from six import string_types
+from six import add_metaclass
 from functools import wraps
 import git as gitpy
 from git.exc import GitCommandError
@@ -369,14 +372,9 @@ def split_remote_branch(branch):
     return branch.split('/', 1)
 
 
-from weakref import WeakValueDictionary
-
-
 class WeakSingletonRepo(type):
 
     def __call__(self, path, *args, **kwargs):
-
-        lgr.debug("__call__ was invoked.")
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
@@ -424,19 +422,16 @@ class WeakSingletonRepo(type):
         #     return repo
 
 
+@add_metaclass(WeakSingletonRepo)
 class GitRepo(object):
     """Representation of a git repository
 
     Not sure if needed yet, since there is GitPython. By now, wrap it to have
     control. Convention: method's names starting with 'git_' to not be
     overridden accidentally by AnnexRepo.
-
     """
 
-    __metaclass__ = WeakSingletonRepo
     _unique_repos = WeakValueDictionary()
-
-    #__slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):
@@ -478,8 +473,6 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
-
-        lgr.debug("__init__ was invoked with path=%s" % path)
 
         if url is not None:
             RuntimeError("RF: url passed to init()")

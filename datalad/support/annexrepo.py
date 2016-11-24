@@ -34,8 +34,6 @@ from subprocess import Popen, PIPE
 from six import string_types
 from six import iteritems
 from six.moves import filter
-from six.moves.configparser import NoOptionError
-from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
@@ -48,7 +46,6 @@ from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
 from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
-from datalad.config import ConfigManager
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -71,7 +68,6 @@ from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
-from .gitrepo import WeakSingletonRepo, WeakValueDictionary
 
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
@@ -82,13 +78,6 @@ class AnnexRepo(GitRepo):
     will be interpreted as relative to `self.path`. Absolute paths will be
     accepted either way.
     """
-
-    __metaclass__ = WeakSingletonRepo
-    _unique_repos = WeakValueDictionary()
-
-
-    #__slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
-    #                                 '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -451,13 +440,8 @@ class AnnexRepo(GitRepo):
         True if on crippled filesystem, False otherwise
         """
 
-        #try:
         self.config.reload()
         return self.config.getbool("annex", "crippledfilesystem", False)
-        #except (NoOptionError, NoSectionError):
-        #    # If .git/config lacks an entry "crippledfilesystem",
-        #    # it's actually not crippled.
-        #    return False
 
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
@@ -1664,13 +1648,11 @@ class AnnexRepo(GitRepo):
 
     @property
     def default_backends(self):
-        try:
-            backends = self.repo.config_reader().get_value("annex", "backends")
-            if backends:
-                return backends.split()
-            else:
-                return None
-        except NoOptionError:
+        self.config.reload()
+        backends = self.config.get("annex.backends", default=None)
+        if backends:
+            return backends.split()
+        else:
             return None
 
     def fsck(self):
