@@ -10,7 +10,7 @@
 from os import linesep
 
 from ...version import __version__
-from ..external_versions import ExternalVersions, StrictVersion, LooseVersion
+from ..external_versions import ExternalVersions, LooseVersion
 from ..exceptions import CommandError
 from ..exceptions import OutdatedExternalDependency
 from ...support.annexrepo import AnnexRepo
@@ -40,10 +40,9 @@ def test_external_versions_basic():
     assert_true(our_module in ev)
     assert_false('unknown' in ev)
 
-    # StrictVersion might remove training .0
-    version_str = str(ev[our_module]) \
-        if isinstance(ev[our_module], StrictVersion) \
-        else __version__
+    # all are LooseVersions now
+    assert_true(isinstance(ev[our_module], LooseVersion))
+    version_str = __version__
     assert_equal(ev.dumps(), "Versions: %s=%s" % (our_module, version_str))
 
     # For non-existing one we get None
@@ -108,7 +107,7 @@ def test_custom_versions():
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
     assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
-    assert(isinstance(ev['cmd:git'], (LooseVersion, StrictVersion)))
+    assert(isinstance(ev['cmd:git'], LooseVersion))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
     ev.CUSTOM = {'bogus': lambda: 1 / 0}

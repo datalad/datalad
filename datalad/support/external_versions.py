@@ -13,7 +13,7 @@ from os import linesep
 from six import string_types
 from six import binary_type
 
-from distutils.version import StrictVersion, LooseVersion
+from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -64,11 +64,11 @@ class ExternalVersions(object):
     To avoid collision between names of python modules and command line tools,
     prepend names for command line tools with `cmd:`.
 
-    It maintains a dictionary of `distuil.version.StrictVersion`s to make
-    comparisons easy.  If version string doesn't conform the StrictVersion
-    LooseVersion will be used.  If version can't be deduced for the external,
-    `UnknownVersion()` is assigned.  If external is not present (can't be
-    imported, or custom check throws exception), None is returned without
+    It maintains a dictionary of `distuil.version.LooseVersion`s to make
+    comparisons easy. Note that even if version string conform the StrictVersion
+    "standard", LooseVersion will be used.  If version can't be deduced for the
+    external, `UnknownVersion()` is assigned.  If external is not present (can't
+    be imported, or custom check throws exception), None is returned without
     storing it, so later call will re-evaluate fully.
     """
 
@@ -108,11 +108,7 @@ class ExternalVersions(object):
             version = None
 
         if version:
-            try:
-                return StrictVersion(version)
-            except ValueError:
-                # let's then go with a Loose one
-                return LooseVersion(version)
+            return LooseVersion(version)
         else:
             return klass.UNKNOWN
 
