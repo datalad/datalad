@@ -936,7 +936,7 @@ def test_get_deleted(path):
 
 @with_tempfile
 def test_optimized_cloning(path):
-    # make test repo with one fiel and one commit
+    # make test repo with one file and one commit
     originpath = opj(path, 'origin')
     repo = GitRepo(originpath, create=True)
     with open(opj(originpath, 'test'), 'w') as f:

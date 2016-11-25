@@ -117,7 +117,7 @@ class SSHConnection(object):
             # check whether controlmaster is still running:
             cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.host]
             out, err = self.runner.run(cmd)
-            if "Master running" not in out:
+            if "Master running" not in err:
                 # master exists but isn't running
                 # => clean up:
                 self.close()

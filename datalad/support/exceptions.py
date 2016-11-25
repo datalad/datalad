@@ -117,6 +117,25 @@ class PathOutsideRepositoryError(Exception):
         return "path {0} not within repository {1}".format(self.file_, self.repo)
 
 
+class MissingBranchError(Exception):
+    """Thrown if accessing a repository's branch, that is not available"""
+
+    def __init__(self, repo, branch, available_branches=None, msg=None):
+        self.repo = repo
+        self.branch = branch
+        self.branches = available_branches
+        if msg is None:
+            self.msg = "branch '{0}' missing in {1}." \
+                       "".format(self.branch, self.repo)
+            if self.branches:
+                self.msg += " Available branches: {0}".format(self.branches)
+        else:
+            self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
+
 class InsufficientArgumentsError(ValueError):
     """To be raise instead of `ValueError` when use help output is desired"""
     pass
