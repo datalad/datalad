@@ -127,8 +127,8 @@ def test_uninstall_git_file(path):
     if not hasattr(ds.repo, 'drop'):
         assert_raises(ValueError, ds.drop, path='INFO.txt')
 
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        ds.uninstall(path="INFO.txt")
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        assert_raises(ValueError, ds.uninstall, path="INFO.txt")
         assert_in("will not act on files", cml.out)
 
     # uninstall removes the file:
@@ -223,9 +223,10 @@ def test_uninstall_dataset(path):
     # actually same as this, for cmdline compat reasons
     ds.drop(path=[])
     ok_clean_git(ds.path)
-    # removing entire dataset, in this case uninstall and remove do the
-    # same thing
-    ds.uninstall()
+    # removing entire dataset, uninstall will refuse to act on top-level
+    # datasets
+    assert_raises(ValueError, ds.uninstall)
+    ds.remove()
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -329,7 +330,7 @@ def test_kill(path):
     eq_(sorted(ds.get_subdatasets()), ['deep1'])
     ok_clean_git(ds.path)
 
-    # and we fail to uninstall since content can't be dropped
-    assert_raises(CommandError, ds.uninstall)
+    # and we fail to remove since content can't be dropped
+    assert_raises(CommandError, ds.remove)
     eq_(ds.remove(recursive=True, check=False), [subds, ds])
     ok_(not exists(path))

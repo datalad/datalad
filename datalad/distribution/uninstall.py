@@ -261,11 +261,31 @@ class Uninstall(_Cinderella):
             recursive=recursive)
         if unavailable_paths:
             lgr.warning('ignored non-installed paths: %s', unavailable_paths)
-
+        # upfront sanity and compliance checks
         if path_is_under(content_by_ds.keys()):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
                 "refusing to uninstall current or parent directory")
+        # check that we have no top-level datasets and not files to process
+        args_ok = True
+        for ds_path in content_by_ds:
+            ds = Dataset(ds_path)
+            paths = content_by_ds[ds_path]
+            if not ds_path in paths:
+                lgr.error(
+                    "will not act on files at %s (consider the `drop` command)",
+                    paths)
+                args_ok = False
+            if not ds.get_superdataset(
+                    datalad_only=False,
+                    topmost=False):
+                lgr.error(
+                    "will not uninstall top-level dataset at %s (consider the `remove` command)",
+                    ds.path)
+                args_ok = False
+        if not args_ok:
+            raise ValueError(
+                'inappropriate arguments, see previous error message(s)')
 
         handle_dirty_datasets(
             content_by_ds.keys(), mode=if_dirty, base=dataset)
@@ -277,16 +297,9 @@ class Uninstall(_Cinderella):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            if ds_path in paths:
-                has_super = ds.get_superdataset(
-                    datalad_only=False,
-                    topmost=False)
-                results.extend(
-                    _uninstall_dataset(ds, check=check, has_super=has_super))
-            else:
-                lgr.warning(
-                    "will not act on files at %s (consider the `drop` command)",
-                    paths)
+            results.extend(
+                # we confirmed the super dataset presence above
+                _uninstall_dataset(ds, check=check, has_super=True))
         # there is nothing to save at the end
         return results
 
