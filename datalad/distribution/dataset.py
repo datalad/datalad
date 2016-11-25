@@ -246,7 +246,7 @@ class Dataset(object):
 
         Returns
         -------
-        list(Dataset paths) or list(tuple(parent path, child path) or None
+        list(Dataset paths) or list(tuple(parent path, child path)) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
