@@ -15,6 +15,7 @@ import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs, getmtime
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split, realpath
+from os.path import relpath
 from os import listdir, lstat, remove, makedirs
 import json as js
 import hashlib
@@ -22,6 +23,7 @@ import hashlib
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
 
+from ..cmdline.helpers import get_repo_instance
 from ..utils import auto_repr
 from .base import Interface
 from ..ui import ui
@@ -56,6 +58,11 @@ class Ls(Interface):
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
       $ datalad ls                               # to list current dataset
     """
+
+    # TODO: during big RF refactor this one away since it must not be instance's
+    # attribute.  For now introduced to make `datalad ls` be relatively usable
+    # in terms of speed
+    _cached_subdatasets = {}
 
     _params_ = dict(
         loc=Parameter(
@@ -129,19 +136,47 @@ class Ls(Interface):
         # rename to not angry Python gods who took all good words
         kw['all_'] = kw.pop('all')
         kw['long_'] = kw.pop('long')
+
+        loc_type = "unknown"
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content,
                           **kw)
-        elif lexists(loc) and Dataset(loc).is_installed():
-            return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
-        else:
+        elif lexists(loc):
+            if isdir(loc):
+                ds = Dataset(loc)
+                if ds.is_installed():
+                    return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
+                    loc_type = False
+                else:
+                    loc_type = "dir"  # we know that so far for sure
+                    # it might have been an uninstalled dataset within super-dataset
+                    superds = ds.get_superdataset()
+                    if superds:
+                        try:
+                            subdatasets = Ls._cached_subdatasets[superds.path]
+                        except KeyError:
+                            subdatasets = Ls._cached_subdatasets[superds.path] \
+                                = superds.get_subdatasets()
+                        if relpath(ds.path, superds.path) in subdatasets:
+                            loc_type = "not installed"
+            else:
+                loc_type = "file"
+                # could list properties -- under annex or git, either clean/dirty
+                # etc
+                # repo = get_repo_instance(dirname(loc))
+
+        if loc_type:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
             # TODO: unify all the output here -- _ls functions should just return something
             # to be displayed
             ui.message(
                 "{}  {}".format(
                     ansi_colors.color_word(loc, ansi_colors.DATASET),
-                    ansi_colors.color_word("unknown", ansi_colors.RED)
+                    ansi_colors.color_word(
+                        loc_type,
+                        ansi_colors.RED
+                        if loc_type in {'unknown', 'not installed'}
+                        else ansi_colors.BLUE)
                 )
             )
 
