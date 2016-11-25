@@ -236,12 +236,21 @@ class AnnexRepo(GitRepo):
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
 
+        self._direct_mode = None  # we don't know yet
+
+        # If we are in direct mode already, we need to make
+        # this instance aware of that. This especially means, that we need to
+        # adapt self._GIT_COMMON_OPTIONS by calling set_direct_mode().
+        # Could happen in case we didn't specify anything, but annex forced
+        # direct mode due to FS or an already existing repo was in direct mode,
+        if self.is_direct_mode():
+            self.set_direct_mode()
+
         # - only force direct mode; don't force indirect mode
         # - parameter `direct` has priority over config
         if direct is None:
             direct = (create or init) and \
                      cfg.getbool("datalad", "repo.direct", default=False)
-        self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
             if self.repo.config_reader().get_value('annex', 'version') < 6:
                 lgr.debug("Switching to direct mode (%s)." % self)
