@@ -92,7 +92,7 @@ def pipeline(bucket,
         'annex': annex
     }
     s3_switch_kw = {}
-    recursive=True
+    recursive = True
     if directory:
         if directory == 'subdataset':
             new_prefix = '%(filename)s/'
