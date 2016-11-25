@@ -87,7 +87,7 @@ def _drop_files(ds, files, check):
     else:
         # TODO think how to handle this best, when called `through` remove
         # and it hits a plain git repo somewhere down below
-        raise ValueError("cannot uninstall, not an annex dataset")
+        raise ValueError("cannot uninstall, not an annex %s" % ds)
     return results
 
 
@@ -339,7 +339,7 @@ class Remove(_CommandBase):
     Examples
     --------
 
-    Permanently remove a subdataset from a datatset and wipe out the subdataset
+    Permanently remove a subdataset from a dataset and wipe out the subdataset
     association too::
 
       ~/some/dataset$ datalad remove somesubdataset1
@@ -446,7 +446,7 @@ class Remove(_CommandBase):
 
         save_dataset_hierarchy(
             list(ds2save),
-            base=dataset.path if dataset.is_installed() else None,
+            base=dataset.path if dataset and dataset.is_installed() else None,
             message='[DATALAD] removed content',
             auto_add_changes=False)
         return results
