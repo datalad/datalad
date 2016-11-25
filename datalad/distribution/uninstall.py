@@ -433,6 +433,10 @@ class Remove(_CommandBase):
                 assert(len(submodule) == 1)
                 submodule = submodule[0]
                 submodule.remove()
+                if exists(ds_path):
+                    # could be an empty dir in case an already uninstalled subdataset
+                    # got removed
+                    os.rmdir(ds_path)
                 ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):

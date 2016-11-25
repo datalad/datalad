@@ -64,7 +64,7 @@ def test_uninstall_uninstalled(path):
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
-    ds.create('two')
+    subds2 = ds.create('two')
     ds.save(auto_add_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
@@ -77,6 +77,21 @@ def test_clean_subds_removal(path):
     eq_(ds.get_subdatasets(), ['two'])
     # one is gone
     assert(not exists(subds1.path))
+    # and now again, but this time remove something that is not installed
+    ds.create('three')
+    ds.save(auto_add_changes=True)
+    eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
+    ds.uninstall('two')
+    ok_clean_git(ds.path)
+    eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
+    ok_(not subds2.is_installed())
+    assert(exists(subds2.path))
+    res = ds.remove('two')
+    ok_clean_git(ds.path)
+    eq_(res, [subds2])
+    eq_(ds.get_subdatasets(), ['three'])
+    #import pdb; pdb.set_trace()
+    assert(not exists(subds2.path))
 
 
 @with_testrepos('.*basic.*', flavors=['clone'])
