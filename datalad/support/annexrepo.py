@@ -89,7 +89,7 @@ class AnnexRepo(GitRepo):
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
-    GIT_ANNEX_MIN_VERSION = LooseVersion('6.20160808')
+    GIT_ANNEX_MIN_VERSION = '6.20160808'
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,

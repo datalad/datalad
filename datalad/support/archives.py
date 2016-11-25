@@ -10,11 +10,11 @@
 
 """
 
-from distutils.version import StrictVersion
 import hashlib
 import patoolib
+from .external_versions import external_versions
 # There were issues, so let's stay consistently with recent version
-assert(StrictVersion(patoolib.__version__) >= "1.7")
+assert(external_versions["patoolib"] >= "1.7")
 
 import os
 import tempfile

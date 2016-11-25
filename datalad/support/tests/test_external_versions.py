@@ -10,8 +10,10 @@
 from os import linesep
 
 from ...version import __version__
-from ..external_versions import ExternalVersions, StrictVersion, LooseVersion
+from ..external_versions import ExternalVersions, LooseVersion
 from ..exceptions import CommandError
+from ..exceptions import OutdatedExternalDependency
+from ...support.annexrepo import AnnexRepo
 
 from mock import patch
 from nose.tools import assert_true, assert_false
@@ -38,10 +40,9 @@ def test_external_versions_basic():
     assert_true(our_module in ev)
     assert_false('unknown' in ev)
 
-    # StrictVersion might remove training .0
-    version_str = str(ev[our_module]) \
-        if isinstance(ev[our_module], StrictVersion) \
-        else __version__
+    # all are LooseVersions now
+    assert_true(isinstance(ev[our_module], LooseVersion))
+    version_str = __version__
     assert_equal(ev.dumps(), "Versions: %s=%s" % (our_module, version_str))
 
     # For non-existing one we get None
@@ -106,7 +107,7 @@ def test_custom_versions():
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
     assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
-    assert(isinstance(ev['cmd:git'], (LooseVersion, StrictVersion)))
+    assert(isinstance(ev['cmd:git'], LooseVersion))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
     ev.CUSTOM = {'bogus': lambda: 1 / 0}
@@ -125,3 +126,53 @@ def test_ancient_annex():
     ev = ExternalVersions()
     with patch('datalad.support.external_versions._runner', _runner()):
         assert_equal(ev['cmd:annex'], '0.1')
+
+
+def _test_annex_version_comparison(v, cmp_):
+    class _runner(object):
+        def run(self, cmd):
+            return v, ""
+
+    ev = ExternalVersions()
+    with patch('datalad.support.external_versions._runner', _runner()), \
+         patch('datalad.support.annexrepo.external_versions',
+               ExternalVersions()):
+        ev['cmd:annex'] < AnnexRepo.GIT_ANNEX_MIN_VERSION
+        if cmp_ in (1, 0):
+            AnnexRepo._check_git_annex_version()
+            if cmp_ == 0:
+                assert_equal(AnnexRepo.git_annex_version, v)
+        elif cmp == -1:
+            with assert_raises(OutdatedExternalDependency):
+                AnnexRepo._check_git_annex_version()
+
+
+def test_annex_version_comparison():
+    # see https://github.com/datalad/datalad/issues/1128
+    for cmp_, base in [(-1, '6.2011'), (1, "2100.0")]:
+        # there could be differing versions of a version
+        #   release, snapshot, neurodebian build of a snapshot
+        for v in base, base + '-g0a34f08', base + '+gitg9f179ae-1~ndall+1':
+            # they all must be comparable to our specification of min version
+            yield _test_annex_version_comparison, v, cmp_
+    yield _test_annex_version_comparison, str(AnnexRepo.GIT_ANNEX_MIN_VERSION), 0
+
+
+def _test_list_tuple(thing):
+    version = ExternalVersions._deduce_version(thing)
+    assert_greater(version, '0.0.1')
+    assert_greater('0.2', version)
+    assert_equal('0.1', version)
+    assert_equal(version, '0.1')
+
+
+def test_list_tuple():
+
+    class thing_with_tuple_version:
+        __version__ = (0, 1)
+
+    class thing_with_list_version:
+        __version__ = [0, 1]
+
+    for v in thing_with_list_version, thing_with_tuple_version, '0.1', (0, 1), [0, 1]:
+        yield _test_list_tuple, v
