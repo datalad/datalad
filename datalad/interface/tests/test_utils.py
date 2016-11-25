@@ -16,9 +16,12 @@ import os
 from os.path import join as opj
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import save_dataset_hierarchy
 from datalad.distribution.dataset import Dataset
 from datalad.api import save
 
@@ -104,3 +107,89 @@ def test_paths_by_dataset(path):
     assert_equal(d[subds.path], [testpath])
     # and also the subdataset underneath
     assert_equal(d[hidden.path], [hidden.path])
+
+
+demo_hierarchy = {
+    'a': {
+        'aa': {
+            'file_aa': 'file_aa'}},
+    'b': {
+        'ba': {
+            'file_ba': 'file_ba'},
+        'bb': {
+            'bba': {
+                'bbaa': {
+                    'file_bbaa': 'file_bbaa'}},
+            'file_bb': 'file_bb'}},
+    'c': {
+        'ca': {
+            'file_ca': 'file_ca'},
+        'file_c': 'file_c'},
+    'd': {
+        'da': {
+            'file_da': 'file_da'},
+        'db': {
+            'file_db': 'file_db'},
+        'file_d': 'file_d'},
+}
+
+
+def make_demo_hierarchy_datasets(path, tree):
+    for node, items in tree.items():
+        node_path = opj(path, node)
+        if isinstance(items, dict):
+            Dataset(node_path).create(force=True)
+            make_demo_hierarchy_datasets(node_path, items)
+            continue
+    topds = Dataset(path)
+    if not topds.is_installed():
+        topds.create(force=True)
+        return topds
+
+
+@with_tree(demo_hierarchy)
+def test_save_hierarchy(path):
+    # this test doesn't use API`remove` to avoid circularities
+    ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
+    ds.save(auto_add_changes=True, recursive=True)
+    ok_clean_git(ds.path)
+    ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
+    ds_bba = Dataset(opj(ds_bb.path, 'bba'))
+    ds_bbaa = Dataset(opj(ds_bba.path, 'bbaa'))
+    # introduce a change at the lowest level
+    ds_bbaa.repo.remove('file_bbaa')
+    for d in (ds, ds_bb, ds_bba, ds_bbaa):
+        ok_(d.repo.dirty)
+    save_dataset_hierarchy((ds_bb.path, ds_bbaa.path))
+    # it has saved all changes in the subtrees spanned
+    # by the given datasets, but nothing else
+    for d in (ds_bb, ds_bba, ds_bbaa):
+        ok_clean_git(d.path)
+    ok_(ds.repo.dirty)
+    # now with two modified repos
+    d = Dataset(opj(ds.path, 'd'))
+    da = Dataset(opj(d.path, 'da'))
+    da.repo.remove('file_da')
+    db = Dataset(opj(d.path, 'db'))
+    db.repo.remove('file_db')
+    save_dataset_hierarchy((d.path, da.path, db.path))
+    for d in (d, da, db):
+        ok_clean_git(d.path)
+    ok_(ds.repo.dirty)
+    # and now with files all over the place and saving
+    # all the way to the root
+    aa = Dataset(opj(ds.path, 'a', 'aa'))
+    aa.repo.remove('file_aa')
+    ba = Dataset(opj(ds.path, 'b', 'ba'))
+    ba.repo.remove('file_ba')
+    bb = Dataset(opj(ds.path, 'b', 'bb'))
+    bb.repo.remove('file_bb')
+    c = Dataset(opj(ds.path, 'c'))
+    c.repo.remove('file_c')
+    ca = Dataset(opj(ds.path, 'c', 'ca'))
+    ca.repo.remove('file_ca')
+    d = Dataset(opj(ds.path, 'd'))
+    d.repo.remove('file_d')
+    save_dataset_hierarchy((aa.path, ba.path, bb.path, c.path, ca.path, d.path),
+                           base=ds.path)
+    ok_clean_git(ds.path)
