@@ -118,22 +118,3 @@ class Test1():
         # and for paranoid assure that DB has them now
         assert_equal(len(list(self.udb._query(URL))), 2)
         assert_equal(len(list(self.udb._query(URL).filter_by(file_id=file_.id))), 2)
-
-
-def test_parse_db_url():
-    blank = {
-        'dbname': None,
-        'dialect': None,
-        'host': None,
-        'options': None,
-        'password': None,
-        'user': None,
-        'port': None,
-    }
-    # shortcuts
-    ub = lambda d: updated(blank, d)
-    purl = UltimateDB._parse_db_url
-    assert_equal(purl('sqlite:///:memory:'), ub({'dialect': 'sqlite', 'dbname': ':memory:'}))
-    assert_equal(purl('postgresql://scott:tiger@localhost:5432/mydatabase'),
-                 ub({'dialect': 'postgresql', 'dbname': 'mydatabase', 'port': '5432', 'host': 'localhost',
-                     'user': 'scott', 'password': 'tiger'}))
