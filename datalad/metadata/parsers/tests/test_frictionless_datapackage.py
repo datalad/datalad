@@ -65,7 +65,10 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": "http://schema.org/",
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
   "@id": "ID",
   "author": "Jane Doe <noemail@example.com>",
   "contributors": [
@@ -86,6 +89,5 @@ def test_get_metadata(path):
   "license": "http://opendatacommons.org/licenses/pddl/",
   "name": "cpi",
   "title": "Annual Consumer Price Index (CPI)",
-  "type": "Dataset",
   "version": "2.0.0"
 }""")

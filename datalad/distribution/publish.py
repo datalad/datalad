@@ -14,14 +14,15 @@ import logging
 
 from os.path import join as opj
 
-from six import string_types
 from datalad.interface.base import Interface
+from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
+    recursion_limit, git_opts, annex_opts
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import exc_str
 from datalad.utils import assure_list
 
@@ -34,6 +35,7 @@ __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
+# TODO: make consistent configurable output
 
 def _log_push_info(pi_list):
     from git.remote import PushInfo as PI
@@ -49,16 +51,17 @@ def _log_push_info(pi_list):
 
 
 class Publish(Interface):
-    """Publish a dataset (e.g. to a web server)
+    """Publish a dataset to a known :term:`sibling`.
 
-    This makes the current state of a dataset available to a sibling of the
-    dataset. That sibling needs to be known to the dataset before.
-    `create_publication_target` commands are meant to set up such a sibling, but
-    generally you can publish to any sibling added to a dataset.
-    Publishing may or may not include subdatasets.
-    By default file handles are published without their actual content,
-    but they can be published including the content, of course.
+    This makes the last saved state of a dataset available to a sibling
+    or special remote data store of the dataset which must already exist
+    and be known to the dataset.
 
+    .. note::
+      Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
+      to publish a dataset. Publication targets are either configured remote
+      Git repositories, or git-annex special remotes (if their support data
+      upload).
     """
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
@@ -79,18 +82,13 @@ class Publish(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         to=Parameter(
             args=("--to",),
-            metavar='DEST',
+            metavar='LABEL',
             doc="""sibling name identifying the publication target. If no
-            destination is given an attempt is made to identify the target based
-            on the dataset's configuration""",
+            destination is given an attempt is made to identify the target
+            based on the dataset's configuration (i.e. a set up tracking
+            branch)""",
             # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="recursively publish all subdatasets of the dataset. In order "
-                "to recursively publish with all data, use '.' as `path` in "
-                "combination with `recursive`"),
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
@@ -100,6 +98,8 @@ class Publish(Interface):
             If empty argument is provided, then we will always run publish command.
             By default, would take from the previously published to that remote/sibling
             state (for the current branch)"""),
+        # since: commit => .gitmodules diff to head => submodules to publish
+
         skip_failing=Parameter(
             args=("--skip-failing",),
             action="store_true",
@@ -116,16 +116,27 @@ class Publish(Interface):
                 "to subdatasets in case `recursive` is also given.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
-        annex_copy_opts=Parameter(
-            args=("--annex-copy-opts",),
-            metavar='OPT_STR',  # better name?
-            doc="options passed to 'annex copy'",
-            constraints=EnsureStr() | EnsureNone(),))
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_copy_opts=annex_copy_opts
+    )
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(path=None, dataset=None, to=None, recursive=False, since=None,
-                 skip_failing=False, annex_copy_opts=None):
+    def __call__(
+            path=None,
+            dataset=None,
+            to=None,
+            since=None,
+            skip_failing=False,
+            recursive=False,
+            recursion_limit=None,
+            git_opts=None,
+            annex_opts=None,
+            annex_copy_opts=None):
+        # shortcut
         ds = require_dataset(dataset, check_installed=True, purpose='publication')
         assert(ds.repo is not None)
 
@@ -173,11 +184,16 @@ class Publish(Interface):
             # out for pushing annex branch anyway and we might as well fail
             # right here.
 
-            track_remote, track_branch = ds.repo.get_tracking_branch()
+            track_remote, track_branch = None, None
 
             # keep `to` in case it's None for passing to recursive calls:
             dest_resolved = to
             if to is None:
+                # TODO: If possible, avoid resolution herein and rely and git
+                # (or GitRepo respectively), meaning: Just pass `None`
+                # ATM conflicts with _get_changed_datasets => figure it out
+
+                track_remote, track_branch = ds.repo.get_tracking_branch()
                 if track_remote:
                     dest_resolved = track_remote
                 else:
@@ -189,6 +205,16 @@ class Publish(Interface):
         subds_prev_hexsha = {}
         if recursive:
             all_subdatasets = ds.get_subdatasets(fulfilled=True)
+
+            # TODO: dest_resolved => to?
+            # Note: This is a bug anyway, since in actual recursive call `to` is
+            # passed in order to be resolved by the subdatasets themselves
+            # (might be None), but when considering what subdatasets to be
+            # published, we assume `dest_resolved` is the same for all of them.
+
+            # ==> TODO: RF to consider `since` only for the current ds and then go on
+            # recursively.
+
             subds_to_consider = \
                 Publish._get_changed_datasets(
                     ds.repo, all_subdatasets, dest_resolved, since=since) \
@@ -256,50 +282,91 @@ class Publish(Interface):
             skipped += skipped_
 
         if publish_this:
-            # upstream branch needed for update (merge) and subsequent push,
-            # in case there is no.
-            # no tracking branch yet?
-            set_upstream = track_branch is None
 
             # is `to` an already known remote?
             if dest_resolved not in ds.repo.get_remotes():
                 # unknown remote
-                raise ValueError("No sibling '%s' found." % dest_resolved)
+                raise ValueError("No sibling '{0}' found for {1}."
+                                 "".format(dest_resolved, ds))
 
-            lgr.info("Publishing dataset {0} to sibling {1} "
-                     "...".format(ds, dest_resolved))
+            # in order to be able to use git's config to determine what to push,
+            # we need to annex merge first. Otherwise a git push might be
+            # rejected if involving all matching branches for example.
+            # Once at it, also push the annex branch right here.
 
-            # we now know where to push to:
-            _log_push_info(ds.repo.push(remote=dest_resolved,
-                                        refspec=ds.repo.get_active_branch(),
-                                        set_upstream=set_upstream))
-
-            # push annex branch:
+            # Q: Do we need to respect annex-ignore here? Does it make sense to
+            # publish to a remote without pushing the annex branch
+            # (if there is any)?
             if isinstance(ds.repo, AnnexRepo):
                 ds.repo.fetch(remote=dest_resolved)
                 ds.repo.merge_annex(dest_resolved)
                 _log_push_info(ds.repo.push(remote=dest_resolved,
                                             refspec="git-annex:git-annex"))
 
-            # we need to fetch
-            # TODO
-            # Note: This is about a gitpython issue as well as something about
-            # annex -> might mean, that we need to do it in case we pushed an annex branch only.
-            # Apparently, we can annex copy new files only, after this fetch. Figure it out!
-            ds.repo.fetch(remote=dest_resolved)
+            # upstream branch needed for update (merge) and subsequent push,
+            # in case there is no.
+            # no tracking branch yet?
+            set_upstream = track_branch is None
+
+            # publishing of `dest_resolved` might depend on publishing other
+            # remote(s) first:
+            # define config var name for potential publication dependencies
+            depvar = 'remote.{}.datalad-publish-depends'.format(dest_resolved)
+            for d in ds.config.get(depvar, []):
+                lgr.info("Dependency detected: '%s'" % d)
+                # Note: Additional info on publishing the dep. comes from within
+                # `ds.publish`.
+                ds.publish(path=path,
+                           to=d,
+                           since=since,
+                           skip_failing=skip_failing,
+                           recursive=recursive,
+                           recursion_limit=recursion_limit,
+                           git_opts=git_opts,
+                           annex_opts=annex_opts,
+                           annex_copy_opts=annex_copy_opts)
+
+            lgr.info("Publishing {0} to {1}".format(ds, dest_resolved))
+
+            # we now know where to push to:
+            # TODO: what to push? default: git push --mirror if nothing configured?
+            # consider also: --follow-tags, --tags, --atomic
+
+            # Note: git's push.default is 'matching', which possibly doesn't
+            # work for first
+            # time publication (a branch, that doesn't exist on remote yet)
+            # But if we want to respect remote.*.push entries, etc. we need to
+            # not pass a specific refspec (like active branch) to `git push`
+            # by default.
+
+            _log_push_info(ds.repo.push(remote=dest_resolved,
+                                        refspec=ds.repo.get_active_branch(),
+                                        set_upstream=set_upstream))
 
             published.append(ds)
 
             if publish_files or annex_copy_opts:
                 if not isinstance(ds.repo, AnnexRepo):
-                    raise RuntimeError(
-                        "Cannot publish content of something, that is not "
-                        "part of an annex. ({0})".format(ds))
+                    # incomplete, since `git push` was done already:
+                    raise IncompleteResultsError(
+                        (published, skipped),
+                        failed=publish_files,
+                        msg="Cannot publish content of something, that is not "
+                            "an annex. ({0})".format(ds))
+                if ds.config.get('remote.{}.annex-ignore', False):
+                    # Q: Do we need a --force option here? annex allows to
+                    # ignore the ignore setting
+                    raise IncompleteResultsError(
+                        (published, skipped),
+                        failed=publish_files,
+                        msg="Sibling '{0}' of {1} is configured to be ignored "
+                            "by annex. No content was published."
+                            % (dest_resolved, ds))
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
                 published += ds.repo.copy_to(files=publish_files,
-                                           remote=dest_resolved,
-                                           options=annex_copy_opts)
+                                             remote=dest_resolved,
+                                             options=annex_copy_opts)
 
         return published, skipped
 
@@ -332,6 +399,10 @@ class Publish(Interface):
             # so we figure out what was the last update
             # XXX here we assume one to one mapping of names from local branches
             # to the remote
+            # TODO: This seems to be the only thing left, that we need to know the
+            # remote `to` for (if not explicitly specified anyway). Otherwise
+            # we could figure it out at GitRepo level instead, which makes
+            # things easier, cleaner and more in line with git push.
             active_branch = repo.get_active_branch()
             since = '%s/%s' % (to, active_branch)
 

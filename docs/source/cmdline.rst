@@ -24,16 +24,19 @@ Dataset operations
    generated/man/datalad-add
    generated/man/datalad-add-sibling
    generated/man/datalad-create
-   generated/man/datalad-get
    generated/man/datalad-create-sibling
-   generated/man/datalad-install
-   generated/man/datalad-rewrite-urls
-   generated/man/datalad-publish
-   generated/man/datalad-uninstall
-   generated/man/datalad-update
-   generated/man/datalad-save
-   generated/man/datalad-unlock
+   generated/man/datalad-create-sibling-github
+   generated/man/datalad-drop
    generated/man/datalad-export
+   generated/man/datalad-get
+   generated/man/datalad-install
+   generated/man/datalad-publish
+   generated/man/datalad-remove
+   generated/man/datalad-rewrite-urls
+   generated/man/datalad-save
+   generated/man/datalad-update
+   generated/man/datalad-uninstall
+   generated/man/datalad-unlock
 
 Meta data handling
 ==================

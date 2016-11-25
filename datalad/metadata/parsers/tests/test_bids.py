@@ -57,7 +57,10 @@ def test_get_metadata(path):
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": "http://schema.org/",
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
   "@id": "ID",
   "author": [
     "Mike One",
@@ -73,6 +76,68 @@ def test_get_metadata(path):
   "description": "Some description",
   "foaf:fundedBy": "We got money from collecting plastic bottles",
   "license": "PDDL",
-  "name": "studyforrest_phase2",
-  "type": "Dataset"
+  "name": "studyforrest_phase2"
+}""")
+
+
+@with_tree(tree={'dataset_description.json': """
+{
+    "Name": "test",
+    "Description": "Some description"
+}
+""",
+                 'README': """
+A very detailed
+description
+"""})
+def test_get_metadata_with_description_and_README(path):
+
+    ds = Dataset(path)
+    meta = MetadataParser(ds).get_metadata('ID')
+    assert_equal(
+        dumps(meta, sort_keys=True, indent=2),
+        """\
+{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
+  "@id": "ID",
+  "dcterms:conformsTo": [
+    "http://docs.datalad.org/metadata.html#v0-1",
+    "http://bids.neuroimaging.io"
+  ],
+  "description": "Some description",
+  "name": "test"
+}""")
+
+
+@with_tree(tree={'dataset_description.json': """
+{
+    "Name": "test"
+}
+""",
+                 'README': """
+A very detailed
+description
+"""})
+def test_get_metadata_with_README(path):
+
+    ds = Dataset(path)
+    meta = MetadataParser(ds).get_metadata('ID')
+    assert_equal(
+        dumps(meta, sort_keys=True, indent=2),
+        """\
+{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#"
+  },
+  "@id": "ID",
+  "dcterms:conformsTo": [
+    "http://docs.datalad.org/metadata.html#v0-1",
+    "http://bids.neuroimaging.io"
+  ],
+  "description": "A very detailed\\ndescription",
+  "name": "test"
 }""")

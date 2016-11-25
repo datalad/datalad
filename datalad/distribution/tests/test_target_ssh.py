@@ -37,6 +37,7 @@ from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import ok_
 
 from datalad.utils import on_windows
 from datalad.utils import _path_
@@ -67,7 +68,7 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 
     # correct ls_json command in hook content (path wrapped in quotes)
     ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -r --json file \'%s\'.*' % target_path,
+                        '.*datalad ls -a --json file \'%s\'.*' % target_path,
                         re_=True,
                         flags=re.DOTALL)
 
@@ -89,7 +90,7 @@ assert_create_sshwebserver = (
 def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
-    source = install(path=src_path, source=origin)
+    source = install(src_path, source=origin)
 
     target_path = opj(target_rootpath, "basic")
     # it will try to fetch it so would fail as well since sshurl is wrong
@@ -157,8 +158,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             existing='replace')
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + target_path,
-            source.repo.get_remote_url("local_target", push=True))
+        ok_(source.repo.get_remote_url("local_target", push=True) is None)
 
         # ensure target tree actually replaced by source
         assert_false(exists(opj(target_path, 'random')))
@@ -256,7 +256,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))

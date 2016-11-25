@@ -17,6 +17,9 @@ env:
     - DATALAD_TESTS_SSH=1
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
+  matrix:
+    - DATALAD_REPO_DIRECT=1
+    - DATALAD_REPO_DIRECT=
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
 #    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
@@ -24,6 +27,10 @@ env:
 matrix:
   include:
   # Additional custom ones
+  - python: 2.7
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
+    - _DATALAD_UPSTREAM_GITPYTHON=1
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
@@ -38,6 +45,7 @@ matrix:
     - DATALAD_API_ALWAYSRENDER=1
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
+    - DATALAD_LOG_OUTPUTS=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -72,6 +80,9 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
+  allow_failures:
+  # For now, don't fail entirely when direct mode fails
+  - env: DATALAD_REPO_DIRECT=1
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
 #  - python: 3.5
@@ -88,26 +99,19 @@ before_install:
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
   - npm install grunt-cli
+  # Install optionally upstream current development so we are sure that they break nothing important for us
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo apt-get install git-annex-standalone zip
+  - travis_retry sudo apt-get install git-annex-standalone zip pandoc
   - travis_retry sudo apt-get install shunit2
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
-  - git submodule update --init --recursive
   - cd ..; pip install -q codecov; cd -
-  - pip install -r requirements.txt
-  # Verify that setup.py build doesn't puke
-  - python setup.py build
-  - pip install -e .
+  - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
-  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
-  - pip install sphinx
-  - pip install sphinx_rtd_theme
-  # Specifically needed for tests here (e.g. example scripts testing)
-  - pip install nibabel
   # TMPDIRs
   - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
@@ -118,24 +122,19 @@ install:
   - npm install grunt-contrib-qunit
 
 script:
-  - echo "Running tests"
+  # Verify that setup.py build doesn't puke
+  - python setup.py build
+  # Run tests
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
-  # Run doc examples "tests"
-  # but for that we need first to install the beast and minimal installation
-  # must be sufficient
-  - pip install .
   # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
   - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
 
 after_success:
-  - /bin/ls -l /tmp/.coverage-entry*
-  - echo "BEFORE combining"; coverage report --show-missing
   - coverage combine -a /tmp/.coverage-entrypoints-*
-  - echo "AFTER combining"; coverage report --show-missing
   - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary

@@ -14,6 +14,7 @@ import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import publish, install
+from datalad.dochelpers import exc_str
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -40,7 +41,7 @@ from datalad.tests.utils import assert_not_in
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
@@ -97,7 +98,7 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -107,7 +108,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
         publish(dataset=source, to="target", recursive=True)
-    assert_in("No sibling 'target' found.", str(cm.exception))
+    assert_in("No sibling 'target' found", exc_str(cm.exception))
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
@@ -182,7 +183,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(path=src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)[0]
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
@@ -206,7 +207,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # TODO: Figure out, when to fetch things in general; Alternatively:
     # Is there an option for push, that prevents GitPython from failing?
     source.repo.fetch("target")
-
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
     eq_(res, ([source, 'test-annex.dat'], []))
 

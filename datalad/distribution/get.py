@@ -12,90 +12,152 @@
 
 import logging
 
+from itertools import chain
 from os import curdir
-from os import linesep
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
-from os.path import lexists
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_get_opts
 from datalad.interface.common_opts import jobs_opt
+from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
+from datalad.support.constraints import EnsureInt
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathOutsideRepositoryError
-from datalad.dochelpers import exc_str
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
-from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import require_dataset
-from .dataset import resolve_path
 from .utils import install_necessary_subdatasets
+from .utils import _recursive_install_subds_underneath
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-class Get(Interface):
-    """Get data content for files/directories of a dataset.
+def _get(content_by_ds, refpath=None, source=None, jobs=None,
+         get_data=True):
+    """Loops through datasets and calls git-annex call where appropriate
+    """
+    for ds_path in sorted(content_by_ds.keys()):
+        cur_ds = Dataset(ds_path)
+        content = content_by_ds[ds_path]
+        results = []
+        if len(content) >= 1 and content[0] == curdir:
+            # we hit a subdataset that just got installed few lines above, and was
+            # requested specifically, as opposed to some of its content.
+            results.append(cur_ds)
 
-    Known data locations for each requested file are evaluated and data are
-    obtained from the best/fastest/cheapest location, unless a dedicated
-    source is identified.
+        if not get_data:
+            lgr.debug(
+                "Will not get any content in %s, as instructed.",
+                cur_ds)
+            yield results
+            continue
+
+        # needs to be an annex:
+        found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
+        if not found_an_annex:
+            lgr.debug("Found no annex at %s. Skipped.", cur_ds)
+            if results:
+                yield results
+            continue
+        lgr.info("Getting %i items of dataset %s ...",
+                 len(content), cur_ds)
+
+        results.extend(cur_ds.repo.get(
+            content,
+            options=['--from=%s' % source] if source else [],
+            jobs=jobs))
+
+        if refpath:
+            # adapt relative paths reported by annex to be relative some
+            # reference
+            if ds_path != refpath:
+                for lr in results:
+                    if isinstance(lr, dict):
+                        lr['file'] = relpath(opj(ds_path, lr['file']), refpath)
+        yield results
+
+
+class Get(Interface):
+    """Get any dataset content (files/directories/subdatasets).
+
+    This command only operates on dataset content. To obtain a new independent
+    dataset from some source use the `install` command.
 
     By default this command operates recursively within a dataset, but not
     across potential subdatasets, i.e. if a directory is provided, all files in
     the directory are obtained. Recursion into subdatasets is supported too. If
-    enabled, potential subdatasets are detected and installed sequentially, in
-    order to fulfill a request. However, this implicit installation of
-    subdatasets is done only, if an explicitly specified path belongs to such a
-    subdataset and for that purpose `recursion_limit` is ignored. Otherwise get
-    recurses into already installed subdatasets only and the depth of this
-    recursion can be limited by `recursion_limit`.
+    enabled, relevant subdatasets are detected and installed in order to
+    fulfill a request.
+
+    Known data locations for each requested file are evaluated and data are
+    obtained from some available location (according to git-annex configuration
+    and possibly assigned remote priorities), unless a specific source is
+    specified.
 
     .. note::
-      Power-user info: This command used :command:`git annex get` to fulfill
-      requests. Subdatasets are obtained via the :func:`~datalad.api.install`
-      command.
+      Power-user info: This command uses :command:`git annex get` to fulfill
+      file handles.
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="PATH",
-            doc="""specify the dataset to perform the add operation on.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            doc="""specify the dataset to perform the add operation on, in
+            which case `path` arguments are interpreted as being relative
+            to this dataset.  If no dataset is given, an attempt is made to
+            identify a dataset for each input `path`""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar="PATH",
             doc="""path/name of the requested dataset component. The component
-            must already be known to the dataset.""",
+            must already be known to a dataset. To add new components to a
+            dataset use the `add` command""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
             metavar="LABEL",
-            doc="""label of the data source to be used to fulfill the request.
+            doc="""label of the data source to be used to fulfill requests.
             This can be the name of a dataset :term:`sibling` or another known
             source""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit,
+        recursion_limit=Parameter(
+            args=("--recursion-limit",),
+            metavar="LEVELS",
+            constraints=EnsureInt() | EnsureChoice('existing') | EnsureNone(),
+            doc="""limit recursion into subdataset to the given number of levels.
+            Alternatively, 'existing' will limit recursion to subdatasets that already
+            existed on the filesystem at the start of processing, and prevent new
+            subdatasets from being obtained recursively."""),
+        get_data=Parameter(
+            args=("-n", "--no-data",),
+            dest='get_data',
+            action='store_false',
+            doc="""whether to obtain data for all file handles. If disabled, `get`
+            operations are limited to dataset handles.[CMD:  This option prevents data
+            for file handles from being obtained CMD]"""),
+        reckless=reckless_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_get_opts=annex_get_opts,
@@ -109,136 +171,149 @@ class Get(Interface):
     @staticmethod
     @datasetmethod(name='get')
     def __call__(
-            path=None,
+            path,
             source=None,
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            get_data=True,
+            reckless=False,
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None,
             jobs=None,
-            verbose=False):
+            verbose=False,
+            # internal -- instead of returning 'get'ed items, return final
+            # content_by_ds, unavailable_paths.  To be used by the call from
+            # Install.__call__ and done so to avoid creating another reusable
+            # function which would need to duplicate all this heavy list of
+            # kwargs
+            _return_datasets=False
+    ):
+        # IMPLEMENTATION CONCEPT:
+        #
+        # 1. turn all input paths into absolute paths
+        # 2. Sort the world into existing handles and the rest
+        # 3. Try locate missing handles (obtain subdatasets along the way)
+        # 4. Expand into subdatasets with recursion enables (potentially
+        #    obtain even more subdatasets
+        # 5. Shoot info of which handles to get in each subdataset to,
+        #    git-annex, once at the very end
 
-        # check parameters:
-        if path is None:
-            raise InsufficientArgumentsError("insufficient information for "
-                                             "getting: requires at least a "
-                                             "path.")
-        # When called from cmdline `path` will be a list even if
-        # there is only one item.
-        # Make sure we deal with the same when called via python API:
-        if not isinstance(path, list):
-            path = [path]
+        # TODO: consider allowing an empty `path` argument, as with other commands,
+        # to indicate CWD
+        resolved_paths, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=None)
+        if not resolved_paths:
+            raise InsufficientArgumentsError(
+                "`get` needs at least one path as argument")
 
-        # resolve path(s):
-        lgr.debug("Resolving paths ...")
-        resolved_paths = [resolve_path(p, dataset) for p in path]
+        # sort paths into the respective datasets
+        dir_lookup = {}
+        content_by_ds, unavailable_paths, nondataset_paths = \
+            get_paths_by_dataset(resolved_paths,
+                                 recursive=recursive,
+                                 recursion_limit=recursion_limit,
+                                 dir_lookup=dir_lookup)
+        lgr.debug(
+            "Found %i existing dataset(s) to get content in "
+            "and %d unavailable paths",
+            len(content_by_ds), len(unavailable_paths)
+        )
+        # IMPORTANT NOTE re `content_by_ds`
+        # each key is a subdataset that we need to get something in
+        # if the value[0] is the subdataset's path, we want all of it
+        # if the value[0] == curdir, we just installed it as part of
+        # resolving file handles and we did not say anything but "give
+        # me the dataset handle"
 
-        # resolve base dataset:
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='getting content')
-        lgr.debug("Resolved dataset: %s" % ds)
-
-        # resolve possible subdatasets:
-        lgr.debug("Resolving (sub-)datasets ...")
-        resolved_datasets = dict()
-        for p in resolved_paths:
-
-            try:
-                p_ds = install_necessary_subdatasets(ds, p)
-            except PathOutsideRepositoryError as e:
-                lgr.warning(exc_str(e) + linesep + "Ignored.")
+        # explore the unknown
+        for path in sorted(unavailable_paths):
+            # how close can we get?
+            dspath = GitRepo.get_toppath(path)
+            if dspath is None:
+                # nothing we can do for this path
                 continue
-            except Exception as e:
-                # skip p, if we didn't manage to install its containing
-                # subdataset
-                lgr.warning("Installation of necessary subdatasets for {0} "
-                            "failed. Skipped.".format(p))
-                lgr.debug("Installation attempt failed with exception:"
-                          "{0}{1}".format(linesep, exc_str(e)))
-                continue
+            ds = Dataset(dspath)
+            # must always yield a dataset -- we sorted out the ones outside
+            # any dataset at the very top
+            assert ds.is_installed()
+            # now actually obtain whatever is necessary to get to this path
+            containing_ds = install_necessary_subdatasets(ds, path, reckless)
+            if containing_ds.path != ds.path:
+                lgr.debug("Installed %s to fulfill request for content for "
+                          "path %s", containing_ds, path)
+                # mark resulting dataset as auto-installed
+                if containing_ds.path == path:
+                    # we had to get the entire dataset, not something within
+                    # mark that it just appeared
+                    content_by_ds[path] = [curdir]
+                else:
+                    # we need to get content within
+                    content_by_ds[path] = [path]
 
-            if not lexists(p):
-                # Note: Skipping non-existing paths currently.
-                # We could also include them in the call to AnnexRepo and get
-                # it reported with success=False and the reason in 'note'.
-                # But not even invoking annex at all is faster, so we skip
-                # it early:
-                lgr.warning("{0} not found. Ignored.".format(p))
-                continue
+        if recursive and not recursion_limit == 'existing':
+            # obtain any subdatasets underneath the paths given inside the
+            # subdatasets that we know already exist
+            # unless we do not want recursion into not-yet-installed datasets
+            for subdspath in sorted(content_by_ds.keys()):
+                for content_path in content_by_ds[subdspath]:
+                    if not isdir(content_path):
+                        # a non-directory cannot have content underneath
+                        continue
+                    subds = Dataset(subdspath)
+                    lgr.info(
+                        "Obtaining %s %s recursively",
+                        subds,
+                        ("underneath %s" % content_path
+                         if subds.path != content_path
+                         else ""))
+                    cbysubds = _recursive_install_subds_underneath(
+                        subds,
+                        # `content_path` was explicitly given as input
+                        # we count recursions from the input, hence we
+                        # can start with the full number
+                        recursion_limit,
+                        reckless,
+                        # protect against magic marker misinterpretation
+                        # only relevant for _get, hence replace here
+                        start=content_path if content_path != curdir else None)
+                    # gets file content for all freshly installed subdatasets
+                    content_by_ds.update(cbysubds)
 
-            # collect all paths belonging to a certain (sub-)datasets in order
-            # to have one call to git-annex per repo:
-            resolved_datasets[p_ds.path] = \
-                resolved_datasets.get(p_ds.path, []) + [p]
+        ## we have now done everything we could to obtain whatever subdataset
+        ## to get something on the file system for previously unavailable paths
+        ## check and sort one last
+        content_by_ds, unavailable_paths, nondataset_paths2 = \
+            get_paths_by_dataset(
+                unavailable_paths,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                out=content_by_ds,
+                dir_lookup=dir_lookup)
 
-            # TODO: Change behaviour of Dataset: Make subdatasets singletons to
-            # always get the same object referencing a certain subdataset.
+        nondataset_paths.extend(nondataset_paths2)
+        if nondataset_paths:
+            lgr.warning(
+                "ignored paths that do not belong to any dataset: %s",
+                nondataset_paths)
 
-        if recursive:
-            # Find implicit subdatasets to call get on:
-            # If there are directories in resolved_paths (Note,
-            # that this includes '.' and '..'), check for subdatasets
-            # beneath them. These should be called recursively with '.'.
-            # Therefore add the subdatasets to resolved_datasets and
-            # corresponding '.' to resolved_paths, in order to generate the
-            # correct call.
-            for p in resolved_paths:
-                if isdir(p):
-                    for subds_path in \
-                      ds.get_subdatasets(absolute=True, recursive=True,
-                                         recursion_limit=recursion_limit,
-                                         fulfilled=True):
-                        if subds_path.startswith(_with_sep(p)):
-                            if subds_path not in resolved_datasets:
-                                lgr.debug("Added implicit subdataset {0} "
-                                          "from path {1}".format(subds_path, p))
-                                resolved_datasets[subds_path] = []
-                            resolved_datasets[subds_path].append(curdir)
-        # Note: While the following is not very telling in terms of progress,
-        # it remains at info level atm to have at least some idea, what `get` is
-        # doing (in combination with "Getting x files of Dataset y") until we
-        # have a working solution for showing progress. Then it should go to
-        # debug level.
-        lgr.info("Found {0} datasets to "
-                 "operate on.".format(len(resolved_datasets)))
-        # TODO:
-        # git_opts
-        # annex_opts
-        # annex_get_opts
+        if unavailable_paths:
+            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
 
-        # now we are ready to actually get the stuff
-
-        found_an_annex = False
-        global_results = []
-        # the actual calls:
-        for ds_path in resolved_datasets:
-            cur_ds = Dataset(ds_path)
-            # needs to be an annex:
-            if not isinstance(cur_ds.repo, AnnexRepo):
-                lgr.debug("Found no annex at {0}. Skipped.".format(cur_ds))
-                continue
-            found_an_annex = True
-            lgr.info("Getting {0} file/dir(s) of dataset "
-                     "{1} ...".format(len(resolved_datasets[ds_path]), cur_ds))
-
-            local_results = cur_ds.repo.get(resolved_datasets[ds_path],
-                                            options=['--from=%s' % source]
-                                                     if source else [],
-                                            jobs=jobs)
-
-            # if we recurse into subdatasets, adapt relative paths reported by
-            # annex to be relative to the toplevel dataset we operate on:
-            if cur_ds != ds:
-                for lr in local_results:
-                    lr['file'] = relpath(opj(ds_path, lr['file']), ds.path)
-
-            global_results.extend(local_results)
-
-        if not found_an_annex:
-            lgr.warning("Found no annex. Could not perform any get operation.")
-        return global_results
+        # hand over to git-annex
+        results = list(chain.from_iterable(
+            _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
+                 get_data=get_data)))
+        # ??? should we in _return_datasets case just return both content_by_ds
+        # and unavailable_paths may be so we provide consistent across runs output
+        # and then issue outside similar IncompleteResultsError?
+        if unavailable_paths:  # and likely other error flags
+            if _return_datasets:
+                results = sorted(set(content_by_ds).difference(unavailable_paths))
+            raise IncompleteResultsError(results, failed=unavailable_paths)
+        else:
+            return sorted(content_by_ds) if _return_datasets else results
 
     @staticmethod
     def result_renderer_cmdline(res, args):
@@ -249,13 +324,15 @@ class Get(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Got nothing")
+            ui.message("Got nothing new")
             return
 
         # provide summary
-        nsuccess = sum(item.get('success', False) for item in res)
+        nsuccess = sum(item.get('success', False) if isinstance(item, dict) else True
+                       for item in res)
         nfailure = len(res) - nsuccess
-        msg = "Tried to get %d %s." % (len(res), single_or_plural("file", "files", len(res)))
+        msg = "Tried to get %d %s." % (
+            len(res), single_or_plural("file", "files", len(res)))
         if nsuccess:
             msg += " Got %d. " % nsuccess
         if nfailure:
@@ -266,8 +343,8 @@ class Get(Interface):
         if len(res) < 10 or args.verbose:
             msg = linesep.join([
                 "{path} ... {suc}".format(
-                    suc="ok." if item.get('success', False)
+                    suc="ok." if isinstance(item, Dataset) or item.get('success', False)
                         else "failed. (%s)" % item.get('note', 'unknown reason'),
-                    path=item.get('file'))
+                    path=item.get('file') if isinstance(item, dict) else item.path)
                 for item in res])
             ui.message(msg)

@@ -9,7 +9,7 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.3.2 (Oct ??, 2016) -- will be better than ever
+## 0.4.2 (Nov ??, 2016) -- will be better than ever
 
 ???
 
@@ -21,6 +21,63 @@ for more details ATM.
 
 ???
 
+
+## 0.4.1 (Nov 10, 2016) -- CA release
+
+Requires now GitPython >= 2.1.0
+
+### Fixes
+
+- [save]
+     - to not save staged files if explicit paths were provided
+- improved (but not yet complete) support for direct mode
+- [update] to not crash if some sub-datasets are not installed
+- do not log calls to `git config` to avoid leakage of possibly 
+  sensitive settings to the logs
+
+### Enhancements and new features
+
+- New [rfc822-compliant metadata] format
+- [save]
+    - -S to save the change also within all super-datasets
+- [add] now has progress-bar reporting
+- [create-sibling-github] to create a :term:`sibling` of a dataset on
+  github
+- [OpenfMRI] crawler and datasets were enriched with URLs to separate
+  files where also available from openfmri s3 bucket
+  (if upgrading your datalad datasets, you might need to run
+  `git annex enableremote datalad` to make them available)
+- various enhancements to log messages
+- web interface
+    - populates "install" box first thus making UX better over slower
+      connections
+
+
+## 0.4 (Oct 22, 2016) -- Paris is waiting
+
+Primarily it is a bugfix release but because of significant refactoring
+of the [install] and [get] implementation, it gets a new minor release. 
+
+### Fixes
+
+- be able to [get] or [install] while providing paths while being 
+  outside of a dataset
+- remote annex datasets get properly initialized
+- robust detection of outdated [git-annex]
+
+### Enhancements and new features
+
+- interface changes
+    - [get] `--recursion-limit=existing` to not recurse into not-installed
+       subdatasets
+    - [get] `-n` to possibly install sub-datasets without getting any data
+    - [install] `--jobs|-J` to specify number of parallel jobs for annex 
+      [get] call could use (ATM would not work when data comes from archives)
+- more (unit-)testing
+- documentation: see http://docs.datalad.org/en/latest/basics.html
+  for basic principles and useful shortcuts in referring to datasets
+- various webface improvements:  breadcrumb paths, instructions how
+  to install dataset, show version from the tags, etc.
 
 ## 0.3.1 (Oct 1, 2016) -- what a wonderful week
 
@@ -117,12 +174,16 @@ publishing
 [FCON1000]: http://fcon_1000.projects.nitrc.org
 [OpenfMRI]: http://openfmri.org
 
+[git-annex]: http://git-annex.branchable.com/ 
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
+[save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
+[create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
 [Configuration documentation]: http://docs.datalad.org/config.html
+[rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data

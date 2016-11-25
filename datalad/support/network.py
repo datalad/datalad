@@ -357,6 +357,10 @@ class RI(object):
             # RI class was used as a factory
             cls = _guess_ri_cls(ri)
 
+        if cls is RI:
+            # should we fail or just pretend we are nothing??? ;-) XXX
+            raise ValueError("Could not deduce RI type for %r" % (ri,))
+
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
         ri_obj._str = ri
@@ -491,6 +495,13 @@ class RI(object):
             return super(RI, self).__getattribute__(item)
         else:
             return self._fields[item]
+
+    def __setattr__(self, item, value):
+        if item.startswith('_') or item not in self._FIELDS:
+            super(RI, self).__setattr__(item, value)
+        else:
+            self._fields[item] = value
+            self._str = None
 
 
 class URL(RI):

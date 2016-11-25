@@ -9,14 +9,13 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
-lgr.log(5, "Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
 
+from .log import lgr
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
@@ -84,12 +83,18 @@ def setup_package():
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
 
+    # Set to non-interactive UI
+    from datalad.ui import ui
+    _test_states['ui_backend'] = ui.backend
+    ui.set_backend('tests-noninteractive')
+
 
 def teardown_package():
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
-
+    from datalad.ui import ui
+    ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
         if _test_states['DATALAD_LOG_LEVEL'] is None:

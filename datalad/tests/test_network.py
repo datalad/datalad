@@ -9,6 +9,7 @@
 
 import logging
 
+from os.path import join as opj
 from collections import OrderedDict
 
 from .utils import eq_, neq_, ok_, nok_, assert_raises
@@ -144,10 +145,20 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
 
     if localpath:
         eq_(ri_.localpath, localpath)
+        old_localpath = ri_.localpath  # for a test below
     else:
         # if not given -- must be a remote url, should raise exception
         with assert_raises(ValueError):
             ri_.localpath
+
+    # do changes in the path persist?
+    old_str = str(ri_)
+    ri_.path = newpath = opj(ri_.path, 'sub')
+    eq_(ri_.path, newpath)
+    neq_(str(ri_), old_str)
+    if localpath:
+        eq_(ri_.localpath, opj(old_localpath, 'sub'))
+
 
 
 def test_url_base():

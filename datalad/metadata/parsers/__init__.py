@@ -12,3 +12,4 @@
 # we can try to guess
 from . import bids
 from . import frictionless_datapackage
+from . import datalad_rfc822

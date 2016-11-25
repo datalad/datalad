@@ -41,6 +41,7 @@ from git.objects.blob import Blob
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
 from datalad.dochelpers import exc_str
+from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -51,6 +52,7 @@ from datalad.utils import updated
 from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
 
@@ -70,7 +72,8 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-# TODO: ignore leading and/or trailing underscore to allow for python-reserved words
+# TODO: ignore leading and/or trailing underscore to allow for
+# python-reserved words
 @optional_args
 def kwargs_to_options(func, split_single_char_options=True,
                       target_kw='options'):
@@ -374,13 +377,8 @@ class GitRepo(object):
     overridden accidentally by AnnexRepo.
 
     """
-    __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    # Disable automatic garbage and autopacking
-    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    # actually no need with default GitPython db backend not in memory
-    # default_git_odbt but still allows for faster testing etc.
-    # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
+    __slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):
@@ -423,9 +421,16 @@ class GitRepo(object):
 
         """
 
-        if git_opts:
-            lgr.warning("TODO: options passed to git are currently ignored.\n"
-                        "options received: %s" % git_opts)
+        # Disable automatic garbage and autopacking
+        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # actually no need with default GitPython db backend not in memory
+        # default_git_odbt but still allows for faster testing etc.
+        # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
+
+        if git_opts is None:
+            git_opts = {}
+        if kwargs:
+            git_opts.update(kwargs)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
@@ -464,11 +469,14 @@ class GitRepo(object):
 
         if create and not GitRepo.is_valid_repo(path):
             try:
-                lgr.debug("Initialize empty Git repository at {0}".format(path))
+                lgr.debug(
+                    "Initialize empty Git repository at '%s'%s",
+                    path,
+                    ' %s' % git_opts if git_opts else '')
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
                                                   mkdir=True,
                                                   odbt=default_git_odbt,
-                                                  **kwargs)
+                                                  **git_opts)
             except GitCommandError as e:
                 lgr.error(exc_str(e))
                 raise
@@ -483,6 +491,12 @@ class GitRepo(object):
                     lgr.error("%s: %s" % (type(e), str(e)))
                     raise
 
+        # inject git options into GitPython's git call wrapper:
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # calls above from being actually executed (DryRunProtocol)
+        if self.repo is not None:
+            self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
     def clone(self, url, path):
         """Clone url into path
 
@@ -495,6 +509,14 @@ class GitRepo(object):
         path : str
         """
 
+        if is_ssh(url):
+            cnct = ssh_manager.get_connection(url)
+            cnct.open()
+            # TODO: with git <= 2.3 keep old mechanism:
+            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+        else:
+            env = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -502,6 +524,7 @@ class GitRepo(object):
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
                                                   url,
                                                   path,
+                                                  env=env,
                                                   odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 break
@@ -558,10 +581,15 @@ class GitRepo(object):
             ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
-    def get_toppath(cls, path):
+    def get_toppath(cls, path, follow_up=True):
         """Return top-level of a repository given the path.
 
-        If path has symlinks -- they get resolved.
+        Parameters
+        -----------
+        follow_up : bool
+          If path has symlinks -- they get resolved by git.  If follow_up is
+          True, we will follow original path up until we hit the same resolved
+          path.  If no such path found, resolved one would be returned.
 
         Return None if no parent directory contains a git repository.
         """
@@ -572,11 +600,23 @@ class GitRepo(object):
                     cwd=path,
                     log_stdout=True, log_stderr=True,
                     expect_fail=True, expect_stderr=True)
-                return toppath.rstrip('\n\r')
+                toppath = toppath.rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
-            return GitRepo.get_toppath(dirname(path))
+            toppath = GitRepo.get_toppath(dirname(path))
+
+        if follow_up:
+            path_ = path
+            path_prev = ""
+            while path_ and path_ != path_prev:  # on top /.. = /
+                if realpath(path_) == toppath:
+                    toppath = path_
+                    break
+                path_prev = path_
+                path_ = dirname(path_)
+
+        return toppath
 
     # classmethod so behavior could be tuned in derived classes
     @classmethod
@@ -595,7 +635,7 @@ class GitRepo(object):
         Parameters
         ----------
         files: list
-            list of paths to add
+          list of paths to add
         commit: bool
           whether or not to directly commit
         msg: str
@@ -606,18 +646,21 @@ class GitRepo(object):
           has to be always true.
         """
 
-        if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
-
         # needs to be True - see docstring:
         assert(git)
 
         files = _remove_empty_items(files)
+        out = []
+
         if files:
             try:
-
-                self._git_custom_command(files, ['git', 'add'])
-
+                # without --verbose git 2.9.3  add does not return anything
+                add_out = self._git_custom_command(
+                    files,
+                    ['git', 'add'] + assure_list(git_options) + ['--verbose']
+                )
+                # get all the entries
+                out = self._process_git_get_output(*add_out)
                 # Note: as opposed to git cmdline, force is True by default in
                 #       gitpython, which would lead to add things, that are
                 #       ignored or excluded otherwise
@@ -652,7 +695,17 @@ class GitRepo(object):
         # currently simulating similar return value, assuming success
         # for all files:
         # TODO: Make return values consistent across both *Repo classes!
-        return [{u'file': f, u'success': True} for f in files]
+        return out
+
+    @staticmethod
+    def _process_git_get_output(stdout, stderr=None):
+        """Given both outputs (stderr is ignored atm) of git add - process it
+
+        Primarily to centralize handling in both indirect annex and direct
+        modes when ran through proxy
+        """
+        return [{u'file': f, u'success': True}
+                for f in re.findall("'(.*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
@@ -763,7 +816,13 @@ class GitRepo(object):
         # TODO: support not only a branch but any treeish
         #       Note: repo.tree(treeish).hexsha
         if branch is None:
-            return self.repo.active_branch.object.hexsha
+            try:
+                return self.repo.active_branch.object.hexsha
+            except ValueError as exc:
+                if 'does not exist' in str(exc):
+                    return None
+                raise
+
         for b in self.repo.branches:
             if b.name == branch:
                 return b.object.hexsha
@@ -1228,9 +1287,24 @@ class GitRepo(object):
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all_=False,
+    def push(self, remote=None, refspec=None, progress=None, all_remotes=False,
              **kwargs):
-        """See fetch
+        """Push to remote repository
+
+        Parameters:
+        -----------
+        remote: str
+          name of the remote to push to
+        refspec: str
+          specify what to push
+        progress:
+          TODO
+        all_remotes: bool
+          if set to True push to all remotes. Conflicts with `remote` not being
+          None.
+        kwargs: dict
+          options to pass to `git push`
+
         Returns
         -------
         list
@@ -1244,21 +1318,37 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
-            if all_:
+            if all_remotes:
                 remotes_to_push = self.repo.remotes
             else:
-                # No explicit remote to fetch.
-                # => get tracking branch:
-                tb = self.repo.active_branch.tracking_branch().name
-                if tb:
-                    tb_remote, refspec = split_remote_branch(tb)
-                    remotes_to_push = [self.repo.remote(tb_remote)]
-                else:
-                    # No remote, no tracking branch
-                    # => fail
-                    raise ValueError("No remote specified to fetch from nor a "
-                                     "tracking branch is set up.")
+                # Nothing explicitly specified. Just call `git push` and let git
+                # decide what to do would be an option. But:
+                # - without knowing the remote and its URL we cannot provide
+                #   shared SSH connection
+                # - we lose ability to use GitPython's progress info and return
+                #   values
+                #   (the latter would be solvable:
+                #    Provide a Repo.push() method for GitPython, copying
+                #    Remote.push() for similar return value and progress
+                #    (also: fetch, pull)
+
+                # Do what git would do:
+                # 1. branch.*.remote for current branch or 'origin' as default
+                #    if config is missing
+                # 2. remote.*.push or push.default
+
+                # get the remote to push to:
+                # TODO: Use ConfigManager when RF'ing GitRepo
+                tb_remote, tb_branch = self.get_tracking_branch()
+                if tb_remote is None:
+                    tb_remote = 'origin'
+                remotes_to_push = [self.repo.remote(tb_remote)]
+                # no refspec, let git find remote.*.push/push.default on its own
+
         else:
+            if all_remotes:
+                lgr.warning("Option 'all_remotes' conflicts with specified "
+                            "remote '%s'. Option ignored.")
             remotes_to_push = [self.repo.remote(remote)]
 
         pi_list = []
@@ -1306,6 +1396,26 @@ class GitRepo(object):
             else:
                 return None
 
+    def set_remote_url(self, name, url, push=False):
+        """Set the URL a remote is pointing to
+
+        Sets the URL of the remote `name`. Requires the remote to already exist.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        url: str
+        push: bool
+          if True, set the push URL, otherwise the fetch URL
+        """
+
+        cmd = ["git", "remote", "set-url"]
+        if push:
+            cmd.append("--push")
+        cmd += [name, url]
+        return self._git_custom_command('', cmd)
+
     def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
@@ -1327,12 +1437,18 @@ class GitRepo(object):
           only its hexsha
         """
 
+        try:
+            _branch = self.repo.branches[branch]
+        except IndexError:
+            raise MissingBranchError(self, branch,
+                                     [b.name for b in self.repo.branches])
+
         fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
 
         if not limit:
             def gen():
                 # traverse doesn't yield original commit
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 yield co
                 for co_ in co.traverse():
                     yield co_
@@ -1340,7 +1456,7 @@ class GitRepo(object):
             # we need a custom implementation since couldn't figure out how to
             # do with .traversal
             def gen():
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 while co:
                     yield co
                     co = co.parents[0] if co.parents else None
@@ -1539,7 +1655,14 @@ class GitRepo(object):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            branch = self.get_active_branch()
+            try:
+                branch = self.get_active_branch()
+            except TypeError as e:
+                if "HEAD is a detached symbolic reference" in str(e):
+                    lgr.debug("detached HEAD in {0}".format(self))
+                    return None, None
+                else:
+                    raise 
 
         cfg_reader = self.repo.config_reader()
         sct = "branch \"{0}\"".format(branch)

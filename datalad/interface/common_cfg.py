@@ -129,11 +129,17 @@ definitions = {
     },
     'datalad.log.level': {
         'ui': ('question', {
-               'title': 'Used for control the verbosity of logs printed to stdout while running datalad commands/debugging'}),
+            'title': 'Used for control the verbosity of logs printed to '
+                     'stdout while running datalad commands/debugging'}),
+    },
+    'datalad.log.outputs': {
+        'ui': ('question', {
+               'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
                'title': 'Used to add timestamp to datalad logs'}),
+        'default': False,
         'type': EnsureBool(),
     },
     'datalad.log.traceback': {

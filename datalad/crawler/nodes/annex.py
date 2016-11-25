@@ -12,6 +12,7 @@ via Annexificator class, which could be used to add files, checkout branches, et
 """
 
 import os
+import re
 import time
 from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
@@ -48,6 +49,7 @@ from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
+from ...support.exceptions import AnnexBatchCommandError
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -57,6 +59,7 @@ from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
+from datalad.dochelpers import exc_str
 
 from logging import getLogger
 
@@ -535,7 +538,14 @@ class Annexificator(object):
             if self.mode == 'full' and url_status and url_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(url_status.size), url))
-            out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+            try:
+                out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+            except AnnexBatchCommandError as exc:
+                if self.skip_problematic:
+                    lgr.warning("Skipping %s due to %s", url, exc_str(exc))
+                    return
+                else:
+                    raise
             added_to_annex = 'key' in out_json
 
             if self.mode == 'full' or not added_to_annex:
@@ -1107,7 +1117,9 @@ class Annexificator(object):
         return _commit_versions
 
     def remove_other_versions(self, name=None, db=None,
-                              overlay=None, remove_unversioned=False, exclude=None):
+                              overlay=None, remove_unversioned=False,
+                              fpath_subs=None,
+                              exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
@@ -1128,6 +1140,11 @@ class Annexificator(object):
           If a callable, it would be used to augment versions before identifying
           non-overlayable version component.  So in other words `overlay=2`
           should be identical to `overlay=lambda v: '.'.join(v.split('.')[:2])`
+        fpath_subs : list of (from, to), optional
+          Regex substitutions to apply to (versioned but with version part removed)
+          filenames before considering.  To be used whenever file names at some point
+          were changed
+          (e.g., `ds001_R1.0.1.tgz` one lucky day became `ds000001_R1.0.2.zip`)
         remove_unversioned: bool, optional
           If there is a version defined now, remove those files which are unversioned
           i.e. not listed associated with any version
@@ -1186,10 +1203,24 @@ class Annexificator(object):
                     # the same overlay but before current version
                     # we need to track the last known within overlay and if
                     # current updates, remove older version
+                    fpaths_considered = {}
                     for fpath, vfpath in fpaths.items():
+                        if fpath_subs:
+                            fpath_orig = fpath
+                            for from_, to_ in fpath_subs:
+                                fpath = re.sub(from_, to_, fpath)
+                            if fpath in fpaths_considered:
+                                # May be it is not that severe, but for now we will
+                                # crash if there is a collision
+                                raise ValueError(
+                                    "Multiple files (%s, %s) collided into the same name %s",
+                                    fpaths_considered[fpath], fpath_orig, fpath
+                                )
+                            fpaths_considered[fpath] = fpath_orig
                         if fpath in tracked_files:
                             files_to_remove.append(tracked_files[fpath])
                         tracked_files[fpath] = vfpath  # replace with current one
+
                     if version == current_version:
                         # just clean out those tracked_files with the most recent versions
                         # and remove nothing
@@ -1397,7 +1428,10 @@ class Annexificator(object):
         # TODO: not sure if we should may be check if exists, and skip/just complain if not
         if stats:
             _call(stats.increment, 'removed')
-        _call(self.repo.remove, filename)
+        if lexists(opj(self.repo.path, filename)):
+            _call(self.repo.remove, filename)
+        else:
+            lgr.warning("Was asked to remove non-existing path %s", filename)
         yield data
 
     def initiate_dataset(self, *args, **kwargs):

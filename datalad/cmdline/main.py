@@ -24,6 +24,7 @@ import datalad
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
@@ -266,7 +267,20 @@ def main(args=None):
             except InsufficientArgumentsError as exc:
                 # if the func reports inappropriate usage, give help output
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
-                cmdlineargs.subparser.print_usage()
+                cmdlineargs.subparser.print_usage(sys.stderr)
+                sys.exit(2)
+            except IncompleteResultsError as exc:
+                # we didn't get everything we wanted: still try to present what
+                # we got as usual, but exit with an error
+                try:
+                    if hasattr(cmdlineargs, 'result_renderer'):
+                        cmdlineargs.result_renderer(exc.results, cmdlineargs)
+                except Exception as exc2:
+                    # could be anything really, but we do not want to blow
+                    #  loud in exception handler
+                    lgr.warning("Failed to render partial results: %s", exc_str(exc2))
+                lgr.error('could not perform all requested actions: %s',
+                          exc_str(exc))
                 sys.exit(1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
@@ -278,7 +292,12 @@ def main(args=None):
         parser.print_usage()
         lgr.error("Please specify the command")
         sys.exit(2)
-    if hasattr(cmdlineargs, 'result_renderer'):
-        cmdlineargs.result_renderer(ret, cmdlineargs)
+
+    try:
+        if hasattr(cmdlineargs, 'result_renderer'):
+            cmdlineargs.result_renderer(ret, cmdlineargs)
+    except Exception as exc:
+        lgr.error("Failed to render results due to %s", exc_str(exc))
+        sys.exit(1)
 
 lgr.log(5, "Done importing cmdline.main")
