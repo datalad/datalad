@@ -91,46 +91,9 @@ def _drop_files(ds, files, check):
     return results
 
 
-class _Cinderella(Interface):
-    """"""
-# keep at copy/paste material for later
-#    Uninstall a dataset component or entire dataset(s)
-#
-#    This command can be used to remove any installed dataset content. This
-#    includes the content of files, as well as file handles, subdatasets, and
-#    datasets themselves.
-#
-#    By default, the availability of at least one remote copy is verified, by
-#    default, before file content is dropped. As these checks could lead to slow
-#    operation (network latencies, etc), they can be disabled.
-#
-#    Any number of paths to process can be given as input. Recursion into
-#    subdatasets needs to be explicitly enabled, while recursion in
-#    subdirectories within a dataset as always done automatically. An optional
-#    recursion limit is applied relative to each given input path.
-#
-#    Examples
-#    --------
-#
-#    Drop all file content in a dataset::
-#
-#      ~/some/dataset$ datalad uninstall
-#
-#    Drop all file content in a dataset and all its subdatasets::
-#
-#      ~/some/dataset$ datalad uninstall --recursive
-#
-#    Deinstall a subdataset (undo installation)::
-#
-#      ~/some/dataset$ datalad uninstall --remove-handles somesubdataset1
-#
-#    Permanently remove a subdataset from a datatset and wipe out the subdataset
-#    association too::
-#
-#      ~/some/dataset$ datalad uninstall --kill somesubdataset1
-#
-#    """
-
+class _CommandBase(Interface):
+    # this could potentially evolve into a base class that is useful for more
+    # than just Drop, Uninstall, and Remove
     @staticmethod
     def _prep(
             path=None,
@@ -177,8 +140,33 @@ class _Cinderella(Interface):
         ui.message(msg)
 
 
-class Drop(_Cinderella):
-    """Drop
+class Drop(_CommandBase):
+    """Drop file content from datasets
+
+    This command takes any number of paths of files and/or directories. If
+    a common (super)dataset is given explicitly, the given paths are
+    interpreted relative to this dataset.
+
+    Recursion into subdatasets needs to be explicitly enabled, while recursion
+    in subdirectories within a dataset as always done automatically. An
+    optional recursion limit is applied relative to each given input path.
+
+    By default, the availability of at least one remote copy is verified,
+    before file content is dropped. As these checks could lead to slow
+    operation (network latencies, etc), they can be disabled.
+
+
+    Examples
+    --------
+
+    Drop all file content in a dataset::
+
+      ~/some/dataset$ datalad drop
+
+    Drop all file content in a dataset and all its subdatasets::
+
+      ~/some/dataset$ datalad drop --recursive
+
     """
     _action = 'drop'
     _passive = 'dropped'
@@ -207,7 +195,7 @@ class Drop(_Cinderella):
             check=True,
             if_dirty='save-before'):
 
-        content_by_ds, unavailable_paths = _Cinderella._prep(
+        content_by_ds, unavailable_paths = _CommandBase._prep(
             path=path,
             dataset=dataset,
             recursive=recursive,
@@ -227,8 +215,34 @@ class Drop(_Cinderella):
         return results
 
 
-class Uninstall(_Cinderella):
-    """Uninstall
+class Uninstall(_CommandBase):
+    """Uninstall subdatasets
+
+    This command can be used to uninstall any number of installed subdataset.
+    If a to-be-uninstalled subdataset contains presently installed subdatasets
+    itself, their recursive removal has to be enabled explicitly to avoid the
+    command to exit with an error. This command will error if individual files
+    or non-dataset directories are given as input (use the drop or remove
+    command depending in the desired goal), nor will it uninstall top-level
+    datasets (i.e. datasets that or not a subdataset in another dataset; use
+    the remove command for this purpose).
+
+    By default, the availability of at least one remote copy for each currently
+    available file in any dataset is verified. As these checks could lead to
+    slow operation (network latencies, etc), they can be disabled.
+
+    Any number of paths to process can be given as input. Recursion into
+    subdatasets needs to be explicitly enabled, while recursion in
+    subdirectories within a dataset as always done automatically. An optional
+    recursion limit is applied relative to each given input path.
+
+    Examples
+    --------
+
+    Uninstall a subdataset (undo installation)::
+
+      ~/some/dataset$ datalad uninstall somesubdataset1
+
     """
     _action = 'uninstall'
     _passive = 'uninstalled'
@@ -255,7 +269,7 @@ class Uninstall(_Cinderella):
             check=True,
             if_dirty='save-before'):
 
-        content_by_ds, unavailable_paths = _Cinderella._prep(
+        content_by_ds, unavailable_paths = _CommandBase._prep(
             path=path,
             dataset=dataset,
             recursive=recursive)
@@ -304,8 +318,31 @@ class Uninstall(_Cinderella):
         return results
 
 
-class Remove(_Cinderella):
-    """Remove
+class Remove(_CommandBase):
+    """Remove components from datasets
+
+    This command can remove any components (subdatasets, and (directories with)
+    files) from datasets. Removing a component implies any present content to
+    be dropped, and any associated subdatasets to be uninstalled. Subsequently,
+    the component is "unregistered" from the respective dataset. This means
+    that the respective component is no longer present on the file system.
+
+    By default, the availability of at least one remote copy is verified, by
+    default, before file content is dropped. As these checks could lead to slow
+    operation (network latencies, etc), they can be disabled.
+
+    Any number of paths to process can be given as input. Recursion into
+    subdatasets needs to be explicitly enabled, while recursion in
+    subdirectories within a dataset as always done automatically. An optional
+    recursion limit is applied relative to each given input path.
+
+    Examples
+    --------
+
+    Permanently remove a subdataset from a datatset and wipe out the subdataset
+    association too::
+
+      ~/some/dataset$ datalad remove somesubdataset1
     """
     _action = 'remove'
     _passive = 'removed'
@@ -337,7 +374,7 @@ class Remove(_Cinderella):
             if not dataset.is_installed() and not path:
                 # all done already
                 return []
-        content_by_ds, unavailable_paths = _Cinderella._prep(
+        content_by_ds, unavailable_paths = _CommandBase._prep(
             path=path,
             dataset=dataset,
             recursive=recursive)
