@@ -261,9 +261,10 @@ class Create(Interface):
             where='dataset')
 
         # make sure that v6 annex repos never commit content under .datalad
-        with open(opj(tbds.path, '.gitattributes'), 'a') as gitattr:
-            gitattr.write('.datalad/** annex.largefiles=nothing\n')
-        tbds.repo.add('.gitattributes', git=True)
+        with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
+            # TODO this will need adjusting, when annex'ed aggregate meta data
+            # comes around
+            gitattr.write('** annex.largefiles=nothing\n')
 
         # save everthing
         tbds.repo.add('.datalad', git=True)
