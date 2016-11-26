@@ -1,4 +1,4 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -112,22 +112,24 @@ def test_get_metadata_with_description_and_README(path):
 }""")
 
 
+# actually does not demonstrate problem with unicode encountered in
+# https://github.com/datalad/datalad/issues/1138
 @with_tree(tree={'dataset_description.json': """
 {
     "Name": "test"
 }
 """,
-                 'README': """
+                 'README': u"""
 A very detailed
-description
+description с юникодом
 """})
 def test_get_metadata_with_README(path):
-
     ds = Dataset(path)
     meta = MetadataParser(ds).get_metadata('ID')
+    dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
-        """\
+        dump,
+        u"""\
 {
   "@context": {
     "@vocab": "http://schema.org/",
@@ -138,6 +140,6 @@ def test_get_metadata_with_README(path):
     "http://docs.datalad.org/metadata.html#v0-1",
     "http://bids.neuroimaging.io"
   ],
-  "description": "A very detailed\\ndescription",
+  "description": "A very detailed\\ndescription с юникодом",
   "name": "test"
 }""")
