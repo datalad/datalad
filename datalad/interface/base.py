@@ -15,9 +15,13 @@ __docformat__ = 'restructuredtext'
 import sys
 import re
 import textwrap
+from os.path import curdir
 
 from ..ui import ui
 from ..dochelpers import exc_str
+
+from datalad.support.exceptions import InsufficientArgumentsError
+
 
 def get_api_name(intfspec):
     """Given an interface specification return an API name for it"""
@@ -304,3 +308,51 @@ class Interface(object):
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)
+
+    @staticmethod
+    def _prep(
+            path=None,
+            dataset=None,
+            recursive=False,
+            recursion_limit=None):
+        from .utils import get_normalized_path_arguments
+        from .utils import get_paths_by_dataset
+
+        # upfront check prior any resolution attempt to avoid disaster
+        if path is None and dataset is None:
+            raise InsufficientArgumentsError(
+                "at least a dataset or a path must be given")
+
+        path, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=curdir)
+        content_by_ds, unavailable_paths, nondataset_paths = \
+            get_paths_by_dataset(path,
+                                 recursive=recursive,
+                                 recursion_limit=recursion_limit)
+        if dataset_path and not content_by_ds and not unavailable_paths:
+            # we got a dataset, but there is nothing actually installed
+            nondataset_paths.append(dataset_path)
+        # complain about nondataset and non-existing paths
+        if nondataset_paths:
+            raise ValueError(
+                "will not touch paths outside of installed datasets: %s"
+                % nondataset_paths)
+        return content_by_ds, unavailable_paths
+
+
+def report_result_objects(cls, res, args, passive):
+    from datalad.ui import ui
+    from datalad.distribution.dataset import Dataset
+    if not res:
+        ui.message("Nothing was {}".format(cls._passive))
+        return
+    msg = "{n} {obj} {action}:\n".format(
+        obj='items were' if len(res) > 1 else 'item was',
+        n=len(res),
+        action=cls._passive)
+    for item in res:
+        if isinstance(item, Dataset):
+            msg += "Dataset: %s\n" % item.path
+        else:
+            msg += "File: %s\n" % item
+    ui.message(msg)
