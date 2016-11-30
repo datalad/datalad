@@ -91,11 +91,15 @@ def test_paths_by_dataset(path):
         assert_equal(t, [])
     assert_equal(d, {ds.path: [ds.path]})
 
-    d, ua, ne = get_paths_by_dataset([path], recursive=True)
+    d, ua, ne = get_paths_by_dataset(
+        [path], recursive=True, mark_recursive=True)
     for t in (ua, ne):
         assert_equal(t, [])
-    for t in (ds, subds, subsubds):
-        assert_equal(d[t.path], [t.path])
+    # we are able to distinguish datasets of input paths vs. recursively
+    # included datasets
+    assert_equal(d[ds.path], [ds.path])
+    for t in (subds, subsubds):
+        assert_equal(d[t.path], [os.curdir])
 
     os.makedirs(opj(ds.path, 'one', 'some'))
     hidden = subds.create(opj('some', 'deep'))
