@@ -1695,7 +1695,7 @@ class GitRepo(object):
         return count
 
     def get_deleted_files(self):
-        """return a list of paths with deleted files (deletion not yet commited)"""
+        """Return a list of paths with deleted files (not yet staged)"""
         return [f.split('\t')[1]
                 for f in self.repo.git.diff('--raw', '--name-status').split('\n')
                 if f.split('\t')[0] == 'D']
