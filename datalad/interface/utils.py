@@ -201,7 +201,7 @@ def save_dataset_hierarchy(
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
-                         out=None, dir_lookup=None):
+                         out=None, dir_lookup=None, mark_recursive=False):
     """Sort a list of paths per dataset they are contained in.
 
     Any paths that are not part of a dataset, or presently unavailable are
@@ -222,14 +222,18 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     dir_lookup : dict or None
       Optional lookup cache that maps paths to previously determined datasets.
       This can speed up repeated processing.
+    mark_recursive : bool
+      If True, subdatasets "discovered" by recursion are marked such that
+      their value is a one-item list that contains `curdir` as the only item,
+      otherwise the item will be the same as the key -- the absolute path to
+      the respective dataset.
 
     Returns
     -------
     Tuple(dict, list, list)
       Dict of `existing dataset path`: `path` mappings, the list of currently
       non-existing paths (possibly matching currently uninstalled datasets),
-      and any paths that are not part of any dataset
-
+      and any paths that are not part of any dataset.
     """
     # sort paths into the respective datasets
     if dir_lookup is None:
@@ -286,7 +290,9 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         # we want it all
                         # be careful to not overwrite anything, in case
                         # this subdataset has been processed before
-                        out[subdspath] = out.get(subdspath, [subdspath])
+                        out[subdspath] = out.get(
+                            subdspath,
+                            [curdir if mark_recursive else subdspath])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 

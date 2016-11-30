@@ -314,7 +314,8 @@ class Interface(object):
             path=None,
             dataset=None,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            mark_recursive=False):
         from .utils import get_normalized_path_arguments
         from .utils import get_paths_by_dataset
 
@@ -328,7 +329,8 @@ class Interface(object):
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(path,
                                  recursive=recursive,
-                                 recursion_limit=recursion_limit)
+                                 recursion_limit=recursion_limit,
+                                 mark_recursive=mark_recursive)
         if dataset_path and not content_by_ds and not unavailable_paths:
             # we got a dataset, but there is nothing actually installed
             nondataset_paths.append(dataset_path)
