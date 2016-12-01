@@ -56,6 +56,7 @@ from datalad.utils import updated
 from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
 
@@ -1354,9 +1355,24 @@ class GitRepo(object):
             return remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all_=False,
+    def push(self, remote=None, refspec=None, progress=None, all_remotes=False,
              **kwargs):
-        """See fetch
+        """Push to remote repository
+
+        Parameters:
+        -----------
+        remote: str
+          name of the remote to push to
+        refspec: str
+          specify what to push
+        progress:
+          TODO
+        all_remotes: bool
+          if set to True push to all remotes. Conflicts with `remote` not being
+          None.
+        kwargs: dict
+          options to pass to `git push`
+
         Returns
         -------
         list
@@ -1370,20 +1386,38 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
-            if all_:
+            if all_remotes:
                 remotes_to_push = self.repo.remotes
             else:
-                # No explicit remote to push to.
-                # => get tracking branch:
+                # Nothing explicitly specified. Just call `git push` and let git
+                # decide what to do would be an option. But:
+                # - without knowing the remote and its URL we cannot provide
+                #   shared SSH connection
+                # - we lose ability to use GitPython's progress info and return
+                #   values
+                #   (the latter would be solvable:
+                #    Provide a Repo.push() method for GitPython, copying
+                #    Remote.push() for similar return value and progress
+                #    (also: fetch, pull)
+
+                # Do what git would do:
+                # 1. branch.*.remote for current branch or 'origin' as default
+                #    if config is missing
+                # 2. remote.*.push or push.default
+
+                # TODO: check out "same procedure" for fetch/pull
+
                 tb_remote, refspec = self.get_tracking_branch()
-                if tb_remote is not None:
-                    remotes_to_push = [self.repo.remote(tb_remote)]
-                else:
-                    # No remote, no tracking branch
-                    # => fail
-                    raise ValueError("No remote specified to push to nor a "
-                                     "tracking branch is set up.")
+                if tb_remote is None:
+                    tb_remote = 'origin'
+                remotes_to_push = [self.repo.remote(tb_remote)]
+                # use no refspec; let git find remote.*.push or push.default on
+                # its own
+
         else:
+            if all_remotes:
+                lgr.warning("Option 'all_remotes' conflicts with specified "
+                            "remote '%s'. Option ignored.")
             remotes_to_push = [self.repo.remote(remote)]
 
         pi_list = []
@@ -1463,12 +1497,18 @@ class GitRepo(object):
           only its hexsha
         """
 
+        try:
+            _branch = self.repo.branches[branch]
+        except IndexError:
+            raise MissingBranchError(self, branch,
+                                     [b.name for b in self.repo.branches])
+
         fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
 
         if not limit:
             def gen():
                 # traverse doesn't yield original commit
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 yield co
                 for co_ in co.traverse():
                     yield co_
@@ -1476,7 +1516,7 @@ class GitRepo(object):
             # we need a custom implementation since couldn't figure out how to
             # do with .traversal
             def gen():
-                co = self.repo.branches[branch].commit
+                co = _branch.commit
                 while co:
                     yield co
                     co = co.parents[0] if co.parents else None
@@ -1686,7 +1726,6 @@ class GitRepo(object):
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
-
         return track_remote, track_branch
 
     @property

@@ -42,7 +42,7 @@ def test_dont_trip_over_missing_subds(path):
     subds2 = ds1.install(source=ds2.path, path='subds2')
     assert_true(subds2.is_installed())
     assert_in('subds2', ds1.get_subdatasets())
-    subds2.uninstall(remove_handles=True, remove_history=True)
+    subds2.uninstall()
     assert_in('subds2', ds1.get_subdatasets())
     assert_false(subds2.is_installed())
     # this will deinit the submodule

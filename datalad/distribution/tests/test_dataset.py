@@ -101,6 +101,7 @@ def test_register_sibling(remote, path):
 def test_get_subdatasets(path):
     ds = Dataset(path)
     eq_(ds.get_subdatasets(), ['sub dataset1'])
+    eq_(ds.get_subdatasets(edges=True), [(os.curdir, 'sub dataset1')])
     eq_(ds.get_subdatasets(recursive=True),
         [
             'sub dataset1/sub sub dataset1/subm 1',
@@ -109,6 +110,15 @@ def test_get_subdatasets(path):
             'sub dataset1/subm 1',
             'sub dataset1/subm 2',
             'sub dataset1'
+        ])
+    eq_(ds.get_subdatasets(recursive=True, edges=True),
+        [
+            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
+            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 2'),
+            ('sub dataset1', 'sub dataset1/sub sub dataset1'),
+            ('sub dataset1', 'sub dataset1/subm 1'),
+            ('sub dataset1', 'sub dataset1/subm 2'),
+            (os.curdir, 'sub dataset1'),
         ])
     eq_(ds.get_subdatasets(recursive=True, recursion_limit=0),
         [])

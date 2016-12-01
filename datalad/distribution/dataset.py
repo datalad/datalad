@@ -230,7 +230,7 @@ class Dataset(object):
     # weakref
     # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None):
+                        recursive=False, recursion_limit=None, edges=False):
 
         """Get names/paths of all known subdatasets (sorted depth-first)
         optionally matching a specific name pattern.
@@ -248,10 +248,13 @@ class Dataset(object):
           If True, recurse into all subdatasets and report them too.
         recursion_limit: int or None
           If not None, set the number of subdataset levels to recurse into.
+        edges : bool
+          If True, return a list of tuples with superdataset and subdataset
+          path pairs that define the edges of the dataset hierarchy tree.
 
         Returns
         -------
-        list(Dataset paths) or None
+        list(Dataset paths) or list(tuple(parent path, child path)) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
@@ -295,17 +298,25 @@ class Dataset(object):
             for sm in submodules:
                 sdspath = opj(self._path, sm)
                 rsm.extend(
-                    [opj(sm, sdsh)
+                    [(normpath(opj(sm, sdsh[0])), opj(sm, sdsh[1])) if isinstance(sdsh, tuple) else opj(sm, sdsh)
                      for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive,
                          recursion_limit=(recursion_limit - 1)
-                         if isinstance(recursion_limit, int) else recursion_limit)])
-                rsm.append(sm)
+                         if isinstance(recursion_limit, int) else recursion_limit,
+                         edges=edges)])
+                rsm.append((curdir, sm) if edges else sm)
             submodules = rsm
+        elif edges:
+            submodules = [(curdir, sm) for sm in submodules]
 
         if absolute:
-            return [opj(self._path, sm) for sm in submodules]
+            if edges:
+                return [(self._path if ds == curdir else opj(self._path, ds),
+                         opj(self._path, sm))
+                        for ds, sm in submodules]
+            else:
+                return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
 

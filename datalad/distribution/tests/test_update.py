@@ -79,7 +79,7 @@ def test_update_simple(origin, src_path, dst_path):
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
     # smoke-test if recursive update doesn't fail if submodule is removed
-    dest.uninstall('subm 1', kill=True)
+    dest.remove('subm 1')
     dest.update(recursive=True)
     dest.update(merge=True, recursive=True)
 

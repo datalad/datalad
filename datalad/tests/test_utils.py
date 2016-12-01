@@ -45,6 +45,7 @@ from ..utils import make_tempfile
 from ..utils import on_windows
 from ..utils import _path_
 from ..utils import get_timestamp_suffix
+from ..utils import get_trace
 
 from ..support.annexrepo import AnnexRepo
 
@@ -530,3 +531,32 @@ def test_path_prefix(tdir):
         eq_(get_path_prefix('d1'), 'd1')
         eq_(get_path_prefix('d1', 'd2'), opj(tdir, 'd1'))
         eq_(get_path_prefix('..'), '..')
+
+
+def test_get_trace():
+    assert_raises(ValueError, get_trace, [], 'bumm', 'doesntmatter')
+    eq_(get_trace([('A', 'B')], 'A', 'A'), None)
+    eq_(get_trace([('A', 'B')], 'A', 'B'), [])
+    eq_(get_trace([('A', 'B')], 'A', 'C'), None)
+    eq_(get_trace([('A', 'B'),
+                   ('B', 'C')], 'A', 'C'), ['B'])
+    # order of edges doesn't matter
+    eq_(get_trace([
+        ('B', 'C'),
+        ('A', 'B')
+        ], 'A', 'C'), ['B'])
+    # mixed rubbish
+    eq_(get_trace([
+        (1, 3),
+        ('B', 'C'),
+        (None, ('schwak', 7)),
+        ('A', 'B'),
+        ], 'A', 'C'), ['B'])
+    # long
+    eq_(get_trace([
+        ('B', 'C'),
+        ('A', 'B'),
+        ('distract', 'me'),
+        ('C', 'D'),
+        ('D', 'E'),
+        ], 'A', 'E'), ['B', 'C', 'D'])

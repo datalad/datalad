@@ -600,7 +600,8 @@ def test_GitRepo_get_files(url, path):
         if rel_dir.startswith(".git"):
             continue
         for file_ in filenames:
-            os_files.add(opj(rel_dir, file_).lstrip("./"))
+            file_path = os.path.normpath(opj(rel_dir, file_))
+            os_files.add(file_path)
 
     # get the files via GitRepo:
     local_files = set(gr.get_files())

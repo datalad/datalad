@@ -16,6 +16,7 @@ import logging
 import hashlib
 
 from glob import glob
+from collections import Counter
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -42,7 +43,10 @@ def test_ls_s3():
         get_test_providers(url)
 
     with swallow_outputs() as cmo:
-        assert_equal(ls(url), None)  # not output ATM
+        res = ls(url)
+        assert_equal(len(res), 17)  # all the entries
+        counts = Counter(map(lambda x: x.__class__.__name__, res))
+        assert_equal(counts, {'Key': 14, 'DeleteMarker': 3})
         assert_in('Bucket info:', cmo.out)
 test_ls_s3.tags = ['network']
 

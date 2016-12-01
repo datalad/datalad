@@ -141,6 +141,8 @@ class Save(Interface):
         ds = require_dataset(dataset, check_installed=True,
                              purpose='saving')
 
+        # make sure that all pending changes (batched annex operations, etc.)
+        # are actually reflected in Git
         ds.repo.precommit()
 
         if not ds.repo.repo.is_dirty(

@@ -14,7 +14,7 @@ import logging
 import uuid
 
 from os import listdir
-from os.path import isdir, realpath, relpath
+from os.path import isdir, realpath, relpath, join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
@@ -259,6 +259,12 @@ class Create(Interface):
             id_var,
             tbds.id if tbds.id is not None else uuid.uuid1().urn.split(':')[-1],
             where='dataset')
+
+        # make sure that v6 annex repos never commit content under .datalad
+        with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
+            # TODO this will need adjusting, when annex'ed aggregate meta data
+            # comes around
+            gitattr.write('** annex.largefiles=nothing\n')
 
         # save everthing
         tbds.repo.add('.datalad', git=True)

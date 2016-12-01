@@ -148,4 +148,14 @@ publish_depends = Parameter(
     [PY: Multiple dependencies can be given as a list of sibling names
     PY][CMD: This option can be given more than once to configure multiple
     dependencies CMD]""",
+    action='append',
+    constraints=EnsureStr() | EnsureNone())
+
+publish_by_default = Parameter(
+    args=("--publish-by-default",),
+    metavar='REFSPEC',
+    doc="""add a refspec to be published to this sibling by default if nothing
+    specified.""",
+    constraints=EnsureStr() | EnsureNone(),
     action='append')
+
