@@ -13,7 +13,7 @@ from os import linesep
 from six import string_types
 from six import binary_type
 
-from distutils.version import StrictVersion, LooseVersion
+from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -52,6 +52,7 @@ def _get_annex_version():
         out, err = _runner.run(['git', 'annex', 'version'])
         return out.split('\n')[0].split(':')[1].strip()
 
+
 def _get_git_version():
     """Return version of available git"""
     return _runner.run('git version'.split())[0].split()[2]
@@ -63,11 +64,11 @@ class ExternalVersions(object):
     To avoid collision between names of python modules and command line tools,
     prepend names for command line tools with `cmd:`.
 
-    It maintains a dictionary of `distuil.version.StrictVersion`s to make
-    comparisons easy.  If version string doesn't conform the StrictVersion
-    LooseVersion will be used.  If version can't be deduced for the external,
-    `UnknownVersion()` is assigned.  If external is not present (can't be
-    imported, or custom check throws exception), None is returned without
+    It maintains a dictionary of `distuil.version.LooseVersion`s to make
+    comparisons easy. Note that even if version string conform the StrictVersion
+    "standard", LooseVersion will be used.  If version can't be deduced for the
+    external, `UnknownVersion()` is assigned.  If external is not present (can't
+    be imported, or custom check throws exception), None is returned without
     storing it, so later call will re-evaluate fully.
     """
 
@@ -84,26 +85,30 @@ class ExternalVersions(object):
     @classmethod
     def _deduce_version(klass, value):
         version = None
+
+        # see if it is something containing a version
         for attr in ('__version__', 'version'):
             if hasattr(value, attr):
                 version = getattr(value, attr)
                 break
 
-        if isinstance(version, tuple) or isinstance(version, list):
-            #  Generate string representation
-            version = ".".join(str(x) for x in version)
-
-        if version is None and isinstance(value, string_types):
+        # assume that value is the version
+        if version is None:
             version = value
 
+        # do type analysis
+        if isinstance(version, (tuple, list)):
+            #  Generate string representation
+            version = ".".join(str(x) for x in version)
+        elif isinstance(version, binary_type):
+            version = version.decode()
+        elif isinstance(version, string_types):
+            pass
+        else:
+            version = None
+
         if version:
-            if isinstance(version, binary_type):
-                version = version.decode()
-            try:
-                return StrictVersion(version)
-            except ValueError:
-                # let's then go with Loose one
-                return LooseVersion(version)
+            return LooseVersion(version)
         else:
             return klass.UNKNOWN
 

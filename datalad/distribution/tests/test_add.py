@@ -85,7 +85,8 @@ def test_add_files(path):
         annexed = set(ds.repo.get_annexed_files())
         indexed = set(ds.repo.get_indexed_files())
         # ignore the initial config file in index:
-        indexed.remove('.datalad/config')
+        indexed.remove(opj('.datalad', 'config'))
+        indexed.remove(opj('.datalad', '.gitattributes'))
         if isinstance(arg[0], list):
             for x in arg[0]:
                 unstaged.remove(x)

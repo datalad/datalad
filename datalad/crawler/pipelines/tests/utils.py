@@ -12,16 +12,16 @@ from ....support.annexrepo import AnnexRepo
 from ....utils import chpwd
 from ....utils import swallow_logs
 from ....tests.utils import ok_
-from ....tests.utils import with_tempfile
+from ....utils import make_tempfile
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
 
-@with_tempfile(mkdir=True)
-def _test_smoke_pipelines(func, args, tmpdir):
-    AnnexRepo(tmpdir, create=True)
-    with chpwd(tmpdir):
-        with swallow_logs():
-            for p in [func(*args)]:
-                ok_(len(p) > 1)
+def _test_smoke_pipelines(func, args, kwargs={}):
+    with make_tempfile(mkdir=True) as tmpdir:
+        AnnexRepo(tmpdir, create=True)
+        with chpwd(tmpdir):
+            with swallow_logs():
+                for p in [func(*args, **kwargs)]:
+                    ok_(len(p) > 1)

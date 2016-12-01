@@ -109,10 +109,11 @@ class BasicAnnexTestRepo(TestRepo):
         annex_version = external_versions['cmd:annex']
         git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
+                         "Testrepo: %s\n"
                          "git: %s\n"
                          "annex: %s\n"
                          "datalad: %s\n"
-                         % (git_version, annex_version, __version__),
+                         % (self.__class__, git_version, annex_version, __version__),
                          annex=False)
 
 
@@ -130,9 +131,10 @@ class BasicGitTestRepo(TestRepo):
     def create_info_file(self):
         git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
+                         "Testrepo: %s\n"
                          "git: %s\n"
                          "datalad: %s\n"
-                         % (git_version, __version__),
+                         % (self.__class__, git_version, __version__),
                          annex=False)
 
 

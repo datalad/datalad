@@ -597,7 +597,8 @@ def test_GitRepo_get_files(url, path):
         if rel_dir.startswith(".git"):
             continue
         for file_ in filenames:
-            os_files.add(opj(rel_dir, file_).lstrip("./"))
+            file_path = os.path.normpath(opj(rel_dir, file_))
+            os_files.add(file_path)
 
     # get the files via GitRepo:
     local_files = set(gr.get_files())
@@ -935,7 +936,7 @@ def test_get_deleted(path):
 
 @with_tempfile
 def test_optimized_cloning(path):
-    # make test repo with one fiel and one commit
+    # make test repo with one file and one commit
     originpath = opj(path, 'origin')
     repo = GitRepo(originpath, create=True)
     with open(opj(originpath, 'test'), 'w') as f:

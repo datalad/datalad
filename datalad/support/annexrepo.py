@@ -83,13 +83,14 @@ class AnnexRepo(GitRepo):
     """
 
     __slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
-                                     '_direct_mode', '_uuid']
+                                     '_direct_mode', '_uuid',
+                                     '_annex_common_options']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
-    GIT_ANNEX_MIN_VERSION = LooseVersion('6.20160808')
+    GIT_ANNEX_MIN_VERSION = '6.20160808'
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
@@ -143,6 +144,7 @@ class AnnexRepo(GitRepo):
 
         # initialize
         self._uuid = None
+        self._annex_common_options = []
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -176,32 +178,7 @@ class AnnexRepo(GitRepo):
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
                 if url is not None:
-                    if is_ssh(url):
-                        c = ssh_manager.get_connection(url)
-                        cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
-                        sct = "remote \"%s\"" % r
-                        opt = "annex-ssh-options"
-                        reader = self.repo.config_reader()
-
-                        # we write only, if there's nothing already
-                        write = False
-                        try:
-                            cfg_string_old = reader.get_value(section=sct,
-                                                              option=opt)
-                        except NoOptionError:
-                            write = True
-                            cfg_string_old = None
-                        if cfg_string_old and cfg_string_old != cfg_string:
-                            lgr.warning("Found conflicting annex-ssh-options "
-                                        "for remote '{0}':\n{1}\n"
-                                        "Did not touch it.".format(
-                                            r, cfg_string_old))
-                            continue
-                        if write:
-                            writer = self.repo.config_writer()
-                            writer.set_value(section=sct, option=opt,
-                                             value=cfg_string)
-                            writer.release()
+                    self._set_shared_connection(r, url)
 
         self.always_commit = always_commit
 
@@ -274,6 +251,28 @@ class AnnexRepo(GitRepo):
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
+    def _set_shared_connection(self, remote_name, url):
+        from datalad.support.network import is_ssh
+        if is_ssh(url):
+            c = ssh_manager.get_connection(url)
+            # options to add:
+            cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
+            # read user-defined options from .git/config:
+            # TODO: ConfigManager.obtain() instead?
+            reader = self.repo.config_reader()
+            try:
+                cfg_string_old = \
+                    reader.get_value(section="remote \"%s\"" % remote_name,
+                                     option="annex-ssh-options")
+            except NoOptionError:
+                cfg_string_old = None
+
+            self._annex_common_options += \
+                ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
+                       ''.format(remote_name,
+                                 (cfg_string_old + " ") if cfg_string_old else "",
+                                 cfg_string)]
+
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
@@ -327,30 +326,14 @@ class AnnexRepo(GitRepo):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options if options else [])
-        from datalad.support.network import is_ssh
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            writer = self.repo.config_writer()
-            writer.set_value("remote \"%s\"" % name,
-                             "annex-ssh-options",
-                             "-o ControlMaster=auto"
-                             " -S %s" % c.ctrl_path)
-            writer.release()
+        self._set_shared_connection(name, url)
 
     def set_remote_url(self, name, url, push=False):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
 
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
-        from datalad.support.network import is_ssh
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            writer = self.repo.config_writer()
-            writer.set_value("remote \"%s\"" % name,
-                             "annex-ssh-options",
-                             "-o ControlMaster=auto"
-                             " -S %s" % c.ctrl_path)
-            writer.release()
+        self._set_shared_connection(name, url)
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -387,6 +370,8 @@ class AnnexRepo(GitRepo):
 
         git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
         annex_options = annex_options[:] if annex_options else []
+        if self._annex_common_options:
+            annex_options = self._annex_common_options + annex_options
 
         if not self.always_commit:
             git_options += ['-c', 'annex.alwayscommit=false']

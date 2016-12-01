@@ -79,7 +79,7 @@ def pipeline(prefix=None, tag=True, skip_problematic=False):
     lgr.info("Creating a pipeline for the openfmri bucket")
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        special_remotes=[DATALAD_SPECIAL_REMOTE],
+        #special_remotes=[DATALAD_SPECIAL_REMOTE],
         backend='MD5E',
         skip_problematic=skip_problematic,
         # Primary purpose of this one is registration of all URLs with our
