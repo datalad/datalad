@@ -543,6 +543,11 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
+        # TODO:
+        # - this is insufficient for WeakRefSingleton; if we cloned into a
+        #   location, that existed during the runtime and there is a dangling
+        #   repo => we get the old one!
+        # - git.Repo correctly is assigned, but still created twice
         gr = cls(path=path, *args, **kwargs)
         gr.repo = repo
         return gr

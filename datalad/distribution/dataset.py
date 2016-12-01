@@ -71,7 +71,7 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
-from datalad.support.gitrepo import WeakSingletonRepo, WeakValueDictionary
+#from datalad.support.gitrepo import WeakSingletonRepo, WeakValueDictionary
 
 class Dataset(object):
 
