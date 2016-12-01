@@ -30,6 +30,7 @@ from os.path import realpath
 from os.path import lexists
 from os.path import isdir
 from subprocess import Popen, PIPE
+from weakref import WeakValueDictionary
 
 from six import string_types
 from six import iteritems
@@ -78,6 +79,8 @@ class AnnexRepo(GitRepo):
     will be interpreted as relative to `self.path`. Absolute paths will be
     accepted either way.
     """
+
+    _unique_repos = WeakValueDictionary()
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"

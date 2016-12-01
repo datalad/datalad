@@ -59,6 +59,8 @@ from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
+from .repo import WeakRefSingletonRepo
+from .repo import RepoInterface
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -373,57 +375,7 @@ def split_remote_branch(branch):
     return branch.split('/', 1)
 
 
-class WeakSingletonRepo(type):
-
-    def __call__(self, path, *args, **kwargs):
-
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-
-        if len(args) >= 1 or ('url' in kwargs and kwargs['url'] is not None):
-            # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing;
-            # keep in master when merging and remove in second PR, so other PRs
-            # benefit from it, when merging/rebasing atm
-            raise RuntimeError("RF: call clone() instead!")
-        #
-        #     if args:
-        #         url = args[0]
-        #         args = args[1:]
-        #     else:
-        #         url = kwargs.pop('url')
-        #     return self.clone(url, path, *args, **kwargs)
-        else:
-            return type.__call__(self, path, *args, **kwargs)
-
-        # Wir brauchen realpath als singleton, aber addressierbar auf versch. weise (=> Dataset normpath?)
-        #
-        # - real path  => git dir?
-        # - address path => work tree?
-        # - name (submodule) => submodule name (or basename?)
-
-        # Clonen in metaklasse moven => classmethod? clone(), falls Parameter src(url) vorhanden
-
-        # TODO: argument src determines cloning, which wouldn't even be tried now, if something is already (or still) pointing to the target
-
-        # TODO: Not sure yet, if and where to resolve symlinks or use abspath
-        # and whether to pass the resolved path. May be have an additional
-        # layer, where we can address the same repo with different paths (links).
-        # For now just make sure it's a "singleton" if addressed the same way.
-        # When caring for this, consider symlinked submodules ...
-        # look for issue by mih
-        # _path = normpath(RI(path).localpath)
-        #
-        # if _path in self._unique_repos:
-        #     return self._unique_repos[_path]
-        # else:
-        #     repo = type.__call__(self, path, *args, **kwargs)  # or `_path`?
-        #     self._unique_repos[_path] = repo
-        #     return repo
-
-
-@add_metaclass(WeakSingletonRepo)
+@add_metaclass(WeakRefSingletonRepo)
 class GitRepo(object):
     """Representation of a git repository
 
@@ -478,6 +430,10 @@ class GitRepo(object):
         if url is not None:
             RuntimeError("RF: url passed to init()")
 
+        self.realpath = realpath(path)
+        # note: we may also want to distinguish between a path to the worktree
+        # and the actual repository
+
         # Disable automatic garbage and autopacking
         self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         # actually no need with default GitPython db backend not in memory
@@ -489,7 +445,7 @@ class GitRepo(object):
         if kwargs:
             git_opts.update(kwargs)
 
-        self.path = abspath(normpath(path))
+        self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self.repo = None
         self._cfg = None
@@ -611,7 +567,7 @@ class GitRepo(object):
 
         This is done by comparing the base repository path.
         """
-        return self.path == obj.path
+        return self.realpath == obj.realpath
 
     @classmethod
     def is_valid_repo(cls, path):

@@ -994,21 +994,23 @@ def test_GitRepo_gitpy_injection(path, path2):
     assert_not_in('test-option', exc_str(cme.exception))
 
 
-# @with_tempfile(mkdir=True)
-# @with_tempfile(mkdir=True)
-# def test_WeakSingletonRepo(path1, path2):
-#
-#     repo1 = GitRepo(path1, create=True)
-#     # instantiate again:
-#     repo2 = GitRepo(path1, create=False)
-#     # the very same object:
-#     ok_(repo1 is repo2)
-#
-#     # reference the same in an different way:
-#     with chpwd(path1):
-#         repo3 = GitRepo(relpath(path1, start=path2), create=False)
-#     # currently not the same object (might change):
-#     ok_(repo1 is not repo3)
-#
-#     # but path attribute is absolute, so they are still equal:
-#     ok_(repo1 == repo3)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_WeakRefSingletonRepo(path1, path2):
+
+    repo1 = GitRepo(path1, create=True)
+    assert_is_instance(repo1, GitRepo)
+    # instantiate again:
+    repo2 = GitRepo(path1, create=False)
+    assert_is_instance(repo2, GitRepo)
+    # the very same object:
+    ok_(repo1 is repo2)
+
+    # reference the same in a different way:
+    with chpwd(path1):
+        repo3 = GitRepo(relpath(path1, start=path2), create=False)
+    # currently not the same object (might change):
+    ok_(repo1 is not repo3)
+
+    # but realpath attribute is the same, so they are still equal:
+    ok_(repo1 == repo3)

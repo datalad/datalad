@@ -13,6 +13,7 @@
 from functools import partial
 from os import mkdir
 from shutil import copyfile
+from nose.tools import assert_not_is_instance
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
@@ -1365,3 +1366,32 @@ def test_get_description(path1, path2):
     annex1.merge_annex('annex1')
     annex2.remove_remote('annex1')
     assert_equal(annex2.get_description(uuid=annex1.uuid), annex1_description)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_WeakSingletonRepo(path1, path2):
+
+    repo1 = AnnexRepo(path1, create=True)
+    assert_is_instance(repo1, AnnexRepo)
+    # instantiate again:
+    repo2 = AnnexRepo(path1, create=False)
+    assert_is_instance(repo2, AnnexRepo)
+    # the very same object:
+    ok_(repo1 is repo2)
+
+    # reference the same in an different way:
+    with chpwd(path1):
+        repo3 = AnnexRepo(relpath(path1, start=path2), create=False)
+        assert_is_instance(repo3, AnnexRepo)
+    # currently not the same object (might change):
+    ok_(repo1 is not repo3)
+
+    # but path attribute is absolute, so they are still equal:
+    ok_(repo1 == repo3)
+
+    # Now, let's try to get a GitRepo instance from a path, we already have an
+    # AnnexRepo of
+    repo4 = GitRepo(path1)
+    assert_is_instance(repo4, GitRepo)
+    assert_not_is_instance(repo4, AnnexRepo)
