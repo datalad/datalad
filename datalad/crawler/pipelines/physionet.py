@@ -25,9 +25,33 @@ from ...support.strings import get_replacement_dict
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
+from datalad.utils import updated
+
 lgr = getLogger("datalad.crawler.pipelines.kaggle")
 
 topurl = 'http://physionet.org'
+physdburl = '%s/physiobank/database' % topurl
+
+
+def parse_DBS(data):
+    # do parsing... check the crcns.py use of parse_checksums
+    response = data['response']
+    for ds in [x.split('\t', 1)[0] for x in response.split('\n')]:
+        if '/' in ds:
+            # composite beast, so we might need to yeild super dataset first
+            # and for some we might need to provide manual handling
+            if ds not in {'gait-maturation-db/data'}:
+                ds_up = '/'.join(ds.split('/')[:-1])
+            else:
+                ds_up = ds  # full name since it is worth it!
+            if '/' in ds_up:
+                # need to generate all supers first
+                full_sds = []
+                for sds in ds_up.split('/')[:-1]:
+                    full_sds.append(sds)
+                    yield updated(data, {'dataset': '/'.join(full_sds)})
+            ds = ds_up  # yield this one instead
+        yield updated(data, {'dataset': ds})
 
 
 def superdataset_pipeline():
@@ -35,21 +59,14 @@ def superdataset_pipeline():
     # Should return a list representing a pipeline
     annex = Annexificator(no_annex=True)
     return [
-        crawl_url("%s/physiobank/database/" % topurl,
-            matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
-#                      a_href_match('.*/data-sets/[\S+/\S+'),]),
-        # TODO:  such matchers don't have state so if they get to the same url from multiple
-        # pages they pass that content twice.  Implement state to remember yielded results +
-        # .reset() for nodes with state so we could first get through the pipe elements and reset
-        # them all
-        a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
-        # http://crcns.org/data-sets/vc/pvc-1
+        crawl_url("%s/DBS" % physdburl),
+        parse_DBS,
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
-            template="crcns",
-            data_fields=['dataset_category', 'dataset'],
+            template="physionet",
+            data_fields=['dataset'],
             # branch='incoming',  # there will be archives etc
-            existing='skip',
+            existing='skip',  # necessary since we create a hierarchy of those beasts
             # further any additional options
         )
     ]
@@ -76,7 +93,7 @@ def pipeline(dataset,
              backend='MD5E'):
     """Pipeline to crawl/annex a physionet dataset"""
 
-    url = "%s/%s" % (topurl, dataset)
+    url = "%s/%s" % (physdburl, dataset)
     if not isinstance(leading_dirs_depth, int):
         leading_dirs_depth = int(leading_dirs_depth)
 
