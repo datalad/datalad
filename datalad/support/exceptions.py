@@ -9,6 +9,7 @@
 """ datalad exceptions
 """
 
+import re
 from os import linesep
 
 
@@ -102,6 +103,21 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not under control of the repository at all.
     """
     pass
+
+
+class GitIgnoreError(CommandError):
+    """Thrown if a path was ignored by a git command due to .gitignore file"""
+
+    pattern = re.compile(r'ignored by one of your .gitignore files:\s*(.*?)$',
+                         flags=re.MULTILINE)
+
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", path=""):
+        super(GitIgnoreError, self).__init__(
+            cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
+        self.path = path
+
+    def __str__(self):
+        return self.msg
 
 
 class PathOutsideRepositoryError(Exception):

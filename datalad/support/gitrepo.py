@@ -1116,16 +1116,28 @@ class GitRepo(object):
             else cmd_str + files
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-        return self.cmd_call_wrapper.run(
-            cmd,
-            log_stderr=log_stderr,
-            log_stdout=log_stdout,
-            log_online=log_online,
-            expect_stderr=expect_stderr,
-            cwd=cwd,
-            env=env,
-            shell=shell,
-            expect_fail=expect_fail)
+
+        from .exceptions import GitIgnoreError
+
+        try:
+            out, err = self.cmd_call_wrapper.run(
+                cmd,
+                log_stderr=log_stderr,
+                log_stdout=log_stdout,
+                log_online=log_online,
+                expect_stderr=expect_stderr,
+                cwd=cwd,
+                env=env,
+                shell=shell,
+                expect_fail=expect_fail)
+        except CommandError as e:
+            ignored = re.search(GitIgnoreError.pattern, e.stderr)
+            if ignored:
+                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
+                                     code=e.code, stdout=e.stdout,
+                                     stderr=e.stderr, path=ignored.groups()[0])
+            raise
+        return out, err
 
 # TODO: --------------------------------------------------------------------
 
