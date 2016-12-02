@@ -29,9 +29,11 @@ from datalad.interface.save import Save
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
 from datalad.utils import get_trace
+from datalad.utils import walk
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -361,3 +363,52 @@ def path_is_under(values, path=None):
             # first match is enough
             return True
     return False
+
+
+def get_dataset_directories(top, ignore_datalad=True):
+    """Return a list of directories in the same dataset under a given path
+
+    Parameters
+    ----------
+    top : path
+      Top-level path
+    ignore_datalad : bool
+      Whether to exlcude the '.datalad' directory of a dataset and its content
+      from the results.
+
+    Returns
+    -------
+    list
+      List of directories matching the top-level path, regardless of whether
+      these directories are known to Git (i.e. contain tracked files). The
+      list does not include the top-level path itself, nor does it include
+      any subdataset mount point (regardless of whether the particular
+      subdatasets are installed or not).
+    """
+    def func(arg, top, names):
+        refpath, ignore, dirs = arg
+        legit_names = []
+        for n in names:
+            path = opj(top, n)
+            if not isdir(path) \
+                    or path in ignore \
+                    or not GitRepo.get_toppath(path) == refpath:
+                pass
+            else:
+                legit_names.append(n)
+                dirs.append(path)
+        names[:] = legit_names
+
+    # collects the directories
+    refpath = GitRepo.get_toppath(top)
+    if not refpath:
+        raise ValueError("`top` path {} is not in a dataset".format(top))
+    ignore = [opj(refpath, get_git_dir(refpath))]
+    # always ignore subdataset mount points
+    ignore.extend(Dataset(refpath).get_subdatasets(
+        absolute=True, recursive=False, fulfilled=False))
+    if ignore_datalad:
+        ignore.append(opj(refpath, '.datalad'))
+    d = []
+    walk(top, func, (refpath, ignore, d))
+    return d

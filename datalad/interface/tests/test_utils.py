@@ -22,6 +22,7 @@ from datalad.tests.utils import ok_
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import get_dataset_directories
 from datalad.distribution.dataset import Dataset
 from datalad.api import save
 
@@ -197,3 +198,40 @@ def test_save_hierarchy(path):
     save_dataset_hierarchy((aa.path, ba.path, bb.path, c.path, ca.path, d.path),
                            base=ds.path)
     ok_clean_git(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_get_dataset_directories(path):
+    assert_raises(ValueError, get_dataset_directories, path)
+    ds = Dataset(path).create()
+    # ignores .git always and .datalad by default
+    assert_equal(get_dataset_directories(path), [])
+    assert_equal(get_dataset_directories(path, ignore_datalad=False),
+                 [opj(path, '.datalad')])
+    # find any directory, not just those known to git
+    testdir = opj(path, 'newdir')
+    os.makedirs(testdir)
+    assert_equal(get_dataset_directories(path), [testdir])
+    # do not find files
+    with open(opj(path, 'somefile'), 'w') as f:
+        f.write('some')
+    assert_equal(get_dataset_directories(path), [testdir])
+    # find more than one directory
+    testdir2 = opj(path, 'newdir2')
+    os.makedirs(testdir2)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2]))
+    # do not find subdataset dirs
+    ds.create('sub')
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2]))
+    # do not find content within subdataset dirs
+    os.makedirs(opj(path, 'sub', 'deep'))
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2]))
+    # find nested directories
+    testdir3 = opj(testdir2, 'newdir21')
+    os.makedirs(testdir3)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3]))
+    # only return hits below the search path
+    assert_equal(sorted(get_dataset_directories(testdir2)), sorted([testdir3]))
+    # empty subdataset mount points are ignored too
+    Dataset(opj(path, 'sub')).uninstall(check=False)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3]))
