@@ -26,6 +26,7 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.utils import chpwd
+from datalad.utils import _path_
 
 from ..dataset import Dataset
 
@@ -84,7 +85,8 @@ def test_add_files(path):
         annexed = set(ds.repo.get_annexed_files())
         indexed = set(ds.repo.get_indexed_files())
         # ignore the initial config file in index:
-        indexed.remove('.datalad/config')
+        indexed.remove(opj('.datalad', 'config'))
+        indexed.remove(opj('.datalad', '.gitattributes'))
         if isinstance(arg[0], list):
             for x in arg[0]:
                 unstaged.remove(x)
@@ -113,19 +115,27 @@ def test_add_recursive(path):
     assert_raises(CommandError, ds.add, opj('dir', 'testindir'),
                   recursive=True, recursion_limit=0)
 
-    ds.add(opj('dir', 'testindir'), recursive=True)
+    # add while also instructing annex to add in parallel 2 jobs (smoke testing
+    # for that effect ATM)
+    added1 = ds.add(opj('dir', 'testindir'), recursive=True, jobs=2)
+    # added to annex, so annex output record
+    eq_(added1, [{'file': _path_('dir/testindir'), 'command': 'add',
+                  'key': 'MD5E-s9--3f0f870d18d6ba60a79d9463ff3827ea',
+                  'success': True}])
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
 
-    ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
+    added2 = ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
+    # added to git, so parsed git output record
+    eq_(added2, [{'success': True, 'file': _path_('dir/testindir2')}])
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
 
+    # We used to fail to add to pure git repository, but now it should all be
+    # just fine
     subds = ds.create('git-sub', no_annex=True)
     with open(opj(subds.path, 'somefile.txt'), "w") as f:
         f.write("bla bla")
     result = ds.add(opj('git-sub', 'somefile.txt'), recursive=True, to_git=False)
-    eq_(result, [{'file': opj(subds.path, 'somefile.txt'),
-                  'note': "no annex at %s" % subds.path,
-                  'success': False}])
+    eq_(result, [{'file': _path_('git-sub/somefile.txt'), 'success': True}])
 
 
 @with_tree(**tree_arg)

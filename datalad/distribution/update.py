@@ -90,17 +90,29 @@ class Update(Interface):
 
         repos_to_update = [ds.repo]
         if recursive:
-            repos_to_update += [GitRepo(opj(ds.path, sub_path))
+            repos_to_update += [GitRepo(opj(ds.path, sub_path), create=False)
                                 for sub_path in
-                                ds.get_subdatasets(recursive=True)]
+                                ds.get_subdatasets(recursive=True, fulfilled=True)]
+        # only work on those which are installed
 
+
+        # TODO: current implementation disregards submodules organization,
+        #  it just updates/merge each one individually whenever in the simplest
+        #  case we just need  a call to
+        # git submodule update --recursive
+        #  if name was not provided, and there is no --merge
+        # If we do --merge we should at the end call save
         for repo in repos_to_update:
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(with_refs_only=True)
+            if not remotes:
+                lgr.debug("No siblings known to dataset at %s\nSkipping",
+                          repo.path)
+                continue
             if name and name not in remotes:
-                lgr.warning("'%s' not known to dataset %s.\nSkipping" %
-                            (name, repo.path))
+                lgr.warning("'%s' not known to dataset %s\nSkipping",
+                            name, repo.path)
                 continue
 
             # Currently '--merge' works for single remote only:
@@ -124,12 +136,13 @@ class Update(Interface):
             # TODO: This isn't correct. `fetch_all` fetches all remotes.
             # Apparently, we currently fetch an entire remote anyway. Is this
             # what we want? Do we want to specify a refspec instead?
-
+            # yoh: we should leave it to git and its configuration.
+            # So imho we should just extract to fetch everything git would fetch
             if knows_annex(repo.path) and not fetch_all:
                 if name:
                     # we are updating from a certain remote, so git-annex branch
                     # should be updated from there as well:
-                    repo.fetch(remote=name, refspec="git-annex")
+                    repo.fetch(remote=name)
                     # TODO: what does failing here look like?
                 else:
                     # we have no remote given, therefore
@@ -138,7 +151,7 @@ class Update(Interface):
                     track_remote, track_branch = repo.get_tracking_branch()
                     if track_remote:
                         # we have a "tracking remote"
-                        repo.fetch(remote=track_remote, refspec="git-annex")
+                        repo.fetch(remote=track_remote)
 
             # merge:
             if merge:

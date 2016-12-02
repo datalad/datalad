@@ -11,8 +11,12 @@
 """
 
 import logging
+
 from os import curdir
 from os.path import isdir
+from os.path import join as opj
+from os.path import relpath
+from collections import defaultdict
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -22,6 +26,7 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import if_dirty_opt
+from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.save import Save
 from datalad.support.constraints import EnsureStr
@@ -118,7 +123,9 @@ class Add(Interface):
         if_dirty=if_dirty_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
-        annex_add_opts=annex_add_opts)
+        annex_add_opts=annex_add_opts,
+        jobs=jobs_opt
+    )
 
     @staticmethod
     @datasetmethod(name='add')
@@ -133,7 +140,8 @@ class Add(Interface):
             if_dirty='ignore',
             git_opts=None,
             annex_opts=None,
-            annex_add_opts=None):
+            annex_add_opts=None,
+            jobs=None):
 
         # parameter constraints:
         if not path and not source:
@@ -231,10 +239,10 @@ class Add(Interface):
         for ds, p, s in param_tuples:
             # it should not happen, that `path` as well as `source` are None:
             assert p or s
-
             if not s:
                 # we have a path only
-                if to_git:
+                # Do not try to add to annex whenever there is no annex
+                if to_git or not isinstance(ds.repo, AnnexRepo):
                     calls[ds.path]['g_add'].append(p)
                 else:
                     calls[ds.path]['a_add'].append(p)
@@ -254,10 +262,10 @@ class Add(Interface):
         # now do the actual add operations:
         # TODO: implement git/git-annex/git-annex-add options
 
-        return_values = []
+        datasets_return_values = defaultdict(list)
         for dspath in calls:
             ds = Dataset(dspath)
-
+            return_values = datasets_return_values[dspath]
             lgr.info("Processing dataset %s ..." % ds)
 
             # check every (sub-)dataset for annex once, since we can't add or
@@ -267,14 +275,17 @@ class Add(Interface):
             _is_annex = isinstance(ds.repo, AnnexRepo)
 
             if calls[ds.path]['g_add']:
-                return_values.extend(ds.repo.add(calls[dspath]['g_add'],
-                                                 git=True,
-                                                 git_options=git_opts))
+                lgr.debug("Adding %s to git", calls[dspath]['g_add'])
+                added = ds.repo.add(calls[dspath]['g_add'], git=True,
+                                  git_options=git_opts)
+                return_values.extend(added)
             if calls[ds.path]['a_add']:
                 if _is_annex:
+                    lgr.debug("Adding %s to annex", calls[dspath]['a_add'])
                     return_values.extend(
                         ds.repo.add(calls[dspath]['a_add'],
                                     git=False,
+                                    jobs=jobs,
                                     git_options=git_opts,
                                     annex_options=annex_opts,
                                     options=annex_add_opts
@@ -294,12 +305,14 @@ class Add(Interface):
             #       file name but the url
             if calls[ds.path]['addurl_s']:
                 if _is_annex:
+                    lgr.debug("Adding urls %s to annex", calls[dspath]['addurl_s'])
                     return_values.extend(
                         ds.repo.add_urls(calls[ds.path]['addurl_s'],
                                          options=annex_add_opts,
                                          # TODO: extra parameter for addurl?
                                          git_options=git_opts,
-                                         annex_options=annex_opts
+                                         annex_options=annex_opts,
+                                         jobs=jobs,
                                          )
                     )
                 else:
@@ -315,6 +328,8 @@ class Add(Interface):
             if calls[ds.path]['addurl_f']:
                 if _is_annex:
                     for f, u in calls[ds.path]['addurl_f']:
+                        lgr.debug("Adding urls %s to files in annex",
+                                  calls[dspath]['addurl_f'])
                         return_values.append(
                             ds.repo.add_url_to_file(f, u,
                                                     options=annex_add_opts,  # TODO: see above
@@ -330,17 +345,34 @@ class Add(Interface):
                           'note': "no annex at %s" % ds.path}
                          for f in calls[dspath]['addurl_f']]
                     )
+            return_values = None  # to avoid mis-use
 
-        if save and len(return_values):
-            # we got something added -> save
-            # everything we care about at this point should be staged already
-            Save.__call__(
-                message='[DATALAD] added content',
-                dataset=ds,
-                auto_add_changes=False,
-                recursive=False)
+        # XXX or we could return entire datasets_return_values, could be useful
+        # that way.  But then should be unified with the rest of commands, e.g.
+        # get etc
+        return_values_flat = []
+        for dspath, return_values in datasets_return_values.items():
+            if save and len(return_values):
+                # we got something added -> save
+                # everything we care about at this point should be staged already
+                Save.__call__(
+                    message='[DATALAD] added content',
+                    dataset=ds,
+                    auto_add_changes=False,
+                    recursive=False)
+            # TODO: you feels that this is some common logic we already have somewhere
+            dsrelpath = relpath(dspath, dataset.path)
+            if dsrelpath != curdir:
+                # we need ot adjust 'file' entry in each record
+                for return_value in return_values:
+                    if 'file' in return_value:
+                        return_value['file'] = opj(dsrelpath, return_value['file'])
+                    return_values_flat.append(return_value)
+            else:
+                return_values_flat.extend(return_values)
 
-        return return_values
+
+        return return_values_flat
 
     @staticmethod
     def result_renderer_cmdline(res, args):

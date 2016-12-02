@@ -116,7 +116,7 @@ def test_get_invalid_call(path, file_outside):
     with swallow_logs(new_level=logging.WARNING) as cml:
         result = ds.get(file_outside)
         eq_(len(result), 0)
-        assert_in("{0} is not part of a dataset, ignored".format(file_outside, ds),
+        assert_in("ignored paths that do not belong to any dataset: ['{0}'".format(file_outside, ds),
                   cml.out)
 
     # TODO: annex --json doesn't report anything when get fails to do get a

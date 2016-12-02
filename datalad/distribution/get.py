@@ -17,10 +17,10 @@ from os import curdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
-from os.path import lexists
-from os.path import dirname
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
@@ -38,84 +38,16 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import resolve_path
 from .utils import install_necessary_subdatasets
 from .utils import _recursive_install_subds_underneath
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
-
-
-def _sort_paths_into_datasets(paths, out=None, dir_lookup=None,
-                              recursive=False, recursion_limit=None):
-    """Returns dict of `existing dataset path`: `directory` mappings
-
-    Any paths that are not part of a dataset or ignored.
-    """
-    # sort paths into the respective datasets
-    if dir_lookup is None:
-        dir_lookup = {}
-    if out is None:
-        out = {}
-    # paths that don't exist (yet)
-    unavailable_paths = []
-    for path in paths:
-        if not lexists(path):
-            # not there yet, impossible to say which ds it will actually
-            # be in, if any
-            unavailable_paths.append(path)
-            continue
-        # the path exists in some shape or form
-        if isdir(path):
-            # this could contain all types of additional content
-            d = path
-        else:
-            # for everything else we are interested in the container
-            d = dirname(path)
-            if not d:
-                d = curdir
-        # this could be `None` if there is no git repo
-        dspath = dir_lookup.get(d, GitRepo.get_toppath(d))
-        dir_lookup[d] = dspath
-        if not dspath:
-            lgr.warning("%s is not part of a dataset, ignored.", path)
-            continue
-        if isdir(path):
-            ds = Dataset(dspath)
-            # we need to doublecheck that this is not a subdataset mount
-            # point, in whic case get_toppath() would point to the parent
-            smpath = ds.get_containing_subdataset(
-                path, recursion_limit=1).path
-            if smpath != dspath:
-                # fix entry
-                dir_lookup[d] = smpath
-                # submodule still needs to be obtained
-                unavailable_paths.append(path)
-                continue
-            if recursive:
-                # make sure we get everything relevant in all _checked out_
-                # subdatasets, obtaining of previously unavailable subdataset
-                # else done elsewhere
-                subs = ds.get_subdatasets(fulfilled=True,
-                                          recursive=recursive,
-                                          recursion_limit=recursion_limit)
-                for sub in subs:
-                    subdspath = opj(dspath, sub)
-                    if subdspath.startswith(_with_sep(path)):
-                        # this subdatasets is underneath the search path
-                        # we want it all
-                        # be careful to not overwrite anything, in case
-                        # this subdataset has been processed before
-                        out[subdspath] = out.get(subdspath, [subdspath])
-        out[dspath] = out.get(dspath, []) + [path]
-    return out, unavailable_paths, dir_lookup
 
 
 def _get(content_by_ds, refpath=None, source=None, jobs=None,
@@ -258,13 +190,6 @@ class Get(Interface):
             # kwargs
             _return_datasets=False
     ):
-
-        dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        path = assure_list(path)
-        if not path:
-            raise InsufficientArgumentsError(
-                "`get` needs at least one path as argument")
-
         # IMPLEMENTATION CONCEPT:
         #
         # 1. turn all input paths into absolute paths
@@ -275,18 +200,21 @@ class Get(Interface):
         # 5. Shoot info of which handles to get in each subdataset to,
         #    git-annex, once at the very end
 
-        # resolve path(s):
-        resolved_paths = [resolve_path(p, dataset) for p in path]
-        if dataset:
-            # guarantee absolute paths relative to any given dataset
-            resolved_paths = [opj(dataset_path, p) for p in resolved_paths]
-        lgr.debug('Resolved targets to get: %s', resolved_paths)
+        # TODO: consider allowing an empty `path` argument, as with other commands,
+        # to indicate CWD
+        resolved_paths, dataset_path = get_normalized_path_arguments(
+            path, dataset, default=None)
+        if not resolved_paths:
+            raise InsufficientArgumentsError(
+                "`get` needs at least one path as argument")
 
         # sort paths into the respective datasets
-        content_by_ds, unavailable_paths, dir_lookup = \
-            _sort_paths_into_datasets(resolved_paths,
-                                      recursive=recursive,
-                                      recursion_limit=recursion_limit)
+        dir_lookup = {}
+        content_by_ds, unavailable_paths, nondataset_paths = \
+            get_paths_by_dataset(resolved_paths,
+                                 recursive=recursive,
+                                 recursion_limit=recursion_limit,
+                                 dir_lookup=dir_lookup)
         lgr.debug(
             "Found %i existing dataset(s) to get content in "
             "and %d unavailable paths",
@@ -356,13 +284,19 @@ class Get(Interface):
         ## we have now done everything we could to obtain whatever subdataset
         ## to get something on the file system for previously unavailable paths
         ## check and sort one last
-        content_by_ds, unavailable_paths, dir_lookup = \
-            _sort_paths_into_datasets(
+        content_by_ds, unavailable_paths, nondataset_paths2 = \
+            get_paths_by_dataset(
                 unavailable_paths,
-                out=content_by_ds,
-                dir_lookup=dir_lookup,
                 recursive=recursive,
-                recursion_limit=recursion_limit)
+                recursion_limit=recursion_limit,
+                out=content_by_ds,
+                dir_lookup=dir_lookup)
+
+        nondataset_paths.extend(nondataset_paths2)
+        if nondataset_paths:
+            lgr.warning(
+                "ignored paths that do not belong to any dataset: %s",
+                nondataset_paths)
 
         if unavailable_paths:
             lgr.warning('ignored non-existing paths: %s', unavailable_paths)

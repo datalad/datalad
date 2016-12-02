@@ -33,6 +33,13 @@ recursion_limit = Parameter(
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
 
+shared_access_opt = Parameter(
+    args=('--shared-access',),
+    metavar='MODE',
+    doc="""configure shared access to a dataset, see `git init --shared`
+    documentation for complete details on the supported scenarios. Possible
+    values include: 'false', 'true', 'group', and 'all'""")
+
 super_datasets_flag = Parameter(
     args=("-S", "--super-datasets",),
     action="store_true",
@@ -141,4 +148,14 @@ publish_depends = Parameter(
     [PY: Multiple dependencies can be given as a list of sibling names
     PY][CMD: This option can be given more than once to configure multiple
     dependencies CMD]""",
+    action='append',
+    constraints=EnsureStr() | EnsureNone())
+
+publish_by_default = Parameter(
+    args=("--publish-by-default",),
+    metavar='REFSPEC',
+    doc="""add a refspec to be published to this sibling by default if nothing
+    specified.""",
+    constraints=EnsureStr() | EnsureNone(),
     action='append')
+

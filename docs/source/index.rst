@@ -18,6 +18,7 @@ Concepts and technologies
    metadata
    config
    usecases/index
+   faq
    glossary
 
 Commands and API

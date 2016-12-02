@@ -37,6 +37,7 @@ from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import ok_
 
 from datalad.utils import on_windows
 from datalad.utils import _path_
@@ -157,8 +158,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             existing='replace')
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + target_path,
-            source.repo.get_remote_url("local_target", push=True))
+        ok_(source.repo.get_remote_url("local_target", push=True) is None)
 
         # ensure target tree actually replaced by source
         assert_false(exists(opj(target_path, 'random')))

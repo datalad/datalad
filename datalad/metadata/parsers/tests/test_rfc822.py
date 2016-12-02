@@ -87,6 +87,5 @@ def test_get_metadata(path):
     "The person who associated a work with this deed has dedicated the work to the public domain by waiving all of his or her rights to the work worldwide under copyright law, including all related and neighboring rights, to the extent allowed by law.\\nYou can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission."
   ],
   "name": "studyforrest_phase2",
-  "sameAs": "http://dx.doi.org/10.5281/zenodo.48421",
-  "type": "Dataset"
+  "sameAs": "http://dx.doi.org/10.5281/zenodo.48421"
 }""")
