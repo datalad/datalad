@@ -346,12 +346,12 @@ def report_result_objects(cls, res, args, passive):
     from datalad.ui import ui
     from datalad.distribution.dataset import Dataset
     if not res:
-        ui.message("Nothing was {}".format(cls._passive))
+        ui.message("Nothing was {}".format(passive))
         return
     msg = "{n} {obj} {action}:\n".format(
         obj='items were' if len(res) > 1 else 'item was',
         n=len(res),
-        action=cls._passive)
+        action=passive)
     for item in res:
         if isinstance(item, Dataset):
             msg += "Dataset: %s\n" % item.path
