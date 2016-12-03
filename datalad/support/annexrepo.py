@@ -1793,6 +1793,18 @@ class BatchedAnnexes(dict):
         if self.batch_size:
             git_options += ['-c', 'annex.queuesize=%d' % self.batch_size]
 
+        # START RF/BF: extend codename to respect different options the process
+        # is running with
+        # TODO: Eventually there should be more RF'ing, since the actually used
+        # codenames are partially reflecting this already. Any options used
+        # therein should go away, since they are now automatically included.
+        options = kwargs.copy()
+        options['git_options'] = git_options
+        options['annex_cmd'] = annex_cmd
+        for key in options:
+            codename += ':{0}:{1}'.format(key, options[key])
+        # END RF/BF
+
         if codename not in self:
             # Create a new git-annex process we will keep around
             self[codename] = BatchedAnnex(annex_cmd,
