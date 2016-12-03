@@ -1248,11 +1248,15 @@ def test_annex_version_handling(path):
             eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
             eq_(cmpc.call_count, 1)
             # 2nd time must not be called
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             ar2 = AnnexRepo(path)
             assert(ar2)
             eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
             eq_(cmpc.call_count, 1)
-
     with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
             patch.object(AnnexRepo, '_check_git_annex_version',
                          auto_spec=True,
@@ -1262,6 +1266,11 @@ def test_annex_version_handling(path):
                 external_versions, '_versions', {'cmd:annex': None}):
             eq_(AnnexRepo.git_annex_version, None)
             with assert_raises(MissingExternalDependency) as cme:
+                try:
+                    # Note: Remove to cause creation of a new instance
+                    rmtree(path)
+                except OSError:
+                    pass
                 AnnexRepo(path)
             if linux_distribution_name == 'debian':
                 assert_in("http://neuro.debian.net", str(cme.exception))
@@ -1271,10 +1280,20 @@ def test_annex_version_handling(path):
         with patch.object(
                 external_versions, '_versions', {'cmd:annex': '6.20160505'}):
             eq_(AnnexRepo.git_annex_version, None)
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             assert_raises(OutdatedExternalDependency, AnnexRepo, path)
             # and we don't assign it
             eq_(AnnexRepo.git_annex_version, None)
             # so we could still fail
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             assert_raises(OutdatedExternalDependency, AnnexRepo, path)
 
 
