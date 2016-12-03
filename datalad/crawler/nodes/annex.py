@@ -350,7 +350,7 @@ class Annexificator(object):
         self._statusdb = None  # actual DB to be instantiated later
 
         if ultimatedb is None:
-            ultimatedb = cfg.getboolean('crawl', 'annex.ultimatedb', default=False)
+            ultimatedb = cfg.getbool('crawl', 'annex.ultimatedb', default=False)
         if isinstance(ultimatedb, bool) and ultimatedb:
             # so we don't require sqlalchemy for lightweight deployments??? XXX
             from ..dbs.ultimate import UltimateDB
@@ -818,7 +818,7 @@ class Annexificator(object):
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
             skip_no_changes_ = skip_no_changes
             if skip_no_changes is None:
-                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                # TODO: skip_no_changes = config.getbool('crawl', 'skip_merge_if_no_changes', default=True)
                 skip_no_changes_ = True
 
             if last_merged_checksum == self.repo.get_hexsha(branch):
