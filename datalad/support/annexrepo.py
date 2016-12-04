@@ -691,6 +691,9 @@ class AnnexRepo(GitRepo):
                     '-c',
                     'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
                 ]
+                if git:
+                    # to maintain behaviour similar to git
+                    options += ['--include-dotfiles']
 
             return_list = list(self._run_annex_command_json(
                 'add',
