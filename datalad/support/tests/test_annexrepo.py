@@ -895,9 +895,15 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
 
     # add into a new file
-    #filename = 'newfile.dat'
+    # filename = 'newfile.dat'
     filename = get_most_obscure_supported_name()
+
+    # Note: The following line was necessary, since the test setup just
+    # doesn't work with singletons
+    # TODO: Singleton mechanic needs a general solution for this
+    AnnexRepo._unique_repos.clear()
     ar2 = AnnexRepo(dst, batch_size=1)
+
     with swallow_outputs():
         assert_equal(len(ar2._batched), 0)
         ar2.add_url_to_file(filename, testurl, batch=True)
