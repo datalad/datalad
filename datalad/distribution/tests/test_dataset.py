@@ -330,6 +330,9 @@ def test_dataset_id(path):
     assert_equal(len(ds.id), 36)
     # creating a new object for the same path
     # yields the same ID
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    Dataset._unique_repos.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
     assert_equal(ds.id, newds.id)
@@ -351,3 +354,6 @@ def test_dataset_id(path):
     # this is also not the ID
     annexds = Dataset(opj(path, 'scratch')).create()
     assert_true(annexds.id != annexds.repo.uuid)
+
+
+#TODO: test singleton

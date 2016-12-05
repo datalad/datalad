@@ -1009,8 +1009,8 @@ def test_WeakRefSingletonRepo(path1, path2):
     # reference the same in a different way:
     with chpwd(path1):
         repo3 = GitRepo(relpath(path1, start=path2), create=False)
-    # currently not the same object (might change):
-    ok_(repo1 is not repo3)
+    # it's the same object:
+    ok_(repo1 is repo3)
 
     # but realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)

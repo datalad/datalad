@@ -1409,8 +1409,8 @@ def test_WeakSingletonRepo(path1, path2):
     with chpwd(path1):
         repo3 = AnnexRepo(relpath(path1, start=path2), create=False)
         assert_is_instance(repo3, AnnexRepo)
-    # currently not the same object (might change):
-    ok_(repo1 is not repo3)
+    # it's the same object:
+    ok_(repo1 is repo3)
 
     # but path attribute is absolute, so they are still equal:
     ok_(repo1 == repo3)

@@ -12,11 +12,28 @@
 
 import logging
 from os.path import normpath
+from os.path import realpath
 
 from .network import RI
 
 
 lgr = logging.getLogger('datalad.repo')
+
+
+
+# TODO: common superclass:
+# class WeakRefSingleton(type):
+#
+#     _id_arg = None
+#
+#     def _id_from_args(cls, *args, **kwargs):
+#         pass
+#
+#     def _cond_invalid(cls, id):
+#         return False
+#
+#     def __call__(cls, *args, **kwargs):
+#
 
 
 class WeakRefSingletonRepo(type):
@@ -73,7 +90,7 @@ class WeakRefSingletonRepo(type):
             path = RI(path).localpath
 
             # use canonical paths only:
-            path = normpath(path)
+            path = realpath(path)
 
             repo = cls._unique_repos.get(path, None)
 
@@ -82,6 +99,48 @@ class WeakRefSingletonRepo(type):
                 cls._unique_repos[path] = repo
 
             return repo
+
+
+# class WeakRefSingletonDataset(type):
+#
+#     def __call__(cls, path, *args, **kwargs):
+#
+#
+#         # Custom handling for few special abbreviations
+#         path_ = path
+#         if path == '^':
+#             # get the topmost dataset from current location. Note that 'zsh'
+#             # might have its ideas on what to do with ^, so better use as -d^
+#             path_ = Dataset(curdir).get_superdataset(topmost=True).path
+#         elif path == '///':
+#             # TODO: logic/UI on installing a central dataset could move here
+#             # from search?
+#             path_ = LOCAL_CENTRAL_PATH
+#         if path != path_:
+#             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
+#
+#
+#
+#
+#
+#
+#         # Sanity check for argument `path`:
+#         # raise if we cannot deal with `path` at all or
+#         # if it is not a local thing:
+#         path_ = RI(path_).localpath
+#
+#         # use canonical paths only:
+#         path_ = normpath(path_)
+#
+#         repo = cls._unique_repos.get(path_, None)
+#
+#         if repo is None:
+#             repo = type.__call__(cls, path_, *args, **kwargs)
+#             cls._unique_repos[path_] = repo
+#
+#         return repo
+
+
 
 
 # TODO: see issue #1100

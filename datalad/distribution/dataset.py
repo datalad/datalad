@@ -16,13 +16,15 @@ from os.path import commonprefix
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
-from os.path import normpath
+from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from os.path import sep
+from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
+from six import add_metaclass
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -34,6 +36,7 @@ from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
+#from datalad.support.repo import WeakRefSingletonDataset
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
@@ -71,15 +74,16 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
-#from datalad.support.gitrepo import WeakSingletonRepo, WeakValueDictionary
+from datalad.support.network import RI
+class WeakRefSingletonDataset(type):
 
-class Dataset(object):
+    def __call__(cls, path, *args, **kwargs):
 
-    #__metaclass__ = WeakSingletonRepo
-    #_unique_repos = WeakValueDictionary()
-    #__slots__ = ['_path', '_repo', '_id', '_cfg']
+        # For some reason a missing `path` does not lead to an AttributeError
+        # with this mechanism
+        if path is None:
+            raise AttributeError
 
-    def __init__(self, path):
         # Custom handling for few special abbreviations
         path_ = path
         if path == '^':
@@ -92,7 +96,44 @@ class Dataset(object):
             path_ = LOCAL_CENTRAL_PATH
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
-        self._path = abspath(path_)
+
+
+
+
+
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path_ = RI(path_).localpath
+
+        # we want an absolute path, but no resolved symlinks
+        if not isabs(path_):
+            path_ = opj(getpwd(), path_)
+
+        # use canonical paths only:
+        path_ = normpath(path_)
+
+        repo = cls._unique_repos.get(path_, None)
+
+        if repo is None:
+            repo = type.__call__(cls, path_, *args, **kwargs)
+            cls._unique_repos[path_] = repo
+
+        return repo
+
+
+
+
+@add_metaclass(WeakRefSingletonDataset)
+class Dataset(object):
+
+    #__metaclass__ = WeakSingletonRepo
+    _unique_repos = WeakValueDictionary()
+    #__slots__ = ['_path', '_repo', '_id', '_cfg']
+
+    def __init__(self, path):
+        self._path = path
         self._repo = None
         self._id = None
         self._cfg = None
@@ -168,6 +209,7 @@ class Dataset(object):
         """
         if self._id is None:
             # if we have one on record, stick to it!
+            self.config.reload()
             self._id = self.config.get('datalad.dataset.id', None)
         return self._id
 
