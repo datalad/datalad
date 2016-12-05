@@ -46,6 +46,7 @@ from ..utils import on_windows
 from ..utils import _path_
 from ..utils import get_timestamp_suffix
 from ..utils import get_trace
+from ..utils import get_mime
 
 from ..support.annexrepo import AnnexRepo
 
@@ -560,3 +561,10 @@ def test_get_trace():
         ('C', 'D'),
         ('D', 'E'),
         ], 'A', 'E'), ['B', 'C', 'D'])
+
+
+@with_tree(tree={'a.tar.gz': {'a': 'b'},
+                 "1.txt": "text"})
+def test_get_mime(p):
+    eq_(get_mime(_path_(p, "a.tar.gz")), ('application/gzip', 'binary'))
+    eq_(get_mime(_path_(p, "a.tar.gz"), uncompress=True), ('application/x-tar', 'binary'))

@@ -373,6 +373,45 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def get_mime(filepath, dereference=True, uncompress=False):
+    """Provide mime type and encoding for filepath
+
+    Just a thin silly adapter for 'file' command.
+
+    Parameters
+    ----------
+    dereference: bool, optional
+    decompress: bool, optional
+
+    Returns
+    -------
+    mimetype, encoding: str, str
+      Or None, None if uncompress but file was not compressed. And '-', '-' if
+      compressed but file failed to figure out for one reason or another
+    """
+    from .cmd import Runner
+    cmd = ["file",
+           "--mime",
+           "-E"  # exit if filesystem error
+           ]
+    if dereference:
+        cmd += ["-L"]
+    if uncompress:
+        cmd += ["-z"]
+    cmd += [filepath]
+    out, err = Runner().run(cmd)
+    if uncompress:
+        if ("compressed-encoding" not in out):
+            return None, None
+        elif (
+            "has unknown compression method" in out or
+            "Entries after the first were ignored" in out
+        ):
+            return "-", "-"
+    mime, mime_charset_eq = map(lambda x: x.strip(), out.rstrip().split(':', 1)[1].split(';', 1))
+    mime_charset = mime_charset_eq.split('=', 1)[1].split(' ')[0]
+    return mime, mime_charset
+
 def assure_tuple_or_list(obj):
     """Given an object, wrap into a tuple if not list or tuple
     """
