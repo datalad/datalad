@@ -106,15 +106,27 @@ class FileNotInRepositoryError(FileNotInAnnexError):
 
 
 class GitIgnoreError(CommandError):
-    """Thrown if a path was ignored by a git command due to .gitignore file"""
+    """Thrown if a path was ignored by a git command due to .gitignore file
 
-    pattern = re.compile(r'ignored by one of your .gitignore files:\s*(.*?)$',
-                         flags=re.MULTILINE)
+    Note, that this might be thrown to indicate what was ignored, while the
+    actual operation was partially successful (regarding paths, not in .gitignore)
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", path=""):
+    Note/Todo:
+    in case of a directory being ignored, git returns that directory as the
+    ignored path, even if a path within that directory was passed to the command.
+    That means, that in such cases the returned path might not match an item you
+    passed!
+    """
+
+    pattern = \
+        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
+                   flags=re.MULTILINE | re.DOTALL)
+
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
+                 paths=None):
         super(GitIgnoreError, self).__init__(
             cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
-        self.path = path
+        self.paths = paths
 
     def __str__(self):
         return self.msg

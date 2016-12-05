@@ -1135,7 +1135,8 @@ class GitRepo(object):
             if ignored:
                 raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
                                      code=e.code, stdout=e.stdout,
-                                     stderr=e.stderr, path=ignored.groups()[0])
+                                     stderr=e.stderr,
+                                     paths=ignored.groups()[0].splitlines())
             raise
         return out, err
 
