@@ -36,7 +36,7 @@ from os.path import isdir
 from os.path import relpath
 
 
-from six import text_type, binary_type
+from six import text_type, binary_type, string_types
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -448,6 +448,23 @@ def assure_dict_from_str(s, **kwargs):
 def assure_unicode(s, encoding='utf-8'):
     """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
     return s.decode(encoding) if isinstance(s, binary_type) else s
+
+def assure_bool(s):
+    """Convert value into boolean following convention for strings
+
+    to recognize on,True,yes as True, off,False,no as False
+    """
+    if isinstance(s, string_types):
+        if s.isdigit():
+            return bool(int(s))
+        sl = s.lower()
+        if sl in {'y', 'yes', 'true', 'on'}:
+            return True
+        elif sl in {'n', 'no', 'false', 'off'}:
+            return False
+        else:
+            raise ValueError("Do not know how to treat %r as a boolean" % s)
+    return bool(s)
 
 
 def unique(seq, key=None):
