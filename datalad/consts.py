@@ -30,6 +30,7 @@ DATALAD_SPECIAL_REMOTE = 'datalad'
 DATALAD_GIT_DIR = join('.git', 'datalad')
 
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
+ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
 
 DATASETS_TOPURL = "http://datasets.datalad.org/"
 
