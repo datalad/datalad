@@ -109,7 +109,7 @@ def test_uninstall_invalid(path):
 def test_uninstall_annex_file(path):
     ds = Dataset(path)
     ok_(ds.is_installed())
-    ok_file_under_git(path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     ds.repo.get('test-annex.dat')
     ok_(ds.repo.file_has_content('test-annex.dat'))
 
@@ -117,7 +117,7 @@ def test_uninstall_annex_file(path):
     res = ds.drop(path='test-annex.dat')
     # test it happened:
     ok_(not ds.repo.file_has_content('test-annex.dat'))
-    ok_file_under_git(path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     # test result:
     eq_(res, [opj(ds.path, 'test-annex.dat')])
 
@@ -125,9 +125,9 @@ def test_uninstall_annex_file(path):
 
     # remove file:
     ds.remove(path='test-annex.dat')
-    assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'test-annex.dat',
                   annexed=True)
-    assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'test-annex.dat',
                   annexed=False)
     ok_(not exists(opj(path, 'test-annex.dat')))
 
@@ -137,7 +137,7 @@ def test_uninstall_git_file(path):
     ds = Dataset(path)
     ok_(ds.is_installed())
     ok_(exists(opj(path, 'INFO.txt')))
-    ok_file_under_git(path, 'INFO.txt')
+    ok_file_under_git(ds.repo.path, 'INFO.txt')
 
     if not hasattr(ds.repo, 'drop'):
         assert_raises(ValueError, ds.drop, path='INFO.txt')
@@ -148,7 +148,7 @@ def test_uninstall_git_file(path):
 
     # uninstall removes the file:
     res = ds.remove(path='INFO.txt')
-    assert_raises(AssertionError, ok_file_under_git, path, 'INFO.txt')
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
     ok_(not exists(opj(path, 'INFO.txt')))
     eq_(res, ['INFO.txt'])
 

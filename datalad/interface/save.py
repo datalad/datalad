@@ -302,7 +302,10 @@ class Save(Interface):
             # see if nothing points outside, and then convert to relative paths
             to_commit_rel = []
             if to_commit:
-                repopath = ds.repo.path
+                # Note: The following was ds.repo.path, which is now different
+                # when ds.path is a symlink to ds.repo.path
+                # TODO: We need to reconsider logic like this
+                repopath = ds.path
                 for f in to_commit:
                     if isabs(f):
                         frel = relpath(f, repopath)
