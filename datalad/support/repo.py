@@ -11,136 +11,113 @@
 """
 
 import logging
-from os.path import normpath
-from os.path import realpath
-
-from .network import RI
-
 
 lgr = logging.getLogger('datalad.repo')
 
 
+class Flyweight(type):
+    """Metaclass providing an implementation of the flyweight pattern.
 
-# TODO: common superclass:
-# class WeakRefSingleton(type):
-#
-#     _id_arg = None
-#
-#     def _id_from_args(cls, *args, **kwargs):
-#         pass
-#
-#     def _cond_invalid(cls, id):
-#         return False
-#
-#     def __call__(cls, *args, **kwargs):
-#
-
-
-class WeakRefSingletonRepo(type):
-    """Metaclass for repo classes, providing singletons.
-
-    This integrates the singleton mechanic into the actual classes, which need
-    to have a class attribute `unique_repos` (WeakValueDictionary).
+    Since the flyweight is very similar to a singleton, we occasionally use this
+    term to make clear there's only one instance (at a time).
+    This integrates the "factory" into the actual classes, which need
+    to have a class attribute `_unique_instances` (WeakValueDictionary).
     By providing an implementation of __call__, you don't need to call a
     factory's get_xy_repo() method to get a singleton. Instead this is called
-    when you simply instantiate via XYRepo(). So, you basically don't even need
+    when you simply instantiate via MyClass(). So, you basically don't even need
     to know there were singletons. Therefore it is also less likely to sabotage
     the concept by not being aware of how to get an appropriate object.
 
     Multiple instances, pointing to the same physical repository can cause a
     lot of trouble. This is why this class exists. You should be very aware of
-    the implications, if you want to circumvent the singleton mechanic.
+    the implications, if you want to circumvent that mechanism.
 
-    Note:
-        ATM the identifying key for the singletons is the given path in its
-        canonical form. Symlinks are not resolved!
+    To use this pattern, you need to add this class as a metaclass to the class
+    you want to use it with. Additionally there needs to be a class attribute
+    `_unique_instances`, which should be a `WeakValueDictionary`. Furthermore
+    implement `_id_from_args` method to determine, what should be the
+    identifying criteria to consider two requested instances the same.
+
+    Example:
+
+    from weakref import WeakValueDictionary
+    from six import add_metaclass
+
+    @add_metaclass(Flyweight)
+    class MyFlyweightClass(object):
+
+        _unique_instances = WeakValueDictionary()
+
+        @classmethod
+        def _id_from_args(cls, *args, **kwargs):
+
+            id = kwargs.pop('id')
+            return id, args, kwargs
+
+        def __init__(self, some, someother=None):
+            pass
+
+    a = MyFlyweightClass('bla', id=1)
+    b = MyFlyweightClass('blubb', id=1)
+    assert a is b
+    c = MyFlyweightClass('whatever', id=2)
+    assert c is not a
     """
 
-    def __call__(cls, path, *args, **kwargs):
+    def _id_from_args(cls, *args, **kwargs):
+        """create an ID from arguments passed to `__call__`
 
-        if len(args) >= 1 or ('url' in kwargs and kwargs['url'] is not None):
-            # TEMP: (mis-)use wrapper class to raise exception to ease RF'ing;
-            # keep in master when merging and remove in second PR, so other PRs
-            # benefit from it, when merging/rebasing atm
-            raise RuntimeError("RF: call clone() instead!")
+        Subclasses need to implement this method. The ID it returns is used to
+        determine whether or not there already is an instance of that kind and
+        as key in the `_unique_instances` dictionary.
 
-        # TODO: Figure out, what to do in case of cloning in order to do (try)
-        # the actual cloning but don't end up with multiple instances;
-        # clone() might call Annex/GitRepo(), but we might need to pass
-        # GitPython's Repo in addition ...
+        Besides the ID this should return args and kwargs, which can be modified
+        herein and will be passed on to the constructor of a requested instance.
 
-        #     if args:
-        #         url = args[0]
-        #         args = args[1:]
-        #     else:
-        #         url = kwargs.pop('url')
-        #     return cls.clone(url, path, *args, **kwargs)
-        else:
-            # TODO: Not sure yet, if and where to resolve symlinks or use
-            # abspath and whether to pass the resolved path. May be have an
-            # additional layer, where we can address the same repo with
-            # different paths (links).
-            # For now just make sure it's a "singleton" if addressed the
-            # same way. When caring for this, consider symlinked submodules ...
-            # (look for issue by mih)
+        Parameters
+        ----------
+        args:
+         positional arguments passed to __call__
+        kwargs:
+         keyword arguments passed to __call__
 
-            # Sanity check for argument `path`:
-            # raise if we cannot deal with `path` at all or
-            # if it is not a local thing:
-            path = RI(path).localpath
+        Returns
+        -------
+        hashable, args, kwargs
+          id, optionally manipulated args and kwargs to be passed to __init__
+        """
+        pass
 
-            # use canonical paths only:
-            path = realpath(path)
+    def _cond_invalid(cls, id):
+        """determines whether or not an instance with `id` became invalid and
+        therefore has to be instantiated again.
 
-            repo = cls._unique_repos.get(path, None)
+        Subclasses can implement this method to provide an additional condition
+        on when to create a new instance besides there is none yet.
 
-            if repo is None or not cls.is_valid_repo(path):
-                repo = type.__call__(cls, path, *args, **kwargs)
-                cls._unique_repos[path] = repo
+        Parameter
+        ---------
+        id: hashable
+          ID of the requested instance
 
-            return repo
+        Returns
+        -------
+        bool
+          whether to consider an existing instance with that ID invalid and
+          therefore create a new instance. Default implementation always returns
+          False.
+        """
+        return False
 
+    def __call__(cls, *args, **kwargs):
 
-# class WeakRefSingletonDataset(type):
-#
-#     def __call__(cls, path, *args, **kwargs):
-#
-#
-#         # Custom handling for few special abbreviations
-#         path_ = path
-#         if path == '^':
-#             # get the topmost dataset from current location. Note that 'zsh'
-#             # might have its ideas on what to do with ^, so better use as -d^
-#             path_ = Dataset(curdir).get_superdataset(topmost=True).path
-#         elif path == '///':
-#             # TODO: logic/UI on installing a central dataset could move here
-#             # from search?
-#             path_ = LOCAL_CENTRAL_PATH
-#         if path != path_:
-#             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
-#
-#
-#
-#
-#
-#
-#         # Sanity check for argument `path`:
-#         # raise if we cannot deal with `path` at all or
-#         # if it is not a local thing:
-#         path_ = RI(path_).localpath
-#
-#         # use canonical paths only:
-#         path_ = normpath(path_)
-#
-#         repo = cls._unique_repos.get(path_, None)
-#
-#         if repo is None:
-#             repo = type.__call__(cls, path_, *args, **kwargs)
-#             cls._unique_repos[path_] = repo
-#
-#         return repo
+        id_, new_args, new_kwargs = cls._id_from_args(*args, **kwargs)
+        instance = cls._unique_instances.get(id_, None)
 
-
+        if instance is None or cls._cond_invalid(id_):
+            instance = type.__call__(cls, *new_args, **new_kwargs)
+            cls._unique_instances[id_] = instance
+        return instance
 
 
 # TODO: see issue #1100

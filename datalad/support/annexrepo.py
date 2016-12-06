@@ -80,7 +80,9 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    _unique_repos = WeakValueDictionary()
+    # Begin Flyweight:
+    _unique_instances = WeakValueDictionary()
+    # End Flyweight:
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"

@@ -36,7 +36,9 @@ from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
-#from datalad.support.repo import WeakRefSingletonDataset
+from datalad.support.repo import Flyweight
+from datalad.support.network import RI
+
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
@@ -74,13 +76,28 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
-from datalad.support.network import RI
-class WeakRefSingletonDataset(type):
+@add_metaclass(Flyweight)
+class Dataset(object):
 
-    def __call__(cls, path, *args, **kwargs):
+    # Begin Flyweight
+    _unique_instances = WeakValueDictionary()
 
-        # For some reason a missing `path` does not lead to an AttributeError
-        # with this mechanism
+    @classmethod
+    def _id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
         if path is None:
             raise AttributeError
 
@@ -97,11 +114,6 @@ class WeakRefSingletonDataset(type):
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
 
-
-
-
-
-
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
         # if it is not a local thing:
@@ -113,24 +125,9 @@ class WeakRefSingletonDataset(type):
 
         # use canonical paths only:
         path_ = normpath(path_)
-
-        repo = cls._unique_repos.get(path_, None)
-
-        if repo is None:
-            repo = type.__call__(cls, path_, *args, **kwargs)
-            cls._unique_repos[path_] = repo
-
-        return repo
-
-
-
-
-@add_metaclass(WeakRefSingletonDataset)
-class Dataset(object):
-
-    #__metaclass__ = WeakSingletonRepo
-    _unique_repos = WeakValueDictionary()
-    #__slots__ = ['_path', '_repo', '_id', '_cfg']
+        kwargs['path'] = path_
+        return path_, args, kwargs
+    # End Flyweight
 
     def __init__(self, path):
         self._path = path

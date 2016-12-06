@@ -59,7 +59,7 @@ from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
-from .repo import WeakRefSingletonRepo
+from .repo import Flyweight
 from .repo import RepoInterface
 
 # shortcuts
@@ -375,7 +375,7 @@ def split_remote_branch(branch):
     return branch.split('/', 1)
 
 
-@add_metaclass(WeakRefSingletonRepo)
+@add_metaclass(Flyweight)
 class GitRepo(object):
     """Representation of a git repository
 
@@ -384,7 +384,44 @@ class GitRepo(object):
     overridden accidentally by AnnexRepo.
     """
 
-    _unique_repos = WeakValueDictionary()
+    # Begin Flyweight:
+
+    _unique_instances = WeakValueDictionary()
+
+    @classmethod
+    def _id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            raise AttributeError
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+        # resolve symlinks to make sure we have exactly one instance per
+        # physical repository at a time
+        path = realpath(path)
+        kwargs['path'] = path
+        return path, args, kwargs
+
+    @classmethod
+    def _cond_invalid(cls, id_):
+        return not cls.is_valid_repo(id_)
+
+    # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, **kwargs):

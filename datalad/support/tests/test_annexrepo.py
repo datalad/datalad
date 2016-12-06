@@ -901,7 +901,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # Note: The following line was necessary, since the test setup just
     # doesn't work with singletons
     # TODO: Singleton mechanic needs a general solution for this
-    AnnexRepo._unique_repos.clear()
+    AnnexRepo._unique_instances.clear()
     ar2 = AnnexRepo(dst, batch_size=1)
 
     with swallow_outputs():

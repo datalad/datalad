@@ -332,7 +332,7 @@ def test_dataset_id(path):
     # yields the same ID
     # Note: Since we switched to singletons, a reset is required in order to
     # make sure we get a new object
-    Dataset._unique_repos.clear()
+    Dataset._unique_instances.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
     assert_equal(ds.id, newds.id)
