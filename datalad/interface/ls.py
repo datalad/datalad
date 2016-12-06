@@ -541,13 +541,16 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     """
 
     # use implicit paths unless paths explicitly specified
-    ds_path = ds_path or fs_metadata['repo']
+    # Note: usage of ds_path as if it was the Repo's path. Therefore use
+    # realpath, since we switched to have symlinks resolved in repos but not in
+    # datasets
+    ds_path = realpath(ds_path) if ds_path else fs_metadata['repo']
     path = path or fs_metadata['path']
     metadata_path = metadata_path or '.git/datalad/metadata'
     # directory metadata directory tree location
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
-    dir_path = path.split(ds_path)[1][1:] or '/'
+    dir_path = realpath(path).split(ds_path)[1][1:] or '/'
     # create md5 hash of current directory's relative path
     metadata_hash = hashlib.md5(dir_path.encode('utf-8')).hexdigest()
     # construct final path to metadata file
@@ -652,7 +655,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                 # if recursive, create info dictionary of each child node too
                 if recursive:
                     subdir = fs_traverse(nodepath, repo,
-                                         parent=None, # children[0],
+                                         parent=None,  # children[0],
                                          recursive=recursive, json=json)
                 else:
                     # read child metadata from its metadata file if it exists
