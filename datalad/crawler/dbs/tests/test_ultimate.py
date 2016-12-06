@@ -24,6 +24,7 @@ from datalad.support.tests.test_digests import SAMPLE_DIGESTS
 
 from mock import patch
 
+
 class Test1():
     def setup(self):
         self.udb = UltimateDB(auto_connect=True)
@@ -39,16 +40,20 @@ class Test1():
         # but we would raise if asking for urls for non existing file
         assert_raises(ValueError, udb.get_urls_with_digest, md5="123")
         # sugarings
-        assert_false("http://example.com" in udb)
+        assert_false(udb.has_file_with_url("http://example.com"))
+        assert_false("1"*32 in udb)
 
     @with_tempfile(content="123")
     def test_process_file(self, f):
         digests = SAMPLE_DIGESTS["123"]
-        file_ = self.udb.process_file(f)
+        file_ = self.udb.get_file(f)
         assert_equal(file_.get_digests(), digests)  # outputs all digests atm
         # This should create all entries in the DB so let's request information
         assert_true(self.udb.has_file_with_digests(**digests))
         assert_false(self.udb.has_file_with_digests(**SAMPLE_DIGESTS["__long__"]))
+        for hexsha in digests.values():
+            assert_true(hexsha in self.udb)
+            assert_equal(self.udb[hexsha], file_)
 
     @with_tempfile(content="123")
     def test_context_manager_single_commit(self, f):
@@ -57,7 +62,7 @@ class Test1():
             with self.udb as db:
                 assert(db is self.udb)  # we are just returning itself for convenience
                 # multiple operations
-                file_ = db.process_file(f)
+                file_ = db.get_file(f)
                 assert_raises(AssertionError, db.get_key, bogus_key)
                 key_ = db.get_key(bogus_key, file_)
                 assert_true(key_ is not None)
@@ -70,7 +75,7 @@ class Test1():
         with patch.object(self.udb._session, 'commit') as patched_commit:
             with self.udb:
                 with self.udb:
-                    self.udb.process_file(f)
+                    self.udb.get_file(f)
                     patched_commit.assert_not_called()
                 patched_commit.assert_not_called()
             patched_commit.assert_called_once_with()
@@ -78,7 +83,7 @@ class Test1():
     @with_tempfile(content="123")
     def test_urls_basic1(self, f):
         urls = []
-        file_ = self.udb.process_file(f)
+        file_ = self.udb.get_file(f)
         digests = file_.get_digests()
         for algo, checksum in digests.items():
             assert_equal(self.udb.get_urls_with_digest(checksum), urls)
@@ -113,7 +118,8 @@ class Test1():
         url = self.udb.add_url(file_, url2)
         assert_equal(self.udb.get_urls(file_), [url1])
         assert_equal(self.udb.get_urls(file_, valid_only=False), [url1, url2])
-        assert_equal(self.udb.get_urls_with_digest(checksum, valid_only=False), [url1, url2])
+        assert_equal(self.udb.get_urls_with_digest(checksum, valid_only=False),
+                     [url1, url2])
 
         # and for paranoid assure that DB has them now
         assert_equal(len(list(self.udb._query(URL))), 2)

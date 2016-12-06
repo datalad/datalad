@@ -53,6 +53,23 @@ definitions = {
         'destination': 'global',
         'type': EnsureBool(),
     },
+
+    # Ultimate DB
+    'datalad.ultimatedb.url': {
+        'ui': ('question', {
+            'title': 'UltimateDB URL',
+            'text': 'URL to access ultimate db. See '
+                    'http://docs.sqlalchemy.org/en/rel_1_1/core/engines.html'}),
+        'destination': 'global',
+    },
+    'datalad.ultimatedb.credential': {
+        'ui': ('question', {
+            'title': 'UltimateDB credential',
+            'text': 'Credential (of type user/password) to be used to '
+                    'authenticate to the UltimateDB'}),
+        'destination': 'global',
+    },
+
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',

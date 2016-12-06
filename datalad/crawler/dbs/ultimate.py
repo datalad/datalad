@@ -51,8 +51,12 @@ DEFAULT_ALGO = "sha256"
 
 from datalad import cfg
 
+
 class HashCollisionError(ValueError):
-    """Exception to "celebrate" -- we ran into a hash collision.  World should skip a bit"""
+    """Exception to "celebrate" -- we ran into a hash collision.
+
+    World should skip a bit
+    """
     pass
 
 
@@ -81,33 +85,36 @@ def _get_digest_value(checksum=None, **digest):
 
 
 class UltimateDB(object):
-    """Database collating urls for the content across all handles
+    """Database collating urls for the content across all datasets
 
     Schema: below via sqlalchemy
 
-        or should there be some kind of separate checking/validation transaction log table(s),
-        so we could have full "history"
+        or should there be some kind of separate checking/validation
+        transaction log table(s), so we could have full "history"
 
         entry, url, date, status (OK, NOK, FAIL), fail_reason
 
         ? then we could deduce first/last if necessary
 
-      Q: should we have independent entries (urls) for the same URL, e.g. we can access
-         public S3 via s3:// http:// and https://.  But some of them might become unavailable
-         (e.g. public goes private, or other obstacles).  So easiest to keep separate but then
-         should we have any notion that they actually point to the same physical object???
+      Q: should we have independent entries (urls) for the same URL, e.g. we
+      can access public S3 via s3:// http:// and https://.  But some of them
+      might become unavailable (e.g. public goes private, or other
+      obstacles).  So easiest to keep separate but then should we have any
+      notion that they actually point to the same physical object???
 
-    May be separate db or table(s) for internal tracking of annexes/repositories containing
-    keys
+    May be separate db or table(s) for internal tracking of
+    annexes/repositories containing keys
 
     - entry <<->> annex uuid,  and annex uuid <->> path
       - theoretically it should be uuid -> path  (but we can't guarantee it ;) )
-      - should we have uuid <->> URL (i.e. knowing remote locations for repos just in case?)
+      - should we have uuid <->> URL (i.e. knowing remote locations for repos
+        just in case?)
 
-      Such DB would allow to locate physical load on our drives happen we want it without downloading
-      from online.  Would also allow for fancy "know not only from where to download 1 file, but
-      what to clone to get it".  Then for each URL we would need the same attributes (could be a table
-      with identical schema to the above)
+      Such DB would allow to locate physical load on our drives happen we
+      want it without downloading from online.  Would also allow for fancy
+      "know not only from where to download 1 file, but what to clone to get
+      it".  Then for each URL we would need the same attributes (could be a
+      table with identical schema to the above)
 
 
     """
@@ -123,23 +130,6 @@ class UltimateDB(object):
         self._contexts = []  # so we could commit upon exiting the last cm
         if auto_connect:
             self.connect()
-
-    # XXX or should this be reserved for checksums?
-    #  probably so since __getitem__ operates on checksums -- TODO
-    def __contains__(self, url):
-        return self.has_file_with_url(url)
-
-    #@abstractmethod
-    def __getitem__(self, checksum=None):
-        return self.get_urls_with_digest(checksum)
-
-    @staticmethod
-    def _initiate_db(engine):
-        lgr.info("Initiating Ultimate DB tables")
-        return DBTable.metadata.create_all(engine)
-
-    def _handle_collision(self, digest):
-        raise HashCollisionError("??? multiple entries for %s" % str(digest))
 
     def connect(self, url='sqlite:///:memory:', username=None, password=None):
         # TODO: might want to "grasp" http://stackoverflow.com/a/8705750
@@ -176,13 +166,14 @@ class UltimateDB(object):
     def from_config(cls):
         """Factory to provide instance initiated based on config settings"""
         db = cls()
-        url = cfg.getboolean('crawl', 'ultimatedb.url')
-        # may be we should use "centralized" credential specification?
-        #credential = cfg.get('ultimatedb', 'credential')
-
+        # Not sure if we want to interact with user on this
+        #url = cfg.obtain('datalad.ultimatedb.url')
+        url = cfg.get('datalad.ultimatedb.url')
+        if not url:
+            raise ValueError("Empty url for UltimateDB was provided in configs")
         # Parse url, since if contains credentials, no need to check config
         try:
-            url = URL(url)
+            url_ = URL(url)
         except Exception as exc:
             raise ValueError(
                 "URL for the ultimatedb should conform to the specification "
@@ -192,28 +183,49 @@ class UltimateDB(object):
                 % (url, exc_str(exc))
             )
 
-        if url.username:
+        if url_.username:
             credkw = {
-                'user': url.username,
-                'password': url.password,
+                'user': url_.username,
+                'password': url_.password,
             }
         else:
             lgr.debug("Obtaining credentials for ultimatedb from config/credentials")
+            cred_type = "user_password"
             try:
-                cred_name = cfg.get('crawl', 'ultimatedb.credname')
-                cred_type = cfg.get('crawl', 'ultimatedb.credtype', default="user_password")
-            except IOError:  # TODO differerent
+                cred_name = cfg.get('datalad.ultimatedb.credential')
+            except IOError:  # TODO different
                 lgr.debug("No mentioning of credname for ultimatedb in config")
                 cred_name = None
             if cred_name:
                 # request credential information
-                from datalad.downloaders.providers import Credential
+                from datalad.downloaders.credentials import Credential
                 cred = Credential(cred_name, cred_type)
                 assert(set(cred.keys()) == {'user', 'password'})
                 credkw = cred()
             else:
                 credkw = {}
         db.connect(url=url, **credkw)
+        return db
+
+    @staticmethod
+    def _initiate_db(engine):
+        lgr.info("Initiating Ultimate DB tables")
+        return DBTable.metadata.create_all(engine)
+
+    #
+    #  Sugarings -- lookup based on checksums
+    #
+
+    def __contains__(self, checksum):
+        return bool(self.get_file_with_digest(checksum))
+
+    #@abstractmethod
+    def __getitem__(self, checksum=None):
+        return self.get_file_with_digest(checksum)
+
+    def _handle_collision(self, digest):
+        raise HashCollisionError("??? multiple entries for %s" % str(digest))
+
 
     #
     # Helpers
@@ -251,6 +263,9 @@ class UltimateDB(object):
             lgr.debug("Committing UDB upon leaving cm")
             self._session.commit()
 
+    #
+    # Interrogating DB
+    #
 
     def has_file_with_url(self, url):  # TODO: valid_only ?
         """Return True if DB knows about this URL (as associated with a file)"""
@@ -319,11 +334,15 @@ class UltimateDB(object):
             urls = [u for u in urls if u.valid]
         return [u.url for u in urls] if url_only else urls
 
+    #
+    # Setting new entries
+    #
+
     def _set_content_type_info(self, file_, fpath):
         pass   # TODO, implement helper under datalad.utils
 
-    def process_file(self, fpath):
-        """For a given file compute its checksums and record that information in DB
+    def get_file(self, fpath):
+        """For a given file path compute its checksums and record that information in DB
 
         Parameters
         ----------
@@ -351,17 +370,33 @@ class UltimateDB(object):
                                  % (size, file_.size))
         except NoResultFound:
             # we need to create a new one!
+            lgr.debug("Adding a new entry for %s of size %d", fpath, size)
             file_ = self._add(oFile(size=size, **digests))
             self._set_content_type_info(file_, fpath)
 
         return file_
 
-
-    def add_url(self, file_, url, filename=None,
+    def add_url(self,
+                file_,
+                url,
+                filename=None,
                 last_modified=None,
                 content_type=None,
                 checked=True, valid=None, invalid_reason=None):
-        """Add or just update (if checked/valid) a URL associated with the file"""
+        """Add or just update (if checked/valid) a URL associated with the file
+
+        Parameters
+        ----------
+        file: File or str
+          If a string value is provided, it is assumed to be a path pointing to
+          a file, so its checksums etc is estimated and it is added first to
+          the DB
+        url: ...
+        filename: str, optional
+          Filename as known (e.g. from disposition-filename header)
+        """
+        if not isinstance(file_, oFile):
+            file_ = self.get_file(file_)
         # TODO: probably would be more efficient with a proper query
         urls = {e.url: e for e in file_.urls}
         if url in urls:

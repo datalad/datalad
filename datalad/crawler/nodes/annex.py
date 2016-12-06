@@ -560,7 +560,7 @@ class Annexificator(object):
                 # TODO: above without url
                 #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
                 with self._ultimatedb as db:
-                    file_ = db.process_file(filepath)
+                    file_ = db.get_file(filepath)
                     db.add_url(file_, url,
                                filename=basename(fpath),
                                # TODO: obtain from the above statusdb?
