@@ -280,8 +280,8 @@ def _guess_ri_cls(ri):
 
     type_ = 'url'
     # Special treatments
-    # file:///path should stay file:
-    if fields['scheme'] and fields['scheme'] not in {'file'} \
+    # file:///path  and sqlite:/// should stay as they are
+    if fields['scheme'] and fields['scheme'] not in {'file', 'sqlite'} \
             and not fields['hostname']:
         # dl+archive:... or just for ssh   hostname:path/p1
         if '+' not in fields['scheme']:
@@ -523,12 +523,24 @@ class URL(RI):
 
     def as_str(self):
         """Render URL as a string"""
-        return urlunparse(self.to_pr())
+        s = urlunparse(self.to_pr())
+        # very special treatment, since apparently we cannot make urlunparse
+        # behave the way sqlalchemy desires to not have it shortened
+        if self.scheme == 'sqlite' and not(self.hostname):
+            s = 'sqlite:///' + s[len('sqlite:'):]
+        return s
 
     @classmethod
     def _str_to_fields(cls, url_str):
         fields = URL._pr_to_fields(urlparse(url_str))
         fields['path'] = urlunquote(fields['path'])
+        if fields['scheme'] == 'sqlite':
+            # as in http://docs.sqlalchemy.org/en/rel_1_1/core/engines.html
+            # sqlalchemy uses sqlite://// to signal sqlite://[nohost]/[/absolute/path]
+            # and treats ///path as a pointer to relative path
+            if fields['path'].startswith('/'):
+                # as it should
+                fields['path'] = fields['path'][1:]
         return fields
 
     def to_pr(self):

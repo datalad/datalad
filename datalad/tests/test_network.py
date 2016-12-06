@@ -251,6 +251,9 @@ def test_url_samples():
     # not sure but let's check
     _check_ri("file:///c:/path/sp1", URL, localpath='/c:/path/sp1', scheme='file', path='/c:/path/sp1', exact_str=False)
 
+    _check_ri("sqlite:///path", URL, scheme='sqlite', path='path')
+    _check_ri("sqlite:////a/path", URL, scheme='sqlite', path='/a/path')
+
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
