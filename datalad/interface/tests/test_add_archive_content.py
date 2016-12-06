@@ -261,7 +261,7 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # We should be able to drop everything since available online
     with swallow_outputs():
-        clean(annex=repo)
+        clean(dataset=repo.path)
     repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 

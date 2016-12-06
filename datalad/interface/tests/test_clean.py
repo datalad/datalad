@@ -16,6 +16,8 @@ from os import makedirs
 from os.path import join as opj
 from ...api import clean
 from ...consts import ARCHIVES_TEMP_DIR
+from ...consts import ANNEX_TEMP_DIR
+from ...distribution.dataset import Dataset
 from ...support.annexrepo import AnnexRepo
 from ...tests.utils import with_tempfile
 from ...utils import swallow_outputs
@@ -24,16 +26,17 @@ from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 
 @with_tempfile(mkdir=True)
-def test_ls(d):
+def test_clean(d):
     repo = AnnexRepo(d, create=True)
+    ds = Dataset(d)
     with swallow_outputs() as cmo:
-        assert_equal(clean(annex=repo), None)  # no output ATM
+        assert_equal(clean(dataset=ds), None)  # no output ATM
         assert_equal(cmo.out, '')  # no output ATM
 
     # if we create some temp archives directory
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
     with swallow_outputs() as cmo:
-        assert_equal(clean(annex=repo), None)  # no output ATM
+        assert_equal(clean(dataset=ds), None)  # no output ATM
         assert_equal("Removing 1 temporary archive directory under %s: somebogus"
                   % opj(d, ARCHIVES_TEMP_DIR), cmo.out.rstrip())
 
@@ -45,3 +48,14 @@ def test_ls(d):
         assert_equal(clean(), None)  # no output ATM
         assert_equal("Removing 2 temporary archive directories under %s: somebogus, somebogus2"
                   % ARCHIVES_TEMP_DIR, cmo.out.rstrip())
+
+    # and what about git annex temporary files?
+    makedirs(opj(d, ANNEX_TEMP_DIR))
+    open(opj(d, ANNEX_TEMP_DIR, "somebogus"), "w").write("load")
+
+    with chpwd(d), \
+         swallow_outputs() as cmo:
+        assert_equal(clean(), None)  # no output ATM
+        assert_equal(
+            "Removing 1 temporary annex file under %s: somebogus"
+            % ANNEX_TEMP_DIR, cmo.out.rstrip())

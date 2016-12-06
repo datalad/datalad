@@ -1346,7 +1346,7 @@ class Annexificator(object):
                         lgr.info("House keeping: gc, repack and clean")
                         # gc and repack
                         self.repo.gc(allow_background=False)
-                        clean(annex=self.repo)
+                        clean(dataset=self.repo.path)
                     else:
                         lgr.info("No git house-keeping performed as instructed by config")
                 else:
