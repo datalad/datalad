@@ -46,12 +46,6 @@ class Clean(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            # TODO: this probably changes to install into the dataset (
-            # add_to_super)
-            # and to install the thing 'just there' without operating 'on' a
-            # dataset.
-            # Adapt doc.
-            # MIH: `shouldn't this be the job of `add`?
             doc="""specify the dataset to perform the clean operation on.  If
                 no dataset is given, an attempt is made to identify the dataset
                 in current working directory""",
@@ -72,8 +66,7 @@ class Clean(Interface):
     @staticmethod
     @datasetmethod(name='clean')
     def __call__(dataset=None, what=None, recursive=False, recursion_limit=None):
-        if dataset is None:
-            dataset = require_dataset(dataset, purpose='clean-up')
+        dataset = require_dataset(dataset, purpose='clean-up')
 
         for dirpath, flag, msg, sing_pl in [
             (ARCHIVES_TEMP_DIR, "cached-archives",
