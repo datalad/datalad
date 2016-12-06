@@ -1,17 +1,17 @@
 /* global window XMLHttpRequest */
-var metadata_dir = '.git/datalad/metadata/';
+var metadataDir = '.git/datalad/metadata/';
 
 /**
  * check if url exists
  * @param {string} url url to test for existence
  * @return {boolean} returns true if url exists
  */
-function url_exists(url) {
+function urlExists(url) {
   var http = new XMLHttpRequest();
   try {
     http.open('HEAD', url, false);
     http.send();
-  } catch(err) {
+  } catch (err) {
     // seems to not work if subdir is not there at all. TODO
     return false;
   }
@@ -21,26 +21,26 @@ function url_exists(url) {
 /**
  * construct parent path to current url
  * @param {string} url current url
- * @param {string} node_name clicked node name(not required)
+ * @param {string} nodeName clicked node name(not required)
  * @return {string} url to parent of current url
  */
-function parent_url(url, node_name) {
+function parentUrl(url, nodeName) {
   var turl = url.charAt(url.length - 1) === '/' ? url : url.concat("/");
-  var url_array = turl.split(/[\\/]/);
-  url_array.splice(-2, 1);
-  return url_array.join('/');
+  var urlArray = turl.split(/[\\/]/);
+  urlArray.splice(-2, 1);
+  return urlArray.join('/');
 }
 
 /**
  * construct child path from current url and clicked node name
  * @param {string} url current url
- * @param {string} node_name clicked node name
+ * @param {string} nodeName clicked node name
  * @return {string} url to reach clicked node
  */
-function child_url(url, node_name) {
+function childUrl(url, nodeName) {
   var turl = url.charAt(url.length - 1) === '/' ? url.slice(0, -1) : url;
-  var tnode_name = node_name.charAt(0) === '/' ? node_name.slice(1) : node_name;
-  return turl + '/' + tnode_name;
+  var tnodeName = nodeName.charAt(0) === '/' ? nodeName.slice(1) : nodeName;
+  return turl + '/' + tnodeName;
 }
 
 /**
@@ -55,16 +55,16 @@ function loc() {
 
 /**
  * decompose url to actual path to node
- * e.g if next_url = d1/d2/d3, current_url = example.com/ds/?dir=d1/d2
+ * e.g if nextUrl = d1/d2/d3, currentUrl = example.com/ds/?dir=d1/d2
  * return example.com/ds/d1/d2/d3
- * @param {string} next_url name of GET parameter to extract value from
+ * @param {string} nextUrl name of GET parameter to extract value from
  * @return {string} returns path to node based on current location
  */
-function absolute_url(next_url) {
-  if (!next_url)
+function absoluteUrl(nextUrl) {
+  if (!nextUrl)
     return loc().pathname;
   else
-    return (loc().pathname.replace(/\?.*/g, '') + next_url).replace('//', '/');
+    return (loc().pathname.replace(/\?.*/g, '') + nextUrl).replace('//', '/');
 }
 
 /**
@@ -88,17 +88,17 @@ function getParameterByName(name, url) {
  * @return {array} html linkified breadcrumbs array
  */
 function bread2crumbs() {
-  var raw_crumbs = loc().href.split('/');
-  var span_class = '<span class="dir">';
+  var rawCrumbs = loc().href.split('/');
+  var spanClass = '<span class="dir">';
   var crumbs = [];
-  for (var index = 2; index < raw_crumbs.length; index++) {
-    if (raw_crumbs[index] === '?dir=')
+  for (var index = 2; index < rawCrumbs.length; index++) {
+    if (rawCrumbs[index] === '?dir=')
       continue;
-    var crumb_link = raw_crumbs.slice(0, index).join('/');
-    if (index === raw_crumbs.length - 1)
-      span_class = '<span class="cwd">';
-    crumbs.push('<a href=' + crumb_link + '/' + raw_crumbs[index] + '>' + span_class +
-		raw_crumbs[index] + '</span></a>');
+    var crumbLink = rawCrumbs.slice(0, index).join('/');
+    if (index === rawCrumbs.length - 1)
+      spanClass = '<span class="cwd">';
+    crumbs.push('<a href=' + crumbLink + '/' + rawCrumbs[index] + '>' + spanClass +
+		rawCrumbs[index] + '</span></a>');
   }
   return crumbs;
 }
@@ -108,45 +108,44 @@ function bread2crumbs() {
  * @return {string} RI to install current dataset from
  */
 function uri2installri() {
-  /// TODO -- RF to centralize common logic with bread2crumbs
-  var raw_crumbs = loc().href.split('/');
-  var span_class = '<span class="dir">';
+  // TODO -- RF to centralize common logic with bread2crumbs
+  var rawCrumbs = loc().href.split('/');
   var ri_ = '';
-  /// poor Yarik knows no JS
-  /// TODO:  now check for the last dataset is crippled, we would need
-  /// meld logic with breadcrumbs I guess, whenever they would get idea
-  /// of where dataset boundary is
+  // poor Yarik knows no JS
+  // TODO:  now check for the last dataset is crippled, we would need
+  // meld logic with breadcrumbs I guess, whenever they would get idea
+  // of where dataset boundary is
   var ri = null;
-  for (var index = 0; index < raw_crumbs.length; index++) {
-    if (raw_crumbs[index] === '?dir=')
+  for (var index = 0; index < rawCrumbs.length; index++) {
+    if (rawCrumbs[index] === '?dir=')
       continue;
     if (ri_)
-      ri_ += '/'
-    ri_ += raw_crumbs[index];
-    if (url_exists(ri_ + '/' + metadata_dir)) {
+      ri_ += '/';
+    ri_ += rawCrumbs[index];
+    if (urlExists(ri_ + '/' + metadataDir)) {
       ri = ri_;
     }
   }
-  /// possible shortcuts
+  // possible shortcuts
   if (ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
   }
-  return ri
+  return ri;
 }
 
 /**
  * update url parameter or url ?
- * @param {string} next_url next url to traverse to
+ * @param {string} nextUrl next url to traverse to
  * @param {string} type type of clicked node
- * @param {string} current_state current node type. (variable unused)
+ * @param {string} currentState current node type. (variable unused)
  * @return {boolean} true if clicked node not root dataset
  */
-function update_param_or_path(next_url, type, current_state) {
+function updateParamOrPath(nextUrl, type, currentState) {
   // if url = root path(wrt index.html) then append index.html to url
   // allows non-root dataset dirs to have index.html
   // ease constrain on non-datalad index.html presence in dataset
-  if (next_url === loc().pathname || next_url === '/' || !next_url)
+  if (nextUrl === loc().pathname || nextUrl === '/' || !nextUrl)
     return false;
   else if (type === 'file' || type === 'link')
     return false;
@@ -160,20 +159,20 @@ function update_param_or_path(next_url, type, current_state) {
  * @param {string} url url to extract parameter from by getParameterByName
  * @return {Object} json contaning traverse type and traverse path
  */
-function click_handler(data, url) {
+function clickHandler(data, url) {
   // don't do anything for broken links
   if (data.type === 'link-broken')
     return {next: '', type: 'none'};
   // get directory parameter
   var dir = getParameterByName('dir', url);
   // which direction to move, up or down the path ?
-  var move = data.name === '..' ? parent_url : child_url;
+  var move = data.name === '..' ? parentUrl : childUrl;
   // which path to move, dir parameter or current path ?
-  var next = dir ? move(absolute_url(dir), data.name) : move(absolute_url(''), data.name);
-  // console.log(dir, move, next, update_param_or_path(next, data.type, dir));
+  var next = dir ? move(absoluteUrl(dir), data.name) : move(absoluteUrl(''), data.name);
+  // console.log(dir, move, next, updateParamOrPath(next, data.type, dir));
   var traverse = {next: next, type: 'assign'};
   // if to update parameter, make next relative to index.html path
-  if (update_param_or_path(next, data.type, dir))
+  if (updateParamOrPath(next, data.type, dir))
     traverse = {next: '?dir=' + next.replace(loc().pathname, '/'), type: 'search'};
   // if clicked was current node '.', remove '.' at at end of next
   if (data.name === '.')
@@ -187,40 +186,40 @@ function click_handler(data, url) {
  * @param {bool} parent if parent, find metadata json of parent directory instead
  * @return {string} path to the current node's metadata json
  */
-function metadata_locator(md5, parent) {
-  var start_loc = absolute_url(getParameterByName('dir')).replace(/\/*$/, '/');
+function metadataLocator(md5, parent) {
+  var startLoc = absoluteUrl(getParameterByName('dir')).replace(/\/*$/, '/');
 
-  if (start_loc === '/' && parent) {
+  if (startLoc === '/' && parent) {
     return "";
   }
 
   // if parent argument set, find metadata json of parent directory instead
-  var find_parent_ds = typeof parent !== 'undefined' ? parent : false;
-  start_loc = find_parent_ds ? parent_url(start_loc).replace(/\/*$/, '/') : start_loc;
-  var current_ds = start_loc;
+  var findParentDs = typeof parent !== 'undefined' ? parent : false;
+  startLoc = findParentDs ? parentUrl(startLoc).replace(/\/*$/, '/') : startLoc;
+  var currentDs = startLoc;
 
   // traverse up directory tree till a dataset directory found
   // check by testing if current directory has a metadata directory
-  while (!url_exists(current_ds + metadata_dir)) {
+  while (!urlExists(currentDs + metadataDir)) {
     // return error code, if no dataset found till root dataset
-    if (current_ds.length <= loc().pathname.length)
+    if (currentDs.length <= loc().pathname.length)
       return '';
     // go to parent of current directory
-    current_ds = parent_url(current_ds).replace(/^\/*/, '/').replace(/\/*$/, '/');
+    currentDs = parentUrl(currentDs).replace(/^\/*/, '/').replace(/\/*$/, '/');
   }
 
   // if locating parent dataset or current_loc is a dataset, metadata filename = md5 of '/'
-  if (start_loc === current_ds)
-    return current_ds + metadata_dir + md5('/');
+  if (startLoc === currentDs)
+    return currentDs + metadataDir + md5('/');
 
   // else compute name of current nodes metadata hash
-  var metadata_path = getParameterByName('dir')
-        .replace(current_ds
-                 .replace(/\/$/, '')                // remove ending / from current_ds
+  var metadataPath = getParameterByName('dir')
+        .replace(currentDs
+                 .replace(/\/$/, '')                // remove ending / from currentDs
                  .replace(loc().pathname, ''), '')  // remove basepath to dir
         .replace(/^\/*/, '')                        // replace beginning /'s
         .replace(/\/*$/, '');                       // replace ending /'s with /
-  return current_ds + metadata_dir + md5(metadata_path);
+  return currentDs + metadataDir + md5(metadataPath);
 }
 
 /**
@@ -229,29 +228,29 @@ function metadata_locator(md5, parent) {
  * @param {string} md5 path of current dataset
  * @return {object} return metadata json object of parent if parent exists
  */
-function parent_json(jQuery, md5) {
-  var parent_metadata = metadata_locator(md5, true);
+function parentJson(jQuery, md5) {
+  var parentMetadata = metadataLocator(md5, true);
 
   // if parent dataset or parent metadata directory doesn't exist, return error code
-  if (parent_metadata === '' || !url_exists(parent_metadata))
+  if (parentMetadata === '' || !urlExists(parentMetadata))
     return {};
 
   // else return required info for parent row from parent metadata json
-  var parent_json_ = {};
+  var parentJson_ = {};
   jQuery.ajax({
-    url: parent_metadata,
+    url: parentMetadata,
     dataType: 'json',
     async: false,
     success: function(data) {
-      parent_json_ = {name: '..',
+      parentJson_ = {name: '..',
                       date: data.date || '-',
                       path: data.path || '-',
                       type: data.type || 'dir',
                       description: data.description || '',
-                      size: size_renderer(data.size || null)};
+                      size: sizeRenderer(data.size || null)};
     }
   });
-  return parent_json_;
+  return parentJson_;
 }
 
 /**
@@ -259,7 +258,7 @@ function parent_json(jQuery, md5) {
  * @param {object} size json object containing size info of current row entry
  * @return {string} return html string to be rendered in size column of current row entry
  */
-function size_renderer(size) {
+function sizeRenderer(size) {
   // if size is undefined
   if (!size)
     return '-';
@@ -278,10 +277,15 @@ function size_renderer(size) {
     return size.ondisk + "/" + size.total;
 }
 
-function error_msg(jQuery, msg) {
-    jQuery('#content').prepend(
-      "<P> ERROR: " + msg + "</P>"
-    );
+/**
+ * wrap and insert error message into html
+ * @param {object} jQuery jQuery library object to insert message into DOM
+ * @param {object} msg message to wrap and insert into HTML
+ */
+function errorMsg(jQuery, msg) {
+  jQuery('#content').prepend(
+    "<P> ERROR: " + msg + "</P>"
+  );
 }
 
 /**
@@ -292,10 +296,10 @@ function error_msg(jQuery, msg) {
  */
 function directory(jQuery, md5) {
   var parent = false;
-  var md5_url = metadata_locator(md5);
+  var md5Url = metadataLocator(md5);
 
-  if (md5_url === "") {
-    error_msg(
+  if (md5Url === "") {
+    errorMsg(
         jQuery,
         "Could not find any metadata directory. Sorry.  Most probably cause is " +
         "that 'publish' didn't run the post-update hook"
@@ -303,8 +307,8 @@ function directory(jQuery, md5) {
     return;
   }
 
-  if (!url_exists(md5_url)) {
-    error_msg(
+  if (!urlExists(md5Url)) {
+    errorMsg(
         jQuery,
         "Could not find metadata for current dataset. Sorry.  Most probably cause is " +
         "that 'publish' didn't run the post-update hook"
@@ -332,7 +336,7 @@ function directory(jQuery, md5) {
     async: true,    // async get json
     paging: false,  // ensure scrolling instead of pages
     ajax: {         // specify url to get json from ajax
-      url: md5_url,
+      url: md5Url,
       dataSrc: "nodes"
     },
     order: [[6, "desc"], [0, 'asc']],
@@ -343,9 +347,9 @@ function directory(jQuery, md5) {
       {data: null, title: "Description", className: "dt-left",
        render: function(data) {
          var meta = data.metadata;
-         if (!meta) { return ''; }
+         if (!meta) return '';
          var desc = meta[0].name;
-         if (desc) { return desc; } else { return '';}
+         return desc ? desc : '';
        }},
       {data: "type", title: "Type", className: "dt-center", visible: false},
       {data: "path", title: "Path", className: "dt-center", visible: false},
@@ -353,11 +357,11 @@ function directory(jQuery, md5) {
        render: function(data) {
          return (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized');
        }},
-      /// make metadata searchable right there!
+      // make metadata searchable right there!
       {data: null, title: "Metadata", visible: false,
         render: function(data) {
           var meta = data.metadata;
-          if (meta) { return JSON.stringify(meta); } else {return "";}
+          return meta ? JSON.stringify(meta) : "";
         }}
     ],
     createdRow: function(row, data, index) {
@@ -365,16 +369,16 @@ function directory(jQuery, md5) {
         parent = true;
 
       // size rendering logic
-      jQuery('td', row).eq(2).html(size_renderer(data.size));
+      jQuery('td', row).eq(2).html(sizeRenderer(data.size));
 
       // if row is a directory append '/' to name cell
       if (data.type === 'dir' || data.type === 'git' || data.type === 'annex' || data.type === 'uninitialized') {
         var orig = jQuery('td', row).eq(0).html();
         orig = '<a>' + orig + '/</a>';
-         if (data.tags) {
-           orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
-         }
-         jQuery('td', row).eq(0).html(orig);
+        if (data.tags) {
+          orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
+        }
+        jQuery('td', row).eq(0).html(orig);
       }
       if (data.name === '..')
         jQuery('td', row).eq(2).html('');
@@ -386,13 +390,13 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parent_meta = parent_json(jQuery, md5);
-        if (!jQuery.isEmptyObject(parent_meta))
-          api.row.add(parent_meta).draw();
+        var parentMeta = parentJson(jQuery, md5);
+        if (!jQuery.isEmptyObject(parentMeta))
+          api.row.add(parentMeta).draw();
       }
       // add click handlers
       api.$('tr').click(function() {
-        var traverse = click_handler(api.row(this).data());
+        var traverse = clickHandler(api.row(this).data());
         if (traverse.type === 'assign')
           window.location.assign(traverse.next);
         else if (traverse.type === 'search')
@@ -401,7 +405,7 @@ function directory(jQuery, md5) {
       // add breadcrumbs
       jQuery('#directory_filter').prepend('<span class="breadcrumb">' +
                                            bread2crumbs().join(' / ') +
-                                           '</span>');
+                                          '</span>');
     }
   });
   return table;
