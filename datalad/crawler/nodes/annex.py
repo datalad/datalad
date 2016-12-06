@@ -63,6 +63,8 @@ from datalad.dochelpers import exc_str
 
 from logging import getLogger
 
+from ..dbs.ultimate import UltimateDB
+
 lgr = getLogger('datalad.crawl.annex')
 
 _runner = get_runner()
@@ -350,7 +352,7 @@ class Annexificator(object):
         self._statusdb = None  # actual DB to be instantiated later
 
         if ultimatedb is None:
-            ultimatedb = cfg.getboolean('crawl', 'annex.ultimatedb', default=False)
+            ultimatedb = cfg.getbool('datalad.crawl', 'ultimatedb', default=False)
         if isinstance(ultimatedb, bool) and ultimatedb:
             # so we don't require sqlalchemy for lightweight deployments??? XXX
             from ..dbs.ultimate import UltimateDB
@@ -554,12 +556,15 @@ class Annexificator(object):
                 _call(stats.increment, 'downloaded')
                 _call(stats.increment, 'downloaded_size', _call(lambda: os.stat(filepath).st_size))
 
-            if added_to_annex and self.ultimatedb and lexists(filepath):
+            # TODO: make it handle fast mode as well whenever we don't actually get
+            # file but we could register information for that url/key
+            if self.ultimatedb and exists(filepath):
                 # Note that we don't bother registering if no download has happened since we
                 # care ATM to register content we can get checksums of
                 # TODO: above without url
                 #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
                 with self._ultimatedb as db:
+
                     file_ = db.get_file(filepath)
                     db.add_url(file_, url,
                                filename=basename(fpath),
@@ -567,8 +572,10 @@ class Annexificator(object):
                                #last_modified=,
                                #content_type=,
                                checked=True, valid=True)
-                # TODO: file_.add_key(out_json['key'])
-                # TODO: file_.add_repo(annex)  # we might even cache/reuse the Annex ORM object here
+                    if added_to_annex:
+                        pass
+                        # TODO: file_.add_key(out_json['key'])
+                        # TODO: file_.add_repo(annex)  # we might even cache/reuse the Annex ORM object here
 
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:
@@ -818,7 +825,7 @@ class Annexificator(object):
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
             skip_no_changes_ = skip_no_changes
             if skip_no_changes is None:
-                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                # TODO: skip_no_changes = config.getbool('crawl', 'skip_merge_if_no_changes', default=True)
                 skip_no_changes_ = True
 
             if last_merged_checksum == self.repo.get_hexsha(branch):

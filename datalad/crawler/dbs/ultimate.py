@@ -22,6 +22,7 @@ from sqlalchemy.engine.reflection import Inspector
 from ...dochelpers import exc_str
 from ...support.digests import Digester
 from ...support.network import URL
+from ...utils import get_mime
 from .ultimate_orm import File as oFile, URL as oURL, Key as oKey, DBTable
 
 # for now lazy/ignorant yoh would just use/pass ORM's objects around
@@ -132,6 +133,7 @@ class UltimateDB(object):
             self.connect()
 
     def connect(self, url='sqlite:///:memory:', username=None, password=None):
+        lgr.info("Connecting to %s", url)
         # TODO: might want to "grasp" http://stackoverflow.com/a/8705750
         # and avoid creating this factory over and over again?
         # TODO: also this is nohow thread/multiprocess safe ATM
@@ -148,6 +150,7 @@ class UltimateDB(object):
 
         # check if we have tables initiated already in the DB
         inspector = Inspector.from_engine(engine)
+
         if not inspector.get_table_names():
             self._initiate_db(engine)
 
@@ -209,8 +212,8 @@ class UltimateDB(object):
 
     @staticmethod
     def _initiate_db(engine):
-        lgr.info("Initiating Ultimate DB tables")
-        return DBTable.metadata.create_all(engine)
+        lgr.info("Initiating Ultimate DB tables within %s", engine)
+        DBTable.metadata.create_all(engine)
 
     #
     #  Sugarings -- lookup based on checksums
@@ -234,6 +237,7 @@ class UltimateDB(object):
     def _commit(self):
         """Would commit if outside of the cm"""
         if not self._contexts:
+            lgr.info("Committing the DB session")
             self._session.commit()
 
     def _add(self, obj):
@@ -339,7 +343,10 @@ class UltimateDB(object):
     #
 
     def _set_content_type_info(self, file_, fpath):
-        pass   # TODO, implement helper under datalad.utils
+        file_.content_type, file_.content_charset = \
+            get_mime(fpath)
+        file_.content_type_u, file_.content_charset_u = \
+            get_mime(fpath, uncompress=True)
 
     def get_file(self, fpath):
         """For a given file path compute its checksums and record that information in DB
@@ -359,6 +366,7 @@ class UltimateDB(object):
         -------
         File
         """
+        lgr.info("Processing file %s", fpath)
         digests = self._digester(fpath)
         size = os.stat(fpath).st_size
         # TODO: check if we have entry known already if not, record in DB
@@ -402,7 +410,8 @@ class UltimateDB(object):
         if url in urls:
             url_ = urls[url]
             if filename and url_.filename != filename:
-                raise NotImplementedError(
+                #raise NotImplementedError(
+                lgr.warning(
                     "We know different file name %s for the url_ %s and no override " \
                     "is implemented ATM. Got new filename=%s"
                     % (url_.filename, url_, filename))

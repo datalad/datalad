@@ -385,7 +385,7 @@ def get_mime(filepath, dereference=True, uncompress=False):
 
     Returns
     -------
-    mimetype, encoding: str, str
+    mimetype, charset: str, str
       Or None, None if uncompress but file was not compressed. And '-', '-' if
       compressed but file failed to figure out for one reason or another
     """

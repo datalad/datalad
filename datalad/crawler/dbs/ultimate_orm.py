@@ -73,8 +73,8 @@ class File(DBTable):
     content_type = Column(String(256))
     content_charset = Column(String(64))
     # running file -z
-    content_type_extracted = Column(String(256))
-    content_charset_extracted = Column(String(64))
+    content_type_u = Column(String(256))
+    content_charset_u = Column(String(64))
 
     def get_digests(self):
         """Return a dictionary with digests stored for this file in the DB"""
@@ -155,6 +155,7 @@ keys_to_repos = Table(
     Column('repo_id', Integer, ForeignKey('repo.id'))
 )
 
+
 class AnnexRepo(DBTable):
     """
     Base class/structure to track annex repositories -- local or special remotes
@@ -162,7 +163,7 @@ class AnnexRepo(DBTable):
     __tablename__ = 'repo'
 
     id = Column(Integer, primary_key=True)
-    type = Column(String(20))
+    type = Column(String(20))   ### ????
 
     location = Column(String)
     uuid = Column(CHAR(36))

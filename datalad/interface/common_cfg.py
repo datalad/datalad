@@ -53,6 +53,13 @@ definitions = {
         'destination': 'global',
         'type': EnsureBool(),
     },
+    'datalad.crawl.ultimatedb': {
+        'ui': ('yesno', {
+            'title': 'Crawler&ultimatedb',
+            'text': 'Should the crawler use ultimate DB (register URLs etc)?'}),
+        'destination': 'global',
+        'type': EnsureBool(),
+    },
 
     # Ultimate DB
     'datalad.ultimatedb.url': {
