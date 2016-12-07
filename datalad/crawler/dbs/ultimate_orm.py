@@ -40,7 +40,7 @@ from sqlalchemy.orm import relationship
 
 from datalad.support.digests import Digester
 
-INVALID_REASONS = ['NA', 'removed', 'changed', 'denied']
+INVALID_REASONS = ['NA', 'removed', 'changed', 'denied', 'uuid-mismatch']
 
 
 DBTable = declarative_base()
@@ -163,7 +163,8 @@ class AnnexRepo(DBTable):
     __tablename__ = 'repo'
 
     id = Column(Integer, primary_key=True)
-    type = Column(String(20))   ### ????
+    # TODO: annex-version?
+    type = Column(String(20))   ### git/annex ????
 
     location = Column(String)
     uuid = Column(CHAR(36))
@@ -195,6 +196,17 @@ class LocalRepo(AnnexRepo):
 
     __mapper_args__ = {'polymorphic_identity': 'localrepo'}
 
+
+@auto_repr
+class Dataset(DBTable):
+
+    __tablename__ = 'dataset'
+
+    id = Column(String(36), primary_key=True)
+    # link back to repo # and also allocate 1-to-many .datasets in Repo
+    repo_id = Column(Integer, ForeignKey('repo.id'))
+    # repo = relationship("AnnexRepo", backref="datasets")
+
 # keys_to_specialremotes = Table(
 #     'keys_to_specialremotes', DBTable.metadata,
 #     Column('key_id', Integer, ForeignKey('key.id')),
@@ -217,6 +229,9 @@ class SpecialRemote(AnnexRepo):
                                 # for now will encode using ... smth
 
     __mapper_args__ = {'polymorphic_identity': 'specialremote'}
+
+
+# TODO:  Dataset -- since we are having repos, we should associate them with Datasets and record those ids
 
 #    keys = relationship("Key", secondary=keys_to_specialremotes, backref="specialremotes")
 

@@ -28,6 +28,7 @@ from mock import patch
 class Test1():
     def setup(self):
         self.udb = UltimateDB(auto_connect=True)
+        # TODO:  make it optionally to be stored in a file so we could troubleshoot etc
 
     def teardown(self):
         pass
@@ -124,3 +125,13 @@ class Test1():
         # and for paranoid assure that DB has them now
         assert_equal(len(list(self.udb._query(URL))), 2)
         assert_equal(len(list(self.udb._query(URL).filter_by(file_id=file_.id))), 2)
+
+    @with_tempfile
+    def test_process_dataset(self, path):
+        from datalad.distribution.dataset import Dataset
+        from datalad.api import create
+        ds = create(path)
+        dbdataset = self.udb.process_dataset(ds)
+        # TODO: actual tests
+        # import pdb; pdb.set_trace()
+        # i =1

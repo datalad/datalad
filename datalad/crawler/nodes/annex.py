@@ -26,7 +26,7 @@ from humanize import naturalsize
 from six import iteritems
 from six import string_types
 from distutils.version import LooseVersion
-from functools import partial
+from datetime import datetime
 
 from git import Repo
 
@@ -359,6 +359,15 @@ class Annexificator(object):
             ultimatedb = UltimateDB.from_config()
         self._ultimatedb = ultimatedb
 
+        if self._ultimatedb:
+            # record information about this repository in the DB
+            from datalad.distribution.dataset import require_dataset
+            dataset = require_dataset(self.repo.path, purpose="annexification")
+            with self._ultimatedb as db:
+                self._dbrepo = db.process_repo(self.repo)
+        else:
+            self._dbrepo = None
+
     @property
     def ultimatedb(self):
         return self._ultimatedb
@@ -564,18 +573,24 @@ class Annexificator(object):
                 # TODO: above without url
                 #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
                 with self._ultimatedb as db:
-
-                    file_ = db.get_file(filepath)
-                    db.add_url(file_, url,
-                               filename=basename(fpath),
-                               # TODO: obtain from the above statusdb?
-                               #last_modified=,
-                               #content_type=,
-                               checked=True, valid=True)
+                    dbfile = db.get_file(filepath)
+                    url_kw = {}
+                    if url_status:
+                        # just an adapter
+                        url_kw['content_type'] = url_status.content_type
+                        url_kw['filename'] = url_status.filename
+                        url_kw['last_modified'] = datetime.fromtimestamp(url_status.mtime)
+                    db.add_url(dbfile, url,
+                               checked=True, valid=True,
+                               **url_kw)
+                    # TODO: db.add_file_to_repo(dbrepo)
                     if added_to_annex:
-                        pass
-                        # TODO: file_.add_key(out_json['key'])
-                        # TODO: file_.add_repo(annex)  # we might even cache/reuse the Annex ORM object here
+                        # adds a key to DB if needed and associates with dbfile
+                        dbkey = db.get_key(out_json['key'], dbfile)
+                        # TODO: optionally add other URLs for the key as known
+                        #       to ultimatedb
+                        #  if self.add_other_urls:  db.addurls(self.dbrepo, dbkey)
+
 
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:

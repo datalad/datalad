@@ -13,6 +13,7 @@ from datetime import datetime
 import os
 import time
 from abc import ABCMeta, abstractmethod, abstractproperty
+from os.path import exists
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -22,8 +23,12 @@ from sqlalchemy.engine.reflection import Inspector
 from ...dochelpers import exc_str
 from ...support.digests import Digester
 from ...support.network import URL
+from ...support.gitrepo import GitRepo
+from ...support.annexrepo import AnnexRepo
 from ...utils import get_mime
 from .ultimate_orm import File as oFile, URL as oURL, Key as oKey, DBTable
+from .ultimate_orm import AnnexRepo as oAnnexRepo
+from .ultimate_orm import Dataset as oDataset
 
 # for now lazy/ignorant yoh would just use/pass ORM's objects around
 # oFile -> file,
@@ -246,6 +251,9 @@ class UltimateDB(object):
         self._commit()
         return obj
 
+    def _get(self, cls, **query):
+        return self._query(cls).filter_by(**query)
+
     def _query(self, *args, **kwargs):
         return self._session.query(*args, **kwargs)
 
@@ -273,7 +281,7 @@ class UltimateDB(object):
 
     def has_file_with_url(self, url):  # TODO: valid_only ?
         """Return True if DB knows about this URL (as associated with a file)"""
-        return self._query(oURL.id).filter_by(url=url).first() is not None
+        return self._get(oURL.id, url=url).first() is not None
 
     def has_file_with_digests(self, **digests):
         # XXX may be relax allowing for arbitrary set of digests or just a checksum being provided
@@ -281,7 +289,7 @@ class UltimateDB(object):
         # search by default one
         try:
             digest = {DEFAULT_ALGO: digests[DEFAULT_ALGO]}
-            file_ = self._query(oFile).filter_by(**digest).one()
+            file_ = self._get(oFile, **digest).one()
         except NoResultFound:
             return False
         except MultipleResultsFound:
@@ -301,7 +309,7 @@ class UltimateDB(object):
         """
         digest = _get_digest_value(checksum, **digest)
         try:
-            file_ = self._query(oFile).filter_by(**digest).one()
+            file_ = self._get(oFile, **digest).one()
         except NoResultFound:
             return None
         except MultipleResultsFound:
@@ -332,7 +340,7 @@ class UltimateDB(object):
 
     # TODO: dichotomy since above get_file beasts return ORMs File and here by default -- url itself
     def get_urls(self, file_, valid_only=True, url_only=True):
-        urls = self._query(oURL).filter_by(file_id=file_.id)
+        urls = self._get(oURL, file_id=file_.id)
         #urls = file_.urls
         if valid_only:
             urls = [u for u in urls if u.valid]
@@ -371,7 +379,7 @@ class UltimateDB(object):
         size = os.stat(fpath).st_size
         # TODO: check if we have entry known already if not, record in DB
         try:
-            file_ = self._query(oFile).filter_by(**digests).one()
+            file_ = self._get(oFile, **digests).one()
             # verify that we have correct size
             if file_.size != size:
                 raise ValueError("File size %d differs from the previously recorded %d"
@@ -405,6 +413,7 @@ class UltimateDB(object):
         """
         if not isinstance(file_, oFile):
             file_ = self.get_file(file_)
+
         # TODO: probably would be more efficient with a proper query
         urls = {e.url: e for e in file_.urls}
         if url in urls:
@@ -428,7 +437,7 @@ class UltimateDB(object):
             if content_type:
                 url_.content_type = content_type
             if last_modified:
-                url_.content_type = content_type
+                url_.last_modified = last_modified
             file_.urls.append(url_)
             #self._add(url_)
             # TODO: all above could be slow etc.
@@ -465,20 +474,134 @@ class UltimateDB(object):
     #
     # TODO:  after we are done torturing URLs, implement support for annex repos/special remotes
     #
+    # TODO:  awkward interface!
     def get_key(self, key, file_=None):
         """Given possibly a string key return Key object, might need to register it within DB first"""
         if not isinstance(key, oKey):
             key_ = key
             # we need to either retrieve or create it
             try:
-                key = self._query(oKey).filter_by(key=key_).one()
+                key = self._get(oKey, key=key_).one()
             except NoResultFound:
                 assert (isinstance(file_, oFile))    # WE NEED A FILE!
                 key = self._add(oKey(key=key_, file=file_))
         return key
 
+    # XXX unlike get_key/get_url would just do get and otherwise return None
+    def get_repo(self, **query):
+        try:
+            return self._get(oAnnexRepo, **query).one()
+        except NoResultFound:
+            return None
+
+    #
+    # Higher level constructs
+    #
+
+    def process_repo(self, repo, keys=None):
+        """
+
+        Parameters
+        ----------
+        repo
+        keys: {'all', 'current'}, optional
+          Either to process all keys for the repo -- check their URLs being
+          known and added for this repository etc
+
+        Returns
+        -------
+        Repo
+        """
+        # Let's try to go by location first
+        if isinstance(repo, GitRepo) and not isinstance(repo, AnnexRepo):
+            # ATM we do not care about pure git repositories since they do not
+            # code interesting URLs etc... but may be we eventually should
+            # TODO
+            return None
+        dbrepo = self.get_repo(location=repo.path)
+
+        if dbrepo:
+            # verify
+            # TODO: if we start to store versions etc -- might be more
+            if dbrepo.uuid != repo.uuid:
+                # most likely old one and was removed or moved aside
+                dbrepo.valid = False
+                dbrepo.last_invalid = datetime.now()
+                dbrepo.invalid_reason = 'uuid-mismatch'
+                dbrepo = None  # unbind since we need to create a new one
+
+        if not dbrepo:
+            lgr.debug("Trying to figure out for location %s by uuid")
+            dbrepo = self.get_repo(uuid=repo.uuid)
+            if dbrepo:
+                # So we have repo with that uuid known to DB but under different
+                # location
+                if exists(dbrepo.location):
+                    assert dbrepo.location != repo.path
+                    repo_old = AnnexRepo(dbrepo.location, create=False, init=False)
+                    # so what could have gone wrong?
+                    assert repo_old.uuid == repo.uuid
+                    # user must disambiguate and stop using rsync/cp on annexes
+                    raise RuntimeError(
+                        "Have got two annexes under different locations (%r and %r) having the same UUID %s"
+                        % (repo.path, dbrepo.location, repo.uuid)
+                    )
+                else:
+                    # so old one has "stale" uuid -- was moved
+                    lgr.warning(
+                        "Detected that annex with uuid %s was moved from %r to %r. Adjusting DB record",
+                        repo.uuid, dbrepo.location, repo.path
+                    )
+                    dbrepo.location = repo.path
+                    # TODO:  should we flag within db?
+
+        if not dbrepo:
+            # create one
+            lgr.info("Creating a new DB record for %s", repo)
+            dbrepo = self._add(oAnnexRepo(
+                location=repo.path,
+                uuid=repo.uuid,
+                last_checked=datetime.now(),
+                # bare  and change to oLocalRepo
+            ))
+
+        if keys:
+            pass
+            # TODO:  asked joey on the best way to figure out list of keys etc
+        return dbrepo
+
+    def process_dataset(self, dataset, dataset_only=False, **kwargs):
+        """Process a dataset (git or annex) while verifying/adding/etc
+
+        Parameters
+        ----------
+        dataset: str or Dataset
+        """
+        from datalad.distribution.dataset import require_dataset
+        dataset = require_dataset(dataset, purpose="ultimatedb processing")
+
+        if not dataset_only:
+            dbrepo = self.process_repo(dataset.repo, **kwargs)
+        else:
+            dbrepo = self.get_repo(location=dataset.path)
+
+        if not dataset.id:
+            return None
+
+        # TODO: dataset specific handling and adjust output to return dbdataset
+        try:
+            dbdataset = self._get(oDataset, repo_id=dbrepo.id).one()
+            if dbdataset.id != dataset.id:
+                raise NotImplementedError("Mismatch between dataset ids... ")
+        except NoResultFound:
+            dbdataset = self._add(oDataset(
+                repo_id=dbrepo.id,
+                id=dataset.id))
+        return dbdataset
+
     def add_key_to_repo(self, key, repo):
-        key = self.get_key(key)  # to assure that we got a Key, would raise if none known yet
+        if not isinstance(key, oKey):
+            key = self.get_key(key)  # to assure that we got a Key, would raise if none known yet
         raise NotImplementedError
 
     def add_key_to_special_remotes(self, key, special_remotes):
