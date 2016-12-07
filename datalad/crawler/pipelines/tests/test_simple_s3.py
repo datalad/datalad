@@ -7,10 +7,9 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import join as opj
+from glob import glob
 
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines as _tsp
-from ...nodes.annex import initiate_dataset
 from ....utils import chpwd
 from ....utils import _path_
 from ....tests.utils import eq_
@@ -18,12 +17,13 @@ from ....tests.utils import assert_false
 from ....tests.utils import with_tempfile
 from ....tests.utils import use_cassette
 from ....tests.utils import externals_use_cassette
+from ....tests.utils import skip_if_no_network
 from ..simple_s3 import pipeline
 from datalad.api import crawl_init
 from datalad.api import crawl
 from datalad.api import create
 from datalad.support.annexrepo import AnnexRepo
-from glob import glob
+from datalad.downloaders.tests.utils import get_test_providers
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -41,7 +41,9 @@ def test_smoke_pipelines():
 
 @with_tempfile
 @use_cassette('test_simple_s3_test0_nonversioned_crawl')
+@skip_if_no_network
 def test_drop(path):
+    get_test_providers('s3://datalad-test0-nonversioned')  # to verify having s3 credentials
     create(path)
     # unfortunately this doesn't work without force dropping since I guess vcr
     # stops and then gets queried again for the same tape while testing for
