@@ -121,6 +121,18 @@ def pipeline(dataset,
         print(data['url'], data.get('path'), data.get('filename'), data.get('metadata'))
         yield data
 
+    def write2metafile(data):
+        import pdb; pdb.set_trace()
+        metadata_path = '.datalad/meta.rfc822'
+        # add homepage to all metadata files
+        data['metadata']['Homepage'] = 'https://physionet.org'
+        with open(metadata_path, "w") as f:
+            f.write('\n'.join(
+                ['{}: {}'.format(key, value) for key, value in data['metadata'].items()]
+            ))
+        lgr.info("Generated Metadata File")
+        yield data
+
     def extract_html(data):
         def _html2txt(xpath_str, html, key):
             "extract, clean text from html using xpath selector"
@@ -166,6 +178,7 @@ def pipeline(dataset,
             crawler,
             extract_html,
             #printnode,
+            write2metafile,
             a_href_match(url +'(/(?P<path>.*))?/[^/]*$'), #, min_count=1),
             # skip those which have # or ? in last component
             continue_if({'url': url.rstrip('/') + '(/.*)?/[^#?/][^/]*$'}, re=True),
