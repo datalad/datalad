@@ -13,14 +13,17 @@ from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines as _tsp
 from ...nodes.annex import initiate_dataset
 from ....utils import chpwd
 from ....utils import _path_
-from ....tests.utils import with_tree
-from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
+from ....tests.utils import eq_
+from ....tests.utils import assert_false
 from ....tests.utils import with_tempfile
-from ....tests.utils import serve_path_via_http
-from ....tests.utils import ok_file_has_content
-from ....tests.utils import ok_file_under_git
+from ....tests.utils import use_cassette
+from ....tests.utils import externals_use_cassette
 from ..simple_s3 import pipeline
-
+from datalad.api import crawl_init
+from datalad.api import crawl
+from datalad.api import create
+from datalad.support.annexrepo import AnnexRepo
+from glob import glob
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -34,3 +37,29 @@ def test_smoke_pipelines():
     yield _tsp, pipeline, ["b"], dict(to_http=True)
     yield _tsp, pipeline, ["b"], dict(to_http=True, archive=True)
     yield _tsp, pipeline, ["b"], dict(to_http=True, directory="subdataset", prefix="some/")
+
+
+@with_tempfile
+@use_cassette('test_simple_s3_test0_nonversioned_crawl')
+def test_drop(path):
+    create(path)
+    # unfortunately this doesn't work without force dropping since I guess vcr
+    # stops and then gets queried again for the same tape while testing for
+    # drop :-/
+    with externals_use_cassette('test_simple_s3_test0_nonversioned_crawl_ext'), \
+         chpwd(path):
+        crawl_init(template="simple_s3",
+                   args=dict(
+                       bucket="datalad-test0-nonversioned",
+                       drop=True,
+                       drop_force=True  # so test goes faster
+                   ),
+                   save=True
+                   )
+        crawl()
+    # test that all was dropped
+    repo = AnnexRepo(path, create=False)
+    files = glob(_path_(path, '*'))
+    eq_(len(files), 8)
+    for f in files:
+        assert_false(repo.file_has_content(f))

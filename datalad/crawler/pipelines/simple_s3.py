@@ -52,6 +52,8 @@ def pipeline(bucket,
              archives=False,
              allow_dirty=False,
              backend='MD5E',
+             drop=False,
+             drop_force=False,
              **kwargs):
     """Pipeline to crawl/annex an arbitrary bucket
 
@@ -70,9 +72,15 @@ def pipeline(bucket,
     directory : {subdataset}, optional
       What to do when encountering a directory.  'subdataset' would initiate a new sub-dataset
       at that directory
+    drop : bool, optional
+      Drop all the files whenever done crawling
     """
 
     lgr.info("Creating a pipeline for the %s bucket", bucket)
+
+    # TODO: see if we could make it more generic!!!
+    # drop = assure_bool(drop)
+    # drop_force = assure_bool(drop_force)
 
     annex_kw = {}
 
@@ -147,4 +155,8 @@ def pipeline(bucket,
                                 **kwargs)
     else:
         pipeline = incoming_pipeline
+
+    if drop:
+        pipeline.append(annex.drop(all=True, force=drop_force))
+
     return pipeline
