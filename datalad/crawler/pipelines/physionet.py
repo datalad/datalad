@@ -10,6 +10,7 @@
 
 # Import necessary nodes
 import os
+import re
 from ..nodes.crawl_url import crawl_url
 from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match, xpath_match
@@ -117,7 +118,40 @@ def pipeline(dataset,
     )
 
     def printnode(data):
-        print(data['url'], data.get('path'), data.get('filename'))
+        print(data['url'], data.get('path'), data.get('filename'), data.get('metadata'))
+        yield data
+
+    def extract_html(data):
+        def _html2txt(xpath_str, html, key):
+            "extract, clean text from html using xpath selector"
+            if key == 'Cite-As':  # join all matches if citation
+                raw_html = ''.join(
+                    [x['match'] for x in xpath_match(xpath_str)(html)][:2]
+                )
+            else:  # else get first match or empty string
+                raw_html = next(xpath_match(xpath_str)(html), {'match': ''})['match']
+            # remove html and escape sequences
+            raw_html = re.sub('<[^<]+?>|[\t|\r]', '',
+                              (str(raw_html.encode('ascii', 'ignore')))).strip()
+            if key == 'DOI':  # remove 'doi' from text of doi key
+                raw_html = re.sub('doi:', '', raw_html)
+            # sub (possibly consecutive) newlines with single space
+            return re.sub('\n ?\n|\n', ' ', raw_html)
+
+        # extract metadata into dictionary from html using xpath selector string
+        metadata = {mkey: _html2txt(xp_str, data, mkey) for mkey, xp_str in
+                    (('DOI', '//aside/p/text()'),
+                     ('Description', '//h1/text()'),
+                     ('Ack', '//p[preceding-sibling::h2[contains(text(), "Acknowledgments")]]'),
+                     ('Cite-As', '//*[@class="reference"]'),
+                     ('Notice', '//*[@class="notice"]'),)}
+
+        metadata['Description'] += '\n ' + metadata['Ack']  # merge acknowledgment and description
+        del metadata['Ack']
+        # extract shortname of dataset
+        metadata['Name'] = str(data['url'].split('/')[-2]).encode('ascii', 'ignore')
+        yield updated(data, {'metadata': metadata})
+
 
     crawler = crawl_url(
         url,
@@ -126,14 +160,16 @@ def pipeline(dataset,
             #a_href_match('%s.*/S001.*/$' % url)
         ]
     )
+
     return [  # Download all the archives found on the project page
         [
             crawler,
+            extract_html,
+            #printnode,
             a_href_match(url +'(/(?P<path>.*))?/[^/]*$'), #, min_count=1),
             # skip those which have # or ? in last component
             continue_if({'url': url.rstrip('/') + '(/.*)?/[^#?/][^/]*$'}, re=True),
             annex,
-            #printnode,
         ],
         annex.finalize(cleanup=True)
     ]
