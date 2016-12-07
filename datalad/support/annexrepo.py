@@ -94,7 +94,8 @@ class AnnexRepo(GitRepo):
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
-                 git_opts=None, annex_opts=None, annex_init_opts=None):
+                 git_opts=None, annex_opts=None, annex_init_opts=None,
+                 repo=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -154,7 +155,8 @@ class AnnexRepo(GitRepo):
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create, git_opts=git_opts)
+                                            create=create, repo=repo,
+                                            git_opts=git_opts)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "

@@ -424,7 +424,7 @@ class GitRepo(object):
     # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, **kwargs):
+                 git_opts=None, repo=None, **kwargs):
         """Creates representation of git repository at `path`.
 
         If `url` is given, a clone is created at `path`.
@@ -484,10 +484,14 @@ class GitRepo(object):
 
         self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self.repo = None
+        self.repo = repo
         self._cfg = None
 
         if create and not GitRepo.is_valid_repo(path):
+            if repo is not None:
+                # `repo` passed with `create`, which doesn't make sense
+                raise TypeError("argument 'repo' must not be used with 'create'")
+
             try:
                 lgr.debug(
                     "Initialize empty Git repository at '%s'%s",
@@ -529,6 +533,10 @@ class GitRepo(object):
         url : str
         path : str
         """
+
+        if 'repo' in kwargs:
+            raise TypeError("argument 'repo' conflicts with cloning")
+            # TODO: what about 'create'?
 
         # try to get a local path from `url`:
         try:
@@ -584,9 +592,7 @@ class GitRepo(object):
         # - this is insufficient for WeakRefSingleton; if we cloned into a
         #   location, that existed during the runtime and there is a dangling
         #   repo => we get the old one!
-        # - git.Repo correctly is assigned, but still created twice
-        gr = cls(path=path, *args, **kwargs)
-        gr.repo = repo
+        gr = cls(path, *args, repo=repo, **kwargs)
         return gr
 
     def __del__(self):
@@ -598,8 +604,10 @@ class GitRepo(object):
         if hasattr(self, 'repo') and self.repo is not None \
                 and exists(self.path):  # gc might be late, so the (temporary)
                                         # repo doesn't exist on FS anymore
+
             self.repo.git.clear_cache()
-            self.repo.index.write()
+            if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                self.repo.index.write()
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -815,7 +823,8 @@ class GitRepo(object):
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        if self.repo is not None:
+
+        if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
             # flush possibly cached in GitPython changes to index:
             self.repo.index.write()
 
