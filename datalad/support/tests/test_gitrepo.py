@@ -1012,5 +1012,31 @@ def test_WeakRefSingletonRepo(path1, path2):
     # it's the same object:
     ok_(repo1 is repo3)
 
-    # but realpath attribute is the same, so they are still equal:
+    # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
+
+
+@with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
+                 'ignore.me': 'ignored content',
+                 'dontigno.re': 'other content'})
+def test_GitRepo_gitignore(path):
+
+    gr = GitRepo(path, create=True)
+    sub = GitRepo(opj(path, 'ignore-sub.me'))
+
+    from ..exceptions import GitIgnoreError
+
+    with open(opj(path, '.gitignore'), "w") as f:
+        f.write("*.me")
+
+    with assert_raises(GitIgnoreError) as cme:
+        gr.add('ignore.me')
+    eq_(cme.exception.paths, ['ignore.me'])
+
+    with assert_raises(GitIgnoreError) as cme:
+        gr.add_submodule(path='ignore-sub.me')
+    eq_(cme.exception.paths, ['ignore-sub.me'])
+
+    with assert_raises(GitIgnoreError) as cme:
+        gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
+    eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})

@@ -18,53 +18,53 @@
     <script src="qunit/qunit-2.0.1.js"></script>
     <script>
       QUnit.test("Parent URL", function(assert) {
-	  assert.equal(parent_url('root/child'), 'root/');
-	  assert.equal(parent_url('root/child/'), 'root/');
-	  assert.equal(parent_url('/root/child/'), '/root/');
-	  assert.equal(parent_url('/root'), '/');
-	  assert.equal(parent_url('root/'), '');
-	  assert.equal(parent_url('/root/'), '/');
-	  assert.equal(parent_url('/'), '');
-	  assert.equal(parent_url(''), '');
+	  assert.equal(parentUrl('root/child'), 'root/');
+	  assert.equal(parentUrl('root/child/'), 'root/');
+	  assert.equal(parentUrl('/root/child/'), '/root/');
+	  assert.equal(parentUrl('/root'), '/');
+	  assert.equal(parentUrl('root/'), '');
+	  assert.equal(parentUrl('/root/'), '/');
+	  assert.equal(parentUrl('/'), '');
+	  assert.equal(parentUrl(''), '');
       });
       QUnit.test("Child URL", function(assert) {
-	  assert.equal(child_url('/root', 'child'), '/root/child');
-	  assert.equal(child_url('/root/', 'child'), '/root/child');
-	  assert.equal(child_url('root/', '/child'), 'root/child');
-	  assert.equal(child_url('/root/', 'child/'), '/root/child/');
-	  assert.equal(child_url('/root/', '/child/'), '/root/child/');
-	  assert.equal(child_url('/root', 'child/'), '/root/child/');
-	  assert.equal(child_url('/', '/root'), '/root');
-	  assert.equal(child_url('', 'root'), '/root');
+	  assert.equal(childUrl('/root', 'child'), '/root/child');
+	  assert.equal(childUrl('/root/', 'child'), '/root/child');
+	  assert.equal(childUrl('root/', '/child'), 'root/child');
+	  assert.equal(childUrl('/root/', 'child/'), '/root/child/');
+	  assert.equal(childUrl('/root/', '/child/'), '/root/child/');
+	  assert.equal(childUrl('/root', 'child/'), '/root/child/');
+	  assert.equal(childUrl('/', '/root'), '/root');
+	  assert.equal(childUrl('', 'root'), '/root');
 	  //assert.equal('http://localhost:8000/?dir=MLd_cells/');
       });
       QUnit.test("Construct Absolute URL", function(assert) {
 	  // mock out loc func with stub (normally returns window.location.pathname)
 	  loc = sinon.stub().returns({pathname: 'example.com'});
-	  assert.equal(absolute_url('/d1'), 'example.com/d1',
+	  assert.equal(absoluteUrl('/d1'), 'example.com/d1',
 		       'at domain root');
 
 	  loc.returns({pathname: 'example.com/ds/'});
-	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/',
+	  assert.equal(absoluteUrl('/d1/'), 'example.com/ds/d1/',
 		       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
 
 	  loc.returns({pathname: 'example.com/ds2/?dir=/'});
-	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
+	  assert.equal(absoluteUrl('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
 		       'if root path(/) in GET parameter');
 
 	  loc.returns({pathname: 'example.com/ds/?dir=d1/d2'});
-	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
+	  assert.equal(absoluteUrl('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
 		       'if subpath in GET parameter');
-	  assert.equal(absolute_url(), loc().pathname, 'if nothing passed return current location');
+	  assert.equal(absoluteUrl(), loc().pathname, 'if nothing passed return current location');
       });
       QUnit.test("Update Param or Path ?", function(assert) {
-	  assert.equal(update_param_or_path('/ds1/', 'dir'), true, 'param if next is a directory');
-	  assert.equal(update_param_or_path('/ds1/', 'file'), false, 'param if next is a file');
-	  assert.equal(update_param_or_path('/ds1/', 'link'), false, 'param if next is a link');
-	  assert.equal(update_param_or_path('/'), false, 'path if next is the root dataset');
-	  assert.equal(update_param_or_path(), false, 'path if next null/undefined/empty');
+	  assert.equal(updateParamOrPath('/ds1/', 'dir'), true, 'param if next is a directory');
+	  assert.equal(updateParamOrPath('/ds1/', 'file'), false, 'param if next is a file');
+	  assert.equal(updateParamOrPath('/ds1/', 'link'), false, 'param if next is a link');
+	  assert.equal(updateParamOrPath('/'), false, 'path if next is the root dataset');
+	  assert.equal(updateParamOrPath(), false, 'path if next null/undefined/empty');
 	  loc = sinon.stub().returns({pathname: '/ds1'});
-	  assert.equal(update_param_or_path('/ds1'), false, 'path if next is root of dataset at subfolder');
+	  assert.equal(updateParamOrPath('/ds1'), false, 'path if next is root of dataset at subfolder');
       });
       QUnit.test("Get Parameter by Name", function(assert) {
 	  assert.equal(getParameterByName('dir'), null,
@@ -78,30 +78,30 @@
       });
       QUnit.test("Click Handler", function(assert) {
 	  loc = sinon.stub().returns({pathname: '/ds1/', href: '/ds1/?dir=/d1/'});
-	  assert.deepEqual(click_handler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
-	  assert.deepEqual(click_handler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
-	  assert.deepEqual(click_handler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
-	  assert.deepEqual(click_handler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(clickHandler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
+	  assert.deepEqual(clickHandler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(clickHandler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(clickHandler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
       });
       QUnit.test("Size Rendering", function(assert) {
-	assert.equal(size_renderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
-	assert.equal(size_renderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
-	assert.equal(size_renderer({}), "-", "no sizes in sizes json");
-	assert.equal(size_renderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
-	assert.equal(size_renderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
+	assert.equal(sizeRenderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
+	assert.equal(sizeRenderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
+	assert.equal(sizeRenderer({}), "-", "no sizes in sizes json");
+	assert.equal(sizeRenderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
+	assert.equal(sizeRenderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
       });
-      QUnit.test("parent_metadata", function(assert) {
+      QUnit.test("parentMetadata", function(assert) {
 	// setup variables, mock method
 	loc = sinon.stub().returns({pathname: '/ds2/', href: '/ds2/?dir=/d1/'});
-	var metadata_loc = "/.git/datalad/metadata/6666cd76f96956469e7be39d750cc7d9";
-	//parent_url = sinon.stub().returns('/ds1');
-	url_exists = sinon.stub().returns(true);
+	var metadataLoc = "/.git/datalad/metadata/6666cd76f96956469e7be39d750cc7d9";
+	//parentUrl = sinon.stub().returns('/ds1');
+	urlExists = sinon.stub().returns(true);
 	sinon.spy(jQuery, "ajax");
 	// function to test
-	parent_json(jQuery, md5);
+	parentJson(jQuery, md5);
 	// spy
 	assert.ok(jQuery.ajax.calledOnce);
-	assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds2" + metadata_loc);
+	assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds2" + metadataLoc);
 	assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
       });
       QUnit.test("Bread2crumbs", function(assert) {
