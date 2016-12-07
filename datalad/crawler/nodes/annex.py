@@ -840,7 +840,7 @@ class Annexificator(object):
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
             skip_no_changes_ = skip_no_changes
             if skip_no_changes is None:
-                # TODO: skip_no_changes = config.getbool('crawl', 'skip_merge_if_no_changes', default=True)
+                # TODO: skip_no_changes = config.getbool('datalad.crawl', 'skip_merge_if_no_changes', default=True)
                 skip_no_changes_ = True
 
             if last_merged_checksum == self.repo.get_hexsha(branch):
