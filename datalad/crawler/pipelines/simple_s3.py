@@ -89,6 +89,8 @@ def pipeline(bucket,
     archives = assure_bool(archives)
     no_annex = assure_bool(no_annex)
     allow_dirty = assure_bool(allow_dirty)
+    drop = assure_bool(drop)
+    drop_force = assure_bool(drop_force)
 
     if not to_http:
         annex_kw['special_remotes'] = [DATALAD_SPECIAL_REMOTE]
