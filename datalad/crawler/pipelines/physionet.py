@@ -122,10 +122,14 @@ def pipeline(dataset,
         yield data
 
     def write2metafile(data):
-        import pdb; pdb.set_trace()
         metadata_path = '.datalad/meta.rfc822'
         # add homepage to all metadata files
         data['metadata']['Homepage'] = 'https://physionet.org'
+        # add physionet dataset license
+        data['metadata']['License'] = '''All data available from PhysioNet are free data. We are not aware of a de facto standard license for free data analogous to the GPL; your suggestions are welcome. 
+        You may make and redistribute verbatim copies of data files.
+
+        IMPORTANT: Modified copies of data files may not be distributed except terms mentioned at https://physionet.org/copying.shtml'''
         with open(metadata_path, "w") as f:
             f.write('\n'.join(
                 ['{}: {}'.format(key, value) for key, value in data['metadata'].items()]
@@ -153,13 +157,15 @@ def pipeline(dataset,
         # extract metadata into dictionary from html using xpath selector string
         metadata = {mkey: _html2txt(xp_str, data, mkey) for mkey, xp_str in
                     (('DOI', '//aside/p/text()'),
-                     ('Description', '//h1/text()'),
+                     ('Title', '//h1/text()'),
                      ('Ack', '//p[preceding-sibling::h2[contains(text(), "Acknowledgments")]]'),
                      ('Cite-As', '//*[@class="reference"]'),
                      ('Notice', '//*[@class="notice"]'),)}
 
-        metadata['Description'] += '\n ' + metadata['Ack']  # merge acknowledgment and description
+        # merge acknowledgment, notice into description
+        metadata['Description'] = 'Notice\n' + metadata['Notice'] + '\nAcknowledgments\n' + metadata['Ack']
         del metadata['Ack']
+        del metadata['Notice']
         # extract shortname of dataset
         metadata['Name'] = str(data['url'].split('/')[-2]).encode('ascii', 'ignore')
         yield updated(data, {'metadata': metadata})
