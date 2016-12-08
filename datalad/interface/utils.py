@@ -29,9 +29,11 @@ from datalad.interface.save import Save
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
 from datalad.utils import get_trace
+from datalad.utils import walk
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -201,7 +203,7 @@ def save_dataset_hierarchy(
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
-                         out=None, dir_lookup=None):
+                         out=None, dir_lookup=None, mark_recursive=False):
     """Sort a list of paths per dataset they are contained in.
 
     Any paths that are not part of a dataset, or presently unavailable are
@@ -222,14 +224,18 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     dir_lookup : dict or None
       Optional lookup cache that maps paths to previously determined datasets.
       This can speed up repeated processing.
+    mark_recursive : bool
+      If True, subdatasets "discovered" by recursion are marked such that
+      their value is a one-item list that contains `curdir` as the only item,
+      otherwise the item will be the same as the key -- the absolute path to
+      the respective dataset.
 
     Returns
     -------
     Tuple(dict, list, list)
       Dict of `existing dataset path`: `path` mappings, the list of currently
       non-existing paths (possibly matching currently uninstalled datasets),
-      and any paths that are not part of any dataset
-
+      and any paths that are not part of any dataset.
     """
     # sort paths into the respective datasets
     if dir_lookup is None:
@@ -286,7 +292,9 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         # we want it all
                         # be careful to not overwrite anything, in case
                         # this subdataset has been processed before
-                        out[subdspath] = out.get(subdspath, [subdspath])
+                        out[subdspath] = out.get(
+                            subdspath,
+                            [curdir if mark_recursive else subdspath])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 
@@ -355,3 +363,52 @@ def path_is_under(values, path=None):
             # first match is enough
             return True
     return False
+
+
+def get_dataset_directories(top, ignore_datalad=True):
+    """Return a list of directories in the same dataset under a given path
+
+    Parameters
+    ----------
+    top : path
+      Top-level path
+    ignore_datalad : bool
+      Whether to exlcude the '.datalad' directory of a dataset and its content
+      from the results.
+
+    Returns
+    -------
+    list
+      List of directories matching the top-level path, regardless of whether
+      these directories are known to Git (i.e. contain tracked files). The
+      list does not include the top-level path itself, nor does it include
+      any subdataset mount point (regardless of whether the particular
+      subdatasets are installed or not).
+    """
+    def func(arg, top, names):
+        refpath, ignore, dirs = arg
+        legit_names = []
+        for n in names:
+            path = opj(top, n)
+            if not isdir(path) \
+                    or path in ignore \
+                    or not GitRepo.get_toppath(path) == refpath:
+                pass
+            else:
+                legit_names.append(n)
+                dirs.append(path)
+        names[:] = legit_names
+
+    # collects the directories
+    refpath = GitRepo.get_toppath(top)
+    if not refpath:
+        raise ValueError("`top` path {} is not in a dataset".format(top))
+    ignore = [opj(refpath, get_git_dir(refpath))]
+    # always ignore subdataset mount points
+    ignore.extend(Dataset(refpath).get_subdatasets(
+        absolute=True, recursive=False, fulfilled=False))
+    if ignore_datalad:
+        ignore.append(opj(refpath, '.datalad'))
+    d = []
+    walk(top, func, (refpath, ignore, d))
+    return d
