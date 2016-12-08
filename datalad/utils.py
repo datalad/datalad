@@ -23,6 +23,7 @@ import platform
 import gc
 import glob
 
+from datalad.cmd import CommandError
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
@@ -392,7 +393,8 @@ def get_mime(filepath, dereference=True, uncompress=False):
     from .cmd import Runner
     cmd = ["file",
            "--mime",
-           "-E"  # exit if filesystem error
+           # not supported on older systems
+           # "-E"  # exit if filesystem error
            ]
     if dereference:
         cmd += ["-L"]
@@ -400,6 +402,8 @@ def get_mime(filepath, dereference=True, uncompress=False):
         cmd += ["-z"]
     cmd += [filepath]
     out, err = Runner().run(cmd)
+    if "ERROR:" in out:
+        raise CommandError("Failed to run  file command, got output: %s" % out)
     if uncompress:
         if ("compressed-encoding" not in out):
             return None, None
