@@ -128,5 +128,15 @@ class RepoInterface(object):
     (or return) the "right thing"
     """
 
+    # Note: Didn't find a way yet, to force GitRepo as well as AnnexRepo to
+    # implement a method defined herein, since AnnexRepo inherits from GitRepo.
+    # Would be much nicer, but still - I'd prefer to have a central place for
+    # these anyway.
+
+    # Note 2: Seems possible. There is MRO magic:
+    # http://pybites.blogspot.de/2009/01/mro-magic.html
+    # http://stackoverflow.com/questions/20822850/change-python-mro-at-runtime
+
     def sth_like_file_has_content(self):
-        return # the real thing in case of annex and True in case of git
+        raise NotImplementedError # the real thing in case of annex and True in case of git
+

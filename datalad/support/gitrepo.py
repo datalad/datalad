@@ -376,13 +376,18 @@ def split_remote_branch(branch):
 
 
 @add_metaclass(Flyweight)
-class GitRepo(object):
+class GitRepo(RepoInterface):
     """Representation of a git repository
 
     Not sure if needed yet, since there is GitPython. By now, wrap it to have
     control. Convention: method's names starting with 'git_' to not be
     overridden accidentally by AnnexRepo.
     """
+
+    # Just a non-functional example:
+    # must be implemented, since abstract in RepoInterface:
+    def sth_like_file_has_content(self):
+        return "Yes, if it's in the index"
 
     # Begin Flyweight:
 
@@ -538,6 +543,27 @@ class GitRepo(object):
             raise TypeError("argument 'repo' conflicts with cloning")
             # TODO: what about 'create'?
 
+        # fail early on non-empty target:
+        from os import listdir
+        if exists(path) and listdir(path):
+            # simulate actual GitCommandError:
+            lgr.warning("destination path '%s' already exists and is not an "
+                        "empty directory." % path)
+            raise GitCommandError(
+                ['git', 'clone', '-v', url, path],
+                128,
+                "fatal: destination path '%s' already exists and is not an "
+                "empty directory." % path)
+        else:
+            # protect against cloning into existing and obviously dangling
+            # instance for that location
+            try:
+                del cls._unique_instances[path]
+            except KeyError:
+                # didn't exist - all fine
+                pass
+
+
         # try to get a local path from `url`:
         try:
             if not isinstance(url, RI):
@@ -561,6 +587,9 @@ class GitRepo(object):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
                 repo = gitpy.Repo.clone_from(url, path, env=env,
                                              odbt=default_git_odbt)
+                # Note/TODO: signature for clone from:
+                # (url, to_path, progress=None, env=None, **kwargs)
+
                 lgr.debug("Git clone completed")
                 break
             except GitCommandError as e:
@@ -588,10 +617,6 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
-        # TODO:
-        # - this is insufficient for WeakRefSingleton; if we cloned into a
-        #   location, that existed during the runtime and there is a dangling
-        #   repo => we get the old one!
         gr = cls(path, *args, repo=repo, **kwargs)
         return gr
 

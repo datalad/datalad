@@ -35,6 +35,7 @@ from weakref import WeakValueDictionary
 from six import string_types
 from six import iteritems
 from six.moves import filter
+from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
@@ -43,9 +44,6 @@ from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
-from datalad.support.external_versions import external_versions
-from datalad.support.external_versions import LooseVersion
-from datalad.support import ansi_colors
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -55,6 +53,8 @@ from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
 from .gitrepo import to_options
+from . import ansi_colors
+from .external_versions import external_versions
 from .exceptions import CommandNotAvailableError
 from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
@@ -65,12 +65,11 @@ from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
-from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
-
-class AnnexRepo(GitRepo):
+from .repo import RepoInterface
+class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.
 
     Paths given to any of the class methods will be interpreted as relative
