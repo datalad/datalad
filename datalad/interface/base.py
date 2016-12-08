@@ -316,6 +316,47 @@ class Interface(object):
             recursive=False,
             recursion_limit=None,
             mark_recursive=False):
+        """Common input argument validation and pre-processing
+
+        This method pre-processes the two most common input argument types:
+        a base dataset, and one or more given paths. One or the other needs
+        to be different from `None` or an `InsufficientArgumentsError` will
+        be raised.
+
+        Paths are normalized based on current practice (if relative, they
+        are interpreted relative to a base dataset, if one is provided, or
+        relative to the current working directory if not).
+
+        Paths are then sorted by the datasets that contain them. If paths are
+        detected that are not associated with any dataset `ValueError` is
+        raised.
+
+        Parameters
+        ----------
+        path : path or list(path) or None
+          Path input argument
+        dataset : path or Dataset or None
+          Dataset input argument
+        recursive : bool
+          Whether to discover subdatasets under any of the given paths
+          recursively
+        recursion_limit : None or int
+          Optional recursion limit specification (max levels of recursion)
+        mark_recursive : bool
+          If True, subdatasets "discovered" by recursion are marked such that
+          their value is a one-item list that contains `curdir` as the only
+          item, otherwise the item will be the same as the key -- the absolute
+          path to the respective dataset.
+
+        Returns
+        -------
+        (dict, list)
+          The dictionary contains keys of absolute dataset paths and lists with
+          the normalized (generally absolute) paths of presently existing
+          locations associated with the respective dataset as values. The list
+          return in addition contains all paths that are part of a dataset, but
+          presently do not exist on the filesystem.
+        """
         from .utils import get_normalized_path_arguments
         from .utils import get_paths_by_dataset
 
