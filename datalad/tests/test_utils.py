@@ -56,6 +56,7 @@ from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
+from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
@@ -298,6 +299,12 @@ def test_auto_repr():
 
     assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<withoutrepr>)")
     assert_equal(buga().some(), "some")
+
+
+def test_assure_list_copy():
+    l = [1]
+    assert assure_list(l) is l
+    assert assure_list(l, copy=True) is not l
 
 
 def test_assure_list_from_str():
