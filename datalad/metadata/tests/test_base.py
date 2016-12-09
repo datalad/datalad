@@ -343,7 +343,7 @@ def test_cached_load_document(tdir):
     with open(cache_filename, 'wb') as f:
         f.write("CRAPNOTPICKLED".encode())
 
-    with patch('datalad.metadata._get_schema_url_cache_filename',
+    with patch('datalad.support.network.get_url_cache_filename',
                return_value=cache_filename):
         with patch('pyld.jsonld.load_document', return_value=target_schema), \
             swallow_logs(new_level=logging.WARNING) as cml:
