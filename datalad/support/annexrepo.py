@@ -44,6 +44,7 @@ from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
+from datalad.utils import assure_list
 from datalad.support.external_versions import external_versions
 from datalad.support.external_versions import LooseVersion
 from datalad.support import ansi_colors
@@ -1278,7 +1279,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def whereis(self, files, output='uuids', key=False, batch=False):
+    def whereis(self, files, output='uuids', key=False, options=None, batch=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -1291,6 +1292,8 @@ class AnnexRepo(GitRepo):
             is returned as returned by annex
         key: bool, optional
             Either provided files are actually annex keys
+        options: list, optional
+            Options to pass into git-annex call
 
         Returns
         -------
@@ -1316,7 +1319,8 @@ class AnnexRepo(GitRepo):
         if batch:
             lgr.warning("TODO: --batch mode for whereis.  Operating serially")
 
-        options = ["--key"] if key else []
+        options = assure_list(options, copy=True)
+        options += ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
 
@@ -1328,7 +1332,8 @@ class AnnexRepo(GitRepo):
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            return {j['key' if key else 'file']: self._whereis_json_to_dict(j)
+            return {j['key' if (key or '--all' in options) else 'file']:
+                        self._whereis_json_to_dict(j)
                     for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
@@ -1771,7 +1776,7 @@ class AnnexRepo(GitRepo):
             return matches[0]
         elif len(matches) == 2:
             lgr.warning(
-                "Found multiple hits while sarching. Returning first among: %s",
+                "Found multiple hits while searching. Returning first among: %s",
                 str(matches)
             )
             return matches[0]
