@@ -183,17 +183,18 @@ function clickHandler(data, url) {
 /**
  * construct path to metadata json of node to be rendered
  * @param {object} md5 the md5 library object, used to compute metadata hash name of current node
- * @param {bool} parent if parent, find metadata json of parent directory instead
- * @return {string} path to the current node's metadata json
+ * @param {bool} parent if parent, find metadata file of parent directory instead
+ * @param {object} nodeurl if nodeurl, find metadata file wrt to node at nodeurl (default: current loc())
+ * @return {string} path to the (default: current loc()) node's metadata file
  */
-function metadataLocator(md5, parent) {
-  var startLoc = absoluteUrl(getParameterByName('dir')).replace(/\/*$/, '/');
+function metadataLocator(md5, parent, nodeurl) {
+  // if path argument set, find metadata file wrt node at path directory
+  var nodepath = typeof nodeurl !== 'undefined' ? nodeurl : loc().href;
+  var startLoc = absoluteUrl(getParameterByName('dir', nodepath)).replace(/\/*$/, '/');
 
-  if (startLoc === '/' && parent) {
-    return "";
-  }
+  if (startLoc === '/' && parent) return "";
 
-  // if parent argument set, find metadata json of parent directory instead
+  // if parent argument set, find metadata file of parent directory instead
   var findParentDs = typeof parent !== 'undefined' ? parent : false;
   startLoc = findParentDs ? parentUrl(startLoc).replace(/\/*$/, '/') : startLoc;
   var currentDs = startLoc;
@@ -223,34 +224,38 @@ function metadataLocator(md5, parent) {
 }
 
 /**
- * Retrieve metadata json of parent if exists
+ * Retrieve metadata json of (parent of) node at path (default: current loc)
  * @param {string} jQuery jQuery library object
  * @param {string} md5 path of current dataset
- * @return {object} return metadata json object of parent if parent exists
+ * @param {string} parent if parent, find metadata json of parent directory instead
+ * @param {string} nodeurl if nodeurl, find metadata json wrt node at nodeurl (default: loc().href)
+ * @return {object} return metadata json object of node if it exists
  */
-function parentJson(jQuery, md5) {
-  var parentMetadata = metadataLocator(md5, true);
+function nodeJson(jQuery, md5, parent, nodeurl) {
+  // if path argument set, find metadata file wrt node at path directory, else current location
+  // if parent argument set, find metadata json of parent directory instead
+  var nodeMetaUrl = metadataLocator(md5, parent, nodeurl);
 
-  // if parent dataset or parent metadata directory doesn't exist, return error code
-  if (parentMetadata === '' || !urlExists(parentMetadata))
+  // if node's dataset or node's metadata directory doesn't exist, return error code
+  if (nodeMetaUrl === '' || !urlExists(nodeMetaUrl))
     return {};
 
   // else return required info for parent row from parent metadata json
-  var parentJson_ = {};
+  var nodeJson_ = {};
   jQuery.ajax({
-    url: parentMetadata,
+    url: nodeMetaUrl,
     dataType: 'json',
     async: false,
     success: function(data) {
-      parentJson_ = {name: '..',
-                      date: data.date || '-',
-                      path: data.path || '-',
-                      type: data.type || 'dir',
-                      description: data.description || '',
-                      size: sizeRenderer(data.size || null)};
+      nodeJson_ = {name: data.name || '-',
+                   date: data.date || '-',
+                   path: data.path || '-',
+                   type: data.type || 'dir',
+                   description: data.description || '',
+                   size: sizeRenderer(data.size || null)};
     }
   });
-  return parentJson_;
+  return nodeJson_;
 }
 
 /**
@@ -300,7 +305,7 @@ function directory(jQuery, md5) {
 
   if (md5Url === "") {
     errorMsg(
-        jQuery,
+      jQuery,
         "Could not find any metadata directory. Sorry.  Most probably cause is " +
         "that 'publish' didn't run the post-update hook"
     );
@@ -309,7 +314,7 @@ function directory(jQuery, md5) {
 
   if (!urlExists(md5Url)) {
     errorMsg(
-        jQuery,
+      jQuery,
         "Could not find metadata for current dataset. Sorry.  Most probably cause is " +
         "that 'publish' didn't run the post-update hook"
     );
@@ -390,7 +395,7 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parentMeta = parentJson(jQuery, md5);
+        var parentMeta = nodeJson(jQuery, md5, true);
         if (!jQuery.isEmptyObject(parentMeta))
           api.row.add(parentMeta).draw();
       }

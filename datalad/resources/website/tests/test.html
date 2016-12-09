@@ -98,7 +98,7 @@
 	urlExists = sinon.stub().returns(true);
 	sinon.spy(jQuery, "ajax");
 	// function to test
-	parentJson(jQuery, md5);
+	nodeJson(jQuery, md5, true);
 	// spy
 	assert.ok(jQuery.ajax.calledOnce);
 	assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds2" + metadataLoc);
