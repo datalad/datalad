@@ -392,6 +392,10 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(set(info2), {testfile, testfile3})
     assert_equal(info2[testfile3]['size'], 10)
 
+    full = ar.whereis([], options='--all', output='full')
+    assert_equal(len(full.keys()), 3)  # we asked for all files -- got 3 keys
+    assert_in(ar.WEB_UUID, full['SHA256E-s10--a978713ea759207f7a6f9ebc9eaebd1b40a69ae408410ddf544463f6d33a30e1.txt'])
+
     # which would work even if we cd to that subdir, but then we should use explicit curdir
     with chpwd(subdir):
         cur_subfile = opj(curdir, 'sub.txt')
