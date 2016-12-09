@@ -291,6 +291,9 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_not_in('uuid', lfull[ar.WEB_UUID])  # no uuid in the records
     assert_equal(lfull[ar.WEB_UUID]['urls'], [testurl])
 
+    # --all and --key are incompatible
+    assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
+
     # output='descriptions'
     ldesc = ar.whereis(testfile, output='descriptions')
     assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))

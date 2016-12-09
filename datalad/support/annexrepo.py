@@ -1267,7 +1267,8 @@ class AnnexRepo(GitRepo):
             # if we didn't raise before, just depend on whether or not we seem
             # to have some json to return. It should contain information on
             # failure in keys 'success' and 'note'
-            if out is None:
+            # Or if we had empty stdout but there was stderr
+            if out is None or (not out and e.stderr):
                 raise e
         finally:
             if progress_indicators:
