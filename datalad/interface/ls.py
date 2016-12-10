@@ -547,7 +547,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     # directory metadata directory tree location
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
-    dir_path = path.split(ds_path)[1][1:] or '/'
+    dir_path = '/' if path == '.' else path
     # create md5 hash of current directory's relative path
     metadata_hash = hashlib.md5(dir_path.encode('utf-8')).hexdigest()
     # construct final path to metadata file
@@ -556,7 +556,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     return metadata_file
 
 
-def fs_extract(nodepath, repo):
+def fs_extract(nodepath, repo, basepath='/'):
     """extract required info of nodepath with its associated parent repository and returns it as a dictionary
 
     Parameters
@@ -573,14 +573,14 @@ def fs_extract(nodepath, repo):
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
     rec = {
-        "name": name, "path": node._path, "repo": node.repo.path,
+        "name": name, "path": relpath(node._path, basepath), "repo": relpath(node.repo.path, basepath),
         "type": node.type_, "size": pretty_size, "date": pretty_date,
     }
     # if there is meta-data for the dataset (done by aggregate-metadata)
     # we include it
     metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
     if exists(metadata_path):
-        rec["metadata"] = metadata = js.load(open(metadata_path))
+        rec["metadata"] = js.load(open(metadata_path))
     return rec
 
 
@@ -615,7 +615,7 @@ def fs_render(fs_metadata, json=None, **kwargs):
         print(js.dumps(fs_metadata) + '\n')
 
 
-def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None):
+def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None, basepath=None):
     """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
 
     Parameters
@@ -637,7 +637,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
       extracts and returns a (recursive) list of directory info at path
       does not traverse into annex, git or hidden directories
     """
-    fs = fs_extract(path, repo)
+    fs = fs_extract(path, repo, basepath=basepath or path)
 
     if isdir(path):                                # if node is a directory
         children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
@@ -653,17 +653,17 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                 if recursive:
                     subdir = fs_traverse(nodepath, repo,
                                          parent=None, # children[0],
-                                         recursive=recursive, json=json)
+                                         recursive=recursive, json=json, basepath=basepath or path)
                 else:
                     # read child metadata from its metadata file if it exists
-                    subdir_json = metadata_locator(path=nodepath, ds_path=fs["repo"])
+                    subdir_json = metadata_locator(path=node, ds_path=basepath or path)
                     if exists(subdir_json):
                         with open(subdir_json) as data_file:
                             subdir = js.load(data_file)
                             subdir.pop('nodes', None)
                     # else extract whatever information you can about the child
                     else:
-                        subdir = fs_extract(nodepath, repo)
+                        subdir = fs_extract(nodepath, repo, basepath=basepath or path)
                 # append child metadata to list
                 children.extend([subdir])
 
@@ -684,7 +684,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
 
         fs['nodes'] = children          # add children info to main fs dictionary
         if render:                      # render directory node at location(path)
-            fs_render(fs, json=json)
+            fs_render(fs, json=json, ds_path=basepath or path)
             lgr.info('Directory: %s' % path)
 
     return fs
@@ -712,7 +712,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     """
 
     # extract parent info to pass to traverser
-    fsparent = fs_extract(parent.path, parent.repo) if parent else None
+    fsparent = fs_extract(parent.path, parent.repo, basepath=rootds.path) if parent else None
 
     # (recursively) traverse file tree of current dataset
     fs = fs_traverse(rootds.path, rootds.repo,
@@ -726,12 +726,12 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
         subds_path = opj(rootds.path, subds_path)
         subds = Dataset(subds_path)
-        subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+        subds_json = metadata_locator(path=subds_path, ds_path=rootds.path)
 
         def handle_not_installed():
             # for now just traverse as fs
             lgr.warning("%s is either not installed or lacks meta-data", subds)
-            subfs = fs_extract(subds_path, rootds)
+            subfs = fs_extract(subds_path, rootds, basepath=rootds.path)
             # but add a custom type that it is a not installed subds
             subfs['type'] = 'uninitialized'
             # we need to kick it out from 'children'
@@ -791,7 +791,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
-    fs_render(fs, json=json)
+    fs_render(fs, json=json, ds_path=rootds.path)
     return fs
 
 
