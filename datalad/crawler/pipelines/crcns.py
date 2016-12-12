@@ -21,10 +21,66 @@ from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ...support.strings import get_replacement_dict
 
+from datalad.support.network import get_cached_url_content
+
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
+
+
+def fetch_datacite_metadata():
+    import json
+    # CRCNS.org is publisher-id "cdl.ucbcrcns"
+    arx = 'http://search.datacite.org/api?q=datacentre_symbol:cdl.ucbcrcns' \
+          '&fl=doi,minted,updated,xml&fq=has_metadata:true&fq=is_active:true' \
+          '&rows=1000&start=0&sort=updated+asc&wt=json'
+    text = get_cached_url_content(arx, name='crcns', maxage=1)
+    return json.loads(text)
+
+
+def process_datacite_xml(json_, xml_):
+    pass
+
+
+def get_metadata(dataset=None):
+    """
+
+    Parameters
+    ----------
+    dataset: str, optional
+      If name of dataset is provided, only a single entry is returned. If None,
+      then a dictionary with records for all datasets is returned
+
+    Returns
+    -------
+    dict or ...
+    """
+    import base64
+    import re
+
+    rj = fetch_datacite_metadata()
+
+    all_datasets = {}
+    for i, json_ in enumerate(rj['response']['docs']):
+        xml_ = base64.decodestring(json_['xml'])
+        reg = re.search('AlternativeTitle.?>CRCNS.org ([^<]*)<', xml_)
+
+        if not reg:
+            lgr.warning("Failed to determine AlternativeTitle within %s", xml_)
+            continue
+
+        dataset_ = reg.groups()[0].strip()
+        dataset_meta = process_datacite_xml(json_, xml_)
+
+        if dataset and dataset == dataset_:
+            return dataset_meta
+        if dataset_ in all_datasets:
+            lgr.warning("We have already collected entry for dataset %s",
+                        dataset_)
+        all_datasets[dataset_] = dataset_meta
+
+    return all_datasets
 
 
 def superdataset_pipeline():
