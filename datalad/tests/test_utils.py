@@ -56,6 +56,7 @@ from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
+from .utils import assure_bool
 from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
@@ -325,6 +326,16 @@ def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(
         dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_assure_bool():
+    for values, t in [
+        (['True', 1, '1', 'yes', 'on'], True),
+        (['False', 0, '0', 'no', 'off'], False)
+    ]:
+        for v in values:
+            eq_(assure_bool(v), t)
+    assert_raises(ValueError, assure_bool, "unknown")
 
 
 def test_any_re_search():
