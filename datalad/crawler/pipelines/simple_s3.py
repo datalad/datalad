@@ -19,6 +19,7 @@ from ...consts import DATALAD_SPECIAL_REMOTE
 from ...support.strings import get_replacement_dict
 
 from .simple_with_archives import pipeline as swa_pipeline
+from datalad.utils import assure_bool
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -49,7 +50,10 @@ def pipeline(bucket,
              rename=None,
              directory=None,
              archives=False,
+             allow_dirty=False,
              backend='MD5E',
+             drop=False,
+             drop_force=False,
              **kwargs):
     """Pipeline to crawl/annex an arbitrary bucket
 
@@ -68,11 +72,26 @@ def pipeline(bucket,
     directory : {subdataset}, optional
       What to do when encountering a directory.  'subdataset' would initiate a new sub-dataset
       at that directory
+    drop : bool, optional
+      Drop all the files whenever done crawling
     """
 
     lgr.info("Creating a pipeline for the %s bucket", bucket)
 
+    # TODO: see if we could make it more generic!!!
+    # drop = assure_bool(drop)
+    # drop_force = assure_bool(drop_force)
+
     annex_kw = {}
+
+    to_http = assure_bool(to_http)
+    tag = assure_bool(tag)
+    archives = assure_bool(archives)
+    no_annex = assure_bool(no_annex)
+    allow_dirty = assure_bool(allow_dirty)
+    drop = assure_bool(drop)
+    drop_force = assure_bool(drop_force)
+
     if not to_http:
         annex_kw['special_remotes'] = [DATALAD_SPECIAL_REMOTE]
 
@@ -81,6 +100,7 @@ def pipeline(bucket,
         backend=backend,
         no_annex=no_annex,
         skip_problematic=skip_problematic,
+        allow_dirty=allow_dirty,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
         # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
@@ -137,4 +157,8 @@ def pipeline(bucket,
                                 **kwargs)
     else:
         pipeline = incoming_pipeline
+
+    if drop:
+        pipeline.append(annex.drop(all=True, force=drop_force))
+
     return pipeline

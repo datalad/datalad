@@ -1400,6 +1400,16 @@ class Annexificator(object):
             lgr.warning("Was asked to remove non-existing path %s", filename)
         yield data
 
+    def drop(self, all=False, force=False):
+        """Drop crawled file or all files if all is specified"""
+        def _drop(data):
+            if not all:
+                raise NotImplementedError("provide handling to drop specific file")
+            else:
+                lgr.debug("Dropping all files in %s", self.repo)
+                self.repo.drop([], options=['--all'] + ['--force'] if force else [])
+        return _drop
+
     def initiate_dataset(self, *args, **kwargs):
         """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator
         """
