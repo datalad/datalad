@@ -573,7 +573,7 @@ def fs_extract(nodepath, repo, basepath='/'):
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
     rec = {
-        "name": name, "path": relpath(node._path, basepath), "repo": relpath(node.repo.path, basepath),
+        "name": name, "path": relpath(node._path, basepath),
         "type": node.type_, "size": pretty_size, "date": pretty_date,
     }
     # if there is meta-data for the dataset (done by aggregate-metadata)
