@@ -247,7 +247,8 @@ function nodeJson(jQuery, md5, parent, nodeurl) {
     dataType: 'json',
     async: false,
     success: function(data) {
-      nodeJson_ = {name: data.name || '-',
+      var dname = parent ? ".." : data.name;
+      nodeJson_ = {name: dname || '-',
                    date: data.date || '-',
                    path: data.path || '-',
                    type: data.type || 'dir',

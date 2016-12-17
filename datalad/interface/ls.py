@@ -639,7 +639,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     """
     fs = fs_extract(path, repo, basepath=basepath or path)
 
-    if isdir(path):                                # if node is a directory
+    if isdir(path):                     # if node is a directory
         children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
         # ATM seems some pieces still rely on having this duplication, so left as is
         # TODO: strip away
@@ -726,7 +726,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
         subds_path = opj(rootds.path, subds_path)
         subds = Dataset(subds_path)
-        subds_json = metadata_locator(path=subds_path, ds_path=rootds.path)
+        subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
 
         def handle_not_installed():
             # for now just traverse as fs
