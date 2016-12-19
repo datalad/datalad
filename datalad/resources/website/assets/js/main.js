@@ -86,20 +86,23 @@ function getParameterByName(name, url) {
 
 /**
  * Create Breadcrumbs to current location in dataset
+ * @param {string} jQuery jQuery library object
+ * @param {string} md5 to compute name of current dataset
+ * @param {string} json metadata of current node
  * @return {array} html linkified breadcrumbs array
  */
-function bread2crumbs() {
-  var rawCrumbs = loc().href.split('/');
+function bread2crumbs(jQuery, md5, json) {
+  var rawCrumbs = loc().href.replace(/\/$/, '').split('/');  // split, remove trailing '/'
   var spanClass = '<span class="dir">';
   var crumbs = [];
   for (var index = 2; index < rawCrumbs.length; index++) {
     if (rawCrumbs[index] === '?dir=')
       continue;
     var crumbLink = rawCrumbs.slice(0, index).join('/');
-    if (index === rawCrumbs.length - 1)
-      spanClass = '<span class="cwd">';
-    crumbs.push('<a href=' + crumbLink + '/' + rawCrumbs[index] + '>' + spanClass +
-		rawCrumbs[index] + '</span></a>');
+    var nextLink = crumbLink + '/' + rawCrumbs[index];
+    // create span class of crumb based on node type it represents
+    spanClass = '<span class="' + getNodeType(jQuery, md5, nextLink, json) + '">';
+    crumbs.push('<a href=' + nextLink + '>' + spanClass + rawCrumbs[index] + '</span></a>');
   }
   return crumbs;
 }
@@ -170,7 +173,6 @@ function clickHandler(data, url) {
   var move = data.name === '..' ? parentUrl : childUrl;
   // which path to move, dir parameter or current path ?
   var next = dir ? move(absoluteUrl(dir), data.name) : move(absoluteUrl(''), data.name);
-  // console.log(dir, move, next, updateParamOrPath(next, data.type, dir));
   var traverse = {next: next, type: 'assign'};
   // if to update parameter, make next relative to index.html path
   if (updateParamOrPath(next, data.type, dir))
@@ -261,7 +263,7 @@ function nodeJson(jQuery, md5, parent, nodeurl) {
   // extract url of current node's dataset
   var metaDirRegex = new RegExp(metadataDir + ".*", "g");
   var currentDs = nodeMetaUrl.replace(metaDirRegex, '');
-  return [nodeJson_, currentDs];
+  return {js: nodeJson_, ds: currentDs};
 }
 
 /**
@@ -326,7 +328,11 @@ function getNodeType(jQuery, md5, url, json) {
   // else get metadata json of node if no json object explictly passed
   var dsLoc = null;
   var metaJson = typeof json !== 'undefined' ? json : false;
-  if (!metaJson) [metaJson, dsLoc] = nodeJson(jQuery, md5, false, url);
+  if (!metaJson) {
+    var temp = nodeJson(jQuery, md5, false, url);
+    metaJson = temp.js;
+    dsLoc = temp.ds;
+  }
 
   // return default type if no metaJson or relative_url
   if (!relUrl || !("path" in metaJson) || !("type" in metaJson)) return 'dir';
@@ -469,7 +475,7 @@ function directory(jQuery, md5) {
       });
       // add breadcrumbs
       jQuery('#directory_filter').prepend('<span class="breadcrumb">' +
-                                           bread2crumbs().join(' / ') +
+                                          bread2crumbs(jQuery, md5).join(' / ') +
                                           '</span>');
     }
   });
