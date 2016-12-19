@@ -137,7 +137,7 @@
       QUnit.test("Cache Node Type", function(assert) {
 	ntCache = {};  	// init/reset cache to empty object
 	// handle null case
-	loc = sinon.stub().returns({pathname: '/ds1/', href: 'https://datasets.datalad.org/ds1/?dir=a/b'});
+	loc = sinon.stub().returns({pathname: '/ds1/', href: 'http://a/ds1/?dir=a/b', search: "?dir=a/b"});
 	assert.deepEqual(getNodeType(jQuery, md5, '', {}), "dir", "handle null case, return default type = directory");
 	assert.deepEqual(ntCache, {});
 
@@ -151,26 +151,29 @@
 	var cacheJson = {"a/b": {type: "annex"},
 			 "a/b/c": {type: "git"},
 			 "a/b/c/d": {type: "dir"}};
-	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a/b', testJson), "annex", "returns correct type of current ds");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a/b', testJson), "annex", "returns correct type of current ds");
 	assert.deepEqual(ntCache, cacheJson, "updates cache");
 
 	// test adding new json to cache
-	testJson = {"path": ".", name: "a", "type": "git",
-		    "nodes": [
-		      {"path": ".", type: "git"},
-		      {"path": "b", "type": "git"}
+	testJson = {path: ".", name: "a", type: "git",
+		    nodes: [
+		      {path: ".", type: "git"},
+		      {path: "b", type: "git"}
 		    ]};
-	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a/b', testJson), "annex", "returns already cached type for node");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a/b', testJson), "annex", "returns already cached type for node");
 	assert.deepEqual(ntCache, cacheJson, "no cache updates as searched node already in cache");
 
-	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a', testJson), "git", "returns new node type");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a', testJson), "git", "returns new node type");
 	cacheJson["a"] = {type: "git"};
 	assert.deepEqual(ntCache, cacheJson, "adds new node but doesn't update node already in cache");
-	assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "annex", "fallbacks to href to find current node url, returns its type from cache");
+	assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "dir", "returns default type(dir) if url outside root dataset boundary");
 
-	loc = sinon.stub().returns({pathname: '/ds1/', href: 'https://datasets.datalad.org/ds1/'});
+	loc = sinon.stub().returns({pathname: '/ds1/', href: 'http://a/ds1/'});
 	testJson["type"] = "annex";
-	assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "git", "base url case, return cached type of root dataset");
+	//assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "annex", "fallbacks to href to find current node url, returns its type from cache");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/', testJson), "git", "returns cached type of root dataset when base url, no dir param");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=', testJson), "git", "returns cached type of root_ds when empty dir param");
+	assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=/', testJson), "git", "returns cached type of root_ds when dir='/'");
       });
     </script>
   </body>

@@ -309,11 +309,19 @@ function errorMsg(jQuery, msg) {
  */
 function getNodeType(jQuery, md5, url, json) {
   // convert url to cache key [url relative to root dataset]
-  var relurl = getParameterByName('dir', url) || '/';
+  var relUrl = getParameterByName('dir', url) || '/';
+
+  function abspathlen(url) {
+    return url.replace(loc().search, '').replace(/\/$/, '').length;
+  }
+
+  // if outside root dataset boundary, return default node type
+  if (abspathlen(loc().href) > abspathlen(url))
+    return 'dir';
 
   // if key of url in current path, return cached node's type
-  if (relurl in ntCache)
-    return ntCache[relurl].type;
+  if (relUrl in ntCache)
+    return ntCache[relUrl].type;
 
   // else get metadata json of node if no json object explictly passed
   var dsLoc = null;
@@ -321,7 +329,7 @@ function getNodeType(jQuery, md5, url, json) {
   if (!metaJson) [metaJson, dsLoc] = nodeJson(jQuery, md5, false, url);
 
   // return default type if no metaJson or relative_url
-  if (!relurl || !("path" in metaJson) || !("type" in metaJson)) return 'dir';
+  if (!relUrl || !("path" in metaJson) || !("type" in metaJson)) return 'dir';
 
   // Find relative url of dataset of node at passed url
   // Crude method: Find name of the current dataset in the url passed
@@ -329,21 +337,20 @@ function getNodeType(jQuery, md5, url, json) {
   // this will fail in case of multiple node's with same name as dataset in current url path
   // method of finding node's dataset url only used while testing (by passing json directly to func)
   if (!dsLoc) {
-    metaJson.name = metaJson.name === '' ? undefined : metaJson.name; // to ensure if empty name don't store its type
+    // to ensure correct subpath creation, if ds name empty name or undefined
+    metaJson.name = (!metaJson.name || metaJson.name === '') ? undefined : metaJson.name;
     var rx = new RegExp(metaJson.name + ".*", "g");
-    dsLoc = relurl.replace(rx, metaJson.name);
+    dsLoc = relUrl.replace(rx, metaJson.name);
   }
-
-  // cache type all node's associate with node at url's dataset
+  // cache type of all node's associated with node at url's dataset
   if ("nodes" in metaJson) {
     metaJson.nodes.forEach(function(child) {
-      var childRelUrl = child.path !== '.' ? dsLoc + '/' + child.path : dsLoc;
+      var childRelUrl = child.path !== '.' ? (dsLoc + '/' + child.path).replace(/\/\//, '/') : dsLoc;
       if (!(childRelUrl in ntCache))
         ntCache[childRelUrl] = {type: child.type};
     });
   }
-
-  return (relurl in ntCache) ? ntCache[relurl].type : "dir";
+  return (relUrl in ntCache) ? ntCache[relUrl].type : "dir";
 }
 
 /**
