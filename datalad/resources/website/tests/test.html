@@ -107,6 +107,8 @@
       QUnit.test("Bread2crumbs", function(assert) {
 	loc = sinon.stub().returns({href: 'https://datasets.datalad.org'});
 	assert.deepEqual(bread2crumbs(), ["<a href=https://datasets.datalad.org><span class=\"cwd\">datasets.datalad.org</span></a>"],
+      // define global cache
+      var ntCache = {};
 			 "base case, root directory in breadcrumbs");
 
 	loc = sinon.stub().returns({href: 'https://datasets.datalad.org/ds1'});
@@ -131,6 +133,38 @@
 					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1><span class=\"dir\">d1</span></a>",
 					  "<a href=https://datasets.datalad.org/ds1/?dir=/d1/d2><span class=\"cwd\">d2</span></a>"],
 			 "multiple sub-directories in 'dir' get parameter");
+      QUnit.test("Cache Node Type", function(assert) {
+	ntCache = {};  	// init/reset cache to empty object
+	// handle null case
+	loc = sinon.stub().returns({pathname: '/ds1/', href: 'https://datasets.datalad.org/ds1/?dir=a/b'});
+	assert.deepEqual(getNodeType(jQuery, md5, '', {}), "dir", "handle null case, return default type = directory");
+	assert.deepEqual(ntCache, {});
+
+	// test json with all normal relevant elements instantiated
+	var testJson = {path: ".", type: "annex", name: "b",
+			nodes: [
+			  {path: "c", type: "git"},
+			  {path: "c/d", type: "dir"}
+			]};
+	var cacheJson = {"a/b": {type: "annex"},
+			 "a/b/c": {type: "git"},
+			 "a/b/c/d": {type: "dir"}};
+	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a/b', testJson), "annex", "returns correct type of current ds");
+	assert.deepEqual(ntCache, cacheJson, "updates cache");
+
+	// test adding new json to cache
+	testJson = {"path": ".", name: "a", "type": "git",
+		    "nodes": [
+		      {"path": ".", "type": "git"},
+		      {"path": "b/c", "type": "annex"}
+		    ]};
+	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a/b/c', testJson), "git", "returns already cached type for node");
+	assert.deepEqual(ntCache, cacheJson, "no cache updates as searched node already in cache");
+
+	assert.deepEqual(getNodeType(jQuery, md5, '?dir=a', testJson), "git", "returns new node type");
+	cacheJson["a"] = {type: "git"};
+	assert.deepEqual(ntCache, cacheJson, "adds new node but doesn't update node already in cache");
+	assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "annex", "fallbacks to href to find current node url, returns its type from cache");
       });
     </script>
   </body>

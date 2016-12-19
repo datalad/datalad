@@ -1,5 +1,6 @@
 /* global window XMLHttpRequest */
 var metadataDir = '.git/datalad/metadata/';
+var ntCache = {};   // node_path: type cache[dictionary]
 
 /**
  * check if url exists
@@ -229,7 +230,7 @@ function metadataLocator(md5, parent, nodeurl) {
  * @param {string} md5 path of current dataset
  * @param {string} parent if parent, find metadata json of parent directory instead
  * @param {string} nodeurl if nodeurl, find metadata json wrt node at nodeurl (default: loc().href)
- * @return {object} return metadata json object of node if it exists
+ * @return {array} return metadata json object and location of node, if it exists
  */
 function nodeJson(jQuery, md5, parent, nodeurl) {
   // if path argument set, find metadata file wrt node at path directory, else current location
@@ -238,7 +239,7 @@ function nodeJson(jQuery, md5, parent, nodeurl) {
 
   // if node's dataset or node's metadata directory doesn't exist, return error code
   if (nodeMetaUrl === '' || !urlExists(nodeMetaUrl))
-    return {};
+    return [{}, null];
 
   // else return required info for parent row from parent metadata json
   var nodeJson_ = {};
@@ -256,7 +257,7 @@ function nodeJson(jQuery, md5, parent, nodeurl) {
                    size: sizeRenderer(data.size || null)};
     }
   });
-  return nodeJson_;
+  return [nodeJson_, nodeMetaUrl];
 }
 
 /**
@@ -292,6 +293,56 @@ function errorMsg(jQuery, msg) {
   jQuery('#content').prepend(
     "<P> ERROR: " + msg + "</P>"
   );
+}
+
+/**
+ * get (and cache) the node type given its path and associated metadata json
+ * @param {object} jQuery jQuery library object
+ * @param {object} md5 md5 library object
+ * @param {string} url leaf url to start caching from upto root
+ * @param {object} json metadata json object
+ * @return {string} returns the type of the node at path
+ */
+function getNodeType(jQuery, md5, url, json) {
+  // convert url to cache key [url relative to root dataset]
+  var relurl = getParameterByName('dir', url) || '';
+
+  // if key of url in current path, return cached node's type
+  if (relurl in ntCache)
+    return ntCache[relurl].type;
+
+  // else get metadata json of node if no json object explictly passed
+  var metaLoc = null;
+  var metaJson = typeof json !== 'undefined' ? json : false;
+  if (!metaJson) [metaJson, metaLoc] = nodeJson(jQuery, md5, false, url);
+
+  // return default type if no metaJson or relative_url
+  if (!relurl || !("path" in metaJson) || !("type" in metaJson)) return 'dir';
+
+  // Find relative url of dataset of node at passed url
+  // Crude method: Find name of the current dataset in the url passed
+  // i.e if dataset_name = b, url = a/b/c, dataset_url = a/b
+  // this will fail in case of multiple node's with same name as dataset in current url path
+  // this method of finding node's dataset url only used while testing (by passing json directly to func)
+  if (!metaLoc) {
+    metaJson.name = metaJson.name === '' ? undefined : metaJson.name; // to ensure if empty name don't store its type
+    var rx = new RegExp(metaJson.name + ".*", "g");
+    metaLoc = relurl.replace(rx, metaJson.name);
+  }
+
+  // cache node's dataset's path:type pair
+  ntCache[metaLoc] = {type: metaJson.type};
+
+  // cache node's dataset's children path:type pairs too
+  if ("nodes" in metaJson) {
+    metaJson.nodes.forEach(function(child) {
+      var childRelUrl = metaLoc + '/' + child.path;
+      if (!(childRelUrl in ntCache) && child.path !== '.')
+        ntCache[childRelUrl] = {type: child.type};
+    });
+  }
+
+  return (relurl in ntCache) ? ntCache[relurl].type : "dir";
 }
 
 /**
@@ -396,7 +447,7 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parentMeta = nodeJson(jQuery, md5, true);
+        var parentMeta = nodeJson(jQuery, md5, true)[0];
         if (!jQuery.isEmptyObject(parentMeta))
           api.row.add(parentMeta).draw();
       }
