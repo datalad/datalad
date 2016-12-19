@@ -91,7 +91,7 @@ function getParameterByName(name, url) {
  * @param {string} json metadata of current node
  * @return {array} html linkified breadcrumbs array
  */
-function bread2crumbs(jQuery, md5, json) {
+function bread2crumbs(jQuery, md5) {
   var rawCrumbs = loc().href.replace(/\/$/, '').split('/');  // split, remove trailing '/'
   var spanClass = '<span class="dir">';
   var crumbs = [];
@@ -101,7 +101,7 @@ function bread2crumbs(jQuery, md5, json) {
     var crumbLink = rawCrumbs.slice(0, index).join('/');
     var nextLink = crumbLink + '/' + rawCrumbs[index];
     // create span class of crumb based on node type it represents
-    spanClass = '<span class="' + getNodeType(jQuery, md5, nextLink, json) + '">';
+    spanClass = '<span class="' + getNodeType(jQuery, md5, nextLink) + '">';
     crumbs.push('<a href=' + nextLink + '>' + spanClass + rawCrumbs[index] + '</span></a>');
   }
   return crumbs;
@@ -309,7 +309,7 @@ function errorMsg(jQuery, msg) {
  * @param {object} json metadata json object
  * @return {string} returns the type of the node at path
  */
-function getNodeType(jQuery, md5, url, json) {
+function getNodeType(jQuery, md5, url) {
   // convert url to cache key [url relative to root dataset]
   var relUrl = getParameterByName('dir', url) || '/';
 
@@ -326,13 +326,9 @@ function getNodeType(jQuery, md5, url, json) {
     return ntCache[relUrl].type;
 
   // else get metadata json of node if no json object explictly passed
-  var dsLoc = null;
-  var metaJson = typeof json !== 'undefined' ? json : false;
-  if (!metaJson) {
-    var temp = nodeJson(jQuery, md5, false, url);
-    metaJson = temp.js;
-    dsLoc = temp.ds;
-  }
+  var temp = nodeJson(jQuery, md5, false, url);
+  var metaJson = temp.js;
+  var dsLoc = temp.ds;
 
   // return default type if no metaJson or relative_url
   if (!relUrl || !("path" in metaJson) || !("type" in metaJson)) return 'dir';
@@ -461,7 +457,7 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parentMeta = nodeJson(jQuery, md5, true)[0];
+        var parentMeta = nodeJson(jQuery, md5, true).js;
         if (!jQuery.isEmptyObject(parentMeta))
           api.row.add(parentMeta).draw();
       }
