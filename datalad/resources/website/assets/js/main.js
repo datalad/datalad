@@ -230,11 +230,12 @@ function metadataLocator(md5, parent, nodeurl) {
  * Retrieve metadata json of (parent of) node at path (default: current loc)
  * @param {string} jQuery jQuery library object
  * @param {string} md5 path of current dataset
- * @param {string} parent if parent, find metadata json of parent directory instead
+ * @param {bool} parent if parent, find metadata json of parent directory instead
+ * @param {bool} top if top, don't return children metadata
  * @param {string} nodeurl if nodeurl, find metadata json wrt node at nodeurl (default: loc().href)
  * @return {array} return metadata json and location of node's dataset, if it exists
  */
-function nodeJson(jQuery, md5, parent, nodeurl) {
+function nodeJson(jQuery, md5, parent, top, nodeurl) {
   // if path argument set, find metadata file wrt node at path directory, else current location
   // if parent argument set, find metadata json of parent directory instead
   var nodeMetaUrl = metadataLocator(md5, parent, nodeurl);
@@ -251,18 +252,18 @@ function nodeJson(jQuery, md5, parent, nodeurl) {
     async: false,
     success: function(data) {
       var dname = parent ? ".." : data.name;
-      nodeJson_ = {name: dname || '-',
-                   date: data.date || '-',
-                   path: data.path || '-',
-                   type: data.type || 'dir',
-                   description: data.description || '',
-                   size: sizeRenderer(data.size || null)};
+      nodeJson_ = top ? {name: dname || '-',
+                         date: data.date || '-',
+                         path: data.path || '-',
+                         type: data.type || 'dir',
+                         description: data.description || '',
+                         size: sizeRenderer(data.size || null)} : data;
     }
   });
 
-  // extract url of current node's dataset
+  // extract relative url of current node's dataset
   var metaDirRegex = new RegExp(metadataDir + ".*", "g");
-  var currentDs = nodeMetaUrl.replace(metaDirRegex, '');
+  var currentDs = nodeMetaUrl.replace(metaDirRegex, '').replace(loc().pathname, '/');
   return {js: nodeJson_, ds: currentDs};
 }
 
@@ -326,7 +327,7 @@ function getNodeType(jQuery, md5, url) {
     return ntCache[relUrl].type;
 
   // else get metadata json of node if no json object explictly passed
-  var temp = nodeJson(jQuery, md5, false, url);
+  var temp = nodeJson(jQuery, md5, false, false, url);
   var metaJson = temp.js;
   var dsLoc = temp.ds;
 
@@ -457,7 +458,7 @@ function directory(jQuery, md5) {
       var api = this.api();
       // all tables should have ../ parent path except webinterface root
       if (!parent) {
-        var parentMeta = nodeJson(jQuery, md5, true).js;
+        var parentMeta = nodeJson(jQuery, md5, true, true).js;
         if (!jQuery.isEmptyObject(parentMeta))
           api.row.add(parentMeta).draw();
       }
