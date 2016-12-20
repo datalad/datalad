@@ -273,7 +273,7 @@ class Create(Interface):
             Save.__call__(
                 message='[DATALAD] new dataset',
                 dataset=tbds,
-                auto_add_changes=False,
+                all_changes=False,
                 recursive=False)
 
         if dataset is not None and dataset.path != tbds.path:
@@ -288,7 +288,7 @@ class Create(Interface):
                 Save.__call__(
                     message='[DATALAD] added subdataset',
                     dataset=dataset,
-                    auto_add_changes=False,
+                    all_changes=False,
                     recursive=False)
 
         return tbds

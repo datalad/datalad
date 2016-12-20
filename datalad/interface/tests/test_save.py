@@ -36,7 +36,7 @@ def test_save(path):
     ds.repo.add("new_file.tst", git=True)
     ok_(ds.repo.dirty)
 
-    ds.save("add a new file", auto_add_changes=False)
+    ds.save("add a new file", all_changes=False)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     with open(opj(path, "new_file.tst"), "w") as f:
@@ -44,7 +44,7 @@ def test_save(path):
 
     ok_(ds.repo.dirty)
     # no need to git add before:
-    ds.save("modified new_file.tst", auto_add_changes=True)
+    ds.save("modified new_file.tst", all_changes=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     files = ['one.txt', 'two.txt']
@@ -61,11 +61,11 @@ def test_save(path):
     # modify subds
     with open(opj(subds.path, "some_file.tst"), "w") as f:
         f.write("something")
-    subds.save(auto_add_changes=True)
+    subds.save(all_changes=True)
     ok_clean_git(subds.path, annex=isinstance(ds.repo, AnnexRepo))
     ok_(ds.repo.dirty)
     # ensure modified subds is commited
-    ds.save(auto_add_changes=True)
+    ds.save(all_changes=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
 

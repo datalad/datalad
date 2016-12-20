@@ -172,7 +172,7 @@ def test_aggregation(path):
     assert_true(success)
 
     # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data', auto_add_changes=True)
+    ds.save('with aggregated meta data', all_changes=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
     clone = install(opj(path, 'clone'), source=ds.path)
@@ -386,7 +386,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(get_metadata(ds)))
         # making it a submodule has no effect either
-        ds.save(auto_add_changes=True)
+        ds.save(all_changes=True)
         assert_equal(len(ds.get_subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1

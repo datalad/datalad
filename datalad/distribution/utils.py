@@ -450,6 +450,6 @@ def _save_installed_datasets(ds, installed_datasets):
     ds.save(
         files=paths,
         message='[DATALAD] ' + msg,
-        auto_add_changes=False,
+        all_changes=False,
         recursive=False)
 

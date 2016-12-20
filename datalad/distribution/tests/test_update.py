@@ -86,7 +86,7 @@ def test_update_simple(origin, src_path, dst_path):
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, 'subm 2'), {'load.dat': 'heavy'})
     source.save(message="saving changes within subm2",
-                recursive=True, auto_add_changes=True)
+                recursive=True, all_changes=True)
     dest.update(merge=True, recursive=True)
     # and now we can get new file
     dest.get('subm 2/load.dat')

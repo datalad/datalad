@@ -358,7 +358,7 @@ class Add(Interface):
                 Save.__call__(
                     message='[DATALAD] added content',
                     dataset=ds,
-                    auto_add_changes=False,
+                    all_changes=False,
                     recursive=False)
             # TODO: you feels that this is some common logic we already have somewhere
             dsrelpath = relpath(dspath, dataset.path)

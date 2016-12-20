@@ -252,7 +252,7 @@ class Uninstall(Interface):
                 'inappropriate arguments, see previous error message(s)')
 
         handle_dirty_datasets(
-            content_by_ds.keys(), mode=if_dirty, base=dataset)
+            content_by_ds, mode=if_dirty, base=dataset)
 
         results = []
 
@@ -357,7 +357,7 @@ class Remove(Interface):
                 "refusing to uninstall current or parent directory")
 
         handle_dirty_datasets(
-            content_by_ds.keys(), mode=if_dirty, base=dataset)
+            content_by_ds, mode=if_dirty, base=dataset)
 
         ds2save = set()
         results = []
@@ -401,7 +401,7 @@ class Remove(Interface):
             list(ds2save),
             base=dataset.path if dataset and dataset.is_installed() else None,
             message='[DATALAD] removed content',
-            auto_add_changes=False)
+            all_changes=False)
         return results
 
     @classmethod

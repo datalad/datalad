@@ -77,7 +77,8 @@ def handle_dirty_dataset(ds, mode, msg=None):
     elif mode == 'save-before':
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
-        Save.__call__(dataset=ds, message=msg, auto_add_changes=True)
+        from datalad.interface.save import Save
+        Save.__call__(dataset=ds, message=msg, all_changes=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
@@ -108,7 +109,7 @@ def handle_dirty_datasets(dpaths,
             dpaths,
             base=base,
             message=msg,
-            auto_add_changes=True)
+            all_changes=True)
     elif mode == 'ignore':
         return
     elif mode == 'fail':
@@ -131,8 +132,9 @@ def save_dataset_hierarchy(
         dpaths,
         base=None,
         message='[DATALAD] saved changes',
-        auto_add_changes=False):
-    """Save a (disjoint) hierarchy of dataset.
+        all_changes=False,
+        version_tag=None):
+    """Save (disjoint) hierarchies of datasets.
 
     Saving is done in an order that guarantees that all to be saved
     datasets reflect any possible change of any other to be saved

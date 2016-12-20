@@ -484,7 +484,7 @@ def test_implicit_install(src, dst):
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
     origin_subsub.add("file3.txt")
-    origin_top.save(auto_add_changes=True)
+    origin_top.save(all_changes=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -588,7 +588,7 @@ def test_install_recursive_repeat(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.save(all_changes=True, recursive=True)
 
     # install top level:
     top_ds = install(path, source=src)
@@ -691,7 +691,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.save(all_changes=True, recursive=True)
 
     # install top level:
     cdss = install(path, source=src, recursive=True)

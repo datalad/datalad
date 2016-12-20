@@ -117,10 +117,10 @@ class Save(Interface):
             metavar='MESSAGE',
             doc="""a message to annotate the saved state.""",
             constraints=EnsureStr() | EnsureNone()),
-        auto_add_changes=Parameter(
-            args=("-a", "--auto-add-changes"),
-            doc="""automatically include all changes in the entire dataset,
-            independent of the current working directory.""",
+        all_changes=Parameter(
+            args=("-a", "--all-changes"),
+            doc="""save changes of all known components in datasets that contain
+            any of the given paths.""",
             action="store_true"),
         version_tag=Parameter(
             args=("--version-tag",),
