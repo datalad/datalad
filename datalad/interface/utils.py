@@ -13,26 +13,31 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+import os
 from os import curdir
 from os import pardir
 from os.path import join as opj
 from os.path import lexists
+from os.path import isabs
 from os.path import isdir
 from os.path import dirname
+from os.path import normpath
 from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
 
+from datalad.dochelpers import exc_str
 # avoid import from API to not get into circular imports
-from datalad.interface.save import Save
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
 from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
 
 
@@ -106,10 +111,9 @@ def handle_dirty_datasets(dpaths,
     """
     if mode == 'save-before':
         save_dataset_hierarchy(
-            dpaths,
+            {d: d for d in dpaths},
             base=base,
-            message=msg,
-            all_changes=True)
+            message=msg)
     elif mode == 'ignore':
         return
     elif mode == 'fail':
@@ -128,11 +132,73 @@ def handle_dirty_datasets(dpaths,
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
 
+def get_tree_roots(paths):
+    """Return common root paths for a set of paths
+
+    This function determines the smallest set of common root
+    paths and sorts all given paths under the respective
+    root.
+
+    Returns
+    -------
+    dict
+      paths by root
+    """
+    paths_ws = [_with_sep(p) for p in paths]
+    # sort all paths under their potential roots
+    roots = {}
+    # start from the top to get all paths down the line
+    # and collate them into as few roots as possible
+    for s in sorted(paths_ws):
+        if any([s.startswith(r) for r in roots]):
+            # this path is already covered by a known root
+            continue
+        # find all sub paths
+        subs = [p for p in paths if p.startswith(s)]
+        roots[s.rstrip(sep)] = subs
+    return roots
+
+
+def sort_paths_into_subdatasets(superds_path, target_subs, spec):
+    # XXX forge a chain: whenever some path needs to be pushed down
+    # put the receiving dataset as a components to process into the
+    # respective superdataset -- this will enable further processing
+    # of all datasets in a completely independent fashion
+    # (except for order of processing)
+
+    # get all existing subdataset as candidate nodes of the graph
+    # that needs to be built and checked
+    subds_graph = Dataset(superds_path).get_subdatasets(
+        absolute=True, recursive=True, edges=True, fulfilled=True)
+    for t in target_subs:
+        trace = get_trace(
+            subds_graph,
+            # need to strip separator to make `==` work
+            superds_path,
+            t)
+        tosort = [superds_path] + trace + [t]
+        # loop over all but the last one, simplifies logic below
+        for i, d in enumerate(tosort[:-1]):
+            paths = spec.get(d, [])
+            keep_paths = []
+            next_ds = tosort[i + 1]
+            next_dspaths = spec.get(next_ds, [])
+            comp = _with_sep(next_ds)
+            for p in assure_list(paths):
+                if p.startswith(comp):
+                    next_dspaths.append(p)
+                    # remember that we pushed the path into this dataset
+                    keep_paths.append(next_ds)
+                else:
+                    keep_paths.append(p)
+            spec[next_ds] = next_dspaths
+            spec[d] = keep_paths
+
+
 def save_dataset_hierarchy(
-        dpaths,
+        info,
         base=None,
         message='[DATALAD] saved changes',
-        all_changes=False,
         version_tag=None):
     """Save (disjoint) hierarchies of datasets.
 
@@ -142,70 +208,268 @@ def save_dataset_hierarchy(
 
     Parameters
     ----------
-    dpaths : sequence
-      Absolute paths of datasets to be saved
+    info : dict
+      Absolute paths of datasets to be saved are the keys, and paths in each
+      dataset to be saved are the values
     base : path or None, optional
       Common super dataset that should also be saved.
     message : str
       Message to be used for saving individual datasets
-    auto_add_changes : bool
-      Whether to auto include any modifications in a dataset.
+
+    Returns
+    -------
+    list
+      Instances of saved datasets, in the order in which they where saved.
     """
+    if not isinstance(info, dict):
+        info = assure_list(info)
+        info = dict(zip(info, [[i] for i in info]))
+    print('INFUCK', info)
+    # TODO check if `add` can do this and move there if necessary
+    #if all_changes:
+    #    # we need to make sure to register all possibly untracked subdatasets
+    #    # before we build the dataset graph tell can tell us in which order
+    #    # things need to be processed
+    #    toprocess = assure_list(info.keys())
+    #    if not toprocess and base:
+    #        # only there arn't any specific base dataset pieces given to process
+    #        # consider the entire dataset too
+    #        toprocess.append(base.path if isinstance(base, Dataset) else base)
+    #    while toprocess:
+    #        dpath = toprocess.pop()
+    #        new_submodules = untracked_subdatasets_to_submodules(
+    #            Dataset(dpath),
+    #            info[dpath] if dpath in info else [])
+    #        for ns in new_submodules:
+    #            dsinfo = info.get(ns, [])
+    #            dsinfo.append(ns)
+    #            info[ns] = dsinfo
+    #            # make sure to look at any new ones too
+    #            toprocess.append(ns)
+    dpaths = info.keys()
     if base:
         # just a convenience...
         dpaths = assure_list(dpaths)
         dpaths.append(base.path if isinstance(base, Dataset) else base)
-    dpaths_ws = [_with_sep(d) for d in dpaths]
     # sort all datasets under their potential superdatasets
-    superdss = {}
     # start from the top to get all subdatasets down the line
     # and collate them into as few superdatasets as possible
-    for s in sorted(dpaths_ws):
-        if any([s.startswith(d) for d in superdss]):
-            # this path is already covered by a known superdataset
-            continue
-        # find all subdatasets
-        subs = [d for d in dpaths if d.startswith(s)]
-        superdss[s] = subs
+    superdss = get_tree_roots(dpaths)
     # for each "superdataset" check the tree of subdatasets and make sure
     # we gather all datasets between the super and any subdataset
     # so we can save them all bottom-up in order to be able to properly
     # save the superdataset
-    tosave = set(dpaths)
+    tocheck = set(dpaths)
     for superds_path in superdss:
         target_subs = superdss[superds_path]
-        subds_graph = Dataset(superds_path).get_subdatasets(
-            absolute=True, recursive=True, edges=True, fulfilled=True)
-        for t in target_subs:
-            trace = get_trace(
-                subds_graph,
-                # need to strip separator to make `==` work
-                superds_path.rstrip(sep),
-                t)
-            if trace:
-                tosave = tosave.union(trace)
+        sort_paths_into_subdatasets(superds_path, target_subs, info)
     # iterate over all datasets, starting at the bottom
-    for dpath in sorted(tosave, reverse=True):
+    saved = []
+    print('INFO', info)
+    for dpath in sorted(info.keys(), reverse=True):
         ds = Dataset(dpath)
         if ds.is_installed():
-            Save.__call__(
-                dataset=ds,
+            saved_state = save_dataset(
+                ds,
+                info[dpath],
                 message=message,
-                auto_add_changes=auto_add_changes,
-                recursive=False)
-        superds = ds.get_superdataset(
-            datalad_only=False,
-            topmost=False)
-        if superds and superds.path in tosave:
-            # stage the new state known in a superdataset, but only if it is
-            # to be saved
-            superds.repo.add(
-                relpath(dpath, start=superds.path),
-                git=True)
+                version_tag=version_tag)
+            if saved_state:
+                saved.append(ds)
+    return saved
+
+
+def save_dataset(
+        ds,
+        paths=None,
+        message=None,
+        version_tag=None):
+    """Save changes in a single dataset.
+
+    Parameters
+    ----------
+    ds : Dataset
+      The dataset to be saved.
+    paths : list, optional
+      Paths to dataset components to be saved.
+    message: str, optional
+      (Commit) message to be attached to the saved state.
+    version_tag : str, optional
+      Tag to be assigned to the saved state.
+
+    Returns
+    -------
+    bool
+      Whether a new state was saved. If all to be saved content was unmodified
+      no new state will be saved.
+    """
+    # XXX paths must be in the given ds, no further sanity checks!
+
+    # make sure that all pending changes (batched annex operations, etc.)
+    # are actually reflected in Git
+    ds.repo.precommit()
+
+    # track what is to be committed, so it becomes
+    # possible to decide when/what to save further down
+    # and one level up
+    orig_hexsha = ds.repo.get_hexsha()
+
+    ## TODO this needs to go into `add`
+    #new_submodules = untracked_subdatasets_to_submodules(
+    #    ds, files)
+    #if new_submodules:
+    #    # make sure that .gitmodules is added to the list of files
+    #    # to be committed.  Adding to index might not be enough iff
+    #    # custom files was provided
+    #    to_commit.append('.gitmodules')
+    #to_commit.extend(new_submodules)
+
+    # always yields list; empty if None
+    files = list(
+        set(
+            [opj(ds.path, f) if not isabs(f) else f for f in assure_list(paths)]))
+
+    if not files:
+        return False
+
+    # try to consider existing and changed files, and prevent untracked
+    # files from being added
+    # XXX not acting upon untracked files would be very expensive, because
+    # I see no way to avoid using `add` below and git annex has no equivalent
+    # to git add's --update -- so for now don't bother
+    # XXX alternatively we could consider --no-ignore-removal to also
+    # have it delete any already vanished files
+    # asking yourself why we need to `add` at all? For example, freshly
+    # unlocked files in a v5 repo are listed as "typechange" and commit
+    # refuses to touch them without an explicit `add`
+    if isinstance(ds.repo, AnnexRepo):
+        # to make this work without calling `git add` in addition,
+        # this needs git-annex v6.20161210 (see #1027)
+        ds.repo.add(files, commit=False)
+    else:
+        # --update will ignore any untracked files, sadly git-annex add
+        # above does not
+        ds.repo.add(files, git_options=['--update'], commit=False)
+
+    _datalad_msg = False
+    if not message:
+        message = 'Recorded existing changes'
+        _datalad_msg = True
+
+    # TODO: commit() should rather report a dedicated ValueError
+    # waiting for #1170
+    from datalad.support.exceptions import CommandError
+    try:
+        ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
+    except CommandError as e:
+        # TODO until #1171 is resolved, test here for "normal" failure to commit
+        if 'nothing to commit' in str(e):
+            lgr.warning(
+                "Was instructed to commit %s files but repository is not dirty",
+                files)
+        elif 'no changes added to commit':
+            lgr.info(
+                'Nothing to save')
+        else:
+            raise ValueError(e)
+
+    # MIH: let's tag even if there was nothing commit. I'd forget this
+    # option too often...
+    if version_tag:
+        ds.repo.tag(version_tag)
+
+    _was_modified = ds.repo.get_hexsha() != orig_hexsha
+
+    return ds.repo.repo.head.commit if _was_modified else None
+
+
+def amend_pathspec_with_superdatasets(spec, topmost=True):
+    """Amend a path spec dictionary with entries for superdatasets
+
+    The result will be a superdataset entry (if a superdataset exists)
+    for each input dataset. This entry will (at least) contain the path
+    to the subdataset.
+
+    Parameters
+    ----------
+    spec : dict
+      Path spec
+    topmost : Dataset or bool
+      Flag whether to grab the immediate, or the top-most superdataset
+      for each entry, alternatively this can be a dataset instance
+      that is used as the topmost dataset. If no superdataset matches
+      this specific dataset the absolute topmost is used instead.
+    Returns
+    -------
+    dict
+      Amended path spec dictionary
+    """
+    superdss = {}
+    for dpath in spec.keys():
+        if isinstance(topmost, Dataset) \
+                and dpath.startswith(_with_sep(topmost.path)):
+            # the given topmost dataset is "above" the current
+            # datasets path
+            superds = topmost
+        else:
+            # grab the (topmost) superdataset
+            superds = Dataset(dpath).get_superdataset(
+                datalad_only=True, topmost=topmost)
+        if not superds:
+            continue
+        # register the subdatasets path in the spec of the superds
+        spaths = superdss.get(superds.path, [])
+        if not spaths:
+            spaths = spec.get(superds.path, [])
+        spaths.append(dpath)
+        superdss[superds.path] = spaths
+    spec.update(superdss)
+    return spec
+
+
+def untracked_subdatasets_to_submodules(ds, consider_paths):
+    # treat special case of still untracked subdatasets.
+    # those need to become submodules now, as they are otherwise added
+    # without an entry in .gitmodules, and subsequently break Git's
+    # submodule functionality completely
+    dspath = ds.path
+    new_modules = []
+    if not consider_paths:
+        # nothing to test
+        return new_modules
+
+    # we cannot ask for "untracked_files", because that requires a working tree
+    # that could be expensive to obtain in direct mode repos
+    # so a different approach....
+
+    # get a list of all directories (abspath) with content known to git
+    # this will include mount points of known subdatasets
+    indexed_dirs = set([opj(ds.path, f if isdir(opj(ds.path, f)) else dirname(f))
+                        for f in ds.repo.get_indexed_files()])
+    # now get all the actual directories in this dataset
+    existing_dirs = set([d for testpath in consider_paths
+                         for d in get_dataset_directories(testpath,
+                                                          ignore_datalad=True)
+                         # do not probe for paths in subdatasets
+                         if GitRepo.get_toppath(testpath) == ds.path])
+    # the difference are directories that could be an untracked subdataset
+    subds_candidates = existing_dirs.difference(indexed_dirs)
+    for cand_dspath in subds_candidates:
+        if not Dataset(cand_dspath).is_installed():
+            # this is not the top of an actual dataset
+            continue
+        _install_subds_inplace(
+            ds=ds,
+            path=cand_dspath,  # can be ignored, we don't need the return value
+            relativepath=relpath(cand_dspath, start=ds.path),
+            name=None)
+        new_modules.append(cand_dspath)
+
+    return new_modules
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
-                         out=None, dir_lookup=None, mark_recursive=False):
+                         out=None, dir_lookup=None):
     """Sort a list of paths per dataset they are contained in.
 
     Any paths that are not part of a dataset, or presently unavailable are
@@ -221,16 +485,11 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
       Depth constraint for recursion. See `Dataset.get_subdatasets()` for more
       information.
     out : dict or None
-      By default a new output dictionary is created, howeverm and existing one
+      By default a new output dictionary is created, however an existing one
       can be provided via this argument to enable incremental processing.
     dir_lookup : dict or None
       Optional lookup cache that maps paths to previously determined datasets.
       This can speed up repeated processing.
-    mark_recursive : bool
-      If True, subdatasets "discovered" by recursion are marked such that
-      their value is a one-item list that contains `curdir` as the only item,
-      otherwise the item will be the same as the key -- the absolute path to
-      the respective dataset.
 
     Returns
     -------
@@ -296,7 +555,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         # this subdataset has been processed before
                         out[subdspath] = out.get(
                             subdspath,
-                            [curdir if mark_recursive else subdspath])
+                            [subdspath])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 
@@ -383,8 +642,8 @@ def get_dataset_directories(top, ignore_datalad=True):
     list
       List of directories matching the top-level path, regardless of whether
       these directories are known to Git (i.e. contain tracked files). The
-      list does not include the top-level path itself, nor does it include
-      any subdataset mount point (regardless of whether the particular
+      list does not include the top-level path itself, but it does include
+      any subdataset mount points (regardless of whether the particular
       subdatasets are installed or not).
     """
     def func(arg, top, names):
@@ -392,10 +651,11 @@ def get_dataset_directories(top, ignore_datalad=True):
         legit_names = []
         for n in names:
             path = opj(top, n)
-            if not isdir(path) \
-                    or path in ignore \
-                    or not GitRepo.get_toppath(path) == refpath:
+            if not isdir(path) or path in ignore:
                 pass
+            elif GitRepo.get_toppath(path) != refpath:
+                # mount point, keep but don't dive into
+                dirs.append(path)
             else:
                 legit_names.append(n)
                 dirs.append(path)
@@ -406,9 +666,6 @@ def get_dataset_directories(top, ignore_datalad=True):
     if not refpath:
         raise ValueError("`top` path {} is not in a dataset".format(top))
     ignore = [opj(refpath, get_git_dir(refpath))]
-    # always ignore subdataset mount points
-    ignore.extend(Dataset(refpath).get_subdatasets(
-        absolute=True, recursive=False, fulfilled=False))
     if ignore_datalad:
         ignore.append(opj(refpath, '.datalad'))
     d = []

@@ -452,4 +452,3 @@ def _save_installed_datasets(ds, installed_datasets):
         message='[DATALAD] ' + msg,
         all_changes=False,
         recursive=False)
-

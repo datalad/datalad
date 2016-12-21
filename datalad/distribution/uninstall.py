@@ -400,8 +400,7 @@ class Remove(Interface):
         save_dataset_hierarchy(
             list(ds2save),
             base=dataset.path if dataset and dataset.is_installed() else None,
-            message='[DATALAD] removed content',
-            all_changes=False)
+            message='[DATALAD] removed content')
         return results
 
     @classmethod
