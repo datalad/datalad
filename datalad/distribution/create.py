@@ -17,15 +17,13 @@ from os import listdir
 from os.path import isdir, realpath, relpath, join as opj
 
 from datalad.interface.base import Interface
-from datalad.interface.save import Save
+from datalad.interface.utils import save_dataset
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import nosave_opt
-from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import shared_access_opt
-from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureDType
@@ -58,6 +56,10 @@ class Create(Interface):
     laptop". This helps humans to identify data locations in distributed
     scenarios.  By default an identifier comprised of user and machine name,
     plus path will be generated.
+
+    This command only creates a new dataset, it does not add any content to it,
+    even if the target directory already contains additional files or
+    directories.
 
     Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
     However, the result will not be a full dataset, and, consequently,
@@ -104,7 +106,6 @@ class Create(Interface):
             annex""",
             action='store_true'),
         save=nosave_opt,
-        if_dirty=if_dirty_opt,
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -148,7 +149,6 @@ class Create(Interface):
             annex_version=None,
             annex_backend='MD5E',
             native_metadata_type=None,
-            if_dirty='save-before',
             shared_access=None,
             git_opts=None,
             annex_opts=None,
@@ -206,8 +206,6 @@ class Create(Interface):
         real_targetpath = with_pathsep(realpath(path))  # realpath OK
         if dataset is not None:
             # make sure we get to an expected state
-            if dataset.is_installed():
-                handle_dirty_dataset(dataset, if_dirty)
             if not real_targetpath.startswith(  # realpath OK
                     with_pathsep(realpath(dataset.path))):  # realpath OK
                 raise ValueError("path {} outside {}".format(path, dataset))
@@ -267,16 +265,17 @@ class Create(Interface):
             gitattr.write('** annex.largefiles=nothing\n')
 
         # save everthing
+        # TODO use `add` without save
         tbds.repo.add('.datalad', git=True)
 
         if save:
-            Save.__call__(
-                message='[DATALAD] new dataset',
-                dataset=tbds,
-                all_changes=False,
-                recursive=False)
+            save_dataset(
+                tbds,
+                paths=['.datalad'],
+                message='[DATALAD] new dataset')
 
         if dataset is not None and dataset.path != tbds.path:
+            # TODO this needs to be RF'ed to call add on the subdataset
             # we created a dataset in another dataset
             # -> make submodule
             from datalad.distribution.utils import _install_subds_inplace
@@ -285,11 +284,10 @@ class Create(Interface):
                                    relativepath=subdsrelpath)
             # this will have staged the changes in the superdataset already
             if save:
-                Save.__call__(
-                    message='[DATALAD] added subdataset',
-                    dataset=dataset,
-                    all_changes=False,
-                    recursive=False)
+                save_dataset(
+                    dataset,
+                    paths=[tbds.path, '.gitmodules'],
+                    message='[DATALAD] added subdataset')
 
         return tbds
 
