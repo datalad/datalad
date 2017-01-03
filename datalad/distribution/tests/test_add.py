@@ -9,6 +9,7 @@
 
 """
 
+import logging
 from os import pardir
 from os.path import join as opj
 
@@ -18,6 +19,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils import ok_
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -25,6 +27,8 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import SkipTest
 from datalad.utils import chpwd
 from datalad.utils import _path_
 
@@ -37,13 +41,14 @@ def test_add_insufficient_args(path):
     assert_raises(InsufficientArgumentsError, add)
     # no `path`, no `source`:
     assert_raises(InsufficientArgumentsError, add, dataset=path)
-    # not in a dataset, no dataset given:
     with chpwd(path):
-        assert_raises(InsufficientArgumentsError, add, path="some")
+        with swallow_logs(new_level=logging.WARNING) as cml:
+            assert_raises(InsufficientArgumentsError, add, path="some")
+            assert_in('ignoring non-existent', cml.out)
 
     ds = Dataset(path)
     ds.create()
-    assert_raises(FileNotInRepositoryError, ds.add,
+    assert_raises(InsufficientArgumentsError, ds.add,
                   opj(pardir, 'path', 'outside'))
 
 
@@ -52,7 +57,8 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'test1.dat': 'test file 1',
                       'test2.dat': 'test file 2',
                       'dir': {'testindir': 'someother',
-                              'testindir2': 'none'}})
+                              'testindir2': 'none'},
+                      'dir2': {'testindir3': 'someother3'}})
 
 
 @with_tree(**tree_arg)
@@ -74,9 +80,9 @@ def test_add_files(path):
                 (test_list_4, False)]:
         # special case 4: give the dir:
         if arg[0] == test_list_4:
-            result = ds.add('dir', to_git=arg[1], save=False, if_dirty='ignore')
+            result = ds.add('dir', to_git=arg[1], save=False)
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False, if_dirty='ignore')
+            result = ds.add(arg[0], to_git=arg[1], save=False)
         # TODO eq_(result, arg[0])
         # added, but not committed:
         ok_(ds.repo.dirty)
@@ -105,28 +111,28 @@ def test_add_files(path):
 def test_add_recursive(path):
     ds = Dataset(path)
     ds.create(force=True, save=False)
-    ds.create('dir', force=True, if_dirty='ignore')
+    subds = ds.create('dir', force=True)
     ds.save("Submodule added.")
 
-    # TODO: CommandError to something meaningful
-    # fail without recursive:
-    assert_raises(CommandError, ds.add, opj('dir', 'testindir'), recursive=False)
-    # fail with recursion limit too low:
-    assert_raises(CommandError, ds.add, opj('dir', 'testindir'),
-                  recursive=True, recursion_limit=0)
+    # no subds without recursive:
+    ds.add('.', recursive=False)
+    ok_(subds.repo.dirty)
+    # nosubds with recursion limit too low:
+    ds.add('.', recursive=True, recursion_limit=0)
+    ok_(subds.repo.dirty)
 
     # add while also instructing annex to add in parallel 2 jobs (smoke testing
     # for that effect ATM)
-    added1 = ds.add(opj('dir', 'testindir'), recursive=True, jobs=2)
+    added1 = ds.add(opj('dir', 'testindir'), jobs=2)
     # added to annex, so annex output record
-    eq_(added1, [{'file': _path_('dir/testindir'), 'command': 'add',
+    eq_(added1, [{'file': opj(ds.path, 'dir', 'testindir'), 'command': 'add',
                   'key': 'MD5E-s9--3f0f870d18d6ba60a79d9463ff3827ea',
                   'success': True}])
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
 
-    added2 = ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
+    added2 = ds.add('dir', to_git=True)
     # added to git, so parsed git output record
-    eq_(added2, [{'file': _path_('dir/testindir2'), 'command': u'add',
+    eq_(added2, [{'file': opj(ds.path, 'dir', 'testindir2'), 'command': u'add',
                   'note': u'non-large file; adding content to git repository',
                   'success': True}])
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
@@ -136,16 +142,16 @@ def test_add_recursive(path):
     subds = ds.create('git-sub', no_annex=True)
     with open(opj(subds.path, 'somefile.txt'), "w") as f:
         f.write("bla bla")
-    result = ds.add(opj('git-sub', 'somefile.txt'), recursive=True, to_git=False)
-    eq_(result, [{'file': _path_('git-sub/somefile.txt'), 'success': True}])
+    result = ds.add(opj('git-sub', 'somefile.txt'), to_git=False)
+    eq_(result, [{'file': opj(subds.path, 'somefile.txt'), 'success': True}])
 
 
 @with_tree(**tree_arg)
 def test_relpath_add(path):
     ds = Dataset(path).create(force=True)
     with chpwd(opj(path, 'dir')):
-        eq_(add('testindir', if_dirty='ignore')[0]['file'],
-            opj('dir', 'testindir'))
+        eq_(add('testindir')[0]['file'],
+            opj(ds.path, 'dir', 'testindir'))
         # and now add all
         add('..')
     # auto-save enabled
@@ -162,6 +168,7 @@ def test_relpath_add(path):
 @serve_path_via_http
 @with_tempfile(mkdir=True)
 def test_add_source(path, url, ds_dir):
+    raise SkipTest('functionality is not supported ATM')
     from os import listdir
     from datalad.support.network import RI
 
