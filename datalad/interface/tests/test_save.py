@@ -17,7 +17,7 @@ from os.path import join as opj
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import ok_, assert_false, assert_true, assert_not_equal
-from datalad import api as _
+from datalad.api import save
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
@@ -66,7 +66,7 @@ def test_save(path):
     subds.add('.')
     ok_clean_git(subds.path, annex=isinstance(ds.repo, AnnexRepo))
     ok_(ds.repo.dirty)
-    # ensure modified subds is commited
+    # ensure modified subds is committed
     ds.save(all_changes=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
@@ -80,11 +80,14 @@ def test_recursive_save(path):
     # subdataset presence already saved
     ok_clean_git(ds.path)
     subsubds = subds.create('subsub')
+    assert_equal(
+        ds.get_subdatasets(recursive=True, absolute=True, fulfilled=True),
+        [subsubds.path, subds.path])
     newfile_name = opj(subsubds.path, 'test')
     with open(newfile_name, 'w') as f:
         f.write('some')
     # saves the status change of the subdataset due to the subsubdataset addition
-    assert_equal(ds.save(), [ds])
+    assert_equal(ds.save(all_changes=True), [ds])
 
     # make the new file known to its dataset
     # with #1141 this would be
@@ -95,6 +98,7 @@ def test_recursive_save(path):
     assert ds.repo.dirty
     # auto-add will save nothing deep down without recursive
     assert_equal(ds.save(all_changes=True), [])
+    assert ds.repo.dirty
     # with recursive pick up the change in subsubds
     assert_equal(ds.save(all_changes=True, recursive=True), [subsubds, subds, ds])
     # modify content in subsub and try saving
@@ -108,7 +112,7 @@ def test_recursive_save(path):
     # no recursive
     assert_false(ds.save(all_changes=True))
     # an explicit target saves only the corresponding dataset
-    assert_equal(ds.save(files=[testfname]), [subsubds])
+    assert_equal(save(files=[testfname]), [subsubds])
     # plain recursive without any files given will save the beast
     assert_equal(ds.save(recursive=True), [subds, ds])
     # there is nothing else to save
@@ -122,8 +126,7 @@ def test_recursive_save(path):
     newstates = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     for old, new in zip(states, newstates):
         assert_not_equal(old, new)
-
-    ## now let's check saving "upwards"
+    # now let's check saving "upwards"
     assert not subds.repo.dirty
     create_tree(subds.path, {"testnew": 'smth', "testadded": "added"})
     subds.repo.add("testadded")
@@ -148,7 +151,7 @@ def test_recursive_save(path):
     # check commits to have correct messages
     # there are no more dedicated superdataset-save commits anymore, because
     # superdatasets get saved as part of the processed hierarchy and can contain
-    # other parts in the commit (if so intructed)
+    # other parts in the commit (if so instructed)
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'savingtestmessage')
     assert_equal(next(subds.repo.get_branch_commits('master')).message.rstrip(),

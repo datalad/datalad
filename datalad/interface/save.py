@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-
-from os.path import curdir
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.gitrepo import GitRepo
@@ -140,7 +138,6 @@ class Save(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
-        print('FROMPREP', content_by_ds)
         if unavailable_paths:
             lgr.warning("ignoring non-existent path(s): %s",
                         unavailable_paths)
@@ -166,7 +163,7 @@ class Save(Interface):
             bp = content_by_ds.get(dataset.path, [])
             for c in content_by_ds:
                 bp.extend(content_by_ds[c])
-            content_by_ds[dataset.path] = bp
+            content_by_ds[dataset.path] = list(set(bp))
 
         saved_ds = save_dataset_hierarchy(
             content_by_ds,
