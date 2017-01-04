@@ -12,11 +12,10 @@
 
 import logging
 
-from os import curdir
+from os import listdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
-from collections import defaultdict
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -27,8 +26,6 @@ from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import sort_paths_into_subdatasets
-from datalad.interface.utils import amend_pathspec_with_superdatasets
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -36,21 +33,63 @@ from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import Dataset
-from .dataset import resolve_path
-from .dataset import require_dataset
-from .install import _get_git_url_from_source
 
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.add')
+
+
+def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
+    # this beast walks the directory tree from a give `top` directory
+    # and discovers valid repos that are scattered around, regardless
+    # of whether they are already subdatasets or not
+    # for all found datasets it puts an entry into the SPEC and also
+    # and entry with the path in the SPEC of the parent dataset
+    if recursion_limit is not None and len(trace) > recursion_limit:
+        return
+    if not isdir(top):
+        return
+    if GitRepo.is_valid_repo(top):
+        # found a repo, add the entire thing
+        spec[top] = spec.get(top, []) + [top]
+        # and to the parent
+        if trace:
+            spec[trace[-1]] = spec.get(trace[-1], []) + [top]
+        trace = trace + [top]
+    for path in listdir(top):
+        path = opj(top, path)
+        if not isdir(path):
+            continue
+        _discover_subdatasets_recursively(path, trace, spec, recursion_limit)
+
+
+def _discover_trace_to_known(path, trace, spec):
+    # this beast walks the directory tree from a given `path` until
+    # it discoveres a known dataset (i.e. recorded in the spec)
+    # if it finds one, it commits any accummulated trace of visited
+    # datasets on this edge to the spec
+    valid_repo = GitRepo.is_valid_repo(path)
+    if valid_repo:
+        trace = trace + [path]
+        if path in spec:
+            # found a known repo, commit the trace
+            for i, p in enumerate(trace[:-1]):
+                spec[p] = spec.get(p, []) + [trace[i + 1]]
+            # this edge is done
+            return
+    for p in listdir(path):
+        if valid_repo and p == '.git':
+            # ignore gitdir to steed things up
+            continue
+        p = opj(path, p)
+        if not isdir(p):
+            continue
+        _discover_trace_to_known(p, trace, spec)
 
 
 class Add(Interface):
@@ -138,38 +177,36 @@ class Add(Interface):
         if not path:
             raise InsufficientArgumentsError(
                 "insufficient information for adding: requires at least a path")
+        # never recursion, need to handle manually below to be able to
+        # discover untracked content
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
+            recursive=False)
         if unavailable_paths:
             lgr.warning("ignoring non-existent path(s): %s",
                         unavailable_paths)
+        if recursive:
+            # with --recursive for each input path traverse the directory
+            # tree, when we find a dataset, add it to the spec, AND add it as
+            # a path to the spec of the parent
+            for d in content_by_ds.keys():
+                for p in content_by_ds[d]:
+                    _discover_subdatasets_recursively(
+                        p,
+                        [d],
+                        content_by_ds,
+                        recursion_limit)
+
         if not content_by_ds:
             raise InsufficientArgumentsError(
                 "no existing content given to add")
 
-        # TODO with --recursive for each input path traverse the directory
-        # tree until the end or until we hit a known dataset
-        # when we find an unknown dataset, add it to the spec, AND add it as
-        # a path to the spec of the parent
-
         if dataset:
             # remeber the datasets associated with actual inputs
             input_ds = list(content_by_ds.keys())
-            # we have a base dataset, so make sure that any added content will
-            # be directly or indirectly (via intermediate subdatasets) linked
-            # to it
-            content_by_ds = amend_pathspec_with_superdatasets(
-                content_by_ds,
-                topmost=dataset,
-                limit_single=True)
             # forge chain from base dataset to any leaf dataset
-            sort_paths_into_subdatasets(
-                dataset.path,
-                content_by_ds.keys(),
-                content_by_ds)
+            _discover_trace_to_known(dataset.path, [], content_by_ds)
             if ds2super:
                 # now check all dataset entries corresponding to the original
                 # input to see if they contain their own paths and remove them
@@ -186,7 +223,7 @@ class Add(Interface):
         # start deep down
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
-            toadd = content_by_ds[ds_path]
+            toadd = list(set(content_by_ds[ds_path]))
             # handle anything that looks like a wannabe subdataset
             for subds_path in [d for d in toadd
                                if GitRepo.is_valid_repo(d) and
@@ -204,6 +241,8 @@ class Add(Interface):
                     relativepath=relpath(subds_path, ds_path))
                 # make sure that .gitmodules is added to the list of files
                 toadd.append(opj(ds.path, '.gitmodules'))
+            # make sure any last minute additions make it to the saving stage
+            content_by_ds[ds_path] = toadd
             added = ds.repo.add(
                 toadd,
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
