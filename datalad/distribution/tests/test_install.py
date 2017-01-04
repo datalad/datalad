@@ -484,7 +484,7 @@ def test_implicit_install(src, dst):
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
     origin_subsub.add("file3.txt")
-    origin_top.save(all_changes=True)
+    origin_top.save(recursive=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -522,7 +522,9 @@ def test_implicit_install(src, dst):
     # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
     with chpwd(dst):
-        result = get(path=opj("sub", "subsub"))
+        # don't ask for the file content to make return value comparison
+        # simpler
+        result = get(path=opj("sub", "subsub"), get_data=False)
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
         eq_(result, [subsub])
@@ -588,7 +590,8 @@ def test_install_recursive_repeat(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(all_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
+    ok_clean_git(top_src.path)
 
     # install top level:
     top_ds = install(path, source=src)
@@ -691,7 +694,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(all_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
 
     # install top level:
     cdss = install(path, source=src, recursive=True)
