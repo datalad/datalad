@@ -126,7 +126,9 @@ def test_add_recursive(path):
 
     added2 = ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
     # added to git, so parsed git output record
-    eq_(added2, [{'success': True, 'file': _path_('dir/testindir2')}])
+    eq_(added2, [{'file': _path_('dir/testindir2'), 'command': u'add',
+                  'note': u'non-large file; adding content to git repository',
+                  'success': True}])
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
 
     # We used to fail to add to pure git repository, but now it should all be
