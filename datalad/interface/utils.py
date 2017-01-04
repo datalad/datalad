@@ -13,7 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-import os
 from os import curdir
 from os import pardir
 from os.path import join as opj
@@ -21,13 +20,11 @@ from os.path import lexists
 from os.path import isabs
 from os.path import isdir
 from os.path import dirname
-from os.path import normpath
 from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
 
-from datalad.dochelpers import exc_str
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
@@ -111,7 +108,7 @@ def handle_dirty_datasets(dpaths,
     """
     if mode == 'save-before':
         save_dataset_hierarchy(
-            {d: d for d in dpaths},
+            {d: [d] for d in dpaths},
             base=base,
             message=msg)
     elif mode == 'ignore':
@@ -170,12 +167,18 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
     # that needs to be built and checked
     subds_graph = Dataset(superds_path).get_subdatasets(
         absolute=True, recursive=True, edges=True, fulfilled=True)
+    if not subds_graph:
+        # no subdatasets, nothing to sort
+        return
     for t in target_subs:
         trace = get_trace(
             subds_graph,
             # need to strip separator to make `==` work
             superds_path,
             t)
+        if not trace:
+            # not connected, or identical
+            continue
         tosort = [superds_path] + trace + [t]
         # loop over all but the last one, simplifies logic below
         for i, d in enumerate(tosort[:-1]):
@@ -193,6 +196,9 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
                     keep_paths.append(p)
             spec[next_ds] = next_dspaths
             spec[d] = keep_paths
+    # tidy up -- deduplicate
+    for c in spec:
+        spec[c] = list(set(spec[c]))
 
 
 def save_dataset_hierarchy(
@@ -224,7 +230,6 @@ def save_dataset_hierarchy(
     if not isinstance(info, dict):
         info = assure_list(info)
         info = dict(zip(info, [[i] for i in info]))
-    print('INFUCK', info)
     # TODO check if `add` can do this and move there if necessary
     #if all_changes:
     #    # we need to make sure to register all possibly untracked subdatasets
@@ -259,13 +264,11 @@ def save_dataset_hierarchy(
     # we gather all datasets between the super and any subdataset
     # so we can save them all bottom-up in order to be able to properly
     # save the superdataset
-    tocheck = set(dpaths)
     for superds_path in superdss:
         target_subs = superdss[superds_path]
         sort_paths_into_subdatasets(superds_path, target_subs, info)
     # iterate over all datasets, starting at the bottom
     saved = []
-    print('INFO', info)
     for dpath in sorted(info.keys(), reverse=True):
         ds = Dataset(dpath)
         if ds.is_installed():
@@ -314,23 +317,10 @@ def save_dataset(
     # and one level up
     orig_hexsha = ds.repo.get_hexsha()
 
-    ## TODO this needs to go into `add`
-    #new_submodules = untracked_subdatasets_to_submodules(
-    #    ds, files)
-    #if new_submodules:
-    #    # make sure that .gitmodules is added to the list of files
-    #    # to be committed.  Adding to index might not be enough iff
-    #    # custom files was provided
-    #    to_commit.append('.gitmodules')
-    #to_commit.extend(new_submodules)
-
     # always yields list; empty if None
     files = list(
         set(
             [opj(ds.path, f) if not isabs(f) else f for f in assure_list(paths)]))
-
-    if not files:
-        return False
 
     # try to consider existing and changed files, and prevent untracked
     # files from being added
@@ -356,22 +346,34 @@ def save_dataset(
         message = 'Recorded existing changes'
         _datalad_msg = True
 
-    # TODO: commit() should rather report a dedicated ValueError
-    # waiting for #1170
-    from datalad.support.exceptions import CommandError
-    try:
-        ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
-    except CommandError as e:
-        # TODO until #1171 is resolved, test here for "normal" failure to commit
-        if 'nothing to commit' in str(e):
-            lgr.warning(
-                "Was instructed to commit %s files but repository is not dirty",
-                files)
-        elif 'no changes added to commit':
-            lgr.info(
-                'Nothing to save')
-        else:
-            raise ValueError(e)
+    if files or ds.repo.repo.is_dirty(
+            index=True,
+            working_tree=False,
+            untracked_files=False,
+            submodules=True):
+        # either we have an explicit list of files, or we have something
+        # stages otherwise do not attempt to commit, as the underlying
+        # repo will happily commit any non-change
+        # not checking the working tree or untracked files should make this
+        # relavtively cheap
+
+        # TODO: commit() should rather report a dedicated ValueError
+        # waiting for #1170
+        from datalad.support.exceptions import CommandError
+        try:
+            ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
+        except CommandError as e:
+            # TODO until #1171 is resolved, test here for "normal" failure
+            # to commit
+            if 'nothing to commit' in str(e):
+                lgr.warning(
+                    "Was instructed to commit %s files but repository is not dirty",
+                    files)
+            elif 'no changes added to commit':
+                lgr.info(
+                    'Nothing to save')
+            else:
+                raise ValueError(e)
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...
@@ -383,7 +385,7 @@ def save_dataset(
     return ds.repo.repo.head.commit if _was_modified else None
 
 
-def amend_pathspec_with_superdatasets(spec, topmost=True):
+def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
     """Amend a path spec dictionary with entries for superdatasets
 
     The result will be a superdataset entry (if a superdataset exists)
@@ -397,8 +399,13 @@ def amend_pathspec_with_superdatasets(spec, topmost=True):
     topmost : Dataset or bool
       Flag whether to grab the immediate, or the top-most superdataset
       for each entry, alternatively this can be a dataset instance
-      that is used as the topmost dataset. If no superdataset matches
-      this specific dataset the absolute topmost is used instead.
+      that is used as the topmost dataset.
+    limit_single : bool
+      If a `topmost` dataset is provided, and this flag is True, only
+      the given topmost dataset will be considered as superdataset. Any
+      datasets in the spec that are not underneath this dataset will
+      not have associated superdataset entries added to the spec.
+
     Returns
     -------
     dict
@@ -406,12 +413,19 @@ def amend_pathspec_with_superdatasets(spec, topmost=True):
     """
     superdss = {}
     for dpath in spec.keys():
-        if isinstance(topmost, Dataset) \
-                and dpath.startswith(_with_sep(topmost.path)):
-            # the given topmost dataset is "above" the current
-            # datasets path
-            superds = topmost
-        else:
+        superds = None
+        if isinstance(topmost, Dataset):
+            if limit_single and dpath == topmost.path:
+                # this is already the topmost, no further superdataset to
+                # consider
+                continue
+            if dpath.startswith(_with_sep(topmost.path)):
+                # the given topmost dataset is "above" the current
+                # datasets path
+                superds = topmost
+            elif limit_single:
+                continue
+        if not superds:
             # grab the (topmost) superdataset
             superds = Dataset(dpath).get_superdataset(
                 datalad_only=True, topmost=topmost)

@@ -157,8 +157,7 @@ def make_demo_hierarchy_datasets(path, tree):
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    # TODO replace next line with add('.', recursive=True) when #1172 is done
-    ds.save()
+    ds.add('.', recursive=True)
     ok_clean_git(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
@@ -239,7 +238,7 @@ def test_get_dataset_directories(path):
     # only return hits below the search path
     assert_equal(sorted(get_dataset_directories(testdir2)), sorted([testdir3]))
     # empty subdataset mount points are reported too
-    subds.uninstall(check=False, recursive=True)
+    ds.uninstall(subds.path, check=False, recursive=True)
     ok_(not subds.is_installed())
     ok_(os.path.exists(subds.path))
     assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
