@@ -399,10 +399,10 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
     # and we should achieve the same behavior if we create a dataset
-    # and then decide to "add" it
-    create(_path_(top_path, 'sub3'), if_dirty='ignore')
+    # and then decide to add it
+    create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
-    ds.install('sub3', if_dirty='ignore')
+    ds.add('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 

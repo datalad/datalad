@@ -23,6 +23,7 @@ from os.path import normpath
 
 from six.moves.urllib.parse import quote as urlquote
 
+
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
@@ -448,7 +449,7 @@ def _save_installed_datasets(ds, installed_datasets):
     lgr.info("Saving possible changes to {0} - {1}".format(
         ds, msg))
     ds.save(
-        files=paths,
+        files=paths + ['.gitmodules'],
         message='[DATALAD] ' + msg,
         all_changes=False,
         recursive=False)
