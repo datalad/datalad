@@ -667,7 +667,7 @@ def get_dataset_directories(top, ignore_datalad=True):
             path = opj(top, n)
             if not isdir(path) or path in ignore:
                 pass
-            elif GitRepo.get_toppath(path) != refpath:
+            elif path != refpath and GitRepo.is_valid_repo(path):
                 # mount point, keep but don't dive into
                 dirs.append(path)
             else:
