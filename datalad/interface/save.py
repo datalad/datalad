@@ -155,7 +155,8 @@ class Save(Interface):
                 content_by_ds,
                 # save up to and including the base dataset (if one is given)
                 # otherwise up to the very top
-                topmost=dataset if dataset else True)
+                topmost=dataset if dataset else True,
+                limit_single=False)
 
         if dataset:
             # stuff all paths also into the base dataset slot to make sure

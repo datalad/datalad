@@ -27,9 +27,13 @@ from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import sort_paths_into_subdatasets
+from datalad.interface.utils import amend_pathspec_with_superdatasets
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import is_datalad_compat_ri
@@ -141,18 +145,42 @@ class Add(Interface):
         # when we find an unknown dataset, add it to the spec, AND add it as
         # a path to the spec of the parent
 
-        # TODO use GitRepo.is_valid_repo(path) instead of GitRepo.get_top_path()
-        # does the same without a Git call
+        if dataset:
+            # we have a base dataset, so make sure that any added content will
+            # be directly or indirectly (via intermediate subdatasets) linked
+            # to it
+            content_by_ds = amend_pathspec_with_superdatasets(
+                content_by_ds,
+                topmost=dataset,
+                limit_single=True)
+            # forge chain from base dataset to any leaf dataset
+            sort_paths_into_subdatasets(
+                dataset.path,
+                content_by_ds.keys(),
+                content_by_ds)
 
         results = []
         # simple loop over datasets -- save happens later
         # start deep down
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
-            # TODO if dir, could be untracked subdataset
-            # if dir, and repo, and there is a base dataset, install_inplace
+            toadd = content_by_ds[ds_path]
+            # handle anything that looks like a wannabe subdataset
+            for subds_path in [d for d in toadd
+                               if GitRepo.is_valid_repo(d) and
+                               d != ds_path and
+                               d not in ds.get_subdatasets(
+                                   recursive=False,
+                                   absolute=True,
+                                   fulfilled=True)]:
+                _install_subds_inplace(
+                    ds=ds,
+                    path=subds_path,
+                    relativepath=relpath(subds_path, ds_path))
+                # make sure that .gitmodules is added to the list of files
+                toadd.append(opj(ds.path, '.gitmodules'))
             added = ds.repo.add(
-                content_by_ds[ds_path],
+                toadd,
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
                 commit=False)
             for a in added:

@@ -152,7 +152,9 @@ def test_recursive_save(path):
     # there are no more dedicated superdataset-save commits anymore, because
     # superdatasets get saved as part of the processed hierarchy and can contain
     # other parts in the commit (if so instructed)
-    assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
+    assert_equal(next(subsubds.repo.get_branch_commits('master')).message.rstrip(),
                  'savingtestmessage')
     assert_equal(next(subds.repo.get_branch_commits('master')).message.rstrip(),
+                 'savingtestmessage')
+    assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'savingtestmessage')

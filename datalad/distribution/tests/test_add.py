@@ -26,6 +26,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import SkipTest
@@ -245,3 +246,21 @@ def test_add_source(path, url, ds_dir):
     eq_(len(annexed), len(urls))
     # all files annexed (-2 for '.git' and '.datalad'):
     eq_(len(annexed), len(listdir(ds.path)) - 2)
+
+
+@with_tree(**tree_arg)
+def test_add_subdataset(path):
+    subds = create(opj(path, 'dir'), force=True)
+    ds = create(path, force=True)
+    ok_(subds.repo.dirty)
+    ok_(ds.repo.dirty)
+    assert_not_in('dir', ds.get_subdatasets())
+    # without a base dataset the next is interpreted as "add everything
+    # in subds to subds"
+    add(subds.path)
+    ok_clean_git(subds.path)
+    assert_not_in('dir', ds.get_subdatasets())
+    # but with a base directory we add the dataset subds as a subdataset
+    # to ds
+    ds.add(subds.path)
+    assert_in('dir', ds.get_subdatasets())
