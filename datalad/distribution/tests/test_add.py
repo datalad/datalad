@@ -114,6 +114,7 @@ def test_add_recursive(path):
     ds.create(force=True, save=False)
     subds = ds.create('dir', force=True)
     ds.save("Submodule added.")
+    ok_(subds.repo.dirty)
 
     # no subds without recursive:
     ds.add('.', recursive=False)

@@ -265,8 +265,7 @@ class Create(Interface):
             gitattr.write('** annex.largefiles=nothing\n')
 
         # save everthing
-        # TODO use `add` without save
-        tbds.repo.add('.datalad', git=True)
+        tbds.add('.datalad', to_git=True, save=False)
 
         if save:
             save_dataset(
@@ -274,20 +273,13 @@ class Create(Interface):
                 paths=['.datalad'],
                 message='[DATALAD] new dataset')
 
-        if dataset is not None and dataset.path != tbds.path:
-            # TODO this needs to be RF'ed to call add on the subdataset
-            # we created a dataset in another dataset
-            # -> make submodule
-            from datalad.distribution.utils import _install_subds_inplace
-            subdsrelpath = relpath(realpath(tbds.path), realpath(dataset.path))  # realpath OK
-            _install_subds_inplace(ds=dataset, path=tbds.path,
-                                   relativepath=subdsrelpath)
-            # this will have staged the changes in the superdataset already
-            if save:
-                save_dataset(
-                    dataset,
-                    paths=[tbds.path, '.gitmodules'],
-                    message='[DATALAD] added subdataset')
+            # the next only makes sense if we saved the created dataset,
+            # otherwise we have no committed state to be registered
+            # in the parent
+            if dataset is not None and dataset.path != tbds.path:
+                # we created a dataset in another dataset
+                # -> make submodule
+                dataset.add(tbds.path, save=save, ds2super=True)
 
         return tbds
 

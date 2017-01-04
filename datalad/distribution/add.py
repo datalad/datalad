@@ -103,6 +103,15 @@ class Add(Interface):
             transport"""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        ds2super=Parameter(
+            args=("--ds2super", "--datasets-to-super",),
+            action='store_true',
+            doc="""given paths of dataset (toplevel) locations will cause
+            these datasets to be added to their respective superdatasets
+            underneath a given base `dataset` (instead of all their content
+            to themselves). If no base `dataset` is provided, this flag has
+            no effect. Regular files and directories are always added to
+            their respective datasets, regardless of this setting."""),
         save=nosave_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
@@ -119,6 +128,7 @@ class Add(Interface):
             save=True,
             recursive=False,
             recursion_limit=None,
+            ds2super=False,
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None,
@@ -146,6 +156,8 @@ class Add(Interface):
         # a path to the spec of the parent
 
         if dataset:
+            # remeber the datasets associated with actual inputs
+            input_ds = list(content_by_ds.keys())
             # we have a base dataset, so make sure that any added content will
             # be directly or indirectly (via intermediate subdatasets) linked
             # to it
@@ -158,6 +170,16 @@ class Add(Interface):
                 dataset.path,
                 content_by_ds.keys(),
                 content_by_ds)
+            if ds2super:
+                # now check all dataset entries corresponding to the original
+                # input to see if they contain their own paths and remove them
+                for inpds in input_ds:
+                    content_by_ds[inpds] = [p for p in content_by_ds[inpds]
+                                            if not p == inpds]
+                # and lastly remove all entries that contain no path to avoid
+                # saving any staged content in the final step
+                content_by_ds = {d: content_by_ds[d] for d in content_by_ds
+                                 if content_by_ds[d]}
 
         results = []
         # simple loop over datasets -- save happens later
@@ -173,6 +195,9 @@ class Add(Interface):
                                    recursive=False,
                                    absolute=True,
                                    fulfilled=True)]:
+                # TODO add check that the subds has a commit, and refuse
+                # to operate on it otherwise, or we would get a bastard
+                # submodule that cripples git operations
                 _install_subds_inplace(
                     ds=ds,
                     path=subds_path,
