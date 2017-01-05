@@ -88,6 +88,19 @@ def _drop_files(ds, files, check):
     return results
 
 
+def _act_on_full_base_dataset_ifany(dataset, content_by_ds):
+    if not dataset:
+        return
+
+    basepath = dataset.path if isinstance(dataset, Dataset) else dataset
+    if len(content_by_ds) == 1 and \
+            basepath in content_by_ds and \
+            not content_by_ds[basepath]:
+        # we have a base dataset, but nothing else was given: this is
+        # like `ds.uninstall()` -> insert the dataset's base path as path
+        content_by_ds[basepath].append(basepath)
+
+
 class Drop(Interface):
     """Drop file content from datasets
 
@@ -149,6 +162,8 @@ class Drop(Interface):
             recursion_limit=recursion_limit)
         handle_dirty_datasets(
             content_by_ds.keys(), mode=if_dirty, base=dataset)
+
+        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
 
         results = []
 
@@ -230,12 +245,13 @@ class Uninstall(Interface):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
                 "refusing to uninstall current or parent directory")
+        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
         # check that we have no top-level datasets and not files to process
         args_ok = True
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            if not ds_path in paths:
+            if ds_path not in paths:
                 lgr.error(
                     "will not act on files at %s (consider the `drop` command)",
                     paths)
@@ -355,6 +371,8 @@ class Remove(Interface):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
                 "refusing to uninstall current or parent directory")
+
+        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
 
         handle_dirty_datasets(
             content_by_ds, mode=if_dirty, base=dataset)
