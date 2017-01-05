@@ -91,7 +91,8 @@ class AnnexRepo(GitRepo):
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
-    GIT_ANNEX_MIN_VERSION = '6.20160808'
+    # 6.20161210 -- annex add  to add also changes (not only new files) to git
+    GIT_ANNEX_MIN_VERSION = '6.20161210'
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
@@ -615,7 +616,7 @@ class AnnexRepo(GitRepo):
         return expected_downloads, fetch_files
 
     @normalize_paths
-    def add(self, files, git=False, backend=None, options=None, commit=False,
+    def add(self, files, git=None, backend=None, options=None, commit=False,
             msg=None, dry_run=False,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False):
@@ -652,13 +653,12 @@ class AnnexRepo(GitRepo):
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
-        git_options = []
-        if dry_run:
-            git_options += ['--dry-run', '-N', '--ignore-missing']
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
-        if git:
+        if dry_run:
+            git_options = ['--dry-run', '-N', '--ignore-missing']
+
             # add to git instead of annex
             if self.is_direct_mode():
                 # TODO:  may be there should be a generic decorator to avoid
@@ -674,10 +674,11 @@ class AnnexRepo(GitRepo):
                 #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
             else:
                 return_list = super(AnnexRepo, self).add(files, git_options=git_options)
-
         else:
             # Theoretically we could have done for git as well, if it could have
             # been batched
+            # Call git annex add for any to have full control of either to go
+            # to git or to anex
             # 1. Figure out what actually will be added
             to_be_added_recs = self.add(files, git=True, dry_run=True)
             # collect their sizes for the progressbar
@@ -685,6 +686,17 @@ class AnnexRepo(GitRepo):
                 rec['file']: self.get_file_size(rec['file'])
                 for rec in to_be_added_recs
             }
+
+            # if None -- leave it to annex to decide
+            if git is not None:
+                options += [
+                    '-c',
+                    'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
+                ]
+                if git:
+                    # to maintain behaviour similar to git
+                    options += ['--include-dotfiles']
+
             return_list = list(self._run_annex_command_json(
                 'add',
                 args=options + files,
