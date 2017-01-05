@@ -335,11 +335,13 @@ def save_dataset(
     if isinstance(ds.repo, AnnexRepo):
         # to make this work without calling `git add` in addition,
         # this needs git-annex v6.20161210 (see #1027)
-        ds.repo.add(files, commit=False)
+        ds.repo.add([f for f in files if lexists(f)], commit=False)
     else:
         # --update will ignore any untracked files, sadly git-annex add
         # above does not
-        ds.repo.add(files, git_options=['--update'], commit=False)
+        # will complain about vanished files though, filter them here, but
+        # keep them for a later commit call
+        ds.repo.add([f for f in files if lexists(f)], git_options=['--update'], commit=False)
 
     _datalad_msg = False
     if not message:
