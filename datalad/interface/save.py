@@ -169,7 +169,8 @@ class Save(Interface):
         saved_ds = save_dataset_hierarchy(
             content_by_ds,
             base=dataset.path if dataset and dataset.is_installed() else None,
-            message=message)
+            message=message,
+            version_tag=version_tag)
 
         return saved_ds
 
