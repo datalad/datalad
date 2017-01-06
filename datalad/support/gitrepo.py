@@ -817,7 +817,10 @@ class GitRepo(object):
         #       Note: repo.tree(treeish).hexsha
         if branch is None:
             try:
-                return self.repo.active_branch.object.hexsha
+                # do not use
+                #self.repo.active_branch.object.hexsha
+                # but HEAD to be able to cope with detached heads
+                return self.repo.head.object.hexsha
             except ValueError as exc:
                 if 'does not exist' in str(exc):
                     return None
