@@ -32,7 +32,11 @@ lgr = logging.getLogger('datalad.distribution.tests')
 
 def _parse_spec(spec):
     out = []   # will return a list of tuples (min, max) for each layer
+    if not spec:
+        return out
     for ilevel, level in enumerate(spec.split('/')):
+        if not level:
+            continue
         minmax = level.split('-')
         if len(minmax) == 1:  # only abs number specified
             minmax = int(minmax[0])
@@ -52,7 +56,7 @@ def _parse_spec(spec):
     return out
 
 
-def _makeds(path, levels, ds=None):
+def _makeds(path, levels, ds=None, max_leading_dirs=2):
     """Create a hierarchy of datasets
 
     Used recursively, with current invocation generating datasets for the
@@ -68,6 +72,9 @@ def _makeds(path, levels, ds=None):
     ds : Dataset, optional
       Super-dataset which would contain a new dataset (thus its path whould be
       a parent of path. Note that ds needs to be installed.
+    max_leading_dirs : int, optional
+      Up to how many leading directories withing a dataset could lead to a
+      sub-dataset
 
     Yields
     ------
@@ -89,31 +96,40 @@ def _makeds(path, levels, ds=None):
     with open(fn, 'w') as f:
         f.write(fn)
     repo.add(fn, git=True, commit=True, msg="Added %s" % fn, _datalad_msg=True)
+
+    yield path
+
+    if levels:
+        # make a dataset for that one since we want to add sub datasets
+        ds_ = Dataset(path)
+        # Process the levels
+        level, levels_ = levels[0], levels[1:]
+        nrepos = random.randint(*level)  # how many subds to generate
+        for irepo in range(nrepos):
+            # we would like to have up to 2 leading dirs
+            subds_path = opj(*(['d%i' % i
+                                for i in range(random.randint(0, max_leading_dirs+1))]
+                               + ['r%i' % irepo]))
+            subds_fpath = opj(path, subds_path)
+            # yield all under
+            for d in _makeds(subds_fpath, levels_, ds=ds_):
+                yield d
+
     if ds:
         assert ds.is_installed()
         rpath = os.path.relpath(path, ds.path)
         out = install(
             rpath,
             source=opj(os.curdir, rpath),
-            dataset=ds
+            dataset=ds,
+            # currently would generate two commits -- first adding a submodule
+            # and then a dummy one (commented out below) talking about "installing".
+            # But may be this all would get automagically straightened out by
+            # GH #1169, so we could also have a sensible message on what was done
+            # if_dirty='ignore',
             )
-        ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
+        # ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
 
-    if not levels:
-        return
-
-    # make a dataset for that one since we want to add sub datasets
-    ds_ = Dataset(path)
-    level, levels_ = levels[0], levels[1:]
-    nrepos = random.randint(*level)  # how many subds to generate
-    for irepo in range(nrepos):
-        # we would like to have up to 2 leading dirs
-        subds_path = opj(*(['d%i' % i for i in range(random.randint(0, 3))] + ['r%i' % irepo]))
-        subds_fpath = opj(path, subds_path)
-        yield subds_fpath
-        # and all under
-        for d in _makeds(subds_fpath, levels_, ds=ds_):
-            yield d
 
 
 class CreateTestDataset(Interface):
@@ -144,8 +160,6 @@ class CreateTestDataset(Interface):
 
     @staticmethod
     def __call__(path=None, spec=None, seed=None):
-        if spec is None:
-            spec = "10/1-3/-2"  # 10 on top level, some random number from 1 to 3 at the 2nd, up to 2 on 3rd
         levels = _parse_spec(spec)
 
         if seed is not None:
