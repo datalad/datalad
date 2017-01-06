@@ -728,12 +728,15 @@ def test_GitRepo_git_get_branch_commits(src):
     repo.add('*')
     repo.commit('committing')
 
+    commits_default = list(repo.get_branch_commits())
     commits = list(repo.get_branch_commits('master'))
+    eq_(commits, commits_default)
+
     eq_(len(commits), 1)
-    commits_stop0 = list(repo.get_branch_commits('master', stop=commits[0].hexsha))
+    commits_stop0 = list(repo.get_branch_commits(stop=commits[0].hexsha))
     eq_(commits_stop0, [])
-    commits_hexsha = list(repo.get_branch_commits('master', value='hexsha'))
-    commits_hexsha_left = list(repo.get_branch_commits('master', value='hexsha', limit='left-only'))
+    commits_hexsha = list(repo.get_branch_commits(value='hexsha'))
+    commits_hexsha_left = list(repo.get_branch_commits(value='hexsha', limit='left-only'))
     eq_([commits[0].hexsha], commits_hexsha)
     # our unittest is rudimentary ;-)
     eq_(commits_hexsha_left, commits_hexsha)
