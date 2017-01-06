@@ -31,6 +31,7 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import _discover_trace_to_known
 from datalad.utils import rmtree
 from datalad.support.gitrepo import GitRepo
 
@@ -88,19 +89,6 @@ def _drop_files(ds, files, check):
     return results
 
 
-def _act_on_full_base_dataset_ifany(dataset, content_by_ds):
-    if not dataset:
-        return
-
-    basepath = dataset.path if isinstance(dataset, Dataset) else dataset
-    if len(content_by_ds) == 1 and \
-            basepath in content_by_ds and \
-            not content_by_ds[basepath]:
-        # we have a base dataset, but nothing else was given: this is
-        # like `ds.uninstall()` -> insert the dataset's base path as path
-        content_by_ds[basepath].append(basepath)
-
-
 class Drop(Interface):
     """Drop file content from datasets
 
@@ -155,6 +143,9 @@ class Drop(Interface):
             check=True,
             if_dirty='save-before'):
 
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -162,8 +153,6 @@ class Drop(Interface):
             recursion_limit=recursion_limit)
         handle_dirty_datasets(
             content_by_ds.keys(), mode=if_dirty, base=dataset)
-
-        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
 
         results = []
 
@@ -234,6 +223,9 @@ class Uninstall(Interface):
             check=True,
             if_dirty='save-before'):
 
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -245,7 +237,6 @@ class Uninstall(Interface):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
                 "refusing to uninstall current or parent directory")
-        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
         # check that we have no top-level datasets and not files to process
         args_ok = True
         for ds_path in content_by_ds:
@@ -343,6 +334,9 @@ class Remove(Interface):
             if not dataset.is_installed() and not path:
                 # all done already
                 return []
+            if not path:
+                # act on the whole dataset if nothing else was specified
+                path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -372,11 +366,8 @@ class Remove(Interface):
             raise ValueError(
                 "refusing to uninstall current or parent directory")
 
-        _act_on_full_base_dataset_ifany(dataset, content_by_ds)
-
         handle_dirty_datasets(
             content_by_ds, mode=if_dirty, base=dataset)
-
         ds2save = set()
         results = []
         # iterate over all datasets, starting at the bottom
@@ -408,6 +399,11 @@ class Remove(Interface):
                     # could be an empty dir in case an already uninstalled subdataset
                     # got removed
                     os.rmdir(ds_path)
+                # need to save changes to .gitmodules later
+                content_by_ds[superds.path] = \
+                    content_by_ds.get(superds.path, []) \
+                    + [opj(superds.path, '.gitmodules'),
+                       ds_path]
                 ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):
@@ -415,8 +411,13 @@ class Remove(Interface):
                 results.extend(ds.repo.remove(paths, r=True))
                 ds2save.add(ds.path)
 
+        if dataset and dataset.is_installed():
+            # forge chain from base dataset to any leaf dataset
+            # on order to save state changes all the way up
+            _discover_trace_to_known(dataset.path, [], content_by_ds)
+
         save_dataset_hierarchy(
-            list(ds2save),
+            content_by_ds,
             base=dataset.path if dataset and dataset.is_installed() else None,
             message='[DATALAD] removed content')
         return results

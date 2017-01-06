@@ -26,6 +26,7 @@ from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import _discover_trace_to_known
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -66,30 +67,6 @@ def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
         if not isdir(path):
             continue
         _discover_subdatasets_recursively(path, trace, spec, recursion_limit)
-
-
-def _discover_trace_to_known(path, trace, spec):
-    # this beast walks the directory tree from a given `path` until
-    # it discoveres a known dataset (i.e. recorded in the spec)
-    # if it finds one, it commits any accummulated trace of visited
-    # datasets on this edge to the spec
-    valid_repo = GitRepo.is_valid_repo(path)
-    if valid_repo:
-        trace = trace + [path]
-        if path in spec:
-            # found a known repo, commit the trace
-            for i, p in enumerate(trace[:-1]):
-                spec[p] = spec.get(p, []) + [trace[i + 1]]
-            # this edge is done
-            return
-    for p in listdir(path):
-        if valid_repo and p == '.git':
-            # ignore gitdir to steed things up
-            continue
-        p = opj(path, p)
-        if not isdir(p):
-            continue
-        _discover_trace_to_known(p, trace, spec)
 
 
 class Add(Interface):

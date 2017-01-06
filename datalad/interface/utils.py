@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from os import curdir
 from os import pardir
+from os import listdir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isabs
@@ -687,3 +688,32 @@ def get_dataset_directories(top, ignore_datalad=True):
     d = []
     walk(top, func, (refpath, ignore, d))
     return d
+
+
+# XXX the following present a different approach to
+# amend_pathspec_with_superdatasets() for discovering datasets between
+# processed ones and a base
+# let it simmer for a while and RF to use one or the other
+# this one here seems more leightweight and less convoluted
+def _discover_trace_to_known(path, trace, spec):
+    # this beast walks the directory tree from a given `path` until
+    # it discoveres a known dataset (i.e. recorded in the spec)
+    # if it finds one, it commits any accummulated trace of visited
+    # datasets on this edge to the spec
+    valid_repo = GitRepo.is_valid_repo(path)
+    if valid_repo:
+        trace = trace + [path]
+        if path in spec:
+            # found a known repo, commit the trace
+            for i, p in enumerate(trace[:-1]):
+                spec[p] = list(set(spec.get(p, []) + [trace[i + 1]]))
+            # this edge is not done, we need to try to reach any downstream
+            # dataset
+    for p in listdir(path):
+        if valid_repo and p == '.git':
+            # ignore gitdir to steed things up
+            continue
+        p = opj(path, p)
+        if not isdir(p):
+            continue
+        _discover_trace_to_known(p, trace, spec)

@@ -65,7 +65,6 @@ def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
     subds2 = ds.create('two')
-    ds.save(all_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
@@ -205,21 +204,19 @@ def test_uninstall_multiple_paths(path):
     subds = ds.create('deep', force=True)
     subds.add('.', recursive=True)
     ds.add('.', recursive=True)
-    ds.save(all_changes=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
-    # must not work without recursive
     topfile = 'kill'
     deepfile = opj('deep', 'dir', 'kill')
     # use a tuple not a list! should also work
-    ds.drop((topfile, deepfile), recursive=True, check=False)
+    ds.drop((topfile, deepfile), check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
     ok_(not ds.repo.file_has_content(topfile))
     ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
     # remove handles for all 'kill' files
-    ds.remove([topfile, deepfile], recursive=True, check=False)
+    ds.remove([topfile, deepfile], check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
@@ -340,7 +337,7 @@ def test_kill(path):
     ds = Dataset(path).create()
     with open(opj(ds.path, "file.dat"), 'w') as f:
         f.write("load")
-    ds.repo.add("file.dat")
+    ds.add("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.get_subdatasets()), ['deep1'])
     ok_clean_git(ds.path)
