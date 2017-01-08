@@ -167,7 +167,10 @@ class Add(Interface):
             # with --recursive for each input path traverse the directory
             # tree, when we find a dataset, add it to the spec, AND add it as
             # a path to the spec of the parent
-            for d in content_by_ds.keys():
+            # MIH: wrap in list() to avoid exception, because dict size might
+            # change, but we want to loop over all that are in at the start
+            # only
+            for d in list(content_by_ds.keys()):
                 for p in content_by_ds[d]:
                     _discover_subdatasets_recursively(
                         p,
