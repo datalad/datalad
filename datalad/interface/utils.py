@@ -231,27 +231,6 @@ def save_dataset_hierarchy(
     if not isinstance(info, dict):
         info = assure_list(info)
         info = dict(zip(info, [[i] for i in info]))
-    # TODO check if `add` can do this and move there if necessary
-    #if all_changes:
-    #    # we need to make sure to register all possibly untracked subdatasets
-    #    # before we build the dataset graph tell can tell us in which order
-    #    # things need to be processed
-    #    toprocess = assure_list(info.keys())
-    #    if not toprocess and base:
-    #        # only there arn't any specific base dataset pieces given to process
-    #        # consider the entire dataset too
-    #        toprocess.append(base.path if isinstance(base, Dataset) else base)
-    #    while toprocess:
-    #        dpath = toprocess.pop()
-    #        new_submodules = untracked_subdatasets_to_submodules(
-    #            Dataset(dpath),
-    #            info[dpath] if dpath in info else [])
-    #        for ns in new_submodules:
-    #            dsinfo = info.get(ns, [])
-    #            dsinfo.append(ns)
-    #            info[ns] = dsinfo
-    #            # make sure to look at any new ones too
-    #            toprocess.append(ns)
     dpaths = info.keys()
     if base:
         # just a convenience...
@@ -333,16 +312,19 @@ def save_dataset(
     # asking yourself why we need to `add` at all? For example, freshly
     # unlocked files in a v5 repo are listed as "typechange" and commit
     # refuses to touch them without an explicit `add`
-    if isinstance(ds.repo, AnnexRepo):
-        # to make this work without calling `git add` in addition,
-        # this needs git-annex v6.20161210 (see #1027)
-        ds.repo.add([f for f in files if lexists(f)], commit=False)
-    else:
-        # --update will ignore any untracked files, sadly git-annex add
-        # above does not
-        # will complain about vanished files though, filter them here, but
-        # keep them for a later commit call
-        ds.repo.add([f for f in files if lexists(f)], git_options=['--update'], commit=False)
+    tostage = [f for f in files if lexists(f)]
+    if tostage:
+        lgr.debug('staging files for commit: %s', tostage)
+        if isinstance(ds.repo, AnnexRepo):
+            # to make this work without calling `git add` in addition,
+            # this needs git-annex v6.20161210 (see #1027)
+            ds.repo.add(tostage, commit=False)
+        else:
+            # --update will ignore any untracked files, sadly git-annex add
+            # above does not
+            # will complain about vanished files though, filter them here, but
+            # keep them for a later commit call
+            ds.repo.add(tostage, git_options=['--update'], commit=False)
 
     _datalad_msg = False
     if not message:
