@@ -420,6 +420,9 @@ def test_failed_install_multiple(top_path):
     with assert_raises(IncompleteResultsError) as cme:
         ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
 
+    # install doesn't add existing submodules -- add does that
+    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+    ds.add(['ds1', 'ds3'])
     ok_clean_git(ds.path, annex=False)
     # those which succeeded should be saved now
     eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
