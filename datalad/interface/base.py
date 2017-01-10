@@ -381,7 +381,7 @@ class Interface(object):
             # fish out the dataset path that we inserted above
             content_by_ds[dataset_path] = [p for p in content_by_ds[dataset_path]
                                            if p != dataset_path]
-        if not path:
+        if not path and dataset_path:
             # no files given, but a dataset -> operate on whole dataset
             # but do not specify any paths to process -- needs to be tailored
             # by caller

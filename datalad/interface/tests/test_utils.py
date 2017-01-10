@@ -24,6 +24,7 @@ from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import get_dataset_directories
+from datalad.interface.save import Save
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.api import save
@@ -242,3 +243,9 @@ def test_get_dataset_directories(path):
     ok_(not subds.is_installed())
     ok_(os.path.exists(subds.path))
     assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
+
+
+def test_interface_prep():
+    # verify sanity if nothing was given, as it would look like from the
+    # cmdline
+    assert_equal(Save._prep(path=[], dataset=None), ({}, []))
