@@ -311,6 +311,31 @@ class AnnexRepo(GitRepo):
         return 0 if not exists(fpath) else os.stat(fpath).st_size
 
     @classmethod
+    def get_toppath(cls, path, follow_up=True):
+        """Return top-level of a repository given the path.
+
+        Parameters
+        -----------
+        follow_up : bool
+          If path has symlinks -- they get resolved by git.  If follow_up is
+          True, we will follow original path up until we hit the same resolved
+          path.  If no such path found, resolved one would be returned.
+
+        Return None if no parent directory contains a git repository.
+        """
+
+        # first try plain git result:
+        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up)
+        if toppath == '':
+            # didn't fail, so git itself didn't come to the conclusion
+            # there is no repo, but we have no actual result;
+            # might be an annex in direct mode
+            toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+                                          git_options=['-c', 'core.bare=False'])
+
+        return toppath
+
+    @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository"""
         initialized_annex = GitRepo.is_valid_repo(path) and \
