@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -26,6 +25,7 @@ from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import amend_pathspec_with_superdatasets
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import get_dataset_root
 
 from .base import Interface
 
@@ -42,7 +42,7 @@ def process_vanished_paths(unavailable_paths, content_by_ds):
         # we need to check whether any of these correspond
         # to a known subdataset, and add those to the list of
         # things to be removed
-        toppath = AnnexRepo.get_toppath(p)
+        toppath = get_dataset_root(p)
         if not toppath:
             nonexistent_paths.append(p)
             continue

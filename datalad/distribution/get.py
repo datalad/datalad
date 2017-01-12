@@ -37,6 +37,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
+from datalad.utils import get_dataset_root
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -229,7 +230,7 @@ class Get(Interface):
         # explore the unknown
         for path in sorted(unavailable_paths):
             # how close can we get?
-            dspath = AnnexRepo.get_toppath(path)
+            dspath = get_dataset_root(path)
             if dspath is None:
                 # nothing we can do for this path
                 continue
