@@ -310,8 +310,10 @@ class AnnexRepo(GitRepo):
         fpath = opj(self.path, path)
         return 0 if not exists(fpath) else os.stat(fpath).st_size
 
+    # TODO: Once the PR containing super class 'Repo' was merged, move there and
+    # melt with GitRepo.get_toppath including tests for both
     @classmethod
-    def get_toppath(cls, path, follow_up=True):
+    def get_toppath(cls, path, follow_up=True, git_options=None):
         """Return top-level of a repository given the path.
 
         Parameters
@@ -320,18 +322,25 @@ class AnnexRepo(GitRepo):
           If path has symlinks -- they get resolved by git.  If follow_up is
           True, we will follow original path up until we hit the same resolved
           path.  If no such path found, resolved one would be returned.
+        git_options: list of str
+          options to be passed to the git rev-parse call
 
         Return None if no parent directory contains a git repository.
         """
 
         # first try plain git result:
-        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up)
+        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+                                      git_options=git_options)
         if toppath == '':
             # didn't fail, so git itself didn't come to the conclusion
             # there is no repo, but we have no actual result;
             # might be an annex in direct mode
+            if git_options is None:
+                git_options = []
+            git_options.extend(['-c', 'core.bare=False'])
+            # TODO: Apparently doesn't work with git 2.11.0
             toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-                                          git_options=['-c', 'core.bare=False'])
+                                          git_options=git_options)
 
         return toppath
 

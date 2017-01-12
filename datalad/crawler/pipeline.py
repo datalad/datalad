@@ -58,6 +58,7 @@ from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.annexrepo import AnnexRepo
 from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
 from ..support.exceptions import PipelineNotSpecifiedError
@@ -412,7 +413,7 @@ def _find_pipeline(name):
             name += '.py'
 
         # first -- current directory
-        repo_path = GitRepo.get_toppath(curdir)
+        repo_path = AnnexRepo.get_toppath(curdir)
         if repo_path:
             yield opj(repo_path, CRAWLER_META_DIR, 'pipelines', name)
 
@@ -530,7 +531,7 @@ def get_repo_pipeline_config_path(repo_path=curdir):
     """Given a path within a repo, return path to the crawl.cfg"""
     if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
-        repo_path = GitRepo.get_toppath(repo_path)
+        repo_path = AnnexRepo.get_toppath(repo_path)
         if not repo_path:
             return None
     return opj(repo_path, CRAWLER_META_CONFIG_PATH)
@@ -542,7 +543,7 @@ def get_repo_pipeline_script_path(repo_path=curdir):
     # tracked or smth like that
     if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
-        repo_path = GitRepo.get_toppath(repo_path)
+        repo_path = AnnexRepo.get_toppath(repo_path)
         if not repo_path:
             return None
     pipelines = glob(opj(repo_path, CRAWLER_META_DIR, 'pipelines', '*.py'))

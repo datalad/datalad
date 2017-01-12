@@ -450,7 +450,7 @@ def untracked_subdatasets_to_submodules(ds, consider_paths):
                          for d in get_dataset_directories(testpath,
                                                           ignore_datalad=True)
                          # do not probe for paths in subdatasets
-                         if GitRepo.get_toppath(testpath) == ds.path])
+                         if AnnexRepo.get_toppath(testpath) == ds.path])
     # the difference are directories that could be an untracked subdataset
     subds_candidates = existing_dirs.difference(indexed_dirs)
     for cand_dspath in subds_candidates:
@@ -521,7 +521,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
             if not d:
                 d = curdir
         # this could be `None` if there is no git repo
-        dspath = dir_lookup.get(d, GitRepo.get_toppath(d))
+        dspath = dir_lookup.get(d, AnnexRepo.get_toppath(d))
         dir_lookup[d] = dspath
         if not dspath:
             nondataset_paths.append(path)
@@ -661,7 +661,7 @@ def get_dataset_directories(top, ignore_datalad=True):
         names[:] = legit_names
 
     # collects the directories
-    refpath = GitRepo.get_toppath(top)
+    refpath = AnnexRepo.get_toppath(top)
     if not refpath:
         raise ValueError("`top` path {} is not in a dataset".format(top))
     ignore = [opj(refpath, get_git_dir(refpath))]

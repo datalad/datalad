@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -42,7 +42,7 @@ def process_vanished_paths(unavailable_paths, content_by_ds):
         # we need to check whether any of these correspond
         # to a known subdataset, and add those to the list of
         # things to be removed
-        toppath = GitRepo.get_toppath(p)
+        toppath = AnnexRepo.get_toppath(p)
         if not toppath:
             nonexistent_paths.append(p)
             continue

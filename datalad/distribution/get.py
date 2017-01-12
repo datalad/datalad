@@ -33,7 +33,6 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
@@ -230,7 +229,7 @@ class Get(Interface):
         # explore the unknown
         for path in sorted(unavailable_paths):
             # how close can we get?
-            dspath = GitRepo.get_toppath(path)
+            dspath = AnnexRepo.get_toppath(path)
             if dspath is None:
                 # nothing we can do for this path
                 continue

@@ -33,7 +33,7 @@ from datalad.interface.utils import path_is_under
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import _discover_trace_to_known
 from datalad.utils import rmtree
-from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -347,7 +347,7 @@ class Remove(Interface):
             # we need to check whether any of these correspond
             # to a known subdataset, and add those to the list of
             # things to be removed
-            toppath = GitRepo.get_toppath(p)
+            toppath = AnnexRepo.get_toppath(p)
             if not toppath:
                 nonexistent_paths.append(p)
                 continue
