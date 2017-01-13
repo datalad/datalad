@@ -17,6 +17,7 @@ from git.exc import GitCommandError
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
+from datalad.cmd import GitRunner
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -77,8 +78,11 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 # but we can rely on it ATM only if "server" (i.e. localhost) has
 # recent enough git since then we expect an error msg to be spit out
 from datalad.support.external_versions import external_versions
+# But with custom GIT_PATH pointing to non-bundled annex, which would not be
+# used on remote, e
 assert_create_sshwebserver = (
-    assert_no_errors_logged(create_sibling)
+    assert_no_errors_logged(
+        create_sibling, skip_re='Git version >= 2.4 needed to configure remote')
     if external_versions['cmd:git'] >= '2.4'
     else create_sibling
 )
