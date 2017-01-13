@@ -30,6 +30,7 @@ from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
+from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -433,19 +434,50 @@ class GitRunner(Runner):
     GIT_WORK_TREE environment variables set to the absolute path
     if is defined and is relative path
     """
+    _GIT_PATH = None
+
+    @borrowdoc(Runner)
+    def __init__(self, *args, **kwargs):
+        super(GitRunner, self).__init__(*args, **kwargs)
+        self._check_git_path()
+
+    @staticmethod
+    def _check_git_path():
+        """If using bundled git-annex, we would like to use bundled with it git
+
+        Thus we will store _GIT_PATH a path to git in the same directory as annex
+        if found.  If it is empty (but not None), we do nothing
+        """
+        if GitRunner._GIT_PATH is None:
+            out, err = Runner().run('which git-annex')  # figure out which git-annex
+            annex_path = os.path.dirname(os.path.realpath(out.rstrip()))
+            GitRunner._GIT_PATH = \
+                annex_path \
+                if os.path.lexists(os.path.join(annex_path, 'git')) \
+                else ''
+            lgr.debug(
+                "Will use git under %r (not adjustments if empty string)",
+                GitRunner._GIT_PATH
+            )
+            assert(GitRunner._GIT_PATH is not None)  # we made the decision!
 
     @staticmethod
     def get_git_environ_adjusted(env=None):
         """
         Replaces GIT_DIR and GIT_WORK_TREE with absolute paths if relative path and defined
         """
-        git_env = env.copy() if env else os.environ.copy()         # if env set copy else get os environment
+        # if env set copy else get os environment
+        git_env = env.copy() if env else os.environ.copy()
+        if GitRunner._GIT_PATH:
+            git_env['PATH'] = ':'.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+                if 'PATH' in git_env \
+                else GitRunner._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
-            if var:                                                # if env variable set
-                if not isabs(var):                                 # and it's a relative path
-                    git_env[varstring] = abspath(var)              # convert it to absolute path
+            if var:                                    # if env variable set
+                if not isabs(var):                     # and it's a relative path
+                    git_env[varstring] = abspath(var)  # to absolute path
                     lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
 
         return git_env

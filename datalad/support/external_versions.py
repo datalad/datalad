@@ -40,7 +40,9 @@ class UnknownVersion:
 # Custom handlers
 #
 from datalad.cmd import Runner
+from datalad.cmd import GitRunner
 _runner = Runner()
+_git_runner = GitRunner()
 
 
 def _get_annex_version():
@@ -55,7 +57,7 @@ def _get_annex_version():
 
 def _get_git_version():
     """Return version of available git"""
-    return _runner.run('git version'.split())[0].split()[2]
+    return _git_runner.run('git version'.split())[0].split()[2]
 
 
 class ExternalVersions(object):
