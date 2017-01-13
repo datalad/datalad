@@ -449,14 +449,21 @@ class GitRunner(Runner):
         if found.  If it is empty (but not None), we do nothing
         """
         if GitRunner._GIT_PATH is None:
-            out, err = Runner().run('which git-annex')  # figure out which git-annex
-            annex_path = os.path.dirname(os.path.realpath(out.rstrip()))
-            GitRunner._GIT_PATH = \
-                annex_path \
-                if os.path.lexists(os.path.join(annex_path, 'git')) \
-                else ''
+            from distutils.spawn import find_executable
+            annex_fpath = find_executable("git-annex")
+            if not annex_fpath:
+                # not sure how to live further anyways! ;)
+                alongside = False
+            else:
+                annex_path = os.path.dirname(os.path.realpath(annex_fpath))
+                if on_windows:
+                    # just bundled installations so git should be taken from annex
+                    alongside = True
+                else:
+                    alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+            GitRunner._GIT_PATH = annex_path if alongside else ''
             lgr.debug(
-                "Will use git under %r (not adjustments if empty string)",
+                "Will use git under %r (no adjustments to PATH if empty string)",
                 GitRunner._GIT_PATH
             )
             assert(GitRunner._GIT_PATH is not None)  # we made the decision!
