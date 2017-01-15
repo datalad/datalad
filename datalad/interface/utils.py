@@ -32,6 +32,7 @@ from datalad.utils import assure_list
 from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
+from datalad.utils import swallow_logs
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
@@ -347,19 +348,27 @@ def save_dataset(
         # waiting for #1170
         from datalad.support.exceptions import CommandError
         try:
-            ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
+            # we will blindly call commit not knowing if there is anything to
+            # commit -- this is cheaper than to anticipate all possible ways
+            # a repo in whatever mode is dirty
+            # however, if nothing is dirty the whining wil start
+            # --> sucking it up right here
+            with swallow_logs(new_level=logging.ERROR) as cml:
+                ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
         except CommandError as e:
             # TODO until #1171 is resolved, test here for "normal" failure
             # to commit
             if 'nothing to commit' in str(e):
-                lgr.warning(
+                lgr.debug(
                     "Was instructed to commit %s files but repository is not dirty",
                     files)
             elif 'no changes added to commit':
                 lgr.info(
                     'Nothing to save')
             else:
-                raise ValueError(e)
+                # relay any prior whining in the exception
+                raise ValueError('{} [error log follows] {}; {}'.format(
+                    e, cml.out, cml.err))
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...
