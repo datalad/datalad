@@ -221,6 +221,10 @@ class Add(Interface):
                     relativepath=relpath(subds_path, ds_path))
                 # make sure that .gitmodules is added to the list of files
                 toadd.append(opj(ds.path, '.gitmodules'))
+                # report added subdatasets -- add below won't do it
+                results.append({
+                    'success': True,
+                    'file': Dataset(subds_path)})
             # make sure any last minute additions make it to the saving stage
             content_by_ds[ds_path] = toadd
             added = ds.repo.add(
@@ -231,7 +235,7 @@ class Add(Interface):
                 a['file'] = opj(ds_path, a['file'])
             results.extend(added)
 
-        if save:
+        if results and save:
             save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
@@ -248,7 +252,9 @@ class Add(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was added")
+            ui.message("Nothing was added{}".format(
+                       '' if args.recursive else
+                       " (consider --recursive if that is unexpected)"))
             return
 
         msg = linesep.join([
