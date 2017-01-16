@@ -18,7 +18,7 @@ class StartupSuite:
     """
     Benchmarks for datalad commands startup
     """
-    def setup(self):
+    def setup_cache(self):
         # we need to prepare/adjust PATH to point to installed datalad
         # We will base it on taking sys.executable
         python_path = osp.dirname(sys.executable)
@@ -33,4 +33,17 @@ class StartupSuite:
         call([sys.executable, "-c", "'import datalad'"])
         
 
+class RunnerSuite:
+    """Some rudimentary tests to see if there is no major slowdowns from Runner
+    """
 
+    def setup_cache(self):
+        from datalad.cmd import Runner, GitRunner
+        self.runner = Runner()
+        self.git_runner = GitRunner()
+
+    def time_echo(self):
+        self.runner.run("echo")
+
+    def time_echo_gitrunner(self):
+        self.git_runner.run("echo")
