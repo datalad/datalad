@@ -23,7 +23,6 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
 
-from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import require_dataset
@@ -51,9 +50,8 @@ class Update(Interface):
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="merge changes from sibling `name` or the remote branch, "
-                "configured to be the tracking branch if no sibling was "
-                "given", ),
+            doc="""merge obtained changes from either the sibling `name` or the
+            default sibling""", ),
         # TODO: How to document it without using the term 'tracking branch'?
         recursive=Parameter(
             args=("-r", "--recursive"),
@@ -76,9 +74,6 @@ class Update(Interface):
                  reobtain_data=False):
         """
         """
-        # TODO: Is there an 'update filehandle' similar to install and publish?
-        # What does it mean?
-
         if reobtain_data:
             # TODO: properly define, what to do
             raise NotImplementedError("TODO: Option '--reobtain-data' not "
@@ -94,7 +89,6 @@ class Update(Interface):
                                 for sub_path in
                                 ds.get_subdatasets(recursive=True, fulfilled=True)]
         # only work on those which are installed
-
 
         # TODO: current implementation disregards submodules organization,
         #  it just updates/merge each one individually whenever in the simplest
