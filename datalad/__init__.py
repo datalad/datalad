@@ -112,4 +112,8 @@ def teardown_package():
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
 
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    print(ev.dumps(query=True))
+
 lgr.log(5, "Done importing main __init__")

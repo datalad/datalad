@@ -165,7 +165,7 @@ class ExternalVersions(object):
         """Return dictionary (copy) of versions"""
         return self._versions.copy()
 
-    def dumps(self, indent=False, preamble="Versions:"):
+    def dumps(self, indent=False, preamble="Versions:", query=False):
         """Return listing of versions as a string
 
         Parameters
@@ -175,7 +175,12 @@ class ExternalVersions(object):
           is used). Otherwise returned in a single line
         preamble: str, optional
           What preamble to the listing to use
+        query : bool, optional
+          To query for versions of all "registered" custom externals, so to
+          get those which weren't queried for yet
         """
+        if query:
+            [self[k] for k in self.CUSTOM]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]
