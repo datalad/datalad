@@ -198,3 +198,23 @@ def test_nested_create(path):
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)
     assert_in(lvl2relpath, ds.get_subdatasets())
+
+
+# Imported from #1016
+@with_tree({'ds2': {'file1.txt': 'some'}})
+def test_saving_prior(topdir):
+    # the problem is that we might be saving what is actually needed to be
+    # "created"
+
+    # we would like to place this structure into a hierarchy of two datasets
+    # so we create first top one
+    ds1 = create(topdir, force=True)
+    # and everything is ok, stuff is not added BUT ds1 will be considered dirty
+    ok_(ds1.repo.dirty)
+    # And then we would like to initiate a sub1 subdataset
+    ds2 = create('ds2', dataset=ds1, force=True)
+    # But what will happen is file1.txt under ds2 would get committed first into
+    # ds1, and then the whole procedure actually crashes since because ds2/file1.txt
+    # is committed -- ds2 is already known to git and it just pukes with a bit
+    # confusing    'ds2' already exists in the index
+    assert_in('ds2', ds1.get_subdatasets())
