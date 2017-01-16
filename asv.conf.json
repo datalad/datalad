@@ -40,7 +40,8 @@
 
     // The Pythons you'd like to test against.  If not provided, defaults
     // to the current version of Python used to run `asv`.
-    "pythons": ["2.7", "3.5"],
+    // Some hosts might not have python3.5 yet, so 3.4 was added
+    "pythons": ["2.7", "3.4", "3.5"],
 
     // The matrix of dependencies to test.  Each key is the name of a
     // package (in PyPI) and the values are version numbers.  An empty
