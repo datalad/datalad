@@ -20,6 +20,7 @@ from .utils import ok_, eq_, assert_is, assert_equal, assert_false, \
     assert_true, assert_greater, assert_raises, assert_in, SkipTest
 
 from ..cmd import Runner, link_file_load
+from ..cmd import GitRunner
 from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
 from .utils import with_tempfile, assert_cwd_unchanged, \
@@ -270,3 +271,11 @@ def test_runner_failure(dir_):
         runner.run(failing_cmd, cwd=dir_)
         assert_in('notexistent.dat not found', cml.out)
     assert_equal(1, cme.exception.code)
+
+
+@with_tempfile(mkdir=True)
+def test_git_path(dir_):
+    from ..support.gitrepo import GitRepo
+    # As soon as we use any GitRepo we should get _GIT_PATH set in the Runner
+    repo = GitRepo(dir_, create=True)
+    assert GitRunner._GIT_PATH is not None
