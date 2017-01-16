@@ -1162,17 +1162,9 @@ def walk(top, func, arg):
 def get_dataset_root(path):
     """Return the root of an existent dataset containing a given path
 
-    Parameters
-    ----------
-    path : str
-      Path to an existing file or directory.
-
-    Returns
-    -------
-    path or None
-      The root path is returned in the same absolute or relative form
-      as the input argument. If no associated dataset exists, or the
-      input path doesn't exist, None is returned.
+    The root path is returned in the same absolute or relative form
+    as the input argument. If no associated dataset exists, or the
+    input path doesn't exist, None is returned.
     """
     suffix = os.sep + opj('.git', 'objects')
     if not isdir(path):
