@@ -195,8 +195,7 @@ class Add(Interface):
                                             if not p == inpds]
                 # and lastly remove all entries that contain no path to avoid
                 # saving any staged content in the final step
-                content_by_ds = {d: content_by_ds[d] for d in content_by_ds
-                                 if content_by_ds[d]}
+                content_by_ds = {d: v for d, v in content_by_ds.items() if v}
 
         results = []
         # simple loop over datasets -- save happens later
