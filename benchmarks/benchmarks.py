@@ -18,26 +18,33 @@ class StartupSuite:
     """
     Benchmarks for datalad commands startup
     """
-    def setup_cache(self):
+
+    # manually set a number since otherwise takes way too long!
+    # see https://github.com/spacetelescope/asv/issues/497
+    number = 5
+
+    def setup(self):
         # we need to prepare/adjust PATH to point to installed datalad
         # We will base it on taking sys.executable
         python_path = osp.dirname(sys.executable)
         self.env = os.environ.copy()
         self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
-        pass
 
     def time_help_np(self):
         call(["datalad", "--help-np"], env=self.env)
         
     def time_import(self):
         call([sys.executable, "-c", "'import datalad'"])
-        
+
+    def time_import_api(self):
+        call([sys.executable, "-c", "'import datalad.api'"])
+
 
 class RunnerSuite:
     """Some rudimentary tests to see if there is no major slowdowns from Runner
     """
 
-    def setup_cache(self):
+    def setup(self):
         from datalad.cmd import Runner, GitRunner
         self.runner = Runner()
         self.git_runner = GitRunner()
