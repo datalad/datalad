@@ -315,7 +315,8 @@ class Interface(object):
             path=None,
             dataset=None,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            dir_lookup=None):
         """Common input argument validation and pre-processing
 
         This method pre-processes the two most common input argument types:
@@ -346,6 +347,8 @@ class Interface(object):
           recursively
         recursion_limit : None or int
           Optional recursion limit specification (max levels of recursion)
+        dir_lookup : dict, optional
+          Passed to `get_paths_by_dataset`
 
         Returns
         -------
@@ -376,7 +379,8 @@ class Interface(object):
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(tosort,
                                  recursive=recursive,
-                                 recursion_limit=recursion_limit)
+                                 recursion_limit=recursion_limit,
+                                 dir_lookup=dir_lookup)
         if not path and dataset_path and recursive:
             # fish out the dataset path that we inserted above
             content_by_ds[dataset_path] = [p for p in content_by_ds[dataset_path]

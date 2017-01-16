@@ -73,20 +73,6 @@ def test_get_invalid_call(path, file_outside):
     ds.add("some.txt", to_git=True)
     ds.save("Initial commit.")
 
-    # no path given:
-    assert_raises(InsufficientArgumentsError, get, dataset=path,
-                  source="some", path=None)
-
-    # get on a plain git:
-    # MIH: why do we warn? user got what was desired. if they want technical
-    # background they better read books not warnings
-    #with swallow_logs(new_level=logging.WARNING) as cml:
-    #    # but we don't fail if not annex -- just inform
-    #    out = ds.get(curdir)
-    #    assert_in('Found no annex. Could not perform any get operation.',
-    #              cml.out)
-    #    eq_(out, [])
-
     # make it an annex:
     AnnexRepo(path, init=True, create=True)
     # call get again on a file in git:
@@ -112,17 +98,8 @@ def test_get_invalid_call(path, file_outside):
         eq_(len(result), 0)
         assert_in("ignored non-existing paths", cml.out)
 
-    # path outside repo:
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(file_outside)
-        eq_(len(result), 0)
-        assert_in("ignored paths that do not belong to any dataset: ['{0}'".format(file_outside, ds),
-                  cml.out)
-
-    # TODO: annex --json doesn't report anything when get fails to do get a
-    # file from a specified source, where the file isn't available from.
-    # File report for Joey (plus other failures like not existing when
-    # called with --json)
+    # path outside repo errors as with most other commands:
+    assert_raises(ValueError, ds.get, file_outside)
 
 
 @with_testrepos('basic_annex', flavors='clone')
@@ -262,7 +239,7 @@ def test_get_recurse_subdatasets(src, path):
     # now, with a path not explicitly pointing within a
     # subdataset, but recursive option:
     # get everything:
-    result = ds.get('.', recursive=True)
+    result = ds.get(recursive=True)
 
     eq_(set([item.get('file') for item in result]), annexed_files)
     ok_(all(item.get('success', False) for item in result))
