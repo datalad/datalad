@@ -111,9 +111,13 @@ def test_custom_versions():
     assert(isinstance(ev['cmd:git'], LooseVersion))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
+    # and there is also a version of system-wide installed git, which might
+    # differ from cmd:git but should be at least good old 1.7
+    assert(ev['cmd:system-git'] > '1.7')
+
     ev.CUSTOM = {'bogus': lambda: 1 / 0}
     assert_equal(ev['bogus'], None)
-    assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
+    assert_equal(set(ev.versions), {'cmd:annex', 'cmd:git', 'cmd:system-git'})
 
 
 def test_ancient_annex():

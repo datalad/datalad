@@ -55,9 +55,23 @@ def _get_annex_version():
         return out.split('\n')[0].split(':')[1].strip()
 
 
-def _get_git_version():
+def __get_git_version(runner):
     """Return version of available git"""
-    return _git_runner.run('git version'.split())[0].split()[2]
+    return runner.run('git version'.split())[0].split()[2]
+
+
+def _get_git_version():
+    """Return version of git we use (might be bundled)"""
+    return __get_git_version(_git_runner)
+
+
+def _get_system_git_version():
+    """Return version of git available system-wide
+
+    Might be different from the one we are using, which might be
+    bundled with git-annex
+    """
+    return __get_git_version(_runner)
 
 
 class ExternalVersions(object):
@@ -78,7 +92,8 @@ class ExternalVersions(object):
 
     CUSTOM = {
         'cmd:annex': _get_annex_version,
-        'cmd:git': _get_git_version
+        'cmd:git': _get_git_version,
+        'cmd:system-git': _get_system_git_version,
     }
 
     def __init__(self):

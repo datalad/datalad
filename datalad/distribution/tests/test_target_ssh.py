@@ -79,11 +79,10 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
 # recent enough git since then we expect an error msg to be spit out
 from datalad.support.external_versions import external_versions
 # But with custom GIT_PATH pointing to non-bundled annex, which would not be
-# used on remote, e
+# used on remote, so we will compare against system-git
 assert_create_sshwebserver = (
-    assert_no_errors_logged(
-        create_sibling, skip_re='Git version >= 2.4 needed to configure remote')
-    if external_versions['cmd:git'] >= '2.4'
+    assert_no_errors_logged(create_sibling)
+    if external_versions['cmd:system-git'] >= '2.4'
     else create_sibling
 )
 
@@ -246,7 +245,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             # files which hook would manage to generate
             _path_('.git/info/refs'), '.git/objects/info/packs'
         }
-        if external_versions['cmd:git'] >= '2.4':
+        if external_versions['cmd:system-git'] >= '2.4':
             # on elderly git we don't change receive setting
             ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
