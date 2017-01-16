@@ -177,8 +177,10 @@ class Save(Interface):
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
-        if res:
-            ui.message('Saved state: "{0}" by {1} [{2}]'.format(
-                res.message.splitlines()[0],
-                res.committer,
-                res.hexsha))
+        if not res:
+            return
+        for ds in res:
+            commit = ds.repo.repo.head.commit
+            ui.message('Saved state: {0} for {1}'.format(
+                commit.hexsha,
+                ds))
