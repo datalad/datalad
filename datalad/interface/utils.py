@@ -436,47 +436,6 @@ def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
     return spec
 
 
-def untracked_subdatasets_to_submodules(ds, consider_paths):
-    # treat special case of still untracked subdatasets.
-    # those need to become submodules now, as they are otherwise added
-    # without an entry in .gitmodules, and subsequently break Git's
-    # submodule functionality completely
-    dspath = ds.path
-    new_modules = []
-    if not consider_paths:
-        # nothing to test
-        return new_modules
-
-    # we cannot ask for "untracked_files", because that requires a working tree
-    # that could be expensive to obtain in direct mode repos
-    # so a different approach....
-
-    # get a list of all directories (abspath) with content known to git
-    # this will include mount points of known subdatasets
-    indexed_dirs = set([opj(ds.path, f if isdir(opj(ds.path, f)) else dirname(f))
-                        for f in ds.repo.get_indexed_files()])
-    # now get all the actual directories in this dataset
-    existing_dirs = set([d for testpath in consider_paths
-                         for d in get_dataset_directories(testpath,
-                                                          ignore_datalad=True)
-                         # do not probe for paths in subdatasets
-                         if get_dataset_root(testpath) == ds.path])
-    # the difference are directories that could be an untracked subdataset
-    subds_candidates = existing_dirs.difference(indexed_dirs)
-    for cand_dspath in subds_candidates:
-        if not Dataset(cand_dspath).is_installed():
-            # this is not the top of an actual dataset
-            continue
-        _install_subds_inplace(
-            ds=ds,
-            path=cand_dspath,  # can be ignored, we don't need the return value
-            relativepath=relpath(cand_dspath, start=ds.path),
-            name=None)
-        new_modules.append(cand_dspath)
-
-    return new_modules
-
-
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None):
     """Sort a list of paths per dataset they are contained in.
