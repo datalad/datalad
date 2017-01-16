@@ -22,10 +22,12 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
 
+from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import require_dataset
 
 lgr = logging.getLogger('datalad.distribution.update')
 
@@ -34,34 +36,37 @@ class Update(Interface):
     """Update a dataset from a sibling.
 
     """
+    # TODO: adjust docs to say:
+    # - update from just one sibling at a time
 
     _params_ = dict(
+        path=Parameter(
+            args=("path",),
+            metavar="PATH",
+            doc="path/name of the component to be dropped",
+            nargs="*",
+            constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
-            args=("name",),
+            args=("-s", "--sibling",),
             doc="""name of the sibling to update from""",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory""",
+            based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
             doc="""merge obtained changes from either the sibling `name` or the
             default sibling""", ),
-        # TODO: How to document it without using the term 'tracking branch'?
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="""if set this updates all possibly existing subdatasets,
-             too"""),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
-            doc="fetch updates from all siblings", ),
+            doc="fetch updates from all known siblings", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
@@ -69,9 +74,15 @@ class Update(Interface):
 
     @staticmethod
     @datasetmethod(name='update')
-    def __call__(name=None, dataset=None,
-                 merge=False, recursive=False, fetch_all=False,
-                 reobtain_data=False):
+    def __call__(
+            name=None,
+            path=None,
+            merge=False,
+            dataset=None,
+            recursive=False,
+            recursion_limit=None,
+            fetch_all=False,
+            reobtain_data=False):
         """
         """
         if reobtain_data:
@@ -79,24 +90,23 @@ class Update(Interface):
             raise NotImplementedError("TODO: Option '--reobtain-data' not "
                                       "implemented yet.")
 
-        # shortcut
-        ds = require_dataset(dataset, check_installed=True, purpose='updating')
-        assert (ds.repo is not None)
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
+        content_by_ds, unavailable_paths = Interface._prep(
+            path=path,
+            dataset=dataset,
+            recursive=recursive,
+            recursion_limit=recursion_limit)
 
-        repos_to_update = [ds.repo]
-        if recursive:
-            repos_to_update += [GitRepo(opj(ds.path, sub_path), create=False)
-                                for sub_path in
-                                ds.get_subdatasets(recursive=True, fulfilled=True)]
-        # only work on those which are installed
+        # TODO: check parsed inputs if any paths within a dataset were given
+        # and issue a message that we will update the associate dataset as a whole
+        # or fail -- see #1185 for a potential discussion
+        results = []
 
-        # TODO: current implementation disregards submodules organization,
-        #  it just updates/merge each one individually whenever in the simplest
-        #  case we just need  a call to
-        # git submodule update --recursive
-        #  if name was not provided, and there is no --merge
-        # If we do --merge we should at the end call save
-        for repo in repos_to_update:
+        for ds_path in content_by_ds:
+            ds = Dataset(ds_path)
+            repo = ds.repo
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(with_refs_only=True)
