@@ -130,9 +130,12 @@ class Update(Interface):
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
+            _update_repo(repo, name, merge, fetch_all)
 
+
+def _update_repo(repo, remote, merge, fetch_all):
             # fetch remote(s):
-            repo.fetch(remote=name, all_=fetch_all)
+            repo.fetch(remote=remote, all_=fetch_all)
 
             # if `repo` is an annex and we didn't fetch the entire remote
             # anyway, explicitly fetch git-annex branch:
@@ -143,10 +146,10 @@ class Update(Interface):
             # yoh: we should leave it to git and its configuration.
             # So imho we should just extract to fetch everything git would fetch
             if knows_annex(repo.path) and not fetch_all:
-                if name:
+                if remote:
                     # we are updating from a certain remote, so git-annex branch
                     # should be updated from there as well:
-                    repo.fetch(remote=name)
+                    repo.fetch(remote=remote)
                     # TODO: what does failing here look like?
                 else:
                     # we have no remote given, therefore
@@ -165,8 +168,8 @@ class Update(Interface):
                 # We need a "tracking remote" but custom refspec to fetch from
                 # that remote
                 cmd_list = ["git", "pull"]
-                if name:
-                    cmd_list.append(name)
+                if remote:
+                    cmd_list.append(remote)
                     # branch needed, if not default remote
                     # => TODO: use default remote/tracking branch to compare
                     #          (see above, where git-annex is fetched)
