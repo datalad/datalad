@@ -7,6 +7,7 @@
 
 import argparse
 import datetime
+import re
 
 
 class ManPageFormatter(argparse.HelpFormatter):
@@ -53,7 +54,8 @@ class ManPageFormatter(argparse.HelpFormatter):
                        parser._mutually_exclusive_groups, prefix='')
         usage = self._format_usage(None, parser._actions,
                                    parser._mutually_exclusive_groups, '')
-
+        # add spaces after comma delimiters for easier reformatting
+        usage = re.sub(r'([a-z]),([a-z])', '\\1, \\2', usage)
         usage = usage.replace('%s ' % self._prog, '')
         usage = '.SH SYNOPSIS\n \\fB%s\\fR %s\n' % (self._markup(self._prog),
                                                     usage)
@@ -115,7 +117,10 @@ class ManPageFormatter(argparse.HelpFormatter):
         formatter.add_text(parser.epilog)
 
         # determine help from format above
-        return '.SH OPTIONS\n' + formatter.format_help()
+        help = formatter.format_help()
+        # add spaces after comma delimiters for easier reformatting
+        help = re.sub(r'([a-z]),([a-z])', '\\1, \\2', help)
+        return '.SH OPTIONS\n' + help
 
     def _format_action_invocation(self, action):
         if not action.option_strings:
