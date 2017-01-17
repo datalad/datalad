@@ -11,17 +11,25 @@ import os
 import sys
 import os.path as osp
 
+import timeit
+
 from subprocess import call
 
+import time
+class SuprocBenchmarks(object):
+    # manually set a number since otherwise takes way too long!
+    # see https://github.com/spacetelescope/asv/issues/497
+    #number = 3
+    # although seems to work ok with a timer which accounts for subprocesses
 
-class StartupSuite:
+    # custom timer so we account for subprocess times
+    timer = timeit.default_timer
+    pass
+
+class StartupSuite(SuprocBenchmarks):
     """
     Benchmarks for datalad commands startup
     """
-
-    # manually set a number since otherwise takes way too long!
-    # see https://github.com/spacetelescope/asv/issues/497
-    number = 5
 
     def setup(self):
         # we need to prepare/adjust PATH to point to installed datalad
@@ -34,20 +42,25 @@ class StartupSuite:
         call(["datalad", "--help-np"], env=self.env)
         
     def time_import(self):
-        call([sys.executable, "-c", "'import datalad'"])
+        call([sys.executable, "-c", "import datalad"])
 
     def time_import_api(self):
-        call([sys.executable, "-c", "'import datalad.api'"])
+        call([sys.executable, "-c", "import datalad.api"])
 
 
-class RunnerSuite:
+class RunnerSuite(SuprocBenchmarks):
     """Some rudimentary tests to see if there is no major slowdowns from Runner
     """
 
     def setup(self):
-        from datalad.cmd import Runner, GitRunner
+        from datalad.cmd import Runner
         self.runner = Runner()
-        self.git_runner = GitRunner()
+        # older versions might not have it
+        try:
+            from datalad.cmd import GitRunner
+            self.git_runner = GitRunner()
+        except ImportError:
+            pass
 
     def time_echo(self):
         self.runner.run("echo")
