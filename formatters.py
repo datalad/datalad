@@ -17,7 +17,7 @@ class ManPageFormatter(argparse.HelpFormatter):
     def __init__(self,
                  prog,
                  indent_increment=2,
-                 max_help_position=24,
+                 max_help_position=4,
                  width=None,
                  section=1,
                  ext_sections=None,
@@ -25,7 +25,11 @@ class ManPageFormatter(argparse.HelpFormatter):
                  version=None
                  ):
 
-        super(ManPageFormatter, self).__init__(prog)
+        super(ManPageFormatter, self).__init__(
+            prog,
+            indent_increment=indent_increment,
+            max_help_position=max_help_position,
+            width=width)
 
         self._prog = prog
         self._section = 1
@@ -82,7 +86,9 @@ class ManPageFormatter(argparse.HelpFormatter):
         # italic section heading
         desc = re.sub(r'^\*(.*)\*$', r'\\fI\1\\fR', desc, flags=re.MULTILINE)
         # bold commands
-        desc = re.sub(r'^  (\S*)$', r'  \\fB\1\\fR', desc, flags=re.MULTILINE)
+        desc = re.sub(r'^  (\S*)$', r'.TP\n\\fB\1\\fR', desc, flags=re.MULTILINE)
+        # deindent body text, leave to troff viewer
+        desc = re.sub(r'^      (\S.*)\n', '\\1\n', desc, flags=re.MULTILINE)
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
@@ -124,6 +130,10 @@ class ManPageFormatter(argparse.HelpFormatter):
         help = formatter.format_help()
         # add spaces after comma delimiters for easier reformatting
         help = re.sub(r'([a-z]),([a-z])', '\\1, \\2', help)
+        # get proper indentation for argument items
+        help = re.sub(r'^  (\S.*)\n', '.TP\n\\1\n', help, flags=re.MULTILINE)
+        # deindent body text, leave to troff viewer
+        help = re.sub(r'^    (\S.*)\n', '\\1\n', help, flags=re.MULTILINE)
         return '.SH OPTIONS\n' + help
 
     def _format_action_invocation(self, action):
