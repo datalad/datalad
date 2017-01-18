@@ -176,7 +176,6 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
     for t in target_subs:
         trace = get_trace(
             subds_graph,
-            # need to strip separator to make `==` work
             superds_path,
             t)
         if not trace:

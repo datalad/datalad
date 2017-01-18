@@ -414,7 +414,7 @@ class Remove(Interface):
 
         if dataset and dataset.is_installed():
             # forge chain from base dataset to any leaf dataset
-            # on order to save state changes all the way up
+            # in order to save state changes all the way up
             _discover_trace_to_known(dataset.path, [], content_by_ds)
 
         save_dataset_hierarchy(
