@@ -55,7 +55,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         usage = self._format_usage(None, parser._actions,
                                    parser._mutually_exclusive_groups, '')
         # replace too long list of commands with a single placeholder
-        usage = re.sub(r'\n\s*{.*}\n\s*', ' COMMAND ', usage, re.MULTILINE)
+        usage = re.sub(r'\n\s*{.*}\n\s*', ' COMMAND ', usage, flags=re.MULTILINE)
         usage = usage.replace('%s ' % self._prog, '')
         usage = '.SH SYNOPSIS\n \\fB%s\\fR %s\n' % (self._markup(self._prog),
                                                     usage)
@@ -79,6 +79,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         if not desc:
             return ''
         desc = desc.replace('\n\n', '\n.PP\n')
+        desc = re.sub(r'^  (\S*)$', r'  \\fB\1\\fR', desc, flags=re.MULTILINE)
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
