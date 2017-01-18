@@ -58,7 +58,7 @@ requires = {
         'GitPython>=2.1.0',
         'iso8601',
         'humanize',
-        'mock',  # mock is also used for auto.py, not only for testing
+        'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
     ] + pbar_requires,

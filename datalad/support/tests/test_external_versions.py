@@ -106,13 +106,18 @@ def test_custom_versions():
     ev = ExternalVersions()
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
-    assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
+    # since we are using bundled version of git -- should be really recent
+    assert(ev['cmd:git'] > '2.10')  # git must be present and recentish
     assert(isinstance(ev['cmd:git'], LooseVersion))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
+    # and there is also a version of system-wide installed git, which might
+    # differ from cmd:git but should be at least good old 1.7
+    assert(ev['cmd:system-git'] > '1.7')
+
     ev.CUSTOM = {'bogus': lambda: 1 / 0}
     assert_equal(ev['bogus'], None)
-    assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
+    assert_equal(set(ev.versions), {'cmd:annex', 'cmd:git', 'cmd:system-git'})
 
 
 def test_ancient_annex():

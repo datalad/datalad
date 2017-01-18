@@ -1542,7 +1542,7 @@ class GitRepo(RepoInterface):
         #    self.config.unset(var, where='local', reload=False)
         self.config.set(var, url, where='local', reload=True)
 
-    def get_branch_commits(self, branch, limit=None, stop=None, value=None):
+    def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
         Pretty much similar to what 'git log <branch>' does.
@@ -1550,7 +1550,8 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        branch: str
+        branch: str, optional
+          If not provided, assumes current branch
         limit: None | 'left-only', optional
           Limit which commits to report.  If None -- all commits (merged or not),
           if 'left-only' -- only the commits from the left side of the tree upon
@@ -1562,6 +1563,9 @@ class GitRepo(RepoInterface):
           What to yield.  If None - entire commit object is yielded, if 'hexsha'
           only its hexsha
         """
+
+        if not branch:
+            branch = self.get_active_branch()
 
         try:
             _branch = self.repo.branches[branch]

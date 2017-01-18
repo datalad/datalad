@@ -292,6 +292,9 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_not_in('uuid', lfull[ar.WEB_UUID])  # no uuid in the records
     assert_equal(lfull[ar.WEB_UUID]['urls'], [testurl])
 
+    # --all and --key are incompatible
+    assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
+
     # output='descriptions'
     ldesc = ar.whereis(testfile, output='descriptions')
     assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))
@@ -392,6 +395,10 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     info2 = ar.info([testfile, testfile3])
     assert_equal(set(info2), {testfile, testfile3})
     assert_equal(info2[testfile3]['size'], 10)
+
+    full = ar.whereis([], options='--all', output='full')
+    assert_equal(len(full.keys()), 3)  # we asked for all files -- got 3 keys
+    assert_in(ar.WEB_UUID, full['SHA256E-s10--a978713ea759207f7a6f9ebc9eaebd1b40a69ae408410ddf544463f6d33a30e1.txt'])
 
     # which would work even if we cd to that subdir, but then we should use explicit curdir
     with chpwd(subdir):
