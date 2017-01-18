@@ -83,10 +83,10 @@ class ManPageFormatter(argparse.HelpFormatter):
         if not desc:
             return ''
         desc = desc.replace('\n\n', '\n.PP\n')
-        # italic section heading
-        desc = re.sub(r'^\*(.*)\*$', r'\\fI\1\\fR', desc, flags=re.MULTILINE)
-        # bold commands
-        desc = re.sub(r'^  (\S*)$', r'.TP\n\\fB\1\\fR', desc, flags=re.MULTILINE)
+        # sub-section headings
+        desc = re.sub(r'^\*(.*)\*$', r'.SS \1', desc, flags=re.MULTILINE)
+        # italic commands
+        desc = re.sub(r'^  (\S*)$', r'.TP\n\\fI\1\\fR', desc, flags=re.MULTILINE)
         # deindent body text, leave to troff viewer
         desc = re.sub(r'^      (\S.*)\n', '\\1\n', desc, flags=re.MULTILINE)
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
