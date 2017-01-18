@@ -60,6 +60,9 @@ class ManPageFormatter(argparse.HelpFormatter):
                                    parser._mutually_exclusive_groups, '')
         # replace too long list of commands with a single placeholder
         usage = re.sub(r'{[^]]*?,.*?}', ' COMMAND ', usage, flags=re.MULTILINE)
+        # take care of proper wrapping
+        usage = re.sub(r'\[([-a-zA-Z0-9]*)\s([a-zA-Z{}]*)\]', r'[\1\~\2]', usage)
+
         usage = usage.replace('%s ' % self._prog, '')
         usage = '.SH SYNOPSIS\n.HP\n\\fB%s\\fR %s\n' % (self._markup(self._prog),
                                                     usage)
