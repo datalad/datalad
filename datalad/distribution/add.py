@@ -120,7 +120,7 @@ class Add(Interface):
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         ds2super=Parameter(
-            args=("--ds2super", "--datasets-to-super",),
+            args=("-S", "--ds2super", "--datasets-to-super",),
             action='store_true',
             doc="""given paths of dataset (toplevel) locations will cause
             these datasets to be added to their respective superdatasets
