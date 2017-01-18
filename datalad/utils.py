@@ -15,7 +15,6 @@ import time
 
 import logging
 import shutil
-import stat
 import os
 import sys
 import tempfile
@@ -35,6 +34,7 @@ from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
 from os.path import stat
+from os.path import dirname
 
 
 from six import text_type, binary_type, string_types
@@ -1157,6 +1157,23 @@ def walk(top, func, arg):
             continue
         if stat.S_ISDIR(st.st_mode):
             walk(name, func, arg)
+
+
+def get_dataset_root(path):
+    """Return the root of an existent dataset containing a given path
+
+    The root path is returned in the same absolute or relative form
+    as the input argument. If no associated dataset exists, or the
+    input path doesn't exist, None is returned.
+    """
+    suffix = os.sep + opj('.git', 'objects')
+    if not isdir(path):
+        path = dirname(path)
+    while not exists(path + suffix):
+        path = opj(path, os.pardir)
+        if not exists(path):
+            return None
+    return normpath(path)
 
 
 lgr.log(5, "Done importing datalad.utils")

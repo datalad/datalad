@@ -23,6 +23,7 @@ from os.path import normpath
 
 from six.moves.urllib.parse import quote as urlquote
 
+
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
@@ -438,18 +439,3 @@ def _handle_possible_annex_dataset(dataset, reckless):
         repo = AnnexRepo(dataset.path, init=True)
         if reckless:
             repo._run_annex_command('untrust', annex_options=['here'])
-
-
-def _save_installed_datasets(ds, installed_datasets):
-    paths = [relpath(subds.path, ds.path) for subds in installed_datasets]
-    paths_str = ", ".join(paths)
-    msg = "installed subdataset{}: {}".format(
-        "s" if len(paths_str) > 1 else "", paths_str)
-    lgr.info("Saving possible changes to {0} - {1}".format(
-        ds, msg))
-    ds.save(
-        files=paths,
-        message='[DATALAD] ' + msg,
-        auto_add_changes=False,
-        recursive=False)
-

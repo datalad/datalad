@@ -65,7 +65,6 @@ def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
     subds2 = ds.create('two')
-    ds.save(auto_add_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
@@ -79,7 +78,7 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
-    ds.save(auto_add_changes=True)
+    ds.save(all_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
@@ -202,24 +201,22 @@ def test_uninstall_subdataset(src, dst):
     'kill': 'kill2'})
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
-    subds = ds.create('deep', force=True, if_dirty='ignore')
+    subds = ds.create('deep', force=True)
     subds.add('.', recursive=True)
     ds.add('.', recursive=True)
-    ds.save(auto_add_changes=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
-    # must not work without recursive
     topfile = 'kill'
     deepfile = opj('deep', 'dir', 'kill')
     # use a tuple not a list! should also work
-    ds.drop((topfile, deepfile), recursive=True, check=False)
+    ds.drop((topfile, deepfile), check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
     ok_(not ds.repo.file_has_content(topfile))
     ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
     # remove handles for all 'kill' files
-    ds.remove([topfile, deepfile], recursive=True, check=False)
+    ds.remove([topfile, deepfile], check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
@@ -270,12 +267,12 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True, if_dirty='ignore')
-    subds = ds.create('deep', force=True, if_dirty='ignore')
+    ds = Dataset(path).create(force=True)
+    subds = ds.create('deep', force=True)
     # we add one file
-    eq_(len(subds.add('.', if_dirty='ignore')), 1)
+    eq_(len(subds.add('.')), 1)
     # save all -> all clean
-    ds.save(auto_add_changes=True, recursive=True)
+    ds.save(all_changes=True, recursive=True)
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
     # now uninstall in subdataset through superdataset
@@ -305,7 +302,7 @@ def test_uninstall_recursive(path):
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
-    ds.save(auto_add_changes=True)
+    ds.save(all_changes=True)
     ok_clean_git(ds.path)
     # fail on missing --recursive because subdataset is present
     assert_raises(ValueError, ds.remove)
@@ -340,7 +337,7 @@ def test_kill(path):
     ds = Dataset(path).create()
     with open(opj(ds.path, "file.dat"), 'w') as f:
         f.write("load")
-    ds.repo.add("file.dat")
+    ds.add("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.get_subdatasets()), ['deep1'])
     ok_clean_git(ds.path)

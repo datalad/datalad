@@ -21,6 +21,7 @@ from ..ui import ui
 from ..dochelpers import exc_str
 
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.utils import with_pathsep as _with_sep
 
 
 def get_api_name(intfspec):
@@ -315,7 +316,7 @@ class Interface(object):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            mark_recursive=False):
+            dir_lookup=None):
         """Common input argument validation and pre-processing
 
         This method pre-processes the two most common input argument types:
@@ -329,24 +330,25 @@ class Interface(object):
 
         Paths are then sorted by the datasets that contain them. If paths are
         detected that are not associated with any dataset `ValueError` is
-        raised.
+        raised. If a `dataset` is given, any paths associated with a dataset
+        that is not this dataset or a subdataset of it will also trigger a
+        `ValueError`.
 
         Parameters
         ----------
         path : path or list(path) or None
           Path input argument
         dataset : path or Dataset or None
-          Dataset input argument
+          Dataset input argument. If given, the output dict is guaranteed
+          to carry a key for this dataset, but not necessarily any paths
+          as values.
         recursive : bool
           Whether to discover subdatasets under any of the given paths
           recursively
         recursion_limit : None or int
           Optional recursion limit specification (max levels of recursion)
-        mark_recursive : bool
-          If True, subdatasets "discovered" by recursion are marked such that
-          their value is a one-item list that contains `curdir` as the only
-          item, otherwise the item will be the same as the key -- the absolute
-          path to the respective dataset.
+        dir_lookup : dict, optional
+          Passed to `get_paths_by_dataset`
 
         Returns
         -------
@@ -366,20 +368,47 @@ class Interface(object):
                 "at least a dataset or a path must be given")
 
         path, dataset_path = get_normalized_path_arguments(
-            path, dataset, default=curdir)
+            path, dataset)
+        if not path and dataset_path and recursive:
+            # if we have nothing given, but need recursion, we need to feed
+            # the dataset path to the sorting to make it work
+            # but we also need to fish it out again afterwards
+            tosort = [dataset_path]
+        else:
+            tosort = path
         content_by_ds, unavailable_paths, nondataset_paths = \
-            get_paths_by_dataset(path,
+            get_paths_by_dataset(tosort,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit,
-                                 mark_recursive=mark_recursive)
+                                 dir_lookup=dir_lookup)
+        if not path and dataset_path and recursive:
+            # fish out the dataset path that we inserted above
+            content_by_ds[dataset_path] = [p for p in content_by_ds[dataset_path]
+                                           if p != dataset_path]
+        if not path and dataset_path:
+            # no files given, but a dataset -> operate on whole dataset
+            # but do not specify any paths to process -- needs to be tailored
+            # by caller
+            content_by_ds[dataset_path] = content_by_ds.get(dataset_path, [])
         if dataset_path and not content_by_ds and not unavailable_paths:
             # we got a dataset, but there is nothing actually installed
             nondataset_paths.append(dataset_path)
+        if dataset_path:
+            # check that we only got SUBdatasets
+            dataset_path = _with_sep(dataset_path)
+            for ds in content_by_ds:
+                if not _with_sep(ds).startswith(dataset_path):
+                    nondataset_paths.extend(content_by_ds[ds])
         # complain about nondataset and non-existing paths
         if nondataset_paths:
-            raise ValueError(
-                "will not touch paths outside of installed datasets: %s"
-                % nondataset_paths)
+            if dataset_path:
+                raise ValueError(
+                    "will not touch paths outside of base datasets(%s): %s"
+                    % (dataset_path, nondataset_paths))
+            else:
+                raise ValueError(
+                    "will not touch paths outside of installed datasets: %s"
+                    % nondataset_paths)
         return content_by_ds, unavailable_paths
 
 

@@ -83,7 +83,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
 
     """
     # we apparently can't import api functionality within api
-    from datalad.api import install
+    from datalad.api import add
     # To simplify managing all the file paths etc
     if not isabs(path):
         path = abspath(path)
@@ -117,19 +117,10 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
 
     if ds:
         assert ds.is_installed()
-        rpath = os.path.relpath(path, ds.path)
-        out = install(
-            rpath,
-            source=opj(os.curdir, rpath),
+        out = add(
+            path,
             dataset=ds,
-            # currently would generate two commits -- first adding a submodule
-            # and then a dummy one (commented out below) talking about "installing".
-            # But may be this all would get automagically straightened out by
-            # GH #1169, so we could also have a sensible message on what was done
-            # if_dirty='ignore',
-            )
-        # ds.repo.commit("subdataset %s installed." % rpath, _datalad_msg=True)
-
+        )
 
 
 class CreateTestDataset(Interface):
