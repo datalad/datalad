@@ -18,7 +18,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                  prog,
                  indent_increment=2,
                  max_help_position=4,
-                 width=None,
+                 width=1000000,
                  section=1,
                  ext_sections=None,
                  authors=None,
@@ -59,9 +59,9 @@ class ManPageFormatter(argparse.HelpFormatter):
         usage = self._format_usage(None, parser._actions,
                                    parser._mutually_exclusive_groups, '')
         # replace too long list of commands with a single placeholder
-        usage = re.sub(r'\n\s*{.*}\n\s*', ' COMMAND ', usage, flags=re.MULTILINE)
+        usage = re.sub(r'{[^]]*?,.*?}', ' COMMAND ', usage, flags=re.MULTILINE)
         usage = usage.replace('%s ' % self._prog, '')
-        usage = '.SH SYNOPSIS\n \\fB%s\\fR %s\n' % (self._markup(self._prog),
+        usage = '.SH SYNOPSIS\n.HP\n\\fB%s\\fR %s\n' % (self._markup(self._prog),
                                                     usage)
         return usage
 
