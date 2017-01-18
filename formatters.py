@@ -78,7 +78,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         desc = parser.description
         if not desc:
             return ''
-        desc = desc.replace('\n', '\n.br\n')
+        desc = desc.replace('\n\n', '\n.PP\n')
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
