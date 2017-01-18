@@ -89,9 +89,14 @@ class ManPageFormatter(argparse.HelpFormatter):
         # sub-section headings
         desc = re.sub(r'^\*(.*)\*$', r'.SS \1', desc, flags=re.MULTILINE)
         # italic commands
-        desc = re.sub(r'^  (\S*)$', r'.TP\n\\fI\1\\fR', desc, flags=re.MULTILINE)
+        desc = re.sub(r'^  ([a-z]*)$', r'.TP\n\\fI\1\\fR', desc, flags=re.MULTILINE)
         # deindent body text, leave to troff viewer
         desc = re.sub(r'^      (\S.*)\n', '\\1\n', desc, flags=re.MULTILINE)
+        # format NOTEs as indented paragraphs
+        desc = re.sub(r'^NOTE\n', '.TP\nNOTE\n', desc, flags=re.MULTILINE)
+        # deindent indented paragraphs after heading setup
+        desc = re.sub(r'^  (.*)$', '\\1', desc, flags=re.MULTILINE)
+
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
