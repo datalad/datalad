@@ -1395,7 +1395,7 @@ def test_get_description(path1, path2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_WeakSingletonRepo(path1, path2):
+def test_AnnexRepo_flyweight(path1, path2):
 
     repo1 = AnnexRepo(path1, create=True)
     assert_is_instance(repo1, AnnexRepo)

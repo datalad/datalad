@@ -996,7 +996,7 @@ def test_GitRepo_gitpy_injection(path, path2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_WeakRefSingletonRepo(path1, path2):
+def test_GitRepo_flyweight(path1, path2):
 
     repo1 = GitRepo(path1, create=True)
     assert_is_instance(repo1, GitRepo)

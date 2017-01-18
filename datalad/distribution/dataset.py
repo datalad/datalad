@@ -83,7 +83,7 @@ class Dataset(object):
     _unique_instances = WeakValueDictionary()
 
     @classmethod
-    def _id_from_args(cls, *args, **kwargs):
+    def _flyweight_id_from_args(cls, *args, **kwargs):
 
         if args:
             # to a certain degree we need to simulate an actual call to __init__

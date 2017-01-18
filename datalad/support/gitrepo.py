@@ -394,7 +394,7 @@ class GitRepo(RepoInterface):
     _unique_instances = WeakValueDictionary()
 
     @classmethod
-    def _id_from_args(cls, *args, **kwargs):
+    def _flyweight_id_from_args(cls, *args, **kwargs):
 
         if args:
             # to a certain degree we need to simulate an actual call to __init__
@@ -423,8 +423,22 @@ class GitRepo(RepoInterface):
         return path, args, kwargs
 
     @classmethod
-    def _cond_invalid(cls, id_):
+    def _flyweight_invalid(cls, id_):
         return not cls.is_valid_repo(id_)
+
+    @classmethod
+    def _flyweight_reject(cls, id_, *args, **kwargs):
+        # TODO:
+        # This is a temporary approach. See PR # ...
+        create = kwargs.pop('create', None)
+        kwargs.pop('path', None)
+        if create and kwargs:
+            # we have `create` plus options other than `path`
+            return "Call to {0}() with args {1} and kwargs {2} conflicts " \
+                   "with existing instance {3}." \
+                   "This is likely to be caused by inconsistent logic in " \
+                   "your code." \
+                   "".format(cls, args, kwargs, cls._unique_instances[id_])
 
     # End Flyweight
 
@@ -449,6 +463,14 @@ class GitRepo(RepoInterface):
           creates `path`, if it doesn't exist.
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
+        repo:
+
+
+
+
+
+
+
         kwargs:
           keyword arguments serving as additional options to the git-init
           command. Therefore, it makes sense only if called with `create`.
@@ -562,7 +584,6 @@ class GitRepo(RepoInterface):
             except KeyError:
                 # didn't exist - all fine
                 pass
-
 
         # try to get a local path from `url`:
         try:

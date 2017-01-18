@@ -12,6 +12,8 @@
 
 import logging
 
+from.exceptions import InvalidInstanceRequestError
+
 lgr = logging.getLogger('datalad.repo')
 
 
@@ -35,7 +37,7 @@ class Flyweight(type):
     To use this pattern, you need to add this class as a metaclass to the class
     you want to use it with. Additionally there needs to be a class attribute
     `_unique_instances`, which should be a `WeakValueDictionary`. Furthermore
-    implement `_id_from_args` method to determine, what should be the
+    implement `_flyweight_id_from_args` method to determine, what should be the
     identifying criteria to consider two requested instances the same.
 
     Example:
@@ -49,7 +51,7 @@ class Flyweight(type):
         _unique_instances = WeakValueDictionary()
 
         @classmethod
-        def _id_from_args(cls, *args, **kwargs):
+        def _flyweight_id_from_args(cls, *args, **kwargs):
 
             id = kwargs.pop('id')
             return id, args, kwargs
@@ -64,7 +66,7 @@ class Flyweight(type):
     assert c is not a
     """
 
-    def _id_from_args(cls, *args, **kwargs):
+    def _flyweight_id_from_args(cls, *args, **kwargs):
         """create an ID from arguments passed to `__call__`
 
         Subclasses need to implement this method. The ID it returns is used to
@@ -88,7 +90,7 @@ class Flyweight(type):
         """
         pass
 
-    def _cond_invalid(cls, id):
+    def _flyweight_invalid(cls, id):
         """determines whether or not an instance with `id` became invalid and
         therefore has to be instantiated again.
 
@@ -109,14 +111,56 @@ class Flyweight(type):
         """
         return False
 
+    def _flyweight_reject(cls, id, *args, **kwargs):
+        """decides whether to reject a request for an instance
+
+        This gives the opportunity to detect a conflict of an instance request
+        with an already existing instance, that is not invalidated by
+        `_flyweight_invalid`. In case the return value is not `None`, it will be
+        used as the message for an `InvalidInstanceRequestError`,
+        raised by `__call__`
+
+        Parameters
+        ----------
+        id: hashable
+          the ID of the instance in question as calculated by
+          `_flyweight_id_from_args`
+        args:
+        kwargs:
+          (keyword) arguments to the original call
+
+        Returns:
+        --------
+        None or str
+        """
+        return None
+
     def __call__(cls, *args, **kwargs):
 
-        id_, new_args, new_kwargs = cls._id_from_args(*args, **kwargs)
+        id_, new_args, new_kwargs = cls._flyweight_id_from_args(*args, **kwargs)
         instance = cls._unique_instances.get(id_, None)
 
-        if instance is None or cls._cond_invalid(id_):
+        if instance is None or cls._flyweight_invalid(id_):
+            # we have no such instance yet or the existing one is invalidated,
+            # so we instantiate:
             instance = type.__call__(cls, *new_args, **new_kwargs)
             cls._unique_instances[id_] = instance
+        else:
+            # we have an instance already that is not invalid itself; check
+            # whether there is a conflict, otherwise return existing one:
+            # TODO
+            # Note, that this might (and probably should) go away, when we
+            # decide how to deal with currently possible invalid constructor
+            # calls for the repo classes. In particular this is about calling
+            # it with different options than before, that might lead to
+            # fundamental changes in the repository (like annex repo version
+            # change or re-init of git)
+
+            # force? may not mean the same thing
+            msg = cls._flyweight_reject(id_, *new_args, **new_kwargs)
+            if msg is not None:
+                raise InvalidInstanceRequestError(id_, msg)
+
         return instance
 
 
@@ -136,6 +180,8 @@ class RepoInterface(object):
     # Note 2: Seems possible. There is MRO magic:
     # http://pybites.blogspot.de/2009/01/mro-magic.html
     # http://stackoverflow.com/questions/20822850/change-python-mro-at-runtime
+
+    # Test!
 
     def sth_like_file_has_content(self):
         raise NotImplementedError # the real thing in case of annex and True in case of git
