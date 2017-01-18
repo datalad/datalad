@@ -43,6 +43,7 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
+from datalad.utils import get_dataset_root
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -440,7 +441,7 @@ class Dataset(object):
             # normalize the path after adding .. so we guaranteed to not
             # follow into original directory if path itself is a symlink
             par_path = normpath(opj(path, pardir))
-            sds_path_ = GitRepo.get_toppath(par_path)
+            sds_path_ = get_dataset_root(par_path)
             if sds_path_ is None:
                 # no more parents, use previous found
                 break
@@ -621,7 +622,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        dspath = GitRepo.get_toppath(getpwd())
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)

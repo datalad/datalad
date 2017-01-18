@@ -636,15 +636,18 @@ def test_GitRepo_get_files(url, path):
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
-def test_GitRepo_get_toppath(repo, tempdir):
+@with_tempfile
+def test_GitRepo_get_toppath(repo, tempdir, repo2):
     reporeal = realpath(repo)
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
     eq_(GitRepo.get_toppath(repo), repo)
     # Generate some nested directory
-    nested = opj(repo, "d1", "d2")
+    GitRepo(repo2, create=True)
+    repo2real = realpath(repo2)
+    nested = opj(repo2, "d1", "d2")
     os.makedirs(nested)
-    eq_(GitRepo.get_toppath(nested, follow_up=False), reporeal)
-    eq_(GitRepo.get_toppath(nested), repo)
+    eq_(GitRepo.get_toppath(nested, follow_up=False), repo2real)
+    eq_(GitRepo.get_toppath(nested), repo2)
     # and if not under git, should return None
     eq_(GitRepo.get_toppath(tempdir), None)
 

@@ -1427,3 +1427,22 @@ def test_AnnexRepo_flyweight(path1, path2):
     repo4 = GitRepo(path1)
     assert_is_instance(repo4, GitRepo)
     assert_not_is_instance(repo4, AnnexRepo)
+
+
+@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
+
+    reporeal = realpath(repo)
+    eq_(AnnexRepo.get_toppath(repo, follow_up=False), reporeal)
+    eq_(AnnexRepo.get_toppath(repo), repo)
+    # Generate some nested directory
+    AnnexRepo(repo2, create=True)
+    repo2real = realpath(repo2)
+    nested = opj(repo2, "d1", "d2")
+    os.makedirs(nested)
+    eq_(AnnexRepo.get_toppath(nested, follow_up=False), repo2real)
+    eq_(AnnexRepo.get_toppath(nested), repo2)
+    # and if not under git, should return None
+    eq_(AnnexRepo.get_toppath(tempdir), None)

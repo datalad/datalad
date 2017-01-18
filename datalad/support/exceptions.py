@@ -82,7 +82,7 @@ class CommandNotAvailableError(CommandError):
     pass
 
 
-class FileNotInAnnexError(CommandError, IOError):
+class FileNotInAnnexError(IOError, CommandError):
     """Thrown if a file is not under control of git-annex.
     """
     def __init__(self, cmd="", msg="", code=None, filename=""):

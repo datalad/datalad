@@ -699,7 +699,7 @@ class GitRepo(RepoInterface):
             ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
-    def get_toppath(cls, path, follow_up=True):
+    def get_toppath(cls, path, follow_up=True, git_options=None):
         """Return top-level of a repository given the path.
 
         Parameters
@@ -708,13 +708,19 @@ class GitRepo(RepoInterface):
           If path has symlinks -- they get resolved by git.  If follow_up is
           True, we will follow original path up until we hit the same resolved
           path.  If no such path found, resolved one would be returned.
+        git_options: list of str
+          options to be passed to the git rev-parse call
 
         Return None if no parent directory contains a git repository.
         """
+        cmd = ['git']
+        if git_options:
+            cmd.extend(git_options)
+        cmd += ["rev-parse", "--show-toplevel"]
         try:
             with swallow_logs():
                 toppath, err = Runner().run(
-                    ["git", "rev-parse", "--show-toplevel"],
+                    cmd,
                     cwd=path,
                     log_stdout=True, log_stderr=True,
                     expect_fail=True, expect_stderr=True)
@@ -722,7 +728,8 @@ class GitRepo(RepoInterface):
         except CommandError:
             return None
         except OSError:
-            toppath = GitRepo.get_toppath(dirname(path))
+            toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
+                                          git_options=git_options)
 
         if follow_up:
             path_ = path
@@ -937,7 +944,10 @@ class GitRepo(RepoInterface):
         #       Note: repo.tree(treeish).hexsha
         if branch is None:
             try:
-                return self.repo.active_branch.object.hexsha
+                # do not use
+                #self.repo.active_branch.object.hexsha
+                # but HEAD to be able to cope with detached heads
+                return self.repo.head.object.hexsha
             except ValueError as exc:
                 if 'does not exist' in str(exc):
                     return None

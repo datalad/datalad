@@ -167,7 +167,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2.add('file.txt')
     sub2.commit("")
     # TODO: Doesn't work:  https://github.com/datalad/datalad/issues/636
-    #source.save("changed sub2", auto_add_changes=True)
+    #source.save("changed sub2", all_changes=True)
     source.repo.commit("", options=['-a'])
 
     res_ = publish(dataset=source, recursive=True)

@@ -20,6 +20,7 @@ from datalad.api import get
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
+from datalad.utils import get_dataset_root
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -272,7 +273,7 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     # the top of a subdataset belongs to the subdataset
     eq_(ds.get_containing_subdataset(opj("sub", "subsub")).path, subsubds.path)
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub", "subsub")), subsubds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub", "subsub")), subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("sub").path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
@@ -282,10 +283,10 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("sub").path, subds.path)
     # # but now GitRepo disagrees...
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub")), ds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
     # and this stays, even if we give the mount point directory back
     os.makedirs(subds.path)
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub")), ds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
     assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,

@@ -109,7 +109,7 @@ def test_basic_metadata(path):
                  ['@context', 'dcterms:conformsTo'])
     ds.create(force=True, save=False)
     # with subdataset
-    sub = ds.create('sub', force=True, if_dirty='ignore')
+    sub = ds.create('sub', force=True)
     ds.save()
     meta = get_metadata(ds)
     assert_equal(
@@ -138,8 +138,8 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
-    subds = ds.create('sub', force=True, if_dirty='ignore')
-    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+    subds = ds.create('sub', force=True)
+    subsubds = subds.create('subsub', force=True)
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second natiev set for the topmost dataset
@@ -172,7 +172,7 @@ def test_aggregation(path):
     assert_true(success)
 
     # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data', auto_add_changes=True)
+    ds.save('with aggregated meta data', all_changes=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
     clone = install(opj(path, 'clone'), source=ds.path)
@@ -301,11 +301,10 @@ def test_aggregation(path):
 def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
-    subds = ds.create('sub', force=True, if_dirty='ignore')
-    subds.repo.remove(opj('.datalad', 'config'))
-    subds.save()
+    subds = ds.create('sub', force=True)
+    subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
     assert_false(exists(opj(subds.path, '.datalad', 'config')))
-    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+    subsubds = subds.create('subsub', force=True)
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second native set for the topmost dataset
@@ -386,7 +385,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(get_metadata(ds)))
         # making it a submodule has no effect either
-        ds.save(auto_add_changes=True)
+        ds.add(subpath)
         assert_equal(len(ds.get_subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
