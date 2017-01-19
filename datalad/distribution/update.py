@@ -75,8 +75,8 @@ class Update(Interface):
     @staticmethod
     @datasetmethod(name='update')
     def __call__(
-            name=None,
             path=None,
+            name=None,
             merge=False,
             dataset=None,
             recursive=False,
