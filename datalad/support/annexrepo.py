@@ -983,17 +983,18 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('enableremote', annex_options=[name])
 
     def merge_annex(self, remote=None):
-        """Call git annex merge to merge git-annex branch
+        """Merge git-annex branch
 
         Parameters
         ----------
         remote: str, optional
-          Name of a remote to be "merged". Not used ATM since git-annex merge
-          doesn't support yet.  But is available in place so uses could specify
-          expected remote to be merged
+          Name of a remote to be "merged".
         """
-        # TODO: wait for support of remote
-        self._run_annex_command('merge')
+        # this doesn't use `merge` but `sync` in order to properly
+        # trigger updating of maintained branches in e.g. v6 repos
+        args = [remote] if remote else []
+        args = args.extend(['--no-push', '--no-pull'])
+        self._run_annex_command('sync', annex_options=args)
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
