@@ -43,7 +43,7 @@ class Update(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path/name of the component to be dropped",
+            doc="path to be updated",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
