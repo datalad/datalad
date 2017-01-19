@@ -309,7 +309,7 @@ class Runner(object):
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
         errstream = subprocess.PIPE if log_stderr else sys.stderr
 
-        self.log("Running: %s" % (cmd,))
+        self.log("Running: %s\ncwd: %s" % (cmd, cwd or self.cwd))
 
         if self.protocol.do_execute_ext_commands:
 

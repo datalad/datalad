@@ -101,8 +101,8 @@ def test_update_recursive():
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_fetch_all(src, remote_1, remote_2):
-    rmt1 = AnnexRepo(remote_1, src)
-    rmt2 = AnnexRepo(remote_2, src)
+    rmt1 = AnnexRepo.clone(src, remote_1)
+    rmt2 = AnnexRepo.clone(src, remote_2)
 
     ds = Dataset(src)
     ds.add_sibling(name="sibling_1", url=remote_1)

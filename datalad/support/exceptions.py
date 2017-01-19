@@ -223,6 +223,15 @@ class RemoteNotAvailableError(CommandError):
                "".format(self.remote, linesep, super_str)
 
 
+class InvalidInstanceRequestError(RuntimeError):
+    """Thrown if a request to create a (flyweight) instance is invalid"""
+
+    def __init__(self, id_, msg=None):
+        super(InvalidInstanceRequestError, self).__init__(msg)
+        self.id = id_
+        self.msg = msg
+
+
 class IncompleteResultsError(RuntimeError):
     """Exception to be raised whenever results are incomplete.
 

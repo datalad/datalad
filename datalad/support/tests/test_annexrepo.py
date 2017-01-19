@@ -13,6 +13,7 @@
 from functools import partial
 from os import mkdir
 from shutil import copyfile
+from nose.tools import assert_not_is_instance
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
@@ -28,14 +29,14 @@ from ..annexrepo import *
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo.clone(src, dst)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(dst, '.git', 'annex')))
 
     # do it again should raise GitCommandError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs(new_level=logging.WARN) as cm:
-        assert_raises(GitCommandError, AnnexRepo, dst, src)
+        assert_raises(GitCommandError, AnnexRepo.clone, src, dst)
         if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)
 
@@ -68,7 +69,7 @@ def test_AnnexRepo_instance_brand_new(path):
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
 
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo.clone(src, dst)
 
     # fake git-annex entries in .git/config:
     writer = ar.repo.config_writer()
@@ -123,7 +124,7 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
 @with_tempfile
 def test_AnnexRepo_set_direct_mode(src, dst):
 
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo.clone(src, dst)
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
@@ -139,7 +140,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
-    ar = AnnexRepo(annex_path, src)
+    ar = AnnexRepo.clone(src, annex_path)
     ar.set_direct_mode(True)
     ok_clean_git_annex_proxy(path=annex_path)
 
@@ -157,7 +158,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 
-    ar = AnnexRepo(annex_path, src)
+    ar = AnnexRepo.clone(src, annex_path)
 
     # test-annex.dat should return the correct key:
     assert_equal(
@@ -215,7 +216,7 @@ def test_AnnexRepo_get_remote_na(path):
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
 def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
-    ar = AnnexRepo(annex_path, src, direct=direct)
+    ar = AnnexRepo.clone(src, annex_path, direct=direct)
     testfiles = ["test-annex.dat", "test.dat"]
 
     assert_equal(ar.file_has_content(testfiles), [False, False])
@@ -236,7 +237,7 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
 def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
-    ar = AnnexRepo(annex_path, src, direct=direct)
+    ar = AnnexRepo.clone(src, annex_path, direct=direct)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
         f.write("aaa")
@@ -414,7 +415,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
-    ar = AnnexRepo(dst, src, backend='MD5')
+    ar = AnnexRepo.clone(src, dst, backend='MD5')
     # GitPython has a bug which causes .git/config being wiped out
     # under Python3, triggered by collecting its config instance I guess
     gc.collect()
@@ -520,7 +521,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
     AnnexRepo(src)
 
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo.clone(src, dst)
 
     assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
     if not ar.is_direct_mode():
@@ -614,7 +615,7 @@ def test_AnnexRepo_on_uninited_annex(path):
 @with_tempfile
 def test_AnnexRepo_commit(src, path):
 
-    ds = AnnexRepo(path, src)
+    ds = AnnexRepo.clone(src, path)
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
@@ -648,7 +649,7 @@ def test_AnnexRepo_add_to_annex(path_1, path_2):
     # first clone as provided by with_testrepos:
     r1 = AnnexRepo(path_1, create=False, init=True)
     # additional second clone for direct mode:
-    r2 = AnnexRepo(path_2, path_1, create=True)
+    r2 = AnnexRepo.clone(path_1, path_2, create=True)
     r2.set_direct_mode()
 
     for repo in [r1, r2]:
@@ -718,7 +719,7 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
     # first clone as provided by with_testrepos:
     r1 = AnnexRepo(path_1, create=False, init=True)
     # additional second clone for direct mode:
-    r2 = AnnexRepo(path_2, path_1, create=True)
+    r2 = AnnexRepo.clone(path_1, path_2, create=True)
     r2.set_direct_mode()
 
     for repo in [r1, r2]:
@@ -764,7 +765,7 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
-    annex = AnnexRepo(dst, src)
+    annex = AnnexRepo.clone(src, dst)
     assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = opj(dst, testfile)
@@ -901,9 +902,15 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
 
     # add into a new file
-    #filename = 'newfile.dat'
+    # filename = 'newfile.dat'
     filename = get_most_obscure_supported_name()
+
+    # Note: The following line was necessary, since the test setup just
+    # doesn't work with singletons
+    # TODO: Singleton mechanic needs a general solution for this
+    AnnexRepo._unique_instances.clear()
     ar2 = AnnexRepo(dst, batch_size=1)
+
     with swallow_outputs():
         assert_equal(len(ar2._batched), 0)
         ar2.add_url_to_file(filename, testurl, batch=True)
@@ -1030,7 +1037,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 @with_tempfile(mkdir=True)
 def test_annex_remove(path1, path2):
     ar1 = AnnexRepo(path1, create=False)
-    ar2 = AnnexRepo(path2, path1, create=True, direct=True)
+    ar2 = AnnexRepo.clone(path1, path2, create=True, direct=True)
 
     for repo in (ar1, ar2):
         file_list = repo.get_annexed_files()
@@ -1084,7 +1091,7 @@ def test_repo_version(path1, path2, path3):
 @with_tempfile(mkdir=True)
 def test_annex_copy_to(origin, clone):
     repo = AnnexRepo(origin, create=False)
-    remote = AnnexRepo(clone, origin, create=True)
+    remote = AnnexRepo.clone(origin, clone, create=True)
     repo.add_remote("target", clone)
 
     assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
@@ -1103,7 +1110,7 @@ def test_annex_copy_to(origin, clone):
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_annex_drop(src, dst):
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo.clone(src, dst)
     testfile = 'test-annex.dat'
     assert_false(ar.file_has_content(testfile))
     ar.get(testfile)
@@ -1139,7 +1146,7 @@ def test_annex_drop(src, dst):
 @with_tempfile(mkdir=True)
 def test_annex_remove(path1, path2):
     ar1 = AnnexRepo(path1, create=False)
-    ar2 = AnnexRepo(path2, path1, create=True, direct=True)
+    ar2 = AnnexRepo.clone(path1, path2, create=True, direct=True)
 
     for repo in (ar1, ar2):
         file_list = repo.get_annexed_files()
@@ -1254,11 +1261,15 @@ def test_annex_version_handling(path):
             eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
             eq_(cmpc.call_count, 1)
             # 2nd time must not be called
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             ar2 = AnnexRepo(path)
             assert(ar2)
             eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
             eq_(cmpc.call_count, 1)
-
     with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
             patch.object(AnnexRepo, '_check_git_annex_version',
                          auto_spec=True,
@@ -1268,6 +1279,11 @@ def test_annex_version_handling(path):
                 external_versions, '_versions', {'cmd:annex': None}):
             eq_(AnnexRepo.git_annex_version, None)
             with assert_raises(MissingExternalDependency) as cme:
+                try:
+                    # Note: Remove to cause creation of a new instance
+                    rmtree(path)
+                except OSError:
+                    pass
                 AnnexRepo(path)
             if linux_distribution_name == 'debian':
                 assert_in("http://neuro.debian.net", str(cme.exception))
@@ -1277,10 +1293,20 @@ def test_annex_version_handling(path):
         with patch.object(
                 external_versions, '_versions', {'cmd:annex': '6.20160505'}):
             eq_(AnnexRepo.git_annex_version, None)
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             assert_raises(OutdatedExternalDependency, AnnexRepo, path)
             # and we don't assign it
             eq_(AnnexRepo.git_annex_version, None)
             # so we could still fail
+            try:
+                # Note: Remove to cause creation of a new instance
+                rmtree(path)
+            except OSError:
+                pass
             assert_raises(OutdatedExternalDependency, AnnexRepo, path)
 
 
@@ -1372,6 +1398,35 @@ def test_get_description(path1, path2):
     annex1.merge_annex('annex1')
     annex2.remove_remote('annex1')
     assert_equal(annex2.get_description(uuid=annex1.uuid), annex1_description)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_flyweight(path1, path2):
+
+    repo1 = AnnexRepo(path1, create=True)
+    assert_is_instance(repo1, AnnexRepo)
+    # instantiate again:
+    repo2 = AnnexRepo(path1, create=False)
+    assert_is_instance(repo2, AnnexRepo)
+    # the very same object:
+    ok_(repo1 is repo2)
+
+    # reference the same in an different way:
+    with chpwd(path1):
+        repo3 = AnnexRepo(relpath(path1, start=path2), create=False)
+        assert_is_instance(repo3, AnnexRepo)
+    # it's the same object:
+    ok_(repo1 is repo3)
+
+    # but path attribute is absolute, so they are still equal:
+    ok_(repo1 == repo3)
+
+    # Now, let's try to get a GitRepo instance from a path, we already have an
+    # AnnexRepo of
+    repo4 = GitRepo(path1)
+    assert_is_instance(repo4, GitRepo)
+    assert_not_is_instance(repo4, AnnexRepo)
 
 
 @with_testrepos(flavors=local_testrepo_flavors)

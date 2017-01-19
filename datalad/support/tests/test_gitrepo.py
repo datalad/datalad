@@ -38,7 +38,7 @@ def test_GitRepo_invalid_path(path):
 @with_tempfile
 def test_GitRepo_instance_from_clone(src, dst):
 
-    gr = GitRepo(dst, src)
+    gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_is_instance(gr.repo, gitpy.Repo,
                        "Failed to instantiate GitPython Repo object.")
@@ -46,8 +46,11 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice there's
     # already a git-repo at that path and therefore can't clone to `dst`
+    # Note: Since GitRepo is now a WeakSingletonRepo, this is prevented from
+    # happening atm. Disabling for now:
+#    raise SkipTest("Disabled for RF: WeakSingletonRepo")
     with swallow_logs() as logs:
-        assert_raises(GitCommandError, GitRepo, dst, src)
+        assert_raises(GitCommandError, GitRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -113,7 +116,7 @@ def test_GitRepo_equals(path1, path2):
 @with_tempfile
 def test_GitRepo_add(src, path):
 
-    gr = GitRepo(path, src)
+    gr = GitRepo.clone(src, path)
     filename = get_most_obscure_supported_name()
     with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
@@ -188,7 +191,7 @@ def test_GitRepo_commit(path):
 @with_tempfile
 def test_GitRepo_get_indexed_files(src, path):
 
-    gr = GitRepo(path, src)
+    gr = GitRepo.clone(src, path)
     idx_list = gr.get_indexed_files()
 
     runner = Runner()
@@ -323,7 +326,7 @@ def test_GitRepo_files_decorator():
 @with_tempfile
 def test_GitRepo_remote_add(orig_path, path):
 
-    gr = GitRepo(path, orig_path)
+    gr = GitRepo.clone(orig_path, path)
     out = gr.show_remotes()
     assert_in('origin', out)
     eq_(len(out), 1)
@@ -340,7 +343,7 @@ def test_GitRepo_remote_add(orig_path, path):
 @with_tempfile
 def test_GitRepo_remote_remove(orig_path, path):
 
-    gr = GitRepo(path, orig_path)
+    gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     gr.remove_remote('github')
     out = gr.show_remotes()
@@ -352,7 +355,7 @@ def test_GitRepo_remote_remove(orig_path, path):
 @with_tempfile
 def test_GitRepo_remote_show(orig_path, path):
 
-    gr = GitRepo(path, orig_path)
+    gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.show_remotes(verbose=True)
     eq_(len(out), 4)
@@ -370,7 +373,7 @@ def test_GitRepo_remote_show(orig_path, path):
 @with_tempfile
 def test_GitRepo_get_remote_url(orig_path, path):
 
-    gr = GitRepo(path, orig_path)
+    gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     eq_(gr.get_remote_url('origin'), orig_path)
     eq_(gr.get_remote_url('github'),
@@ -382,8 +385,8 @@ def test_GitRepo_get_remote_url(orig_path, path):
 @with_tempfile
 def test_GitRepo_pull(test_path, orig_path, clone_path):
 
-    origin = GitRepo(orig_path, test_path)
-    clone = GitRepo(clone_path, orig_path)
+    origin = GitRepo.clone(test_path, orig_path)
+    clone = GitRepo.clone(orig_path, clone_path)
     filename = get_most_obscure_supported_name()
 
     with open(opj(orig_path, filename), 'w') as f:
@@ -399,8 +402,8 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
 @with_tempfile
 def test_GitRepo_fetch(test_path, orig_path, clone_path):
 
-    origin = GitRepo(orig_path, test_path)
-    clone = GitRepo(clone_path, orig_path)
+    origin = GitRepo.clone(test_path, orig_path)
+    clone = GitRepo.clone(orig_path, clone_path)
     filename = get_most_obscure_supported_name()
 
     origin.checkout("new_branch", ['-b'])
@@ -525,7 +528,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
 def test_GitRepo_push_n_checkout(orig_path, clone_path):
 
     origin = GitRepo(orig_path)
-    clone = GitRepo(clone_path, orig_path)
+    clone = GitRepo.clone(orig_path, clone_path)
     filename = get_most_obscure_supported_name()
 
     with open(opj(clone_path, filename), 'w') as f:
@@ -588,7 +591,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
 @with_tempfile
 def test_GitRepo_get_files(url, path):
 
-    gr = GitRepo(path, url)
+    gr = GitRepo.clone(url, path)
 
     # get the expected files via os for comparison:
     os_files = set()
@@ -831,7 +834,7 @@ def test_git_custom_calls(path, path2):
 @with_tempfile(mkdir=True)
 def test_get_tracking_branch(o_path, c_path):
 
-    clone = GitRepo(c_path, o_path)
+    clone = GitRepo.clone(o_path, c_path)
     eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
 
     clone.checkout('new_branch', ['-b'])
@@ -964,10 +967,14 @@ def test_optimized_cloning(path):
     from datalad.support.network import get_local_file_url
     clonepath = opj(path, 'clone')
     for src in (originpath, get_local_file_url(originpath)):
-        clone = GitRepo(clonepath, url=src, create=True)
+        clone = GitRepo.clone(url=src, path=clonepath, create=True)
         clone_inodes = _get_inodes(clone)
         eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
         rmtree(clonepath)
+#        del clone
+#        gc.collect()
+        # Note: del needed, since otherwise WeakSingletonRepo would just
+        # return the original object in second run
 
 
 @with_tempfile
@@ -991,6 +998,28 @@ def test_GitRepo_gitpy_injection(path, path2):
     with assert_raises(GitCommandError) as cme:
         gr2.repo.git.unknown_git_command()
     assert_not_in('test-option', exc_str(cme.exception))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_GitRepo_flyweight(path1, path2):
+
+    repo1 = GitRepo(path1, create=True)
+    assert_is_instance(repo1, GitRepo)
+    # instantiate again:
+    repo2 = GitRepo(path1, create=False)
+    assert_is_instance(repo2, GitRepo)
+    # the very same object:
+    ok_(repo1 is repo2)
+
+    # reference the same in a different way:
+    with chpwd(path1):
+        repo3 = GitRepo(relpath(path1, start=path2), create=False)
+    # it's the same object:
+    ok_(repo1 is repo3)
+
+    # and realpath attribute is the same, so they are still equal:
+    ok_(repo1 == repo3)
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
@@ -1017,4 +1046,3 @@ def test_GitRepo_gitignore(path):
     with assert_raises(GitIgnoreError) as cme:
         gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
-

@@ -189,7 +189,7 @@ class Publish(Interface):
             # keep `to` in case it's None for passing to recursive calls:
             dest_resolved = to
             if to is None:
-                # TODO: If possible, avoid resolution herein and rely and git
+                # TODO: If possible, avoid resolution herein and rely on git
                 # (or GitRepo respectively), meaning: Just pass `None`
                 # ATM conflicts with _get_changed_datasets => figure it out
 
