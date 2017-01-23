@@ -249,7 +249,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             if hasattr(self, '_batched') and self._batched is not None:
                 self._batched.close()
-            super(AnnexRepo, self).__del__()
         except TypeError as e:
             # Workaround:
             # most likely something wasn't accessible anymore; doesn't really
@@ -259,6 +258,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
+            lgr.debug(exc_str(e))
+        try:
+            super(AnnexRepo, self).__del__()
+        except TypeError as e:
+            # see above
             lgr.debug(exc_str(e))
 
     def _set_shared_connection(self, remote_name, url):
