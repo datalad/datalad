@@ -254,11 +254,12 @@ class SSHManager(object):
           connection.close, and just log them at DEBUG level
         """
         if self._connections:
-            lgr.debug("Closing %d SSH connections..." % len(self._connections))
-            for cnct in self._connections:
-                if self._connections[cnct].ctrl_path in self._prev_connections:
-                    # don't close if connection wasn't opened by SSHManager
-                    continue
+            to_close = [c for c in self._connections
+                        # don't close if connection wasn't opened by SSHManager
+                        if self._connections[c].ctrl_path
+                        not in self._prev_connections]
+            lgr.debug("Closing %d SSH connections..." % len(to_close))
+            for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:
                     f()
@@ -266,4 +267,5 @@ class SSHManager(object):
                     try:
                         f()
                     except Exception as exc:
-                        lgr.debug("Failed to close a connection: %s", exc_str(exc))
+                        lgr.debug("Failed to close a connection: "
+                                  "%s", exc_str(exc))

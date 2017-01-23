@@ -40,11 +40,11 @@ def test_ssh_get_connection():
     # deal with them):
     assert_raises(ValueError, manager.get_connection, 'localhost')
     # we can do what urlparse cannot
-    #assert_raises(ValueError, manager.get_connection, 'someone@localhost')
+    # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
     # next one is considered a proper url by urlparse (netloc:'',
     # path='/localhost), but eventually gets turned into SSHRI(hostname='ssh',
     # path='/localhost') -- which is fair IMHO -> invalid test
-    #assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
+    # assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
 
 
 @skip_ssh
@@ -80,6 +80,11 @@ def test_ssh_open_close(tfile1):
 def test_ssh_manager_close():
 
     manager = SSHManager()
+
+    # check for previously existing sockets:
+    existed_before_1 = exists(opj(manager.socket_dir, 'localhost'))
+    existed_before_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+
     manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
     ok_(exists(opj(manager.socket_dir, 'localhost')))
@@ -87,8 +92,18 @@ def test_ssh_manager_close():
 
     manager.close()
 
-    ok_(not exists(opj(manager.socket_dir, 'localhost')))
-    ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+    still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
+    still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+
+    if existed_before_1:
+        ok_(still_exists_1)
+    else:
+        ok_(not still_exists_1)
+
+    if existed_before_2:
+        ok_(still_exists_2)
+    else:
+        ok_(not still_exists_2)
 
 
 def test_ssh_manager_close_no_throw():
