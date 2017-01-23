@@ -7,6 +7,7 @@
 
 import argparse
 import datetime
+import re
 
 
 class ManPageFormatter(argparse.HelpFormatter):
@@ -16,15 +17,19 @@ class ManPageFormatter(argparse.HelpFormatter):
     def __init__(self,
                  prog,
                  indent_increment=2,
-                 max_help_position=24,
-                 width=None,
+                 max_help_position=4,
+                 width=1000000,
                  section=1,
                  ext_sections=None,
                  authors=None,
                  version=None
                  ):
 
-        super(ManPageFormatter, self).__init__(prog)
+        super(ManPageFormatter, self).__init__(
+            prog,
+            indent_increment=indent_increment,
+            max_help_position=max_help_position,
+            width=width)
 
         self._prog = prog
         self._section = 1
@@ -53,9 +58,13 @@ class ManPageFormatter(argparse.HelpFormatter):
                        parser._mutually_exclusive_groups, prefix='')
         usage = self._format_usage(None, parser._actions,
                                    parser._mutually_exclusive_groups, '')
+        # replace too long list of commands with a single placeholder
+        usage = re.sub(r'{[^]]*?create,.*?}', ' COMMAND ', usage, flags=re.MULTILINE)
+        # take care of proper wrapping
+        usage = re.sub(r'\[([-a-zA-Z0-9]*)\s([a-zA-Z0-9{}|_]*)\]', r'[\1\~\2]', usage)
 
         usage = usage.replace('%s ' % self._prog, '')
-        usage = '.SH SYNOPSIS\n \\fB%s\\fR %s\n' % (self._markup(self._prog),
+        usage = '.SH SYNOPSIS\n.nh\n.HP\n\\fB%s\\fR %s\n.hy\n' % (self._markup(self._prog),
                                                     usage)
         return usage
 
@@ -76,7 +85,18 @@ class ManPageFormatter(argparse.HelpFormatter):
         desc = parser.description
         if not desc:
             return ''
-        desc = desc.replace('\n', '\n.br\n')
+        desc = desc.replace('\n\n', '\n.PP\n')
+        # sub-section headings
+        desc = re.sub(r'^\*(.*)\*$', r'.SS \1', desc, flags=re.MULTILINE)
+        # italic commands
+        desc = re.sub(r'^  ([-a-z]*)$', r'.TP\n\\fI\1\\fR', desc, flags=re.MULTILINE)
+        # deindent body text, leave to troff viewer
+        desc = re.sub(r'^      (\S.*)\n', '\\1\n', desc, flags=re.MULTILINE)
+        # format NOTEs as indented paragraphs
+        desc = re.sub(r'^NOTE\n', '.TP\nNOTE\n', desc, flags=re.MULTILINE)
+        # deindent indented paragraphs after heading setup
+        desc = re.sub(r'^  (.*)$', '\\1', desc, flags=re.MULTILINE)
+
         return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
@@ -115,7 +135,14 @@ class ManPageFormatter(argparse.HelpFormatter):
         formatter.add_text(parser.epilog)
 
         # determine help from format above
-        return '.SH OPTIONS\n' + formatter.format_help()
+        help = formatter.format_help()
+        # add spaces after comma delimiters for easier reformatting
+        help = re.sub(r'([a-z]),([a-z])', '\\1, \\2', help)
+        # get proper indentation for argument items
+        help = re.sub(r'^  (\S.*)\n', '.TP\n\\1\n', help, flags=re.MULTILINE)
+        # deindent body text, leave to troff viewer
+        help = re.sub(r'^    (\S.*)\n', '\\1\n', help, flags=re.MULTILINE)
+        return '.SH OPTIONS\n' + help
 
     def _format_action_invocation(self, action):
         if not action.option_strings:

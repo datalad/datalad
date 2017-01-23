@@ -1030,15 +1030,18 @@ def with_testsui(t, responses=None, interactive=True):
 with_testsui.__test__ = False
 
 
-def assert_no_errors_logged(func):
+def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
     def new_func(*args, **kwargs):
         with swallow_logs(new_level=logging.ERROR) as cml:
             out = func(*args, **kwargs)
             if cml.out:
-                raise AssertionError("Expected no errors to be logged, but log output is %s"
-                                     % cml.out)
+                if not (skip_re and re.search(skip_re, cml.out)):
+                    raise AssertionError(
+                        "Expected no errors to be logged, but log output is %s"
+                        % cml.out
+                    )
         return out
 
     return new_func

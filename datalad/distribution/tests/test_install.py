@@ -399,10 +399,10 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
     # and we should achieve the same behavior if we create a dataset
-    # and then decide to "add" it
-    create(_path_(top_path, 'sub3'), if_dirty='ignore')
+    # and then decide to add it
+    create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
-    ds.install('sub3', if_dirty='ignore')
+    ds.add('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
@@ -420,6 +420,9 @@ def test_failed_install_multiple(top_path):
     with assert_raises(IncompleteResultsError) as cme:
         ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
 
+    # install doesn't add existing submodules -- add does that
+    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+    ds.add(['ds1', 'ds3'])
     ok_clean_git(ds.path, annex=False)
     # those which succeeded should be saved now
     eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
@@ -484,7 +487,7 @@ def test_implicit_install(src, dst):
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
     origin_subsub.add("file3.txt")
-    origin_top.save(auto_add_changes=True)
+    origin_top.save(recursive=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -522,7 +525,9 @@ def test_implicit_install(src, dst):
     # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
     with chpwd(dst):
-        result = get(path=opj("sub", "subsub"))
+        # don't ask for the file content to make return value comparison
+        # simpler
+        result = get(path=opj("sub", "subsub"), get_data=False)
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
         eq_(result, [subsub])
@@ -588,7 +593,8 @@ def test_install_recursive_repeat(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
+    ok_clean_git(top_src.path)
 
     # install top level:
     top_ds = install(path, source=src)
@@ -691,7 +697,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
 
     # install top level:
     cdss = install(path, source=src, recursive=True)

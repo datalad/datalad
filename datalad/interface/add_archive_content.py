@@ -211,7 +211,7 @@ class AddArchiveContent(Interface):
             annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
                 # if not absolute -- relative to wd and thus
-                archive_path = normpath(opj(pwd, archive))
+                archive_path = normpath(opj(realpath(pwd), archive))
                 # abspath(archive) is not "good" since dereferences links in the path
                 # archive_path = abspath(archive)
         elif not isabs(archive):

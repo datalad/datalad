@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj
+from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import with_tree
@@ -22,7 +23,10 @@ from datalad.tests.utils import ok_
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import get_dataset_directories
+from datalad.interface.save import Save
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.api import save
 
 _dirty_modes = ('fail', 'ignore', 'save-before')
@@ -91,11 +95,10 @@ def test_paths_by_dataset(path):
         assert_equal(t, [])
     assert_equal(d, {ds.path: [ds.path]})
 
-    d, ua, ne = get_paths_by_dataset([path], recursive=True)
+    d, ua, ne = get_paths_by_dataset(
+        [path], recursive=True)
     for t in (ua, ne):
         assert_equal(t, [])
-    for t in (ds, subds, subsubds):
-        assert_equal(d[t.path], [t.path])
 
     os.makedirs(opj(ds.path, 'one', 'some'))
     hidden = subds.create(opj('some', 'deep'))
@@ -135,15 +138,19 @@ demo_hierarchy = {
 
 
 def make_demo_hierarchy_datasets(path, tree):
+    created_ds = []
     for node, items in tree.items():
         node_path = opj(path, node)
         if isinstance(items, dict):
-            Dataset(node_path).create(force=True)
-            make_demo_hierarchy_datasets(node_path, items)
-            continue
+            ds = make_demo_hierarchy_datasets(node_path, items)
+            created_ds.append(ds)
     topds = Dataset(path)
     if not topds.is_installed():
         topds.create(force=True)
+        # TODO this farce would not be necessary if add() could add subdatasets
+        for ds in created_ds:
+            _install_subds_inplace(ds=topds, path=ds.path, relativepath=relpath(ds.path, topds.path))
+            ds.save()
         return topds
 
 
@@ -151,7 +158,7 @@ def make_demo_hierarchy_datasets(path, tree):
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    ds.save(auto_add_changes=True, recursive=True)
+    ds.add('.', recursive=True)
     ok_clean_git(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
@@ -160,7 +167,7 @@ def test_save_hierarchy(path):
     ds_bbaa.repo.remove('file_bbaa')
     for d in (ds, ds_bb, ds_bba, ds_bbaa):
         ok_(d.repo.dirty)
-    save_dataset_hierarchy((ds_bb.path, ds_bbaa.path))
+    ds_bb.save(files=ds_bbaa.path, super_datasets=True)
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -190,6 +197,55 @@ def test_save_hierarchy(path):
     ca.repo.remove('file_ca')
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
-    save_dataset_hierarchy((aa.path, ba.path, bb.path, c.path, ca.path, d.path),
-                           base=ds.path)
+    ds.save(files=(aa.path, ba.path, bb.path, c.path, ca.path, d.path),
+            super_datasets=True)
     ok_clean_git(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_get_dataset_directories(path):
+    assert_raises(ValueError, get_dataset_directories, path)
+    ds = Dataset(path).create()
+    # ignores .git always and .datalad by default
+    assert_equal(get_dataset_directories(path), [])
+    assert_equal(get_dataset_directories(path, ignore_datalad=False),
+                 [opj(path, '.datalad')])
+    # find any directory, not just those known to git
+    testdir = opj(path, 'newdir')
+    os.makedirs(testdir)
+    assert_equal(get_dataset_directories(path), [testdir])
+    # do not find files
+    with open(opj(path, 'somefile'), 'w') as f:
+        f.write('some')
+    assert_equal(get_dataset_directories(path), [testdir])
+    # find more than one directory
+    testdir2 = opj(path, 'newdir2')
+    os.makedirs(testdir2)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2]))
+    # find subdataset mount points
+    subdsdir = opj(path, 'sub')
+    subds = ds.create(subdsdir)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
+    # do not find content within subdataset dirs
+    os.makedirs(opj(path, 'sub', 'deep'))
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
+    subsubdsdir = opj(subdsdir, 'subsub')
+    subds.create(subsubdsdir)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
+    # find nested directories
+    testdir3 = opj(testdir2, 'newdir21')
+    os.makedirs(testdir3)
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
+    # only return hits below the search path
+    assert_equal(sorted(get_dataset_directories(testdir2)), sorted([testdir3]))
+    # empty subdataset mount points are reported too
+    ds.uninstall(subds.path, check=False, recursive=True)
+    ok_(not subds.is_installed())
+    ok_(os.path.exists(subds.path))
+    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
+
+
+def test_interface_prep():
+    # verify sanity if nothing was given, as it would look like from the
+    # cmdline
+    assert_equal(Save._prep(path=[], dataset=None), ({}, []))

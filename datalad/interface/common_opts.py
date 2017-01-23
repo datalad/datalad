@@ -43,8 +43,7 @@ shared_access_opt = Parameter(
 super_datasets_flag = Parameter(
     args=("-S", "--super-datasets",),
     action="store_true",
-    doc="""if set, traverse and save stats corresponding to the change
-    within super-datasets""")
+    doc="""if set, save a change in a dataset also in its superdataset""")
 
 git_opts = Parameter(
     args=("--git-opts",),

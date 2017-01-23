@@ -9,6 +9,7 @@
 """ datalad exceptions
 """
 
+import re
 from os import linesep
 
 
@@ -81,7 +82,7 @@ class CommandNotAvailableError(CommandError):
     pass
 
 
-class FileNotInAnnexError(CommandError, IOError):
+class FileNotInAnnexError(IOError, CommandError):
     """Thrown if a file is not under control of git-annex.
     """
     def __init__(self, cmd="", msg="", code=None, filename=""):
@@ -102,6 +103,33 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not under control of the repository at all.
     """
     pass
+
+
+class GitIgnoreError(CommandError):
+    """Thrown if a path was ignored by a git command due to .gitignore file
+
+    Note, that this might be thrown to indicate what was ignored, while the
+    actual operation was partially successful (regarding paths, not in .gitignore)
+
+    Note/Todo:
+    in case of a directory being ignored, git returns that directory as the
+    ignored path, even if a path within that directory was passed to the command.
+    That means, that in such cases the returned path might not match an item you
+    passed!
+    """
+
+    pattern = \
+        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
+                   flags=re.MULTILINE | re.DOTALL)
+
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
+                 paths=None):
+        super(GitIgnoreError, self).__init__(
+            cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
+        self.paths = paths
+
+    def __str__(self):
+        return self.msg
 
 
 class PathOutsideRepositoryError(Exception):
@@ -193,6 +221,15 @@ class RemoteNotAvailableError(CommandError):
         super_str = super(RemoteNotAvailableError, self).__str__()
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
+
+
+class InvalidInstanceRequestError(RuntimeError):
+    """Thrown if a request to create a (flyweight) instance is invalid"""
+
+    def __init__(self, id_, msg=None):
+        super(InvalidInstanceRequestError, self).__init__(msg)
+        self.id = id_
+        self.msg = msg
 
 
 class IncompleteResultsError(RuntimeError):

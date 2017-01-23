@@ -67,7 +67,7 @@ def test_initiate_dataset(path, path2):
     # and even if we clone it -- nope -- since persistence is set by Annexificator
     # so we don't need to explicitly to commit it just in master since that might
     # not be the branch we will end up working in
-    annex2 = AnnexRepo(path2, url=dataset_path)
+    annex2 = AnnexRepo.clone(path=path2, url=dataset_path)
     annex3 = put_file_under_git(path2, 'test2.dat', content="test2", annexed=True)
     eq_(annex3.get_file_backend('test2.dat'), 'MD5E')
 
@@ -197,8 +197,8 @@ def _test_add_archive_content_tar(direct, repo_path):
     if not direct:  # Notimplemented otherwise
         assert_true(annex.repo.dirty)
     annex.repo.commit("added")
-    ok_file_under_git(repo_path, 'file.txt', annexed=False)
-    ok_file_under_git(repo_path, '1.dat', annexed=True)
+    ok_file_under_git(annex.repo.path, 'file.txt', annexed=False)
+    ok_file_under_git(annex.repo.path, '1.dat', annexed=True)
     assert_false(lexists(opj(repo_path, '1.tar')))
     if not direct:  # Notimplemented otherwise
         assert_false(annex.repo.dirty)

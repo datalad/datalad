@@ -18,6 +18,7 @@ lgr.log(5, "Importing cmdline.main")
 import argparse
 import sys
 import textwrap
+import shutil
 from importlib import import_module
 
 import datalad
@@ -176,19 +177,22 @@ def setup_parser(
 
     # create command summary
     cmd_summary = []
+    console_width = shutil.get_terminal_size()[0] \
+        if hasattr(shutil, 'get_terminal_size') else 80
+
     for i, grp in enumerate(interface_groups):
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[i]
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  - %-20s %s'
-                               % ((cd[0] + ':',
+            cmd_summary.append('  %s\n%s'
+                               % ((cd[0],
                                   textwrap.fill(
                                       cd[1].rstrip(' .'),
-                                      75,
-                                      #initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 8))))
+                                      console_width - 5,
+                                      initial_indent=' ' * 6,
+                                      subsequent_indent=' ' * 6))))
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
@@ -199,7 +203,7 @@ def setup_parser(
     Detailed usage information for individual commands is
     available via command-specific --help, i.e.:
     datalad <command> --help"""),
-                         75, initial_indent='', subsequent_indent=''))
+                         console_width - 5, initial_indent='', subsequent_indent=''))
     parts['datalad'] = parser
     lgr.log(5, "Finished setup_parser")
     if return_subparsers:

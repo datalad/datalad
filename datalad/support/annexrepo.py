@@ -30,12 +30,12 @@ from os.path import realpath
 from os.path import lexists
 from os.path import isdir
 from subprocess import Popen, PIPE
+from weakref import WeakValueDictionary
 
 from six import string_types
 from six import iteritems
 from six.moves import filter
-from six.moves.configparser import NoOptionError
-from six.moves.configparser import NoSectionError
+from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
@@ -44,19 +44,19 @@ from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
-from datalad.support.external_versions import external_versions
-from datalad.support.external_versions import LooseVersion
-from datalad.support import ansi_colors
+from datalad.utils import assure_list
 from datalad.cmd import GitRunner
-from datalad.config import ConfigManager
 
 # imports from same module:
+from .repo import RepoInterface
 from .gitrepo import GitRepo
 from .gitrepo import NoSuchPathError
 from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
 from .gitrepo import to_options
+from . import ansi_colors
+from .external_versions import external_versions
 from .exceptions import CommandNotAvailableError
 from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
@@ -67,12 +67,11 @@ from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
-from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
 
-class AnnexRepo(GitRepo):
+class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.
 
     Paths given to any of the class methods will be interpreted as relative
@@ -82,21 +81,23 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched',
-                                     '_direct_mode', '_uuid',
-                                     '_annex_common_options']
+    # Begin Flyweight:
+    _unique_instances = WeakValueDictionary()
+    # End Flyweight:
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
-    GIT_ANNEX_MIN_VERSION = '6.20160808'
+    # 6.20161210 -- annex add  to add also changes (not only new files) to git
+    GIT_ANNEX_MIN_VERSION = '6.20161210'
     git_annex_version = None
 
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
-                 git_opts=None, annex_opts=None, annex_init_opts=None):
+                 git_opts=None, annex_opts=None, annex_init_opts=None,
+                 repo=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -156,7 +157,8 @@ class AnnexRepo(GitRepo):
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create, git_opts=git_opts)
+                                            create=create, repo=repo,
+                                            git_opts=git_opts)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
@@ -165,15 +167,8 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
-        # Note: set ssh options before any possible invocation of git-annex
-        # Temporary approach to ssh connection sharing:
-        # Register every ssh remote with the corresponding control master.
-        # Issues:
-        # - currently overwrites existing ssh config of the remote
-        # - request SSHConnection instance and write config even if no
-        #   connection needed (but: connection is not actually created/opened)
-        # - no solution for a ssh url of a file (annex addurl)
-        from datalad.support.network import is_ssh
+        # check for possible SSH URLs of the remotes in order to set up
+        # shared connections:
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
@@ -182,16 +177,8 @@ class AnnexRepo(GitRepo):
 
         self.always_commit = always_commit
 
-        # Note: Not sure yet, whether 'dataset=self' is appropriate, but we need
-        # to be able to read dataset's config in case we don't create a brand
-        # new one here.
-        cfg = ConfigManager(dataset=self)
-
         if version is None:
-            try:
-                version = cfg["datalad.repo.version"]
-            except KeyError:
-                pass
+            version = self.config.get("datalad.repo.version", None)
 
         if fix_it:
             self._init(version=version, description=description)
@@ -227,9 +214,14 @@ class AnnexRepo(GitRepo):
         # - parameter `direct` has priority over config
         if direct is None:
             direct = (create or init) and \
-                     cfg.getbool("datalad", "repo.direct", default=False)
+                     self.config.getbool("datalad", "repo.direct", default=False)
+        self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
-            if self.repo.config_reader().get_value('annex', 'version') < 6:
+            # direct mode is available below version 6 repos only.
+            # Note: If 'annex.version' is missing in .git/config for some
+            # reason, we need to try to set direct mode:
+            repo_version = self.config.getint("annex", "version")
+            if (repo_version is None) or (repo_version < 6):
                 lgr.debug("Switching to direct mode (%s)." % self)
                 self.set_direct_mode()
             else:
@@ -245,33 +237,69 @@ class AnnexRepo(GitRepo):
             # Must be done with explicit release, otherwise on Python3 would end up
             # with .git/config wiped out
             # see https://github.com/gitpython-developers/GitPython/issues/333#issuecomment-126633757
-            writer = self.repo.config_writer()
-            writer.set_value("annex", "backends", backend)
-            writer.release()
+
+            # TODO: 'annex.backends' actually is a space separated list.
+            # Figure out, whether we want to allow for a list here or what to
+            # do, if there is sth in that setting already
+            self.config.set('annex.backends', backend, where='local')
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
+    def __del__(self):
+        if hasattr(self, '_batched') and self._batched is not None:
+            self._batched.close()
+        super(AnnexRepo, self).__del__()
+
     def _set_shared_connection(self, remote_name, url):
+        """Make sure a remote with SSH URL uses shared connections.
+
+        Set ssh options for annex on a per call basis, using
+        '-c remote.<name>.annex-sshoptions'.
+
+        Note
+        ----
+        There's currently no solution for using these connections, if the SSH
+        URL is just connected to a file instead of a remote
+        (`annex addurl` for example).
+
+        Parameters
+        ----------
+        remote_name: str
+        url: str
+        """
         from datalad.support.network import is_ssh
+        # Note:
+        #
+        # before any possible invocation of git-annex
+        # Temporary approach to ssh connection sharing:
+        # Register every ssh remote with the corresponding control master.
+        # Issues:
+        # - currently overwrites existing ssh config of the remote
+        # - request SSHConnection instance and write config even if no
+        #   connection needed (but: connection is not actually created/opened)
+        # - no solution for a ssh url of a file (annex addurl)
+
         if is_ssh(url):
             c = ssh_manager.get_connection(url)
+            ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
             # options to add:
             cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
             # read user-defined options from .git/config:
-            # TODO: ConfigManager.obtain() instead?
-            reader = self.repo.config_reader()
-            try:
-                cfg_string_old = \
-                    reader.get_value(section="remote \"%s\"" % remote_name,
-                                     option="annex-ssh-options")
-            except NoOptionError:
-                cfg_string_old = None
-
+            cfg_string_old = self.config.get(ssh_cfg_var, None)
             self._annex_common_options += \
                 ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
                        ''.format(remote_name,
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
+
+    @property
+    def dirty(self):
+        """Returns true if there are uncommitted changes or files not known to
+        index"""
+        # flush pending changes, especially close batched annex processes to
+        # make sure their changes are registered
+        self.precommit()
+        return super(AnnexRepo, self).dirty
 
     @classmethod
     def _check_git_annex_version(cls):
@@ -307,6 +335,40 @@ class AnnexRepo(GitRepo):
     def get_file_size(self, path):
         fpath = opj(self.path, path)
         return 0 if not exists(fpath) else os.stat(fpath).st_size
+
+    # TODO: Once the PR containing super class 'Repo' was merged, move there and
+    # melt with GitRepo.get_toppath including tests for both
+    @classmethod
+    def get_toppath(cls, path, follow_up=True, git_options=None):
+        """Return top-level of a repository given the path.
+
+        Parameters
+        -----------
+        follow_up : bool
+          If path has symlinks -- they get resolved by git.  If follow_up is
+          True, we will follow original path up until we hit the same resolved
+          path.  If no such path found, resolved one would be returned.
+        git_options: list of str
+          options to be passed to the git rev-parse call
+
+        Return None if no parent directory contains a git repository.
+        """
+
+        # first try plain git result:
+        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+                                      git_options=git_options)
+        if toppath == '':
+            # didn't fail, so git itself didn't come to the conclusion
+            # there is no repo, but we have no actual result;
+            # might be an annex in direct mode
+            if git_options is None:
+                git_options = []
+            git_options.extend(['-c', 'core.bare=False'])
+            # TODO: Apparently doesn't work with git 2.11.0
+            toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+                                          git_options=git_options)
+
+        return toppath
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
@@ -405,13 +467,10 @@ class AnnexRepo(GitRepo):
         -------
         True if in direct mode, False otherwise.
         """
-
-        try:
-            return self.repo.config_reader().get_value("annex", "direct")
-        except (NoOptionError, NoSectionError):
-            # If .git/config lacks an entry "direct",
-            # it's actually indirect mode.
-            return False
+        # If .git/config lacks an entry "direct",
+        # it's actually indirect mode.
+        self.config.reload()
+        return self.config.getbool("annex", "direct", False)
 
     def is_direct_mode(self):
         """Return True if annex is in direct mode
@@ -440,13 +499,8 @@ class AnnexRepo(GitRepo):
         True if on crippled filesystem, False otherwise
         """
 
-        try:
-            return self.repo.config_reader().get_value("annex",
-                                                       "crippledfilesystem")
-        except (NoOptionError, NoSectionError):
-            # If .git/config lacks an entry "crippledfilesystem",
-            # it's actually not crippled.
-            return False
+        self.config.reload()
+        return self.config.getbool("annex", "crippledfilesystem", False)
 
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
@@ -469,6 +523,8 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('direct' if enable_direct_mode else 'indirect',
                                 expect_stderr=True)
+        self.config.reload()
+
         # For paranoid we will just re-request
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
@@ -501,6 +557,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('init', annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
+        self.config.reload()
 
     @normalize_paths
     def get(self, files, options=None, jobs=None):
@@ -533,8 +590,8 @@ class AnnexRepo(GitRepo):
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if not fetch_files:
-             lgr.debug("No files found needing fetching.")
-             return []
+            lgr.debug("No files found needing fetching.")
+            return []
 
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
@@ -614,7 +671,7 @@ class AnnexRepo(GitRepo):
         return expected_downloads, fetch_files
 
     @normalize_paths
-    def add(self, files, git=False, backend=None, options=None, commit=False,
+    def add(self, files, git=None, backend=None, options=None, commit=False,
             msg=None, dry_run=False,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False):
@@ -651,13 +708,12 @@ class AnnexRepo(GitRepo):
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
-        git_options = []
-        if dry_run:
-            git_options += ['--dry-run', '-N', '--ignore-missing']
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
-        if git:
+        if dry_run:
+            git_options = ['--dry-run', '-N', '--ignore-missing']
+
             # add to git instead of annex
             if self.is_direct_mode():
                 # TODO:  may be there should be a generic decorator to avoid
@@ -673,10 +729,11 @@ class AnnexRepo(GitRepo):
                 #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
             else:
                 return_list = super(AnnexRepo, self).add(files, git_options=git_options)
-
         else:
             # Theoretically we could have done for git as well, if it could have
             # been batched
+            # Call git annex add for any to have full control of either to go
+            # to git or to anex
             # 1. Figure out what actually will be added
             to_be_added_recs = self.add(files, git=True, dry_run=True)
             # collect their sizes for the progressbar
@@ -684,6 +741,17 @@ class AnnexRepo(GitRepo):
                 rec['file']: self.get_file_size(rec['file'])
                 for rec in to_be_added_recs
             }
+
+            # if None -- leave it to annex to decide
+            if git is not None:
+                options += [
+                    '-c',
+                    'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
+                ]
+                if git:
+                    # to maintain behaviour similar to git
+                    options += ['--include-dotfiles']
+
             return_list = list(self._run_annex_command_json(
                 'add',
                 args=options + files,
@@ -923,6 +991,7 @@ class AnnexRepo(GitRepo):
         # TODO: figure out consistent way for passing options + document
 
         self._run_annex_command('initremote', annex_options=[name] + options)
+        self.config.reload()
 
     def enable_remote(self, name):
         """Enables use of an existing special remote
@@ -934,19 +1003,21 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('enableremote', annex_options=[name])
+        self.config.reload()
 
     def merge_annex(self, remote=None):
-        """Call git annex merge to merge git-annex branch
+        """Merge git-annex branch
 
         Parameters
         ----------
         remote: str, optional
-          Name of a remote to be "merged". Not used ATM since git-annex merge
-          doesn't support yet.  But is available in place so uses could specify
-          expected remote to be merged
+          Name of a remote to be "merged".
         """
-        # TODO: wait for support of remote
-        self._run_annex_command('merge')
+        # this doesn't use `merge` but `sync` in order to properly
+        # trigger updating of maintained branches in e.g. v6 repos
+        args = [remote] if remote else []
+        args = args.extend(['--no-push', '--no-pull'])
+        self._run_annex_command('sync', annex_options=args)
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
@@ -985,8 +1056,6 @@ class AnnexRepo(GitRepo):
 
         options = options[:] if options else []
         git_options = []
-        #if file_ == 'about.txt':
-        #    import pdb; pdb.set_trace()
         kwargs = dict(backend=backend)
         if not batch:
             self._run_annex_command('addurl',
@@ -1266,7 +1335,8 @@ class AnnexRepo(GitRepo):
             # if we didn't raise before, just depend on whether or not we seem
             # to have some json to return. It should contain information on
             # failure in keys 'success' and 'note'
-            if out is None:
+            # Or if we had empty stdout but there was stderr
+            if out is None or (not out and e.stderr):
                 raise e
         finally:
             if progress_indicators:
@@ -1278,7 +1348,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def whereis(self, files, output='uuids', key=False, batch=False):
+    def whereis(self, files, output='uuids', key=False, options=None, batch=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -1291,6 +1361,8 @@ class AnnexRepo(GitRepo):
             is returned as returned by annex
         key: bool, optional
             Either provided files are actually annex keys
+        options: list, optional
+            Options to pass into git-annex call
 
         Returns
         -------
@@ -1316,7 +1388,8 @@ class AnnexRepo(GitRepo):
         if batch:
             lgr.warning("TODO: --batch mode for whereis.  Operating serially")
 
-        options = ["--key"] if key else []
+        options = assure_list(options, copy=True)
+        options += ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
 
@@ -1328,7 +1401,8 @@ class AnnexRepo(GitRepo):
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            return {j['key' if key else 'file']: self._whereis_json_to_dict(j)
+            return {j['key' if (key or '--all' in options) else 'file']:
+                        self._whereis_json_to_dict(j)
                     for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
@@ -1423,7 +1497,8 @@ class AnnexRepo(GitRepo):
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
         since they might still need to flush their changes into index
         """
-        self._batched.close()
+        if self._batched is not None:
+            self._batched.close()
         super(AnnexRepo, self).precommit()
 
     def commit(self, msg=None, options=None, _datalad_msg=False):
@@ -1649,13 +1724,11 @@ class AnnexRepo(GitRepo):
 
     @property
     def default_backends(self):
-        try:
-            backends = self.repo.config_reader().get_value("annex", "backends")
-            if backends:
-                return backends.split()
-            else:
-                return None
-        except NoOptionError:
+        self.config.reload()
+        backends = self.config.get("annex.backends", default=None)
+        if backends:
+            return backends.split()
+        else:
             return None
 
     def fsck(self):
@@ -1733,10 +1806,7 @@ class AnnexRepo(GitRepo):
         if not self._uuid:
             if not self.repo:
                 return None
-            repocfg = self.repo.config_reader()
-            self._uuid = repocfg.get_value('annex', 'uuid', default='')
-            if not self._uuid:
-                self._uuid = None
+            self._uuid = self.config.get('annex.uuid', default=None)
         return self._uuid
 
     def get_description(self, uuid=None):
@@ -1771,17 +1841,19 @@ class AnnexRepo(GitRepo):
             return matches[0]
         elif len(matches) == 2:
             lgr.warning(
-                "Found multiple hits while sarching. Returning first among: %s",
+                "Found multiple hits while searching. Returning first among: %s",
                 str(matches)
             )
             return matches[0]
         else:
             return None
 
+
 # TODO: Why was this commented out?
 # @auto_repr
 class BatchedAnnexes(dict):
-    """Class to contain the registry of active batch'ed instances of annex for a repository
+    """Class to contain the registry of active batch'ed instances of annex for
+    a repository
     """
     def __init__(self, batch_size=0):
         self.batch_size = batch_size
@@ -1795,13 +1867,28 @@ class BatchedAnnexes(dict):
         if self.batch_size:
             git_options += ['-c', 'annex.queuesize=%d' % self.batch_size]
 
+        # START RF/BF: extend codename to respect different options the process
+        # is running with
+        # TODO: Eventually there should be more RF'ing, since the actually used
+        # codenames are partially reflecting this already. Any options used
+        # therein should go away, since they are now automatically included.
+        options = kwargs.copy()
+        options['git_options'] = git_options
+        options['annex_cmd'] = annex_cmd
+        for key in options:
+            codename += ':{0}:{1}'.format(key, options[key])
+        # END RF/BF
+
         if codename not in self:
             # Create a new git-annex process we will keep around
-            self[codename] = BatchedAnnex(annex_cmd, git_options=git_options, **kwargs)
+            self[codename] = BatchedAnnex(annex_cmd,
+                                          git_options=git_options,
+                                          **kwargs)
         return self[codename]
 
     def clear(self):
-        """Override just to make sure we don't rely on __del__ to close all the pipes"""
+        """Override just to make sure we don't rely on __del__ to close all
+        the pipes"""
         self.close()
         super(BatchedAnnexes, self).clear()
 
@@ -1812,6 +1899,9 @@ class BatchedAnnexes(dict):
         """
         for p in self.values():
             p.close()
+
+    def __del__(self):
+        self.close()
 
 
 def readline_rstripped(stdout):

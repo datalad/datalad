@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+# ORDER MATTERS FOLKS!
 
 # the following should be series of import definitions for interface implementations
 # that shall be exposed in the Python API and the cmdline interface

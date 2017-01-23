@@ -15,7 +15,6 @@ import time
 
 import logging
 import shutil
-import stat
 import os
 import sys
 import tempfile
@@ -34,9 +33,11 @@ from os.path import curdir, basename, exists, realpath, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
+from os.path import stat
+from os.path import dirname
 
 
-from six import text_type, binary_type
+from six import text_type, binary_type, string_types
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -381,16 +382,18 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_list(s):
+def assure_list(s, copy=False):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
     ----------
     s: list or anything
+    copy: bool, optional
+      If list is passed, it would generate a shallow copy of the list
     """
 
     if isinstance(s, list):
-        return s
+        return s if not copy else s[:]
     elif isinstance(s, text_type):
         return [s]
     elif hasattr(s, '__iter__'):
@@ -448,6 +451,23 @@ def assure_dict_from_str(s, **kwargs):
 def assure_unicode(s, encoding='utf-8'):
     """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
     return s.decode(encoding) if isinstance(s, binary_type) else s
+
+def assure_bool(s):
+    """Convert value into boolean following convention for strings
+
+    to recognize on,True,yes as True, off,False,no as False
+    """
+    if isinstance(s, string_types):
+        if s.isdigit():
+            return bool(int(s))
+        sl = s.lower()
+        if sl in {'y', 'yes', 'true', 'on'}:
+            return True
+        elif sl in {'n', 'no', 'false', 'off'}:
+            return False
+        else:
+            raise ValueError("Do not know how to treat %r as a boolean" % s)
+    return bool(s)
 
 
 def unique(seq, key=None):
@@ -1107,6 +1127,53 @@ def get_trace(edges, start, end, trace=None):
         if cand_trace:
             return cand_trace
     return None
+
+
+# this is imported from PY2 os.path (removed in PY3)
+def walk(top, func, arg):
+    """Directory tree walk with callback function.
+
+    For each directory in the directory tree rooted at top (including top
+    itself, but excluding '.' and '..'), call func(arg, dirname, fnames).
+    dirname is the name of the directory, and fnames a list of the names of
+    the files and subdirectories in dirname (excluding '.' and '..').  func
+    may modify the fnames list in-place (e.g. via del or slice assignment),
+    and walk will only recurse into the subdirectories whose names remain in
+    fnames; this can be used to implement a filter, or to impose a specific
+    order of visiting.  No semantics are defined for, or required of, arg,
+    beyond that arg is always passed to func.  It can be used, e.g., to pass
+    a filename pattern, or a mutable object designed to accumulate
+    statistics.  Passing None for arg is common."""
+    try:
+        names = os.listdir(top)
+    except os.error:
+        return
+    func(arg, top, names)
+    for name in names:
+        name = opj(top, name)
+        try:
+            st = os.lstat(name)
+        except os.error:
+            continue
+        if stat.S_ISDIR(st.st_mode):
+            walk(name, func, arg)
+
+
+def get_dataset_root(path):
+    """Return the root of an existent dataset containing a given path
+
+    The root path is returned in the same absolute or relative form
+    as the input argument. If no associated dataset exists, or the
+    input path doesn't exist, None is returned.
+    """
+    suffix = os.sep + opj('.git', 'objects')
+    if not isdir(path):
+        path = dirname(path)
+    while not exists(path + suffix):
+        path = opj(path, os.pardir)
+        if not exists(path):
+            return None
+    return normpath(path)
 
 
 lgr.log(5, "Done importing datalad.utils")
