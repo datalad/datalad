@@ -72,9 +72,15 @@ if [ -z "$docker_id" ]; then
      -p 127.0.0.1:2221:22 \
      $tag`
     echo "Started container $docker_id"
-    echo "I: installing datalad inside (in development mode)"
 
-    # crap -- in sid image finishes witgh
+    # ATM pip freaks out with obnoxious message 
+    #  of parse error at "'__placeh'". So we better upgrade pip while at it
+    #  see https://github.com/pypa/pip/issues/3659
+    echo "I: upgrading pip to avoid obnoxious problems"
+    docker exec $docker_id bash -c "pip install -U pip --force-reinstall"
+
+    echo "I: installing datalad inside (in development mode)"
+    # crap -- in sid image finishes with
     #  Segmentation fault (core dumped)
     # yoh@8c3178bd7ea7:~/datalad$ echo $?
     # 139
