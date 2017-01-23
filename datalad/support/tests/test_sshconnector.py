@@ -87,6 +87,13 @@ def test_ssh_manager_close():
 
     manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
+
+    if existed_before_1 and existed_before_2:
+        # we need one connection to be closed and therefore being opened
+        # by `manager`
+        manager.get_connection('ssh://localhost').close()
+        manager.get_connection('ssh://localhost').open()
+
     ok_(exists(opj(manager.socket_dir, 'localhost')))
     ok_(exists(opj(manager.socket_dir, 'datalad-test')))
 
@@ -95,15 +102,8 @@ def test_ssh_manager_close():
     still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
     still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
 
-    if existed_before_1:
-        ok_(still_exists_1)
-    else:
-        ok_(not still_exists_1)
-
-    if existed_before_2:
-        ok_(still_exists_2)
-    else:
-        ok_(not still_exists_2)
+    ok_(existed_before_1 == still_exists_1)
+    ok_(existed_before_2 == still_exists_2)
 
 
 def test_ssh_manager_close_no_throw():
