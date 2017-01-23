@@ -246,15 +246,27 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
     def __del__(self):
-        if hasattr(self, '_batched') and self._batched is not None:
-            self._batched.close()
-        super(AnnexRepo, self).__del__()
+        try:
+            if hasattr(self, '_batched') and self._batched is not None:
+                self._batched.close()
+            super(AnnexRepo, self).__del__()
+        except TypeError as e:
+            # Workaround:
+            # most likely something wasn't accessible anymore; doesn't really
+            # matter since we wanted to delete it anyway.
+            #
+            # Nevertheless, in some cases might be an issue and it is a strange
+            # thing to happen, since we check for things being None herein as
+            # well as in super class __del__;
+            # At least log it:
+            lgr.debug(exc_str(e))
+            pass
 
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.
 
         Set ssh options for annex on a per call basis, using
-        '-c remote.<name>.annex-sshoptions'.
+        '-c remote.<name>.annex-ssh-options'.
 
         Note
         ----
@@ -1408,12 +1420,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
 
     # TODO:
-    #  I think we should make interface cleaner and less ambigious for those annex
-    #  commands which could operate on globs, files, and entire repositories, separating
-    #  those out, e.g. annex_info_repo, annex_info_files at least.
-    #  If we make our calling wrappers work without relying on invoking from repo topdir,
-    #  then returned filenames would not need to be mapped, so we could easily work on dirs
-    #  and globs.
+    # I think we should make interface cleaner and less ambigious for those annex
+    # commands which could operate on globs, files, and entire repositories, separating
+    # those out, e.g. annex_info_repo, annex_info_files at least.
+    # If we make our calling wrappers work without relying on invoking from repo topdir,
+    # then returned filenames would not need to be mapped, so we could easily work on dirs
+    # and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
     @normalize_paths(map_filenames_back=True)
     def info(self, files, batch=False, fast=False):
@@ -2145,7 +2157,6 @@ class ProcessAnnexProgressIndicators(object):
 
             if pbar:
                 pbar.finish()
-
 
         if 'byte-progress' not in j:
             # some other thing than progress

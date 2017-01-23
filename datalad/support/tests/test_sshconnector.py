@@ -98,6 +98,10 @@ def test_ssh_manager_close_no_throw():
         def close(self):
             raise Exception("oh I am so bad")
 
+        @property
+        def ctrl_path(self):
+            return "whatever"
+
     manager._connections['bogus'] = bogus()
     assert_raises(Exception, manager.close)
     assert_raises(Exception, manager.close)
