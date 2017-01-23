@@ -260,7 +260,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # well as in super class __del__;
             # At least log it:
             lgr.debug(exc_str(e))
-            pass
 
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.

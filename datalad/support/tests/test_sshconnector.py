@@ -102,8 +102,8 @@ def test_ssh_manager_close():
     still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
     still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
 
-    ok_(existed_before_1 == still_exists_1)
-    ok_(existed_before_2 == still_exists_2)
+    eq_(existed_before_1, still_exists_1)
+    eq_(existed_before_2, still_exists_2)
 
 
 def test_ssh_manager_close_no_throw():
