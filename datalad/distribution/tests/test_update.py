@@ -134,7 +134,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
     assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
 
     # merge a certain remote:
-    ds.update(name="sibling_1", merge=True)
+    ds.update(sibling="sibling_1", merge=True)
 
     # changes from sibling_2 still not present:
     assert_not_in("second.txt",
