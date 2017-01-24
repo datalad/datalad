@@ -704,10 +704,15 @@ def filter_unmodified(content_by_ds, refds, since):
     Returns
     -------
     dict
-      Filtered path spec dictionary. The output is guaranteed to only contain
-      paths to modified, and presently existing components of subdatasets
-      of the given reference dataset (and itself).
+      Filtered path spec dictionary. If `since` is not None, the output is
+      guaranteed to only contain paths to modified, and presently existing
+      components of subdatasets of the given reference dataset (and itself).
     """
+    if since is None:
+        # we want all, subds not matching the ref are assumed to have been
+        # sorted out before (e.g. one level up)
+        return content_by_ds
+
     # life is simple: we diff the base dataset, and kill anything that
     # does not start with something that is in the diff
     # we cannot really limit the diff paths easily because we might get
@@ -717,7 +722,6 @@ def filter_unmodified(content_by_ds, refds, since):
     # get all modified paths (with original? commit) that are still
     # present
     modified = dict((opj(refds.path, d.b_path),
-                    # talk to @yaricoptic about the next line
                     d.b_blob.hexsha if d.b_blob else None)
                     for d in diff)
     if not modified:
@@ -733,7 +737,6 @@ def filter_unmodified(content_by_ds, refds, since):
                 if candds != refds.path and
                 any(_with_sep(candds).startswith(md) for md in modified_dirs)}
     # now query the next level down
-    # XXX new `since` could be None, see above @yarikoptic must share wisdom
     keep_subs = \
         [filter_unmodified(mod_subs, Dataset(subds_path), modified[subds_path])
          for subds_path in mod_subs
