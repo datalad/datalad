@@ -46,7 +46,7 @@ class Update(Interface):
             doc="path to be updated",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        name=Parameter(
+        sibling=Parameter(
             args=("-s", "--sibling",),
             doc="""name of the sibling to update from""",
             constraints=EnsureStr() | EnsureNone()),
@@ -59,7 +59,7 @@ class Update(Interface):
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="""merge obtained changes from either the sibling `name` or the
+            doc="""merge obtained changes from the given or the
             default sibling""", ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -76,7 +76,7 @@ class Update(Interface):
     @datasetmethod(name='update')
     def __call__(
             path=None,
-            name=None,
+            sibling=None,
             merge=False,
             dataset=None,
             recursive=False,
@@ -114,9 +114,9 @@ class Update(Interface):
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
                 continue
-            if name and name not in remotes:
+            if sibling and sibling not in remotes:
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
-                            name, repo.path)
+                            sibling, repo.path)
                 continue
 
             # Currently '--merge' works for single remote only:
@@ -125,12 +125,12 @@ class Update(Interface):
             #         tracking branch
             #       - we also can fetch all remotes independently on whether or
             #         not we merge a certain remote
-            if not name and len(remotes) > 1 and merge:
+            if not sibling and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple remotes:\n%s" % remotes)
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
-            _update_repo(repo, name, merge, fetch_all)
+            _update_repo(repo, sibling, merge, fetch_all)
 
 
 def _update_repo(repo, remote, merge, fetch_all):
