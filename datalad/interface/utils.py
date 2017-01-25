@@ -693,9 +693,8 @@ def filter_unmodified(content_by_ds, refds, since):
     content_by_ds : dict
       Per-dataset path specifications, as produced ,for example, by
       `Interface._prep()`
-    refds : Dataset
-      Instance of a reference dataset for which to determine the initial
-      change set
+    refds : Dataset or *Repo or path
+      Reference dataset for which to determine the initial change set
     since : state
       Any commit-ish/tree-ish supported by Git (tag, commit, branch, ...).
       Changes between this given state and the most recent commit are
@@ -712,16 +711,27 @@ def filter_unmodified(content_by_ds, refds, since):
         # we want all, subds not matching the ref are assumed to have been
         # sorted out before (e.g. one level up)
         return content_by_ds
+    # turn refds argument into a usable repo instance
+    if not hasattr(refds, 'path'):
+        # not a Repo or Dataset
+        refds_path = refds
+        refds = GitRepo(refds, create=False)
+    else:
+        refds_path = refds.path
+    repo = refds.repo
+    if hasattr(repo, 'repo'):
+        # TODO use GitRepo.diff() when available (gh-1217)
+        repo = repo.repo
 
     # life is simple: we diff the base dataset, and kill anything that
     # does not start with something that is in the diff
     # we cannot really limit the diff paths easily because we might get
     # or miss content (e.g. subdatasets) if we don't figure out which ones
     # are known -- and we don't want that
-    diff = refds.repo.repo.commit().diff(since)
+    diff = repo.commit().diff(since)
     # get all modified paths (with original? commit) that are still
     # present
-    modified = dict((opj(refds.path, d.b_path),
+    modified = dict((opj(refds_path, d.b_path),
                     d.b_blob.hexsha if d.b_blob else None)
                     for d in diff)
     if not modified:
@@ -734,18 +744,18 @@ def filter_unmodified(content_by_ds, refds, since):
     # any paths that are not in the dataset sub-hierarchy
     mod_subs = {candds: paths
                 for candds, paths in content_by_ds.items()
-                if candds != refds.path and
+                if candds != refds_path and
                 any(_with_sep(candds).startswith(md) for md in modified_dirs)}
     # now query the next level down
     keep_subs = \
-        [filter_unmodified(mod_subs, Dataset(subds_path), modified[subds_path])
+        [filter_unmodified(mod_subs, subds_path, modified[subds_path])
          for subds_path in mod_subs
          if subds_path in modified]
     # merge result list into a single dict
     keep = {k: v for d in keep_subs for k, v in d.items()}
 
-    paths_refds = content_by_ds[refds.path]
-    keep[refds.path] = [m for m in modified
+    paths_refds = content_by_ds[refds_path]
+    keep[refds_path] = [m for m in modified
                         if lexists(m) # still around
                         and (m in paths_refds # listed file, or subds
                         # or a modified path under a given directory
