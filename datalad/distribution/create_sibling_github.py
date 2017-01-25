@@ -43,7 +43,8 @@ def _get_github_entity(gh, cred, github_user, github_passwd, github_organization
             # check that they keystore knows about this user
             if github_user != cred.get('user', github_user):
                 # there is a mismatch, we need to ask
-                creds = cred.enter_new()
+                cred.enter_new()
+                creds = cred()
                 github_user = creds['user']
                 github_passwd = creds['password']
 
