@@ -220,8 +220,8 @@ class CreateSiblingGithub(Interface):
             constraints=EnsureStr()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        sibling_name=Parameter(
-            args=('--sibling-name',),
+        name=Parameter(
+            args=('-s', '--name',),
             metavar='NAME',
             doc="""name to represent the Github repository in the local
             dataset installation""",
@@ -272,7 +272,7 @@ class CreateSiblingGithub(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            sibling_name='github',
+            name='github',
             existing='error',
             github_user=None,
             github_passwd=None,
@@ -310,10 +310,10 @@ class CreateSiblingGithub(Interface):
         # check for existing remote configuration
         filtered = []
         for d, mp in toprocess:
-            if sibling_name in d.repo.get_remotes():
+            if name in d.repo.get_remotes():
                 if existing == 'error':
                     msg = '{} already had a configured sibling "{}"'.format(
-                        d, sibling_name)
+                        d, name)
                     if dryrun:
                         lgr.error(msg)
                     else:
@@ -340,12 +340,12 @@ class CreateSiblingGithub(Interface):
             if not dryrun:
                 # first make sure that annex doesn't touch this one
                 # but respect any existing config
-                ignore_var = 'remote.{}.annex-ignore'.format(sibling_name)
+                ignore_var = 'remote.{}.annex-ignore'.format(name)
                 if not ignore_var in d.config:
                     d.config.add(ignore_var, 'true', where='local')
                 AddSibling()(
                     dataset=d,
-                    name=sibling_name,
+                    name=name,
                     url=url,
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
@@ -369,5 +369,5 @@ class CreateSiblingGithub(Interface):
                     "'{}'{} configured as sibling '{}' for {}".format(
                         url,
                         " (existing repository)" if existed else '',
-                        args.sibling_name,
+                        args.name,
                         d))

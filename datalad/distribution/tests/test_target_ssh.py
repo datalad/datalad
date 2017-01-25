@@ -17,7 +17,6 @@ from git.exc import GitCommandError
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
-from datalad.cmd import GitRunner
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -86,6 +85,7 @@ assert_create_sshwebserver = (
     else create_sibling
 )
 
+
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -101,7 +101,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_raises(GitCommandError):
             create_sibling(
                 dataset=source,
-                target="local_target",
+                name="local_target",
                 sshurl="ssh://localhost",
                 target_dir=target_path,
                 ui=True)
@@ -136,7 +136,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     with assert_raises(RuntimeError) as cm:
         assert_create_sshwebserver(
             dataset=source,
-            target="local_target",
+            name="local_target",
             sshurl="ssh://localhost",
             target_dir=target_path)
     eq_("Target directory %s already exists." % target_path,
@@ -156,7 +156,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         assert_create_sshwebserver(
             dataset=source,
-            target="local_target",
+            name="local_target",
             sshurl="ssh://localhost" + target_path,
             existing='replace')
         eq_("ssh://localhost" + target_path,
@@ -176,7 +176,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # local path should work:
         cpkwargs = dict(
             dataset=source,
-            target="local_target",
+            name="local_target",
             sshurl="ssh://localhost",
             target_dir=target_path,
             target_url=target_path,
@@ -230,7 +230,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
         process_digests_mtimes(orig_digests, orig_mtimes)
 
-        import time; time.sleep(0.1)  # just so that mtimes change
+        import time
+        time.sleep(0.1)  # just so that mtimes change
         assert_create_sshwebserver(existing='reconfigure', **cpkwargs)
         digests, mtimes = get_mtimes_and_digests(target_path)
         process_digests_mtimes(digests, mtimes)
@@ -284,7 +285,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         with chpwd(source.path):
             #assert_create_sshwebserver(
             create_sibling(
-                target=remote_name,
+                name=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
                 recursive=True,
