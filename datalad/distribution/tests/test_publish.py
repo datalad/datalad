@@ -168,7 +168,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
-    eq_(set(r.path for r in res_[0]), set([]))
+    eq_(set(r.path for r in res_[0]), set())
 
     # still nothing gets pushed, because orgin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')

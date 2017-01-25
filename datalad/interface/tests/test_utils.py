@@ -18,6 +18,7 @@ from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
 from datalad.interface.utils import handle_dirty_dataset
@@ -273,8 +274,7 @@ def test_filter_unmodified(path):
 
     # modify one subdataset
     added_path = opj(subb.path, 'added')
-    with open(added_path, 'w') as f:
-        f.write('test')
+    create_tree(subb.path, {'added': 'test'})
     subb.add('added')
 
     # still nothing was modified compared to orig commit, because the base
