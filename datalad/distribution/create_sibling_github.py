@@ -36,6 +36,8 @@ lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
 
 def _get_github_entity(gh, cred, github_login, github_passwd, github_organization):
+    if github_login == 'disabledloginfortesting':
+        raise gh.BadCredentialsException(403, 'no login specified')
     if not (github_login and github_passwd):
         # we don't have both
         # check if there is an oauth token from
