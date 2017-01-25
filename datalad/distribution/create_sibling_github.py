@@ -35,41 +35,36 @@ from .add_sibling import AddSibling
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
 
-def _get_github_entity(gh, cred, github_user, github_passwd, github_organization):
-    # figure out authentication
-    if not (github_user and github_passwd):
-        # access to the system secrets
-        if github_user:
-            # check that they keystore knows about this user
-            if github_user != cred.get('user', github_user):
-                # there is a mismatch, we need to ask
-                cred.enter_new()
-                creds = cred()
-                github_user = creds['user']
-                github_passwd = creds['password']
+def _get_github_entity(gh, cred, github_login, github_passwd, github_organization):
+    if not (github_login and github_passwd):
+        # we don't have both
+        # check if there is an oauth token from
+        # https://github.com/sociomantic/git-hub
+        token = False
+        if not cred.is_known:
+            if not github_login:
+                # try find a token as login
+                github_login = cfg.get('hub.oauthtoken', None)
+                token = True
+            if not (github_login and (github_passwd or token)):
+                # still at least one missing, utilize the credential store
+                # to get auth info, pass potential passwd value along
+                cred.enter_new(
+                    user=github_login,
+                    password=github_passwd)
+        # now we should really have it
+        creds = cred()
+        github_login = creds['user']
+        github_passwd = creds['password']
 
-        # if a user is provided, go with it, don't even ask any store
-        if github_user is None and not cred.is_known:
-            # let's figure out authentication
-            if github_user is None:
-                # check if there is an oauth token from
-                # https://github.com/sociomantic/git-hub
-                github_user = cfg.get('hub.oauthtoken', None)
-
-        if github_user is None:
-            # still nothing, ask if necessary
-            creds = cred()
-            github_user = creds['user']
-            github_passwd = creds['password']
-
-    if not github_user:
-        raise gh.BadCredentialsException(403, 'no user specified')
+    if not github_login:
+        raise gh.BadCredentialsException(403, 'no login specified')
 
     # this will always succeed, but it might later throw an exception
     # if the credentials were wrong
-    # XXX make sure to wipe out known credentials if that happens
+    # and this case, known credentials are wiped out again below
     authed_gh = gh.Github(
-        github_user,
+        github_login,
         password=github_passwd)
 
     try:
@@ -92,7 +87,7 @@ def _get_github_entity(gh, cred, github_user, github_passwd, github_organization
 
 
 def _make_github_repos(
-        gh, github_user, github_passwd, github_organization, rinfo, existing,
+        gh, github_login, github_passwd, github_organization, rinfo, existing,
         access_protocol, dryrun):
     cred = UserPassword('github', 'https://github.com/login')
 
@@ -100,7 +95,7 @@ def _make_github_repos(
     entity = _get_github_entity(
         gh,
         cred,
-        github_user,
+        github_login,
         github_passwd,
         github_organization)
 
@@ -235,11 +230,11 @@ class CreateSiblingGithub(Interface):
             siblings are discovered. 'skip': ignore; 'error': fail immediately;
             'reconfigure': use the existing repository and reconfigure the
             local dataset to use it as a sibling""",),
-        github_user=Parameter(
-            args=('--github-user',),
+        github_login=Parameter(
+            args=('--github-login',),
             constraints=EnsureStr() | EnsureNone(),
             metavar='NAME',
-            doc="""Github user name"""),
+            doc="""Github user name or access token"""),
         github_passwd=Parameter(
             args=('--github-passwd',),
             constraints=EnsureStr() | EnsureNone(),
@@ -275,7 +270,7 @@ class CreateSiblingGithub(Interface):
             recursion_limit=None,
             sibling_name='github',
             existing='error',
-            github_user=None,
+            github_login=None,
             github_passwd=None,
             github_organization=None,
             access_protocol='git',
@@ -333,7 +328,7 @@ class CreateSiblingGithub(Interface):
 
         # actually make it happen on Github
         rinfo = _make_github_repos(
-            gh, github_user, github_passwd, github_organization, filtered,
+            gh, github_login, github_passwd, github_organization, filtered,
             existing, access_protocol, dryrun)
 
         # lastly configure the local datasets
