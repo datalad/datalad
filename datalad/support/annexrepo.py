@@ -93,6 +93,9 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '6.20161210'
     git_annex_version = None
 
+    # Workaround for per-call config issue with git 2.11.0
+    GIT_DIRECT_MODE_WRAPPER_ACTIVE = False
+
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
@@ -533,8 +536,36 @@ class AnnexRepo(GitRepo, RepoInterface):
             # adjust git options for plain git calls on this repo:
             # Note: Not sure yet, whether this solves the issue entirely or we
             # still need 'annex proxy' in some cases ...
-            if 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
+
+            lgr.debug("detected git version: %s" % external_versions['cmd:git'])
+
+            if external_versions['cmd:git'] == '2.11.0':
+                # workaround for git 2.11.0, which for some reason ignores the
+                # per-call config "-c core.bare=False", but respects the value
+                # if it is set in .git/config
+                self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = True
+
+            elif 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
+                # standard procedure:
                 self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
+
+    def _git_custom_command(self, *args, **kwargs):
+
+        if self.GIT_DIRECT_MODE_WRAPPER_ACTIVE:
+            old = self.config.get('core.bare')
+            lgr.debug("old config: %s(%s)" % (old, type(old)))
+            if old is not False:
+                self.config.set('core.bare', 'False', where='local')
+
+            out, err = super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
+
+            if old is None:
+                self.config.unset('core.bare', where='local')
+            elif old:
+                self.config.set('core.bare', old, where='local')
+            return out, err
+        else:
+            return super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
