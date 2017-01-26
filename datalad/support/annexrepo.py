@@ -302,7 +302,22 @@ class AnnexRepo(GitRepo, RepoInterface):
         # flush pending changes, especially close batched annex processes to
         # make sure their changes are registered
         self.precommit()
-        return super(AnnexRepo, self).dirty
+
+        if self.is_direct_mode():
+            result = self._run_annex_command_json('status')
+            # JSON result for 'git annex status'
+            # {"status":"?","file":"filename"}
+            # ? -- untracked
+            # D -- deleted
+            # M -- modified
+            # A -- staged
+            # T -- type changed/unlocked
+            if not list(result):
+                return False
+            else:
+                return True
+        else:
+            return super(AnnexRepo, self).dirty
 
     @classmethod
     def _check_git_annex_version(cls):

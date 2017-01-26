@@ -652,41 +652,36 @@ def test_GitRepo_get_toppath(repo, tempdir, repo2):
     eq_(GitRepo.get_toppath(tempdir), None)
 
 
-def test_GitRepo_dirty():
-    trepo = BasicAnnexTestRepo()
-    repo = trepo.repo
-    # empty at this point -- should not be dirty as well. TODO
-    assert_false(repo.dirty)
-    trepo.create()
-    assert_false(repo.dirty)
+@with_tempfile(mkdir=True)
+def test_GitRepo_dirty(path):
 
-    # new file added to index
-    trepo.create_file('newfiletest.dat', '123\n', annex=False)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
+    repo = GitRepo(path, create=True)
+    ok_(not repo.dirty)
 
-    # file modified to be the same
-    trepo.create_file('newfiletest.dat', '123\n', annex=False)
-    assert_false(repo.dirty)
+    # untracked file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(repo.dirty)
+    # staged file
+    repo.add('file1.txt')
+    ok_(repo.dirty)
+    # clean again
+    repo.commit("file1.txt added")
+    ok_(not repo.dirty)
+    # modify to be the same
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(not repo.dirty)
+    # modified file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('something else')
+    ok_(repo.dirty)
+    # clean again
+    repo.add('file1.txt')
+    repo.commit("file1.txt modified")
+    ok_(not repo.dirty)
 
-    # file modified
-    trepo.create_file('newfiletest.dat', '12\n', annex=False)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
-
-    # new file not added to index
-    trepo.create_file('newfiletest2.dat', '123\n', add=False, annex=False)
-    assert_true(repo.dirty)
-    os.unlink(opj(repo.path, 'newfiletest2.dat'))
-    assert_false(repo.dirty)
-
-    # new annexed file
-    trepo.create_file('newfiletest2.dat', '123\n', annex=True)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
+    # TODO: submodules
 
 
 @with_tempfile(mkdir=True)

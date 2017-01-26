@@ -1472,3 +1472,54 @@ def test_AnnexRepo_update_submodule():
 
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
+
+
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_dirty(path):
+
+    repo = AnnexRepo(path, create=True)
+    ok_(not repo.dirty)
+
+    # pure git operations:
+    # untracked file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(repo.dirty)
+    # staged file
+    #import pdb; pdb.set_trace()
+    repo.add('file1.txt', git=True)
+    ok_(repo.dirty)
+    # clean again
+    repo.commit("file1.txt added")
+    ok_(not repo.dirty)
+    # modify to be the same
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(not repo.dirty)
+    # modified file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('something else')
+    ok_(repo.dirty)
+    # clean again
+    repo.add('file1.txt', git=True)
+    repo.commit("file1.txt modified")
+    ok_(not repo.dirty)
+
+    # annex operations:
+    # untracked file
+    with open(opj(path, 'file2.txt'), 'w') as f:
+        f.write('different content')
+    ok_(repo.dirty)
+    # annexed file
+    repo.add('file2.txt', git=False)
+    if not repo.is_direct_mode():
+        # in direct mode 'annex add' results in a clean repo
+        ok_(repo.dirty)
+        # commit
+        repo.commit("file2.txt annexed")
+    ok_(not repo.dirty)
+
+    # TODO: unlock/modify
+
+    # TODO: submodules
+
