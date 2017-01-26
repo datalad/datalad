@@ -139,7 +139,8 @@ def test_uninstall_git_file(path):
     ok_file_under_git(ds.repo.path, 'INFO.txt')
 
     if not hasattr(ds.repo, 'drop'):
-        assert_raises(ValueError, ds.drop, path='INFO.txt')
+        # nothing can be dropped in a plain GitRepo
+        eq_([], ds.drop(path='INFO.txt'))
 
     with swallow_logs(new_level=logging.ERROR) as cml:
         assert_raises(ValueError, ds.uninstall, path="INFO.txt")
