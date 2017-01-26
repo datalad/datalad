@@ -190,8 +190,13 @@ class SSHManager(object):
                                  "interface platform dependent SSH")
 
         self._connections = dict()
-
         self._socket_dir = None
+
+        from os import listdir
+        from os.path import isdir
+        self._prev_connections = [opj(self.socket_dir, p)
+                                  for p in listdir(self.socket_dir)
+                                  if not isdir(opj(self.socket_dir, p))]
 
     @property
     def socket_dir(self):
@@ -223,7 +228,8 @@ class SSHManager(object):
         sshri = RI(url)
 
         if not is_ssh(sshri):
-            raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(url))
+            raise ValueError("Unsupported SSH URL: '{0}', use "
+                             "ssh://host/path or host:path syntax".format(url))
 
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, sshri.hostname)
@@ -248,8 +254,12 @@ class SSHManager(object):
           connection.close, and just log them at DEBUG level
         """
         if self._connections:
-            lgr.debug("Closing %d SSH connections..." % len(self._connections))
-            for cnct in self._connections:
+            to_close = [c for c in self._connections
+                        # don't close if connection wasn't opened by SSHManager
+                        if self._connections[c].ctrl_path
+                        not in self._prev_connections]
+            lgr.debug("Closing %d SSH connections..." % len(to_close))
+            for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:
                     f()
@@ -257,4 +267,5 @@ class SSHManager(object):
                     try:
                         f()
                     except Exception as exc:
-                        lgr.debug("Failed to close a connection: %s", exc_str(exc))
+                        lgr.debug("Failed to close a connection: "
+                                  "%s", exc_str(exc))
