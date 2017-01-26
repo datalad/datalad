@@ -195,7 +195,7 @@ class AddSibling(Interface):
             repoinfo = repos[repo_name]
             repo = repoinfo['repo']
             if repo_name in already_existing:
-                if repo_name not in conflicting and repo.get_remote_url(repo_name) is not None:
+                if repo_name not in conflicting and repo.get_remote_url(name) is not None:
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
