@@ -864,6 +864,27 @@ def test_submodule_deinit(path):
     ok_(not top_repo.repo.submodule('subm 1').module_exists())
 
 
+@with_testrepos(".*basic.*", flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_GitRepo_add_submodule(source, path):
+
+    top_repo = GitRepo(path, create=True)
+
+    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.commit('submodule added')
+    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+    ok_clean_git(path, annex=False)
+    ok_clean_git(opj(path, 'sub'), annex=False)
+
+
+def test_GitRepo_update_submodule():
+    raise SkipTest("TODO")
+
+
+def test_GitRepo_get_submodules():
+    raise SkipTest("TODO")
+
+
 def test_kwargs_to_options():
 
     class Some(object):

@@ -1446,3 +1446,29 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(nested), repo2)
     # and if not under git, should return None
     eq_(AnnexRepo.get_toppath(tempdir), None)
+
+
+@with_testrepos(".*basic.*", flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_add_submodule(source, path):
+
+    top_repo = AnnexRepo(path, create=True)
+
+    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.commit('submodule added')
+    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+
+    if top_repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+
+    ok_clean_git(opj(path, 'sub'), annex=False)
+
+
+def test_AnnexRepo_update_submodule():
+    raise SkipTest("TODO")
+
+
+def test_AnnexRepo_get_submodules():
+    raise SkipTest("TODO")
