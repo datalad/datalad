@@ -258,19 +258,32 @@ class CreateSibling(Interface):
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
             if not replicate_local_structure:
-                path = target_dir.replace("%NAME",
-                                          current_dspath.replace("/", "-"))
+                ds_name = current_dspath.replace("/", "-")
+                path = target_dir.replace("%NAME", ds_name)
             else:
                 # TODO: opj depends on local platform, not the remote one.
                 # check how to deal with it. Does windows ssh server accept
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
                 # see gh-1188
-                path = normpath(opj(target_dir,
-                                    relpath(current_dspath,
-                                            start=ds.path)))
+                ds_name = relpath(current_dspath, start=ds.path)
+                path = normpath(opj(target_dir, ds_name))
 
-            lgr.info("Creating target dataset {0} at {1}".format(current_dspath, path))
+            # construct a would-be ssh url based on the current dataset's path
+            sshri.path = path
+            ds_sshurl = sshri.as_str()
+            # configure dataset's git-access urls
+            ds_target_url = target_url.replace('%NAME', ds_name) \
+                if target_url else ds_sshurl
+            # push, configure only if needed
+            ds_target_pushurl = None
+            if ds_target_url != ds_sshurl:
+                # not guaranteed that we can push via the primary URL
+                ds_target_pushurl = target_pushurl.replace('%NAME', ds_name) \
+                    if target_pushurl else ds_sshurl
+
+            lgr.info("Creating target dataset {0} at {1}".format(
+                current_dspath, path))
             # Must be set to True only if exists and existing='reconfigure'
             # otherwise we might skip actions if we say existing='reconfigure'
             # but it did not even exist before
@@ -317,6 +330,21 @@ class CreateSibling(Interface):
                         path, ssh, shared, current_ds,
                         description=target_url):
                     continue
+
+            # at this point we have a remote sibling in some shape or form
+            # -> add as remote
+            lgr.debug("Adding the siblings")
+            AddSibling.__call__(
+                dataset=current_ds,
+                name=name,
+                url=ds_target_url,
+                pushurl=ds_target_pushurl,
+                recursive=False,
+                fetch=True,
+                force=existing in {'replace'},
+                as_common_datasrc=as_common_datasrc,
+                publish_by_default=publish_by_default,
+                publish_depends=publish_depends)
 
             # check git version on remote end
             lgr.info("Adjusting remote git configuration")
@@ -371,22 +399,6 @@ class CreateSibling(Interface):
                 lgr.error("Failed to run post-update hook under path %s. "
                           "Error: %s" % (path, exc_str(e)))
 
-        # add the sibling(s):
-        lgr.debug("Adding the siblings")
-        if target_url is None:
-            target_url = sshurl
-        if target_pushurl is None and sshurl != target_url:
-            target_pushurl = sshurl
-        AddSibling()(dataset=ds,
-                     name=name,
-                     url=target_url,
-                     pushurl=target_pushurl,
-                     recursive=recursive,
-                     fetch=True,
-                     force=existing in {'replace'},
-                     as_common_datasrc=as_common_datasrc,
-                     publish_by_default=publish_by_default,
-                     publish_depends=publish_depends)
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
