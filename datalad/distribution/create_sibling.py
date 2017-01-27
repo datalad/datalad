@@ -194,8 +194,11 @@ class CreateSibling(Interface):
         # anal verification
         assert(ds is not None and sshurl is not None and ds.repo is not None)
 
+        # TODO apply a future --since
+
         # dataset instances
         datasets = {p: Dataset(p) for p in content_by_ds}
+
         # find datasets with existing remotes with the target name
         remote_existing = [p for p in datasets
                            if name in datasets[p].repo.get_remotes()]
@@ -207,6 +210,24 @@ class CreateSibling(Interface):
                     name=name,
                     existing=remote_existing,
                     plural='s' if len(remote_existing) > 1 else ''))
+        if existing == 'skip':
+            # no need to process already configured datasets
+            lgr.info(
+                "Skipping dataset{plural} with an already configured "
+                "sibling '{name}': {existing}".format(
+                    name=name,
+                    existing=remote_existing,
+                    plural='s' if len(remote_existing) > 1 else ''))
+            datasets = {p: d for p, d in datasets.items()
+                        if p not in remote_existing}
+
+        if not datasets:
+            # we ruled out all possibilities
+            # TODO wait for gh-1218 and make better return values
+            lgr.info("No datasets qualify for sibling creation. "
+                     "Consider different settings for --existing "
+                     "if this is unexpected")
+            return
 
         if target_dir is None:
             if sshri.path:
