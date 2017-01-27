@@ -265,6 +265,7 @@ class CreateSibling(Interface):
                 # check how to deal with it. Does windows ssh server accept
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
+                # see gh-1188
                 path = normpath(opj(target_dir,
                                     relpath(current_dspath,
                                             start=ds.path)))
