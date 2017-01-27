@@ -14,12 +14,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import datalad
-from os.path import join as opj, abspath, basename, relpath, normpath, dirname
+from os.path import join as opj, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
 from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
-from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
@@ -33,7 +32,7 @@ from datalad.interface.common_opts import publish_depends
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.cmd import CommandError
-from datalad.utils import not_supported_on_windows, getpwd
+from datalad.utils import not_supported_on_windows
 from .add_sibling import AddSibling
 from datalad import ssh_manager
 from datalad.utils import make_tempfile
@@ -66,15 +65,13 @@ class CreateSibling(Interface):
                 Unless overridden, this also serves the future dataset's access
                 URL and path on the server.""",
             constraints=EnsureStr()),
-        target=Parameter(
-            args=('target',),
-            metavar='TARGETNAME',
+        name=Parameter(
+            args=('-s', '--name',),
+            metavar='NAME',
             doc="""sibling name to create for this publication target.
                 If `recursive` is set, the same name will be used to label all
-                the subdatasets' siblings.  Note, this is just a
-                convenience option, siblings can also be added at a later point
-                in time.  When creation target datasets fails, no siblings are
-                added""",
+                the subdatasets' siblings. When creating a target dataset fails,
+                no sibling is added""",
             constraints=EnsureStr() | EnsureNone(),
             nargs="?"),
         target_dir=Parameter(
@@ -147,7 +144,7 @@ class CreateSibling(Interface):
 
     @staticmethod
     @datasetmethod(name='create_sibling')
-    def __call__(sshurl, target=None, target_dir=None,
+    def __call__(sshurl, name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
                  existing='error', shared=False, ui=False,
@@ -159,8 +156,9 @@ class CreateSibling(Interface):
             raise ValueError("""insufficient information for target creation
             (needs at least a dataset and a SSH URL).""")
 
-        if target is None and (target_url is not None or
-                               target_pushurl is not None):
+        if name is None and \
+                (target_url is not None or
+                 target_pushurl is not None):
             raise ValueError("""insufficient information for adding the target
             as a sibling (needs at least a name)""")
 
@@ -175,7 +173,19 @@ class CreateSibling(Interface):
 
         if not isinstance(sshri, SSHRI) \
                 and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
-                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(sshurl))
+            raise ValueError(
+                "Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(
+                    sshurl))
+
+        if not name:
+            # use the hostname
+            name = sshri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
+
+        # TODO add check if such a remote already exists and act based on
+        # --existing
 
         if target_dir is None:
             if sshri.path:
@@ -336,23 +346,22 @@ class CreateSibling(Interface):
                 lgr.error("Failed to run post-update hook under path %s. "
                           "Error: %s" % (path, exc_str(e)))
 
-        if target:
-            # add the sibling(s):
-            lgr.debug("Adding the siblings")
-            if target_url is None:
-                target_url = sshurl
-            if target_pushurl is None and sshurl != target_url:
-                target_pushurl = sshurl
-            AddSibling()(dataset=ds,
-                         name=target,
-                         url=target_url,
-                         pushurl=target_pushurl,
-                         recursive=recursive,
-                         fetch=True,
-                         force=existing in {'replace'},
-                         as_common_datasrc=as_common_datasrc,
-                         publish_by_default=publish_by_default,
-                         publish_depends=publish_depends)
+        # add the sibling(s):
+        lgr.debug("Adding the siblings")
+        if target_url is None:
+            target_url = sshurl
+        if target_pushurl is None and sshurl != target_url:
+            target_pushurl = sshurl
+        AddSibling()(dataset=ds,
+                     name=name,
+                     url=target_url,
+                     pushurl=target_pushurl,
+                     recursive=recursive,
+                     fetch=True,
+                     force=existing in {'replace'},
+                     as_common_datasrc=as_common_datasrc,
+                     publish_by_default=publish_by_default,
+                     publish_depends=publish_depends)
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
