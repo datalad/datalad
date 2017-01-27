@@ -87,7 +87,8 @@ assert_create_sshwebserver = (
 )
 
 
-def test_invalid_call():
+@with_tempfile(mkdir=True)
+def test_invalid_call(path):
     # needs a SSH URL
     assert_raises(InsufficientArgumentsError, create_sibling, '')
     assert_raises(ValueError, create_sibling, 'http://ignore.me')
@@ -95,6 +96,15 @@ def test_invalid_call():
     assert_raises(
         ValueError,
         create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+    # pre-configure a bogus remote
+    ds = Dataset(path).create()
+    ds.repo.add_remote('bogus', 'http://bogus.url.com')
+    # fails to reconfigure by default with generated
+    assert_raises(ValueError, ds.create_sibling, 'bogus:/tmp/somewhere')
+    # and also when given an existing name
+    assert_raises(
+        ValueError,
+        ds.create_sibling, 'localhost:/tmp/somewhere', name='bogus')
 
 
 @skip_ssh
@@ -143,11 +153,12 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # hm, but ATM wouldn't get a uuid since url is wrong
         assert_raises(Exception, local_target_cfg, 'annex-uuid')
 
-    # do it again without force:
+    # do it again without force, but use a different name to avoid initial checks
+    # for existing remotes:
     with assert_raises(RuntimeError) as cm:
         assert_create_sshwebserver(
             dataset=source,
-            name="local_target",
+            name="local_target_alt",
             sshurl="ssh://localhost",
             target_dir=target_path)
     eq_("Target directory %s already exists." % target_path,

@@ -118,12 +118,12 @@ class CreateSibling(Interface):
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
             metavar='MODE',
-            doc="""action to perform, if target directory exists already.
-                Dataset is skipped if 'skip'. 'replace' forces to (re-)init
-                the dataset, and to (re-)configure the dataset sibling,
-                i.e. its URL(s), in case it already exists. 'reconfigure'
-                updates metadata of the dataset sibling. 'error' causes
-                an exception to be raised.""",),
+            doc="""action to perform, if a sibling is already configured under the
+            given name and/or a target directory already exists.
+            In this case, a dataset can be skipped ('skip'), an existing target
+            directory be forcefully re-initialized, and the sibling (re-)configured
+            ('replace', implies 'reconfigure'), the sibling configuration be updated
+            only ('reconfigure'), or to error ('error').""",),
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -194,8 +194,19 @@ class CreateSibling(Interface):
         # anal verification
         assert(ds is not None and sshurl is not None and ds.repo is not None)
 
-        # TODO add check if such a remote already exists and act based on
-        # --existing
+        # dataset instances
+        datasets = {p: Dataset(p) for p in content_by_ds}
+        # find datasets with existing remotes with the target name
+        remote_existing = [p for p in datasets
+                           if name in datasets[p].repo.get_remotes()]
+        if existing == 'error' and remote_existing:
+            raise ValueError(
+                "sibling '{name}' already configured for dataset{plural}: "
+                "{existing}. Specify alternative sibling name, or force "
+                "reconfiguration via --existing".format(
+                    name=name,
+                    existing=remote_existing,
+                    plural='s' if len(remote_existing) > 1 else ''))
 
         if target_dir is None:
             if sshri.path:
@@ -207,9 +218,6 @@ class CreateSibling(Interface):
         replicate_local_structure = False
         if "%NAME" not in target_dir:
             replicate_local_structure = True
-
-        # dataset instances
-        datasets = {p: Dataset(p) for p in content_by_ds}
 
         # request ssh connection:
         lgr.info("Connecting ...")
