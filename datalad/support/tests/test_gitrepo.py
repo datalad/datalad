@@ -440,7 +440,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     fetched = repo.fetch(remote="ssh-remote")
     assert_in('ssh-remote/master', [commit.name for commit in fetched])
-    ok_clean_git(repo.path)
+    ok_clean_git(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
