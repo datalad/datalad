@@ -35,7 +35,8 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.network import RI, URL, SSHRI
+from datalad.support.network import RI
+from datalad.support.network import is_ssh
 from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
 from datalad.utils import not_supported_on_windows
@@ -166,8 +167,7 @@ class CreateSibling(Interface):
 
         # check the login URL
         sshri = RI(sshurl)
-        if not isinstance(sshri, SSHRI) \
-                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
+        if not is_ssh(sshri):
             raise ValueError(
                 "Unsupported SSH URL: '{0}', "
                 "use ssh://host/path or host:path syntax".format(sshurl))
@@ -398,7 +398,6 @@ class CreateSibling(Interface):
             except CommandError as e:
                 lgr.error("Failed to run post-update hook under path %s. "
                           "Error: %s" % (path, exc_str(e)))
-
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
