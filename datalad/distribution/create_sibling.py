@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import datalad
-from os.path import join as opj, basename, relpath, normpath, dirname
+from os.path import join as opj, relpath, normpath, dirname
 from distutils.version import LooseVersion
 from glob import glob
 
@@ -25,7 +25,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
-from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
@@ -113,6 +113,7 @@ class CreateSibling(Interface):
                 placeholders) are supported.\n""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
+        recursion_limit=recursion_limit,
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
@@ -147,7 +148,9 @@ class CreateSibling(Interface):
     @datasetmethod(name='create_sibling')
     def __call__(sshurl, name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
-                 dataset=None, recursive=False,
+                 dataset=None,
+                 recursive=False,
+                 recursion_limit=None,
                  existing='error', shared=False, ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
@@ -176,10 +179,19 @@ class CreateSibling(Interface):
                 "No sibling name given, use URL hostname '%s' as sibling name",
                 name)
 
-        # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='creating a sibling')
 
+        # use common sorting implementation to discover all subdatasets
+        content_by_ds, unavailable_paths = Interface._prep(
+            # the base data set is the only path
+            dataset=ds,
+            recursive=recursive,
+            recursion_limit=recursion_limit)
+        # dataset arg was tested before, only existing dataset should be reported
+        assert(not unavailable_paths)
+
+        # anal verification
         assert(ds is not None and sshurl is not None and ds.repo is not None)
 
         # TODO add check if such a remote already exists and act based on
@@ -196,19 +208,8 @@ class CreateSibling(Interface):
         if "%NAME" not in target_dir:
             replicate_local_structure = True
 
-        # collect datasets to use:
-        datasets = dict()
-        datasets[basename(ds.path)] = ds
-        if recursive:
-            for subds in ds.get_subdatasets(recursive=True):
-                sub_path = opj(ds.path, subds)
-                # TODO: when enhancing Dataset/*Repo classes and therefore
-                # adapt to moved code, make proper distinction between name and
-                # path of a submodule, which are technically different. This
-                # probably will become important on windows as well as whenever
-                # we want to allow for moved worktrees.
-                datasets[basename(ds.path) + '/' + subds] = \
-                    Dataset(sub_path)
+        # dataset instances
+        datasets = {p: Dataset(p) for p in content_by_ds}
 
         # request ssh connection:
         lgr.info("Connecting ...")
@@ -226,9 +227,6 @@ class CreateSibling(Interface):
         for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
-            if not current_ds.is_installed():
-                lgr.info("Skipping %s since not installed locally", current_dspath)
-                continue
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
                                           current_dspath.replace("/", "-"))
@@ -238,7 +236,7 @@ class CreateSibling(Interface):
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
                 path = normpath(opj(target_dir,
-                                    relpath(datasets[current_dspath].path,
+                                    relpath(current_dspath,
                                             start=ds.path)))
 
             lgr.info("Creating target dataset {0} at {1}".format(current_dspath, path))
@@ -285,7 +283,7 @@ class CreateSibling(Interface):
             if not only_reconfigure:
                 # init git and possibly annex repo
                 if not CreateSibling.init_remote_repo(
-                        path, ssh, shared, datasets[current_dspath],
+                        path, ssh, shared, current_ds,
                         description=target_url):
                     continue
 
@@ -313,7 +311,7 @@ class CreateSibling(Interface):
             lgr.info("Enabling git post-update hook ...")
             try:
                 CreateSibling.create_postupdate_hook(
-                    path, ssh, datasets[current_dspath])
+                    path, ssh, current_ds)
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update "
                           "hook.\nError: %s" % exc_str(e))
