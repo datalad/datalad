@@ -12,34 +12,34 @@
 __docformat__ = 'restructuredtext'
 
 
-import logging
-import datalad
-from os.path import join as opj, relpath, normpath, dirname
 from distutils.version import LooseVersion
 from glob import glob
+import logging
+from os.path import join as opj, relpath, normpath, dirname
 
-from datalad.support.network import RI, URL, SSHRI
-from datalad.support.param import Parameter
+import datalad
+from datalad import ssh_manager
+from datalad.cmd import CommandError
+from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
+from datalad.consts import TIMESTAMP_FMT
 from datalad.dochelpers import exc_str
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
-from datalad.support.constraints import EnsureChoice
-from datalad.support.annexrepo import AnnexRepo
-from ..interface.base import Interface
+from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.dataset import EnsureDataset, Dataset, \
+    datasetmethod, require_dataset
+from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, require_dataset
-from datalad.cmd import CommandError
-from datalad.utils import not_supported_on_windows
-from .add_sibling import AddSibling
-from datalad import ssh_manager
-from datalad.utils import make_tempfile
-from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
-from datalad.consts import TIMESTAMP_FMT
-from datalad.utils import _path_
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
+from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.network import RI, URL, SSHRI
+from datalad.support.param import Parameter
+from datalad.utils import make_tempfile
+from datalad.utils import not_supported_on_windows
+from datalad.utils import _path_
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
