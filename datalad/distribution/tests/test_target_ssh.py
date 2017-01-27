@@ -163,6 +163,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             dataset=source,
             name="local_target",
             sshurl="ssh://localhost" + target_path,
+            publish_by_default='master',
             existing='replace')
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target"))
@@ -176,6 +177,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
             eq_(local_target_cfg('annex-ignore'), 'false')
             eq_(local_target_cfg('annex-uuid').count('-'), 4)  # valid uuid
+            # should be added too, even if URL matches prior state
+            eq_(local_target_cfg('push'), 'master')
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
