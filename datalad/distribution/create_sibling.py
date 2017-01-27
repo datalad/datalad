@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 from distutils.version import LooseVersion
 from glob import glob
 import logging
-from os.path import join as opj, relpath, normpath, dirname
+from os.path import join as opj, relpath, normpath, dirname, curdir
 
 import datalad
 from datalad import ssh_manager
@@ -62,29 +62,32 @@ def _create_dataset_sibling(
         publish_by_default,
         as_common_datasrc):
     localds_path = ds.path
+    ds_name = relpath(localds_path, start=hierarchy_basepath)
     if not replicate_local_structure:
-        ds_name = localds_path.replace("/", "-")
-        remoteds_path = target_dir.replace("%NAME", ds_name)
+        ds_name = '' if ds_name == curdir \
+            else '-{}'.format(ds_name.replace("/", "-"))
+        remoteds_path = target_dir.replace(
+            "%RELNAME",
+            ds_name)
     else:
         # TODO: opj depends on local platform, not the remote one.
         # check how to deal with it. Does windows ssh server accept
         # posix paths? vice versa? Should planned SSH class provide
         # tools for this issue?
         # see gh-1188
-        ds_name = relpath(localds_path, start=hierarchy_basepath)
         remoteds_path = normpath(opj(target_dir, ds_name))
 
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
     ds_sshurl = ssh_url.as_str()
     # configure dataset's git-access urls
-    ds_target_url = target_url.replace('%NAME', ds_name) \
+    ds_target_url = target_url.replace('%RELNAME', ds_name) \
         if target_url else ds_sshurl
     # push, configure only if needed
     ds_target_pushurl = None
     if ds_target_url != ds_sshurl:
         # not guaranteed that we can push via the primary URL
-        ds_target_pushurl = target_pushurl.replace('%NAME', ds_name) \
+        ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
             if target_pushurl else ds_sshurl
 
     lgr.info("Creating target dataset {0} at {1}".format(
@@ -250,9 +253,9 @@ class CreateSibling(Interface):
                 possible to provide a template for generating different target
                 directory names for all (sub)datasets. Templates can contain
                 certain placeholder that are substituted for each (sub)dataset.
-                For example: "/mydirectory/dataset-%%NAME".\nSupported
+                For example: "/mydirectory/dataset%%RELNAME".\nSupported
                 placeholders:\n
-                %%NAME - the name of the datasets, with any slashes replaced by
+                %%RELNAME - the name of the datasets, with any slashes replaced by
                 dashes\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_url=Parameter(
@@ -397,7 +400,7 @@ class CreateSibling(Interface):
 
         # TODO: centralize and generalize template symbol handling
         replicate_local_structure = False
-        if "%NAME" not in target_dir:
+        if "%RELNAME" not in target_dir:
             replicate_local_structure = True
 
         # request ssh connection:

@@ -11,9 +11,7 @@
 
 import os
 import re
-from os.path import join as opj, basename, exists
-
-from git.exc import GitCommandError
+from os.path import join as opj, exists
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
@@ -24,7 +22,6 @@ from datalad.support.annexrepo import AnnexRepo
 from nose.tools import eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_exists
 from datalad.tests.utils import ok_endswith
@@ -278,22 +275,14 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         target_path_ = target_dir_tpl = target_path + "-" + str(flat)
 
         if flat:
-            target_dir_tpl += "/%NAME"
+            target_dir_tpl += "/prefix%RELNAME"
             sep = '-'
         else:
             sep = os.path.sep
 
-        if flat:
-            # now that create_sibling also does fetch -- the related problem
-            # so skipping this early
-            raise SkipTest('TODO: Make publish work for flat datasets, it currently breaks')
-
         remote_name = 'remote-' + str(flat)
-        # TODO: there is f.ckup with paths so assert_create fails ATM
-        # And let's test without explicit dataset being provided
         with chpwd(source.path):
-            #assert_create_sshwebserver(
-            create_sibling(
+            assert_create_sshwebserver(
                 name=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
@@ -302,7 +291,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
-            target_dir = opj(target_path_, basename(src_path) if flat else "").rstrip(os.path.sep) + suffix
+            target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
 
