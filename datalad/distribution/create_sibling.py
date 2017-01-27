@@ -31,6 +31,7 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
+from datalad.interface.utils import filter_unmodified
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -306,6 +307,12 @@ class CreateSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        since=Parameter(
+            args=("--since",),
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""limit processing to datasets that have been changed since a given
+            state (by tag, branch, commit, etc). This can be used to create siblings
+            for recently added subdatasets."""),
     )
 
     @staticmethod
@@ -318,7 +325,8 @@ class CreateSibling(Interface):
                  existing='error', shared=False, ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
-                 publish_depends=None):
+                 publish_depends=None,
+                 since=None):
 
         # there is no point in doing anything further
         not_supported_on_windows(
@@ -357,7 +365,15 @@ class CreateSibling(Interface):
         # anal verification
         assert(ds is not None and sshurl is not None and ds.repo is not None)
 
-        # TODO apply a future --since
+        if since:
+            mod_subs = []
+            content_by_ds = filter_unmodified(content_by_ds, ds, since)
+            # look for those subdatasets that are listed as modified
+            # together with a .gitmodules change
+            for d, paths in content_by_ds.items():
+                if any(p.endswith('.gitmodules') for p in paths):
+                    mod_subs.extend(p for p in paths if p in content_by_ds)
+            content_by_ds = mod_subs
 
         # dataset instances
         datasets = {p: Dataset(p) for p in content_by_ds}
@@ -389,7 +405,7 @@ class CreateSibling(Interface):
             # TODO wait for gh-1218 and make better return values
             lgr.info("No datasets qualify for sibling creation. "
                      "Consider different settings for --existing "
-                     "if this is unexpected")
+                     "or --since if this is unexpected")
             return
 
         if target_dir is None:
