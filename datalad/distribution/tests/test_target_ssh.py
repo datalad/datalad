@@ -38,6 +38,7 @@ from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
+from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.utils import on_windows
 from datalad.utils import _path_
@@ -84,6 +85,16 @@ assert_create_sshwebserver = (
     if external_versions['cmd:system-git'] >= '2.4'
     else create_sibling
 )
+
+
+def test_invalid_call():
+    # needs a SSH URL
+    assert_raises(InsufficientArgumentsError, create_sibling, '')
+    assert_raises(ValueError, create_sibling, 'http://ignore.me')
+    # needs an actual dataset
+    assert_raises(
+        ValueError,
+        create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
 
 
 @skip_ssh
