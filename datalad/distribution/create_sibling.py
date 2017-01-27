@@ -59,7 +59,8 @@ def _create_dataset_sibling(
         shared,
         remote_git_version,
         publish_depends,
-        publish_by_default):
+        publish_by_default,
+        as_common_datasrc):
     localds_path = ds.path
     if not replicate_local_structure:
         ds_name = localds_path.replace("/", "-")
@@ -427,7 +428,8 @@ class CreateSibling(Interface):
                 shared,
                 remote_git_version,
                 publish_depends,
-                publish_by_default)
+                publish_by_default,
+                as_common_datasrc)
             if not path:
                 # nothing new was created
                 continue
