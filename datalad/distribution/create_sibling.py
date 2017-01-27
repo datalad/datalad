@@ -244,6 +244,7 @@ class CreateSibling(Interface):
         lgr.info("Connecting ...")
         ssh = ssh_manager.get_connection(sshurl)
         ssh.open()
+        remote_git_version = CreateSibling.get_remote_git_version(ssh)
 
         # flag to check if at dataset_root
         at_root = True
@@ -318,7 +319,6 @@ class CreateSibling(Interface):
 
             # check git version on remote end
             lgr.info("Adjusting remote git configuration")
-            remote_git_version = CreateSibling.get_remote_git_version(ssh)
             if remote_git_version and remote_git_version >= "2.4":
                 # allow for pushing to checked out branch
                 try:
