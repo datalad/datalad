@@ -382,9 +382,6 @@ class CreateSibling(Interface):
         ssh.open()
         remote_git_version = CreateSibling.get_remote_git_version(ssh)
 
-        # flag to check if at dataset_root
-        at_root = True
-
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         # But we need to run post-update hook in depth-first fashion, so
@@ -411,18 +408,16 @@ class CreateSibling(Interface):
             if not path:
                 # nothing new was created
                 continue
+            remote_repos_to_run_hook_for.append(path)
 
             # publish web-interface to root dataset on publication server
-            if at_root and ui:
+            if current_dspath == ds.path and ui:
                 lgr.info("Uploading web interface to %s" % path)
-                at_root = False
                 try:
                     CreateSibling.upload_web_interface(path, ssh, shared, ui)
                 except CommandError as e:
                     lgr.error("Failed to push web interface to the remote "
                               "datalad repository.\nError: %s" % exc_str(e))
-
-            remote_repos_to_run_hook_for.append(path)
 
         # in reverse order would be depth first
         lgr.debug("Running post-update hooks in all created siblings")
