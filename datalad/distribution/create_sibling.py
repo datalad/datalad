@@ -157,33 +157,26 @@ class CreateSibling(Interface):
             raise InsufficientArgumentsError(
                 "need at least an SSH URL")
 
-        if name is None and \
-                (target_url is not None or
-                 target_pushurl is not None):
-            raise ValueError("""insufficient information for adding the target
-            as a sibling (needs at least a name)""")
+        # check the login URL
+        sshri = RI(sshurl)
+        if not isinstance(sshri, SSHRI) \
+                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
+            raise ValueError(
+                "Unsupported SSH URL: '{0}', "
+                "use ssh://host/path or host:path syntax".format(sshurl))
+
+        if not name:
+            # use the hostname as default remote name
+            name = sshri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
         # shortcut
         ds = require_dataset(dataset, check_installed=True,
                              purpose='creating a sibling')
 
         assert(ds is not None and sshurl is not None and ds.repo is not None)
-
-        # determine target parameters:
-        sshri = RI(sshurl)
-
-        if not isinstance(sshri, SSHRI) \
-                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
-            raise ValueError(
-                "Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(
-                    sshurl))
-
-        if not name:
-            # use the hostname
-            name = sshri.hostname
-            lgr.debug(
-                "No sibling name given, use URL hostname '%s' as sibling name",
-                name)
 
         # TODO add check if such a remote already exists and act based on
         # --existing
