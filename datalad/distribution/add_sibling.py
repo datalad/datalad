@@ -35,7 +35,7 @@ from datalad.distribution.dataset import EnsureDataset, Dataset, \
 from datalad.support.exceptions import CommandError
 
 
-lgr = logging.getLogger('datalad.distribution.add_publication_target')
+lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
 class AddSibling(Interface):
