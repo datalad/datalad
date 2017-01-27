@@ -153,6 +153,10 @@ class CreateSibling(Interface):
                  publish_by_default=None,
                  publish_depends=None):
 
+        # there is no point in doing anything further
+        not_supported_on_windows(
+            "Support for SSH connections is not yet implemented in Windows")
+
         if not sshurl:
             raise InsufficientArgumentsError(
                 "need at least an SSH URL")
@@ -207,7 +211,6 @@ class CreateSibling(Interface):
                     Dataset(sub_path)
 
         # request ssh connection:
-        not_supported_on_windows("TODO")
         lgr.info("Connecting ...")
         ssh = ssh_manager.get_connection(sshurl)
         ssh.open()
