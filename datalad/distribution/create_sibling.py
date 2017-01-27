@@ -39,6 +39,7 @@ from datalad.utils import make_tempfile
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import _path_
+from datalad.support.exceptions import InsufficientArgumentsError
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
@@ -152,9 +153,9 @@ class CreateSibling(Interface):
                  publish_by_default=None,
                  publish_depends=None):
 
-        if sshurl is None:
-            raise ValueError("""insufficient information for target creation
-            (needs at least a dataset and a SSH URL).""")
+        if not sshurl:
+            raise InsufficientArgumentsError(
+                "need at least an SSH URL")
 
         if name is None and \
                 (target_url is not None or
