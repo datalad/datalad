@@ -114,15 +114,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     source = install(src_path, source=origin)
 
     target_path = opj(target_rootpath, "basic")
-    #with swallow_logs(new_level=logging.ERROR) as cml:
-    create_sibling(
-        dataset=source,
-        name="local_target",
-        sshurl="ssh://localhost",
-        target_dir=target_path,
-        ui=True)
-        # is not actually happening on one of the two basic cases -- TODO figure it out
-        # assert_in('enableremote local_target failed', cml.out)
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        create_sibling(
+            dataset=source,
+            name="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path,
+            ui=True)
+        assert_not_in('enableremote local_target failed', cml.out)
 
     GitRepo(target_path, create=False)  # raises if not a git repo
     assert_in("local_target", source.repo.get_remotes())
