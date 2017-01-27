@@ -147,58 +147,92 @@ def ok_clean_git_annex_proxy(path):
     """
     # TODO: May be let's make a method of AnnexRepo for this purpose
 
-    ar = AnnexRepo(path)
-    cwd = getpwd()
-    chpwd(path)
-
-    try:
-        out = ar.proxy(['git', 'status'])
-    except CommandNotAvailableError as e:
-        raise SkipTest
-    finally:
-        chpwd(cwd)
-
-    assert_in(
-        "nothing to commit", out[0],
-        msg="git-status output via proxy not plausible: %s" % out[0]
-    )
+    if isinstance(path, AnnexRepo):
+        ar = path
+    else:
+        ar = AnnexRepo(path)
+        # Note: Possible exception while trying to instantiate AnnexRepo
+        # intended to be thrown in order to have a failure in the assertion
+    ok_(not ar.dirty)
 
 
-def ok_clean_git(path, annex=True, head_modified=[], index_modified=[], untracked=[]):
+def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
+                 untracked=[]):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
+
+    Parameters
+    ----------
+    path: str or Repo
+      in case of a str: path to the repository's base dir;
+      Note, that passing a Repo instance prevents detecting annex. This might be
+      useful in case of a non-initialized annex, a GitRepo is pointing to.
+    annex: bool or None
+      explicitly set to True or False to indicate, that an annex is (not)
+      expected; set to None to autodetect, whether there is an annex.
+      Default: None.
     """
-    from datalad.support.gitrepo import GitRepo
-    if isinstance(path, GitRepo):
-        path = path.path
 
-    ok_(exists(path))
-    ok_(exists(join(path, '.git')))
-    if annex:
-        ok_(exists(join(path, '.git', 'annex')))
-    repo = git.Repo(path)
+    if isinstance(path, AnnexRepo):
+        if annex is None:
+            annex = True
+        # if `annex` was set to False, but we find an annex => fail
+        assert_is(annex, True)
+        r = path
+    elif isinstance(path, GitRepo):
+        if annex is None:
+            annex = False
+        # explicitly given GitRepo instance doesn't make sense with 'annex' True
+        assert_is(annex, False)
+        r = path
+    else:
+        # 'path' is an actual path
+        try:
+            r = AnnexRepo(path, init=False, create=False)
+            if annex is None:
+                annex = True
+            # if `annex` was set to False, but we find an annex => fail
+            assert_is(annex, True)
+        except Exception:
+            # Instantiation failed => no annex
+            r = GitRepo(path, init=False, create=False)
+            if annex is None:
+                annex = False
+            # explicitly given GitRepo instance doesn't make sense with
+            # 'annex' True
+            assert_is(annex, False)
 
-    if repo.index.entries.keys():
-        ok_(repo.head.is_valid())
+    if annex and r.is_direct_mode():
+        ok_(not r.dirty)
+    else:
+        ok_(exists(r.path))
+        ok_(exists(join(r.path, '.git')))
+        if annex:
+            ok_(exists(join(r.path, '.git', 'annex')))
 
-        eq_(sorted(repo.untracked_files), sorted(untracked))
+        repo = r.repo
 
-        if not head_modified and not index_modified:
-            # get string representations of diffs with index to ease
-            # troubleshooting
-            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-            index_diffs = [str(d) for d in repo.index.diff(None)]
-            eq_(head_diffs, [])
-            eq_(index_diffs, [])
-        else:
-            if head_modified:
-                # we did ask for interrogating changes
-                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                eq_(head_modified_, head_modified)
-            if index_modified:
-                index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                eq_(index_modified_, index_modified)
+        if repo.index.entries.keys():
+            ok_(repo.head.is_valid())
+
+            eq_(sorted(repo.untracked_files), sorted(untracked))
+
+            if not head_modified and not index_modified:
+                # get string representations of diffs with index to ease
+                # troubleshooting
+                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+                index_diffs = [str(d) for d in repo.index.diff(None)]
+                eq_(head_diffs, [])
+                eq_(index_diffs, [])
+            else:
+                if head_modified:
+                    # we did ask for interrogating changes
+                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                    eq_(head_modified_, head_modified)
+                if index_modified:
+                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                    eq_(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):

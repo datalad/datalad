@@ -112,7 +112,7 @@ def test_GitRepo_equals(path1, path2):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_add(src, path):
 
@@ -140,7 +140,7 @@ def test_GitRepo_add(src, path):
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
-    ok_clean_git(path, annex=False)
+    ok_clean_git(path)
 
 
 @assert_cwd_unchanged
@@ -417,7 +417,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/master', u'origin/new_branch'],
         [commit.name for commit in fetched])
 
-    ok_clean_git(clone.path, annex=False)
+    ok_clean_git(clone.path)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
@@ -440,7 +440,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     fetched = repo.fetch(remote="ssh-remote")
     assert_in('ssh-remote/master', [commit.name for commit in fetched])
-    ok_clean_git(repo.path, annex=False)
+    ok_clean_git(repo.path)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
@@ -859,7 +859,7 @@ def test_submodule_deinit(path):
     ok_(not top_repo.repo.submodule('subm 1').module_exists())
 
 
-@with_testrepos(".*basic.*", flavors=['local'])
+@with_testrepos(".*basic_git.*", flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_GitRepo_add_submodule(source, path):
 
@@ -868,8 +868,8 @@ def test_GitRepo_add_submodule(source, path):
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
-    ok_clean_git(path, annex=False)
-    ok_clean_git(opj(path, 'sub'), annex=False)
+    ok_clean_git(path)
+    ok_clean_git(opj(path, 'sub'))
 
 
 def test_GitRepo_update_submodule():

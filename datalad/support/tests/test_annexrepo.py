@@ -142,7 +142,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
     ar.set_direct_mode(True)
-    ok_clean_git_annex_proxy(path=annex_path)
+    ok_clean_git(path=annex_path, annex=True)
 
     # annex proxy raises in indirect mode:
     try:
@@ -621,16 +621,10 @@ def test_AnnexRepo_commit(src, path):
         f.write("File to add to git")
     ds.add(filename, git=True)
 
-    if ds.is_direct_mode():
-        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
-    else:
-        assert_raises(AssertionError, ok_clean_git, path, annex=True)
+    assert_raises(AssertionError, ok_clean_git, path, annex=True)
 
     ds.commit("test _commit")
-    if ds.is_direct_mode():
-        ok_clean_git_annex_proxy(path)
-    else:
-        ok_clean_git(path, annex=True)
+    ok_clean_git(path, annex=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -653,10 +647,7 @@ def test_AnnexRepo_add_to_annex(path_1, path_2):
     r2.set_direct_mode()
 
     for repo in [r1, r2]:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
         filename = get_most_obscure_supported_name()
         filename_abs = opj(repo.path, filename)
         with open(filename_abs, "w") as f:
@@ -681,10 +672,7 @@ def test_AnnexRepo_add_to_annex(path_1, path_2):
         ok_(repo.repo.is_dirty())
 
         repo.commit("Added file to annex.")
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
 
         # now using commit/msg options:
         filename = "another.txt"
@@ -697,10 +685,7 @@ def test_AnnexRepo_add_to_annex(path_1, path_2):
         ok_(repo.file_has_content(filename))
 
         # and committed:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -724,10 +709,7 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
 
     for repo in [r1, r2]:
 
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
         filename = get_most_obscure_supported_name()
         with open(opj(repo.path, filename), "w") as f:
             f.write("some")
@@ -738,10 +720,7 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
         # uncommitted:
         ok_(repo.repo.is_dirty())
         repo.commit("Added file to annex.")
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
 
         # now using commit/msg options:
         filename = "another.txt"
@@ -754,10 +733,7 @@ def test_AnnexRepo_add_to_git(path_1, path_2):
         assert_raises(FileInGitError, repo.get_file_key, filename)
 
         # and committed:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+        ok_clean_git(repo.path, annex=True)
 
 
 @ignore_nose_capturing_stdout
@@ -1458,11 +1434,7 @@ def test_AnnexRepo_add_submodule(source, path):
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
 
-    if top_repo.is_direct_mode():
-        ok_clean_git_annex_proxy(path)
-    else:
-        ok_clean_git(path, annex=True)
-
+    ok_clean_git(path, annex=True)
     ok_clean_git(opj(path, 'sub'), annex=False)
 
 
@@ -1486,7 +1458,6 @@ def test_AnnexRepo_dirty(path):
         f.write('whatever')
     ok_(repo.dirty)
     # staged file
-    #import pdb; pdb.set_trace()
     repo.add('file1.txt', git=True)
     ok_(repo.dirty)
     # clean again

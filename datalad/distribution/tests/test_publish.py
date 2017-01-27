@@ -54,8 +54,8 @@ def test_publish_simple(origin, src_path, dst_path):
     res = publish(dataset=source, to="target")
     eq_(res, ([source], []))
 
-    ok_clean_git(src_path, annex=False)
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(src_path, annex=None)
+    ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
 
@@ -63,8 +63,8 @@ def test_publish_simple(origin, src_path, dst_path):
     res = publish(dataset=source, to="target")
     eq_(res, ([source], []))
 
-    ok_clean_git(src_path, annex=False)
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(src_path, annex=None)
+    ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     eq_(list(target.get_branch_commits("git-annex")),
@@ -78,12 +78,12 @@ def test_publish_simple(origin, src_path, dst_path):
         f.write("Some additional stuff.")
     source.repo.add(opj(src_path, 'test_mod_file'), git=True,
                     commit=True, msg="Modified.")
-    ok_clean_git(src_path, annex=False)
+    ok_clean_git(src_path, annex=None)
 
     res = publish(dataset=source)
     eq_(res, ([source], []))
 
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     eq_(list(target.get_branch_commits("git-annex")),
@@ -152,7 +152,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
 
-    # test for publishing with  --since.  By default since no changes, only current pushed
+    # test for publishing with  --since.
+    # By default since no changes, only current pushed
     res_ = publish(dataset=source, recursive=True)
     # only current one would get pushed
     eq_(set(r.path for r in res_[0]), {src_path})
