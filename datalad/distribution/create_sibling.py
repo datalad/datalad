@@ -47,11 +47,11 @@ lgr = logging.getLogger('datalad.distribution.create_sibling')
 
 def _create_dataset_sibling(
         name,
-        current_ds,
         ds,
+        hierarchy_basepath,
         ssh,
         replicate_local_structure,
-        sshri,
+        ssh_url,
         target_dir,
         target_url,
         target_pushurl,
@@ -60,22 +60,22 @@ def _create_dataset_sibling(
         remote_git_version,
         publish_depends,
         publish_by_default):
-    current_dspath = current_ds.path
+    localds_path = ds.path
     if not replicate_local_structure:
-        ds_name = current_dspath.replace("/", "-")
-        path = target_dir.replace("%NAME", ds_name)
+        ds_name = localds_path.replace("/", "-")
+        remoteds_path = target_dir.replace("%NAME", ds_name)
     else:
         # TODO: opj depends on local platform, not the remote one.
         # check how to deal with it. Does windows ssh server accept
         # posix paths? vice versa? Should planned SSH class provide
         # tools for this issue?
         # see gh-1188
-        ds_name = relpath(current_dspath, start=ds.path)
-        path = normpath(opj(target_dir, ds_name))
+        ds_name = relpath(localds_path, start=hierarchy_basepath)
+        remoteds_path = normpath(opj(target_dir, ds_name))
 
     # construct a would-be ssh url based on the current dataset's path
-    sshri.path = path
-    ds_sshurl = sshri.as_str()
+    ssh_url.path = remoteds_path
+    ds_sshurl = ssh_url.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%NAME', ds_name) \
         if target_url else ds_sshurl
@@ -87,51 +87,58 @@ def _create_dataset_sibling(
             if target_pushurl else ds_sshurl
 
     lgr.info("Creating target dataset {0} at {1}".format(
-        current_dspath, path))
+        localds_path, remoteds_path))
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
     # but it did not even exist before
     only_reconfigure = False
-    if path != '.':
+    if remoteds_path != '.':
         # check if target exists
         # TODO: Is this condition valid for != '.' only?
         path_exists = True
         try:
-            out, err = ssh(["ls", path])
+            out, err = ssh(["ls", remoteds_path])
         except CommandError as e:
             if "No such file or directory" in e.stderr and \
-                    path in e.stderr:
+                    remoteds_path in e.stderr:
                 path_exists = False
             else:
                 raise  # It's an unexpected failure here
 
         if path_exists:
             if existing == 'error':
-                raise RuntimeError("Target directory %s already exists." % path)
+                raise RuntimeError(
+                    "Target directory {} already exists.".format(
+                        remoteds_path))
             elif existing == 'skip':
                 return
             elif existing == 'replace':
-                ssh(["chmod", "+r+w", "-R", path])  # enable write permissions to allow removing dir
-                ssh(["rm", "-rf", path])            # remove target at path
-                path_exists = False                 # if we succeeded in removing it
+                # enable write permissions to allow removing dir
+                ssh(["chmod", "+r+w", "-R", remoteds_path])
+                # remove target at path
+                ssh(["rm", "-rf", remoteds_path])
+                # if we succeeded in removing it
+                path_exists = False
             elif existing == 'reconfigure':
                 only_reconfigure = True
             else:
-                raise ValueError("Do not know how to handle existing=%s" % repr(existing))
+                raise ValueError(
+                    "Do not know how to handle existing={}".format(
+                        repr(existing)))
 
         if not path_exists:
             try:
-                ssh(["mkdir", "-p", path])
+                ssh(["mkdir", "-p", remoteds_path])
             except CommandError as e:
                 lgr.error("Remotely creating target directory failed at "
-                          "%s.\nError: %s" % (path, exc_str(e)))
+                          "%s.\nError: %s" % (remoteds_path, exc_str(e)))
                 return
 
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
         if not CreateSibling.init_remote_repo(
-                path, ssh, shared, current_ds,
+                remoteds_path, ssh, shared, ds,
                 description=target_url):
             return
 
@@ -139,7 +146,7 @@ def _create_dataset_sibling(
     # -> add as remote
     lgr.debug("Adding the siblings")
     AddSibling.__call__(
-        dataset=current_ds,
+        dataset=ds,
         name=name,
         url=ds_target_url,
         pushurl=ds_target_pushurl,
@@ -155,12 +162,12 @@ def _create_dataset_sibling(
     if remote_git_version and remote_git_version >= "2.4":
         # allow for pushing to checked out branch
         try:
-            ssh(["git", "-C", path] +
+            ssh(["git", "-C", remoteds_path] +
                 ["config", "receive.denyCurrentBranch", "updateInstead"])
         except CommandError as e:
             lgr.error("git config failed at remote location %s.\n"
                       "You will not be able to push to checked out "
-                      "branch. Error: %s", path, exc_str(e))
+                      "branch. Error: %s", remoteds_path, exc_str(e))
     else:
         lgr.error("Git version >= 2.4 needed to configure remote."
                   " Version detected on server: %s\nSkipping configuration"
@@ -173,12 +180,12 @@ def _create_dataset_sibling(
     lgr.info("Enabling git post-update hook ...")
     try:
         CreateSibling.create_postupdate_hook(
-            path, ssh, current_ds)
+            remoteds_path, ssh, ds)
     except CommandError as e:
         lgr.error("Failed to add json creation command to post update "
                   "hook.\nError: %s" % exc_str(e))
 
-    return path
+    return remoteds_path
 
 
 class CreateSibling(Interface):
@@ -393,7 +400,7 @@ class CreateSibling(Interface):
             path = _create_dataset_sibling(
                 name,
                 current_ds,
-                ds,
+                ds.path,
                 ssh,
                 replicate_local_structure,
                 sshri,
