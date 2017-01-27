@@ -189,9 +189,25 @@ def _create_dataset_sibling(
 
 
 class CreateSibling(Interface):
-    """Create dataset(s)'s sibling (e.g., on a web server).
+    """Create a dataset sibling on a UNIX-like SSH-accessible machine
 
-    Those (empty) datasets can then serve as a target for the `publish` command.
+    Given a local dataset, and SSH login information this command creates
+    a remote dataset repository and configures it as a dataset sibling to
+    be used as a publication target (see `publish` command).
+
+    Various properties of the remote sibling can be configured (e.g. name
+    location on the server, read and write access URLs, and access
+    permissions.
+
+    Optionally, a basic web-viewer for DataLad datasets can be installed
+    at the remote location.
+
+    This command supports recursive processing of dataset hierarchies, creating
+    a remote sibling for each dataset in the hierarchy. By default, remote
+    siblings are created in hierarchical structure that reflects the
+    organization on the local file system. However, a simple templating
+    mechanism is provided to produce a flat list of datasets (see
+    --target-dir).
     """
 
     _params_ = dict(
