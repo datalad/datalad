@@ -177,10 +177,11 @@ class AddSibling(Interface):
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if (existing_url and repoinfo['url'].rstrip('/') != existing_url.rstrip('/')) \
+                if existing_url and \
+                        repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and
                             repoinfo['pushurl'].rstrip('/') !=
-                                    existing_pushurl.rstrip('/')) \
+                            existing_pushurl.rstrip('/')) \
                         or (pushurl and not existing_pushurl) \
                         or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                     conflicting.append(repo_name)
