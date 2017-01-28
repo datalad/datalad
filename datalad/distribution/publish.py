@@ -11,6 +11,7 @@
 """
 
 import logging
+from os.path import curdir
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import filter_unmodified
@@ -237,6 +238,9 @@ class Publish(Interface):
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not dataset and not path:
+            dataset = curdir
+
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -255,6 +259,9 @@ class Publish(Interface):
         # 4. publish the content needed to go to the primary remote to
         #    the dependencies first, and to the primary afterwards
         ds_remote_info = {}
+        lgr.debug(
+            "Evaluating %i dataset publication candidate(s)",
+            len(content_by_ds))
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             if to is None:
@@ -292,14 +299,19 @@ class Publish(Interface):
 
         if dataset and since:
             # remove all unmodified components from the spec
+            lgr.debug(
+                "Testing %i dataset(s) for modifications since '%s'",
+                len(content_by_ds), since)
             content_by_ds = filter_unmodified(
                 content_by_ds, dataset, since)
 
+        lgr.debug("Attempt to publish %i datasets", len(content_by_ds))
         published, skipped = [], []
         for ds_path in content_by_ds:
             remote_info = ds_remote_info[ds_path]
             if not remote_info:
                 # in case we are skipping
+                lgr.debug("Skipping dataset at '%s'", ds_path)
                 continue
             # and publish
             ds = Dataset(ds_path)
