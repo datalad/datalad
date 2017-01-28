@@ -18,7 +18,7 @@ from datalad.api import publish, install, create_sibling
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
+from datalad.support.network import urlquote
 from nose.tools import eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
@@ -165,7 +165,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             sshurl="ssh://localhost" + target_path,
             publish_by_default='master',
             existing='replace')
-        eq_("ssh://localhost" + target_path,
+        eq_("ssh://localhost" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
 
