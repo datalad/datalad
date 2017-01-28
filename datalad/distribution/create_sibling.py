@@ -356,6 +356,7 @@ class CreateSibling(Interface):
         # use common sorting implementation to discover all subdatasets
         content_by_ds, unavailable_paths = Interface._prep(
             # the base data set is the only path
+            path=ds.path,
             dataset=ds,
             recursive=recursive,
             recursion_limit=recursion_limit)

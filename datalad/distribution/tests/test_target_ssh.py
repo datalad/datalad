@@ -24,6 +24,7 @@ from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_exists
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_endswith
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
@@ -304,3 +305,28 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
         # now, push should work:
         publish(dataset=source, to=remote_name)
+
+
+@skip_ssh
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_target_ssh_since(origin, src_path, target_path):
+    # prepare src
+    source = install(src_path, source=origin, recursive=True)[0]
+    eq_(len(source.get_subdatasets()), 2)
+    # get a new subdataset and make sure it is commited in the super
+    source.create('brandnew')
+    eq_(len(source.get_subdatasets()), 3)
+    ok_clean_git(source.path)
+
+    # and now we create a sibling for the new subdataset only
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl="ssh://localhost" + target_path,
+        recursive=True,
+        since='HEAD~1')
+    # there is one thing in the target directory only, and that is the
+    # remote repo of the newly added subdataset
+    eq_(['brandnew'], os.listdir(target_path))
