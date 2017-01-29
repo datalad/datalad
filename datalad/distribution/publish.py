@@ -38,17 +38,27 @@ lgr = logging.getLogger('datalad.distribution.publish')
 def _log_push_info(pi_list):
     from git.remote import PushInfo as PI
 
+    error = False
     if pi_list:
         for push_info in pi_list:
             if (push_info.flags & PI.ERROR) == PI.ERROR:
-                lgr.error(push_info.summary)
+                lgr.debug('Push failed: %s', push_info.summary)
+                error = True
             else:
-                lgr.info(push_info.summary)
+                lgr.debug('Pushed: %s', push_info.summary)
     else:
-        lgr.warning("Nothing was pushed.")
+        lgr.debug("Pushed: nothing")
+    return error
 
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
+    # Plan:
+    # 1. Check if there is anything to push
+    # 2. If so, process push dependencies
+    # 3. fetch and merge annex branch
+    # 4. Push non-annex branch(es)
+    # 5. copy data
+
     published, skipped = [], []
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
@@ -80,16 +90,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     if not diff:
         return published, skipped
 
-    # in order to be able to use git's config to determine what to push,
-    # we need to annex merge first. Otherwise a git push might be
-    # rejected if involving all matching branches for example.
-    # Once at it, also push the annex branch right here.
-    if isinstance(ds.repo, AnnexRepo):
-        ds.repo.fetch(remote=remote)
-        ds.repo.merge_annex(remote)
-        _log_push_info(ds.repo.push(remote=remote,
-                                    refspec="git-annex:git-annex"))
-
     # publishing of `remote` might depend on publishing other
     # remote(s) first:
     # define config var name for potential publication dependencies
@@ -104,6 +104,18 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         skipped.extend(skp)
 
     lgr.info("Publishing {0} to {1}".format(ds, remote))
+
+    # in order to be able to use git's config to determine what to push,
+    # we need to annex merge first. Otherwise a git push might be
+    # rejected if involving all matching branches for example.
+    # Once at it, also push the annex branch right here.
+    if isinstance(ds.repo, AnnexRepo):
+        lgr.debug("Obtain remote annex info from '%s'", remote)
+        ds.repo.fetch(remote=remote)
+        ds.repo.merge_annex(remote)
+        lgr.debug("Push annex info to '%s'", remote)
+        _log_push_info(ds.repo.push(remote=remote,
+                                    refspec="git-annex:git-annex"))
 
     # we now know where to push to:
     # TODO: what to push? default: git push --mirror if nothing configured?
