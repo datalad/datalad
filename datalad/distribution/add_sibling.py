@@ -38,6 +38,18 @@ from datalad.support.exceptions import CommandError
 lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
+def _check_deps(repo, deps):
+    if not deps:
+        return
+    remotes = repo.get_remotes()
+    unknown_deps = [d for d in assure_list(deps)
+                    if d not in remotes]
+    if unknown_deps:
+        raise ValueError(
+            'unknown sibling(s) specified as publication dependency: %s'
+            % unknown_deps)
+
+
 class AddSibling(Interface):
     """Add a sibling to a dataset.
 
@@ -112,6 +124,8 @@ class AddSibling(Interface):
         ds = require_dataset(dataset, check_installed=True,
                              purpose='sibling addition')
         assert(ds.repo is not None)
+
+        _check_deps(ds.repo, publish_depends)
 
         ds_basename = basename(ds.path)
         repos = OrderedDict()

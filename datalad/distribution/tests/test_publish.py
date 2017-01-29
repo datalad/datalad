@@ -249,3 +249,32 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # before
     eq_({sub1.path, sub2.path},
         set(result_paths))
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile()
+@with_tempfile()
+def test_publish_depends(origin, src_path, target1_path, target2_path):
+    # prepare src
+    source = install(src_path, source=origin, recursive=True)[0]
+    source.repo.get('test-annex.dat')
+    # two remote sibling on two "different" hosts
+    source.create_sibling(
+        'ssh://localhost' + target1_path,
+        name='target1')
+    # fails with unknown remote
+    assert_raises(
+        ValueError,
+        source.create_sibling,
+        'ssh://datalad-test' + target2_path,
+        name='target2',
+        publish_depends='bogus')
+    source.create_sibling(
+        'ssh://datalad-test' + target2_path,
+        name='target2',
+        publish_depends='target1')
+    # introduce change in source
+    create_tree(src_path, {'probe1': 'probe1'})
+    source.add('probe1')
+    ok_clean_git(src_path)

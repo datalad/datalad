@@ -24,6 +24,7 @@ from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.dochelpers import exc_str
 from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
@@ -380,9 +381,14 @@ class CreateSibling(Interface):
         # dataset instances
         datasets = {p: Dataset(p) for p in content_by_ds}
 
+        # make sure dependencies are valid
+        for d in datasets.values():
+            _check_deps(d.repo, publish_depends)
+
         # find datasets with existing remotes with the target name
         remote_existing = [p for p in datasets
                            if name in datasets[p].repo.get_remotes()]
+
         if existing == 'error' and remote_existing:
             raise ValueError(
                 "sibling '{name}' already configured for dataset{plural}: "
