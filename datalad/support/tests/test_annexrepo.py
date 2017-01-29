@@ -10,17 +10,86 @@
 
 """
 
+import logging
 from functools import partial
+import os
 from os import mkdir
+from os.path import join as opj
+from os.path import basename
+from os.path import realpath
+from os.path import relpath
+from os.path import curdir
+from os.path import pardir
+from os.path import exists
 from shutil import copyfile
 from nose.tools import assert_not_is_instance
 
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
 
-from datalad.tests.utils import *
+import git
+from git import GitCommandError
+from mock import patch
+import gc
+
+from datalad.cmd import Runner
+
+from datalad.support.external_versions import external_versions
+
+from datalad.utils import on_windows
+from datalad.utils import chpwd
+from datalad.utils import rmtree
+from datalad.utils import linux_distribution_name
+
+from datalad.tests.utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import assert_cwd_unchanged
+from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import with_batch_direct
+from datalad.tests.utils import assert_is_instance
+from datalad.tests.utils import assert_true
+from datalad.tests.utils import assert_false
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_is
+from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_not_equal
+from datalad.tests.utils import eq_
+from datalad.tests.utils import ok_
+from datalad.tests.utils import ok_clean_git_annex_proxy
+from datalad.tests.utils import ok_git_config_not_empty
+from datalad.tests.utils import ok_annex_get
+from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import local_testrepo_flavors
+from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import get_most_obscure_supported_name
+from datalad.tests.utils import SkipTest
+from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import find_files
+
+from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import FileNotInAnnexError
+from datalad.support.exceptions import FileInGitError
+from datalad.support.exceptions import OutOfSpaceError
+from datalad.support.exceptions import RemoteNotAvailableError
+from datalad.support.exceptions import OutdatedExternalDependency
+from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import AnnexBatchCommandError
+
+from datalad.support.gitrepo import GitRepo
+
 # imports from same module:
-from ..annexrepo import *
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import ProcessAnnexProgressIndicators
 
 
 @ignore_nose_capturing_stdout
@@ -129,7 +198,8 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
         assert_raises(CommandNotAvailableError, ar.set_direct_mode, False)
-        assert_true(ar.is_direct_mode(),
+        assert_true(
+            ar.is_direct_mode(),
             "Indirect mode on crippled fs detected. Shouldn't be possible.")
     else:
         ar.set_direct_mode(False)
@@ -182,8 +252,6 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-
-
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_get_outofspace(annex_path):
     ar = AnnexRepo(annex_path, create=True)
@@ -195,7 +263,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
         )
 
     with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
-        assert_raises(OutOfSpaceError) as cme:
+            assert_raises(OutOfSpaceError) as cme:
         ar.get("file")
     exc = cme.exception
     assert_equal(exc.sizemore_msg, '905.6 MB')
@@ -799,7 +867,6 @@ def test_AnnexRepo_get(src, dst):
         annex.get(testfile, jobs=5)
     assert_equal(called, ['find', 'get'])
     ok_file_has_content(testfile_abs, '123', strip=True)
-
 
 
 # TODO:
