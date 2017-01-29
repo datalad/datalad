@@ -352,7 +352,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # output='full'
     lfull = ar.whereis(testfile, output='full')
     eq_(set(lfull), set(l))  # the same entries
-    non_web_remote = l[1-l.index(ar.WEB_UUID)]
+    non_web_remote = l[1 - l.index(ar.WEB_UUID)]
     assert_in('urls', lfull[non_web_remote])
     eq_(lfull[non_web_remote]['urls'], [])
     assert_not_in('uuid', lfull[ar.WEB_UUID])  # no uuid in the records
@@ -733,7 +733,7 @@ def test_AnnexRepo_add_to_annex(path_1, path_2):
         # file is known to annex:
         if not repo.is_direct_mode():
             ok_(os.path.islink(filename_abs),
-                        "Annexed file is not a link.")
+                "Annexed file is not a link.")
         else:
             assert_false(os.path.islink(filename_abs),
                          "Annexed file is link in direct mode.")
@@ -1457,7 +1457,7 @@ def test_get_description(path1, path2):
     annex2.fetch('annex1')
     # it will match the remote name
     eq_(annex2.get_description(uuid=annex1.uuid),
-                 annex1_description + ' [annex1]')
+        annex1_description + ' [annex1]')
     # but let's remove the remote
     annex2.merge_annex('annex1')
     annex2.remove_remote('annex1')
