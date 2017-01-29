@@ -11,22 +11,20 @@
 
 import os
 import re
-from os.path import join as opj, basename, exists
-
-from git.exc import GitCommandError
+from os.path import join as opj, exists
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
+from datalad.support.network import urlquote
 from nose.tools import eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_exists
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_endswith
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
@@ -38,6 +36,7 @@ from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
+from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.utils import on_windows
 from datalad.utils import _path_
@@ -86,6 +85,26 @@ assert_create_sshwebserver = (
 )
 
 
+@with_tempfile(mkdir=True)
+def test_invalid_call(path):
+    # needs a SSH URL
+    assert_raises(InsufficientArgumentsError, create_sibling, '')
+    assert_raises(ValueError, create_sibling, 'http://ignore.me')
+    # needs an actual dataset
+    assert_raises(
+        ValueError,
+        create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+    # pre-configure a bogus remote
+    ds = Dataset(path).create()
+    ds.repo.add_remote('bogus', 'http://bogus.url.com')
+    # fails to reconfigure by default with generated
+    assert_raises(ValueError, ds.create_sibling, 'bogus:/tmp/somewhere')
+    # and also when given an existing name
+    assert_raises(
+        ValueError,
+        ds.create_sibling, 'localhost:/tmp/somewhere', name='bogus')
+
+
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -96,25 +115,17 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     source = install(src_path, source=origin)
 
     target_path = opj(target_rootpath, "basic")
-    # it will try to fetch it so would fail as well since sshurl is wrong
-    with swallow_logs(new_level=logging.ERROR) as cml, \
-        assert_raises(GitCommandError):
-            create_sibling(
-                dataset=source,
-                name="local_target",
-                sshurl="ssh://localhost",
-                target_dir=target_path,
-                ui=True)
-        # is not actually happening on one of the two basic cases -- TODO figure it out
-        # assert_in('enableremote local_target failed', cml.out)
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        create_sibling(
+            dataset=source,
+            name="local_target",
+            sshurl="ssh://localhost",
+            target_dir=target_path,
+            ui=True)
+        assert_not_in('enableremote local_target failed', cml.out)
 
     GitRepo(target_path, create=False)  # raises if not a git repo
     assert_in("local_target", source.repo.get_remotes())
-    eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
-    # should NOT be able to push now, since url isn't correct:
-    # TODO:  assumption is wrong if ~ does have .git! fix up!
-    assert_raises(GitCommandError, publish, dataset=source, to="local_target")
-
     # Both must be annex or git repositories
     src_is_annex = AnnexRepo.is_valid_repo(src_path)
     eq_(src_is_annex, AnnexRepo.is_valid_repo(target_path))
@@ -122,21 +133,16 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     if src_is_annex:
         annex = AnnexRepo(src_path)
         local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
-        # for some reason this was "correct"
-        # eq_(local_target_cfg('annex-ignore'), 'false')
-        # but after fixing creating siblings in
-        # 21f6dd012b2c7b9c0b8b348dcfb3b0ace7e8b2ec it started to fail
-        # I think it is legit since we are trying to fetch now before calling
-        # annex.enable_remote so it doesn't set it up, and fails before
-        assert_raises(Exception, local_target_cfg, 'annex-ignore')
-        # hm, but ATM wouldn't get a uuid since url is wrong
-        assert_raises(Exception, local_target_cfg, 'annex-uuid')
+        # basic config in place
+        eq_(local_target_cfg('annex-ignore'), 'false')
+        ok_(local_target_cfg('annex-uuid'))
 
-    # do it again without force:
+    # do it again without force, but use a different name to avoid initial checks
+    # for existing remotes:
     with assert_raises(RuntimeError) as cm:
         assert_create_sshwebserver(
             dataset=source,
-            name="local_target",
+            name="local_target_alt",
             sshurl="ssh://localhost",
             target_dir=target_path)
     eq_("Target directory %s already exists." % target_path,
@@ -158,8 +164,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             dataset=source,
             name="local_target",
             sshurl="ssh://localhost" + target_path,
+            publish_by_default='master',
             existing='replace')
-        eq_("ssh://localhost" + target_path,
+        eq_("ssh://localhost" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
 
@@ -171,6 +178,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
             eq_(local_target_cfg('annex-ignore'), 'false')
             eq_(local_target_cfg('annex-uuid').count('-'), 4)  # valid uuid
+            # should be added too, even if URL matches prior state
+            eq_(local_target_cfg('push'), 'master')
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
@@ -269,22 +278,14 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         target_path_ = target_dir_tpl = target_path + "-" + str(flat)
 
         if flat:
-            target_dir_tpl += "/%NAME"
+            target_dir_tpl += "/prefix%RELNAME"
             sep = '-'
         else:
             sep = os.path.sep
 
-        if flat:
-            # now that create_sibling also does fetch -- the related problem
-            # so skipping this early
-            raise SkipTest('TODO: Make publish work for flat datasets, it currently breaks')
-
         remote_name = 'remote-' + str(flat)
-        # TODO: there is f.ckup with paths so assert_create fails ATM
-        # And let's test without explicit dataset being provided
         with chpwd(source.path):
-            #assert_create_sshwebserver(
-            create_sibling(
+            assert_create_sshwebserver(
                 name=remote_name,
                 sshurl="ssh://localhost" + target_path_,
                 target_dir=target_dir_tpl,
@@ -293,7 +294,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
-            target_dir = opj(target_path_, basename(src_path) if flat else "").rstrip(os.path.sep) + suffix
+            target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
 
@@ -304,3 +305,28 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
         # now, push should work:
         publish(dataset=source, to=remote_name)
+
+
+@skip_ssh
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_target_ssh_since(origin, src_path, target_path):
+    # prepare src
+    source = install(src_path, source=origin, recursive=True)[0]
+    eq_(len(source.get_subdatasets()), 2)
+    # get a new subdataset and make sure it is commited in the super
+    source.create('brandnew')
+    eq_(len(source.get_subdatasets()), 3)
+    ok_clean_git(source.path)
+
+    # and now we create a sibling for the new subdataset only
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl="ssh://localhost" + target_path,
+        recursive=True,
+        since='HEAD~1')
+    # there is one thing in the target directory only, and that is the
+    # remote repo of the newly added subdataset
+    eq_(['brandnew'], os.listdir(target_path))

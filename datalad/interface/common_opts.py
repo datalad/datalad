@@ -141,7 +141,7 @@ as_common_datasrc = Parameter(
 publish_depends = Parameter(
     args=("--publish-depends",),
     metavar='SIBLINGNAME',
-    doc="""add a dependency such that the given exsiting sibling is
+    doc="""add a dependency such that the given existing sibling is
     always published prior to the new sibling. This equals setting a
     configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
     [PY: Multiple dependencies can be given as a list of sibling names

@@ -35,7 +35,7 @@ from datalad.distribution.dataset import EnsureDataset, Dataset, \
 from datalad.support.exceptions import CommandError
 
 
-lgr = logging.getLogger('datalad.distribution.add_publication_target')
+lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
 class AddSibling(Interface):
@@ -195,7 +195,9 @@ class AddSibling(Interface):
             repoinfo = repos[repo_name]
             repo = repoinfo['repo']
             if repo_name in already_existing:
-                if repo_name not in conflicting and repo.get_remote_url(name) is not None:
+                if not force and \
+                        repo_name not in conflicting \
+                        and repo.get_remote_url(name) is not None:
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
@@ -223,12 +225,14 @@ class AddSibling(Interface):
                 ds.config.reload()
 
             if publish_by_default:
+                dfltvar = "remote.{}.push".format(name)
+                if dfltvar in ds.config:
+                    ds.config.unset(dfltvar, where='local', reload=False)
                 for refspec in assure_list(publish_by_default):
                     lgr.info(
                         'Configure additional default publication refspec "%s"',
                         refspec)
-                    ds.config.add("remote.{}.push".format(name), refspec,
-                                  'local')
+                    ds.config.add(dfltvar, refspec, 'local')
                 ds.config.reload()
 
             assert isinstance(repo, GitRepo)  # just against silly code
