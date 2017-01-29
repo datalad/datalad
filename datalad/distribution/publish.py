@@ -69,6 +69,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # check if there are any differences wrt the to-be-published paths,
     # and if not skip this dataset
     if refspec:
+        lgr.debug("Testing for changes with respect to '%s'", refspec)
         # we have a matching branch on the other side
         diff = ds.repo.repo.commit().diff(
             refspec.replace(
@@ -81,13 +82,18 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         refspec = active_branch
         if active_branch in ds.repo.repo.remotes[remote].refs:
             # we know some remote state -> diff
+            lgr.debug("Testing matching branch to '%s' at '%s' for differences",
+                      active_branch, remote)
             diff = ds.repo.repo.commit().diff(
                 ds.repo.repo.remotes[remote].refs[active_branch],
                 paths=paths)
         else:
+            lgr.debug("No matching branch to '%s' at '%s'",
+                      active_branch, remote)
             # we don't have any remote state, need to push for sure
             diff = True
     if not diff:
+        lgr.debug("No changes detected with respect to state of '%s'", remote)
         return published, skipped
 
     # publishing of `remote` might depend on publishing other
@@ -114,8 +120,15 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         ds.repo.fetch(remote=remote)
         ds.repo.merge_annex(remote)
         lgr.debug("Push annex info to '%s'", remote)
-        _log_push_info(ds.repo.push(remote=remote,
-                                    refspec="git-annex:git-annex"))
+        annex_err = _log_push_info(
+            ds.repo.push(remote=remote,
+                         refspec="git-annex:git-annex"))
+        if annex_err:
+            lgr.error(
+                "Failed to publish data availbility information to '%s', "
+                "will not attempt to publish data",
+                remote)
+            return published, skipped
 
     # we now know where to push to:
     # TODO: what to push? default: git push --mirror if nothing configured?
@@ -128,6 +141,10 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # not pass a specific refspec (like active branch) to `git push`
     # by default.
 
+    lgr.debug("Push refspec '%s' to '%s'%s",
+              refspec,
+              remote,
+              ' (set as tracking reference)' if set_upstream else '')
     _log_push_info(ds.repo.push(remote=remote,
                                 refspec=refspec,
                                 set_upstream=set_upstream))
