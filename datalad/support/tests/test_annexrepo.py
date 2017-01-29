@@ -1459,7 +1459,7 @@ def test_get_description(path1, path2):
     eq_(annex2.get_description(uuid=annex1.uuid),
                  annex1_description + ' [annex1]')
     # but let's remove the remote
-    annex1.merge_annex('annex1')
+    annex2.merge_annex('annex1')
     annex2.remove_remote('annex1')
     eq_(annex2.get_description(uuid=annex1.uuid), annex1_description)
 
