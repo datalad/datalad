@@ -108,6 +108,19 @@ class SSHConnection(object):
             self._runner = Runner()
         return self._runner
 
+    def is_open(self):
+        if not exists(self.ctrl_path):
+            return False
+        # check whether controlmaster is still running:
+        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.host]
+        out, err = self.runner.run(cmd)
+        if "Master running" not in err:
+            # master exists but isn't running
+            # => clean up:
+            self.close()
+            return False
+        return True
+
     def open(self):
         """Opens the connection.
 
@@ -115,26 +128,19 @@ class SSHConnection(object):
         connection, if it is not there already.
         """
 
-        if exists(self.ctrl_path):
-            # check whether controlmaster is still running:
-            cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.host]
-            out, err = self.runner.run(cmd)
-            if "Master running" not in err:
-                # master exists but isn't running
-                # => clean up:
-                self.close()
+        if self.is_open():
+            return
 
-        if not exists(self.ctrl_path):
-            # set control options
-            ctrl_options = ["-o", "ControlMaster=auto",
-                            "-o", "ControlPersist=15m"] + self.ctrl_options
-            # create ssh control master command
-            cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
+        # set control options
+        ctrl_options = ["-o", "ControlMaster=auto",
+                        "-o", "ControlPersist=15m"] + self.ctrl_options
+        # create ssh control master command
+        cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
 
-            # start control master:
-            lgr.debug("Try starting control master by calling:\n%s" % cmd)
-            proc = Popen(cmd)
-            proc.communicate(input="\n")  # why the f.. this is necessary?
+        # start control master:
+        lgr.debug("Try starting control master by calling:\n%s" % cmd)
+        proc = Popen(cmd)
+        proc.communicate(input="\n")  # why the f.. this is necessary?
 
     def close(self):
         """Closes the connection.
