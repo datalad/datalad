@@ -75,6 +75,9 @@ class SSHConnection(object):
         self.port = port
         self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
+        # essential properties of the remote system
+        self.remote_props = {}
+
     def __call__(self, cmd):
         """Executes a command on the remote.
 
@@ -95,6 +98,16 @@ class SSHConnection(object):
 
         if not self.is_open():
             self.open()
+            # locate annex and set the bundled vs. system Git machinery in motion
+            self.get_annex_installdir()
+
+        remote_annex_install_dir = self.remote_props.get(
+            'installdir:annex', None)
+        if remote_annex_install_dir:
+            # make sure to use the bundled git version if any exists
+            cmd = '{}; {}'.format(
+                'export "PATH={}:$PATH"'.format(remote_annex_installdir),
+                cmd)
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
@@ -188,6 +201,54 @@ class SSHConnection(object):
         # add destination path
         scp_cmd += ['%s:"%s"' % (self.host, destination)]
         return self.runner.run(scp_cmd)
+
+    def get_annex_installdir(self):
+        key = 'installdir:annex'
+        if key in self.remote_props:
+            return self.remote_props[key]
+        annex_install_dir = None
+        try:
+            annex_install_dir = self(
+                # use sh -e to be able to fail at each stage of the process
+                "sh -e -c 'set -e;dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
+        except CommandError as e:
+            lgr.debug('Failed to locate remote git-annex installation: %s',
+                      exc_str(e))
+        self.remote_props[key] = annex_install_dir
+        return annex_install_dir
+
+    def get_annex_version(self):
+        key = 'cmd:annex'
+        if key in self.remote_props:
+            return self.remote_props[key]
+        try:
+            # modern annex versions
+            version = self('git annex version --raw')[0]
+        except CommandError:
+            # either no annex, or old version
+            try:
+                # fall back on method that could work with older installations
+                out, err = self('git annex version')
+                version = out.split('\n')[0].split(':')[1].strip()
+            except CommandError as e:
+                lgr.debug('Failed to determine remote git-annex version: %s',
+                          exc_str(e))
+                version = None
+        self.remote_props[key] = version
+        return version
+
+    def get_git_version(self):
+        key = 'cmd:git'
+        if key in self.remote_props:
+            return self.remote_props[key]
+        git_version = None
+        try:
+            git_version = self('git version')[0].split()[2]
+        except CommandError as e:
+            lgr.debug('Failed to determine Git version: %s',
+                      exc_str(e))
+        self.remote_props[key] = git_version
+        return git_version
 
 
 @auto_repr
