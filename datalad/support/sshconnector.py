@@ -76,6 +76,8 @@ class SSHConnection(object):
         ----------
         cmd: list or str
           command to run on the remote
+        wrap_args : bool
+          Flag whether to quote argument string before passing them on to SSH
 
         Returns
         -------
