@@ -167,3 +167,11 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     ssh.close()
+
+
+@skip_ssh
+def test_ssh_git_props():
+    remote_url = 'ssh://localhost'
+    manager = SSHManager()
+    ssh = manager.get_connection(remote_url)
+    ok_(not ssh.is_open())
