@@ -60,7 +60,6 @@ def _create_dataset_sibling(
         target_pushurl,
         existing,
         shared,
-        remote_git_version,
         publish_depends,
         publish_by_default,
         as_common_datasrc):
@@ -166,7 +165,7 @@ def _create_dataset_sibling(
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
-    if remote_git_version and remote_git_version >= "2.4":
+    if ssh.get_git_version() and ssh.get_git_version() >= LooseVersion("2.4"):
         # allow for pushing to checked out branch
         try:
             ssh("git -C {} config receive.denyCurrentBranch updateInstead".format(
@@ -180,8 +179,8 @@ def _create_dataset_sibling(
                   " Version detected on server: %s\nSkipping configuration"
                   " of receive.denyCurrentBranch - you will not be able to"
                   " publish updates to this repository. Upgrade your git"
-                  " and run with --existing=reconfigure"
-                  % remote_git_version)
+                  " and run with --existing=reconfigure",
+                  ssh.get_git_version())
 
     # enable metadata refresh on dataset updates to publication server
     lgr.info("Enabling git post-update hook ...")
@@ -435,8 +434,6 @@ class CreateSibling(Interface):
                 'git-annex',
                 msg='on the remote system')
 
-        remote_git_version = CreateSibling.get_remote_git_version(ssh)
-
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         # But we need to run post-update hook in depth-first fashion, so
@@ -457,7 +454,6 @@ class CreateSibling(Interface):
                 target_pushurl,
                 existing,
                 shared,
-                remote_git_version,
                 publish_depends,
                 publish_by_default,
                 as_common_datasrc)
@@ -516,24 +512,6 @@ class CreateSibling(Interface):
                           "\nError: %s\nSkipping ..." % (path, exc_str(e)))
                 return False
         return True
-
-    @staticmethod
-    def get_remote_git_version(ssh):
-        try:
-            # options to disable all auto so we don't trigger them while testing
-            # for absent changes
-            out, err = ssh("git version")
-            assert out.strip().startswith("git version")
-            git_version = out.strip().split()[2]
-            lgr.debug("Detected git version on server: %s" % git_version)
-            return LooseVersion(git_version)
-
-        except CommandError as e:
-            lgr.warning(
-                "Failed to determine git version on remote.\n"
-                "Error: {0}\nTrying to configure anyway "
-                "...".format(exc_str(e)))
-        return None
 
     @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
