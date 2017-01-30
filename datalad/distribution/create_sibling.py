@@ -430,7 +430,11 @@ class CreateSibling(Interface):
         # request ssh connection:
         lgr.info("Connecting ...")
         ssh = ssh_manager.get_connection(sshurl)
-        ssh.open()
+        if not ssh.get_annex_version():
+            raise MissingExternalDependency(
+                'git-annex',
+                msg='on the remote system')
+
         remote_git_version = CreateSibling.get_remote_git_version(ssh)
 
         # loop over all datasets, ordered from top to bottom to make test
