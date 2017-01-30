@@ -85,8 +85,8 @@ class SSHConnection(object):
           stdout, stderr of the command run.
         """
 
-        # TODO: Do we need to check for the connection to be open or just rely
-        # on possible ssh failing?
+        if not self.is_open():
+            self.open()
         cmd_list = cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
             # windows check currently not needed, but keep it as a reminder
