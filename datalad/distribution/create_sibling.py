@@ -38,6 +38,7 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import RI
 from datalad.support.network import is_ssh
+from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
 from datalad.utils import not_supported_on_windows
@@ -102,7 +103,7 @@ def _create_dataset_sibling(
         # TODO: Is this condition valid for != '.' only?
         path_exists = True
         try:
-            out, err = ssh(["ls", remoteds_path])
+            out, err = ssh("ls {}".format(sh_quote(remoteds_path)))
         except CommandError as e:
             if "No such file or directory" in e.stderr and \
                     remoteds_path in e.stderr:
@@ -119,9 +120,9 @@ def _create_dataset_sibling(
                 return
             elif existing == 'replace':
                 # enable write permissions to allow removing dir
-                ssh(["chmod", "+r+w", "-R", remoteds_path])
+                ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
                 # remove target at path
-                ssh(["rm", "-rf", remoteds_path])
+                ssh("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
                 path_exists = False
             elif existing == 'reconfigure':
@@ -133,7 +134,7 @@ def _create_dataset_sibling(
 
         if not path_exists:
             try:
-                ssh(["mkdir", "-p", remoteds_path])
+                ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
             except CommandError as e:
                 lgr.error("Remotely creating target directory failed at "
                           "%s.\nError: %s" % (remoteds_path, exc_str(e)))
@@ -167,8 +168,8 @@ def _create_dataset_sibling(
     if remote_git_version and remote_git_version >= "2.4":
         # allow for pushing to checked out branch
         try:
-            ssh(["git", "-C", remoteds_path] +
-                ["config", "receive.denyCurrentBranch", "updateInstead"])
+            ssh("git -C {} config receive.denyCurrentBranch updateInstead".format(
+                sh_quote(remoteds_path)))
         except CommandError as e:
             lgr.error("git config failed at remote location %s.\n"
                       "You will not be able to push to checked out "
@@ -469,9 +470,8 @@ class CreateSibling(Interface):
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
             try:
-                ssh(
-                    ["cd '" + _path_(path, ".git") + "' && hooks/post-update"],
-                    wrap_args=False  # we wrapped here manually
+                ssh("cd {} && hooks/post-update".format(
+                    sh_quote(_path_(path, ".git")))
                 )
             except CommandError as e:
                 lgr.error("Failed to run post-update hook under path %s. "
@@ -482,9 +482,9 @@ class CreateSibling(Interface):
 
     @staticmethod
     def init_remote_repo(path, ssh, shared, dataset, description=None):
-        cmd = ["git", "-C", path, "init"]
-        if shared:
-            cmd.append("--shared=%s" % shared)
+        cmd = "git -C {} init{}".format(
+            sh_quote(path),
+            " --shared='{}'".format(sh_quote(shared)) if shared else '')
         try:
             ssh(cmd)
         except CommandError as e:
@@ -496,8 +496,10 @@ class CreateSibling(Interface):
             # init remote git annex repo (part fix of #463)
             try:
                 ssh(
-                    ["git", "-C", path, "annex", "init"] +
-                    ([description] if description else [])
+                    "git -C {} annex init {}".format(
+                        sh_quote(path),
+                        sh_quote(description)
+                        if description else '')
                 )
             except CommandError as e:
                 lgr.error("Initialization of remote git annex repository failed at %s."
@@ -510,7 +512,7 @@ class CreateSibling(Interface):
         try:
             # options to disable all auto so we don't trigger them while testing
             # for absent changes
-            out, err = ssh(["git"] + ["version"])
+            out, err = ssh("git version")
             assert out.strip().startswith("git version")
             git_version = out.strip().split()[2]
             lgr.debug("Detected git version on server: %s" % git_version)
@@ -548,9 +550,12 @@ class CreateSibling(Interface):
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
 
-        with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
-            ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
-        ssh(['chmod', '+x', hook_remote_target])            # and make it executable
+        with make_tempfile(content=hook_content) as tempf:
+            # create post_update hook script
+            # upload hook to dataset
+            ssh.copy(tempf, hook_remote_target)
+        # and make it executable
+        ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
 
     @staticmethod
     def upload_web_interface(path, ssh, shared, ui):
@@ -569,7 +574,7 @@ class CreateSibling(Interface):
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
-        ssh(['mkdir', '-p', webresources_remote])
+        ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
         ssh.copy(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets
@@ -596,4 +601,7 @@ class CreateSibling(Interface):
             mode = shared
 
         if mode:
-            ssh(['chmod', mode, '-R', dirname(webresources_remote), opj(path, 'index.html')])
+            ssh('chmod {} -R {} {}'.format(
+                mode,
+                sh_quote(dirname(webresources_remote)),
+                sh_quote(opj(path, 'index.html'))))
