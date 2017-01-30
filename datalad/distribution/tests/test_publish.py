@@ -283,13 +283,19 @@ def test_publish_depends(
     assert_raises(
         ValueError,
         source.create_sibling,
-        'ssh://datalad-test' + target2_path,
+        # cannot use a URL besides localhost because of ancient Git on travis
+        # see gh-1240
+        # 'ssh://datalad-test' + target2_path,
+        'ssh://localhost' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
         publish_depends='bogus')
     # for reals
     source.create_sibling(
-        'ssh://datalad-test' + target2_path,
+        # cannot use a URL besides localhost because of ancient Git on travis
+        # see gh-1240
+        # 'ssh://datalad-test' + target2_path,
+        'ssh://localhost' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
         publish_depends='target1')
@@ -297,7 +303,10 @@ def test_publish_depends(
     eq_(source.config.get(depvar, None), 'target1')
     # and one more remote, on the same host but associated with a dependency
     source.create_sibling(
-        'ssh://datalad-test' + target3_path,
+        # cannot use a URL besides localhost because of ancient Git on travis
+        # see gh-1240
+        # 'ssh://datalad-test' + target3_path,
+        'ssh://localhost' + target3_path,
         name='target3')
     ok_clean_git(src_path)
     # introduce change in source
