@@ -23,7 +23,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_is_instance
 
-from ..sshconnector import SSHConnection, SSHManager
+from ..sshconnector import SSHConnection, SSHManager, sh_quote
 
 
 @skip_ssh
@@ -48,7 +48,7 @@ def test_ssh_get_connection():
 
 
 @skip_ssh
-@with_tempfile(suffix=" \"`suffix:;& ",  # get_most_obscure_supported_name(),
+@with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
 def test_ssh_open_close(tfile1):
 
@@ -60,14 +60,14 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path))
 
     # use connection to execute remote command:
-    out, err = c1(['ls', '-a'])
+    out, err = c1('ls -a')
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
     local_ls = os.listdir(os.path.expanduser('~'))
     eq_(set(remote_ls), set(local_ls))
 
     # now test for arguments containing spaces and other pleasant symbols
-    out, err = c1(['ls', '-l', tfile1])
+    out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
     assert_in(tfile1, out)
     eq_(err, '')
 
@@ -167,6 +167,13 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     ssh.close()
+
+
+@skip_ssh
+def test_ssh_compound_cmds():
+    ssh = SSHManager().get_connection('ssh://localhost')
+    out, err = ssh('[ 1 = 2 ] && echo no || echo success')
+    eq_(out.strip(), 'success')
 
 
 @skip_ssh

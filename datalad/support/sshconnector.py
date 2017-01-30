@@ -17,7 +17,14 @@ import logging
 from os.path import exists
 from os.path import join as opj
 from subprocess import Popen
-from shlex import split as sh_split
+# importing the quote function here so it can always be imported from this
+# module
+try:
+    # from Python 3.3 onwards
+    from shlex import quote as sh_quote
+except ImportError:
+    # deprecated since Pythonn 2.7
+    from pipes import quote as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -26,7 +33,6 @@ from shlex import split as sh_split
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
 from datalad.utils import not_supported_on_windows
-from datalad.utils import on_windows
 from datalad.utils import assure_dir
 from datalad.utils import auto_repr
 from datalad.cmd import Runner
@@ -69,15 +75,17 @@ class SSHConnection(object):
         self.port = port
         self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
-    def __call__(self, cmd, wrap_args=True):
+    def __call__(self, cmd):
         """Executes a command on the remote.
+
+        It is the callers responsibility to properly quote commands
+        for remote execution (e.g. filename with spaces of other special
+        characters). Use the `sh_quote()` from the module for this purpose.
 
         Parameters
         ----------
-        cmd: list or str
+        cmd: str
           command to run on the remote
-        wrap_args : bool
-          Flag whether to quote argument string before passing them on to SSH
 
         Returns
         -------
@@ -87,16 +95,11 @@ class SSHConnection(object):
 
         if not self.is_open():
             self.open()
-        cmd_list = cmd if isinstance(cmd, list) \
-            else sh_split(cmd, posix=not on_windows)
-            # windows check currently not needed, but keep it as a reminder
-        # The safest best while dealing with any special characters is to wrap
-        # entire argument into "" while escaping possibly present " inside.
-        # I guess for the ` & and other symbols used in the shell -- yet to figure out
-        # how to escape it reliably.
-        if wrap_args:
-            cmd_list = list(map(_wrap_str, cmd_list))
-        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd_list
+        # build SSH call, feed remote command as a single last argument
+        # whatever it contains will go to the remote machine for execution
+        # we cannot perform any sort of escaping, because it will limit
+        # what we can do on the remote, e.g. concatenate commands with '&&'
+        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + [cmd]
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
