@@ -101,9 +101,9 @@ class SSHConnection(object):
             # locate annex and set the bundled vs. system Git machinery in motion
             self.get_annex_installdir()
 
-        remote_annex_install_dir = self.remote_props.get(
+        remote_annex_installdir = self.remote_props.get(
             'installdir:annex', None)
-        if remote_annex_install_dir:
+        if remote_annex_installdir:
             # make sure to use the bundled git version if any exists
             cmd = '{}; {}'.format(
                 'export "PATH={}:$PATH"'.format(remote_annex_installdir),
