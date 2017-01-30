@@ -23,6 +23,8 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
+from datalad.utils import assure_list
+
 from .dataset import EnsureDataset
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -100,12 +102,17 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # remote(s) first:
     # define config var name for potential publication dependencies
     depvar = 'remote.{}.datalad-publish-depends'.format(remote)
-    for d in ds.config.get(depvar, []):
+    for d in assure_list(ds.config.get(depvar, [])):
         lgr.info("Dependency detected: '%s'" % d)
         # call this again to take care of the dependency first,
         # but keep the paths the same, as the goal is to publish those
         # to the primary remote, and not anything elase to a dependency
-        pblsh, skp = _publish_dataset(ds, d, None, paths)
+        pblsh, skp = _publish_dataset(
+            ds,
+            d,
+            None,
+            paths,
+            annex_copy_options)
         published.extend(pblsh)
         skipped.extend(skp)
 

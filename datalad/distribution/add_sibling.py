@@ -217,6 +217,14 @@ class AddSibling(Interface):
                     continue
                 # rewrite url
                 repo.set_remote_url(name, repoinfo['url'])
+                fetchvar = 'remote.{}.fetch'.format(repo_name)
+                if fetchvar not in repo.config:
+                    # place default fetch refspec in config
+                    # same as `git remote add` would have added
+                    repo.config.add(
+                        fetchvar,
+                        '+refs/heads/*:refs/remotes/{}/*'.format(name),
+                        where='local')
             else:
                 # add the remote
                 repo.add_remote(name, repoinfo['url'])

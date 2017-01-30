@@ -159,7 +159,7 @@ def _create_dataset_sibling(
         pushurl=ds_target_pushurl,
         recursive=False,
         fetch=True,
-        force=existing in {'replace'},
+        force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
         publish_depends=publish_depends)
