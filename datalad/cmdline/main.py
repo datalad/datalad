@@ -127,7 +127,8 @@ def setup_parser(
     # API from them
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
-    for grp_name, grp_descr, _interfaces in interface_groups:
+    for grp_name, grp_descr, _interfaces \
+                in sorted(interface_groups, key=lambda x: x[1]):
         # for all subcommand modules it can find
         cmd_short_descriptions = []
 
@@ -180,7 +181,8 @@ def setup_parser(
     console_width = shutil.get_terminal_size()[0] \
         if hasattr(shutil, 'get_terminal_size') else 80
 
-    for i, grp in enumerate(interface_groups):
+    for i, grp in enumerate(
+            sorted(interface_groups, key=lambda x: x[1])):
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[i]
 
