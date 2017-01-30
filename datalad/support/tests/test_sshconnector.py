@@ -13,6 +13,8 @@ import logging
 import os
 from os.path import exists, isdir, getmtime, join as opj
 
+from datalad.support.external_versions import external_versions
+
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import eq_
 from datalad.tests.utils import skip_ssh
@@ -181,4 +183,8 @@ def test_ssh_git_props():
     remote_url = 'ssh://localhost'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
-    ok_(not ssh.is_open())
+    eq_(ssh.get_annex_version(),
+        external_versions['cmd:annex'])
+    # cannot compare to locally detected, might differ depending on
+    # how annex was installed
+    ok_(ssh.get_git_version())
