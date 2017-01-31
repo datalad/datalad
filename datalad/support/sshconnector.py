@@ -39,14 +39,7 @@ from datalad.utils import assure_dir
 from datalad.utils import auto_repr
 from datalad.cmd import Runner
 
-lgr = logging.getLogger('datalad.ssh')
-
-
-def _wrap_str(s):
-    """Helper to wrap argument into '' to be passed over ssh cmdline"""
-    s = s.replace("'", r'\'')
-    return "'%s'" % s
-
+lgr = logging.getLogger('datalad.support.sshconnector')
 
 def get_connection_hash(hostname, port='', username=''):
     """Generate a hash based on SSH connection properties
