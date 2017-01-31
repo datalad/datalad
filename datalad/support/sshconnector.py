@@ -221,7 +221,7 @@ class SSHConnection(object):
         try:
             annex_install_dir = self(
                 # use sh -e to be able to fail at each stage of the process
-                "sh -e -c 'set -e;dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
+                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
                       exc_str(e))
