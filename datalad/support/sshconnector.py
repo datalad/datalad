@@ -206,7 +206,7 @@ class SSHConnection(object):
             else [source]
 
         # add destination path
-        scp_cmd += ['%s:"%s"' % (self.host, destination)]
+        scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
         return self.runner.run(scp_cmd)
 
     def get_annex_installdir(self):
