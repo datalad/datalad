@@ -23,7 +23,6 @@ from os.path import isabs
 from os.path import commonprefix
 from os.path import relpath
 from os.path import realpath
-from os.path import abspath
 from os.path import dirname
 from os.path import basename
 from os.path import curdir
@@ -1793,7 +1792,7 @@ class GitRepo(RepoInterface):
                     lgr.debug("detached HEAD in {0}".format(self))
                     return None, None
                 else:
-                    raise 
+                    raise
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
