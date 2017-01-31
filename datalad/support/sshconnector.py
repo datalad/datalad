@@ -51,28 +51,29 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, host, port=None):
-        """Create the connection.
+    def __init__(self, ctrl_path, sshri):
+        """Create a connection handler
 
-        This does not actually open the connection.
-        It's just its representation.
+        The actual opening of the connection is performed on-demand.
 
         Parameters
         ----------
         ctrl_path: str
           path to SSH controlmaster
-        host: str
-          host to connect to. This may include the user ( [user@]host )
-        port: str
-          port to connect over
+        sshri: SSHRI
+          SSH resource identifier (contains all connection-relevant info),
+          or another resource identifier that can be converted into an SSHRI.
         """
         self._runner = None
 
-        # TODO: This may actually also contain "user@host".
-        #       So, better name instead of 'host'?
-        self.host = host
-        self.ctrl_path = ctrl_path + ":" + port if port else ctrl_path
-        self.port = port
+        from datalad.support.network import SSHRI
+        if hasattr(sshri, 'scheme') and not sshri.scheme == 'ssh':
+            raise ValueError(
+                "Non-SSH resource identifiers are not supported for SSH "
+                "connections: {}".format(sshri))
+        self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
+                              if k in ('username', 'hostname', 'port')})
+        self.ctrl_path = ctrl_path
         self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
         # essential properties of the remote system
@@ -112,7 +113,11 @@ class SSHConnection(object):
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
-        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + [cmd]
+        ssh_cmd = ["ssh"] + self.ctrl_options
+        if self.sshri.port:
+            ssh_cmd += ['-p', self.sshri.port]
+        ssh_cmd += [self.sshri.as_str()] \
+            + [cmd]
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
@@ -128,7 +133,7 @@ class SSHConnection(object):
         if not exists(self.ctrl_path):
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.host]
+        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.sshri.hostname]
         out, err = self.runner.run(cmd)
         if "Master running" not in err:
             # master exists but isn't running
@@ -151,7 +156,7 @@ class SSHConnection(object):
         ctrl_options = ["-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self.ctrl_options
         # create ssh control master command
-        cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
+        cmd = ["ssh"] + ctrl_options + [self.sshri.hostname, "exit"]
 
         # start control master:
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
@@ -312,7 +317,7 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri.hostname)
+            c = SSHConnection(ctrl_path, sshri)
             self._connections[ctrl_path] = c
             return c
 
