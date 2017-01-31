@@ -26,6 +26,7 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_is_instance
 
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
+from ..sshconnector import get_connection_hash
 
 
 @skip_ssh
@@ -56,7 +57,7 @@ def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
     c1 = manager.get_connection('ssh://localhost')
-    path = opj(manager.socket_dir, 'localhost')
+    path = opj(manager.socket_dir, get_connection_hash('localhost'))
     c1.open()
     # control master exists:
     ok_(exists(path))
@@ -96,8 +97,8 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://localhost').close()
         manager.get_connection('ssh://localhost').open()
 
-    ok_(exists(opj(manager.socket_dir, 'localhost')))
-    ok_(exists(opj(manager.socket_dir, 'datalad-test')))
+    ok_(exists(opj(manager.socket_dir, get_connection_hash('localhost'))))
+    ok_(exists(opj(manager.socket_dir, get_connection_hash('datalad-test'))))
 
     manager.close()
 

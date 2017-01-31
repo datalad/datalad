@@ -48,6 +48,21 @@ def _wrap_str(s):
     return "'%s'" % s
 
 
+def get_connection_hash(hostname, port='', username=''):
+    """Generate a hash based on SSH connection properties
+
+    This can be used for generating filenames that are unique
+    to a connection from and to a particular machine (with
+    port and login username). The hash also contains the local
+    host name.
+    """
+    return md5(
+        '{lhost}{rhost}{port}{username}'.format(
+            lhost=gethostname(),
+            rhost=hostname,
+            port=port,
+            username=username)).hexdigest()
+
 @auto_repr
 class SSHConnection(object):
     """Representation of a (shared) ssh connection.
@@ -319,12 +334,10 @@ class SSHManager(object):
             raise ValueError("Unsupported SSH URL: '{0}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
-        conhash = md5(
-            '{lhost}{rhost}{port}{username}'.format(
-                lhost=gethostname(),
-                rhost=sshri.hostname,
-                port=sshri.port,
-                username=sshri.username)).hexdigest()
+        conhash = get_connection_hash(
+            sshri.hostname,
+            port=sshri.port,
+            username=sshri.username)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
 
