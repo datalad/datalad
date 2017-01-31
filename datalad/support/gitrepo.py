@@ -40,6 +40,7 @@ from git.exc import NoSuchPathError
 from git.exc import InvalidGitRepositoryError
 from git.objects.blob import Blob
 
+from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
@@ -593,6 +594,7 @@ class GitRepo(RepoInterface):
             pass
 
         if is_ssh(url):
+            ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             env = {'GIT_SSH_COMMAND': "datalad sshrun"}
@@ -1371,6 +1373,7 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
             if is_ssh(fetch_url):
+                ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
@@ -1413,6 +1416,7 @@ class GitRepo(RepoInterface):
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
         if is_ssh(fetch_url):
+            ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
@@ -1495,6 +1499,7 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
             if is_ssh(push_url):
+                ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
