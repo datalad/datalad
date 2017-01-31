@@ -61,7 +61,7 @@ def get_connection_hash(hostname, port='', username=''):
             lhost=gethostname(),
             rhost=hostname,
             port=port,
-            username=username)).hexdigest()
+            username=username).encode('utf-8')).hexdigest()
 
 @auto_repr
 class SSHConnection(object):
