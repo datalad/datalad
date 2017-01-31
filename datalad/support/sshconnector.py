@@ -75,6 +75,8 @@ class SSHConnection(object):
                               if k in ('username', 'hostname', 'port')})
         self.ctrl_path = ctrl_path
         self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
+        if self.sshri.port:
+            self.ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
         # essential properties of the remote system
         self.remote_props = {}
@@ -114,8 +116,6 @@ class SSHConnection(object):
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
         ssh_cmd = ["ssh"] + self.ctrl_options
-        if self.sshri.port:
-            ssh_cmd += ['-p', self.sshri.port]
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
@@ -133,7 +133,7 @@ class SSHConnection(object):
         if not exists(self.ctrl_path):
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.sshri.hostname]
+        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.sshri.as_str()]
         out, err = self.runner.run(cmd)
         if "Master running" not in err:
             # master exists but isn't running
@@ -156,7 +156,7 @@ class SSHConnection(object):
         ctrl_options = ["-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self.ctrl_options
         # create ssh control master command
-        cmd = ["ssh"] + ctrl_options + [self.sshri.hostname, "exit"]
+        cmd = ["ssh"] + ctrl_options + [self.sshri.as_str(), "exit"]
 
         # start control master:
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
