@@ -25,7 +25,12 @@ from datalad import ssh_manager
 
 
 class SSHRun(Interface):
-    """
+    """Run command on remote machines via SSH.
+
+    This is a replacement for a small part of the functionality of SSH.
+    In addition to SSH alaon, this command can make use ofdatalad's SSH
+    connection management. Its primary use case is to be used with Git
+    as 'core.sshCommand' or via "GIT_SSH_COMMAND".
     """
 
     _params_ = dict(
