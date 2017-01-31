@@ -238,7 +238,7 @@ class Runner(object):
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
-            cwd=None, env=None, shell=None):
+            cwd=None, env=None, shell=None, stdin=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is
@@ -291,6 +291,9 @@ class Runner(object):
             Run command in a shell.  If not specified, then it runs in a shell
             only if command is specified as a string (not a list)
 
+        stdin: file descriptor
+            input stream to connect to stdin of the process.
+
         Returns
         -------
         (stdout, stderr)
@@ -327,7 +330,8 @@ class Runner(object):
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
-                                        env=env or self.env)
+                                        env=env or self.env,
+                                        stdin=stdin)
 
             except Exception as e:
                 prot_exc = e
