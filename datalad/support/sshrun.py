@@ -17,6 +17,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
+import sys
 
 from datalad.support.param import Parameter
 from datalad.interface.base import Interface
@@ -51,6 +52,6 @@ class SSHRun(Interface):
             login,
             ':{}'.format(port) if port else '')
         ssh = ssh_manager.get_connection(sshurl)
-        out, err = ssh(cmd)
+        out, err = ssh(cmd, stdin=sys.stdin)
         os.write(1, out)
         os.write(2, err)

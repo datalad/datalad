@@ -83,7 +83,7 @@ class SSHConnection(object):
         # essential properties of the remote system
         self.remote_props = {}
 
-    def __call__(self, cmd):
+    def __call__(self, cmd, stdin=None):
         """Executes a command on the remote.
 
         It is the callers responsibility to properly quote commands
@@ -123,7 +123,11 @@ class SSHConnection(object):
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
-        return self.runner.run(ssh_cmd, expect_fail=True, expect_stderr=True)
+        return self.runner.run(
+            ssh_cmd,
+            expect_fail=True,
+            expect_stderr=True,
+            stdin=stdin)
 
     @property
     def runner(self):
