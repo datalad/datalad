@@ -14,6 +14,8 @@ git calls to a ssh remote without the need to reauthenticate.
 """
 
 import logging
+from socket import gethostname
+from hashlib import md5
 from os.path import exists
 from os.path import join as opj
 from subprocess import Popen
@@ -168,7 +170,7 @@ class SSHConnection(object):
         """
 
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self.ctrl_options + [self.host]
+        cmd = ["ssh", "-O", "stop"] + self.ctrl_options + [self.sshri.as_str()]
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
@@ -308,10 +310,14 @@ class SSHManager(object):
             raise ValueError("Unsupported SSH URL: '{0}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
+        conhash = md5(
+            '{lhost}{rhost}{port}{username}'.format(
+                lhost=gethostname(),
+                rhost=sshri.hostname,
+                port=sshri.port,
+                username=sshri.username)).hexdigest()
         # determine control master:
-        ctrl_path = "%s/%s" % (self.socket_dir, sshri.hostname)
-        if sshri.port:
-            ctrl_path += ":%s" % sshri.port
+        ctrl_path = "%s/%s" % (self.socket_dir, conhash)
 
         # do we know it already?
         if ctrl_path in self._connections:
