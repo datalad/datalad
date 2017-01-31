@@ -83,8 +83,8 @@ class SSHConnection(object):
         """
         self._runner = None
 
-        from datalad.support.network import SSHRI
-        if hasattr(sshri, 'scheme') and not sshri.scheme == 'ssh':
+        from datalad.support.network import SSHRI, is_ssh
+        if not is_ssh(sshri):
             raise ValueError(
                 "Non-SSH resource identifiers are not supported for SSH "
                 "connections: {}".format(sshri))
@@ -136,12 +136,12 @@ class SSHConnection(object):
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
-        # TODO: pass expect parameters from above?
-        # Hard to explain to toplevel users ... So for now, just set True
         if log_output:
             kwargs = dict(log_stdout=True, log_stderr=True, log_online=False)
         else:
             kwargs = dict(log_stdout=False, log_stderr=False, log_online=True)
+        # TODO: pass expect parameters from above?
+        # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(
             ssh_cmd,
             expect_fail=True,
