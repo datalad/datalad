@@ -118,10 +118,7 @@ class SSHConnection(object):
                     'Cannot open SSH connection to {}'.format(
                         self.sshri))
             # locate annex and set the bundled vs. system Git machinery in motion
-            self.get_annex_installdir()
-
-        remote_annex_installdir = self.remote_props.get(
-            'installdir:annex', None)
+        remote_annex_installdir = self.get_annex_installdir()
         if remote_annex_installdir:
             # make sure to use the bundled git version if any exists
             cmd = '{}; {}'.format(
@@ -250,6 +247,9 @@ class SSHConnection(object):
         if key in self.remote_props:
             return self.remote_props[key]
         annex_install_dir = None
+        # already set here to avoid any sort of recursion until we know
+        # more
+        self.remote_props[key] = annex_install_dir
         try:
             annex_install_dir = self(
                 # use sh -e to be able to fail at each stage of the process
