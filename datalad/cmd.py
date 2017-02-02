@@ -495,7 +495,7 @@ class GitRunner(Runner):
 
     def run(self, cmd, env=None, *args, **kwargs):
         return super(GitRunner, self).run(
-            cmd, env=self.get_git_environ_adjusted(), *args, **kwargs)
+            cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
 
 
 # ####
