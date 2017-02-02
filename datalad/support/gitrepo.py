@@ -1378,8 +1378,15 @@ class GitRepo(RepoInterface):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="datalad sshrun"):
-                    fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                    # Note: The following (outcommented line) doesn't seem to
+                    # work with custom_env;
+                    # TODO: Fix within gitpython or build a fully functional
+                    # alternative herein
+                    # fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
+                    self.repo.git.fetch(rm.name, refspec,
+                                        universal_newlines=True, **kwargs)
+                    # TODO: no return value yet
             else:
                 fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
@@ -1504,8 +1511,22 @@ class GitRepo(RepoInterface):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="datalad sshrun"):
-                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
+                    # Note: The following (outcommented line) doesn't seem to
+                    # work with custom_env;
+                    # TODO: Fix within gitpython or build a fully functional
+                    # alternative herein
+                    # pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
+                    out = self.repo.git.push(rm.name, refspec, porcelain=True,
+                                             universal_newlines=True, **kwargs)
+                    for line in out.splitlines():
+                        try:
+                            pi_list.append(gitpy.remote.PushInfo._from_line(
+                                rm, line))
+                        except ValueError:
+                            # TODO: Figure out error handling.
+                            # see git/remote.py:_get_push_info()
+                            pass
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
