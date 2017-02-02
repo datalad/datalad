@@ -16,6 +16,7 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from socket import gethostname
 from hashlib import md5
+from os import remove
 from os.path import exists
 from os.path import join as opj
 from subprocess import Popen
@@ -41,6 +42,7 @@ from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
+
 def get_connection_hash(hostname, port='', username=''):
     """Generate a hash based on SSH connection properties
 
@@ -55,6 +57,7 @@ def get_connection_hash(hostname, port='', username=''):
             rhost=hostname,
             port=port,
             username=username).encode('utf-8')).hexdigest()
+
 
 @auto_repr
 class SSHConnection(object):
@@ -110,7 +113,10 @@ class SSHConnection(object):
         """
 
         if not self.is_open():
-            self.open()
+            if not self.open():
+                raise RuntimeError(
+                    'Cannot open SSH connection to {}'.format(
+                        self.sshri))
             # locate annex and set the bundled vs. system Git machinery in motion
             self.get_annex_installdir()
 
@@ -153,10 +159,13 @@ class SSHConnection(object):
             return False
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.sshri.as_str()]
-        out, err = self.runner.run(cmd)
-        if "Master running" not in err:
-            # master exists but isn't running
-            # => clean up:
+        try:
+            out, err = self.runner.run(cmd)
+        except CommandError as e:
+            if e.code != 255:
+                # this is not a normal SSH error, whine ...
+                raise e
+            # SSH died and left socket behind, or server closed connection
             self.close()
             return False
         return True
@@ -166,6 +175,11 @@ class SSHConnection(object):
 
         In other words: Creates the SSH controlmaster to be used by this
         connection, if it is not there already.
+
+        Returns
+        -------
+        bool
+          Whether SSH reports success opening the connection
         """
 
         if self.is_open():
@@ -182,6 +196,10 @@ class SSHConnection(object):
         proc = Popen(cmd)
         proc.communicate(input="\n")  # why the f.. this is necessary?
 
+        # wait till the command exits, connection is conclusively
+        # open or not at this point
+        return proc.wait() == 0
+
     def close(self):
         """Closes the connection.
         """
@@ -191,11 +209,12 @@ class SSHConnection(object):
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
-            if "No such file or directory" in e.stderr:
-                # nothing to clean up
-                pass
-            else:
-                raise
+            if exists(self.ctrl_path):
+                # socket need to go in any case
+                remove(self.ctrl_path)
+            if e.code != 255:
+                # not a "normal" SSH error
+                raise e
 
     def copy(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
