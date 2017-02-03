@@ -517,6 +517,8 @@ class CreateSibling(Interface):
     def create_postupdate_hook(path, ssh, dataset):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
+        # make sure hooks directory exists (see #1251)
+        ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
         # post-update hook should create its log directory if doesn't exist
         logs_remote_dir = opj(path, WEB_META_LOG)
