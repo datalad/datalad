@@ -54,6 +54,10 @@ def _log_push_info(pi_list):
 
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
+    # TODO: this setup is now quite ugly. The only way `refspec` can come
+    # in, is when there is a tracking branch, and we get its state via
+    # `refspec`
+
     # Plan:
     # 1. Check if there is anything to push
     # 2. If so, process push dependencies
@@ -65,8 +69,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
     # no tracking refspec yet?
-    # TODO what if `to` was given, doesn't have tracking info in this case
-    set_upstream = refspec is None
 
     # check if there are any differences wrt the to-be-published paths,
     # and if not skip this dataset
@@ -126,35 +128,23 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         lgr.debug("Obtain remote annex info from '%s'", remote)
         ds.repo.fetch(remote=remote)
         ds.repo.merge_annex(remote)
-        lgr.debug("Push annex info to '%s'", remote)
-        annex_err = _log_push_info(
-            ds.repo.push(remote=remote,
-                         refspec="git-annex:git-annex"))
-        if annex_err:
-            lgr.error(
-                "Failed to publish data availbility information to '%s', "
-                "will not attempt to publish data",
-                remote)
-            return published, skipped
 
     # we now know where to push to:
-    # TODO: what to push? default: git push --mirror if nothing configured?
-    # consider also: --follow-tags, --tags, --atomic
-
-    # Note: git's push.default is 'matching', which possibly doesn't
-    # work for first
+    # Note: git's push.default is 'matching', which doesn't work for first
     # time publication (a branch, that doesn't exist on remote yet)
     # But if we want to respect remote.*.push entries, etc. we need to
     # not pass a specific refspec (like active branch) to `git push`
     # by default.
-
-    lgr.debug("Push refspec '%s' to '%s'%s",
-              refspec,
-              remote,
-              ' (set as tracking reference)' if set_upstream else '')
-    _log_push_info(ds.repo.push(remote=remote,
-                                refspec=refspec,
-                                set_upstream=set_upstream))
+    # TODO: what else to push by default?
+    # consider also: --follow-tags, --tags, --atomic
+    lgr.debug("Push to '%s'", remote)
+    pushvar = 'remote.{}.push'.format(remote)
+    if not ds.config.get(pushvar, None):
+        # no default push targets configured for this remote, leave our mark
+        ds.config.add(pushvar, 'master', where='local')
+        if isinstance(ds.repo, AnnexRepo):
+            ds.config.add(pushvar, 'git-annex', where='local')
+    _log_push_info(ds.repo.push(remote=remote))
 
     published.append(ds)
 
@@ -219,7 +209,8 @@ class Publish(Interface):
             metavar='LABEL',
             doc="""name of the target sibling. If no name is given an attempt is
             made to identify the target based on the dataset's configuration
-            (i.e. a configured tracking branch)""",
+            (i.e. a configured tracking branch, or a single sibling that is
+            configured for publication)""",
             # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
         since=Parameter(
@@ -312,6 +303,20 @@ class Publish(Interface):
                 # figure it out for pushing annex branch anyway and we might as
                 # well fail right here.
                 track_remote, track_refspec = ds.repo.get_tracking_branch()
+                if not track_remote:
+                    # no tracking remote configured, but let try one more
+                    # if we only have one remote, and it has a push target
+                    # configured that is "good enough" for us
+                    cand_remotes = [r for r in ds.repo.get_remotes()
+                                    if 'remote.{}.push'.format(r) in ds.config]
+                    if len(cand_remotes) > 1:
+                        lgr.warning('Target sibling ambiguous, please specific via --to')
+                    elif len(cand_remotes) == 1:
+                        track_remote = cand_remotes[0]
+                    else:
+                        lgr.warning(
+                            'No target sibling configured for default publication, '
+                            'please specific via --to')
                 if track_remote:
                     ds_remote_info[ds_path] = dict(zip(
                         ('remote', 'refspec'),
