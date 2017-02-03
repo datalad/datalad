@@ -35,6 +35,14 @@ from .add_sibling import AddSibling
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
 
+def get_repo_url(repo, access_protocol):
+    """Report the repository access URL for Git matching the protocol"""
+    prop = {
+        'https': repo.clone_url,
+        'ssh': repo.ssh_url}[access_protocol]
+    return prop
+
+
 def _get_github_entity(gh, cred, github_login, github_passwd, github_organization):
     if github_login == 'disabledloginfortesting':
         raise gh.BadCredentialsException(403, 'no login specified')
@@ -134,7 +142,7 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
 
     if repo is not None:
         if existing in ('skip', 'reconfigure'):
-            access_url = getattr(repo, '{}_url'.format(access_protocol))
+            access_url = get_repo_url(repo, access_protocol)
             return access_url, existing == 'skip'
         elif existing == 'error':
             msg = 'repository "{}" already exists on Github'.format(reponame)
@@ -172,7 +180,7 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
         return '{}:github/.../{}'.format(access_protocol, reponame), False
     else:
         # report URL for given access protocol
-        return getattr(repo, '{}_url'.format(access_protocol)), False
+        return get_repo_url(repo, access_protocol), False
 
 
 # presently only implemented method to turn subdataset paths into Github
@@ -251,7 +259,7 @@ class CreateSiblingGithub(Interface):
             permissions."""),
         access_protocol=Parameter(
             args=("--access-protocol",),
-            constraints=EnsureChoice('git', 'ssh'),
+            constraints=EnsureChoice('https', 'ssh'),
             doc="""Which access protocol/URL to configure for the sibling"""),
         publish_depends=publish_depends,
         dryrun=Parameter(
@@ -275,7 +283,7 @@ class CreateSiblingGithub(Interface):
             github_login=None,
             github_passwd=None,
             github_organization=None,
-            access_protocol='git',
+            access_protocol='https',
             publish_depends=None,
             dryrun=False):
         try:
