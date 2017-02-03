@@ -28,6 +28,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import skip_ssh
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -254,6 +255,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
         set(result_paths))
 
 
+@skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile()
