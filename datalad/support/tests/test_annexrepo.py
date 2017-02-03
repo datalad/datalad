@@ -1460,8 +1460,12 @@ def test_get_description(path1, path2):
     # it will match the remote name
     eq_(annex2.get_description(uuid=annex1.uuid),
         annex1_description + ' [annex1]')
-    # but let's remove the remote
+    # add a little probe file to make sure it stays untracked
+    create_tree(path1, {'probe': 'probe'})
+    assert_not_in('probe', annex2.get_indexed_files())
     annex2.merge_annex('annex1')
+    assert_not_in('probe', annex2.get_indexed_files())
+    # but let's remove the remote
     annex2.remove_remote('annex1')
     eq_(annex2.get_description(uuid=annex1.uuid), annex1_description)
 
