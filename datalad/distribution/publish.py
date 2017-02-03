@@ -160,7 +160,10 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
 
     if (paths or annex_copy_opts) and \
             isinstance(ds.repo, AnnexRepo) and not \
-            ds.config.get('remote.{}.annex-ignore', False):
+            ds.config.getbool(
+                'remote.{}'.format(remote),
+                'annex-ignore',
+                False):
         lgr.info("Publishing data of dataset {0} ...".format(ds))
         pblshd = ds.repo.copy_to(files=paths,
                                  remote=remote,
