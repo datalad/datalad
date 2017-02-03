@@ -491,6 +491,9 @@ class GitRunner(Runner):
                     git_env[varstring] = abspath(var)  # to absolute path
                     lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
 
+        if 'GIT_SSH_COMMAND' not in git_env:
+            git_env['GIT_SSH_COMMAND'] = 'datalad sshrun'
+
         return git_env
 
     def run(self, cmd, env=None, *args, **kwargs):
