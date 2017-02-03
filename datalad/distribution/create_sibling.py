@@ -147,6 +147,10 @@ def _create_dataset_sibling(
                 remoteds_path, ssh, shared, ds,
                 description=target_url):
             return
+        if not is_ssh(target_url):
+            # we are not coming in via SSH, hence cannot assume proper
+            # setup for webserver access -> fix
+            ssh('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
 
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
