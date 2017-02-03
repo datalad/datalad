@@ -155,6 +155,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
                 'annex-ignore',
                 False):
         lgr.info("Publishing data of dataset {0} ...".format(ds))
+        # overwrite URL with pushurl if any, reason:
+        # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
+        pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
+        if pushurl:
+            annex_copy_options = '{}{}'.format(
+                annex_copy_options if annex_copy_options else '',
+                ' -c "remote.{}.url={}"'.format(remote, pushurl))
         pblshd = ds.repo.copy_to(files=paths,
                                  remote=remote,
                                  options=annex_copy_options)
