@@ -124,6 +124,7 @@ script:
   # Verify that setup.py build doesn't puke
   - python setup.py build
   # Run tests
+  - ./test.sh
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
