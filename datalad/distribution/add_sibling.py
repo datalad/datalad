@@ -39,11 +39,14 @@ lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
 def _check_deps(repo, deps):
-    if not deps:
-        return
-    remotes = repo.get_remotes()
-    unknown_deps = [d for d in assure_list(deps)
-                    if d not in remotes]
+    """Check if all `deps` remotes are known to the `repo`
+
+    Raises
+    ------
+    ValueError
+      if any of the deps is an unknown remote
+    """
+    unknown_deps = set(assure_list(deps)).difference(repo.get_remotes())
     if unknown_deps:
         raise ValueError(
             'unknown sibling(s) specified as publication dependency: %s'
