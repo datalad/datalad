@@ -183,10 +183,11 @@ class SSHConnection(object):
             return
 
         # set control options
-        ctrl_options = ["-o", "ControlMaster=auto",
+        ctrl_options = ["-fN",
+                        "-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self.ctrl_options
         # create ssh control master command
-        cmd = ["ssh"] + ctrl_options + [self.sshri.as_str(), "exit"]
+        cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
 
         # start control master:
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
