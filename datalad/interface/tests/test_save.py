@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from os.path import join as opj
+from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
@@ -45,6 +46,22 @@ def test_save(path):
     ok_(ds.repo.dirty)
     ds.save("modified new_file.tst", all_changes=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
+
+    # save works without ds and files given in the PWD
+    with open(opj(path, "new_file.tst"), "w") as f:
+        f.write("rapunzel")
+    with chpwd(path):
+        save("love rapunzel", all_changes=True)
+    ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
+
+    # and also without `-a` when things are staged
+    with open(opj(path, "new_file.tst"), "w") as f:
+        f.write("exotic")
+    ds.repo.add("new_file.tst", git=True)
+    with chpwd(path):
+        save("love marsians", all_changes=False)
+    ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
+
 
     files = ['one.txt', 'two.txt']
     for fn in files:

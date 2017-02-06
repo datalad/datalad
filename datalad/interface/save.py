@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+from os import curdir
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -130,6 +131,10 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  all_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False):
+        if not dataset and not files:
+            # we got nothing at all -> save what is staged in the repo in "this" directory?
+            # we verify that there is an actual repo next
+            dataset = curdir
         if dataset:
             dataset = require_dataset(
                 dataset, check_installed=True, purpose='saving')
