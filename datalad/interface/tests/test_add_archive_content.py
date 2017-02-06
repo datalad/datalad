@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+import os
 from os import unlink
 from os.path import exists, join as opj, pardir, basename, lexists
 from glob import glob
@@ -396,3 +397,29 @@ class TestAddArchiveOptions():
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 1)  # in archive
+
+
+    def test_add_delete_after_and_drop_subdir(self):
+        os.mkdir(opj(self.annex.path, 'subdir'))
+        mv_out = self.annex._git_custom_command(
+            [],
+            ['git', 'mv', '1.tar', 'subdir']
+        )
+        self.annex.commit("moved into subdir")
+        with chpwd(self.annex.path):
+            # was failing since deleting without considering if tarball
+            # was extracted in that tarball directory
+            commits_prior_master = list(self.annex.get_branch_commits())
+            commits_prior = list(self.annex.get_branch_commits('git-annex'))
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True)
+            commits_after_master = list(self.annex.get_branch_commits())
+            commits_after = list(self.annex.get_branch_commits('git-annex'))
+            # There should be a single commit for all additions +1 to
+            # initiate datalad-archives gh-1258
+            assert_equal(len(commits_after), len(commits_prior) + 2)
+            assert_equal(len(commits_after_master), len(commits_prior_master))
+            assert(add_out is self.annex)
+        assert_false(self.annex.dirty)

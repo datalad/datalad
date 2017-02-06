@@ -356,6 +356,8 @@ class AddArchiveContent(Interface):
 
                 if prefix_dir:
                     target_file = opj(prefix_dir, target_file)
+                    # but also allow for it in the orig
+                    target_file_orig = opj(prefix_dir, target_file_orig)
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
@@ -463,26 +465,36 @@ class AddArchiveContent(Interface):
             if outside_stats:
                 outside_stats += stats
             if delete_after:
-                # force since not committed
-                annex.remove(prefix_dir, r=True, force=True)
+                # force since not committed. r=True for -r (passed into git call
+                # to recurse)
+                delete_after_rpath = opj(extract_rpath, prefix_dir) if extract_rpath else prefix_dir
+                lgr.debug(
+                    "Removing extracted and annexed files under %s",
+                    delete_after_rpath
+                )
+                annex.remove(delete_after_rpath, r=True, force=True)
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
-                annex.commit(
-                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
-                    _datalad_msg=True
-                )
-                commit_stats.reset()
+                if annex.dirty:
+                    annex.commit(
+                        "Added content extracted from %s %s\n\n%s" %
+                        (origin, archive, commit_stats.as_str(mode='full')),
+                        _datalad_msg=True
+                    )
+                    commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
             annex.precommit()
 
             if delete_after:
-                prefix_path = opj(annex_path, prefix_dir)
-
-                if exists(prefix_path):  # probably would always be there
-                    lgr.info("Removing temporary directory under which extracted files were annexed: %s",
-                             prefix_path)
-                    rmtree(prefix_path)
+                delete_after_path = opj(annex_path, delete_after_rpath)
+                if exists(delete_after_path):  # should not be there
+                    # but for paranoid yoh
+                    lgr.warning(
+                        "Removing temporary directory under which extracted "
+                        "files were annexed and should have been removed: %s",
+                        delete_after_path)
+                    rmtree(delete_after_path)
 
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
