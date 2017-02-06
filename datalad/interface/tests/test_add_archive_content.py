@@ -381,7 +381,11 @@ class TestAddArchiveOptions():
         with assert_raises(Exception), \
                 swallow_logs():
             self.annex.whereis(key1, key=True, output='full')
+        commits_prior = list(self.annex.get_branch_commits('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
+        commits_after = list(self.annex.get_branch_commits('git-annex'))
+        # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
+        assert_equal(len(commits_after), len(commits_prior) + 2)
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop

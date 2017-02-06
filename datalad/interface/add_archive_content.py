@@ -434,8 +434,8 @@ class AddArchiveContent(Interface):
                     stats.add_git += 1
 
                 if delete_after:
-                    # forcing since it is only staged, not yet committed
-                    annex.remove(target_file_rpath, force=True)  # TODO: batch!
+                    # delayed removal so it doesn't interfer with batched processes since any pure
+                    # git action invokes precommit which closes batched processes. But we like to count
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
@@ -462,6 +462,9 @@ class AddArchiveContent(Interface):
 
             if outside_stats:
                 outside_stats += stats
+            if delete_after:
+                # force since not committed
+                annex.remove(prefix_dir, r=True, force=True)
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
@@ -475,6 +478,7 @@ class AddArchiveContent(Interface):
 
             if delete_after:
                 prefix_path = opj(annex_path, prefix_dir)
+
                 if exists(prefix_path):  # probably would always be there
                     lgr.info("Removing temporary directory under which extracted files were annexed: %s",
                              prefix_path)
