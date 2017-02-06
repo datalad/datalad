@@ -295,6 +295,7 @@ class AddArchiveContent(Interface):
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
+        precommitted = False
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
@@ -475,7 +476,9 @@ class AddArchiveContent(Interface):
                 annex.remove(delete_after_rpath, r=True, force=True)
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
-                if annex.dirty:
+                annex.precommit()  # so batched ones close and files become annex symlinks etc
+                precommitted = True
+                if annex.repo.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive, commit_stats.as_str(mode='full')),
@@ -484,7 +487,10 @@ class AddArchiveContent(Interface):
                     commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
-            annex.precommit()
+            # if haven't done yet.  explicitly checked to avoid any possible
+            # "double-action"
+            if not precommitted:
+                annex.precommit()
 
             if delete_after:
                 delete_after_path = opj(annex_path, delete_after_rpath)

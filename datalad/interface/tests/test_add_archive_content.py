@@ -37,6 +37,8 @@ from ...utils import rmtree
 from datalad.log import lgr
 from ...api import add_archive_content, clean
 
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_clean_git
 
 treeargs = dict(
     tree=(
@@ -415,6 +417,7 @@ class TestAddArchiveOptions():
                 opj('subdir', '1.tar'),
                 delete_after=True,
                 drop_after=True)
+            ok_clean_git(self.annex.path)
             commits_after_master = list(self.annex.get_branch_commits())
             commits_after = list(self.annex.get_branch_commits('git-annex'))
             # There should be a single commit for all additions +1 to
@@ -422,4 +425,17 @@ class TestAddArchiveOptions():
             assert_equal(len(commits_after), len(commits_prior) + 2)
             assert_equal(len(commits_after_master), len(commits_prior_master))
             assert(add_out is self.annex)
-        assert_false(self.annex.dirty)
+
+            # and if we add some untracked file, redo, there should be no changes
+            # to master and file should remain not committed
+            create_tree(self.annex.path, {'dummy.txt': '123'})
+            assert_true(self.annex.dirty)  # untracked file
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True,
+                allow_dirty=True)
+            ok_clean_git(self.annex.path, untracked=['dummy.txt'])
+            assert_equal(len(list(self.annex.get_branch_commits())),
+                         len(commits_prior_master))
+
