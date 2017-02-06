@@ -296,6 +296,7 @@ class AddArchiveContent(Interface):
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
         precommitted = False
+        delete_after_rpath = None
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
@@ -311,7 +312,7 @@ class AddArchiveContent(Interface):
 
             # we need to create a temporary directory at the top level which would later be
             # removed
-            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex_path)) \
+            prefix_dir = basename(tempfile.mktemp(prefix=".datalad", dir=annex_path)) \
                 if delete_after \
                 else None
 
@@ -492,7 +493,7 @@ class AddArchiveContent(Interface):
             if not precommitted:
                 annex.precommit()
 
-            if delete_after:
+            if delete_after_rpath:
                 delete_after_path = opj(annex_path, delete_after_rpath)
                 if exists(delete_after_path):  # should not be there
                     # but for paranoid yoh

@@ -400,6 +400,8 @@ class TestAddArchiveOptions():
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 1)  # in archive
 
+        # there should be no .datalad temporary files hanging around
+        self.assert_no_trash_left_behind()
 
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
@@ -425,6 +427,8 @@ class TestAddArchiveOptions():
             assert_equal(len(commits_after), len(commits_prior) + 2)
             assert_equal(len(commits_after_master), len(commits_prior_master))
             assert(add_out is self.annex)
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
 
             # and if we add some untracked file, redo, there should be no changes
             # to master and file should remain not committed
@@ -439,3 +443,11 @@ class TestAddArchiveOptions():
             assert_equal(len(list(self.annex.get_branch_commits())),
                          len(commits_prior_master))
 
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
+
+    def assert_no_trash_left_behind(self):
+        assert_equal(
+            list(find_files('\.datalad..*', self.annex.path, dirs=True)),
+            []
+        )
