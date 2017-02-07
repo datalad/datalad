@@ -53,5 +53,5 @@ class SSHRun(Interface):
             ':{}'.format(port) if port else '')
         ssh = ssh_manager.get_connection(sshurl)
         out, err = ssh(cmd, stdin=sys.stdin, log_output=False)
-        os.write(1, out)
-        os.write(2, err)
+        os.write(1, out.encode('UTF-8'))
+        os.write(2, err.encode('UTF-8'))
