@@ -23,6 +23,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import super_datasets_flag
+from datalad.interface.common_opts import save_message_opt
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import amend_pathspec_with_superdatasets
 from datalad.utils import with_pathsep as _with_sep
@@ -106,11 +107,7 @@ class Save(Interface):
             to those files are recorded in the new state.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
-        message=Parameter(
-            args=("-m", "--message",),
-            metavar='MESSAGE',
-            doc="""a message to annotate the saved state.""",
-            constraints=EnsureStr() | EnsureNone()),
+        message=save_message_opt,
         all_changes=Parameter(
             args=("-a", "--all-changes"),
             doc="""save changes of all known components in datasets that contain

@@ -108,6 +108,12 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
+save_message_opt=Parameter(
+    args=("-m", "--message",),
+    metavar='MESSAGE',
+    doc="""a description of the state or the changes made to a dataset.""",
+    constraints=EnsureStr() | EnsureNone())
+
 reckless_opt = Parameter(
     args=("--reckless",),
     action="store_true",
