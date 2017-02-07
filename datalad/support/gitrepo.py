@@ -23,7 +23,6 @@ from os.path import isabs
 from os.path import commonprefix
 from os.path import relpath
 from os.path import realpath
-from os.path import abspath
 from os.path import dirname
 from os.path import basename
 from os.path import curdir
@@ -595,11 +594,10 @@ class GitRepo(RepoInterface):
             pass
 
         if is_ssh(url):
-            cnct = ssh_manager.get_connection(url)
-            cnct.open()
+            ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+            env = {'GIT_SSH_COMMAND': "datalad sshrun"}
         else:
             env = None
         ntries = 5  # 3 is not enough for robust workaround
@@ -1375,14 +1373,20 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
             if is_ssh(fetch_url):
-                cnct = ssh_manager.get_connection(fetch_url)
-                cnct.open()
+                ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                        GIT_SSH_COMMAND="datalad sshrun"):
+                    # Note: The following (outcommented line) doesn't seem to
+                    # work with custom_env;
+                    # TODO: Fix within gitpython or build a fully functional
+                    # alternative herein
+                    # fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
+                    self.repo.git.fetch(rm.name, refspec,
+                                        universal_newlines=True, **kwargs)
+                    # TODO: no return value yet
             else:
                 fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
@@ -1419,12 +1423,11 @@ class GitRepo(RepoInterface):
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
         if is_ssh(fetch_url):
-            cnct = ssh_manager.get_connection(fetch_url)
-            cnct.open()
+            ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
-                    GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    GIT_SSH_COMMAND="datalad sshrun"):
                 return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
@@ -1503,14 +1506,27 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
             if is_ssh(push_url):
-                cnct = ssh_manager.get_connection(push_url)
-                cnct.open()
+                ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
+                        GIT_SSH_COMMAND="datalad sshrun"):
+                    # Note: The following (outcommented line) doesn't seem to
+                    # work with custom_env;
+                    # TODO: Fix within gitpython or build a fully functional
+                    # alternative herein
+                    # pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
+                    out = self.repo.git.push(rm.name, refspec, porcelain=True,
+                                             universal_newlines=True, **kwargs)
+                    for line in out.splitlines():
+                        try:
+                            pi_list.append(gitpy.remote.PushInfo._from_line(
+                                rm, line))
+                        except ValueError:
+                            # TODO: Figure out error handling.
+                            # see git/remote.py:_get_push_info()
+                            pass
             else:
                 pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
@@ -1802,7 +1818,7 @@ class GitRepo(RepoInterface):
                     lgr.debug("detached HEAD in {0}".format(self))
                     return None, None
                 else:
-                    raise 
+                    raise
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
