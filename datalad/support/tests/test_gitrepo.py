@@ -414,7 +414,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
 
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
-    eq_([u'origin/master', u'origin/new_branch'],
+    eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit.name for commit in fetched])
 
     ok_clean_git(clone.path)
@@ -634,7 +634,7 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_GitRepo_get_toppath(repo, tempdir, repo2):
@@ -682,6 +682,7 @@ def test_GitRepo_dirty(path):
     ok_(not repo.dirty)
 
     # TODO: submodules
+
 
 
 @with_tempfile(mkdir=True)
@@ -830,12 +831,21 @@ def test_git_custom_calls(path, path2):
 def test_get_tracking_branch(o_path, c_path):
 
     clone = GitRepo.clone(o_path, c_path)
-    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
+    # Note, that the default branch might differ even if it is always 'master'.
+    # For direct mode annex repositories it would then be "annex/direct/master"
+    # for example. Therefore use whatever branch is checked out by default:
+    master_branch = clone.get_active_branch()
+    ok_(master_branch)
+
+    eq_(('origin', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch())
 
     clone.checkout('new_branch', ['-b'])
+
     eq_((None, None), clone.get_tracking_branch())
 
-    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
+    eq_(('origin', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch(master_branch))
 
 
 @with_testrepos('submodule_annex', flavors=['clone'])
