@@ -61,3 +61,11 @@ Miscellaneous commands
    generated/man/datalad-download-url
    generated/man/datalad-ls
    generated/man/datalad-test
+
+Plumbing commands
+=================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-sshrun
