@@ -21,6 +21,7 @@ from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import save_message_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
@@ -129,6 +130,7 @@ class Add(Interface):
             no effect. Regular files and directories are always added to
             their respective datasets, regardless of this setting."""),
         save=nosave_opt,
+        message=save_message_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts,
@@ -142,6 +144,7 @@ class Add(Interface):
             dataset=None,
             to_git=False,
             save=True,
+            message=None,
             recursive=False,
             recursion_limit=None,
             ds2super=False,
@@ -238,7 +241,7 @@ class Add(Interface):
             save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
-                message='[DATALAD] added content')
+                message=message if message else '[DATALAD] added content')
 
         return results
 
