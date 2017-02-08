@@ -15,10 +15,11 @@ distribution with the convenience of git-annex repositories as a backend."""
 
 # If there is a bundled git, make sure GitPython uses it too:
 from datalad.cmd import GitRunner
-_git_runner = GitRunner()
-if _git_runner._GIT_PATH:
+GitRunner._check_git_path()
+if GitRunner._GIT_PATH:
     import os
-    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = os.path.join(_git_runner._GIT_PATH, 'git')
+    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
+        os.path.join(GitRunner._GIT_PATH, 'git')
 
 from .config import ConfigManager
 cfg = ConfigManager()
