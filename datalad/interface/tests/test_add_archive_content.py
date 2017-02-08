@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+import os
 from os import unlink
 from os.path import exists, join as opj, pardir, basename, lexists
 from glob import glob
@@ -36,6 +37,8 @@ from ...utils import rmtree
 from datalad.log import lgr
 from ...api import add_archive_content, clean
 
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_clean_git
 
 treeargs = dict(
     tree=(
@@ -381,7 +384,11 @@ class TestAddArchiveOptions():
         with assert_raises(Exception), \
                 swallow_logs():
             self.annex.whereis(key1, key=True, output='full')
+        commits_prior = list(self.annex.get_branch_commits('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
+        commits_after = list(self.annex.get_branch_commits('git-annex'))
+        # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
+        assert_equal(len(commits_after), len(commits_prior) + 2)
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
@@ -392,3 +399,55 @@ class TestAddArchiveOptions():
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 1)  # in archive
+
+        # there should be no .datalad temporary files hanging around
+        self.assert_no_trash_left_behind()
+
+    def test_add_delete_after_and_drop_subdir(self):
+        os.mkdir(opj(self.annex.path, 'subdir'))
+        mv_out = self.annex._git_custom_command(
+            [],
+            ['git', 'mv', '1.tar', 'subdir']
+        )
+        self.annex.commit("moved into subdir")
+        with chpwd(self.annex.path):
+            # was failing since deleting without considering if tarball
+            # was extracted in that tarball directory
+            commits_prior_master = list(self.annex.get_branch_commits())
+            commits_prior = list(self.annex.get_branch_commits('git-annex'))
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True)
+            ok_clean_git(self.annex.path)
+            commits_after_master = list(self.annex.get_branch_commits())
+            commits_after = list(self.annex.get_branch_commits('git-annex'))
+            # There should be a single commit for all additions +1 to
+            # initiate datalad-archives gh-1258
+            assert_equal(len(commits_after), len(commits_prior) + 2)
+            assert_equal(len(commits_after_master), len(commits_prior_master))
+            assert(add_out is self.annex)
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
+
+            # and if we add some untracked file, redo, there should be no changes
+            # to master and file should remain not committed
+            create_tree(self.annex.path, {'dummy.txt': '123'})
+            assert_true(self.annex.dirty)  # untracked file
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True,
+                allow_dirty=True)
+            ok_clean_git(self.annex.path, untracked=['dummy.txt'])
+            assert_equal(len(list(self.annex.get_branch_commits())),
+                         len(commits_prior_master))
+
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
+
+    def assert_no_trash_left_behind(self):
+        assert_equal(
+            list(find_files('\.datalad..*', self.annex.path, dirs=True)),
+            []
+        )

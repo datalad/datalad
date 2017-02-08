@@ -108,6 +108,12 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
+save_message_opt=Parameter(
+    args=("-m", "--message",),
+    metavar='MESSAGE',
+    doc="""a description of the state or the changes made to a dataset.""",
+    constraints=EnsureStr() | EnsureNone())
+
 reckless_opt = Parameter(
     args=("--reckless",),
     action="store_true",
@@ -141,7 +147,7 @@ as_common_datasrc = Parameter(
 publish_depends = Parameter(
     args=("--publish-depends",),
     metavar='SIBLINGNAME',
-    doc="""add a dependency such that the given exsiting sibling is
+    doc="""add a dependency such that the given existing sibling is
     always published prior to the new sibling. This equals setting a
     configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
     [PY: Multiple dependencies can be given as a list of sibling names

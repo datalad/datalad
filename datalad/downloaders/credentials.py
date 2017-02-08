@@ -108,11 +108,21 @@ class Credential(object):
         self.set(**{f: v})
         return v
 
-    def enter_new(self):
-        """Enter new values for the credential fields"""
+    def enter_new(self, **kwargs):
+        """Enter new values for the credential fields
+
+        Parameters
+        ----------
+        **kwargs
+          Any given key value pairs with non-None values are used to set the
+          field `key` to the given value, without asking for user input
+        """
         # Use ui., request credential fields corresponding to the type
         for f in self._FIELDS:
-            if not self._is_field_optional(f):
+            if kwargs.get(f, None):
+                # use given value, don't ask
+                self.set(**{f: kwargs[f]})
+            elif not self._is_field_optional(f):
                 self._ask_and_set(f)
 
     def __call__(self):

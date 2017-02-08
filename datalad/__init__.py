@@ -12,6 +12,14 @@ distribution with the convenience of git-annex repositories as a backend."""
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
+
+# If there is a bundled git, make sure GitPython uses it too:
+from datalad.cmd import GitRunner
+_git_runner = GitRunner()
+if _git_runner._GIT_PATH:
+    import os
+    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = os.path.join(_git_runner._GIT_PATH, 'git')
+
 from .config import ConfigManager
 cfg = ConfigManager()
 

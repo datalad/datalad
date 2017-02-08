@@ -52,7 +52,7 @@ def test_add_sibling(origin, repo_path):
     with assert_raises(RuntimeError) as cm:
         add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere")
-    assert_in("""'test-remote' already exists with conflicting URL""",
+    assert_in("""'test-remote' already exists with conflicting settings""",
               str(cm.exception))
 
     # don't fail with conflicting url, when using force:
@@ -68,7 +68,7 @@ def test_add_sibling(origin, repo_path):
         add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere",
                     pushurl="ssh://push.it", force=False)
-    assert_in("""'test-remote' already exists with conflicting URL""",
+    assert_in("""'test-remote' already exists with conflicting settings""",
               str(cm.exception))
 
     # add push url (force):

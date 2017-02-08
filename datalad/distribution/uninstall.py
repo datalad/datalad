@@ -84,9 +84,7 @@ def _drop_files(ds, files, check):
         dropped = ds.repo.drop(files, options=opts)
         results.extend([opj(ds.path, f) for f in dropped])
     else:
-        # TODO think how to handle this best, when called `through` remove
-        # and it hits a plain git repo somewhere down below
-        raise ValueError("cannot uninstall, not an annex %s" % ds)
+        lgr.info("skip dropping files in %s, no annex", ds)
     return results
 
 
