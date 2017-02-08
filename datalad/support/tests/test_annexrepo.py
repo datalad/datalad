@@ -56,6 +56,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_equal
+from datalad.tests.utils import assert_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git_annex_proxy
@@ -1510,3 +1511,27 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(nested), repo2)
     # and if not under git, should return None
     eq_(AnnexRepo.get_toppath(tempdir), None)
+
+
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_set_remote_url(path):
+
+    ar = AnnexRepo(path, create=True)
+    ar.add_remote('some', 'http://example.com/.git')
+    assert_equal(ar.config['remote.some.url'],
+                 'http://example.com/.git')
+    assert_not_in('remote.some.annexurl', ar.config.keys())
+    # change url:
+    ar.set_remote_url('some', 'http://believe.it')
+    assert_equal(ar.config['remote.some.url'],
+                 'http://believe.it')
+    assert_not_in('remote.some.annexurl', ar.config.keys())
+
+    # set push url:
+    ar.set_remote_url('some', 'ssh://whatever.ru', push=True)
+    assert_equal(ar.config['remote.some.pushurl'],
+                 'ssh://whatever.ru')
+    assert_in('remote.some.annexurl', ar.config.keys())
+    assert_equal(ar.config['remote.some.annexurl'],
+                 'ssh://whatever.ru')
+

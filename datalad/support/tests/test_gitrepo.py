@@ -1046,3 +1046,21 @@ def test_GitRepo_gitignore(path):
     with assert_raises(GitIgnoreError) as cme:
         gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
+
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_set_remote_url(path):
+
+    gr = GitRepo(path, create=True)
+    gr.add_remote('some', 'http://example.com/.git')
+    assert_equal(gr.config['remote.some.url'],
+                 'http://example.com/.git')
+    # change url:
+    gr.set_remote_url('some', 'http://believe.it')
+    assert_equal(gr.config['remote.some.url'],
+                 'http://believe.it')
+
+    # set push url:
+    gr.set_remote_url('some', 'ssh://whatever.ru', push=True)
+    assert_equal(gr.config['remote.some.pushurl'],
+                 'ssh://whatever.ru')

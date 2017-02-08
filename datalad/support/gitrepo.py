@@ -1548,8 +1548,6 @@ class GitRepo(RepoInterface):
         """
 
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
-        #if var in self.config:  # git-config unset exits non-zero otherwise
-        #    self.config.unset(var, where='local', reload=False)
         self.config.set(var, url, where='local', reload=True)
 
     def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
