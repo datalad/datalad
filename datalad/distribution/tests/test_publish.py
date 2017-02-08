@@ -18,6 +18,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import InsufficientArgumentsError
 
 from nose.tools import ok_, eq_, assert_false, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
@@ -33,6 +34,18 @@ from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_not_in
+
+
+@with_testrepos('submodule_annex', flavors=['local'])
+def test_invalid_call(origin):
+    ds = Dataset(origin)
+    ds.uninstall('subm 1', check=False)
+    # nothing
+    assert_raises(ValueError, publish, '/notthere')
+    # known, but not present
+    assert_raises(ValueError, publish, opj(ds.path, 'subm 1'))
+    # --since without dataset is not supported
+    assert_raises(InsufficientArgumentsError, publish, since='HEAD')
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -61,7 +74,8 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
-    eq_(res, ([source], []))
+    # and nothing is pushed
+    eq_(res, ([], []))
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -108,7 +122,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
         publish(dataset=source, to="target", recursive=True)
-    assert_in("No sibling 'target' found", exc_str(cm.exception))
+    assert_in("Unknown target sibling 'target'", exc_str(cm.exception))
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
@@ -152,25 +166,26 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
 
-    # test for publishing with  --since.  By default since no changes, only current pushed
+    # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
-    # only current one would get pushed
-    eq_(set(r.path for r in res_[0]), {src_path})
+    eq_(set(r.path for r in res_[0]), set())
 
-    # all get pushed
+    # still nothing gets pushed, because orgin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
-    eq_(set(r.path for r in res_[0]), {src_path, sub1.path, sub2.path})
+    eq_(set(r.path for r in res_[0]), set([]))
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:
         f.write('')
-    sub2.add('file.txt')
-    sub2.commit("")
-    source.save("changed sub2", all_changes=True)
+    # add to subdataset, does not alter super dataset!
+    # MIH: use `to_git` because original test author used
+    # and explicit `GitRepo.add` -- keeping this for now
+    Dataset(sub2.path).add('file.txt', to_git=True)
 
     res_ = publish(dataset=source, recursive=True)
-    # only updated ones were published
-    eq_(set(r.path for r in res_[0]), {src_path, sub2.path})
+    # only updates published, i.e. just the subdataset
+    # super wasn't altered and there was no new annexed content
+    eq_(set(r.path for r in res_[0]), {sub2.path})
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -221,7 +236,9 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['.'])
-    eq_(res, ([source, 'test-annex.dat'], []))
+    # there is nothing to publish on 2nd attempt
+    #eq_(res, ([source, 'test-annex.dat'], []))
+    eq_(res, ([], []))
 
     source.repo.fetch("target")
     import glob
@@ -236,6 +253,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
             result_paths.append(item.path)
         else:
             result_paths.append(item)
-    eq_({source.path, opj(source.path, "subm 1"),
-         opj(source.path, "subm 2"), 'test-annex.dat'},
+    # only the subdatasets, targets are plain git repos, hence
+    # no file content is pushed, all content in super was pushed
+    # before
+    eq_({sub1.path, sub2.path},
         set(result_paths))

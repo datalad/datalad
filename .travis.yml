@@ -127,7 +127,7 @@ script:
   # Run tests
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   # Generate documentation and run doctests
-  - PYTHONPATH=$PWD make -C docs html doctest
+  - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
   # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893

@@ -40,11 +40,11 @@ def test_ssh_get_connection():
     # deal with them):
     assert_raises(ValueError, manager.get_connection, 'localhost')
     # we can do what urlparse cannot
-    #assert_raises(ValueError, manager.get_connection, 'someone@localhost')
+    # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
     # next one is considered a proper url by urlparse (netloc:'',
     # path='/localhost), but eventually gets turned into SSHRI(hostname='ssh',
     # path='/localhost') -- which is fair IMHO -> invalid test
-    #assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
+    # assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
 
 
 @skip_ssh
@@ -80,15 +80,30 @@ def test_ssh_open_close(tfile1):
 def test_ssh_manager_close():
 
     manager = SSHManager()
+
+    # check for previously existing sockets:
+    existed_before_1 = exists(opj(manager.socket_dir, 'localhost'))
+    existed_before_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+
     manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
+
+    if existed_before_1 and existed_before_2:
+        # we need one connection to be closed and therefore being opened
+        # by `manager`
+        manager.get_connection('ssh://localhost').close()
+        manager.get_connection('ssh://localhost').open()
+
     ok_(exists(opj(manager.socket_dir, 'localhost')))
     ok_(exists(opj(manager.socket_dir, 'datalad-test')))
 
     manager.close()
 
-    ok_(not exists(opj(manager.socket_dir, 'localhost')))
-    ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+    still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
+    still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+
+    eq_(existed_before_1, still_exists_1)
+    eq_(existed_before_2, still_exists_2)
 
 
 def test_ssh_manager_close_no_throw():
@@ -97,6 +112,10 @@ def test_ssh_manager_close_no_throw():
     class bogus:
         def close(self):
             raise Exception("oh I am so bad")
+
+        @property
+        def ctrl_path(self):
+            return "whatever"
 
     manager._connections['bogus'] = bogus()
     assert_raises(Exception, manager.close)

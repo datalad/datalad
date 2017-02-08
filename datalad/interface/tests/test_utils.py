@@ -18,12 +18,14 @@ from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import get_paths_by_dataset
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import get_dataset_directories
+from datalad.interface.utils import filter_unmodified
 from datalad.interface.save import Save
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.utils import _install_subds_inplace
@@ -249,3 +251,64 @@ def test_interface_prep():
     # verify sanity if nothing was given, as it would look like from the
     # cmdline
     assert_equal(Save._prep(path=[], dataset=None), ({}, []))
+
+
+@with_tree(demo_hierarchy['b'])
+def test_filter_unmodified(path):
+    ds = Dataset(path).create(force=True)
+    suba = ds.create('ba', force=True)
+    subb = ds.create('bb', force=True)
+    subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
+    ds.add('.', recursive=True)
+    ok_clean_git(path)
+
+    spec, unavail = Save._prep('.', ds, recursive=True)
+    # just to be sure -- find all datasets, and just datasets
+    assert_equal(len(spec), 4)
+    for r, p in spec.items():
+        assert_equal([r], p)
+
+    orig_base_commit = ds.repo.repo.commit()
+    # nothing was modified compared to the status quo, output must be empty
+    assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
+
+    # modify one subdataset
+    added_path = opj(subb.path, 'added')
+    create_tree(subb.path, {'added': 'test'})
+    subb.add('added')
+
+    # still nothing was modified compared to orig commit, because the base
+    # dataset does not have the recent change saved
+    assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
+
+    ds.save(all_changes=True)
+
+    modspec, unavail = Save._prep('.', ds, recursive=True)
+    # arg sorting is not affected
+    assert_equal(spec, modspec)
+
+    # only the actually modified components per dataset are kept
+    assert_equal(
+        {
+            ds.path: [subb.path],
+            subb.path: [added_path]
+        },
+        filter_unmodified(spec, ds, orig_base_commit))
+
+    # deal with removal (force insufiicient copies error)
+    ds.remove(opj(subsub.path, 'file_bbaa'), check=False)
+    #import pdb; pdb.set_trace()
+    # saves all the way up
+    ok_clean_git(path)
+
+    modspec, unavail = Save._prep('.', ds, recursive=True)
+    # arg sorting is again not affected
+    assert_equal(spec, modspec)
+    # only the actually modified components per dataset are kept
+    assert_equal(
+        {
+            ds.path: [subb.path],
+            subb.path: [added_path, subsub.path],
+            subsub.path: []
+        },
+        {d: sorted(p) for d, p in filter_unmodified(spec, ds, orig_base_commit).items()})
