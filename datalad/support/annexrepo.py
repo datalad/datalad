@@ -1874,7 +1874,10 @@ class AnnexRepo(GitRepo, RepoInterface):
           name of the remote
         url: str
         push: bool
-          if True, set the push URL, otherwise the fetch URL
+          if True, set the push URL, otherwise the fetch URL;
+          if True, additionally set annexurl to `url`, to make sure annex uses
+          it to talk to the remote, since access via fetch URL might be
+          restricted.
         """
 
         if push:
