@@ -59,9 +59,9 @@ from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_true
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git_annex_proxy
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
 from datalad.tests.utils import ok_clean_git
@@ -161,14 +161,8 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
-    dm = ar.is_direct_mode()
-
-    # by default annex should be in direct mode on crippled filesystem and
-    # on windows:
-    if ar.is_crippled_fs() or on_windows:
-        ok_(dm)
-    else:
-        assert_false(dm)
+    eq_(ar.config.getbool("annex", "direct", False),
+        ar.is_direct_mode())
 
 
 @with_tempfile()
@@ -213,7 +207,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
     ar.set_direct_mode(True)
-    ok_clean_git_annex_proxy(path=annex_path)
+    ok_clean_git(path=annex_path, annex=True)
 
     # annex proxy raises in indirect mode:
     try:
@@ -690,143 +684,101 @@ def test_AnnexRepo_commit(src, path):
         f.write("File to add to git")
     ds.add(filename, git=True)
 
-    if ds.is_direct_mode():
-        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
-    else:
-        assert_raises(AssertionError, ok_clean_git, path, annex=True)
+    assert_raises(AssertionError, ok_clean_git, path, annex=True)
 
     ds.commit("test _commit")
-    if ds.is_direct_mode():
-        ok_clean_git_annex_proxy(path)
+    ok_clean_git(path, annex=True)
+
+
+@with_testrepos('.*annex.*', flavors=['clone'])
+def test_AnnexRepo_add_to_annex(path):
+
+    # Note: Some test repos appears to not be initialized.
+    #       Therefore: 'init=True'
+    # TODO: Fix these repos finally!
+
+    # clone as provided by with_testrepos:
+    repo = AnnexRepo(path, create=False, init=True)
+
+    ok_clean_git(repo.path, annex=True)
+    filename = get_most_obscure_supported_name()
+    filename_abs = opj(repo.path, filename)
+    with open(filename_abs, "w") as f:
+        f.write("some")
+
+    out_json = repo.add(filename)
+    # file is known to annex:
+    if not repo.is_direct_mode():
+        assert_true(os.path.islink(filename_abs),
+                    "Annexed file is not a link.")
     else:
-        ok_clean_git(path, annex=True)
+        assert_false(os.path.islink(filename_abs),
+                     "Annexed file is link in direct mode.")
+    assert_in('key', out_json)
+    key = repo.get_file_key(filename)
+    assert_false(key == '')
+    assert_equal(key, out_json['key'])
+    ok_(repo.file_has_content(filename))
+
+    # uncommitted:
+    # but not in direct mode branch
+    if repo.is_direct_mode():
+        ok_(not repo.dirty)
+    else:
+        ok_(repo.dirty)
+
+    repo.commit("Added file to annex.")
+    ok_clean_git(repo.path, annex=True)
+
+    # now using commit/msg options:
+    filename = "another.txt"
+    with open(opj(repo.path, filename), "w") as f:
+        f.write("something else")
+
+    repo.add(filename, commit=True, msg="Added another file to annex.")
+    # known to annex:
+    ok_(repo.get_file_key(filename))
+    ok_(repo.file_has_content(filename))
+
+    # and committed:
+    ok_clean_git(repo.path, annex=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_AnnexRepo_add_to_annex(path_1, path_2):
+def test_AnnexRepo_add_to_git(path):
 
     # Note: Some test repos appears to not be initialized.
     #       Therefore: 'init=True'
     # TODO: Fix these repos finally!
 
-    # Note: For now running twice to test direct mode.
-    #       Eventually this should implicitly be tested by a proper testrepo
-    #       setup and by running the tests on different filesystem, where direct
-    #       mode is implied.
+    # clone as provided by with_testrepos:
+    repo = AnnexRepo(path, create=False, init=True)
 
-    # first clone as provided by with_testrepos:
-    r1 = AnnexRepo(path_1, create=False, init=True)
-    # additional second clone for direct mode:
-    r2 = AnnexRepo.clone(path_1, path_2, create=True)
-    r2.set_direct_mode()
+    ok_clean_git(repo.path, annex=True)
+    filename = get_most_obscure_supported_name()
+    with open(opj(repo.path, filename), "w") as f:
+        f.write("some")
+    repo.add(filename, git=True)
 
-    for repo in [r1, r2]:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
-        filename = get_most_obscure_supported_name()
-        filename_abs = opj(repo.path, filename)
-        with open(filename_abs, "w") as f:
-            f.write("some")
+    # not in annex, but in git:
+    assert_raises(FileInGitError, repo.get_file_key, filename)
+    # uncommitted:
+    ok_(repo.repo.is_dirty())
+    repo.commit("Added file to annex.")
+    ok_clean_git(repo.path, annex=True)
 
-        out_json = repo.add(filename)
+    # now using commit/msg options:
+    filename = "another.txt"
+    with open(opj(repo.path, filename), "w") as f:
+        f.write("something else")
 
-        # file is known to annex:
-        if not repo.is_direct_mode():
-            ok_(os.path.islink(filename_abs),
-                "Annexed file is not a link.")
-        else:
-            assert_false(os.path.islink(filename_abs),
-                         "Annexed file is link in direct mode.")
-        assert_in('key', out_json)
-        key = repo.get_file_key(filename)
-        assert_false(key == '')
-        eq_(key, out_json['key'])
-        ok_(repo.file_has_content(filename))
+    repo.add(filename, git=True, commit=True,
+             msg="Added another file to annex.")
+    # not in annex, but in git:
+    assert_raises(FileInGitError, repo.get_file_key, filename)
 
-        # uncommitted:
-        ok_(repo.repo.is_dirty())
-
-        repo.commit("Added file to annex.")
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
-
-        # now using commit/msg options:
-        filename = "another.txt"
-        with open(opj(repo.path, filename), "w") as f:
-            f.write("something else")
-
-        repo.add(filename, commit=True, msg="Added another file to annex.")
-        # known to annex:
-        ok_(repo.get_file_key(filename))
-        ok_(repo.file_has_content(filename))
-
-        # and committed:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
-
-
-@with_testrepos('.*annex.*', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_AnnexRepo_add_to_git(path_1, path_2):
-
-    # Note: Some test repos appears to not be initialized.
-    #       Therefore: 'init=True'
-    # TODO: Fix these repos finally!
-
-        # Note: For now running twice to test direct mode.
-    #       Eventually this should implicitly be tested by a proper testrepo
-    #       setup and by running the tests on different filesystem, where direct
-    #       mode is implied.
-
-    # first clone as provided by with_testrepos:
-    r1 = AnnexRepo(path_1, create=False, init=True)
-    # additional second clone for direct mode:
-    r2 = AnnexRepo.clone(path_1, path_2, create=True)
-    r2.set_direct_mode()
-
-    for repo in [r1, r2]:
-
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
-        filename = get_most_obscure_supported_name()
-        with open(opj(repo.path, filename), "w") as f:
-            f.write("some")
-        repo.add(filename, git=True)
-
-        # not in annex, but in git:
-        assert_raises(FileInGitError, repo.get_file_key, filename)
-        # uncommitted:
-        ok_(repo.repo.is_dirty())
-        repo.commit("Added file to annex.")
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
-
-        # now using commit/msg options:
-        filename = "another.txt"
-        with open(opj(repo.path, filename), "w") as f:
-            f.write("something else")
-
-        repo.add(filename, git=True, commit=True,
-                 msg="Added another file to annex.")
-        # not in annex, but in git:
-        assert_raises(FileInGitError, repo.get_file_key, filename)
-
-        # and committed:
-        if repo.is_direct_mode():
-            ok_clean_git_annex_proxy(repo.path)
-        else:
-            ok_clean_git(repo.path, annex=True)
+    # and committed:
+    ok_clean_git(repo.path, annex=True)
 
 
 @ignore_nose_capturing_stdout
@@ -945,7 +897,11 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(info['size'], 14)
     assert(info['key'])
     # not even added to index yet since we this repo is with default batch_size
-    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    # but: in direct mode it is added!
+    if ar.is_direct_mode():
+        assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    else:
+        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -960,7 +916,10 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
     ar.add(testfile2_)
-    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    if ar.is_direct_mode():
+        assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    else:
+        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
     assert_in(ar.WEB_UUID, ar.whereis(testfile))
@@ -987,7 +946,9 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))
 
-    ar.commit("actually committing new files")
+    if not ar.is_direct_mode():
+        # in direct mode there's nothing to commit
+        ar.commit("actually committing new files")
     assert_in(filename, ar.get_files())
     assert_in(ar.WEB_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
@@ -1283,32 +1244,30 @@ def test_is_available(batch, direct, p):
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
-    ok_(os.path.exists(ar.path))
-    assert_false(ar.repo.is_dirty(
-        index=True, working_tree=True, untracked_files=True, submodules=True))
+    print(ar.path)
+    assert_true(os.path.exists(ar.path))
+    assert_false(ar.dirty)
     os.makedirs(opj(ar.path, '.datalad'))
     # we don't care about empty directories
-    assert_false(ar.repo.is_dirty(
-        index=True, working_tree=True, untracked_files=True, submodules=True))
+    assert_false(ar.dirty)
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    ok_(ar.repo.is_dirty(
-        index=False, working_tree=False, untracked_files=True, submodules=False))
+    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # no file is being added, as dotfiles/directories are ignored by default
     ar.add('.', git=False)
     # double check, still dirty
-    ok_(ar.repo.is_dirty(
-        index=False, working_tree=False, untracked_files=True, submodules=False))
+    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
     ar.add('.', git=True)
     # all in index
-    assert_false(ar.repo.is_dirty(
-        index=False, working_tree=True, untracked_files=True, submodules=True))
+    assert_true(ar.dirty)
+    # TODO: has been more specific:
+    # assert_false(ar.repo.is_dirty(
+    #     index=False, working_tree=True, untracked_files=True, submodules=True))
     ar.commit(msg="some")
     # all committed
-    assert_false(ar.repo.is_dirty(
-        index=True, working_tree=True, untracked_files=True, submodules=True))
+    assert_false(ar.dirty)
     # not known to annex
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
 
@@ -1519,6 +1478,78 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
+@with_testrepos(".*basic.*", flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_add_submodule(source, path):
+
+    top_repo = AnnexRepo(path, create=True)
+
+    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.commit('submodule added')
+    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+
+    ok_clean_git(path, annex=True)
+    ok_clean_git(opj(path, 'sub'), annex=False)
+
+
+def test_AnnexRepo_update_submodule():
+    raise SkipTest("TODO")
+
+
+def test_AnnexRepo_get_submodules():
+    raise SkipTest("TODO")
+
+
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_dirty(path):
+
+    repo = AnnexRepo(path, create=True)
+    ok_(not repo.dirty)
+
+    # pure git operations:
+    # untracked file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(repo.dirty)
+    # staged file
+    repo.add('file1.txt', git=True)
+    ok_(repo.dirty)
+    # clean again
+    repo.commit("file1.txt added")
+    ok_(not repo.dirty)
+    # modify to be the same
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    if not repo.config.getint("annex", "version") == 6:
+        ok_(not repo.dirty)
+    # modified file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('something else')
+    ok_(repo.dirty)
+    # clean again
+    repo.add('file1.txt', git=True)
+    repo.commit("file1.txt modified")
+    ok_(not repo.dirty)
+
+    # annex operations:
+    # untracked file
+    with open(opj(path, 'file2.txt'), 'w') as f:
+        f.write('different content')
+    ok_(repo.dirty)
+    # annexed file
+    repo.add('file2.txt', git=False)
+    if not repo.is_direct_mode():
+        # in direct mode 'annex add' results in a clean repo
+        ok_(repo.dirty)
+        # commit
+        repo.commit("file2.txt annexed")
+    ok_(not repo.dirty)
+
+    # TODO: unlock/modify
+
+    # TODO: submodules
+
+
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
 
@@ -1540,4 +1571,5 @@ def test_AnnexRepo_set_remote_url(path):
     assert_in('remote.some.annexurl', ar.config.keys())
     assert_equal(ar.config['remote.some.annexurl'],
                  'ssh://whatever.ru')
+
 

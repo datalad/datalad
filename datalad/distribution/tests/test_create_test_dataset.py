@@ -43,7 +43,7 @@ def test_create_test_dataset():
         dss = create_test_dataset(spec='2/1-2')
     ok_(5 <= len(dss) <= 7)  # at least five - 1 top, two on top level, 1 in each
     for ds in dss:
-        ok_clean_git(ds, annex=False)  # some of them are annex but we just don't check
+        ok_clean_git(ds, annex=None)  # some of them are annex but we just don't check
         ok_(len(glob(opj(ds, 'file*'))))
 
 

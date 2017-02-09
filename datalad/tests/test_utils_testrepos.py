@@ -12,8 +12,7 @@
 from os.path import join as opj
 
 from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo
-from .utils import with_tempfile, assert_true, ok_clean_git, \
-    ok_clean_git_annex_proxy, eq_, ok_
+from .utils import with_tempfile, assert_true, ok_clean_git, eq_, ok_
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
 from .utils import on_windows
@@ -27,10 +26,7 @@ if on_windows:
 def _test_BasicAnnexTestRepo(repodir):
     trepo = BasicAnnexTestRepo(repodir)
     trepo.create()
-    if trepo.repo.is_direct_mode():
-        ok_clean_git_annex_proxy(trepo.path)
-    else:
-        ok_clean_git(trepo.path)
+    ok_clean_git(trepo.path)
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'INFO.txt')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
