@@ -1031,7 +1031,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # this doesn't use `merge` but `sync` in order to properly
         # trigger updating of maintained branches in e.g. v6 repos
         args = [remote] if remote else []
-        args.extend(['--no-push', '--no-pull'])
+        # would commit any dirty files, we don't want that
+        args.extend(['--no-push', '--no-pull', '--no-commit', '--no-content'])
         self._run_annex_command('sync', annex_options=args)
 
     @normalize_path

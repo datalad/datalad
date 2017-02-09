@@ -38,6 +38,21 @@ from datalad.support.exceptions import CommandError
 lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
+def _check_deps(repo, deps):
+    """Check if all `deps` remotes are known to the `repo`
+
+    Raises
+    ------
+    ValueError
+      if any of the deps is an unknown remote
+    """
+    unknown_deps = set(assure_list(deps)).difference(repo.get_remotes())
+    if unknown_deps:
+        raise ValueError(
+            'unknown sibling(s) specified as publication dependency: %s'
+            % unknown_deps)
+
+
 class AddSibling(Interface):
     """Add a sibling to a dataset.
 
@@ -113,6 +128,8 @@ class AddSibling(Interface):
                              purpose='sibling addition')
         assert(ds.repo is not None)
 
+        _check_deps(ds.repo, publish_depends)
+
         ds_basename = basename(ds.path)
         repos = OrderedDict()
         repos[ds_basename] = {'repo': ds.repo}
@@ -177,10 +194,11 @@ class AddSibling(Interface):
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if (existing_url and repoinfo['url'].rstrip('/') != existing_url.rstrip('/')) \
+                if existing_url and \
+                        repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and
                             repoinfo['pushurl'].rstrip('/') !=
-                                    existing_pushurl.rstrip('/')) \
+                            existing_pushurl.rstrip('/')) \
                         or (pushurl and not existing_pushurl) \
                         or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                     conflicting.append(repo_name)
@@ -202,6 +220,14 @@ class AddSibling(Interface):
                     continue
                 # rewrite url
                 repo.set_remote_url(name, repoinfo['url'])
+                fetchvar = 'remote.{}.fetch'.format(name)
+                if fetchvar not in repo.config:
+                    # place default fetch refspec in config
+                    # same as `git remote add` would have added
+                    repo.config.add(
+                        fetchvar,
+                        '+refs/heads/*:refs/remotes/{}/*'.format(name),
+                        where='local')
             else:
                 # add the remote
                 repo.add_remote(name, repoinfo['url'])

@@ -10,30 +10,25 @@
 """
 
 import logging
-import os
-from os.path import join as opj, abspath, basename
+from os.path import join as opj
+from os.path import exists
 from ..dataset import Dataset
 from datalad.api import publish, install
 from datalad.dochelpers import exc_str
-from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
-from nose.tools import ok_, eq_, assert_false, assert_is_instance
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
+from nose.tools import eq_, assert_is_instance
+from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import skip_ssh
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -258,3 +253,70 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # before
     eq_({sub1.path, sub2.path},
         set(result_paths))
+
+
+@skip_ssh
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile()
+@with_tempfile()
+@with_tempfile()
+def test_publish_depends(
+        origin,
+        src_path,
+        target1_path,
+        target2_path,
+        target3_path):
+    # prepare src
+    source = install(src_path, source=origin, recursive=True)[0]
+    source.repo.get('test-annex.dat')
+    # pollute config
+    depvar = 'remote.target2.datalad-publish-depends'
+    # TODO next line would require `add_sibling` to be called with force
+    # see gh-1235
+    #source.config.add(depvar, 'stupid', where='local')
+    #eq_(source.config.get(depvar, None), 'stupid')
+
+    # two remote sibling on two "different" hosts
+    source.create_sibling(
+        'ssh://localhost' + target1_path,
+        name='target1')
+    # fails with unknown remote
+    assert_raises(
+        ValueError,
+        source.create_sibling,
+        'ssh://datalad-test' + target2_path,
+        name='target2',
+        existing='reconfigure',  # because 'target2' is known in polluted cfg
+        publish_depends='bogus')
+    # for reals
+    source.create_sibling(
+        'ssh://datalad-test' + target2_path,
+        name='target2',
+        existing='reconfigure',  # because 'target2' is known in polluted cfg
+        publish_depends='target1')
+    # wiped out previous dependencies
+    eq_(source.config.get(depvar, None), 'target1')
+    # and one more remote, on the same host but associated with a dependency
+    source.create_sibling(
+        'ssh://datalad-test' + target3_path,
+        name='target3')
+    ok_clean_git(src_path)
+    # introduce change in source
+    create_tree(src_path, {'probe1': 'probe1'})
+    source.add('probe1')
+    ok_clean_git(src_path)
+    # only the source has the probe
+    ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
+    for p in (target1_path, target2_path, target3_path):
+        assert_false(exists(opj(p, 'probe1')))
+    # publish to a standalone remote
+    source.publish(to='target3')
+    # no others are affected
+    ok_file_has_content(opj(target3_path, 'probe1'), 'probe1')
+    for p in (target1_path, target2_path):
+        assert_false(exists(opj(p, 'probe1')))
+    # publish to all remaining, but via a dependency
+    source.publish(to='target2')
+    for p in (target1_path, target2_path, target3_path):
+        ok_file_has_content(opj(p, 'probe1'), 'probe1')

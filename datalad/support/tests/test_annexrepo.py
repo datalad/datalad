@@ -36,6 +36,8 @@ from datalad.cmd import Runner
 
 from datalad.support.external_versions import external_versions
 
+from datalad.support.sshconnector import get_connection_hash
+
 from datalad.utils import on_windows
 from datalad.utils import chpwd
 from datalad.utils import rmtree
@@ -1029,8 +1031,8 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
-    socket_1 = opj(ssh_manager.socket_dir, 'datalad-test')
-    socket_2 = opj(ssh_manager.socket_dir, 'localhost')
+    socket_1 = opj(ssh_manager.socket_dir, get_connection_hash('datalad-test'))
+    socket_2 = opj(ssh_manager.socket_dir, get_connection_hash('localhost'))
     datalad_test_was_open = exists(socket_1)
     localhost_was_open = exists(socket_2)
 
@@ -1458,8 +1460,12 @@ def test_get_description(path1, path2):
     # it will match the remote name
     eq_(annex2.get_description(uuid=annex1.uuid),
         annex1_description + ' [annex1]')
-    # but let's remove the remote
+    # add a little probe file to make sure it stays untracked
+    create_tree(path1, {'probe': 'probe'})
+    assert_not_in('probe', annex2.get_indexed_files())
     annex2.merge_annex('annex1')
+    assert_not_in('probe', annex2.get_indexed_files())
+    # but let's remove the remote
     annex2.remove_remote('annex1')
     eq_(annex2.get_description(uuid=annex1.uuid), annex1_description)
 
