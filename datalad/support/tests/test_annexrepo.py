@@ -719,7 +719,11 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # uncommitted:
-    ok_(repo.dirty)
+    # but not in direct mode branch
+    if repo.is_direct_mode():
+        ok_(not repo.dirty)
+    else:
+        ok_(repo.dirty)
 
     repo.commit("Added file to annex.")
     ok_clean_git(repo.path, annex=True)
@@ -891,7 +895,11 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(info['size'], 14)
     assert(info['key'])
     # not even added to index yet since we this repo is with default batch_size
-    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    # but: in direct mode it is added!
+    if ar.is_direct_mode():
+        assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    else:
+        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -906,7 +914,10 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
     ar.add(testfile2_)
-    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    if ar.is_direct_mode():
+        assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    else:
+        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
     assert_in(ar.WEB_UUID, ar.whereis(testfile))
@@ -933,7 +944,9 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))
 
-    ar.commit("actually committing new files")
+    if not ar.is_direct_mode():
+        # in direct mode there's nothing to commit
+        ar.commit("actually committing new files")
     assert_in(filename, ar.get_files())
     assert_in(ar.WEB_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
