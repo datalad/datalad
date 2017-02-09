@@ -12,30 +12,30 @@ import logging
 from os.path import join as opj
 from collections import OrderedDict
 
-from .utils import eq_, neq_, ok_, nok_, assert_raises
-from .utils import skip_if_on_windows
-from .utils import swallow_logs
-from .utils import assert_re_in
-from .utils import assert_in
-from .utils import get_most_obscure_supported_name
-from .utils import SkipTest
+from datalad.tests.utils import eq_, neq_, ok_, nok_, assert_raises
+from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import get_most_obscure_supported_name
+from datalad.tests.utils import SkipTest
 
-from ..support.network import same_website, dlurljoin
-from ..support.network import get_tld
-from ..support.network import get_url_straight_filename
-from ..support.network import get_response_disposition_filename
-from ..support.network import parse_url_opts
-from ..support.network import RI
-from ..support.network import SSHRI
-from ..support.network import PathRI
-from ..support.network import DataLadRI
-from ..support.network import URL
-from ..support.network import _split_colon
-from ..support.network import is_url
-from ..support.network import is_datalad_compat_ri
-from ..support.network import get_local_file_url
-from ..support.network import is_ssh
-from ..support.network import iso8601_to_epoch
+from ..network import same_website, dlurljoin
+from ..network import get_tld
+from ..network import get_url_straight_filename
+from ..network import get_response_disposition_filename
+from ..network import parse_url_opts
+from ..network import RI
+from ..network import SSHRI
+from ..network import PathRI
+from ..network import DataLadRI
+from ..network import URL
+from ..network import _split_colon
+from ..network import is_url
+from ..network import is_datalad_compat_ri
+from ..network import get_local_file_url
+from ..network import is_ssh
+from ..network import iso8601_to_epoch
 
 
 def test_same_website():
@@ -82,7 +82,7 @@ def test_get_url_straight_filename():
     yield _test_get_url_straight_filename, '?param=1'
     yield _test_get_url_straight_filename, '?param=1&another=/'
 
-from ..support.network import rfc2822_to_epoch
+from ..network import rfc2822_to_epoch
 def test_rfc2822_to_epoch():
     eq_(rfc2822_to_epoch("Thu, 16 Oct 2014 01:16:17 EDT"), 1413436577)
 
