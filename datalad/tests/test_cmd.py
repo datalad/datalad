@@ -279,3 +279,14 @@ def test_git_path(dir_):
     # As soon as we use any GitRepo we should get _GIT_PATH set in the Runner
     repo = GitRepo(dir_, create=True)
     assert GitRunner._GIT_PATH is not None
+
+
+@with_tempfile(mkdir=True)
+def test_runner_stdin(path):
+    runner = Runner()
+    with open(opj(path, "test_input.txt"), "w") as f:
+        f.write("whatever")
+
+    with swallow_outputs() as cmo, open(opj(path, "test_input.txt"), "r") as fake_input:
+        runner.run(['cat'], log_stdout=False, stdin=fake_input)
+        assert_in("whatever", cmo.out)

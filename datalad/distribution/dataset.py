@@ -144,6 +144,15 @@ class Dataset(object):
             return False
         return realpath(self.path) == realpath(other.path)
 
+    def close(self):
+        """Perform operations which would close any possible process using this Dataset
+        """
+        repo = self._repo
+        self._repo = None
+        if repo:
+            # might take care about lingering batched processes etc
+            del repo
+
     @property
     def path(self):
         """path to the dataset"""

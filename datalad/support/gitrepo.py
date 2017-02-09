@@ -23,7 +23,6 @@ from os.path import isabs
 from os.path import commonprefix
 from os.path import relpath
 from os.path import realpath
-from os.path import abspath
 from os.path import dirname
 from os.path import basename
 from os.path import curdir
@@ -595,11 +594,10 @@ class GitRepo(RepoInterface):
             pass
 
         if is_ssh(url):
-            cnct = ssh_manager.get_connection(url)
-            cnct.open()
+            ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+            env = {'GIT_SSH_COMMAND': "datalad sshrun"}
         else:
             env = None
         ntries = 5  # 3 is not enough for robust workaround
@@ -1375,12 +1373,11 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
             if is_ssh(fetch_url):
-                cnct = ssh_manager.get_connection(fetch_url)
-                cnct.open()
+                ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                        GIT_SSH_COMMAND="datalad sshrun"):
                     fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1419,12 +1416,11 @@ class GitRepo(RepoInterface):
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
         if is_ssh(fetch_url):
-            cnct = ssh_manager.get_connection(fetch_url)
-            cnct.open()
+            ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
-                    GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    GIT_SSH_COMMAND="datalad sshrun"):
                 return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
@@ -1503,12 +1499,11 @@ class GitRepo(RepoInterface):
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
             if is_ssh(push_url):
-                cnct = ssh_manager.get_connection(push_url)
-                cnct.open()
+                ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                        GIT_SSH_COMMAND="datalad sshrun"):
                     pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1800,7 +1795,7 @@ class GitRepo(RepoInterface):
                     lgr.debug("detached HEAD in {0}".format(self))
                     return None, None
                 else:
-                    raise 
+                    raise
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)

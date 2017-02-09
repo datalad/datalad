@@ -11,6 +11,7 @@
 """
 
 import logging
+from os.path import curdir
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import filter_unmodified
@@ -22,9 +23,12 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
+from datalad.utils import assure_list
+
 from .dataset import EnsureDataset
 from .dataset import Dataset
 from .dataset import datasetmethod
+from .dataset import require_dataset
 
 __docformat__ = 'restructuredtext'
 
@@ -36,27 +40,40 @@ lgr = logging.getLogger('datalad.distribution.publish')
 def _log_push_info(pi_list):
     from git.remote import PushInfo as PI
 
+    error = False
     if pi_list:
         for push_info in pi_list:
             if (push_info.flags & PI.ERROR) == PI.ERROR:
-                lgr.error(push_info.summary)
+                lgr.debug('Push failed: %s', push_info.summary)
+                error = True
             else:
-                lgr.info(push_info.summary)
+                lgr.debug('Pushed: %s', push_info.summary)
     else:
-        lgr.warning("Nothing was pushed.")
+        lgr.debug("Pushed: nothing")
+    return error
 
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
+    # TODO: this setup is now quite ugly. The only way `refspec` can come
+    # in, is when there is a tracking branch, and we get its state via
+    # `refspec`
+
+    # Plan:
+    # 1. Check if there is anything to push
+    # 2. If so, process push dependencies
+    # 3. fetch and merge annex branch
+    # 4. Push non-annex branch(es)
+    # 5. copy data
+
     published, skipped = [], []
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
     # no tracking refspec yet?
-    # TODO what if `to` was given, doesn't have tracking info in this case
-    set_upstream = refspec is None
 
     # check if there are any differences wrt the to-be-published paths,
     # and if not skip this dataset
     if refspec:
+        lgr.debug("Testing for changes with respect to '%s'", refspec)
         # we have a matching branch on the other side
         diff = ds.repo.repo.commit().diff(
             refspec.replace(
@@ -69,61 +86,82 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         refspec = active_branch
         if active_branch in ds.repo.repo.remotes[remote].refs:
             # we know some remote state -> diff
+            lgr.debug("Testing matching branch to '%s' at '%s' for differences",
+                      active_branch, remote)
             diff = ds.repo.repo.commit().diff(
                 ds.repo.repo.remotes[remote].refs[active_branch],
                 paths=paths)
         else:
+            lgr.debug("No matching branch to '%s' at '%s'",
+                      active_branch, remote)
             # we don't have any remote state, need to push for sure
             diff = True
     if not diff:
+        lgr.debug("No changes detected with respect to state of '%s'", remote)
         return published, skipped
+
+    # publishing of `remote` might depend on publishing other
+    # remote(s) first:
+    # define config var name for potential publication dependencies
+    depvar = 'remote.{}.datalad-publish-depends'.format(remote)
+    for d in assure_list(ds.config.get(depvar, [])):
+        lgr.info("Dependency detected: '%s'" % d)
+        # call this again to take care of the dependency first,
+        # but keep the paths the same, as the goal is to publish those
+        # to the primary remote, and not anything elase to a dependency
+        pblsh, skp = _publish_dataset(
+            ds,
+            d,
+            None,
+            paths,
+            annex_copy_options)
+        published.extend(pblsh)
+        skipped.extend(skp)
+
+    lgr.info("Publishing {0} to {1}".format(ds, remote))
 
     # in order to be able to use git's config to determine what to push,
     # we need to annex merge first. Otherwise a git push might be
     # rejected if involving all matching branches for example.
     # Once at it, also push the annex branch right here.
     if isinstance(ds.repo, AnnexRepo):
+        lgr.debug("Obtain remote annex info from '%s'", remote)
         ds.repo.fetch(remote=remote)
         ds.repo.merge_annex(remote)
-        _log_push_info(ds.repo.push(remote=remote,
-                                    refspec="git-annex:git-annex"))
-
-    # publishing of `remote` might depend on publishing other
-    # remote(s) first:
-    # define config var name for potential publication dependencies
-    depvar = 'remote.{}.datalad-publish-depends'.format(remote)
-    for d in ds.config.get(depvar, []):
-        lgr.info("Dependency detected: '%s'" % d)
-        # call this again to take care of the dependency first,
-        # but keep the paths the same, as the goal is to publish those
-        # to the primary remote, and not anything elase to a dependency
-        pblsh, skp = _publish_dataset(ds, d, None, paths)
-        published.extend(pblsh)
-        skipped.extend(skp)
-
-    lgr.info("Publishing {0} to {1}".format(ds, remote))
 
     # we now know where to push to:
-    # TODO: what to push? default: git push --mirror if nothing configured?
-    # consider also: --follow-tags, --tags, --atomic
-
-    # Note: git's push.default is 'matching', which possibly doesn't
-    # work for first
+    # Note: git's push.default is 'matching', which doesn't work for first
     # time publication (a branch, that doesn't exist on remote yet)
     # But if we want to respect remote.*.push entries, etc. we need to
     # not pass a specific refspec (like active branch) to `git push`
     # by default.
-
-    _log_push_info(ds.repo.push(remote=remote,
-                                refspec=refspec,
-                                set_upstream=set_upstream))
+    # TODO: what else to push by default?
+    # consider also: --follow-tags, --tags, --atomic
+    lgr.debug("Push to '%s'", remote)
+    pushvar = 'remote.{}.push'.format(remote)
+    if not ds.config.get(pushvar, None):
+        # no default push targets configured for this remote, leave our mark
+        ds.config.add(pushvar, 'master', where='local')
+        if isinstance(ds.repo, AnnexRepo):
+            ds.config.add(pushvar, 'git-annex', where='local')
+    _log_push_info(ds.repo.push(remote=remote))
 
     published.append(ds)
 
     if (paths or annex_copy_opts) and \
             isinstance(ds.repo, AnnexRepo) and not \
-            ds.config.get('remote.{}.annex-ignore', False):
+            ds.config.getbool(
+                'remote.{}'.format(remote),
+                'annex-ignore',
+                False):
         lgr.info("Publishing data of dataset {0} ...".format(ds))
+        # overwrite URL with pushurl if any, reason:
+        # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
+        pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
+        if pushurl:
+            annex_copy_options = '{}{}'.format(
+                annex_copy_options if annex_copy_options else '',
+                ' -c "remote.{}.url={}"'.format(remote, pushurl))
         pblshd = ds.repo.copy_to(files=paths,
                                  remote=remote,
                                  options=annex_copy_options)
@@ -178,7 +216,8 @@ class Publish(Interface):
             metavar='LABEL',
             doc="""name of the target sibling. If no name is given an attempt is
             made to identify the target based on the dataset's configuration
-            (i.e. a configured tracking branch)""",
+            (i.e. a configured tracking branch, or a single sibling that is
+            configured for publication)""",
             # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
         since=Parameter(
@@ -237,6 +276,11 @@ class Publish(Interface):
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not dataset and not path:
+            # try to find a dataset in PWD
+            dataset = require_dataset(
+                None, check_installed=True, purpose='publishing')
+
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -255,6 +299,9 @@ class Publish(Interface):
         # 4. publish the content needed to go to the primary remote to
         #    the dependencies first, and to the primary afterwards
         ds_remote_info = {}
+        lgr.debug(
+            "Evaluating %i dataset publication candidate(s)",
+            len(content_by_ds))
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             if to is None:
@@ -263,6 +310,20 @@ class Publish(Interface):
                 # figure it out for pushing annex branch anyway and we might as
                 # well fail right here.
                 track_remote, track_refspec = ds.repo.get_tracking_branch()
+                if not track_remote:
+                    # no tracking remote configured, but let try one more
+                    # if we only have one remote, and it has a push target
+                    # configured that is "good enough" for us
+                    cand_remotes = [r for r in ds.repo.get_remotes()
+                                    if 'remote.{}.push'.format(r) in ds.config]
+                    if len(cand_remotes) > 1:
+                        lgr.warning('Target sibling ambiguous, please specific via --to')
+                    elif len(cand_remotes) == 1:
+                        track_remote = cand_remotes[0]
+                    else:
+                        lgr.warning(
+                            'No target sibling configured for default publication, '
+                            'please specific via --to')
                 if track_remote:
                     ds_remote_info[ds_path] = dict(zip(
                         ('remote', 'refspec'),
@@ -292,14 +353,19 @@ class Publish(Interface):
 
         if dataset and since:
             # remove all unmodified components from the spec
+            lgr.debug(
+                "Testing %i dataset(s) for modifications since '%s'",
+                len(content_by_ds), since)
             content_by_ds = filter_unmodified(
                 content_by_ds, dataset, since)
 
+        lgr.debug("Attempt to publish %i datasets", len(content_by_ds))
         published, skipped = [], []
         for ds_path in content_by_ds:
             remote_info = ds_remote_info[ds_path]
             if not remote_info:
                 # in case we are skipping
+                lgr.debug("Skipping dataset at '%s'", ds_path)
                 continue
             # and publish
             ds = Dataset(ds_path)

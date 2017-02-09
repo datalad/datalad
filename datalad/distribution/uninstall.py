@@ -66,6 +66,11 @@ def _uninstall_dataset(ds, check, has_super):
     # TODO check that the relevant branched are pushed to a remote
     if ds.get_subdatasets(fulfilled=True):
         raise ValueError('to be uninstalled dataset has present subdatasets, forgot --recursive?')
+    # Close any possibly associated process etc with underlying repo.
+    # Otherwise - rmtree could fail to remove e.g. under NFS which would
+    # still have some files opened by them (thus having .nfs00000xxxx
+    # files) forbidding rmdir to work in rmtree
+    ds.close()
     if ds.is_installed():
         rmtree(ds.path)
     if has_super and not exists(ds.path):
