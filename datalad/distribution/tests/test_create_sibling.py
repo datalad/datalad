@@ -10,6 +10,8 @@
 """
 
 import os
+from os import chmod
+import stat
 import re
 from os.path import join as opj, exists
 
@@ -36,6 +38,7 @@ from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
+from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.utils import on_windows
@@ -329,3 +332,23 @@ def test_target_ssh_since(origin, src_path, target_path):
     # there is one thing in the target directory only, and that is the
     # remote repo of the newly added subdataset
     eq_(['brandnew'], os.listdir(target_path))
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_failon_no_permissions(src_path, target_path):
+    ds = Dataset(src_path).create()
+    # remove user write permissions from target path
+    chmod(target_path, stat.S_IREAD | stat.S_IEXEC)
+    assert_raises(
+        CommandError,
+        ds.create_sibling,
+        name='noperm',
+        sshurl="ssh://localhost" + opj(target_path, 'ds'))
+    # restore permissions
+    chmod(target_path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+    assert_create_sshwebserver(
+        name='goodperm',
+        dataset=ds,
+        sshurl="ssh://localhost" + opj(target_path, 'ds'))
