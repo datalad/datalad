@@ -327,10 +327,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # M -- modified
             # A -- staged
             # T -- type changed/unlocked
-            if not list(result):
-                return False
-            else:
-                return True
+            return any(result)
         else:
             return super(AnnexRepo, self).dirty
 
@@ -569,7 +566,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             lgr.debug("detected git version: %s" % external_versions['cmd:git'])
 
-            if external_versions['cmd:git'] == '2.11.0':
+            if external_versions['cmd:git'] >= '2.11.0':
                 # workaround for git 2.11.0, which for some reason ignores the
                 # per-call config "-c core.bare=False", but respects the value
                 # if it is set in .git/config

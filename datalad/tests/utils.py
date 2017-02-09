@@ -142,20 +142,6 @@ from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
 
-def ok_clean_git_annex_proxy(path):
-    """Helper to check, whether an annex in direct mode is clean
-    """
-    # TODO: May be let's make a method of AnnexRepo for this purpose
-
-    if isinstance(path, AnnexRepo):
-        ar = path
-    else:
-        ar = AnnexRepo(path)
-        # Note: Possible exception while trying to instantiate AnnexRepo
-        # intended to be thrown in order to have a failure in the assertion
-    ok_(not ar.dirty)
-
-
 def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                  untracked=[]):
     """Verify that under given path there is a clean git repository
@@ -196,7 +182,11 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             assert_is(annex, True)
         except Exception:
             # Instantiation failed => no annex
-            r = GitRepo(path, init=False, create=False)
+            try:
+                r = GitRepo(path, init=False, create=False)
+            except Exception:
+                raise AssertionError("Couldn't find an annex or a git "
+                                     "repository at {}.".format(path))
             if annex is None:
                 annex = False
             # explicitly given GitRepo instance doesn't make sense with
