@@ -20,12 +20,14 @@ import sys
 import textwrap
 import shutil
 from importlib import import_module
+import os
 
 import datalad
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import CommandError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
@@ -127,7 +129,8 @@ def setup_parser(
     # API from them
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
-    for grp_name, grp_descr, _interfaces in interface_groups:
+    for grp_name, grp_descr, _interfaces \
+                in sorted(interface_groups, key=lambda x: x[1]):
         # for all subcommand modules it can find
         cmd_short_descriptions = []
 
@@ -180,7 +183,8 @@ def setup_parser(
     console_width = shutil.get_terminal_size()[0] \
         if hasattr(shutil, 'get_terminal_size') else 80
 
-    for i, grp in enumerate(interface_groups):
+    for i, grp in enumerate(
+            sorted(interface_groups, key=lambda x: x[1])):
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[i]
 
@@ -286,6 +290,14 @@ def main(args=None):
                 lgr.error('could not perform all requested actions: %s',
                           exc_str(exc))
                 sys.exit(1)
+            except CommandError as exc:
+                # behave as if the command ran directly, importantly pass
+                # exit code as is
+                if exc.stdout:
+                    os.write(1, exc.stdout)
+                if exc.stderr:
+                    os.write(2, exc.stderr)
+                sys.exit(exc.code)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)

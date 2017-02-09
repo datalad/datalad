@@ -84,7 +84,8 @@ def test_help_np():
                   'Commands for meta data handling',
                   'Miscellaneous commands',
                   'General information',
-                  'Global options'})
+                  'Global options',
+                  'Plumbing commands'})
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly

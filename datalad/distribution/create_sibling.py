@@ -24,6 +24,7 @@ from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.dochelpers import exc_str
 from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
@@ -38,6 +39,7 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import RI
 from datalad.support.network import is_ssh
+from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
 from datalad.utils import not_supported_on_windows
@@ -58,7 +60,6 @@ def _create_dataset_sibling(
         target_pushurl,
         existing,
         shared,
-        remote_git_version,
         publish_depends,
         publish_by_default,
         as_common_datasrc):
@@ -102,7 +103,7 @@ def _create_dataset_sibling(
         # TODO: Is this condition valid for != '.' only?
         path_exists = True
         try:
-            out, err = ssh(["ls", remoteds_path])
+            out, err = ssh("ls {}".format(sh_quote(remoteds_path)))
         except CommandError as e:
             if "No such file or directory" in e.stderr and \
                     remoteds_path in e.stderr:
@@ -119,9 +120,9 @@ def _create_dataset_sibling(
                 return
             elif existing == 'replace':
                 # enable write permissions to allow removing dir
-                ssh(["chmod", "+r+w", "-R", remoteds_path])
+                ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
                 # remove target at path
-                ssh(["rm", "-rf", remoteds_path])
+                ssh("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
                 path_exists = False
             elif existing == 'reconfigure':
@@ -133,7 +134,7 @@ def _create_dataset_sibling(
 
         if not path_exists:
             try:
-                ssh(["mkdir", "-p", remoteds_path])
+                ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
             except CommandError as e:
                 lgr.error("Remotely creating target directory failed at "
                           "%s.\nError: %s" % (remoteds_path, exc_str(e)))
@@ -146,6 +147,10 @@ def _create_dataset_sibling(
                 remoteds_path, ssh, shared, ds,
                 description=target_url):
             return
+        if target_url and not is_ssh(target_url):
+            # we are not coming in via SSH, hence cannot assume proper
+            # setup for webserver access -> fix
+            ssh('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
 
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
@@ -157,18 +162,18 @@ def _create_dataset_sibling(
         pushurl=ds_target_pushurl,
         recursive=False,
         fetch=True,
-        force=existing in {'replace'},
+        force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
         publish_depends=publish_depends)
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
-    if remote_git_version and remote_git_version >= "2.4":
+    if ssh.get_git_version() and ssh.get_git_version() >= LooseVersion("2.4"):
         # allow for pushing to checked out branch
         try:
-            ssh(["git", "-C", remoteds_path] +
-                ["config", "receive.denyCurrentBranch", "updateInstead"])
+            ssh("git -C {} config receive.denyCurrentBranch updateInstead".format(
+                sh_quote(remoteds_path)))
         except CommandError as e:
             lgr.error("git config failed at remote location %s.\n"
                       "You will not be able to push to checked out "
@@ -178,8 +183,8 @@ def _create_dataset_sibling(
                   " Version detected on server: %s\nSkipping configuration"
                   " of receive.denyCurrentBranch - you will not be able to"
                   " publish updates to this repository. Upgrade your git"
-                  " and run with --existing=reconfigure"
-                  % remote_git_version)
+                  " and run with --existing=reconfigure",
+                  ssh.get_git_version())
 
     # enable metadata refresh on dataset updates to publication server
     lgr.info("Enabling git post-update hook ...")
@@ -379,9 +384,14 @@ class CreateSibling(Interface):
         # dataset instances
         datasets = {p: Dataset(p) for p in content_by_ds}
 
+        # make sure dependencies are valid
+        for d in datasets.values():
+            _check_deps(d.repo, publish_depends)
+
         # find datasets with existing remotes with the target name
         remote_existing = [p for p in datasets
                            if name in datasets[p].repo.get_remotes()]
+
         if existing == 'error' and remote_existing:
             raise ValueError(
                 "sibling '{name}' already configured for dataset{plural}: "
@@ -423,8 +433,10 @@ class CreateSibling(Interface):
         # request ssh connection:
         lgr.info("Connecting ...")
         ssh = ssh_manager.get_connection(sshurl)
-        ssh.open()
-        remote_git_version = CreateSibling.get_remote_git_version(ssh)
+        if not ssh.get_annex_version():
+            raise MissingExternalDependency(
+                'git-annex',
+                msg='on the remote system')
 
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
@@ -446,7 +458,6 @@ class CreateSibling(Interface):
                 target_pushurl,
                 existing,
                 shared,
-                remote_git_version,
                 publish_depends,
                 publish_by_default,
                 as_common_datasrc)
@@ -469,9 +480,8 @@ class CreateSibling(Interface):
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
             try:
-                ssh(
-                    ["cd '" + _path_(path, ".git") + "' && hooks/post-update"],
-                    wrap_args=False  # we wrapped here manually
+                ssh("cd {} && hooks/post-update".format(
+                    sh_quote(_path_(path, ".git")))
                 )
             except CommandError as e:
                 lgr.error("Failed to run post-update hook under path %s. "
@@ -482,9 +492,9 @@ class CreateSibling(Interface):
 
     @staticmethod
     def init_remote_repo(path, ssh, shared, dataset, description=None):
-        cmd = ["git", "-C", path, "init"]
-        if shared:
-            cmd.append("--shared=%s" % shared)
+        cmd = "git -C {} init{}".format(
+            sh_quote(path),
+            " --shared='{}'".format(sh_quote(shared)) if shared else '')
         try:
             ssh(cmd)
         except CommandError as e:
@@ -496,8 +506,10 @@ class CreateSibling(Interface):
             # init remote git annex repo (part fix of #463)
             try:
                 ssh(
-                    ["git", "-C", path, "annex", "init"] +
-                    ([description] if description else [])
+                    "git -C {} annex init {}".format(
+                        sh_quote(path),
+                        sh_quote(description)
+                        if description else '')
                 )
             except CommandError as e:
                 lgr.error("Initialization of remote git annex repository failed at %s."
@@ -506,27 +518,11 @@ class CreateSibling(Interface):
         return True
 
     @staticmethod
-    def get_remote_git_version(ssh):
-        try:
-            # options to disable all auto so we don't trigger them while testing
-            # for absent changes
-            out, err = ssh(["git"] + ["version"])
-            assert out.strip().startswith("git version")
-            git_version = out.strip().split()[2]
-            lgr.debug("Detected git version on server: %s" % git_version)
-            return LooseVersion(git_version)
-
-        except CommandError as e:
-            lgr.warning(
-                "Failed to determine git version on remote.\n"
-                "Error: {0}\nTrying to configure anyway "
-                "...".format(exc_str(e)))
-        return None
-
-    @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
+        # make sure hooks directory exists (see #1251)
+        ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
         # post-update hook should create its log directory if doesn't exist
         logs_remote_dir = opj(path, WEB_META_LOG)
@@ -548,9 +544,12 @@ class CreateSibling(Interface):
         # collate content for post_update hook
         hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
 
-        with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
-            ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
-        ssh(['chmod', '+x', hook_remote_target])            # and make it executable
+        with make_tempfile(content=hook_content) as tempf:
+            # create post_update hook script
+            # upload hook to dataset
+            ssh.copy(tempf, hook_remote_target)
+        # and make it executable
+        ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
 
     @staticmethod
     def upload_web_interface(path, ssh, shared, ui):
@@ -569,7 +568,7 @@ class CreateSibling(Interface):
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
-        ssh(['mkdir', '-p', webresources_remote])
+        ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
         ssh.copy(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets
@@ -596,4 +595,7 @@ class CreateSibling(Interface):
             mode = shared
 
         if mode:
-            ssh(['chmod', mode, '-R', dirname(webresources_remote), opj(path, 'index.html')])
+            ssh('chmod {} -R {} {}'.format(
+                mode,
+                sh_quote(dirname(webresources_remote)),
+                sh_quote(opj(path, 'index.html'))))

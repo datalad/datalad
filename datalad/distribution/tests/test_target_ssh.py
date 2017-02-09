@@ -255,9 +255,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             # files which hook would manage to generate
             _path_('.git/info/refs'), '.git/objects/info/packs'
         }
-        if external_versions['cmd:system-git'] >= '2.4':
-            # on elderly git we don't change receive setting
-            ok_modified_files.add(_path_('.git/config'))
+        # on elderly git we don't change receive setting
+        ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
         assert_set_equal(modified_files, ok_modified_files)
 

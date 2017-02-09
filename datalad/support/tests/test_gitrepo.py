@@ -17,6 +17,8 @@ from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
 
+from datalad.support.sshconnector import get_connection_hash
+
 # imports from same module:
 # we want to test everything in gitrepo:
 from ..gitrepo import *
@@ -431,7 +433,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     remote_repo = GitRepo(remote_path, create=False)
     url = "ssh://localhost" + abspath(remote_path)
-    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    socket_path = opj(ssh_manager.socket_dir, get_connection_hash('localhost'))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -459,7 +461,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + abspath(remote_path)
-    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    socket_path = opj(ssh_manager.socket_dir, get_connection_hash('localhost'))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -494,7 +496,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
 
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + abspath(remote_path)
-    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    socket_path = opj(ssh_manager.socket_dir, get_connection_hash('localhost'))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -1072,3 +1074,21 @@ def test_GitRepo_gitignore(path):
     with assert_raises(GitIgnoreError) as cme:
         gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
+
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_set_remote_url(path):
+
+    gr = GitRepo(path, create=True)
+    gr.add_remote('some', 'http://example.com/.git')
+    assert_equal(gr.config['remote.some.url'],
+                 'http://example.com/.git')
+    # change url:
+    gr.set_remote_url('some', 'http://believe.it')
+    assert_equal(gr.config['remote.some.url'],
+                 'http://believe.it')
+
+    # set push url:
+    gr.set_remote_url('some', 'ssh://whatever.ru', push=True)
+    assert_equal(gr.config['remote.some.pushurl'],
+                 'ssh://whatever.ru')

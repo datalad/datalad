@@ -29,11 +29,20 @@ def test_add_sibling(origin, repo_path):
     depvar = 'remote.test-remote.datalad-publish-depends'
     source.config.add(depvar, 'stupid', where='local')
 
+    # cannot configure unknown remotes as dependencies
+    assert_raises(
+        add_sibling,
+        dataset=source,
+        name="test-remote",
+        url="http://some.remo.te/location",
+        publish_depends=['r1', 'r2'],
+        force=True)
+    # prior config was changed by failed call above
+    eq_(source.config.get(depvar, None), 'stupid')
+
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location",
-                      publish_depends=['r1', 'r2'],
                       force=True)
-    eq_(source.config.get(depvar, None), ('r1', 'r2'))
 
     eq_(res, [basename(source.path)])
     assert_in("test-remote", source.repo.get_remotes())
