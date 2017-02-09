@@ -133,12 +133,7 @@ def _create_dataset_sibling(
                         repr(existing)))
 
         if not path_exists:
-            try:
-                ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
-            except CommandError as e:
-                lgr.error("Remotely creating target directory failed at "
-                          "%s.\nError: %s" % (remoteds_path, exc_str(e)))
-                return
+            ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
