@@ -81,7 +81,9 @@ def test_save(path):
     with open(opj(subds.path, "some_file.tst"), "w") as f:
         f.write("something")
     subds.add('.')
-    ok_clean_git(subds.path, annex=isinstance(ds.repo, AnnexRepo))
+    ok_clean_git(subds.path, annex=isinstance(subds.repo, AnnexRepo))
+    # Note/TODO: ok_clean_git is failing in direct mode, due to staged but
+    # uncommited .datalad (probably caused within create)
     ok_(ds.repo.dirty)
     # ensure modified subds is committed
     ds.save(all_changes=True)

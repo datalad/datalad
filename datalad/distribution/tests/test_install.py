@@ -254,7 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -271,7 +271,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -382,12 +382,12 @@ def test_install_into_dataset(source, top_path):
     ok_(subds.is_installed())
     assert_in('sub', ds.get_subdatasets())
     # sub is clean:
-    ok_clean_git(subds.path, annex=False)
+    ok_clean_git(subds.path, annex=None)
     # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
+    assert_raises(AssertionError, ok_clean_git, ds.path, annex=None)
     ds.save('addsub')
     # now it is:
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -414,16 +414,16 @@ def test_failed_install_multiple(top_path):
 
     create(_path_(top_path, 'ds1'))
     create(_path_(top_path, 'ds3'))
-    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
 
     # specify install with multiple paths and one non-existing
     with assert_raises(IncompleteResultsError) as cme:
         ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
 
     # install doesn't add existing submodules -- add does that
-    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
     ds.add(['ds1', 'ds3'])
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
     # those which succeeded should be saved now
     eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed

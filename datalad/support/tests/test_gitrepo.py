@@ -112,7 +112,7 @@ def test_GitRepo_equals(path1, path2):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_add(src, path):
 
@@ -140,7 +140,7 @@ def test_GitRepo_add(src, path):
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
-    ok_clean_git(path, annex=False)
+    ok_clean_git(path)
 
 
 @assert_cwd_unchanged
@@ -414,10 +414,10 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
 
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
-    eq_([u'origin/master', u'origin/new_branch'],
+    eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit.name for commit in fetched])
 
-    ok_clean_git(clone.path, annex=False)
+    ok_clean_git(clone.path)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
@@ -440,7 +440,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     fetched = repo.fetch(remote="ssh-remote")
     assert_in('ssh-remote/master', [commit.name for commit in fetched])
-    ok_clean_git(repo.path, annex=False)
+    ok_clean_git(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
@@ -634,7 +634,7 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_GitRepo_get_toppath(repo, tempdir, repo2):
@@ -652,41 +652,37 @@ def test_GitRepo_get_toppath(repo, tempdir, repo2):
     eq_(GitRepo.get_toppath(tempdir), None)
 
 
-def test_GitRepo_dirty():
-    trepo = BasicAnnexTestRepo()
-    repo = trepo.repo
-    # empty at this point -- should not be dirty as well. TODO
-    assert_false(repo.dirty)
-    trepo.create()
-    assert_false(repo.dirty)
+@with_tempfile(mkdir=True)
+def test_GitRepo_dirty(path):
 
-    # new file added to index
-    trepo.create_file('newfiletest.dat', '123\n', annex=False)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
+    repo = GitRepo(path, create=True)
+    ok_(not repo.dirty)
 
-    # file modified to be the same
-    trepo.create_file('newfiletest.dat', '123\n', annex=False)
-    assert_false(repo.dirty)
+    # untracked file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(repo.dirty)
+    # staged file
+    repo.add('file1.txt')
+    ok_(repo.dirty)
+    # clean again
+    repo.commit("file1.txt added")
+    ok_(not repo.dirty)
+    # modify to be the same
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('whatever')
+    ok_(not repo.dirty)
+    # modified file
+    with open(opj(path, 'file1.txt'), 'w') as f:
+        f.write('something else')
+    ok_(repo.dirty)
+    # clean again
+    repo.add('file1.txt')
+    repo.commit("file1.txt modified")
+    ok_(not repo.dirty)
 
-    # file modified
-    trepo.create_file('newfiletest.dat', '12\n', annex=False)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
+    # TODO: submodules
 
-    # new file not added to index
-    trepo.create_file('newfiletest2.dat', '123\n', add=False, annex=False)
-    assert_true(repo.dirty)
-    os.unlink(opj(repo.path, 'newfiletest2.dat'))
-    assert_false(repo.dirty)
-
-    # new annexed file
-    trepo.create_file('newfiletest2.dat', '123\n', annex=True)
-    assert_true(repo.dirty)
-    repo.commit("just a commit")
-    assert_false(repo.dirty)
 
 
 @with_tempfile(mkdir=True)
@@ -835,12 +831,21 @@ def test_git_custom_calls(path, path2):
 def test_get_tracking_branch(o_path, c_path):
 
     clone = GitRepo.clone(o_path, c_path)
-    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
+    # Note, that the default branch might differ even if it is always 'master'.
+    # For direct mode annex repositories it would then be "annex/direct/master"
+    # for example. Therefore use whatever branch is checked out by default:
+    master_branch = clone.get_active_branch()
+    ok_(master_branch)
+
+    eq_(('origin', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch())
 
     clone.checkout('new_branch', ['-b'])
+
     eq_((None, None), clone.get_tracking_branch())
 
-    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
+    eq_(('origin', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch(master_branch))
 
 
 @with_testrepos('submodule_annex', flavors=['clone'])
@@ -862,6 +867,27 @@ def test_submodule_deinit(path):
     top_repo.deinit_submodule('subm 1', force=True)
 
     ok_(not top_repo.repo.submodule('subm 1').module_exists())
+
+
+@with_testrepos(".*basic_git.*", flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_GitRepo_add_submodule(source, path):
+
+    top_repo = GitRepo(path, create=True)
+
+    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.commit('submodule added')
+    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+    ok_clean_git(path)
+    ok_clean_git(opj(path, 'sub'))
+
+
+def test_GitRepo_update_submodule():
+    raise SkipTest("TODO")
+
+
+def test_GitRepo_get_submodules():
+    raise SkipTest("TODO")
 
 
 def test_kwargs_to_options():

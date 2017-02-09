@@ -67,8 +67,8 @@ def test_publish_simple(origin, src_path, dst_path):
     res = publish(dataset=source, to="target")
     eq_(res, ([source], []))
 
-    ok_clean_git(src_path, annex=False)
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(source.repo, annex=None)
+    ok_clean_git(target, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
 
@@ -77,8 +77,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # and nothing is pushed
     eq_(res, ([], []))
 
-    ok_clean_git(src_path, annex=False)
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(source.repo, annex=None)
+    ok_clean_git(target, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     eq_(list(target.get_branch_commits("git-annex")),
@@ -92,12 +92,12 @@ def test_publish_simple(origin, src_path, dst_path):
         f.write("Some additional stuff.")
     source.repo.add(opj(src_path, 'test_mod_file'), git=True,
                     commit=True, msg="Modified.")
-    ok_clean_git(src_path, annex=False)
+    ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source)
     eq_(res, ([source], []))
 
-    ok_clean_git(dst_path, annex=False)
+    ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     eq_(list(target.get_branch_commits("git-annex")),
