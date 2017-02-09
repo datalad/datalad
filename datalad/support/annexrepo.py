@@ -1864,6 +1864,31 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return None
 
+    def set_remote_url(self, name, url, push=False):
+        """Set the URL a remote is pointing to
+
+        Sets the URL of the remote `name`. Requires the remote to already exist.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        url: str
+        push: bool
+          if True, set the push URL, otherwise the fetch URL;
+          if True, additionally set annexurl to `url`, to make sure annex uses
+          it to talk to the remote, since access via fetch URL might be
+          restricted.
+        """
+
+        if push:
+            # if we are to set a push url, also set 'annexUrl' for this remote,
+            # in order to make git-annex use it, when talking to the remote.
+            # (see http://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/)
+            var = 'remote.{0}.{1}'.format(name, 'annexurl')
+            self.config.set(var, url, where='local', reload=True)
+        super(AnnexRepo, self).set_remote_url(name, url, push)
+
 
 # TODO: Why was this commented out?
 # @auto_repr
