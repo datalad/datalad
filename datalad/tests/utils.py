@@ -148,6 +148,12 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
 
+    Note
+    ----
+    Parameters head_modified, index_modified and untracked currently work
+    in pure git or indirect mode annex only and are ignored otherwise!
+    Implementation is yet to do!
+
     Parameters
     ----------
     path: str or Repo
@@ -159,6 +165,7 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
       expected; set to None to autodetect, whether there is an annex.
       Default: None.
     """
+    # TODO: See 'Note' in docstring
 
     if isinstance(path, AnnexRepo):
         if annex is None:
@@ -194,13 +201,10 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             assert_is(annex, False)
 
     if annex and r.is_direct_mode():
+        if head_modified or index_modified or untracked:
+            raise NotImplementedError("TODO - see note in docstring")
         ok_(not r.dirty)
     else:
-        ok_(exists(r.path))
-        ok_(exists(join(r.path, '.git')))
-        if annex:
-            ok_(exists(join(r.path, '.git', 'annex')))
-
         repo = r.repo
 
         if repo.index.entries.keys():
