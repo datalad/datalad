@@ -1639,11 +1639,30 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
-    @property
-    def dirty(self):
-        """Returns true if there are uncommitted changes or files not known to
-        index"""
-        return self.repo.is_dirty(untracked_files=True)
+    def dirty(self, index=True, working_tree=True, untracked_files=True,
+              submodules=True, path=None):
+        """Returns true if the repo is considered to be dirty
+
+        Parameters
+        ----------
+        index: bool
+          if True, consider changes to the index
+        working_tree: bool
+          if True, consider changes to the working tree
+        untracked_files: bool
+          if True, consider untracked files
+        submodules: bool
+          if True, consider submodules
+        path: str or list of str
+          path(s) to consider only
+        Returns
+        -------
+          bool
+        """
+
+        return self.repo.is_dirty(index=index, working_tree=working_tree,
+                                  untracked_files=untracked_files,
+                                  submodules=submodules, path=path)
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""

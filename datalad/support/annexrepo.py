@@ -39,6 +39,7 @@ from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import borrowdoc
 from datalad.utils import linux_distribution_name
 from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
@@ -310,26 +311,48 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
-    @property
-    def dirty(self):
-        """Returns true if there are uncommitted changes or files not known to
-        index"""
+    @borrowdoc(GitRepo)
+    def dirty(self, index=True, working_tree=True, untracked_files=True,
+              submodules=True, path=None):
         # flush pending changes, especially close batched annex processes to
         # make sure their changes are registered
         self.precommit()
 
         if self.is_direct_mode():
-            result = self._run_annex_command_json('status')
+            # Note: 'git annex status' does not distinguish between staged and
+            # unstaged changes wrt 'deleted', 'type changed' and 'modified'
+            # Note 2: in direct mode any modification can be viewed as staged
+            # TODO: Clearify what is the desired behaviour of this function in
+            # these cases when `index=True` and/or `working_tree=True` are passed.
+
+            result = self._run_annex_command_json('status',
+                                                  args=[path] if path else None)
             # JSON result for 'git annex status'
             # {"status":"?","file":"filename"}
             # ? -- untracked
             # D -- deleted
             # M -- modified
-            # A -- staged
+            # A -- staged => index
             # T -- type changed/unlocked
-            return any(result)
+
+            # TODO: submodules! clean result from paths within submodules
+            for entry in result:
+                if entry['status'] == "?" and untracked_files:
+                    return True
+                # Note: See general direct mode notes. For now no difference
+                # between `index` and `working_tree`
+                if index or working_tree and \
+                        (entry['status'] == "A" or entry['status'] == "D"
+                         or entry['status'] == "M" or entry['status'] == "T"):
+                    return True
+            return False
+
         else:
-            return super(AnnexRepo, self).dirty
+            return super(AnnexRepo, self).dirty(index=index,
+                                                working_tree=working_tree,
+                                                untracked_files=untracked_files,
+                                                submodules=submodules,
+                                                path=path)
 
     @classmethod
     def _check_git_annex_version(cls):
