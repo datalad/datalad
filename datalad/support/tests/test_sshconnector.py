@@ -109,7 +109,8 @@ def test_ssh_manager_close():
     eq_(existed_before_2, still_exists_2)
 
 
-def test_ssh_manager_close_no_throw():
+@with_tempfile
+def test_ssh_manager_close_no_throw(bogus_socket):
     manager = SSHManager()
 
     class bogus:
@@ -118,7 +119,9 @@ def test_ssh_manager_close_no_throw():
 
         @property
         def ctrl_path(self):
-            return "whatever"
+            with open(bogus_socket, "w") as f:
+                f.write("whatever")
+            return bogus_socket
 
     manager._connections['bogus'] = bogus()
     assert_raises(Exception, manager.close)
