@@ -317,7 +317,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)[0]
     eq_(len(source.get_subdatasets()), 2)
-    # get a new subdataset and make sure it is commited in the super
+    # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
     eq_(len(source.get_subdatasets()), 3)
     ok_clean_git(source.path)
@@ -331,7 +331,25 @@ def test_target_ssh_since(origin, src_path, target_path):
         since='HEAD~1')
     # there is one thing in the target directory only, and that is the
     # remote repo of the newly added subdataset
+
+    target = Dataset(target_path)
+    ok_(not target.is_installed())  # since we didn't create it due to since
     eq_(['brandnew'], os.listdir(target_path))
+
+    # now test functionality if we add a subdataset with a subdataset
+    brandnew2 = source.create('brandnew2')
+    brandnewsub = brandnew2.create('sub')
+    brandnewsubsub = brandnewsub.create('sub')
+    # and now we create a sibling for the new subdataset only
+    assert_create_sshwebserver(
+        name='dominique_carrera',
+        dataset=source,
+        sshurl="ssh://localhost" + target_path,
+        recursive=True,
+        existing='skip')
+    # verify that it created the sub and sub/sub
+    ok_(Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
+    ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub')).is_installed())
 
 
 @skip_ssh
