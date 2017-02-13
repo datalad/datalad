@@ -312,38 +312,52 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  cfg_string)]
 
     @borrowdoc(GitRepo)
-    def dirty(self, index=True, working_tree=True, untracked_files=True,
+    def dirty(self, index=True, working_tree=False, untracked_files=True,
               submodules=True, path=None):
+        # TODO: Add doc on how this differs from GitRepo.dirty()
+
+        if working_tree:
+            # Note: annex repos don't always have a git working tree and the
+            # behaviour in direct mode or V6 repos is fundamentally different
+            # from that concept. There are no unstaged changes in direct mode
+            # for example. Therefore the need to call this method with
+            # 'working_tree=True' indicates invalid assumptions in the
+            # calling code.
+
+            # TODO: Better exception. InvalidArgumentError or sth ...
+            raise CommandNotAvailableError(
+                "Querying a git-annex repository for a clean/dirty "
+                "working tree is an invalid concept.")
+
         # flush pending changes, especially close batched annex processes to
         # make sure their changes are registered
         self.precommit()
 
         if self.is_direct_mode():
-            # Note: 'git annex status' does not distinguish between staged and
-            # unstaged changes wrt 'deleted', 'type changed' and 'modified'
-            # Note 2: in direct mode any modification can be viewed as staged
-            # TODO: Clearify what is the desired behaviour of this function in
-            # these cases when `index=True` and/or `working_tree=True` are passed.
 
             result = self._run_annex_command_json('status',
                                                   args=[path] if path else None)
-            # JSON result for 'git annex status'
-            # {"status":"?","file":"filename"}
-            # ? -- untracked
-            # D -- deleted
-            # M -- modified
-            # A -- staged => index
-            # T -- type changed/unlocked
+            if not submodules:
+                # filter results to not contain paths within submodules
+                result = [p for p in result
+                          if all(not p['file'].startswith(sm.path)
+                                 for sm in self.get_submodules())]
 
-            # TODO: submodules! clean result from paths within submodules
             for entry in result:
-                if entry['status'] == "?" and untracked_files:
+                if untracked_files and entry['status'] == "?":
                     return True
                 # Note: See general direct mode notes. For now no difference
                 # between `index` and `working_tree`
-                if index or working_tree and \
-                        (entry['status'] == "A" or entry['status'] == "D"
-                         or entry['status'] == "M" or entry['status'] == "T"):
+                if index and entry['status'] != "?":
+                    # Note: this condition relies on the fact, that ATM
+                    # everything in 'status' field except '?' qualifies for
+                    # being dirty wrt the index. Currently that is the list of
+                    # possible entries:
+                    # ? -- untracked
+                    # D -- deleted
+                    # M -- modified
+                    # A -- staged
+                    # T -- type changed/unlocked
                     return True
             return False
 
