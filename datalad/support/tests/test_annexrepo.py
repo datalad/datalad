@@ -723,9 +723,9 @@ def test_AnnexRepo_add_to_annex(path):
     # uncommitted:
     # but not in direct mode branch
     if repo.is_direct_mode():
-        ok_(not repo.dirty)
+        ok_(not repo.dirty())
     else:
-        ok_(repo.dirty)
+        ok_(repo.dirty())
 
     repo.commit("Added file to annex.")
     ok_clean_git(repo.path, annex=True)
@@ -763,7 +763,7 @@ def test_AnnexRepo_add_to_git(path):
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
     # uncommitted:
-    ok_(repo.repo.is_dirty())
+    ok_(repo.dirty())
     repo.commit("Added file to annex.")
     ok_clean_git(repo.path, annex=True)
 
@@ -923,7 +923,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
     assert_in(ar.WEB_UUID, ar.whereis(testfile))
-    assert(not ar.dirty)
+    assert(not ar.dirty())
     ar.add_url_to_file(testfile2_, testurl2_, batch=True)
     assert(ar.info(testfile2_))
     assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
@@ -957,7 +957,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(len(ar._batched), 1)
     ar._batched.close()
     eq_(len(ar._batched), 1)  # doesn't remove them, just closes
-    assert(not ar.dirty)
+    assert(not ar.dirty())
 
     ar._batched.clear()
     eq_(len(ar._batched), 0)  # .clear also removes
@@ -1246,28 +1246,28 @@ def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
     print(ar.path)
     assert_true(os.path.exists(ar.path))
-    assert_false(ar.dirty)
+    assert_false(ar.dirty())
     os.makedirs(opj(ar.path, '.datalad'))
     # we don't care about empty directories
-    assert_false(ar.dirty)
+    assert_false(ar.dirty())
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
+    assert_true(ar.dirty())  # TODO: has been more detailed assertion (untracked file)
     # no file is being added, as dotfiles/directories are ignored by default
     ar.add('.', git=False)
     # double check, still dirty
-    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
+    assert_true(ar.dirty())  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
     ar.add('.', git=True)
     # all in index
-    assert_true(ar.dirty)
+    assert_true(ar.dirty())
     # TODO: has been more specific:
     # assert_false(ar.repo.is_dirty(
     #     index=False, working_tree=True, untracked_files=True, submodules=True))
     ar.commit(msg="some")
     # all committed
-    assert_false(ar.dirty)
+    assert_false(ar.dirty())
     # not known to annex
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
 
@@ -1504,46 +1504,46 @@ def test_AnnexRepo_get_submodules():
 def test_AnnexRepo_dirty(path):
 
     repo = AnnexRepo(path, create=True)
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
 
     # pure git operations:
     # untracked file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # staged file
     repo.add('file1.txt', git=True)
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # clean again
     repo.commit("file1.txt added")
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
     if not repo.config.getint("annex", "version") == 6:
-        ok_(not repo.dirty)
+        ok_(not repo.dirty())
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('something else')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # clean again
     repo.add('file1.txt', git=True)
     repo.commit("file1.txt modified")
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
 
     # annex operations:
     # untracked file
     with open(opj(path, 'file2.txt'), 'w') as f:
         f.write('different content')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # annexed file
     repo.add('file2.txt', git=False)
     if not repo.is_direct_mode():
         # in direct mode 'annex add' results in a clean repo
-        ok_(repo.dirty)
+        ok_(repo.dirty())
         # commit
         repo.commit("file2.txt annexed")
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
 
     # TODO: unlock/modify
 

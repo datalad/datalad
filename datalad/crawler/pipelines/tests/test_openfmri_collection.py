@@ -75,7 +75,7 @@ def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
     # Check that crawling configuration was created for every one of those
     for sub in subdatasets:
         repo = GitRepo(opj(outd, sub))
-        assert(not repo.dirty)
+        assert(not repo.dirty())
         assert(exists(opj(repo.path, CRAWLER_META_CONFIG_PATH)))
 
     # TODO: check that configuration for the crawler is up to the standard

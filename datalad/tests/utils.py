@@ -62,6 +62,7 @@ _TEMP_PATHS_CLONES = set()
 neq_ = assert_not_equal
 nok_ = assert_false
 
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
@@ -203,7 +204,7 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     if annex and r.is_direct_mode():
         if head_modified or index_modified or untracked:
             raise NotImplementedError("TODO - see note in docstring")
-        ok_(not r.dirty)
+        ok_(not r.dirty())
     else:
         repo = r.repo
 

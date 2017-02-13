@@ -224,7 +224,7 @@ class AddArchiveContent(Interface):
         archive_rpath = relpath(archive_path, annex_path)
 
         # TODO: somewhat too cruel -- may be an option or smth...
-        if not allow_dirty and annex.dirty:
+        if not allow_dirty and annex.dirty():
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
@@ -479,7 +479,7 @@ class AddArchiveContent(Interface):
                 commit_stats = outside_stats if outside_stats else stats
                 annex.precommit()  # so batched ones close and files become annex symlinks etc
                 precommitted = True
-                if annex.repo.is_dirty(untracked_files=False):
+                if annex.dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive, commit_stats.as_str(mode='full')),

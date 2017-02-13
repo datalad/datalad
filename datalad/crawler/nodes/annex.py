@@ -336,7 +336,7 @@ class Annexificator(object):
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
 
-        if (not allow_dirty) and self.repo.dirty:
+        if (not allow_dirty) and self.repo.dirty():
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
         self.statusdb = statusdb
@@ -699,7 +699,7 @@ class Annexificator(object):
 
         def switch_branch(data):
             """Switches to the branch %s""" % branch
-            # if self.repo.dirty
+            # if self.repo.dirty()
             list(self.finalize()(data))
             # statusdb is valid only within the same branch
             self._statusdb = None
@@ -726,7 +726,7 @@ class Annexificator(object):
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
                     self.repo.checkout(branch, options=["--orphan"])
-                    if self.repo.dirty:
+                    if self.repo.dirty():
                         self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc TEST/fix
                 else:
                     if parent not in existing_branches:
@@ -778,7 +778,7 @@ class Annexificator(object):
                 orig_branch = None
                 target_branch_ = self.repo.get_active_branch()
 
-            if self.repo.dirty:
+            if self.repo.dirty():
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
@@ -851,7 +851,7 @@ class Annexificator(object):
             self._statusdb.save()
         # there is something to commit and backends was set but no .gitattributes yet
         path = self.repo.path
-        if self.repo.dirty and not exists(opj(path, '.gitattributes')):
+        if self.repo.dirty() and not exists(opj(path, '.gitattributes')):
             backends = self.repo.default_backends
             if backends:
                 # then record default backend into the .gitattributes
@@ -1292,7 +1292,7 @@ class Annexificator(object):
         def _finalize(data):
             self._precommit()
             stats = data.get('datalad_stats', None)
-            if self.repo.dirty:  # or self.tracker.dirty # for dry run
+            if self.repo.dirty():  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
                 _call(self.repo.add, '.', options=self.options)  # so everything is committed
 

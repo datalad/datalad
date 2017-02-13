@@ -128,7 +128,7 @@ def test_GitRepo_add(src, path):
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty())
 
     filename = "another.txt"
     with open(opj(path, filename), 'w') as f:
@@ -186,7 +186,7 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("commit with options", options=to_options(dry_run=True))
     # wasn't actually committed:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty())
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -658,30 +658,30 @@ def test_GitRepo_get_toppath(repo, tempdir, repo2):
 def test_GitRepo_dirty(path):
 
     repo = GitRepo(path, create=True)
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
 
     # untracked file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # staged file
     repo.add('file1.txt')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # clean again
     repo.commit("file1.txt added")
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('something else')
-    ok_(repo.dirty)
+    ok_(repo.dirty())
     # clean again
     repo.add('file1.txt')
     repo.commit("file1.txt modified")
-    ok_(not repo.dirty)
+    ok_(not repo.dirty())
 
     # TODO: submodules
 
@@ -778,7 +778,7 @@ def test_git_custom_calls(path, path2):
 
     # actually executed:
     assert_in("cc_test.dat", repo.get_indexed_files())
-    ok_(repo.dirty)
+    ok_(repo.dirty())
 
     # call using cmd_options:
     out, err = repo._gitpy_custom_call('commit',
