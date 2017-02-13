@@ -1005,7 +1005,15 @@ class GitRepo(RepoInterface):
         return commit.committed_date
 
     def get_active_branch(self):
-        return self.repo.active_branch.name
+        try:
+            branch = self.repo.active_branch.name
+        except TypeError as e:
+            if "HEAD is a detached symbolic reference" in str(e):
+                lgr.debug("detached HEAD in {0}".format(self))
+                return None, None
+            else:
+                raise
+        return branch
 
     def get_branches(self):
         """Get all branches of the repo.
@@ -1807,14 +1815,9 @@ class GitRepo(RepoInterface):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            try:
-                branch = self.get_active_branch()
-            except TypeError as e:
-                if "HEAD is a detached symbolic reference" in str(e):
-                    lgr.debug("detached HEAD in {0}".format(self))
-                    return None, None
-                else:
-                    raise
+            branch = self.get_active_branch()
+            if branch is None:
+                return None, None
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
