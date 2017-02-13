@@ -315,6 +315,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def dirty(self, index=True, working_tree=False, untracked_files=True,
               submodules=True, path=None):
         # TODO: Add doc on how this differs from GitRepo.dirty()
+        # Parameter working_tree exists to meet the signature of GitRepo.dirty()
 
         if working_tree:
             # Note: annex repos don't always have a git working tree and the
@@ -333,40 +334,32 @@ class AnnexRepo(GitRepo, RepoInterface):
         # make sure their changes are registered
         self.precommit()
 
-        if self.is_direct_mode():
+        result = self._run_annex_command_json('status',
+                                              args=[path] if path else None)
+        if not submodules:
+            # filter results to not contain paths within submodules
+            result = [p for p in result
+                      if all(not p['file'].startswith(sm.path)
+                             for sm in self.get_submodules())]
 
-            result = self._run_annex_command_json('status',
-                                                  args=[path] if path else None)
-            if not submodules:
-                # filter results to not contain paths within submodules
-                result = [p for p in result
-                          if all(not p['file'].startswith(sm.path)
-                                 for sm in self.get_submodules())]
-
-            for entry in result:
-                if untracked_files and entry['status'] == "?":
-                    return True
-                # Note: See general direct mode notes. For now no difference
-                # between `index` and `working_tree`
-                if index and entry['status'] != "?":
-                    # Note: this condition relies on the fact, that ATM
-                    # everything in 'status' field except '?' qualifies for
-                    # being dirty wrt the index. Currently that is the list of
-                    # possible entries:
-                    # ? -- untracked
-                    # D -- deleted
-                    # M -- modified
-                    # A -- staged
-                    # T -- type changed/unlocked
-                    return True
-            return False
-
-        else:
-            return super(AnnexRepo, self).dirty(index=index,
-                                                working_tree=working_tree,
-                                                untracked_files=untracked_files,
-                                                submodules=submodules,
-                                                path=path)
+        for entry in result:
+            if untracked_files and entry['status'] == "?":
+                return True
+            # Note: See general direct mode notes. For now no difference
+            # between `index` and `working_tree`
+            if index and entry['status'] != "?":
+                # Note: this condition relies on the fact, that ATM
+                # everything in 'status' field except '?' qualifies for
+                # being dirty wrt the index, since "working_tree" doesn't make
+                # sense for an annex. Currently that is the list of
+                # possible entries:
+                # ? -- untracked
+                # D -- deleted
+                # M -- modified
+                # A -- staged
+                # T -- type changed/unlocked
+                return True
+        return False
 
     @classmethod
     def _check_git_annex_version(cls):
