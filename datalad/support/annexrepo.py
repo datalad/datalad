@@ -1932,6 +1932,49 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
+    def get_metadata(self, files, timestamps=False):
+        files = assure_list(files)
+        args = ['--json']
+        args.extend(files)
+        return {res['file']:
+                res['fields'] if timestamps else \
+                {k: v for k, v in res['fields'].items()
+                 if not k.endswith('lastchanged')}
+                for res in self._run_annex_command_json('metadata', args)}
+
+    def set_metadata(
+            self, files, reset=None, add=None, init=None,
+            remove=None, purge=None):
+
+        def _genspec(expr, d):
+            return [expr.format(k, v) for k, v in d.items()]
+
+        args = []
+        spec = []
+        for expr, d in (('{}={}', reset),
+                        ('{}+={}', add),
+                        ('{}?={}', init),
+                        ('{}-={}', remove)):
+            if d:
+                spec.extend(_genspec(expr, d))
+        # prefix all with '-s' and extend arg list
+        args.extend(j for i in zip(['-s'] * len(spec), spec) for j in i)
+        if purge:
+            # and all '-r' args
+            args.extend(j for i in zip(['-r'] * len(purge), purge)
+                        for j in i)
+        if not args:
+            return
+
+        # append actual file path arguments
+        args.extend(assure_list(files))
+
+        # XXX do we need the return values for anything?
+        self._run_annex_command_json(
+            'metadata',
+            args)
+
+
 
 # TODO: Why was this commented out?
 # @auto_repr

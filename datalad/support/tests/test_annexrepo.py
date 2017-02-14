@@ -1573,3 +1573,42 @@ def test_AnnexRepo_set_remote_url(path):
                  'ssh://whatever.ru')
 
 
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_metadata(path):
+    def _nochange(d):
+        return {k: v for k, v in d.items() if not k.endswith('lastchanged')}
+    # prelude
+    ar = AnnexRepo(path, create=True)
+    create_tree(
+        path,
+        {
+            'up.dat': 'content',
+            'down': {
+                'down.dat': 'lowcontent'
+            }
+        })
+    ar.add('.', git=False)
+    ar.commit('content')
+    ok_clean_git(path)
+    # fugue
+    # doesn't do anything if there is nothing to do
+    ar.set_metadata('up.dat')
+    eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
+    # basic invokation
+    eq_(None, ar.set_metadata(
+        'up.dat',
+        reset={'mike': 'awesome'},
+        add={'tag': 'awesome'},
+        remove={'tag': 'awesome'},  # cancels prev
+        init={'virgin': 'true'},
+        purge=['nothere']))
+    # no timestamps by default
+    md = ar.get_metadata('up.dat')
+    eq_({'up.dat': {
+        'virgin': ['true'],
+        'mike': ['awesome']}},
+        md)
+    md_ts = ar.get_metadata('up.dat', timestamps=True)
+    for k in md['up.dat']:
+        assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
+    assert_in('lastchanged', md_ts['up.dat'])
