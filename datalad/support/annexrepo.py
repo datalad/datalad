@@ -1588,7 +1588,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg=None, options=None, _datalad_msg=False):
+    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
         """
 
         Parameters
@@ -1611,7 +1611,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
                        (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg)
+            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg, careless=careless)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

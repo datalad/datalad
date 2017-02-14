@@ -884,7 +884,7 @@ class GitRepo(RepoInterface):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def commit(self, msg=None, options=None, _datalad_msg=False):
+    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
         """Commit changes to git.
 
         Parameters
@@ -896,6 +896,9 @@ class GitRepo(RepoInterface):
         _datalad_msg: bool, optional
           To signal that commit is automated commit by datalad, so
           it would carry the [DATALAD] prefix
+        careless: bool
+          if False, raise when there's nothing actually committed;
+          if True, don't care
         """
 
         if _datalad_msg:
@@ -931,7 +934,34 @@ class GitRepo(RepoInterface):
         if options:
             cmd.extend(options)
         lgr.debug("Committing via direct call of git: %s" % cmd)
-        self._git_custom_command([], cmd)
+
+        try:
+            with swallow_logs(new_level=logging.ERROR) as cml:
+                self._git_custom_command([], cmd)
+        except CommandError as e:
+            if 'nothing to commit' in e.stdout:
+                if careless:
+                    lgr.debug("nothing to commit in {}. "
+                              "Ignored.".format(self))
+                else:
+                    raise
+            elif 'no changes added to commit' in e.stdout:
+                if careless:
+                    lgr.debug("no changes added to commit in {}. "
+                              "Ignored.".format(self))
+                else:
+                    raise
+            elif "did not match any file(s) known to git." in e.stderr:
+                # TODO: Improve FileNotInXXXXError classes to better deal with
+                # multiple files
+                raise FileNotInRepositoryError(cmd=e.cmd,
+                                               msg="File(s) unknown to git",
+                                               code=e.code,
+                                               filename=linesep.join(
+                                            [l for l in e.stderr.splitlines()
+                                             if l.startswith("pathspec")]))
+            else:
+                raise
 
     def get_indexed_files(self):
         """Get a list of files in git's index
