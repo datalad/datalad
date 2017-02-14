@@ -1933,6 +1933,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
     def get_metadata(self, files, timestamps=False):
+        """Query git-annex file metadata
+
+        Parameters
+        ----------
+        files : path or list(paths)
+          One or more paths for which metadata is to be queried.
+        timestamps: bool
+          If True, the output contains a '<metadatakey>-lastchanged'
+          key for every metadata item, reflecting the modification
+          time, as well as a 'lastchanged' key with the most recent
+          modification time of any metadata item.
+
+        Returns
+        -------
+        dict
+          One item per file (could be more items than input arguments
+          when directories are given). Keys are filenames, values are
+          dictionaries with metadata key/value pairs. Note that annex
+          metadata tags are stored under the key 'tag', which is a
+          regular metadata item that can be manipulated like any other.
+        """
+        if not files:
+            return {}
         files = assure_list(files)
         args = ['--json']
         args.extend(files)
@@ -1944,7 +1967,42 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,
-            remove=None, purge=None):
+            remove=None, purge=None, recursive=False):
+        """Manipulate git-annex file-metadata
+
+        Parameters
+        ----------
+        files : path or list(paths)
+          One or more paths for which metadata is to be manipulated.
+          The changes applied to each file item are uniform. However,
+          the result may not be uniform across files, depending on the
+          actual operation.
+        reset : dict
+          Metadata items matching keys in the given dict are (re)set
+          to the respective values.
+        add : dict
+          The values of matching keys in the given dict appended to
+          any possibly existing values. The metadata keys need not
+          necessarily exist before.
+        init : dict
+          Metadata items for the keys in the given dict are set
+          to the respective values, if the key is not yet present
+          in a file's metadata.
+        remove : dict
+          Values in the given dict are removed from the metadata items
+          matching the respective key, if they exist in a file's metadata.
+          Non-existing values, or keys do not lead to failure.
+        purge : list
+          Any metadata item with a key matching an entry in the given
+          list is removed from the metadata.
+        recursive : bool
+          If False, fail (with CommandError) when directory paths
+          are given as `files`.
+
+        Returns
+        -------
+        None
+        """
 
         def _genspec(expr, d):
             return [expr.format(k, v) for k, v in d.items()]
@@ -1966,6 +2024,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if not args:
             return
 
+        if recursive:
+            args.append('--force')
         # append actual file path arguments
         args.extend(assure_list(files))
 
@@ -1973,7 +2033,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command_json(
             'metadata',
             args)
-
 
 
 # TODO: Why was this commented out?
