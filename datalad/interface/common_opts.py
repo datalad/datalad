@@ -164,3 +164,8 @@ publish_by_default = Parameter(
     constraints=EnsureStr() | EnsureNone(),
     action='append')
 
+inherit_settings_opt = Parameter(
+    args=("--inherit-settings",),
+    action="store_true",
+    doc="""if sibling does not exist in a given dataset, its
+    `create-sibling --inherit-settings` is called""")

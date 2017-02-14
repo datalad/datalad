@@ -391,3 +391,19 @@ def test_failon_no_permissions(src_path, target_path):
         name='goodperm',
         dataset=ds,
         sshurl="ssh://localhost" + opj(target_path, 'ds'))
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile(suffix="target")
+def test_target_ssh_inherit(src_path, target_path):
+    ds = Dataset(src_path).create()
+    target_url = 'localhost:%s' % target_path
+    remote = "magical"
+    ds.create_sibling(target_url, name=remote)  # not doing recursively
+    ds.publish(to=remote)
+    ds.create('sub')  # so now we got a hierarchy!
+    ds.publish()  # should be ok, non recursive; BUT it (git or us?) would
+                  # create an empty sub/ directory
+    assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
+    ds.publish(to=remote, recursive=True, inherit_settings=True)

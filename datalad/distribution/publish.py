@@ -17,6 +17,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import filter_unmodified
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
+from datalad.interface.common_opts import inherit_settings_opt
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -255,7 +256,10 @@ class Publish(Interface):
         recursion_limit=recursion_limit,
         git_opts=git_opts,
         annex_opts=annex_opts,
-        annex_copy_opts=annex_copy_opts
+        annex_copy_opts=annex_copy_opts,
+        # "interferes" with skip_failing which is actually "skip_missing"
+        # TODO: unify as --missing=(skip|inherit) ?
+        inherit_settings=inherit_settings_opt
     )
 
     @staticmethod
@@ -266,6 +270,7 @@ class Publish(Interface):
             to=None,
             since=None,
             skip_failing=False,
+            inherit_settings=False,
             recursive=False,
             recursion_limit=None,
             git_opts=None,
@@ -343,11 +348,24 @@ class Publish(Interface):
                         'Cannot determine target sibling for %s' % (ds,))
             elif to not in ds.repo.get_remotes():
                 # unknown given remote
+                # TODO: not quite "failing" really so interfers with "inherit_settings"
                 if skip_failing:
                     lgr.warning(
                         "Unknown target sibling '%s', skipping %s",
                         to, ds)
                     ds_remote_info[ds_path] = None
+                elif inherit_settings:
+                    superds = ds.get_superdataset()
+                    if not superds:
+                        raise RuntimeError(
+                            "%s has no super-dataset to inherit settings for the remote %s"
+                            % (ds, to)
+                        )
+                    # XXX due to difference between create-sibling and create-sibling-github
+                    # would not be as transparent to inherit for -github
+                    lgr.info("Will try to create a sibling inheriting settings from %s", superds)
+                    # XXX explicit None as sshurl for now
+                    ds.create_sibling(None, name=to, inherit_settings=True)
                 else:
                     raise ValueError(
                         "Unknown target sibling '%s' for %s" % (to, ds))

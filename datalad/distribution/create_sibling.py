@@ -22,9 +22,11 @@ from datalad import ssh_manager
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.distribution.add_sibling import AddSibling
 from datalad.distribution.add_sibling import _check_deps
+from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
@@ -32,11 +34,13 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
+from datalad.interface.common_opts import inherit_settings_opt
 from datalad.interface.utils import filter_unmodified
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.network import RI
 from datalad.support.network import is_ssh
 from datalad.support.sshconnector import sh_quote
@@ -63,6 +67,10 @@ def _create_dataset_sibling(
         publish_depends,
         publish_by_default,
         as_common_datasrc):
+    """Everyone is very smart here and could figure out the combinatorial
+    affluence among provided tiny (just slightly over a dozen) number of options
+    and only a few pages of code
+    """
     localds_path = ds.path
     ds_name = relpath(localds_path, start=hierarchy_basepath)
     if not replicate_local_structure:
@@ -313,7 +321,7 @@ class CreateSibling(Interface):
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
-            constraints=EnsureStr() | EnsureBool()),
+            constraints=EnsureStr() | EnsureBool() | EnsureNone()),
         ui=Parameter(
             args=("--ui",),
             metavar='false|true|html_filename',
@@ -324,6 +332,7 @@ class CreateSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        inherit_settings=inherit_settings_opt,
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
@@ -339,33 +348,16 @@ class CreateSibling(Interface):
                  dataset=None,
                  recursive=False,
                  recursion_limit=None,
-                 existing='error', shared=False, ui=False,
+                 existing='error', shared=None, ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
                  publish_depends=None,
+                 inherit_settings=False,
                  since=None):
 
         # there is no point in doing anything further
         not_supported_on_windows(
             "Support for SSH connections is not yet implemented in Windows")
-
-        if not sshurl:
-            raise InsufficientArgumentsError(
-                "need at least an SSH URL")
-
-        # check the login URL
-        sshri = RI(sshurl)
-        if not is_ssh(sshri):
-            raise ValueError(
-                "Unsupported SSH URL: '{0}', "
-                "use ssh://host/path or host:path syntax".format(sshurl))
-
-        if not name:
-            # use the hostname as default remote name
-            name = sshri.hostname
-            lgr.debug(
-                "No sibling name given, use URL hostname '%s' as sibling name",
-                name)
 
         ds = require_dataset(dataset, check_installed=True,
                              purpose='creating a sibling')
@@ -381,7 +373,7 @@ class CreateSibling(Interface):
         assert(not unavailable_paths)
 
         # anal verification
-        assert(ds is not None and sshurl is not None and ds.repo is not None)
+        assert(ds is not None and ds.repo is not None)
 
         if since:
             mod_subs = []
@@ -398,7 +390,59 @@ class CreateSibling(Interface):
 
         # make sure dependencies are valid
         for d in datasets.values():
+            # TODO: inherit_settings -- we might want to automagically create
+            # those dependents as well???
             _check_deps(d.repo, publish_depends)
+
+        # Finally we get to the point where sshurl is possibly used  to
+        # get the name in case if not specified
+        if not sshurl:
+            if not inherit_settings:
+                raise InsufficientArgumentsError(
+                    "needs at least an SSH URL, if no inherrit_settings option"
+                )
+            if name is None:
+                raise ValueError(
+                    "Neither SSH URL, nor the name of sibling to inherit from "
+                    "was specified"
+                )
+            # TODO: may be more back up before _prep?
+            super_ds = ds.get_superdataset()
+            if not super_ds:
+                raise ValueError(
+                    "Could not determine super dataset to inherit URL")
+            # take pushurl if present, if not -- just a url
+            super_url = super_ds.config.get('remote.%s.pushurl' % name) or \
+                        super_ds.config.get('remote.%s.url' % name)
+            if not super_url:
+                raise ValueError(
+                    "Super dataset %s had neither pushurl or url defined for %s"
+                    % (super_ds, name)
+                )
+            # for now assuming hierarchical setup
+            # (TODO: to be able to destinguish between the two, probably
+            # needs storing datalad.*.target_dir to have %RELNAME in there)
+            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
+        elif inherit_settings:
+            raise ValueError(
+                "For now to clarity not allowing specifying a custom sshurl "
+                "while inheritting settings"
+            )
+            # may be could be safely dropped -- still WiP
+
+        # check the login URL
+        sshri = RI(sshurl)
+        if not is_ssh(sshri):
+            raise ValueError(
+                "Unsupported SSH URL: '{0}', "
+                "use ssh://host/path or host:path syntax".format(sshurl))
+
+        if not name:
+            # use the hostname as default remote name
+            name = sshri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
         # find datasets with existing remotes with the target name
         remote_existing = [p for p in datasets
@@ -438,12 +482,11 @@ class CreateSibling(Interface):
                 target_dir = '.'
 
         # TODO: centralize and generalize template symbol handling
-        replicate_local_structure = False
-        if "%RELNAME" not in target_dir:
-            replicate_local_structure = True
+        replicate_local_structure = "%RELNAME" not in target_dir
 
         # request ssh connection:
         lgr.info("Connecting ...")
+        assert(sshurl is not None)  # delayed anal verification
         ssh = ssh_manager.get_connection(sshurl)
         if not ssh.get_annex_version():
             raise MissingExternalDependency(
@@ -458,6 +501,29 @@ class CreateSibling(Interface):
         for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
+
+            add_config = {}  # additional .config items
+            if inherit_settings:
+                # here we must analyze current_ds's super, not the super_ds
+                current_super_ds = current_ds.get_superdataset()
+                super_config = current_super_ds.config
+
+                # XXX yoh is not exactly comfortable stating understanding
+                # interactions with sshri below, and why we could just use a
+                # single sshri
+                shared_ = shared  # TODO: from super
+                # Copy config options
+                remote_section = 'remote.%s' % name
+                for opt_name in ['push'] + \
+                         [opt_name for opt_name in super_config.options(remote_section)
+                          if opt_name.startswith('datalad-')]:
+                    opt = "%s.%s" % (remote_section, opt_name)
+                    v = super_config.get(opt)
+                    if v:
+                        add_config[opt] = v
+            else:
+                shared_ = shared
+
             path = _create_dataset_sibling(
                 name,
                 current_ds,
@@ -469,7 +535,7 @@ class CreateSibling(Interface):
                 target_url,
                 target_pushurl,
                 existing,
-                shared,
+                shared_,
                 publish_depends,
                 publish_by_default,
                 as_common_datasrc)
@@ -477,6 +543,14 @@ class CreateSibling(Interface):
                 # nothing new was created
                 continue
             remote_repos_to_run_hook_for.append(path)
+
+            # if any - set inherited options
+            for opt, value in add_config.items():
+                current_values = assure_list(current_ds.config.get(opt))
+                for v in assure_list(value):
+                    if v not in current_values:
+                        lgr.debug("Adding inherited option %s=%r", opt, v)
+                        current_ds.config.add(opt, v)
 
             # publish web-interface to root dataset on publication server
             if current_dspath == ds.path and ui:

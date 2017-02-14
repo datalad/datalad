@@ -105,6 +105,7 @@ class AddSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        # TODO: inherit_settings
     )
 
     @staticmethod
