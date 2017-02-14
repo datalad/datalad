@@ -1581,8 +1581,8 @@ def test_AnnexRepo_metadata(path):
         path,
         {
             'up.dat': 'content',
-            'down': {
-                'down.dat': 'lowcontent'
+            'd o"w n': {
+                'd o w n.dat': 'lowcontent'
             }
         })
     ar.add('.', git=False)
@@ -1621,7 +1621,7 @@ def test_AnnexRepo_metadata(path):
         'mike': ['awesome']}},
         ar.get_metadata('up.dat'))
     ar.set_metadata('.', reset={'tag': 'one'}, purge=['mike'], recursive=True)
-    playfile = opj('down', 'down.dat')
+    playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one']},
