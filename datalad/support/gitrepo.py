@@ -909,15 +909,29 @@ class GitRepo(RepoInterface):
                     options = ["--allow-empty-message"]
 
         self.precommit()
+        # Note: We used to use a direct call to git only if there were options,
+        # since we can't pass all possible options to gitpython's implementation
+        # of commit.
+        # But there's an additional issue. GitPython implements commit in a way,
+        # that it might create a new commit, when a direct call wouldn't. This
+        # was discovered with a modified (but unstaged) submodule, leading to a
+        # commit, that apparently did nothing - git status still showed the very
+        # same thing afterwards. But a commit was created nevertheless:
+        # diff --git a/sub b/sub
+        # --- a/sub
+        # +++ b/sub
+        # @@ -1 +1 @@
+        # -Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f
+        # +Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f-dirty
+        #
+        # Therefore, for now always use direct call.
+        # TODO: Figure out, what exactly is going on with gitpython here
+
+        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
         if options:
-            # we can't pass all possible options to gitpython's implementation
-            # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
-            lgr.debug("Committing via direct call of git: %s" % cmd)
-            self._git_custom_command([], cmd)
-        else:
-            lgr.debug("Committing with msg=%r" % msg)
-            self.cmd_call_wrapper(self.repo.index.commit, msg)
+            cmd.extend(options)
+        lgr.debug("Committing via direct call of git: %s" % cmd)
+        self._git_custom_command([], cmd)
 
     def get_indexed_files(self):
         """Get a list of files in git's index
