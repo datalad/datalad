@@ -338,7 +338,7 @@ def save_dataset(
         # stages otherwise do not attempt to commit, as the underlying
         # repo will happily commit any non-change
         # not checking the working tree or untracked files should make this
-        # relavtively cheap
+        # relatively cheap
 
         # we will blindly call commit not knowing if there is anything to
         # commit -- this is cheaper than to anticipate all possible ways

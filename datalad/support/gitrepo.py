@@ -945,7 +945,8 @@ class GitRepo(RepoInterface):
                               "Ignored.".format(self))
                 else:
                     raise
-            elif 'no changes added to commit' in e.stdout:
+            elif 'no changes added to commit' in e.stdout or \
+                    'nothing added to commit' in e.stdout:
                 if careless:
                     lgr.debug("no changes added to commit in {}. "
                               "Ignored.".format(self))
@@ -953,7 +954,7 @@ class GitRepo(RepoInterface):
                     raise
             elif "did not match any file(s) known to git." in e.stderr:
                 # TODO: Improve FileNotInXXXXError classes to better deal with
-                # multiple files
+                # multiple files; Also consider PathOutsideRepositoryError
                 raise FileNotInRepositoryError(cmd=e.cmd,
                                                msg="File(s) unknown to git",
                                                code=e.code,
