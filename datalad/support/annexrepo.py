@@ -1588,30 +1588,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
+    @borrowdoc(GitRepo)
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
-        """
-
-        Parameters
-        ----------
-        msg: str
-        options: list of str
-          cmdline options for git-commit
-        """
         self.precommit()
-        if self.is_direct_mode():
-            if _datalad_msg:
-                msg = self._get_prefixed_commit_msg(msg)
-            if not msg:
-                if options:
-                    if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-                else:
-                    options = ["--allow-empty-message"]
-
-            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
-                       (options if options else []), expect_stderr=True)
-        else:
-            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg, careless=careless)
+        super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg,
+                                      careless=careless)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
