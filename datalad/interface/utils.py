@@ -361,7 +361,7 @@ def save_dataset(
                 lgr.debug(
                     "Was instructed to commit %s files but repository is not dirty",
                     files)
-            elif 'no changes added to commit':
+            elif 'no changes added to commit' in str(e):
                 lgr.info(
                     'Nothing to save')
             else:
