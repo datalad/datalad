@@ -345,8 +345,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         for entry in result:
             if untracked_files and entry['status'] == "?":
                 return True
-            # Note: See general direct mode notes. For now no difference
-            # between `index` and `working_tree`
             if index and entry['status'] != "?":
                 # Note: this condition relies on the fact, that ATM
                 # everything in 'status' field except '?' qualifies for

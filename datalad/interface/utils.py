@@ -332,7 +332,6 @@ def save_dataset(
 
     if files or ds.repo.dirty(
             index=True,
-            working_tree=False,
             untracked_files=False,
             submodules=True):
         # either we have an explicit list of files, or we have something
