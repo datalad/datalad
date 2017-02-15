@@ -114,17 +114,21 @@ class Update(Interface):
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
                 continue
-            if sibling and sibling not in remotes:
+            if not sibling:
+                # nothing given, look for tracking branch
+                sibling_ = repo.get_tracking_branch()[0]
+            else:
+                sibling_ = sibling
+            if sibling_ and sibling_ not in remotes:
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
-                            sibling, repo.path)
+                            sibling_, repo.path)
                 continue
-
-            if not sibling and len(remotes) > 1 and merge:
+            if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 raise NotImplementedError(
                     "Multiple siblings, please specify from which to update.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
-            _update_repo(repo, sibling, merge, fetch_all)
+            _update_repo(repo, sibling_, merge, fetch_all)
 
 
 def _update_repo(repo, remote, merge, fetch_all):

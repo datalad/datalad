@@ -131,7 +131,8 @@ def test_update_fetch_all(src, remote_1, remote_2):
     assert_in("second.txt", ds.repo.get_files("sibling_2/master"))
 
     # no merge strategy for multiple remotes yet:
-    assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
+    # more clever now, there is a tracking branch that provides a remote
+    #assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
 
     # merge a certain remote:
     ds.update(sibling="sibling_1", merge=True)
