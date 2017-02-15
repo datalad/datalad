@@ -135,33 +135,10 @@ class Update(Interface):
 
 
 def _update_repo(repo, remote, merge, fetch_all):
-    # fetch remote(s):
+    # fetch remote
     repo.fetch(
         remote=None if fetch_all else remote,
         all_=fetch_all)
-
-    # if `repo` is an annex and we didn't fetch the entire remote
-    # anyway, explicitly fetch git-annex branch:
-
-    # TODO: This isn't correct. `fetch_all` fetches all remotes.
-    # Apparently, we currently fetch an entire remote anyway. Is this
-    # what we want? Do we want to specify a refspec instead?
-    # yoh: we should leave it to git and its configuration.
-    # So imho we should just extract to fetch everything git would fetch
-    if knows_annex(repo.path) and not fetch_all:
-        if remote:
-            # we are updating from a certain remote, so git-annex branch
-            # should be updated from there as well:
-            repo.fetch(remote=remote)
-            # TODO: what does failing here look like?
-        else:
-            # we have no remote given, therefore
-            # check for tracking branch's remote:
-
-            track_remote, track_branch = repo.get_tracking_branch()
-            if track_remote:
-                # we have a "tracking remote"
-                repo.fetch(remote=track_remote)
 
     # merge:
     if merge:
