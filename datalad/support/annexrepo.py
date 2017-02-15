@@ -39,7 +39,6 @@ from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
-from datalad.dochelpers import borrowdoc
 from datalad.utils import linux_distribution_name
 from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
@@ -1561,10 +1560,42 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    @borrowdoc(GitRepo)
-    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
+    def commit(self, msg=None, options=None, _datalad_msg=False):
+        """
+
+        Parameters
+        ----------
+        msg: str
+        options: list of str
+          cmdline options for git-commit
+        """
         self.precommit()
-        super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg)
+        if self.is_direct_mode():
+            # committing explicitly given paths in direct mode via proxy used to
+            # fail, because absolute paths are used. Using annex proxy this
+            # leads to an error (path outside repository)
+            if options:
+                for i in range(len(options)):
+                    if not options[i].startswith('-'):
+                        # an option, that is not an option => it's a path
+                        # TODO: comprehensive + have dedicated parameter 'files'
+                        from os.path import isabs, relpath, normpath
+                        if isabs(options[i]):
+                            options[i] = normpath(relpath(options[i], start=self.path))
+
+            if _datalad_msg:
+                msg = self._get_prefixed_commit_msg(msg)
+            if not msg:
+                if options:
+                    if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
+            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+                       (options if options else []), expect_stderr=True)
+        else:
+            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
