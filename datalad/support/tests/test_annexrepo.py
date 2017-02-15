@@ -50,6 +50,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_batch_direct
+from datalad.tests.utils import assert_dict_equal as deq_
 from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
@@ -1595,7 +1596,7 @@ def test_AnnexRepo_metadata(path):
     eq_({}, ar.get_metadata(''))
     eq_({}, ar.get_metadata([]))
     eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
-    # basic invokation
+    # basic invocation
     eq_(None, ar.set_metadata(
         'up.dat',
         reset={'mike': 'awesome'},
@@ -1605,7 +1606,7 @@ def test_AnnexRepo_metadata(path):
         purge=['nothere']))
     # no timestamps by default
     md = ar.get_metadata('up.dat')
-    eq_({'up.dat': {
+    deq_({'up.dat': {
         'virgin': ['true'],
         'mike': ['awesome']}},
         md)
@@ -1617,30 +1618,32 @@ def test_AnnexRepo_metadata(path):
     # recursive needs a flag
     assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
     ar.set_metadata('.', purge=['virgin'], recursive=True)
-    eq_({'up.dat': {
+    deq_({'up.dat': {
         'mike': ['awesome']}},
         ar.get_metadata('up.dat'))
-    ar.set_metadata('.', reset={'tag': 'one'}, purge=['mike'], recursive=True)
+    # Use trickier tags (spaces, =)
+    ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
     playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
-            'tag': ['one']},
+            'tag': ['one and= ']},
         playfile: {
-            'tag': ['one']}}
-    eq_(target, ar.get_metadata('.'))
+            'tag': ['one and= ']}}
+    deq_(target, ar.get_metadata('.'))
     # incremental work like a set
-    ar.set_metadata(playfile, add={'tag': 'one'})
-    eq_(target, ar.get_metadata('.'))
-    ar.set_metadata(playfile, add={'tag': 'two'})
-    eq_(['one', 'two'], ar.get_metadata(playfile)[playfile]['tag'])
+    ar.set_metadata(playfile, add={'tag': 'one and= '})
+    deq_(target, ar.get_metadata('.'))
+    ar.set_metadata(playfile, add={'tag': ' two'})
+    # returned values are sorted
+    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
     # init honor prior values
     ar.set_metadata(playfile, init={'tag': 'three'})
-    eq_(['one', 'two'], ar.get_metadata(playfile)[playfile]['tag'])
-    ar.set_metadata(playfile, remove={'tag': 'two'})
-    eq_(target, ar.get_metadata('.'))
+    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
+    ar.set_metadata(playfile, remove={'tag': ' two'})
+    deq_(target, ar.get_metadata('.'))
     # remove non-existing doesn't error and doesn't change anything
     ar.set_metadata(playfile, remove={'ether': 'best'})
-    eq_(target, ar.get_metadata('.'))
+    deq_(target, ar.get_metadata('.'))
     # add works without prior existence
     ar.set_metadata(playfile, add={'novel': 'best'})
     eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
