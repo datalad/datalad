@@ -119,16 +119,10 @@ class Update(Interface):
                             sibling, repo.path)
                 continue
 
-            # Currently '--merge' works for single remote only:
-            # TODO: - condition still incomplete
-            #       - We can merge if a remote was given or there is a
-            #         tracking branch
-            #       - we also can fetch all remotes independently on whether or
-            #         not we merge a certain remote
             if not sibling and len(remotes) > 1 and merge:
-                lgr.debug("Found multiple remotes:\n%s" % remotes)
-                raise NotImplementedError("No merge strategy for multiple "
-                                          "remotes implemented yet.")
+                lgr.debug("Found multiple siblings:\n%s" % remotes)
+                raise NotImplementedError(
+                    "Multiple siblings, please specify from which to update.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
             _update_repo(repo, sibling, merge, fetch_all)
 
