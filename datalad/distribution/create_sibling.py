@@ -550,7 +550,7 @@ class CreateSibling(Interface):
                 for v in assure_list(value):
                     if v not in current_values:
                         lgr.debug("Adding inherited option %s=%r", opt, v)
-                        current_ds.config.add(opt, v)
+                        current_ds.config.add(opt, v, where='local')
 
             # publish web-interface to root dataset on publication server
             if current_dspath == ds.path and ui:

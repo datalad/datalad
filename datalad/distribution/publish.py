@@ -366,6 +366,7 @@ class Publish(Interface):
                     lgr.info("Will try to create a sibling inheriting settings from %s", superds)
                     # XXX explicit None as sshurl for now
                     ds.create_sibling(None, name=to, inherit_settings=True)
+                    ds_remote_info[ds_path] = {'remote': to}
                 else:
                     raise ValueError(
                         "Unknown target sibling '%s' for %s" % (to, ds))
