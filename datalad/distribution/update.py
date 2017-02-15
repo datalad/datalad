@@ -129,7 +129,9 @@ class Update(Interface):
 
 def _update_repo(repo, remote, merge, fetch_all):
     # fetch remote(s):
-    repo.fetch(remote=remote, all_=fetch_all)
+    repo.fetch(
+        remote=None if fetch_all else remote,
+        all_=fetch_all)
 
     # if `repo` is an annex and we didn't fetch the entire remote
     # anyway, explicitly fetch git-annex branch:
