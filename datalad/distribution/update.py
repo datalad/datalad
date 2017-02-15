@@ -128,57 +128,57 @@ class Update(Interface):
 
 
 def _update_repo(repo, remote, merge, fetch_all):
-            # fetch remote(s):
-            repo.fetch(remote=remote, all_=fetch_all)
+    # fetch remote(s):
+    repo.fetch(remote=remote, all_=fetch_all)
 
-            # if `repo` is an annex and we didn't fetch the entire remote
-            # anyway, explicitly fetch git-annex branch:
+    # if `repo` is an annex and we didn't fetch the entire remote
+    # anyway, explicitly fetch git-annex branch:
 
-            # TODO: This isn't correct. `fetch_all` fetches all remotes.
-            # Apparently, we currently fetch an entire remote anyway. Is this
-            # what we want? Do we want to specify a refspec instead?
-            # yoh: we should leave it to git and its configuration.
-            # So imho we should just extract to fetch everything git would fetch
-            if knows_annex(repo.path) and not fetch_all:
-                if remote:
-                    # we are updating from a certain remote, so git-annex branch
-                    # should be updated from there as well:
-                    repo.fetch(remote=remote)
-                    # TODO: what does failing here look like?
-                else:
-                    # we have no remote given, therefore
-                    # check for tracking branch's remote:
+    # TODO: This isn't correct. `fetch_all` fetches all remotes.
+    # Apparently, we currently fetch an entire remote anyway. Is this
+    # what we want? Do we want to specify a refspec instead?
+    # yoh: we should leave it to git and its configuration.
+    # So imho we should just extract to fetch everything git would fetch
+    if knows_annex(repo.path) and not fetch_all:
+        if remote:
+            # we are updating from a certain remote, so git-annex branch
+            # should be updated from there as well:
+            repo.fetch(remote=remote)
+            # TODO: what does failing here look like?
+        else:
+            # we have no remote given, therefore
+            # check for tracking branch's remote:
 
-                    track_remote, track_branch = repo.get_tracking_branch()
-                    if track_remote:
-                        # we have a "tracking remote"
-                        repo.fetch(remote=track_remote)
+            track_remote, track_branch = repo.get_tracking_branch()
+            if track_remote:
+                # we have a "tracking remote"
+                repo.fetch(remote=track_remote)
 
-            # merge:
-            if merge:
-                lgr.info("Applying changes from tracking branch...")
-                # TODO: Adapt.
-                # TODO: Rethink default remote/tracking branch. See above.
-                # We need a "tracking remote" but custom refspec to fetch from
-                # that remote
-                cmd_list = ["git", "pull"]
-                if remote:
-                    cmd_list.append(remote)
-                    # branch needed, if not default remote
-                    # => TODO: use default remote/tracking branch to compare
-                    #          (see above, where git-annex is fetched)
-                    # => TODO: allow for passing a branch
-                    # (or more general refspec?)
-                    # For now, just use the same name
-                    cmd_list.append(repo.get_active_branch())
+    # merge:
+    if merge:
+        lgr.info("Applying changes from tracking branch...")
+        # TODO: Adapt.
+        # TODO: Rethink default remote/tracking branch. See above.
+        # We need a "tracking remote" but custom refspec to fetch from
+        # that remote
+        cmd_list = ["git", "pull"]
+        if remote:
+            cmd_list.append(remote)
+            # branch needed, if not default remote
+            # => TODO: use default remote/tracking branch to compare
+            #          (see above, where git-annex is fetched)
+            # => TODO: allow for passing a branch
+            # (or more general refspec?)
+            # For now, just use the same name
+            cmd_list.append(repo.get_active_branch())
 
-                std_out, std_err = repo._git_custom_command('', cmd_list)
-                lgr.info(std_out)
-                if knows_annex(repo.path):
-                    # annex-apply:
-                    lgr.info("Updating annex ...")
-                    std_out, std_err = repo._git_custom_command(
-                        '', ["git", "annex", "merge"])
-                    lgr.info(std_out)
+        std_out, std_err = repo._git_custom_command('', cmd_list)
+        lgr.info(std_out)
+        if knows_annex(repo.path):
+            # annex-apply:
+            lgr.info("Updating annex ...")
+            std_out, std_err = repo._git_custom_command(
+                '', ["git", "annex", "merge"])
+            lgr.info(std_out)
 
-                    # TODO: return value?
+            # TODO: return value?
