@@ -142,7 +142,13 @@ def _update_repo(repo, remote, merge, fetch_all):
 
     # merge:
     if merge:
-        lgr.info("Applying changes from tracking branch...")
+        lgr.info("Merging updates...")
+        if hasattr(repo, 'merge_annex'):
+            # this runs 'annex sync' and should deal with anything
+            repo.merge_annex(remote=remote)
+        else:
+            # handle merge in plain git
+            pass
         # TODO: Adapt.
         # TODO: Rethink default remote/tracking branch. See above.
         # We need a "tracking remote" but custom refspec to fetch from
@@ -160,11 +166,3 @@ def _update_repo(repo, remote, merge, fetch_all):
 
         std_out, std_err = repo._git_custom_command('', cmd_list)
         lgr.info(std_out)
-        if knows_annex(repo.path):
-            # annex-apply:
-            lgr.info("Updating annex ...")
-            std_out, std_err = repo._git_custom_command(
-                '', ["git", "annex", "merge"])
-            lgr.info(std_out)
-
-            # TODO: return value?
