@@ -361,13 +361,13 @@ def save_dataset(
                 lgr.debug(
                     "Was instructed to commit %s files but repository is not dirty",
                     files)
-            elif 'no changes added to commit':
+            elif 'no changes added to commit' in str(e) or 'nothing added to commit' in str(e):
                 lgr.info(
                     'Nothing to save')
             else:
                 # relay any prior whining in the exception
                 raise ValueError('{} [error log follows] {}; {}'.format(
-                    e, cml.out, cml.err))
+                    e, e.stdout, e.stderr))
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...

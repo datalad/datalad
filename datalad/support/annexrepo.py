@@ -1571,6 +1571,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         self.precommit()
         if self.is_direct_mode():
+            # committing explicitly given paths in direct mode via proxy used to
+            # fail, because absolute paths are used. Using annex proxy this
+            # leads to an error (path outside repository)
+            if options:
+                for i in range(len(options)):
+                    if not options[i].startswith('-'):
+                        # an option, that is not an option => it's a path
+                        # TODO: comprehensive + have dedicated parameter 'files'
+                        from os.path import isabs, relpath, normpath
+                        if isabs(options[i]):
+                            options[i] = normpath(relpath(options[i], start=self.path))
+
             if _datalad_msg:
                 msg = self._get_prefixed_commit_msg(msg)
             if not msg:
