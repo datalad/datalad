@@ -884,22 +884,27 @@ class GitRepo(RepoInterface):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
+    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
+               files=None):
         """Commit changes to git.
 
         Parameters
         ----------
-        msg: str
+        msg: str, optional
           commit-message
-        options: list of str
+        options: list of str, optional
           cmdline options for git-commit
         _datalad_msg: bool, optional
           To signal that commit is automated commit by datalad, so
           it would carry the [DATALAD] prefix
-        careless: bool
+        careless: bool, optional
           if False, raise when there's nothing actually committed;
           if True, don't care
+        files: list of str, optional
+          path(s) to commit
         """
+
+        self.precommit()
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
@@ -911,7 +916,6 @@ class GitRepo(RepoInterface):
                 else:
                     options = ["--allow-empty-message"]
 
-        self.precommit()
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation
         # of commit.
@@ -936,8 +940,8 @@ class GitRepo(RepoInterface):
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         try:
-            with swallow_logs(new_level=logging.ERROR) as cml:
-                self._git_custom_command([], cmd)
+            self._git_custom_command(files, cmd,
+                                     expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:

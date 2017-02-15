@@ -344,7 +344,7 @@ def save_dataset(
         # we will blindly call commit not knowing if there is anything to
         # commit -- this is cheaper than to anticipate all possible ways
         # a repo in whatever mode is dirty
-        ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg,
+        ds.repo.commit(message, files=files, _datalad_msg=_datalad_msg,
                        careless=True)
 
     # MIH: let's tag even if there was nothing commit. I'd forget this

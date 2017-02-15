@@ -29,6 +29,9 @@ from os.path import islink
 from os.path import realpath
 from os.path import lexists
 from os.path import isdir
+from os.path import isabs
+from os.path import relpath
+from os.path import normpath
 from subprocess import Popen, PIPE
 from weakref import WeakValueDictionary
 
@@ -62,6 +65,7 @@ from .exceptions import CommandNotAvailableError
 from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
+from .exceptions import FileNotInRepositoryError
 from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
@@ -1589,22 +1593,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self).precommit()
 
     @borrowdoc(GitRepo)
-    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
+    def commit(self, msg=None, options=None, _datalad_msg=False,
+               careless=True, files=None):
         self.precommit()
         if self.is_direct_mode():
             # TODO: Exceptions/careless
-
-            # committing explicitly given paths in direct mode via proxy used to
-            # fail, because absolute paths are used. Using annex proxy this
-            # leads to an error (path outside repository)
-            if options:
-                for i in range(len(options)):
-                    if not options[i].startswith('-'):
-                        # an option, that is not an option => it's a path
-                        # TODO: comprehensive + have dedicated parameter 'files'
-                        from os.path import isabs, relpath, normpath
-                        if isabs(options[i]):
-                            options[i] = normpath(relpath(options[i], start=self.path))
 
             if _datalad_msg:
                 msg = self._get_prefixed_commit_msg(msg)
@@ -1615,12 +1608,51 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     options = ["--allow-empty-message"]
 
-            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
-                       (options if options else []), expect_stderr=True)
+            # committing explicitly given paths in direct mode via proxy used to
+            # fail, because absolute paths are used. Using annex proxy this
+            # leads to an error (path outside repository)
+            if files:
+                if options is None:
+                    options = []
+                for i in range(len(files)):
+                    if isabs(files[i]):
+                        options.append(normpath(relpath(files[i],
+                                                        start=self.path)))
+                    else:
+                        options.append(files[i])
+            try:
+                self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+                           (options if options else []),
+                           expect_stderr=True, expect_fail=True)
+            except CommandError as e:
+                if 'nothing to commit' in e.stdout:
+                    if careless:
+                        lgr.debug("nothing to commit in {}. "
+                                  "Ignored.".format(self))
+                    else:
+                        raise
+                elif 'no changes added to commit' in e.stdout or \
+                        'nothing added to commit' in e.stdout:
+                    if careless:
+                        lgr.debug("no changes added to commit in {}. "
+                                  "Ignored.".format(self))
+                    else:
+                        raise
+                elif "did not match any file(s) known to git." in e.stderr:
+                    # TODO: Improve FileNotInXXXXError classes to better deal with
+                    # multiple files; Also consider PathOutsideRepositoryError
+                    raise FileNotInRepositoryError(cmd=e.cmd,
+                                                   msg="File(s) unknown to git",
+                                                   code=e.code,
+                                                   filename=linesep.join(
+                                                [l for l in e.stderr.splitlines()
+                                                 if l.startswith("pathspec")]))
+                else:
+                    raise
         else:
             super(AnnexRepo, self).commit(msg, options,
                                           _datalad_msg=_datalad_msg,
-                                          careless=careless)
+                                          careless=careless, files=files)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
