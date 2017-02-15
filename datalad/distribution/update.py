@@ -123,6 +123,9 @@ class Update(Interface):
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
                             sibling_, repo.path)
                 continue
+            if not sibling_ and len(remotes) == 1:
+                # there is only one remote, must be this one
+                sibling_ = remotes[0]
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 raise NotImplementedError(
