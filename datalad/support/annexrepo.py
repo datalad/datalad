@@ -1591,8 +1591,36 @@ class AnnexRepo(GitRepo, RepoInterface):
     @borrowdoc(GitRepo)
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True):
         self.precommit()
-        super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg,
-                                      careless=careless)
+        if self.is_direct_mode():
+            # TODO: Exceptions/careless
+
+            # committing explicitly given paths in direct mode via proxy used to
+            # fail, because absolute paths are used. Using annex proxy this
+            # leads to an error (path outside repository)
+            if options:
+                for i in range(len(options)):
+                    if not options[i].startswith('-'):
+                        # an option, that is not an option => it's a path
+                        # TODO: comprehensive + have dedicated parameter 'files'
+                        from os.path import isabs, relpath, normpath
+                        if isabs(options[i]):
+                            options[i] = normpath(relpath(options[i], start=self.path))
+
+            if _datalad_msg:
+                msg = self._get_prefixed_commit_msg(msg)
+            if not msg:
+                if options:
+                    if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
+            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+                       (options if options else []), expect_stderr=True)
+        else:
+            super(AnnexRepo, self).commit(msg, options,
+                                          _datalad_msg=_datalad_msg,
+                                          careless=careless)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

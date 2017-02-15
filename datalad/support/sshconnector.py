@@ -375,7 +375,8 @@ class SSHManager(object):
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
-                        not in self._prev_connections]
+                        not in self._prev_connections and
+                        exists(self._connections[c].ctrl_path)]
             lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
@@ -387,3 +388,4 @@ class SSHManager(object):
                     except Exception as exc:
                         lgr.debug("Failed to close a connection: "
                                   "%s", exc_str(exc))
+            self._connections = dict()

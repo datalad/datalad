@@ -35,6 +35,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI
@@ -570,8 +571,13 @@ def _save_installed_datasets(ds, installed_datasets):
         "s" if len(paths) > 1 else "", paths_str)
     lgr.info("Saving possible changes to {0} - {1}".format(
         ds, msg))
-    ds.save(
-        files=paths + ['.gitmodules'],
-        message='[DATALAD] ' + msg,
-        all_changes=False,
-        recursive=False)
+    try:
+        ds.save(
+            files=paths + ['.gitmodules'],
+            message='[DATALAD] ' + msg,
+            all_changes=False,
+            recursive=False)
+    except FileNotInRepositoryError:
+        # install doesn't add; therefore save call might included
+        # not yet added paths.
+        pass
