@@ -1932,6 +1932,108 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
+    def get_metadata(self, files, timestamps=False):
+        """Query git-annex file metadata
+
+        Parameters
+        ----------
+        files : str or list(str)
+          One or more paths for which metadata is to be queried.
+        timestamps: bool, optional
+          If True, the output contains a '<metadatakey>-lastchanged'
+          key for every metadata item, reflecting the modification
+          time, as well as a 'lastchanged' key with the most recent
+          modification time of any metadata item.
+
+        Returns
+        -------
+        dict
+          One item per file (could be more items than input arguments
+          when directories are given). Keys are filenames, values are
+          dictionaries with metadata key/value pairs. Note that annex
+          metadata tags are stored under the key 'tag', which is a
+          regular metadata item that can be manipulated like any other.
+        """
+        if not files:
+            return {}
+        files = assure_list(files)
+        args = ['--json']
+        args.extend(files)
+        return {res['file']:
+                res['fields'] if timestamps else \
+                {k: v for k, v in res['fields'].items()
+                 if not k.endswith('lastchanged')}
+                for res in self._run_annex_command_json('metadata', args)}
+
+    def set_metadata(
+            self, files, reset=None, add=None, init=None,
+            remove=None, purge=None, recursive=False):
+        """Manipulate git-annex file-metadata
+
+        Parameters
+        ----------
+        files : str or list(str)
+          One or more paths for which metadata is to be manipulated.
+          The changes applied to each file item are uniform. However,
+          the result may not be uniform across files, depending on the
+          actual operation.
+        reset : dict, optional
+          Metadata items matching keys in the given dict are (re)set
+          to the respective values.
+        add : dict, optional
+          The values of matching keys in the given dict appended to
+          any possibly existing values. The metadata keys need not
+          necessarily exist before.
+        init : dict, optional
+          Metadata items for the keys in the given dict are set
+          to the respective values, if the key is not yet present
+          in a file's metadata.
+        remove : dict, optional
+          Values in the given dict are removed from the metadata items
+          matching the respective key, if they exist in a file's metadata.
+          Non-existing values, or keys do not lead to failure.
+        purge : list, optional
+          Any metadata item with a key matching an entry in the given
+          list is removed from the metadata.
+        recursive : bool, optional
+          If False, fail (with CommandError) when directory paths
+          are given as `files`.
+
+        Returns
+        -------
+        None
+        """
+
+        def _genspec(expr, d):
+            return [expr.format(k, v) for k, v in d.items()]
+
+        args = []
+        spec = []
+        for expr, d in (('{}={}', reset),
+                        ('{}+={}', add),
+                        ('{}?={}', init),
+                        ('{}-={}', remove)):
+            if d:
+                spec.extend(_genspec(expr, d))
+        # prefix all with '-s' and extend arg list
+        args.extend(j for i in zip(['-s'] * len(spec), spec) for j in i)
+        if purge:
+            # and all '-r' args
+            args.extend(j for i in zip(['-r'] * len(purge), purge)
+                        for j in i)
+        if not args:
+            return
+
+        if recursive:
+            args.append('--force')
+        # append actual file path arguments
+        args.extend(assure_list(files))
+
+        # XXX do we need the return values for anything?
+        self._run_annex_command_json(
+            'metadata',
+            args)
+
 
 # TODO: Why was this commented out?
 # @auto_repr
