@@ -92,7 +92,7 @@ def _create_dataset_sibling(
         ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
             if target_pushurl else ds_sshurl
 
-    lgr.info("Creating target dataset {0} at {1}".format(
+    lgr.info("Considering to create a target dataset {0} at {1}".format(
         localds_path, remoteds_path))
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
@@ -112,13 +112,29 @@ def _create_dataset_sibling(
                 raise  # It's an unexpected failure here
 
         if path_exists:
+            _msg = "Target path %s already exists." % remoteds_path
+            # path might be existing but be an empty directory, which should be
+            # ok to remove
+            try:
+                lgr.debug(
+                    "Trying to rmdir %s on remote since might be an empty dir",
+                    remoteds_path
+                )
+                # should be safe since should not remove anything unless an empty dir
+                ssh("rmdir {}".format(sh_quote(remoteds_path)))
+                path_exists = False
+            except CommandError as e:
+                # If fails to rmdir -- either contains stuff no permissions
+                _msg += " And it fails to rmdir (%s)." % (e.stderr.strip(), )
+
+        if path_exists:
             if existing == 'error':
-                raise RuntimeError(
-                    "Target directory {} already exists.".format(
-                        remoteds_path))
+                raise RuntimeError(_msg)
             elif existing == 'skip':
+                lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
                 ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
                 # remove target at path
@@ -126,6 +142,7 @@ def _create_dataset_sibling(
                 # if we succeeded in removing it
                 path_exists = False
             elif existing == 'reconfigure':
+                lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
             else:
                 raise ValueError(
