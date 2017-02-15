@@ -1937,9 +1937,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Parameters
         ----------
-        files : path or list(paths)
+        files : str or list(str)
           One or more paths for which metadata is to be queried.
-        timestamps: bool
+        timestamps: bool, optional
           If True, the output contains a '<metadatakey>-lastchanged'
           key for every metadata item, reflecting the modification
           time, as well as a 'lastchanged' key with the most recent
@@ -1972,30 +1972,30 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Parameters
         ----------
-        files : path or list(paths)
+        files : str or list(str)
           One or more paths for which metadata is to be manipulated.
           The changes applied to each file item are uniform. However,
           the result may not be uniform across files, depending on the
           actual operation.
-        reset : dict
+        reset : dict, optional
           Metadata items matching keys in the given dict are (re)set
           to the respective values.
-        add : dict
+        add : dict, optional
           The values of matching keys in the given dict appended to
           any possibly existing values. The metadata keys need not
           necessarily exist before.
-        init : dict
+        init : dict, optional
           Metadata items for the keys in the given dict are set
           to the respective values, if the key is not yet present
           in a file's metadata.
-        remove : dict
+        remove : dict, optional
           Values in the given dict are removed from the metadata items
           matching the respective key, if they exist in a file's metadata.
           Non-existing values, or keys do not lead to failure.
-        purge : list
+        purge : list, optional
           Any metadata item with a key matching an entry in the given
           list is removed from the metadata.
-        recursive : bool
+        recursive : bool, optional
           If False, fail (with CommandError) when directory paths
           are given as `files`.
 
