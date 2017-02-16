@@ -426,8 +426,8 @@ class CreateSibling(Interface):
             sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
         elif inherit_settings:
             raise ValueError(
-                "For now to clarity not allowing specifying a custom sshurl "
-                "while inheritting settings"
+                "For now, for clarity not allowing specifying a custom sshurl "
+                "while inheriting settings"
             )
             # may be could be safely dropped -- still WiP
 
@@ -509,11 +509,10 @@ class CreateSibling(Interface):
                 current_super_ds = current_ds.get_superdataset()
                 super_config = current_super_ds.config
 
-                # XXX yoh is not exactly comfortable stating understanding
-                # interactions with sshri below, and why we could just use a
-                # single sshri
+                # XXX yoh is not exactly understanding interactions with sshri
+                # below, and why we could just use a single sshri
                 shared_ = shared  # TODO: from super
-                # Copy config options
+                # Copy git config options
                 remote_section = 'remote.%s' % name
                 for opt_name in ['push'] + \
                          [opt_name for opt_name in super_config.options(remote_section)
@@ -522,6 +521,14 @@ class CreateSibling(Interface):
                     v = super_config.get(opt)
                     if v:
                         add_config[opt] = v
+                # Copy relevant annex settings for the sibling
+                annex_wanted = None
+                # makes sense only if current AND super are annexes, so it is
+                # kinda a boomer, since then forbids having a super a pure git
+                if isinstance(current_super_ds, AnnexRepo) and \
+                    isinstance(current_ds, AnnexRepo):
+                        annex_wanted = current_super_ds.get_wanted(name)
+
             else:
                 shared_ = shared
 
