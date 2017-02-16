@@ -170,3 +170,8 @@ def test_newthings_coming_down(originpath, destpath):
     # no merge, only one sibling, no parameters should be specific enough
     ds.update()
     assert(knows_annex(ds.path))
+    # no branches appeared
+    eq_(ds.repo.get_branches(), ['master'])
+    # now merge
+    ds.update(merge=True)
+    eq_(sorted(ds.repo.get_branches()), ['git-annex', 'master'])
