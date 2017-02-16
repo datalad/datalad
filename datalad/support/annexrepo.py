@@ -1066,16 +1066,59 @@ class AnnexRepo(GitRepo, RepoInterface):
     def merge_annex(self, remote=None):
         """Merge git-annex branch
 
+        Merely calls `sync` with the appropriate arguments.
+
         Parameters
         ----------
         remote: str, optional
           Name of a remote to be "merged".
         """
-        # this doesn't use `merge` but `sync` in order to properly
-        # trigger updating of maintained branches in e.g. v6 repos
-        args = [remote] if remote else []
-        # would commit any dirty files, we don't want that
-        args.extend(['--no-push', '--no-pull', '--no-commit', '--no-content'])
+        self.sync(
+            remotes=remote, push=False, pull=False, commit=False, content=False,
+            all=False)
+
+    def sync(self, remotes=None, push=True, pull=True, commit=True,
+             content=False, all=False, fast=False):
+        """Synchronize local repository with remotes
+
+        Use  this  command  when you want to synchronize the local repository
+        with one or more of its remotes. You can specify the remotes (or
+        remote groups) to sync with by name; the default if none are specified
+        is to sync with all remotes.
+
+        Parameters
+        ----------
+        remotes: str, list(str), optional
+          Name of one or more remotes to be sync'ed.
+        push : bool
+          By default, git pushes to remotes.
+        pull : bool
+          By default, git pulls from remotes
+        commit : bool
+          A commit is done by default. Disable to avoid  committing local
+          changes.
+        content : bool
+          Normally, syncing does not transfer the contents of annexed
+          files.  This option causes the content of files in the work tree
+          to also be uploaded and downloaded as necessary.
+        all : bool
+          This option, when combined with `content`, makes all available
+          versions of all files be synced, when preferred content settings
+          allow
+        fast : bool
+          Only sync with the remotes with the lowest annex-cost value
+          configured
+        """
+        args = []
+        for label, arg in (('push', push),
+                           ('pull', pull),
+                           ('commit', commit),
+                           ('content', content)):
+            args.append('--{}{}'.format('' if arg else 'no-', label))
+        for label, arg in (('all', all), ('fast', fast)):
+            if arg:
+                args.append('--{}'.format(label))
+        args.extend(assure_list(remotes))
         self._run_annex_command('sync', annex_options=args)
 
     @normalize_path
