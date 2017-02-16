@@ -315,6 +315,42 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
+    def status(self, untracked=True, deleted=True, modified=True, staged=True,
+               type_changed=True, submodules=True, path=None):
+        """
+
+        :param untracked:
+        :param deleted:
+        :param modified:
+        :param staged:
+        :param type_changed:
+        :param submodules:
+        :param path:
+        :return:
+        """
+        self.precommit()
+
+        # Note, that _run_annex_command_json returns a generator
+        json_list = list(self._run_annex_command_json('status',
+                                                  args=[path] if path else None))
+
+        # TODO: 'annex status' doesn't have '--ignore-submodules'
+        # Therefore it's just an output filter for now:
+        if not submodules:
+            # filter results to not contain paths within submodules
+            json_list = [p for p in json_list
+                         if all(not p['file'].startswith(sm.path)
+                                for sm in self.get_submodules())]
+
+        key_mapping = [(untracked, 'untracked', '?'),
+                       (deleted, 'deleted', 'D'),
+                       (modified, 'modified', 'M'),
+                       (staged, 'staged', 'A'),
+                       (type_changed, 'type_changed', 'T')]
+
+        return {key: [i['file'] for i in json_list if i['status'] == st]
+                for cond, key, st in key_mapping if cond}
+
     @borrowdoc(GitRepo)
     def dirty(self, index=True, working_tree=False, untracked_files=True,
               submodules=True, path=None):
@@ -604,7 +640,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # if it is set in .git/config
                 self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = True
 
-            elif 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
+            # TEMP: nevertheless use this option to inject it to gitpython
+            # TODO: Solve it and change to "elif"
+            if 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
                 # standard procedure:
                 self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
 
