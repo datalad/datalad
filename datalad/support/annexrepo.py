@@ -315,14 +315,14 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
-    def status(self, untracked=True, deleted=True, modified=True, staged=True,
+    def status(self, untracked=True, deleted=True, modified=True, added=True,
                type_changed=True, submodules=True, path=None):
         """
 
         :param untracked:
         :param deleted:
         :param modified:
-        :param staged:
+        :param added:
         :param type_changed:
         :param submodules:
         :param path:
@@ -345,7 +345,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         key_mapping = [(untracked, 'untracked', '?'),
                        (deleted, 'deleted', 'D'),
                        (modified, 'modified', 'M'),
-                       (staged, 'staged', 'A'),
+                       (added, 'added', 'A'),
                        (type_changed, 'type_changed', 'T')]
 
         return {key: [i['file'] for i in json_list if i['status'] == st]
@@ -369,35 +369,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise CommandNotAvailableError(
                 "Querying a git-annex repository for a clean/dirty "
                 "working tree is an invalid concept.")
-
-        # flush pending changes, especially close batched annex processes to
-        # make sure their changes are registered
-        self.precommit()
-
-        result = self._run_annex_command_json('status',
-                                              args=[path] if path else None)
-        if not submodules:
-            # filter results to not contain paths within submodules
-            result = [p for p in result
-                      if all(not p['file'].startswith(sm.path)
-                             for sm in self.get_submodules())]
-
-        for entry in result:
-            if untracked_files and entry['status'] == "?":
-                return True
-            if index and entry['status'] != "?":
-                # Note: this condition relies on the fact, that ATM
-                # everything in 'status' field except '?' qualifies for
-                # being dirty wrt the index, since "working_tree" doesn't make
-                # sense for an annex. Currently that is the list of
-                # possible entries:
-                # ? -- untracked
-                # D -- deleted
-                # M -- modified
-                # A -- staged
-                # T -- type changed/unlocked
-                return True
-        return False
+        # Again note, that 'annex status' isn't distinguishing staged and
+        # unstaged changes, since this makes little sense for an annex repo
+        # in general. Therefore we use only 'index' and 'untracked_files' to
+        # specify what kind of dirtyness we are interested in:
+        status = self.status(untracked=untracked_files, deleted=index,
+                             modified=index, added=index,
+                             type_changed=index, submodules=submodules,
+                             path=path)
+        return any([bool(status[i]) for i in status])
 
     @classmethod
     def _check_git_annex_version(cls):
