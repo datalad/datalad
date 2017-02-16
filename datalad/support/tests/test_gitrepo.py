@@ -189,6 +189,8 @@ def test_GitRepo_commit(path):
     ok_(gr.dirty())
 
 
+
+
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_indexed_files(src, path):
