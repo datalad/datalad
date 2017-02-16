@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import join as opj
 
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
