@@ -379,6 +379,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                              path=path)
         return any([bool(status[i]) for i in status])
 
+    @property
+    def untracked_files(self):
+        return self.status(untracked=True, deleted=False, modified=False,
+                           added=False, type_changed=False, submodules=True,
+                           path=None)['untracked']
+
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']

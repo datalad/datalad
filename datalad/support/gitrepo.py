@@ -1721,6 +1721,10 @@ class GitRepo(RepoInterface):
                                   untracked_files=untracked_files,
                                   submodules=submodules, path=path)
 
+    @property
+    def untracked_files(self):
+        return self.repo.untracked_files
+
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
         cmd_options = ['git']

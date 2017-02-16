@@ -201,6 +201,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             # 'annex' True
             assert_is(annex, False)
 
+    eq_(sorted(r.untracked_files), sorted(untracked))
+
     if annex and r.is_direct_mode():
         if head_modified or index_modified or untracked:
             raise NotImplementedError("TODO - see note in docstring")
@@ -210,8 +212,6 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
         if repo.index.entries.keys():
             ok_(repo.head.is_valid())
-
-            eq_(sorted(repo.untracked_files), sorted(untracked))
 
             if not head_modified and not index_modified:
                 # get string representations of diffs with index to ease
