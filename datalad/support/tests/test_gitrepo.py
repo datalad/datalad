@@ -995,6 +995,8 @@ def test_optimized_cloning(path):
     from datalad.support.network import get_local_file_url
     clonepath = opj(path, 'clone')
     for src in (originpath, get_local_file_url(originpath)):
+        # deprecated
+        assert_raises(DeprecatedError, GitRepo, url=src, path=clonepath)
         clone = GitRepo.clone(url=src, path=clonepath, create=True)
         clone_inodes = _get_inodes(clone)
         eq_(origin_inodes, clone_inodes, msg='with src={}'.format(src))
