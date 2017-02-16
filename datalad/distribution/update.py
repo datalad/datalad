@@ -149,26 +149,15 @@ def _update_repo(repo, remote, merge, fetch_all):
             lgr.info("Init annex at '%s' prior merge.", repo.path)
             repo = AnnexRepo(repo.path, create=False)
         lgr.info("Merging updates...")
-        if hasattr(repo, 'merge_annex'):
+        if isinstance(repo, AnnexRepo):
             # this runs 'annex sync' and should deal with anything
-            repo.merge_annex(remote=remote)
+            repo.sync(remotes=remote, push=False, pull=True, commit=False)
         else:
             # handle merge in plain git
-            pass
-        # TODO: Adapt.
-        # TODO: Rethink default remote/tracking branch. See above.
-        # We need a "tracking remote" but custom refspec to fetch from
-        # that remote
-        cmd_list = ["git", "pull"]
-        if remote:
-            cmd_list.append(remote)
-            # branch needed, if not default remote
-            # => TODO: use default remote/tracking branch to compare
-            #          (see above, where git-annex is fetched)
-            # => TODO: allow for passing a branch
-            # (or more general refspec?)
-            # For now, just use the same name
-            cmd_list.append(repo.get_active_branch())
-
-        std_out, std_err = repo._git_custom_command('', cmd_list)
-        lgr.info(std_out)
+            active_branch = repo.get_active_branch()
+            if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
+                # the branch love this remote already, let git pull do its thing
+                repo.pull(remote=remote)
+            else:
+                # no marriage yet, be specific
+                repo.pull(remote=remote, refspec=active_branch)
