@@ -347,8 +347,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                        (modified, 'modified', 'M'),
                        (added, 'added', 'A'),
                        (type_changed, 'type_changed', 'T')]
-
-        return {key: [i['file'] for i in json_list if i['status'] == st]
+        from datalad.utils import with_pathsep
+        return {key: [with_pathsep(i['file'])
+                      if isdir(opj(self.path, i['file'])) else i['file']
+                      # for consistency with 'git status' return directories
+                      # with trailing path separator
+                      for i in json_list if i['status'] == st]
                 for cond, key, st in key_mapping if cond}
 
     @borrowdoc(GitRepo)
