@@ -1596,3 +1596,77 @@ def test_wanted(path):
     eq_(ar1.get_wanted('origin'), v)
     ar1.set_wanted(expr='standard')
     eq_(ar1.get_wanted(), 'standard')
+
+
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_metadata(path):
+    # prelude
+    ar = AnnexRepo(path, create=True)
+    create_tree(
+        path,
+        {
+            'up.dat': 'content',
+            'd o"w n': {
+                'd o w n.dat': 'lowcontent'
+            }
+        })
+    ar.add('.', git=False)
+    ar.commit('content')
+    ok_clean_git(path)
+    # fugue
+    # doesn't do anything if there is nothing to do
+    ar.set_metadata('up.dat')
+    eq_({}, ar.get_metadata(None))
+    eq_({}, ar.get_metadata(''))
+    eq_({}, ar.get_metadata([]))
+    eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
+    # basic invokation
+    eq_(None, ar.set_metadata(
+        'up.dat',
+        reset={'mike': 'awesome'},
+        add={'tag': 'awesome'},
+        remove={'tag': 'awesome'},  # cancels prev, just to use it
+        init={'virgin': 'true'},
+        purge=['nothere']))
+    # no timestamps by default
+    md = ar.get_metadata('up.dat')
+    eq_({'up.dat': {
+        'virgin': ['true'],
+        'mike': ['awesome']}},
+        md)
+    # matching timestamp entries for all keys
+    md_ts = ar.get_metadata('up.dat', timestamps=True)
+    for k in md['up.dat']:
+        assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
+    assert_in('lastchanged', md_ts['up.dat'])
+    # recursive needs a flag
+    assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
+    ar.set_metadata('.', purge=['virgin'], recursive=True)
+    eq_({'up.dat': {
+        'mike': ['awesome']}},
+        ar.get_metadata('up.dat'))
+    ar.set_metadata('.', reset={'tag': 'one'}, purge=['mike'], recursive=True)
+    playfile = opj('d o"w n', 'd o w n.dat')
+    target = {
+        'up.dat': {
+            'tag': ['one']},
+        playfile: {
+            'tag': ['one']}}
+    eq_(target, ar.get_metadata('.'))
+    # incremental work like a set
+    ar.set_metadata(playfile, add={'tag': 'one'})
+    eq_(target, ar.get_metadata('.'))
+    ar.set_metadata(playfile, add={'tag': 'two'})
+    eq_(['one', 'two'], ar.get_metadata(playfile)[playfile]['tag'])
+    # init honor prior values
+    ar.set_metadata(playfile, init={'tag': 'three'})
+    eq_(['one', 'two'], ar.get_metadata(playfile)[playfile]['tag'])
+    ar.set_metadata(playfile, remove={'tag': 'two'})
+    eq_(target, ar.get_metadata('.'))
+    # remove non-existing doesn't error and doesn't change anything
+    ar.set_metadata(playfile, remove={'ether': 'best'})
+    eq_(target, ar.get_metadata('.'))
+    # add works without prior existence
+    ar.set_metadata(playfile, add={'novel': 'best'})
+    eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
+

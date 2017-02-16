@@ -421,7 +421,7 @@ class Install(Interface):
                       "{0}: {1}".format(ds, relativepath))
 
             # FLOW_GUIDE 1.4.
-            lgr.info("Installing subdataset from '{0}' at: {0}".format(
+            lgr.info("Installing subdataset from '{0}' at: {1}".format(
                 source, relativepath))
             destination_dataset = _install_subds_from_flexible_source(
                 ds,
@@ -570,8 +570,16 @@ def _save_installed_datasets(ds, installed_datasets):
         "s" if len(paths) > 1 else "", paths_str)
     lgr.info("Saving possible changes to {0} - {1}".format(
         ds, msg))
-    ds.save(
-        files=paths + ['.gitmodules'],
-        message='[DATALAD] ' + msg,
-        all_changes=False,
-        recursive=False)
+    try:
+        ds.save(
+            files=paths + ['.gitmodules'],
+            message='[DATALAD] ' + msg,
+            all_changes=False,
+            recursive=False)
+    except ValueError as e:
+        if "did not match any file(s) known to git" in str(e):
+            # install doesn't add; therefore save call might included
+            # not yet added paths.
+            pass
+        else:
+            raise
