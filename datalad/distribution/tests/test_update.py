@@ -14,6 +14,7 @@ from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import update, install, uninstall
 from datalad.utils import chpwd
+from datalad.utils import knows_annex
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -147,3 +148,19 @@ def test_update_fetch_all(src, remote_1, remote_2):
     ds.repo.get_file_key("first.txt")  # raises if unknown
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_newthings_coming_down(originpath, destpath):
+    GitRepo(originpath, create=True)
+    ds = install(source=originpath, path=destpath)
+    assert_is_instance(ds.repo, GitRepo)
+    assert_in('origin', ds.repo.get_remotes())
+    # turn origin into an annex
+    origin = AnnexRepo(originpath, create=True)
+    # clone doesn't know yet
+    assert_false(knows_annex(ds.path))
+    # but after an update it should
+    # no merge, only one sibling, no parameters should be specific enough
+    ds.update()
+    assert(knows_annex(ds.path))
