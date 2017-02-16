@@ -1552,6 +1552,37 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: JSON
         return out.splitlines()
 
+    def get_wanted(self, remote=None):
+        """Get `wanted` for the remote.  "" corresponds to none set
+
+        Parameters
+        ----------
+        remote : str, optional
+           If not specified (None), returns `wanted` for current repository
+        """
+        out, err = self._run_annex_command(
+            'wanted',
+            annex_options=[remote or '.']
+        )
+        lines = out.rstrip('\n').split('\n')
+        # ignore some lines which might appear on a fresh clone
+        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
+        lines_ = [
+            l for l in lines
+            if not re.search(
+                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+            )
+        ]
+        assert(len(lines_) <= 1)
+        return lines_[0] if lines_ else None
+
+    def set_wanted(self, remote=None, expr=None):
+        """Set `wanted` `expr` for the remote."""
+        out, err = self._run_annex_command(
+            'wanted',
+            annex_options=[remote or '.', expr]
+        )
+
     def precommit(self):
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
         since they might still need to flush their changes into index

@@ -1573,3 +1573,26 @@ def test_AnnexRepo_set_remote_url(path):
                  'ssh://whatever.ru')
 
 
+@with_tempfile(mkdir=True)
+def test_wanted(path):
+    ar = AnnexRepo(path, create=True)
+    eq_(ar.get_wanted(), '')
+    # test samples with increasing "trickiness"
+    for v in ("standard",
+              "include=*.nii.gz or include=*.nii",
+              "exclude=archive/* and (include=*.dat or smallerthan=2b)"
+              ):
+        ar.set_wanted(expr=v)
+        eq_(ar.get_wanted(), v)
+    # give it some file so clone/checkout works without hiccups
+    create_tree(ar.path, {'1.dat': 'content'}); ar.add('1.dat'); ar.commit(msg="blah")
+    # make a clone and see if all cool there
+    # intentionally clone as pure Git and do not annex init so to see if we
+    # are ignoring crummy log msgs
+    ar1_path = ar.path + '_1'
+    GitRepo.clone(ar.path, ar1_path)
+    ar1 = AnnexRepo(ar1_path, init=False)
+    eq_(ar1.get_wanted(), '')
+    eq_(ar1.get_wanted('origin'), v)
+    ar1.set_wanted(expr='standard')
+    eq_(ar1.get_wanted(), 'standard')
