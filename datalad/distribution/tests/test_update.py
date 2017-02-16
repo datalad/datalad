@@ -152,7 +152,13 @@ def test_update_fetch_all(src, remote_1, remote_2):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
-    GitRepo(originpath, create=True)
+    origin = GitRepo(originpath, create=True)
+    # the dance of the next three lines is necessary, because our code uses
+    # the lack of refs in a remote as an indication that it is a special
+    # remote, consequently it would never even consider fetching from this
+    # repo... sad...
+    create_tree(originpath, {'load.dat': 'heavy'})
+    Dataset(originpath).add('load.dat')
     ds = install(source=originpath, path=destpath)
     assert_is_instance(ds.repo, GitRepo)
     assert_in('origin', ds.repo.get_remotes())
