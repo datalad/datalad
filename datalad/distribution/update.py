@@ -20,6 +20,7 @@ from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
 from datalad.interface.common_opts import recursion_flag
@@ -142,6 +143,12 @@ def _update_repo(repo, remote, merge, fetch_all):
 
     # merge:
     if merge:
+        # we need to check whether we need to convert this dataset to
+        # annex, would would be the case when we presently have a git repo
+        # and the recent fetch brought evidence for a remote annex
+        if isinstance(repo, GitRepo) and knows_annex(repo.path):
+            lgr.info("Init annex at '%s' prior merge.", repo.path)
+            repo = AnnexRepo(repo.path, create=False)
         lgr.info("Merging updates...")
         if hasattr(repo, 'merge_annex'):
             # this runs 'annex sync' and should deal with anything

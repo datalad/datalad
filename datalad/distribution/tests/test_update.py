@@ -30,6 +30,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git, swallow_outputs
+from datalad.tests.utils import ok_file_has_content
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -172,6 +173,12 @@ def test_newthings_coming_down(originpath, destpath):
     assert(knows_annex(ds.path))
     # no branches appeared
     eq_(ds.repo.get_branches(), ['master'])
-    # now merge
+    # now merge, and get an annex
     ds.update(merge=True)
-    eq_(sorted(ds.repo.get_branches()), ['git-annex', 'master'])
+    assert_in('git-annex', ds.repo.get_branches())
+    assert_is_instance(ds.repo, AnnexRepo)
+    # should be fully functional
+    testfname = opj(ds.path, 'load.dat')
+    assert_false(ds.repo.file_has_content(testfname))
+    ds.get('.')
+    ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
