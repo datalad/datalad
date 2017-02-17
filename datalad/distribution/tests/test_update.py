@@ -225,8 +225,6 @@ def test_update_volatile_subds(originpath, destpath):
     assert_false(exists(opj(ds.path, sname)))
 
     # re-introduce at origin
-    # cannot re-use 'subm 1' due to gh-1311
-    sname = 'subm 2'
     osm1 = origin.create(sname)
     create_tree(osm1.path, {'load.dat': 'heavy'})
     origin.add(opj(osm1.path, 'load.dat'))
