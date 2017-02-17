@@ -138,7 +138,8 @@ def _update_repo(repo, remote, merge, fetch_all):
     # fetch remote
     repo.fetch(
         remote=None if fetch_all else remote,
-        all_=fetch_all)
+        all_=fetch_all,
+        prune=True)  # prune to not accumulate a mess over time
 
     # merge:
     if merge:

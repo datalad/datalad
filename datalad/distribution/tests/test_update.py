@@ -13,6 +13,7 @@ from os.path import join as opj
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.utils import knows_annex
+from datalad.utils import rmtree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -174,3 +175,19 @@ def test_newthings_coming_down(originpath, destpath):
     assert_false(ds.repo.file_has_content(testfname))
     ds.get('.')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
+
+    # and now we destroy the remote annex
+    origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
+    rmtree(opj(origin.path, '.git', 'annex'), chmod_files=True)
+    origin._git_custom_command([], ['git', 'branch', '-D', 'git-annex'])
+    origin = GitRepo(originpath)
+    assert_false(knows_annex(originpath))
+
+    # and update the local clone
+    # for now this should simply not fail (see gh-793), later might be enhanced to a
+    # graceful downgrade
+    before_branches = ds.repo.get_branches()
+    ds.update()
+    eq_(before_branches, ds.repo.get_branches())
+    # annex branch got pruned
+    eq_(['origin/HEAD', 'origin/master'], ds.repo.get_remote_branches())
