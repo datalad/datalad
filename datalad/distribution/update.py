@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
@@ -85,11 +86,6 @@ class Update(Interface):
             reobtain_data=False):
         """
         """
-        if reobtain_data:
-            # TODO: properly define, what to do
-            raise NotImplementedError("TODO: Option '--reobtain-data' not "
-                                      "implemented yet.")
-
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
@@ -132,10 +128,11 @@ class Update(Interface):
                 raise NotImplementedError(
                     "Multiple siblings, please specify from which to update.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
-            _update_repo(repo, sibling_, merge, fetch_all)
+            _update_repo(ds, sibling_, merge, fetch_all, reobtain_data)
 
 
-def _update_repo(repo, remote, merge, fetch_all):
+def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
+    repo = ds.repo
     # fetch remote
     repo.fetch(
         remote=None if fetch_all else remote,
@@ -152,8 +149,17 @@ def _update_repo(repo, remote, merge, fetch_all):
         repo = AnnexRepo(repo.path, create=False)
     lgr.info("Merging updates...")
     if isinstance(repo, AnnexRepo):
+        if reobtain_data:
+            # get all annexed files that have data present
+            lgr.info('Recording file content availability to re-obtain update files later on')
+            reobtain_data = repo.get_annexed_files(with_content_only=True)
         # this runs 'annex sync' and should deal with anything
         repo.sync(remotes=remote, push=False, pull=True, commit=False)
+        if reobtain_data:
+            reobtain_data = [p for p in reobtain_data if lexists(opj(ds.path, p))]
+        if reobtain_data:
+            lgr.info('Ensure content availability for %i previously available files', len(reobtain_data))
+            ds.get(reobtain_data, recursive=False)
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()

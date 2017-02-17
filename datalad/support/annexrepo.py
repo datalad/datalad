@@ -1610,13 +1610,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self):
+    def get_annexed_files(self, with_content_only=False):
         """Get a list of files in annex
         """
-        # TODO: Review!
-
-        out, err = self._run_annex_command('find',
-                                           annex_options=['--include', "*"])
+        # TODO: Review!!
+        args = [] if with_content_only else ['--include', "*"]
+        out, err = self._run_annex_command('find', annex_options=args)
         # TODO: JSON
         return out.splitlines()
 

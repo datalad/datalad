@@ -9,6 +9,7 @@
 
 """
 
+import os
 from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
@@ -239,3 +240,38 @@ def test_update_volatile_subds(originpath, destpath):
     assert_not_in(sname, ds.get_subdatasets())
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_reobtain_data(originpath, destpath):
+    origin = Dataset(originpath).create()
+    ds = install(source=originpath, path=destpath)
+    # no harm
+    ds.update(merge=True, reobtain_data=True)
+    # content
+    create_tree(origin.path, {'load.dat': 'heavy'})
+    origin.add(opj(origin.path, 'load.dat'))
+    # update does not bring data automatically
+    ds.update(merge=True, reobtain_data=True)
+    assert_in('load.dat', ds.repo.get_annexed_files())
+    assert_false(ds.repo.file_has_content('load.dat'))
+    # now get data
+    ds.get('load.dat')
+    ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
+    # new content at origin
+    create_tree(origin.path, {'novel': 'but boring'})
+    origin.add('.')
+    # update must not bring in data for new file
+    ds.update(merge=True, reobtain_data=True)
+    ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
+    assert_in('novel', ds.repo.get_annexed_files())
+    assert_false(ds.repo.file_has_content('novel'))
+    # modify content at origin
+    os.remove(opj(origin.path, 'load.dat'))
+    create_tree(origin.path, {'load.dat': 'light'})
+    origin.add('.')
+    # update must update file with existing data, but leave empty one alone
+    ds.update(merge=True, reobtain_data=True)
+    ok_file_has_content(opj(ds.path, 'load.dat'), 'light')
+    assert_false(ds.repo.file_has_content('novel'))
