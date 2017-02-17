@@ -76,6 +76,8 @@ def _uninstall_dataset(ds, check, has_super):
     if has_super and not exists(ds.path):
         # recreate an empty mountpoint to make Git happier
         os.makedirs(ds.path)
+    # invalidate loaded ConfigManager:
+    ds._cfg = None
     results.append(ds)
     return results
 
