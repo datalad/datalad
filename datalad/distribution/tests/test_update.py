@@ -9,7 +9,7 @@
 
 """
 
-from os.path import join as opj
+from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.utils import knows_annex
@@ -17,7 +17,7 @@ from datalad.utils import rmtree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import eq_, assert_false, assert_is_instance
+from nose.tools import eq_, assert_false, assert_is_instance, ok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import SkipTest
@@ -199,3 +199,49 @@ def test_newthings_coming_down(originpath, destpath):
     origin.tag('second!')
     ds.update()
     eq_(ds.repo.repo.tags[-1].name, 'second!')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_update_volatile_subds(originpath, destpath):
+    origin = Dataset(originpath).create()
+    ds = install(source=originpath, path=destpath)
+    # as a submodule
+    sname = 'subm 1'
+    osm1 = origin.create(sname)
+    ds.update()
+    # nothing without a merge, no inappropriate magic
+    assert_not_in(sname, ds.get_subdatasets())
+    ds.update(merge=True)
+    # known, and placeholder exists
+    assert_in(sname, ds.get_subdatasets())
+    ok_(exists(opj(ds.path, sname)))
+
+    # remove from origin
+    origin.remove(sname)
+    ds.update(merge=True)
+    # gone locally, wasn't checked out
+    assert_not_in(sname, ds.get_subdatasets())
+    assert_false(exists(opj(ds.path, sname)))
+
+    # re-introduce at origin
+    # cannot re-use 'subm 1' due to gh-1311
+    sname = 'subm 2'
+    osm1 = origin.create(sname)
+    create_tree(osm1.path, {'load.dat': 'heavy'})
+    origin.add(opj(osm1.path, 'load.dat'))
+    ds.update(merge=True)
+    # grab new content of uninstall subdataset, right away
+    ds.get(opj(ds.path, sname, 'load.dat'))
+    ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
+
+    # now remove just-installed subdataset from origin again
+    origin.remove(sname, check=False)
+    assert_not_in(sname, origin.get_subdatasets())
+    assert_in(sname, ds.get_subdatasets())
+    # merge should disconnect the installed subdataset, but leave the actual
+    # ex-subdataset alone
+    ds.update(merge=True)
+    assert_not_in(sname, ds.get_subdatasets())
+    ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
+    ok_(Dataset(opj(ds.path, sname)).is_installed())
