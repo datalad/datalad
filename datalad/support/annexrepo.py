@@ -429,7 +429,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._set_shared_connection(name, url)
 
     @borrowkwargs(GitRepo)
-    def get_remotes(self, with_refs_only=False, exclude_special_remotes=True):
+    def get_remotes(self, with_refs_only=False, exclude_special_remotes=False):
         """Get known (special-) remotes of the repository
 
         Parameters
