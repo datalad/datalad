@@ -181,6 +181,8 @@ def test_proxying_open_regular():
 def test_proxying_open_nibabel():
     if not nib:
         raise SkipTest("No nibabel found")
+    # cannot have numpy if nibabel is available
+    from numpy.testing import assert_array_equal
 
     d = np.empty((3, 3, 3))
     d[1, 1, 1] = 99
@@ -192,6 +194,6 @@ def test_proxying_open_nibabel():
 
     def verify_nii(f, mode="r"):
         ni = nib.load(f)
-        ok_(np.all(ni.get_data() == d))
+        assert_array_equal(ni.get_data(), d)
 
     yield _test_proxying_open, generate_nii, verify_nii
