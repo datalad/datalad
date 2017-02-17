@@ -175,6 +175,10 @@ def test_newthings_coming_down(originpath, destpath):
     assert_false(ds.repo.file_has_content(testfname))
     ds.get('.')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
+    # check that a new tag comes down
+    origin.tag('first!')
+    ds.update()
+    eq_(ds.repo.repo.tags[0].name, 'first!')
 
     # and now we destroy the remote annex
     origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
@@ -191,3 +195,7 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
     eq_(['origin/HEAD', 'origin/master'], ds.repo.get_remote_branches())
+    # check that a new tag comes down even if repo types mismatch
+    origin.tag('second!')
+    ds.update()
+    eq_(ds.repo.repo.tags[-1].name, 'second!')
