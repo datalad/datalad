@@ -142,24 +142,24 @@ def _update_repo(repo, remote, merge, fetch_all):
         all_=fetch_all,
         prune=True)  # prune to not accumulate a mess over time
 
-    # merge:
-    if merge:
-        # we need to check whether we need to convert this dataset to
-        # annex, would would be the case when we presently have a git repo
-        # and the recent fetch brought evidence for a remote annex
-        if isinstance(repo, GitRepo) and knows_annex(repo.path):
-            lgr.info("Init annex at '%s' prior merge.", repo.path)
-            repo = AnnexRepo(repo.path, create=False)
-        lgr.info("Merging updates...")
-        if isinstance(repo, AnnexRepo):
-            # this runs 'annex sync' and should deal with anything
-            repo.sync(remotes=remote, push=False, pull=True, commit=False)
+    if not merge:
+        return
+    # we need to check whether we need to convert this dataset to
+    # annex, would would be the case when we presently have a git repo
+    # and the recent fetch brought evidence for a remote annex
+    if isinstance(repo, GitRepo) and knows_annex(repo.path):
+        lgr.info("Init annex at '%s' prior merge.", repo.path)
+        repo = AnnexRepo(repo.path, create=False)
+    lgr.info("Merging updates...")
+    if isinstance(repo, AnnexRepo):
+        # this runs 'annex sync' and should deal with anything
+        repo.sync(remotes=remote, push=False, pull=True, commit=False)
+    else:
+        # handle merge in plain git
+        active_branch = repo.get_active_branch()
+        if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
+            # the branch love this remote already, let git pull do its thing
+            repo.pull(remote=remote)
         else:
-            # handle merge in plain git
-            active_branch = repo.get_active_branch()
-            if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
-                # the branch love this remote already, let git pull do its thing
-                repo.pull(remote=remote)
-            else:
-                # no marriage yet, be specific
-                repo.pull(remote=remote, refspec=active_branch)
+            # no marriage yet, be specific
+            repo.pull(remote=remote, refspec=active_branch)
