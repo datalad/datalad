@@ -109,7 +109,8 @@ class Update(Interface):
             repo = ds.repo
             # get all remotes which have references (would exclude
             # special remotes)
-            remotes = repo.get_remotes(with_refs_only=True)
+            remotes = repo.get_remotes(
+                **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
             if not remotes:
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
