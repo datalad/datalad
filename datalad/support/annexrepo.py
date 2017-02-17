@@ -39,6 +39,7 @@ from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import borrowkwargs
 from datalad.utils import linux_distribution_name
 from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
@@ -426,6 +427,30 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
         self._set_shared_connection(name, url)
+
+    @borrowkwargs(GitRepo)
+    def get_remotes(self, with_refs_only=False, exclude_special_remotes=True):
+        """Get known (special-) remotes of the repository
+
+        Parameters
+        ----------
+        exclude_special_remotes: bool, optional
+          if True, don't return annex special remotes
+
+        Returns
+        -------
+        remotes : list of str
+          List of names of the remotes
+        """
+        remotes = super(AnnexRepo, self).get_remotes(
+            with_refs_only=with_refs_only)
+
+        if exclude_special_remotes:
+            return [remote for remote in remotes
+                    if not self.config.has_option('remote.{}'.format(remote),
+                                                  'annex-externaltype')]
+        else:
+            return remotes
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
