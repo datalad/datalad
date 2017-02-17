@@ -1551,6 +1551,125 @@ def test_AnnexRepo_dirty(path):
 
 
 @with_tempfile(mkdir=True)
+def test_AnnexRepo_status(path):
+
+    ar = AnnexRepo(path, create=True)
+
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+    eq_(stat, ar.status())
+
+    with open(opj(path, 'first'), 'w') as f:
+        f.write("it's huge!")
+    with open(opj(path, 'second'), 'w') as f:
+        f.write("looser")
+
+    stat['untracked'].append('first')
+    stat['untracked'].append('second')
+    eq_(stat, ar.status())
+
+    # add a file to git
+    if ar.config.getint("annex", "version") == 6:
+        # TODO: figure out, what's going on with V6 here!
+        # without delay the status after add(git=True) is different.
+        # if we go into the repo after failing assertion,
+        # git status reports 'first' as modified (unstaged) and new file (staged),
+        # while annex status just reports modified.
+        # with that delay, we got just 'new file (staged)' for both.
+        import time
+        time.sleep(1)
+    ar.add('first', git=True)
+    stat['untracked'].remove('first')
+    stat['added'].append('first')
+    # TODO: V6: modified instead of added!?
+    eq_(stat, ar.status())
+
+    # add a file to annex
+    ar.add('second')
+    stat['untracked'].remove('second')
+    if not ar.is_direct_mode():
+        # in direct mode an annexed file is committed to the
+        # annex/direct/.. branch when annexed
+        stat['added'].append('second')
+    eq_(stat, ar.status())
+
+    # commit to be clean again:
+    ar.commit("added first and second")
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+    eq_(stat, ar.status())
+
+    # modify a file in git:
+    with open(opj(path, 'first'), 'w') as f:
+        f.write("increased tremendousness")
+    stat['modified'].append('first')
+    eq_(stat, ar.status())
+
+    # modify an annexed file:
+    # TODO: provide AnnexRepo.unlock()
+    if not ar.is_direct_mode():
+        # actually: if 'second' isn't locked, which is the case in direct mode
+        # need to fix/check for V6 => TODO
+        ar._annex_custom_command('second', ['git', 'annex', 'unlock'])
+    with open(opj(path, 'second'), 'w') as f:
+        f.write("Needed to unlock first. Sad!")
+    if not ar.is_direct_mode():
+        ar.add('second')
+        # TODO: is it locked now?
+    stat['modified'].append('second')
+    eq_(stat, ar.status())
+
+    # create something in a subdir
+    os.mkdir(opj(path, 'sub'))
+    with open(opj(path, 'sub', 'third'), 'w') as f:
+        f.write("tired of winning")
+
+    # Note, that this is different from 'git status',
+    # which would just say 'sub/':
+    stat['untracked'].append(opj('sub', 'third'))
+    eq_(stat, ar.status())
+
+    # create a subrepo:
+    sub = AnnexRepo(opj(path, 'submod'), create=True)
+    # nothing changed, it's empty besides .git, which is ignored
+    eq_(stat, ar.status())
+
+    # file in subrepo
+    with open(opj(path, 'submod', 'fourth'), 'w') as f:
+        f.write("this is a birth certificate")
+    stat['untracked'].append(opj('submod', 'fourth'))
+    eq_(stat, ar.status())
+
+    # add to subrepo
+    sub.add('fourth', commit=True, msg="birther mod init'ed")
+    stat['untracked'].remove(opj('submod', 'fourth'))
+    # Note, that now the non-empty repo is untracked
+    stat['untracked'].append('submod/')
+    eq_(stat, ar.status())
+
+    # add the submodule
+    ar.add_submodule('submod', url=opj(curdir, 'submod'))
+    stat['untracked'].remove('submod/')
+    if not ar.is_direct_mode():
+        # TODO: in direct mode, all clean, including 'modified' and 'untracked'!?
+        stat['added'].append('.gitmodules')
+        stat['added'].append('submod/')
+        eq_(stat, ar.status())
+
+
+# TODO: test commit
+# TODO: test dirty
+# TODO: GitRep.commit/dirty
+# TODO: test/utils ok_clean_git
+
+
+@with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
 
     ar = AnnexRepo(path, create=True)
