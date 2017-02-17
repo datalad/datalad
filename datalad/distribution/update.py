@@ -19,7 +19,6 @@ from os.path import lexists, join as opj
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
@@ -144,7 +143,7 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
     # we need to check whether we need to convert this dataset to
     # annex, would would be the case when we presently have a git repo
     # and the recent fetch brought evidence for a remote annex
-    if isinstance(repo, GitRepo) and knows_annex(repo.path):
+    if not isinstance(repo, AnnexRepo) and knows_annex(repo.path):
         lgr.info("Init annex at '%s' prior merge.", repo.path)
         repo = AnnexRepo(repo.path, create=False)
     lgr.info("Merging updates...")
