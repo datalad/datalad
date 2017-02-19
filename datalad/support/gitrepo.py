@@ -1055,7 +1055,7 @@ class GitRepo(RepoInterface):
         #         self.repo.git.branch(r=True).splitlines()]
 
     def get_remotes(self, with_refs_only=False):
-        """
+        """Get known remotes of the repository
 
         Parameters
         ----------
