@@ -21,6 +21,7 @@ import textwrap
 import shutil
 from importlib import import_module
 import os
+import inspect
 
 import datalad
 
@@ -276,11 +277,15 @@ def main(args=None):
             # so we could see/stop clearly at the point of failure
             setup_exceptionhook(ipython=cmdlineargs.common_idebug)
             ret = cmdlineargs.func(cmdlineargs)
+            if inspect.isgenerator(ret):
+                ret = list(ret)
         else:
             # otherwise - guard and only log the summary. Postmortem is not
             # as convenient if being caught in this ultimate except
             try:
                 ret = cmdlineargs.func(cmdlineargs)
+                if inspect.isgenerator(ret):
+                    ret = list(ret)
             except InsufficientArgumentsError as exc:
                 # if the func reports inappropriate usage, give help output
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
