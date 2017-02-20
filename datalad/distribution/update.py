@@ -140,12 +140,10 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
 
     if not merge:
         return
-    # we need to check whether we need to convert this dataset to
-    # annex, would would be the case when we presently have a git repo
-    # and the recent fetch brought evidence for a remote annex
-    if not isinstance(repo, AnnexRepo) and knows_annex(repo.path):
-        lgr.info("Init annex at '%s' prior merge.", repo.path)
-        repo = AnnexRepo(repo.path, create=False)
+
+    # reevaluate repo instance, for it might be an annex now:
+    repo = ds.repo
+
     lgr.info("Merging updates...")
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
