@@ -54,6 +54,33 @@ class MissingExternalDependency(RuntimeError):
         return to_str
 
 
+class DeprecatedError(RuntimeError):
+    """To raise whenever a deprecated entirely feature is used"""
+    def __init__(self, new=None, version=None, msg=''):
+        """
+
+        Parameters
+        ----------
+        new : str, optional
+          What new construct to use
+        version : str, optional
+          Since which version is deprecated
+        kwargs
+        """
+        super(DeprecatedError, self).__init__()
+        self.version = version
+        self.new = new
+        self.msg = msg
+
+    def __str__(self):
+        s = self.msg if self.msg else ''
+        if self.version:
+            s += " Deprecated since version %s." % self.version
+        if self.new:
+            s += " Use %s instead." % self.new
+        return s
+
+
 class OutdatedExternalDependency(MissingExternalDependency):
     """External dependency is present but outdated"""
 

@@ -148,8 +148,8 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target_alt",
             sshurl="ssh://localhost",
             target_dir=target_path)
-    eq_("Target directory %s already exists." % target_path,
-        str(cm.exception))
+    ok_(str(cm.exception).startswith(
+        "Target path %s already exists. And it fails to rmdir" % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
         assert_not_equal(target_description, None)
@@ -307,6 +307,27 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
         # now, push should work:
         publish(dataset=source, to=remote_name)
+
+        # verify that we can create-sibling which was created later and possibly
+        # first published in super-dataset as an empty directory
+        sub3_name = 'subm 3-%s' % flat
+        sub3 = source.create(sub3_name)
+        # since is an empty value to force it to consider all changes since we published
+        # already
+        with chpwd(source.path):
+            publish(to=remote_name)  # no recursion
+            assert_create_sshwebserver(
+                name=remote_name,
+                sshurl="ssh://localhost" + target_path_,
+                target_dir=target_dir_tpl,
+                recursive=True,
+                existing='skip',
+                ui=True,
+                since=''
+            )
+        # so it was created on remote correctly and wasn't just skipped
+        assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
+        publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
 
 
 @skip_ssh
