@@ -912,8 +912,8 @@ class GitRepo(RepoInterface):
             if options:
                 if "--allow-empty-message" not in options:
                         options.append("--allow-empty-message")
-                else:
-                    options = ["--allow-empty-message"]
+            else:
+                options = ["--allow-empty-message"]
 
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation

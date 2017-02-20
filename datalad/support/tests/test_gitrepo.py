@@ -178,7 +178,9 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(path, annex=False, untracked=[])
+    ok_clean_git(gr)
+    eq_("Testing GitRepo.commit().{}".format(linesep),
+        gr.repo.head.commit.message)
 
     with open(opj(path, filename), 'w') as f:
         f.write("changed content")
@@ -188,7 +190,21 @@ def test_GitRepo_commit(path):
     # wasn't actually committed:
     ok_(gr.dirty())
 
+    # commit with empty message:
+    gr.commit()
+    ok_clean_git(gr)
 
+    # nothing to commit doesn't raise by default:
+    gr.commit()
+    # but does with careless=False:
+    assert_raises(CommandError, gr.commit, careless=False)
+
+    # committing untracked file raises:
+    with open(opj(path, "untracked"), "w") as f:
+        f.write("some")
+    assert_raises(FileNotInRepositoryError, gr.commit, files="untracked")
+    # not existing file as well:
+    assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
 
 
 @with_testrepos(flavors=local_testrepo_flavors)

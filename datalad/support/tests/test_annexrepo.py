@@ -78,6 +78,7 @@ from datalad.tests.utils import find_files
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import FileNotInAnnexError
 from datalad.support.exceptions import FileInGitError
 from datalad.support.exceptions import OutOfSpaceError
@@ -675,20 +676,40 @@ def test_AnnexRepo_on_uninited_annex(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-def test_AnnexRepo_commit(src, path):
+def test_AnnexRepo_commit(path):
 
-    ds = AnnexRepo.clone(src, path)
+    ds = AnnexRepo(path, create=True)
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
+    if ds.config.getint("annex", "version") == 6:
+        # TODO: figure out, what's going on with V6 here!
+        # without delay the status after add(git=True) is different.
+        # if we go into the repo after failing assertion,
+        # git status reports 'first' as modified (unstaged) and new file (staged),
+        # while annex status just reports modified.
+        # with that delay, we got just 'new file (staged)' for both.
+        import time
+        time.sleep(1)
     ds.add(filename, git=True)
 
     assert_raises(AssertionError, ok_clean_git, path, annex=True)
 
     ds.commit("test _commit")
     ok_clean_git(path, annex=True)
+
+    # nothing to commit doesn't raise by default:
+    ds.commit()
+    # but does with careless=False:
+    assert_raises(CommandError, ds.commit, careless=False)
+
+    # committing untracked file raises:
+    with open(opj(path, "untracked"), "w") as f:
+        f.write("some")
+    assert_raises(FileNotInRepositoryError, ds.commit, files="untracked")
+    # not existing file as well:
+    assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -1553,7 +1574,13 @@ def test_AnnexRepo_dirty(path):
 
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_status(path):
+    # this test is WIP
+    #
+    #http://git-annex.branchable.com/bugs/Can__39__t_use_adjusted_branch_in_v6__44___if_submodule_already_is_using_this_feature/
+    #http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+    #
 
+    # TODO: git annex adjust --unlock|--fix if V6
     ar = AnnexRepo(path, create=True)
 
     stat = {'untracked': [],
@@ -1654,19 +1681,27 @@ def test_AnnexRepo_status(path):
     stat['untracked'].append('submod/')
     eq_(stat, ar.status())
 
+
+
+    #import pdb; pdb.set_trace()
     # add the submodule
     ar.add_submodule('submod', url=opj(curdir, 'submod'))
+
+
+    eq_(stat, ar.status())  # ??clean DM
+
     stat['untracked'].remove('submod/')
     if not ar.is_direct_mode():
         # TODO: in direct mode, all clean, including 'modified' and 'untracked'!?
         stat['added'].append('.gitmodules')
         stat['added'].append('submod/')
         eq_(stat, ar.status())
+    # ????
 
+    # add another file to submodule
 
-# TODO: test commit
 # TODO: test dirty
-# TODO: GitRep.commit/dirty
+# TODO: GitRep.dirty
 # TODO: test/utils ok_clean_git
 
 
