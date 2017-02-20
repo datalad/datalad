@@ -23,7 +23,6 @@ from datalad.support.annexrepo import AnnexRepo
 from nose.tools import eq_, assert_false, assert_is_instance, ok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
-from datalad.tests.utils import SkipTest
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_clean_git
@@ -104,10 +103,6 @@ def test_update_git_smoke(src_path, dst_path):
     ds.add('file.dat')
     target.update(recursive=True, merge=True)
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
-
-
-def test_update_recursive():
-    raise SkipTest("TODO more tests to add to above ones")
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
