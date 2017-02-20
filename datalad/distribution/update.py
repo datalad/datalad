@@ -88,6 +88,10 @@ class Update(Interface):
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not dataset and not path:
+            # try to find a dataset in PWD
+            dataset = require_dataset(
+                None, check_installed=True, purpose='updating')
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
