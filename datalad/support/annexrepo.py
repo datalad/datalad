@@ -1135,14 +1135,13 @@ class AnnexRepo(GitRepo, RepoInterface):
           configured
         """
         args = []
-        for label, arg in (('push', push),
-                           ('pull', pull),
-                           ('commit', commit),
-                           ('content', content)):
-            args.append('--{}{}'.format('' if arg else 'no-', label))
-        for label, arg in (('all', all), ('fast', fast)):
-            if arg:
-                args.append('--{}'.format(label))
+        args.extend(to_options(push=push, no_push=not push,
+                               # means: '--push' if push else '--no-push'
+                               pull=pull, no_pull=not pull,
+                               commit=commit, no_commit=not commit,
+                               content=content, no_content=not content,
+                               all=all,
+                               fast=fast))
         args.extend(assure_list(remotes))
         self._run_annex_command('sync', annex_options=args)
 
