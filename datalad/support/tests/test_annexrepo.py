@@ -191,6 +191,12 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
 def test_AnnexRepo_set_direct_mode(src, dst):
 
     ar = AnnexRepo.clone(src, dst)
+
+    if ar.config.getint("annex", "version") >= 6:
+        # there's no direct mode available:
+        assert_raises(CommandError, ar.set_direct_mode, True)
+        raise SkipTest("Test not applicable in repository version >= 6")
+
     ar.set_direct_mode(True)
     ok_(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
@@ -208,8 +214,20 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
+    if ar.config.getint("annex", "version") >= 6:
+        # there's no direct mode available and therefore no 'annex proxy':
+        assert_raises(CommandError, ar.proxy, ['git', 'status'])
+        raise SkipTest("Test not applicable in repository version >= 6")
     ar.set_direct_mode(True)
-    ok_clean_git(path=annex_path, annex=True)
+
+    try:
+        ok_clean_git(ar, annex=True)
+    except CommandNotAvailableError as e:
+        if e.cmd == 'git-annex status' and \
+           "submodules in direct mode" in e.msg and \
+           AnnexRepo.git_annex_version < '6.20170221':
+            # known bug (http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/)
+            pass
 
     # annex proxy raises in indirect mode:
     try:
@@ -683,15 +701,6 @@ def test_AnnexRepo_commit(path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    if ds.config.getint("annex", "version") == 6:
-        # TODO: figure out, what's going on with V6 here!
-        # without delay the status after add(git=True) is different.
-        # if we go into the repo after failing assertion,
-        # git status reports 'first' as modified (unstaged) and new file (staged),
-        # while annex status just reports modified.
-        # with that delay, we got just 'new file (staged)' for both.
-        import time
-        time.sleep(1)
     ds.add(filename, git=True)
 
     assert_raises(AssertionError, ok_clean_git, path, annex=True)
@@ -1576,9 +1585,13 @@ def test_AnnexRepo_dirty(path):
 def test_AnnexRepo_status(path):
     # this test is WIP
     #
-    #http://git-annex.branchable.com/bugs/Can__39__t_use_adjusted_branch_in_v6__44___if_submodule_already_is_using_this_feature/
-    #http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+    # http://git-annex.branchable.com/bugs/Can__39__t_use_adjusted_branch_in_v6__44___if_submodule_already_is_using_this_feature/
+    # fixed in 6.20170220
     #
+    # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+    #
+    # annex version
+    # AnnexRepo.git_annex_version
 
     # TODO: git annex adjust --unlock|--fix if V6
     ar = AnnexRepo(path, create=True)
@@ -1600,15 +1613,6 @@ def test_AnnexRepo_status(path):
     eq_(stat, ar.status())
 
     # add a file to git
-    if ar.config.getint("annex", "version") == 6:
-        # TODO: figure out, what's going on with V6 here!
-        # without delay the status after add(git=True) is different.
-        # if we go into the repo after failing assertion,
-        # git status reports 'first' as modified (unstaged) and new file (staged),
-        # while annex status just reports modified.
-        # with that delay, we got just 'new file (staged)' for both.
-        import time
-        time.sleep(1)
     ar.add('first', git=True)
     stat['untracked'].remove('first')
     stat['added'].append('first')
@@ -1641,6 +1645,9 @@ def test_AnnexRepo_status(path):
 
     # modify an annexed file:
     # TODO: provide AnnexRepo.unlock()
+
+    # v6: locked/unlocked file ; adjusted branch
+
     if not ar.is_direct_mode():
         # actually: if 'second' isn't locked, which is the case in direct mode
         # need to fix/check for V6 => TODO
@@ -1681,24 +1688,35 @@ def test_AnnexRepo_status(path):
     stat['untracked'].append('submod/')
     eq_(stat, ar.status())
 
-
-
-    #import pdb; pdb.set_trace()
     # add the submodule
     ar.add_submodule('submod', url=opj(curdir, 'submod'))
 
+    if sub.is_direct_mode() and AnnexRepo.git_annex_version < '6.20170221':
+        # ATM (annex version 6.20170220+gitgbfb38eece-1~ndall+1)
+        # 'annex status' fails, if there are submodules in direct mode
+        # Note: used version in condition to notice, when we are able to fix
+        # this
+        assert_raises(CommandNotAvailableError, ar.status)
 
-    eq_(stat, ar.status())  # ??clean DM
+        # we can't proceed, since any call to 'status' will fail now
+        raise SkipTest("Skipping due to a submodule in direct mode.")
 
     stat['untracked'].remove('submod/')
-    if not ar.is_direct_mode():
-        # TODO: in direct mode, all clean, including 'modified' and 'untracked'!?
-        stat['added'].append('.gitmodules')
-        stat['added'].append('submod/')
-        eq_(stat, ar.status())
-    # ????
+    stat['added'].append('.gitmodules')
+    stat['added'].append('submod/')
+    eq_(stat, ar.status())
 
     # add another file to submodule
+    with open(opj(path, 'submod', 'not_tracked'), 'w') as f:
+        f.write("#LastNightInSweden")
+    stat['modified'].append('submod/')
+    stat['added'].remove('submod/')  # only one state in 'annex status'
+    eq_(stat, ar.status())
+
+
+    # TODO: explicit path(s)
+    # TODO: unlock file
+    #
 
 # TODO: test dirty
 # TODO: GitRep.dirty

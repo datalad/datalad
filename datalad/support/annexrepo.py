@@ -19,6 +19,7 @@ import os
 import re
 import shlex
 import tempfile
+import time
 
 from itertools import chain
 from os import linesep
@@ -329,6 +330,21 @@ class AnnexRepo(GitRepo, RepoInterface):
         :param path:
         :return:
         """
+
+        if any([bool(sm.repo.config_reader().get_value('annex', 'direct', False))
+                for sm in self.get_submodules()]):
+            # git-annex-status cannot deal with submodules in direct mode:
+            # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+            #
+            # We need to either fail, or build a workaround, which would need us
+            # to do the submodule traversal on our own while calling
+            # git-annex-status --ignore-submodules in each
+            # TODO: AnnexRepo.git_annex_version >= '6.20170221'(?)
+            #       => --ignore-submodules available
+            raise CommandNotAvailableError(
+                cmd="git-annex status",
+                msg="Cannot deal with submodules in direct mode. "
+                    "submodules=False required.")
         self.precommit()
 
         # Note, that _run_annex_command_json returns a generator
@@ -386,9 +402,24 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @property
     def untracked_files(self):
-        return self.status(untracked=True, deleted=False, modified=False,
-                           added=False, type_changed=False, submodules=True,
-                           path=None)['untracked']
+        try:
+            # TODO: Probably submodules=False instead
+            return self.status(untracked=True, deleted=False, modified=False,
+                               added=False, type_changed=False, submodules=True,
+                               path=None)['untracked']
+        except CommandNotAvailableError as e:
+            if e.cmd == 'git-annex status' and \
+               "submodules in direct mode" in e.msg and \
+               AnnexRepo.git_annex_version < '6.20170221' and \
+               not self.is_direct_mode():
+                # => known bug: 'status' fails on direct mode submodules
+                # try to use standard git approach, since we are not in direct
+                # mode ourselves:
+                # TODO: This is not a 'real' fix. Consider adjusted branches
+                # and the likes
+                return super(AnnexRepo, self).untracked_files
+            else:
+                raise
 
     @classmethod
     def _check_git_annex_version(cls):
@@ -594,7 +625,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TEMP: Disable lazy loading and make sure to read from file every time
         # instead, since we might have several instances pointing to the very
-        # same repo atm.
+        # same repo atm. TODO: We can remove that, right?
         self.repo.config_reader()._is_initialized = False
         self.repo.config_reader().read()
         self._direct_mode = None
@@ -887,6 +918,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # if None -- leave it to annex to decide
             if git is not None:
+                if self.config.getint("annex", "version") == 6:
+                    # Note: For now ugly workaround to prevent unexpected
+                    # outcome when adding to git. See:
+                    # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
+                    time.sleep(1)
+
                 options += [
                     '-c',
                     'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
@@ -1522,6 +1559,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             # if we didn't raise before, just depend on whether or not we seem
             # to have some json to return. It should contain information on
             # failure in keys 'success' and 'note'
+            # TODO: This is not entirely true. 'annex status' may return empty,
+            # while there was a 'fatal:...' in stderr, which should be a
+            # failure/exception
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
