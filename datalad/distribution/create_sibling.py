@@ -331,6 +331,7 @@ class CreateSibling(Interface):
             directory be forcefully re-initialized, and the sibling (re-)configured
             ('replace', implies 'reconfigure'), the sibling configuration be updated
             only ('reconfigure'), or to error ('error').""",),
+        inherit_settings=inherit_settings_opt,
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -352,7 +353,6 @@ class CreateSibling(Interface):
         annex_wanted=annex_wanted_opt,
         annex_group=annex_group_opt,
         annex_groupwanted=annex_groupwanted_opt,
-        inherit_settings=inherit_settings_opt,
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),

@@ -17,7 +17,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import filter_unmodified
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
-from datalad.interface.common_opts import inherit_settings_opt
+from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -235,12 +235,7 @@ class Publish(Interface):
             By default, would take from the previously published to that remote/sibling
             state (for the current branch)"""),
         # since: commit => .gitmodules diff to head => submodules to publish
-
-        skip_failing=Parameter(
-            args=("--skip-failing",),
-            action="store_true",
-            doc="skip failing sub-datasets (in combination with `recursive`) "
-                "instead of failing altogether"),
+        missing=missing_sibling_opt,
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -257,9 +252,6 @@ class Publish(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_copy_opts=annex_copy_opts,
-        # "interferes" with skip_failing which is actually "skip_missing"
-        # TODO: unify as --missing=(skip|inherit) ?
-        inherit_settings=inherit_settings_opt
     )
 
     @staticmethod
@@ -269,8 +261,7 @@ class Publish(Interface):
             dataset=None,
             to=None,
             since=None,
-            skip_failing=False,
-            inherit_settings=False,
+            missing='fail',
             recursive=False,
             recursion_limit=None,
             git_opts=None,
@@ -337,7 +328,7 @@ class Publish(Interface):
                     ds_remote_info[ds_path] = dict(zip(
                         ('remote', 'refspec'),
                         (track_remote, track_refspec)))
-                elif skip_failing:
+                elif missing == 'skip':
                     lgr.warning(
                         'Cannot determine target sibling, skipping %s',
                         ds)
@@ -349,12 +340,12 @@ class Publish(Interface):
             elif to not in ds.repo.get_remotes():
                 # unknown given remote
                 # TODO: not quite "failing" really so interfers with "inherit_settings"
-                if skip_failing:
+                if missing == 'skip':
                     lgr.warning(
                         "Unknown target sibling '%s', skipping %s",
                         to, ds)
                     ds_remote_info[ds_path] = None
-                elif inherit_settings:
+                elif missing == 'inherit':
                     superds = ds.get_superdataset()
                     if not superds:
                         raise RuntimeError(

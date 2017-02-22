@@ -420,7 +420,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ok_(not target_sub.is_installed())  # still not there
     with swallow_logs():  # so no warnings etc
         assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
-    ds.publish(to=remote, recursive=True, inherit_settings=True)
+    ds.publish(to=remote, recursive=True, missing='inherit')
     # we added the remote and set all the
     eq_(subds.repo.get_wanted(remote), 'standard' if standardgroup else '')
     eq_(subds.repo.get_group(remote), standardgroup or '')

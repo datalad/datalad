@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
+from datalad.support.constraints import EnsureChoice
 
 
 dataset_description = Parameter(
@@ -195,3 +196,12 @@ inherit_settings_opt = Parameter(
     action="store_true",
     doc="""if sibling does not exist in a given dataset, its
     `create-sibling --inherit-settings` is called""")
+
+missing_sibling_opt = Parameter(
+    args=("--missing",),
+    constraints=EnsureChoice('fail', 'inherit', 'skip'),  # may be inherit-skip
+    metavar='MODE',
+    doc="""action to perform, if a sibling does not exist in a given dataset.
+    By default it would fail the run ('fail' setting).  With 'inherit' a
+    `create-sibling` with `--inherit-settings` will be used to create sibling
+    on the remote. With 'skip' - it simply will be skipped.""")
