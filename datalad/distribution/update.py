@@ -170,10 +170,9 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
             # into the state it points to for this submodule, but for now let's
             # just blow I guess :-/
             lgr.warning(
-                "No active branch in %s, fetching and not changing state",
+                "No active branch in %s - we just fetched and not changing state",
                 repo
             )
-            repo.fetch(remote=remote)
         else:
             if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
                 # the branch love this remote already, let git pull do its thing
