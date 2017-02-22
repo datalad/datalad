@@ -402,7 +402,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds = Dataset(src_path).create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
-    ds.create_sibling(target_url, name=remote)  # not doing recursively
+    ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
     if standardgroup:
         ds.repo.set_wanted(remote, 'standard')
         ds.repo.set_group(remote, standardgroup)
@@ -426,6 +426,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     eq_(subds.repo.get_group(remote), standardgroup or '')
 
     ok_(target_sub.is_installed())  # it is there now
+    eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
     # and we have transferred the content
     if standardgroup and standardgroup == 'backup':
         # only then content should be copied

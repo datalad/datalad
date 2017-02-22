@@ -472,24 +472,25 @@ class CreateSibling(Interface):
         remote_existing = [p for p in datasets
                            if name in datasets[p].repo.get_remotes()]
 
-        if existing == 'error' and remote_existing:
-            raise ValueError(
-                "sibling '{name}' already configured for dataset{plural}: "
-                "{existing}. Specify alternative sibling name, or force "
-                "reconfiguration via --existing".format(
-                    name=name,
-                    existing=remote_existing,
-                    plural='s' if len(remote_existing) > 1 else ''))
-        if existing == 'skip':
-            # no need to process already configured datasets
-            lgr.info(
-                "Skipping dataset{plural} with an already configured "
-                "sibling '{name}': {existing}".format(
-                    name=name,
-                    existing=remote_existing,
-                    plural='s' if len(remote_existing) > 1 else ''))
-            datasets = {p: d for p, d in datasets.items()
-                        if p not in remote_existing}
+        if remote_existing:
+            if existing == 'error':
+                raise ValueError(
+                    "sibling '{name}' already configured for dataset{plural}: "
+                    "{existing}. Specify alternative sibling name, or force "
+                    "reconfiguration via --existing".format(
+                        name=name,
+                        existing=remote_existing,
+                        plural='s' if len(remote_existing) > 1 else ''))
+            if existing == 'skip':
+                # no need to process already configured datasets
+                lgr.info(
+                    "Skipping dataset{plural} with an already configured "
+                    "sibling '{name}': {existing}".format(
+                        name=name,
+                        existing=remote_existing,
+                        plural='s' if len(remote_existing) > 1 else ''))
+                datasets = {p: d for p, d in datasets.items()
+                            if p not in remote_existing}
 
         if not datasets:
             # we ruled out all possibilities
@@ -640,11 +641,14 @@ class CreateSibling(Interface):
             current_super_url = CreateSibling._get_remote_url(
                 ds, name)
             current_super_ri = RI(current_super_url)
-            shared = ssh('git -C {} config --get core.sharedrepository'.format(
+            out, err = ssh('git -C {} config --get core.sharedrepository'.format(
                 # TODO -- we might need to expanduser taking .user into account
                 # but then it must be done also on remote side
                 sh_quote(current_super_ri.path))
-            ).strip()
+            )
+            shared = out.strip()
+            if err:
+                lgr.warning("Got stderr while calling ssh: %s", err)
         except CommandError as e:
             lgr.debug(
                 "Could not figure out remote shared setting of %s for %s due "
