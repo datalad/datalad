@@ -690,8 +690,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # fetched
 
         if '--key' not in options:
-            expected_downloads, fetch_files = self._get_expected_downloads(
-                files)
+            expected_downloads, fetch_files = self._get_expected_files(
+                files, ['--not', '--in', 'here'])
         else:
             fetch_files = files
             assert(len(files) == 1)
@@ -733,29 +733,31 @@ class AnnexRepo(GitRepo, RepoInterface):
         # and womit an exception of incomplete download????
         return results_list
 
-    def _get_expected_downloads(self, files):
+    def _get_expected_files(self, files, expr):
         """Given a list of files, figure out what to be downloaded
 
         Parameters
         ----------
         files
+        expr: list
+          Expression to be passed into annex's find
 
         Returns
         -------
-        expected_downloads : dict
+        expected_files : dict
           key -> size
         fetch_files : list
           files to be fetched
         """
-        lgr.debug("Determine what files need to be obtained")
+        lgr.debug("Determine what files match the query to work with")
         # Let's figure out first which files/keys and of what size to download
-        expected_downloads = {}
+        expected_files = {}
         fetch_files = []
         keys_seen = set()
         unknown_sizes = []  # unused atm
         # for now just record total size, and
         for j in self._run_annex_command_json(
-                'find', args=['--json', '--not', '--in', 'here'] + files
+                'find', args=['--json'] + expr + files
         ):
             key = j['key']
             size = j.get('bytesize')
@@ -767,11 +769,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             assert j['file']
             fetch_files.append(j['file'])
             if size and size.isdigit():
-                expected_downloads[key] = int(size)
+                expected_files[key] = int(size)
             else:
-                expected_downloads[key] = None
+                expected_files[key] = None
                 unknown_sizes.append(j['file'])
-        return expected_downloads, fetch_files
+        return expected_files, fetch_files
 
     @normalize_paths
     def add(self, files, git=None, backend=None, options=None, commit=False,
@@ -1952,6 +1954,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # TODO: we probably need to override get_file_content, since it returns the
     # symlink's target instead of the actual content.
 
+    # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
     def copy_to(self, files, remote, options=None, log_online=True):
         """Copy the actual content of `files` to `remote`
@@ -1971,6 +1974,7 @@ class AnnexRepo(GitRepo, RepoInterface):
            files successfully copied
         """
 
+        # find --in here --not --in remote
         # TODO: full support of annex copy options would lead to `files` being
         # optional. This means to check for whether files or certain options are
         # given and fail or just pass everything as is and try to figure out,
@@ -2005,10 +2009,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             #log_stdout=True, log_stderr=not log_online,
             #log_online=log_online, expect_stderr=True
         )
-        import pdb; pdb.set_trace()
+        #results_list = list(results)
 
-        return [line.split()[1] for line in std_out.splitlines()
-                if line.startswith('copy ') and line.endswith('ok')]
+        return [e['file'] for e in results if e['success']]
 
     @property
     def uuid(self):
