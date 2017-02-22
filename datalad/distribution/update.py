@@ -165,7 +165,7 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
-        if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
+        if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
             # the branch love this remote already, let git pull do its thing
             repo.pull(remote=remote)
         else:
