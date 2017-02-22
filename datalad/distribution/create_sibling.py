@@ -39,6 +39,7 @@ from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.utils import filter_unmodified
+from datalad.support.network import SSHRI
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -97,7 +98,10 @@ def _create_dataset_sibling(
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
     # .git/config seems to not like all the escapes since they aren't needed
-    ds_sshurl = ssh_url.as_str(escape=False)
+    # XXX yoh broke consistency with this escape argument present only in SSHRI
+    #     but here it could be a simple URL as tests show
+    ds_sshurl = ssh_url.as_str(escape=False) \
+        if isinstance(ssh_url, SSHRI) else ssh_url.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%RELNAME', ds_name) \
         if target_url else ds_sshurl
@@ -263,6 +267,7 @@ class CreateSibling(Interface):
         sshurl=Parameter(
             args=("sshurl",),
             metavar='SSHURL',
+            nargs='?',
             doc="""Login information for the target server. This can be given
                 as a URL (ssh://host/path) or SSH-style (user@host:path).
                 Unless overridden, this also serves the future dataset's access
@@ -415,29 +420,39 @@ class CreateSibling(Interface):
         if not sshurl:
             if not inherit_settings:
                 raise InsufficientArgumentsError(
-                    "needs at least an SSH URL, if no inherrit_settings option"
+                    "needs at least an SSH URL, if no inherit_settings option"
                 )
             if name is None:
                 raise ValueError(
                     "Neither SSH URL, nor the name of sibling to inherit from "
                     "was specified"
                 )
-            # TODO: may be more back up before _prep?
-            super_ds = ds.get_superdataset()
-            if not super_ds:
-                raise ValueError(
-                    "Could not determine super dataset to inherit URL")
-            super_url = CreateSibling._get_remote_url(super_ds, name)
-            # for now assuming hierarchical setup
-            # (TODO: to be able to destinguish between the two, probably
-            # needs storing datalad.*.target_dir to have %RELNAME in there)
-            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
+            # It might well be that we already have this remote setup
+            try:
+                sshurl = CreateSibling._get_remote_url(ds, name)
+            except Exception as exc:
+                lgr.debug('%s does not know about url for %s: %s', ds, name, exc_str(exc))
         elif inherit_settings:
             raise ValueError(
                 "For now, for clarity not allowing specifying a custom sshurl "
                 "while inheriting settings"
             )
             # may be could be safely dropped -- still WiP
+
+        if not sshurl:
+            # TODO: may be more back up before _prep?
+            super_ds = ds.get_superdataset()
+            if not super_ds:
+                raise ValueError(
+                    "Could not determine super dataset for %s to inherit URL"
+                    % ds
+                )
+            super_url = CreateSibling._get_remote_url(super_ds, name)
+            # for now assuming hierarchical setup
+            # (TODO: to be able to destinguish between the two, probably
+            # needs storing datalad.*.target_dir to have %RELNAME in there)
+            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
+
 
         # check the login URL
         sshri = RI(sshurl)
