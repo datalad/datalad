@@ -318,6 +318,70 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
+    def _submodules_dirty_direct_mode(self,
+            untracked=True, deleted=True, modified=True, added=True,
+            type_changed=True, path=None):
+        """Get modified submodules
+
+        Workaround for http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+
+        This is using git-annex-status with --ignore-submodules to not let
+        git-status try to recurse into annex submodules without a working tree.
+        Therefore we need to do the recursion on our own.
+
+        Intended to be used by AnnexRepo.status() internally.
+        """
+
+        # Note: We do a lazy recursion. The only thing we need to know is
+        # whether or not a submodule is to be reported dirty. Once we already
+        # know it is, there's no need to go any deeper in the hierarchy.
+        # Apart from better performance, this also allows us to inspect each
+        # submodule separately, and therefore be able to deal with mixed
+        # hierarchies of git and annex submodules!
+
+        modified_subs = []
+        for sm in self.get_submodules():
+            sm_dirty = False
+            if AnnexRepo.is_valid_repo(opj(self.path, sm.path),
+                                       allow_noninitialized=False):
+                # check state of annex submodules, that might be in direct mode
+                sm_repo = AnnexRepo(opj(self.path, sm.path),
+                                    create=False, init=False)
+
+                sm_status = sm_repo.status(untracked=untracked, deleted=deleted,
+                                           modified=modified, added=added,
+                                           type_changed=type_changed,
+                                           submodules=False, path=path)
+                if any([bool(sm_status[i]) for i in sm_status]):
+                    sm_dirty = True
+
+            elif GitRepo.is_valid_repo(opj(self.path, sm.path)):
+                # not an initialized annex, we can safely assume a plain git
+                sm_repo = GitRepo(opj(self.path, sm.path))
+
+                # TODO: Clarify issue: GitRepo.dirty() doesn't fit our parameters
+                if sm_repo.dirty(index=deleted or modified or added or type_changed,
+                                 working_tree=deleted or modified or added or type_changed,
+                                 untracked_files=untracked,
+                                 submodules=False, path=path):
+                    sm_dirty = True
+            else:
+                raise InvalidGitRepositoryError
+
+            if sm_dirty:
+                # the submodule itself is dirty
+                modified_subs.append(sm.path)
+            else:
+                # the submodule itself is clean, recurse:
+                modified_subs.extend(
+                    sm_repo._submodules_dirty_direct_mode(
+                        untracked=untracked, deleted=deleted,
+                        modified=modified, added=added,
+                        type_changed=type_changed, path=path
+                    ))
+
+        return modified_subs
+
     def status(self, untracked=True, deleted=True, modified=True, added=True,
                type_changed=True, submodules=True, path=None):
         """
@@ -333,33 +397,67 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         # TODO: This check is too expensive ATM:
-        if submodules and \
-            any([sm.module_exists() and
-                 sm.module().config_reader().get_value('annex', 'direct', False)
-                 for sm in self.get_submodules()]):
-            # git-annex-status cannot deal with submodules in direct mode:
-            # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
-            #
-            # We need to either fail, or build a workaround, which would need us
-            # to do the submodule traversal on our own while calling
-            # git-annex-status --ignore-submodules in each
-            #
-            # Note, that condition actually is incomplete: We are looking just
-            # at the next level of submodules. We could still run into commom
-            # CommandError deeper down.
-            raise CommandNotAvailableError(
-                cmd="git-annex status",
-                msg="Cannot deal with submodules in direct mode. "
-                    "submodules=False required.")
+        # if submodules and \
+        #     any([sm.module_exists() and
+        #          sm.module().config_reader().get_value('annex', 'direct', False)
+        #          for sm in self.get_submodules()]):
+        #     # git-annex-status cannot deal with submodules in direct mode:
+        #     # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
+        #     #
+        #     # We need to either fail, or build a workaround, which would need us
+        #     # to do the submodule traversal on our own while calling
+        #     # git-annex-status --ignore-submodules in each
+        #     #
+        #     # Note, that condition actually is incomplete: We are looking just
+        #     # at the next level of submodules. We could still run into commom
+        #     # CommandError deeper down.
+        #     raise CommandNotAvailableError(
+        #         cmd="git-annex status",
+        #         msg="Cannot deal with submodules in direct mode. "
+        #             "submodules=False required.")
         self.precommit()
 
         options = [path] if path else []
         if not submodules:
             options.extend(to_options(ignore_submodules='all'))
-        # Note, that _run_annex_command_json returns a generator
-        json_list = list(
-            self._run_annex_command_json('status',
-                                         args=options))
+
+        # BEGIN workaround bug (see self._submodules_dirty_direct_mode)
+        # TODO: To be catched bug ATM results in empty json and zero-exit
+        # We need to get the indication from the log instead an exception:
+        old_log_state = self.cmd_call_wrapper._log_outputs
+        self.cmd_call_wrapper._log_outputs = True
+        with swallow_logs(new_level=logging.ERROR) as cml:
+            # Note, that _run_annex_command_json returns a generator
+            json_list = list(
+                self._run_annex_command_json('status',
+                                             args=options, expect_stderr=False))
+        if submodules and \
+           "fatal: This operation must be run in a work tree" in cml.out and \
+           "failed in submodule" in cml.out:
+
+            lgr.debug("git-annex-status failed probably due to submodule in "
+                      "direct mode. Trying to workaround.")
+            # try again, ignoring submodules:
+            options = [path] if path else []
+            options.extend(to_options(ignore_submodules='all'))
+            json_list = list(
+                self._run_annex_command_json('status', args=options)
+            )
+            # separately get modified submodules:
+            m_subs = \
+                self._submodules_dirty_direct_mode(untracked=untracked,
+                                                   deleted=deleted,
+                                                   modified=modified,
+                                                   added=added,
+                                                   type_changed=type_changed,
+                                                   path=path)
+            json_list.extend({'file': p, 'status': 'M'} for p in m_subs)
+        elif cml.out:
+            lgr.warning("Unexpected stderr by git-annex-status: %s%s",
+                        linesep, cml.out)
+
+        self.cmd_call_wrapper._log_outputs = old_log_state
+        # END workaround
 
         key_mapping = [(untracked, 'untracked', '?'),
                        (deleted, 'deleted', 'D'),

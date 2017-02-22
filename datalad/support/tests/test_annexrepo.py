@@ -1704,7 +1704,6 @@ def test_AnnexRepo_status(path):
     stat['added'].remove('submod/')  # only one state in 'annex status'
     eq_(stat, ar.status())
 
-
     # TODO: explicit path(s)
     # TODO: unlock file
     # TODO: parameters; especially submodules
