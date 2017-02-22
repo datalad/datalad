@@ -112,7 +112,7 @@ class AddSibling(Interface):
         annex_wanted=annex_wanted_opt,
         annex_group=annex_group_opt,
         annex_groupwanted=annex_groupwanted_opt,
-        # TODO: inherit_settings
+        # TODO: inherit
     )
 
     @staticmethod

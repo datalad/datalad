@@ -34,7 +34,7 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import inherit_settings_opt
+from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
@@ -331,7 +331,7 @@ class CreateSibling(Interface):
             directory be forcefully re-initialized, and the sibling (re-)configured
             ('replace', implies 'reconfigure'), the sibling configuration be updated
             only ('reconfigure'), or to error ('error').""",),
-        inherit_settings=inherit_settings_opt,
+        inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -373,7 +373,7 @@ class CreateSibling(Interface):
                  publish_by_default=None,
                  publish_depends=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
-                 inherit_settings=False,
+                 inherit=False,
                  since=None):
 
         # there is no point in doing anything further
@@ -411,16 +411,16 @@ class CreateSibling(Interface):
 
         # make sure dependencies are valid
         for d in datasets.values():
-            # TODO: inherit_settings -- we might want to automagically create
+            # TODO: inherit -- we might want to automagically create
             # those dependents as well???
             _check_deps(d.repo, publish_depends)
 
         # Finally we get to the point where sshurl is possibly used  to
         # get the name in case if not specified
         if not sshurl:
-            if not inherit_settings:
+            if not inherit:
                 raise InsufficientArgumentsError(
-                    "needs at least an SSH URL, if no inherit_settings option"
+                    "needs at least an SSH URL, if no inherit option"
                 )
             if name is None:
                 raise ValueError(
@@ -432,7 +432,7 @@ class CreateSibling(Interface):
                 sshurl = CreateSibling._get_remote_url(ds, name)
             except Exception as exc:
                 lgr.debug('%s does not know about url for %s: %s', ds, name, exc_str(exc))
-        elif inherit_settings:
+        elif inherit:
             raise ValueError(
                 "For now, for clarity not allowing specifying a custom sshurl "
                 "while inheriting settings"
@@ -536,7 +536,7 @@ class CreateSibling(Interface):
             add_config = {}  # additional .config items
             add_annex_configs = OrderedDict()  # additional settings for annex
 
-            if inherit_settings:
+            if inherit:
                 # here we must analyze current_ds's super, not the super_ds
                 current_super_ds = current_ds.get_superdataset()
                 super_config = current_super_ds.config

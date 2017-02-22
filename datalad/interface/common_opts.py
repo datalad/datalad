@@ -191,11 +191,11 @@ annex_groupwanted_opt = Parameter(
     constraints=EnsureStr() | EnsureNone())
 
 
-inherit_settings_opt = Parameter(
-    args=("--inherit-settings",),
+inherit_opt = Parameter(
+    args=("--inherit",),
     action="store_true",
-    doc="""if sibling does not exist in a given dataset, its
-    `create-sibling --inherit-settings` is called""")
+    doc="""if sibling is missing, inherit settings (git config, git annex
+    wanted/group/groupwanted) from its super-dataset""")
 
 missing_sibling_opt = Parameter(
     args=("--missing",),

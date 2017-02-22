@@ -339,7 +339,6 @@ class Publish(Interface):
                         'Cannot determine target sibling for %s' % (ds,))
             elif to not in ds.repo.get_remotes():
                 # unknown given remote
-                # TODO: not quite "failing" really so interfers with "inherit_settings"
                 if missing == 'skip':
                     lgr.warning(
                         "Unknown target sibling '%s', skipping %s",
@@ -356,7 +355,7 @@ class Publish(Interface):
                     # would not be as transparent to inherit for -github
                     lgr.info("Will try to create a sibling inheriting settings from %s", superds)
                     # XXX explicit None as sshurl for now
-                    ds.create_sibling(None, name=to, inherit_settings=True)
+                    ds.create_sibling(None, name=to, inherit=True)
                     ds_remote_info[ds_path] = {'remote': to}
                 else:
                     raise ValueError(
