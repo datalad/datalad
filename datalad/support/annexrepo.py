@@ -704,13 +704,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(fetch_files) != len(files):
             lgr.info("Actually getting %d files", len(fetch_files))
 
-        # TODO:  check annex version and issue a one time warning if not
-        # old enough for --json-progress
-
-        # Without up to date annex, we would still report total! ;)
-        if self.git_annex_version >= '6.20160923':
-            # options  might be the '--key' which should go last
-            options = ['--json-progress'] + options
+        # options  might be the '--key' which should go last
+        options = ['--json-progress'] + options
 
         # Note: Currently swallowing logs, due to the workaround to report files
         # not found, but don't fail and report about other files and use JSON,
@@ -1999,17 +1994,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         #   but are ignored
         # - in case of multiple items, annex would silently skip those files
 
-        annex_options = files + ['--to=%s' % remote]
+        annex_options = ['--to=%s' % remote, '--json-progress']
         if options:
             annex_options.extend(shlex.split(options))
-        # Note:
-        # As of now, there is no --json option for annex copy. Use it once this
-        # changed.
-        std_out, std_err = self._run_annex_command(
+
+        results = self._run_annex_command_json(
             'copy',
-            annex_options=annex_options,
-            log_stdout=True, log_stderr=not log_online,
-            log_online=log_online, expect_stderr=True)
+            args=annex_options + files,
+            # jobs TODO
+            #log_stdout=True, log_stderr=not log_online,
+            #log_online=log_online, expect_stderr=True
+        )
+        import pdb; pdb.set_trace()
 
         return [line.split()[1] for line in std_out.splitlines()
                 if line.startswith('copy ') and line.endswith('ok')]
