@@ -18,6 +18,7 @@ from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
 from datalad.utils import chpwd
+from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
@@ -38,6 +39,7 @@ from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
+from datalad.tests.utils import ok_file_under_git
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
@@ -401,9 +403,28 @@ def test_target_ssh_inherit(src_path, target_path):
     target_url = 'localhost:%s' % target_path
     remote = "magical"
     ds.create_sibling(target_url, name=remote)  # not doing recursively
+    ds.repo.set_wanted(remote, 'standard')
+    ds.repo.set_group(remote, 'backup')
     ds.publish(to=remote)
-    ds.create('sub')  # so now we got a hierarchy!
+
+    # now a month later we created a new subdataset
+    subds = ds.create('sub')  # so now we got a hierarchy!
+    create_tree(subds.path, {'sub.dat': 'lots of data'})
+    subds.add('sub.dat')
+    ok_file_under_git(subds.path, 'sub.dat', annexed=True)
+
+    target_sub = Dataset(opj(target_path, 'sub'))
     ds.publish()  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
-    assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
+    ok_(not target_sub.is_installed())  # still not there
+    with swallow_logs():  # so no warnings etc
+        assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
     ds.publish(to=remote, recursive=True, inherit_settings=True)
+    # we added the remote and set all the
+    eq_(subds.repo.get_wanted(remote), 'standard')
+    eq_(subds.repo.get_group(remote), 'backup')
+
+    ok_(target_sub.is_installed())  # it is there now
+    # and we have transferred the content
+    ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
+

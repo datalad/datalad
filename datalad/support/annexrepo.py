@@ -488,6 +488,31 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 raise e
 
+    def _run_simple_annex_command(self, *args, **kwargs):
+        """Run an annex command and return its output, of which expect 1 line
+
+        Just a little helper to interact with basic annex commands and process
+        their output while ignoring some messages
+
+        Parameters
+        ----------
+        **kwargs: all passed into _run
+        """
+        out, err = self._run_annex_command(
+            *args, **kwargs
+        )
+        lines = out.rstrip('\n').split('\n')
+        # ignore some lines which might appear on a fresh clone
+        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
+        lines_ = [
+            l for l in lines
+            if not re.search(
+                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+            )
+        ]
+        assert(len(lines_) <= 1)
+        return lines_[0] if lines_ else None
+
     def _is_direct_mode_from_config(self):
         """Figure out if in direct mode from the git config.
 
@@ -1560,27 +1585,54 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote : str, optional
            If not specified (None), returns `wanted` for current repository
         """
-        out, err = self._run_annex_command(
+        return self._run_simple_annex_command(
             'wanted',
             annex_options=[remote or '.']
         )
-        lines = out.rstrip('\n').split('\n')
-        # ignore some lines which might appear on a fresh clone
-        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
-        lines_ = [
-            l for l in lines
-            if not re.search(
-                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
-            )
-        ]
-        assert(len(lines_) <= 1)
-        return lines_[0] if lines_ else None
 
     def set_wanted(self, remote=None, expr=None):
         """Set `wanted` `expr` for the remote."""
-        out, err = self._run_annex_command(
+        return self._run_simple_annex_command(
             'wanted',
             annex_options=[remote or '.', expr]
+        )
+
+    def get_group(self, remote=None):
+        """Get `group` for the remote.  "" corresponds to none set
+
+        Parameters
+        ----------
+        remote : str, optional
+           If not specified (None), returns `group` for current repository
+        """
+        return self._run_simple_annex_command(
+            'group',
+            annex_options=[remote or '.']
+        )
+
+    def set_group(self, remote=None, group=None):
+        """Set `group` of the remote."""
+        return self._run_simple_annex_command(
+            'group',
+            annex_options=[remote or '.', group]
+        )
+
+    def get_groupwanted(self, name=None):
+        """Get `groupwanted` expression for a group `name`
+
+        Parameters
+        ----------
+        name : str, optional
+           Name of the groupwanted group
+        """
+        return self._run_simple_annex_command(
+            'groupwanted', annex_options=[name]
+        )
+
+    def set_groupwanted(self, name=None, expr=None):
+        """Set `expr` for the `name` groupwanted"""
+        return self._run_simple_annex_command(
+            'groupwanted', annex_options=[name, expr]
         )
 
     def precommit(self):

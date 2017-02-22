@@ -11,7 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
-
+from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -101,8 +101,8 @@ def _create_dataset_sibling(
         ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
             if target_pushurl else ds_sshurl
 
-    lgr.info("Considering to create a target dataset {0} at {1}".format(
-        localds_path, remoteds_path))
+    lgr.info("Considering to create a target dataset {0} at {1} of {2}".format(
+        localds_path, remoteds_path, ssh_url.hostname))
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
     # but it did not even exist before
@@ -412,14 +412,7 @@ class CreateSibling(Interface):
             if not super_ds:
                 raise ValueError(
                     "Could not determine super dataset to inherit URL")
-            # take pushurl if present, if not -- just a url
-            super_url = super_ds.config.get('remote.%s.pushurl' % name) or \
-                        super_ds.config.get('remote.%s.url' % name)
-            if not super_url:
-                raise ValueError(
-                    "Super dataset %s had neither pushurl or url defined for %s"
-                    % (super_ds, name)
-                )
+            super_url = CreateSibling._get_remote_url(super_ds, name)
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
@@ -503,7 +496,10 @@ class CreateSibling(Interface):
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
 
+            shared_ = shared
             add_config = {}  # additional .config items
+            add_annex_configs = OrderedDict()  # additional settings for annex
+
             if inherit_settings:
                 # here we must analyze current_ds's super, not the super_ds
                 current_super_ds = current_ds.get_superdataset()
@@ -511,26 +507,36 @@ class CreateSibling(Interface):
 
                 # XXX yoh is not exactly understanding interactions with sshri
                 # below, and why we could just use a single sshri
-                shared_ = shared  # TODO: from super
+                if shared_ is None:
+                    # inherit from the setting on remote end
+                    shared_ = CreateSibling._get_ds_remote_shared_setting(
+                        current_super_ds, name, ssh)
+
                 # Copy git config options
                 remote_section = 'remote.%s' % name
                 for opt_name in ['push'] + \
                          [opt_name for opt_name in super_config.options(remote_section)
+                          # we might not want to blindly copy all of them! TODO
                           if opt_name.startswith('datalad-')]:
                     opt = "%s.%s" % (remote_section, opt_name)
                     v = super_config.get(opt)
                     if v:
                         add_config[opt] = v
+
                 # Copy relevant annex settings for the sibling
-                annex_wanted = None
                 # makes sense only if current AND super are annexes, so it is
                 # kinda a boomer, since then forbids having a super a pure git
-                if isinstance(current_super_ds, AnnexRepo) and \
-                    isinstance(current_ds, AnnexRepo):
-                        annex_wanted = current_super_ds.get_wanted(name)
-
-            else:
-                shared_ = shared
+                current_super_repo = current_super_ds.repo
+                if isinstance(current_super_repo, AnnexRepo) and \
+                    isinstance(current_ds.repo, AnnexRepo):
+                    add_annex_configs['wanted'] = current_super_repo.get_wanted(name)
+                    # I think it might be worth inheritting group regardless what
+                    # value is
+                    #if annex_wanted in {'groupwanted', 'standard'}:
+                    add_annex_configs['group'] = current_super_repo.get_group(name)
+                    if add_annex_configs['wanted'] == 'groupwanted':
+                        # we better have a value for the expression for that group
+                        add_annex_configs['groupwanted'] = current_super_repo.get_groupwanted(name)
 
             path = _create_dataset_sibling(
                 name,
@@ -557,8 +563,14 @@ class CreateSibling(Interface):
                 current_values = assure_list(current_ds.config.get(opt))
                 for v in assure_list(value):
                     if v not in current_values:
-                        lgr.debug("Adding inherited option %s=%r", opt, v)
+                        lgr.info(" inheriting git option %s=%r", opt, v)
                         current_ds.config.add(opt, v, where='local')
+
+            # annex settings
+            for opt, value in add_annex_configs.items():
+                if opt:
+                    lgr.info(" inheriting annex setting %s=%s", opt, value)
+                    getattr(current_ds.repo, 'set_%s' % opt)(name, value)
 
             # publish web-interface to root dataset on publication server
             if current_dspath == ds.path and ui:
@@ -583,6 +595,41 @@ class CreateSibling(Interface):
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
+
+    @staticmethod
+    def _get_ds_remote_shared_setting(ds, name, ssh):
+        """Figure out setting of sharedrepository for dataset's `name` remote"""
+        shared = None
+        try:
+            current_super_url = CreateSibling._get_remote_url(
+                ds, name)
+            current_super_ri = RI(current_super_url)
+            shared = ssh('git -C {} config --get core.sharedrepository'.format(
+                # TODO -- we might need to expanduser taking .user into account
+                # but then it must be done also on remote side
+                sh_quote(current_super_ri.path))
+            ).strip()
+        except CommandError as e:
+            lgr.debug(
+                "Could not figure out remote shared setting of %s for %s due "
+                "to %s",
+                ds, name, exc_str(e)
+            )
+            # could well be ok if e.g. not shared
+            # TODO: more detailed analysis may be?
+        return shared
+
+    @staticmethod
+    def _get_remote_url(ds, name):
+        """A little helper to get url from pushurl or from url if not defined"""
+        # take pushurl if present, if not -- just a url
+        url = ds.config.get('remote.%s.pushurl' % name) or \
+            ds.config.get('remote.%s.url' % name)
+        if not url:
+            raise ValueError(
+                "%s had neither pushurl or url defined for %s" % (ds, name)
+            )
+        return url
 
     @staticmethod
     def init_remote_repo(path, ssh, shared, dataset, description=None):
