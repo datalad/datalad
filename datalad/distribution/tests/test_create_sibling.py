@@ -398,13 +398,14 @@ def test_failon_no_permissions(src_path, target_path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(suffix="target")
-def test_target_ssh_inherit(src_path, target_path):
+def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds = Dataset(src_path).create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
     ds.create_sibling(target_url, name=remote)  # not doing recursively
-    ds.repo.set_wanted(remote, 'standard')
-    ds.repo.set_group(remote, 'backup')
+    if standardgroup:
+        ds.repo.set_wanted(remote, 'standard')
+        ds.repo.set_group(remote, standardgroup)
     ds.publish(to=remote)
 
     # now a month later we created a new subdataset
@@ -421,10 +422,22 @@ def test_target_ssh_inherit(src_path, target_path):
         assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
     ds.publish(to=remote, recursive=True, inherit_settings=True)
     # we added the remote and set all the
-    eq_(subds.repo.get_wanted(remote), 'standard')
-    eq_(subds.repo.get_group(remote), 'backup')
+    eq_(subds.repo.get_wanted(remote), 'standard' if standardgroup else '')
+    eq_(subds.repo.get_group(remote), standardgroup or '')
 
     ok_(target_sub.is_installed())  # it is there now
     # and we have transferred the content
-    ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
+    if standardgroup and standardgroup == 'backup':
+        # only then content should be copied
+        ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
+    else:
+        # otherwise nothing is copied by default
+        assert_false(target_sub.repo.file_has_content('sub.dat'))
 
+
+def test_target_ssh_inherit():
+    # TODO: waits for resolution on
+    #   https://github.com/datalad/datalad/issues/1274
+    #yield _test_target_ssh_inherit, None      # no wanted etc
+    #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
+    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files
