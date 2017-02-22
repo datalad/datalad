@@ -44,6 +44,7 @@ from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
+from datalad.utils import knows_annex
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -196,8 +197,9 @@ class Dataset(object):
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.get_branches():
+            if knows_annex(self.path):
                 # we acquired git-annex branch
+                lgr.info("Init new annex at '%s'.", self.path)
                 self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
 
