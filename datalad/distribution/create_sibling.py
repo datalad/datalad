@@ -35,6 +35,9 @@ from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import inherit_settings_opt
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.utils import filter_unmodified
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
@@ -66,7 +69,11 @@ def _create_dataset_sibling(
         shared,
         publish_depends,
         publish_by_default,
-        as_common_datasrc):
+        as_common_datasrc,
+        annex_wanted,
+        annex_group,
+        annex_groupwanted,
+):
     """Everyone is very smart here and could figure out the combinatorial
     affluence among provided tiny (just slightly over a dozen) number of options
     and only a few pages of code
@@ -186,7 +193,11 @@ def _create_dataset_sibling(
         force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
-        publish_depends=publish_depends)
+        publish_depends=publish_depends,
+        annex_wanted=annex_wanted,
+        annex_group=annex_group,
+        annex_groupwanted=annex_groupwanted
+    )
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
@@ -333,6 +344,9 @@ class CreateSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
         inherit_settings=inherit_settings_opt,
         since=Parameter(
             args=("--since",),
@@ -353,6 +367,7 @@ class CreateSibling(Interface):
                  as_common_datasrc=None,
                  publish_by_default=None,
                  publish_depends=None,
+                 annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit_settings=False,
                  since=None):
 
@@ -498,6 +513,10 @@ class CreateSibling(Interface):
 
             shared_ = shared
             publish_depends_ = publish_depends
+            annex_wanted_ = annex_wanted
+            annex_group_ = annex_group
+            annex_groupwanted_ = annex_groupwanted
+
             add_config = {}  # additional .config items
             add_annex_configs = OrderedDict()  # additional settings for annex
 
@@ -531,14 +550,16 @@ class CreateSibling(Interface):
                 current_super_repo = current_super_ds.repo
                 if isinstance(current_super_repo, AnnexRepo) and \
                     isinstance(current_ds.repo, AnnexRepo):
-                    add_annex_configs['wanted'] = current_super_repo.get_wanted(name)
-                    # I think it might be worth inheritting group regardless what
-                    # value is
-                    #if annex_wanted in {'groupwanted', 'standard'}:
-                    add_annex_configs['group'] = current_super_repo.get_group(name)
-                    if add_annex_configs['wanted'] == 'groupwanted':
+                    if annex_wanted_ is None:
+                        annex_wanted_ = current_super_repo.get_wanted(name)
+                    if annex_group_ is None:
+                        # I think it might be worth inheritting group regardless what
+                        # value is
+                        #if annex_wanted in {'groupwanted', 'standard'}:
+                        annex_group_ = current_super_repo.get_group(name)
+                    if annex_wanted_ == 'groupwanted' and annex_groupwanted_ is None:
                         # we better have a value for the expression for that group
-                        add_annex_configs['groupwanted'] = current_super_repo.get_groupwanted(name)
+                        annex_groupwanted_ = current_super_repo.get_groupwanted(name)
 
             path = _create_dataset_sibling(
                 name,
@@ -554,7 +575,11 @@ class CreateSibling(Interface):
                 shared_,
                 publish_depends_,
                 publish_by_default,
-                as_common_datasrc)
+                as_common_datasrc,
+                annex_wanted_,
+                annex_group_,
+                annex_groupwanted_
+            )
             if not path:
                 # nothing new was created
                 continue
@@ -567,12 +592,6 @@ class CreateSibling(Interface):
                     if v not in current_values:
                         lgr.info(" inheriting git option %s=%r", opt, v)
                         current_ds.config.add(opt, v, where='local')
-
-            # annex settings
-            for opt, value in add_annex_configs.items():
-                if opt:
-                    lgr.info(" inheriting annex setting %s=%s", opt, value)
-                    getattr(current_ds.repo, 'set_%s' % opt)(name, value)
 
             # publish web-interface to root dataset on publication server
             if current_dspath == ds.path and ui:

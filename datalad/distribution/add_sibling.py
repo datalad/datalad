@@ -30,6 +30,9 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import publish_by_default
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -105,6 +108,9 @@ class AddSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
         # TODO: inherit_settings
     )
 
@@ -113,7 +119,8 @@ class AddSibling(Interface):
     def __call__(name=None, url=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
                  as_common_datasrc=None, publish_depends=None,
-                 publish_by_default=None):
+                 publish_by_default=None,
+                 annex_wanted=None, annex_group=None, annex_groupwanted=None):
 
         # TODO: Detect malformed URL and fail?
 
@@ -299,6 +306,16 @@ class AddSibling(Interface):
                             'Not configuring "%s" as a common data source, '
                             'URL protocol is not http or https',
                             name)
+                if annex_wanted:
+                    repo.set_wanted(name, annex_wanted)
+                if annex_group:
+                    repo.set_group(name, annex_group)
+                if annex_groupwanted:
+                    if not annex_group:
+                        raise ValueError("To set groupwanted, you need to provide annex_group option")
+                    repo.set_groupwanted(annex_group, annex_groupwanted)
+
+
 
             successfully_added.append(repo_name)
 
