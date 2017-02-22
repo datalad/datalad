@@ -24,6 +24,7 @@ from datalad.support.param import Parameter
 from datalad.utils import knows_annex
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import require_dataset
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
