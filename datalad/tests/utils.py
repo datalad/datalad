@@ -62,6 +62,8 @@ _TEMP_PATHS_CLONES = set()
 neq_ = assert_not_equal
 nok_ = assert_false
 
+lgr = logging.getLogger("datalad.tests.utils")
+
 
 def skip_if_no_module(module):
     try:
@@ -207,8 +209,18 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     if annex and r.is_direct_mode():
         if head_modified or index_modified:
-            raise NotImplementedError("TODO - see note in docstring")
-        ok_(not r.dirty(submodules=not ignore_submodules))
+            lgr.warning("head_modified and index_modified are not quite valid "
+                        "concepts in direct mode! Looking for any change "
+                        "(staged or not) instead.")
+            status = r.status(untracked=False, submodules=not ignore_submodules)
+            modified = []
+            for s in status:
+                modified.extend(status[s])
+            eq_(sorted(head_modified + index_modified),
+                sorted(f for f in modified))
+        else:
+            ok_(not r.dirty(untracked_files=not untracked,
+                            submodules=not ignore_submodules))
     else:
         repo = r.repo
 
