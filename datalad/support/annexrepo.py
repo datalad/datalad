@@ -97,7 +97,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
-    GIT_ANNEX_MIN_VERSION = '6.20161210'
+    # 6.20170220 -- annex status provides --ignore-submodules
+    GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
     # Workaround for per-call config issue with git 2.11.0
@@ -331,33 +332,34 @@ class AnnexRepo(GitRepo, RepoInterface):
         :return:
         """
 
-        if any([bool(sm.repo.config_reader().get_value('annex', 'direct', False))
-                for sm in self.get_submodules()]):
+        # TODO: This check is too expensive ATM:
+        if submodules and \
+            any([sm.module_exists() and
+                 sm.module().config_reader().get_value('annex', 'direct', False)
+                 for sm in self.get_submodules()]):
             # git-annex-status cannot deal with submodules in direct mode:
             # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
             #
             # We need to either fail, or build a workaround, which would need us
             # to do the submodule traversal on our own while calling
             # git-annex-status --ignore-submodules in each
-            # TODO: AnnexRepo.git_annex_version >= '6.20170221'(?)
-            #       => --ignore-submodules available
+            #
+            # Note, that condition actually is incomplete: We are looking just
+            # at the next level of submodules. We could still run into commom
+            # CommandError deeper down.
             raise CommandNotAvailableError(
                 cmd="git-annex status",
                 msg="Cannot deal with submodules in direct mode. "
                     "submodules=False required.")
         self.precommit()
 
-        # Note, that _run_annex_command_json returns a generator
-        json_list = list(self._run_annex_command_json('status',
-                                                  args=[path] if path else None))
-
-        # TODO: 'annex status' doesn't have '--ignore-submodules'
-        # Therefore it's just an output filter for now:
+        options = [path] if path else []
         if not submodules:
-            # filter results to not contain paths within submodules
-            json_list = [p for p in json_list
-                         if all(not p['file'].startswith(sm.path)
-                                for sm in self.get_submodules())]
+            options.extend(to_options(ignore_submodules='all'))
+        # Note, that _run_annex_command_json returns a generator
+        json_list = list(
+            self._run_annex_command_json('status',
+                                         args=options))
 
         key_mapping = [(untracked, 'untracked', '?'),
                        (deleted, 'deleted', 'D'),
@@ -402,24 +404,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @property
     def untracked_files(self):
-        try:
-            # TODO: Probably submodules=False instead
-            return self.status(untracked=True, deleted=False, modified=False,
-                               added=False, type_changed=False, submodules=True,
-                               path=None)['untracked']
-        except CommandNotAvailableError as e:
-            if e.cmd == 'git-annex status' and \
-               "submodules in direct mode" in e.msg and \
-               AnnexRepo.git_annex_version < '6.20170221' and \
-               not self.is_direct_mode():
-                # => known bug: 'status' fails on direct mode submodules
-                # try to use standard git approach, since we are not in direct
-                # mode ourselves:
-                # TODO: This is not a 'real' fix. Consider adjusted branches
-                # and the likes
-                return super(AnnexRepo, self).untracked_files
-            else:
-                raise
+        """Get a list of untracked files
+        """
+        return self.status(untracked=True, deleted=False, modified=False,
+                           added=False, type_changed=False, submodules=False,
+                           path=None)['untracked']
 
     @classmethod
     def _check_git_annex_version(cls):
@@ -922,6 +911,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # Note: For now ugly workaround to prevent unexpected
                     # outcome when adding to git. See:
                     # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
+                    lgr.warning("Workaround: Wait for {} to add to git ({})."
+                                "".format(files, self))
                     time.sleep(1)
 
                 options += [

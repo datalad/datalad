@@ -220,15 +220,6 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
         raise SkipTest("Test not applicable in repository version >= 6")
     ar.set_direct_mode(True)
 
-    try:
-        ok_clean_git(ar, annex=True)
-    except CommandNotAvailableError as e:
-        if e.cmd == 'git-annex status' and \
-           "submodules in direct mode" in e.msg and \
-           AnnexRepo.git_annex_version < '6.20170221':
-            # known bug (http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/)
-            pass
-
     # annex proxy raises in indirect mode:
     try:
         ar.set_direct_mode(False)
@@ -727,11 +718,10 @@ def test_AnnexRepo_add_to_annex(path):
     # Note: Some test repos appears to not be initialized.
     #       Therefore: 'init=True'
     # TODO: Fix these repos finally!
-
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
     filename = get_most_obscure_supported_name()
     filename_abs = opj(repo.path, filename)
     with open(filename_abs, "w") as f:
@@ -754,12 +744,12 @@ def test_AnnexRepo_add_to_annex(path):
     # uncommitted:
     # but not in direct mode branch
     if repo.is_direct_mode():
-        ok_(not repo.dirty())
+        ok_(not repo.dirty(submodules=False))
     else:
-        ok_(repo.dirty())
+        ok_(repo.dirty(submodules=False))
 
     repo.commit("Added file to annex.")
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -772,7 +762,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # and committed:
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -785,7 +775,7 @@ def test_AnnexRepo_add_to_git(path):
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
     filename = get_most_obscure_supported_name()
     with open(opj(repo.path, filename), "w") as f:
         f.write("some")
@@ -794,9 +784,9 @@ def test_AnnexRepo_add_to_git(path):
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
     # uncommitted:
-    ok_(repo.dirty())
+    ok_(repo.dirty(submodules=False))
     repo.commit("Added file to annex.")
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -809,7 +799,7 @@ def test_AnnexRepo_add_to_git(path):
     assert_raises(FileInGitError, repo.get_file_key, filename)
 
     # and committed:
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
 @ignore_nose_capturing_stdout
@@ -1519,7 +1509,7 @@ def test_AnnexRepo_add_submodule(source, path):
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
 
-    ok_clean_git(path, annex=True)
+    ok_clean_git(top_repo, annex=True)
     ok_clean_git(opj(path, 'sub'), annex=False)
 
 
@@ -1691,13 +1681,14 @@ def test_AnnexRepo_status(path):
     # add the submodule
     ar.add_submodule('submod', url=opj(curdir, 'submod'))
 
-    if sub.is_direct_mode() and AnnexRepo.git_annex_version < '6.20170221':
+    if sub.is_direct_mode():
         # ATM (annex version 6.20170220+gitgbfb38eece-1~ndall+1)
         # 'annex status' fails, if there are submodules in direct mode
         # Note: used version in condition to notice, when we are able to fix
         # this
         assert_raises(CommandNotAvailableError, ar.status)
-
+        # TODO: ignore_submodules instead? Better: Do all tests not involving
+        # submodules before
         # we can't proceed, since any call to 'status' will fail now
         raise SkipTest("Skipping due to a submodule in direct mode.")
 
@@ -1716,7 +1707,7 @@ def test_AnnexRepo_status(path):
 
     # TODO: explicit path(s)
     # TODO: unlock file
-    #
+    # TODO: parameters; especially submodules
 
 # TODO: test dirty
 # TODO: GitRep.dirty

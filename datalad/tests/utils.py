@@ -144,14 +144,14 @@ from ..utils import chpwd, getpwd
 
 
 def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
-                 untracked=[]):
+                 untracked=[], ignore_submodules=False):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
 
     Note
     ----
-    Parameters head_modified, index_modified and untracked currently work
+    Parameters head_modified and index_modified currently work
     in pure git or indirect mode annex only and are ignored otherwise!
     Implementation is yet to do!
 
@@ -165,6 +165,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
       explicitly set to True or False to indicate, that an annex is (not)
       expected; set to None to autodetect, whether there is an annex.
       Default: None.
+    ignore_submodules: bool
+      if True, submodules are not inspected
     """
     # TODO: See 'Note' in docstring
 
@@ -204,9 +206,9 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     eq_(sorted(r.untracked_files), sorted(untracked))
 
     if annex and r.is_direct_mode():
-        if head_modified or index_modified or untracked:
+        if head_modified or index_modified:
             raise NotImplementedError("TODO - see note in docstring")
-        ok_(not r.dirty())
+        ok_(not r.dirty(submodules=not ignore_submodules))
     else:
         repo = r.repo
 
