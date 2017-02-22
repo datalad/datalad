@@ -95,8 +95,8 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    assert(set(source.repo.get_branch_commits("git-annex")).issubset(
+        set(target.get_branch_commits("git-annex"))))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
