@@ -36,6 +36,7 @@ from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import InsufficientArgumentsError
 
 
 lgr = logging.getLogger('datalad.distribution.add_sibling')
@@ -312,10 +313,9 @@ class AddSibling(Interface):
                     repo.set_group(name, annex_group)
                 if annex_groupwanted:
                     if not annex_group:
-                        raise ValueError("To set groupwanted, you need to provide annex_group option")
+                        raise InsufficientArgumentsError(
+                            "To set groupwanted, you need to provide annex_group option")
                     repo.set_groupwanted(annex_group, annex_groupwanted)
-
-
 
             successfully_added.append(repo_name)
 

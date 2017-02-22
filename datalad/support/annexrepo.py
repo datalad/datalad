@@ -526,7 +526,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         out, err = self._run_annex_command(
             *args, **kwargs
         )
-        lines = out.rstrip('\n').split('\n')
+        lines = out.rstrip('\n').splitlines()
         # ignore some lines which might appear on a fresh clone
         # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
         lines_ = [

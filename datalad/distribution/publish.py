@@ -239,7 +239,7 @@ class Publish(Interface):
         skip_failing=Parameter(
             args=("--skip-failing",),
             action="store_true",
-            doc="skip failing sub-datasets (incombination with `recursive`) "
+            doc="skip failing sub-datasets (in combination with `recursive`) "
                 "instead of failing altogether"),
         path=Parameter(
             args=("path",),
