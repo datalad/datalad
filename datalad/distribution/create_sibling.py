@@ -497,6 +497,7 @@ class CreateSibling(Interface):
             current_ds = datasets[current_dspath]
 
             shared_ = shared
+            publish_depends_ = publish_depends
             add_config = {}  # additional .config items
             add_annex_configs = OrderedDict()  # additional settings for annex
 
@@ -514,14 +515,15 @@ class CreateSibling(Interface):
 
                 # Copy git config options
                 remote_section = 'remote.%s' % name
-                for opt_name in ['push'] + \
-                         [opt_name for opt_name in super_config.options(remote_section)
-                          # we might not want to blindly copy all of them! TODO
-                          if opt_name.startswith('datalad-')]:
+                for opt_name in ['push']:  # as a loop so later may be more
                     opt = "%s.%s" % (remote_section, opt_name)
                     v = super_config.get(opt)
                     if v:
                         add_config[opt] = v
+
+                if publish_depends_ is None:
+                    publish_depends_ = super_config.get(
+                        "%s.datalad-publish-depends" % remote_section)
 
                 # Copy relevant annex settings for the sibling
                 # makes sense only if current AND super are annexes, so it is
@@ -550,7 +552,7 @@ class CreateSibling(Interface):
                 target_pushurl,
                 existing,
                 shared_,
-                publish_depends,
+                publish_depends_,
                 publish_by_default,
                 as_common_datasrc)
             if not path:
