@@ -81,6 +81,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
+    # MIH: Nope, we don't automatically add this anymore
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -89,7 +90,7 @@ def test_publish_simple(origin, src_path, dst_path):
                     commit=True, msg="Modified.")
     ok_clean_git(source.repo, annex=None)
 
-    res = publish(dataset=source)
+    res = publish(dataset=source, to='target')
     eq_(res, ([source], []))
 
     ok_clean_git(dst_path, annex=None)
