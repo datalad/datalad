@@ -24,6 +24,7 @@ from datalad.support.param import Parameter
 from datalad.utils import knows_annex
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import require_dataset
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -164,9 +165,18 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
-        if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
-            # the branch love this remote already, let git pull do its thing
-            repo.pull(remote=remote)
+        if active_branch == (None, None):
+            # I guess we need to fetch, and then let super-dataset to update
+            # into the state it points to for this submodule, but for now let's
+            # just blow I guess :-/
+            lgr.warning(
+                "No active branch in %s - we just fetched and not changing state",
+                repo
+            )
         else:
-            # no marriage yet, be specific
-            repo.pull(remote=remote, refspec=active_branch)
+            if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
+                # the branch love this remote already, let git pull do its thing
+                repo.pull(remote=remote)
+            else:
+                # no marriage yet, be specific
+                repo.pull(remote=remote, refspec=active_branch)
