@@ -28,13 +28,14 @@ from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
+from .helpers import strip_arg_from_argv
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
 
 def _license_info():
     return """\
-Copyright (c) 2013-2016 DataLad developers
+Copyright (c) 2013-2017 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -88,6 +89,7 @@ def setup_parser(
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
     helpers.parser_add_common_opt(parser, 'pbs_runner')
+    helpers.parser_add_common_opt(parser, 'change_path')
     helpers.parser_add_common_opt(
         parser,
         'version',
@@ -99,14 +101,6 @@ def setup_parser(
         parser.add_argument(
             '--idbg', action='store_true', dest='common_idebug',
             help="enter IPython debugger when uncaught exception happens")
-    parser.add_argument(
-        '-C', action='append', dest='change_path', metavar='PATH',
-        help="""run as if datalad was started in <path> instead
-        of the current working directory.  When multiple -C options are given,
-        each subsequent non-absolute -C <path> is interpreted relative to the
-        preceding -C <path>.  This option affects the interpretations of the
-        path names in that they are made relative to the working directory
-        caused by the -C option""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -250,16 +244,20 @@ def main(args=None):
             # store all unparsed arguments
             cmdlineargs.datalad_unparsed_args = unparsed_args
 
+    # to possibly be passed into PBS scheduled call
+    args_ = args or sys.argv
+
     if cmdlineargs.change_path is not None:
+        from .common_args import change_path as change_path_opt
         for path in cmdlineargs.change_path:
             chpwd(path)
+            args_ = strip_arg_from_argv(args_, path, change_path_opt[1])
 
     ret = None
     if cmdlineargs.pbs_runner:
         from .helpers import run_via_pbs
-        from .helpers import strip_arg_from_argv
         from .common_args import pbs_runner as pbs_runner_opt
-        args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
+        args_ = strip_arg_from_argv(args_, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
     elif has_func:

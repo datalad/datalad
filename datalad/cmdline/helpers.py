@@ -121,7 +121,8 @@ def strip_arg_from_argv(args, value, opt_names):
     """Strip an originally listed option (with its value) from the list cmdline args
     """
     # Yarik doesn't know better
-    args = args or sys.argv
+    if args is None:
+        args = sys.argv
     # remove present pbs-runner option
     args_clean = []
     skip = 0
