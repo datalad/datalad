@@ -1577,7 +1577,7 @@ def test_AnnexRepo_set_remote_url(path):
 @with_tempfile(mkdir=True)
 def test_wanted(path):
     ar = AnnexRepo(path, create=True)
-    eq_(ar.get_wanted(), '')
+    eq_(ar.get_wanted(), None)
     # test samples with increasing "trickiness"
     for v in ("standard",
               "include=*.nii.gz or include=*.nii",
@@ -1593,7 +1593,7 @@ def test_wanted(path):
     ar1_path = ar.path + '_1'
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
-    eq_(ar1.get_wanted(), '')
+    eq_(ar1.get_wanted(), None)
     eq_(ar1.get_wanted('origin'), v)
     ar1.set_wanted(expr='standard')
     eq_(ar1.get_wanted(), 'standard')
