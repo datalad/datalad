@@ -25,6 +25,7 @@ from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.add_sibling import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
@@ -74,6 +75,7 @@ def _create_dataset_sibling(
         annex_wanted,
         annex_group,
         annex_groupwanted,
+        inherit
 ):
     """Everyone is very smart here and could figure out the combinatorial
     affluence among provided tiny (just slightly over a dozen) number of options
@@ -172,6 +174,13 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
+    if inherit and shared is None:
+        # here we must analyze current_ds's super, not the super_ds
+        delayed_super = _DelayedSuper(ds)
+        # inherit from the setting on remote end
+        shared = CreateSibling._get_ds_remote_shared_setting(
+            delayed_super, name, ssh)
+
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
@@ -179,10 +188,14 @@ def _create_dataset_sibling(
                 remoteds_path, ssh, shared, ds,
                 description=target_url):
             return
+
         if target_url and not is_ssh(target_url):
             # we are not coming in via SSH, hence cannot assume proper
             # setup for webserver access -> fix
             ssh('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
+    else:
+        # TODO -- we might still want to reconfigure 'shared' setting!
+        pass
 
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
@@ -200,7 +213,8 @@ def _create_dataset_sibling(
         publish_depends=publish_depends,
         annex_wanted=annex_wanted,
         annex_group=annex_group,
-        annex_groupwanted=annex_groupwanted
+        annex_groupwanted=annex_groupwanted,
+        inherit=inherit
     )
 
     # check git version on remote end
@@ -527,56 +541,6 @@ class CreateSibling(Interface):
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
 
-            shared_ = shared
-            publish_depends_ = publish_depends
-            annex_wanted_ = annex_wanted
-            annex_group_ = annex_group
-            annex_groupwanted_ = annex_groupwanted
-
-            add_config = {}  # additional .config items
-            add_annex_configs = OrderedDict()  # additional settings for annex
-
-            if inherit:
-                # here we must analyze current_ds's super, not the super_ds
-                current_super_ds = current_ds.get_superdataset()
-                super_config = current_super_ds.config
-
-                # XXX yoh is not exactly understanding interactions with sshri
-                # below, and why we could just use a single sshri
-                if shared_ is None:
-                    # inherit from the setting on remote end
-                    shared_ = CreateSibling._get_ds_remote_shared_setting(
-                        current_super_ds, name, ssh)
-
-                # Copy git config options
-                remote_section = 'remote.%s' % name
-                for opt_name in ['push']:  # as a loop so later may be more
-                    opt = "%s.%s" % (remote_section, opt_name)
-                    v = super_config.get(opt)
-                    if v:
-                        add_config[opt] = v
-
-                if publish_depends_ is None:
-                    publish_depends_ = super_config.get(
-                        "%s.datalad-publish-depends" % remote_section)
-
-                # Copy relevant annex settings for the sibling
-                # makes sense only if current AND super are annexes, so it is
-                # kinda a boomer, since then forbids having a super a pure git
-                current_super_repo = current_super_ds.repo
-                if isinstance(current_super_repo, AnnexRepo) and \
-                    isinstance(current_ds.repo, AnnexRepo):
-                    if annex_wanted_ is None:
-                        annex_wanted_ = current_super_repo.get_wanted(name)
-                    if annex_group_ is None:
-                        # I think it might be worth inheritting group regardless what
-                        # value is
-                        #if annex_wanted in {'groupwanted', 'standard'}:
-                        annex_group_ = current_super_repo.get_group(name)
-                    if annex_wanted_ == 'groupwanted' and annex_groupwanted_ is None:
-                        # we better have a value for the expression for that group
-                        annex_groupwanted_ = current_super_repo.get_groupwanted(name)
-
             path = _create_dataset_sibling(
                 name,
                 current_ds,
@@ -588,26 +552,19 @@ class CreateSibling(Interface):
                 target_url,
                 target_pushurl,
                 existing,
-                shared_,
-                publish_depends_,
+                shared,
+                publish_depends,
                 publish_by_default,
                 as_common_datasrc,
-                annex_wanted_,
-                annex_group_,
-                annex_groupwanted_
+                annex_wanted,
+                annex_group,
+                annex_groupwanted,
+                inherit
             )
             if not path:
                 # nothing new was created
                 continue
             remote_repos_to_run_hook_for.append(path)
-
-            # if any - set inherited options
-            for opt, value in add_config.items():
-                current_values = assure_list(current_ds.config.get(opt))
-                for v in assure_list(value):
-                    if v not in current_values:
-                        lgr.info(" inheriting git option %s=%r", opt, v)
-                        current_ds.config.add(opt, v, where='local')
 
             # publish web-interface to root dataset on publication server
             if current_dspath == ds.path and ui:

@@ -203,5 +203,5 @@ missing_sibling_opt = Parameter(
     metavar='MODE',
     doc="""action to perform, if a sibling does not exist in a given dataset.
     By default it would fail the run ('fail' setting).  With 'inherit' a
-    `create-sibling` with `--inherit-settings` will be used to create sibling
+    'create-sibling' with '--inherit-settings' will be used to create sibling
     on the remote. With 'skip' - it simply will be skipped.""")
