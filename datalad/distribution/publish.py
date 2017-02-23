@@ -155,7 +155,10 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
                 current_branch)
             if match_adjusted:
                 # adjusted/master(...)
-                current_branch = match.group(1)
+                # TODO:  this code is not tested
+                # see https://codecov.io/gh/datalad/datalad/src/17e67045a088ae0372b38aa4d8d46ecf7c821cb7/datalad/distribution/publish.py#L156
+                # and thus probably broken -- test me!
+                current_branch = match_adjusted.group(1)
         things2push.append(current_branch)
     if isinstance(ds.repo, AnnexRepo):
         things2push.append('git-annex')
@@ -169,12 +172,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
                    if t not in ds.config.get('remote.{}.push'.format(remote), [])]
     # now we know what to push where
     lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-    # configure targets for the next push call
-    # those will be incremental to any remote..push setting in the config
-    ds.repo.repo.git(
-        c=['remote.{}.push={}'.format(remote, thing)
-           for thing in things2push])
-    _log_push_info(ds.repo.push(remote=remote))
+    _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
 
     published.append(ds)
 
