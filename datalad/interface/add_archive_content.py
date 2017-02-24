@@ -41,6 +41,8 @@ from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 
+from datalad.customremotes.base import init_datalad_remote
+
 from six import string_types
 
 from ..log import logging
@@ -287,11 +289,7 @@ class AddArchiveContent(Interface):
 
         # TODO: check if may be it was already added
         if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
-            lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
-            annex.init_remote(
-                ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
-                 'autoenable=true'])
+            init_datalad_remote(annex, ARCHIVES_SPECIAL_REMOTE, autoenable=True)
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
