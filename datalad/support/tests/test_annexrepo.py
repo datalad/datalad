@@ -1660,6 +1660,27 @@ def test_AnnexRepo_status(path):
     stat['untracked'].append(opj('sub', 'third'))
     eq_(stat, ar.status())
 
+    # test parameters for status to restrict results:
+    # limit requested states:
+    limited_status = ar.status(untracked=True, deleted=False, modified=True,
+                               added=True, type_changed=False)
+    eq_(len(limited_status), 3)
+    ok_(all([k in ('untracked', 'modified', 'added') for k in limited_status]))
+    eq_(stat['untracked'], limited_status['untracked'])
+    eq_(stat['modified'], limited_status['modified'])
+    eq_(stat['added'], limited_status['added'])
+    # limit requested files:
+    limited_status = ar.status(path=opj('sub', 'third'))
+    eq_(limited_status['untracked'], [opj('sub', 'third')])
+    ok_(all([len(limited_status[l]) == 0 for l in ('modified', 'added',
+                                                   'deleted', 'type_changed')]))
+    # again, with a list:
+    limited_status = ar.status(path=[opj('sub', 'third'), 'second'])
+    eq_(limited_status['untracked'], [opj('sub', 'third')])
+    eq_(limited_status['modified'], ['second'])
+    ok_(all([len(limited_status[l]) == 0 for l in ('added', 'deleted',
+                                                   'type_changed')]))
+
     # create a subrepo:
     sub = AnnexRepo(opj(path, 'submod'), create=True)
     # nothing changed, it's empty besides .git, which is ignored
@@ -1695,11 +1716,17 @@ def test_AnnexRepo_status(path):
     ok_(stat['modified'] == reported_stat['modified'] or
         stat['modified'] + ['submod/'] == reported_stat['modified'])
 
+    # simpler assertion if we ignore submodules:
+    eq_(stat, ar.status(submodules=False))
+
     # commit the submodule
     # TODO: issue: we can't commit 'submod' by explicitly passing it to commit
     # in direct mode. Not sure yet, whether this is about direct mode in
     # `ar` or `sub`.
-    ar.commit(msg="submodule added")
+    if ar.is_direct_mode():
+        ar.commit(msg="submodule added")
+    else:
+        ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
     stat['added'].remove('.gitmodules')
     eq_(stat, ar.status())
 
@@ -1709,9 +1736,9 @@ def test_AnnexRepo_status(path):
     stat['modified'].append('submod/')
     eq_(stat, ar.status())
 
-    # TODO: explicit path(s)
+    # TODO: modify file in submodule:
     # TODO: unlock file
-    # TODO: parameters; especially submodules
+
 
 # TODO: test dirty
 # TODO: GitRep.dirty

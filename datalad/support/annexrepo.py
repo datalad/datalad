@@ -419,7 +419,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         self.precommit()
 
-        options = [path] if path else []
+        options = assure_list(path) if path else []
         if not submodules:
             options.extend(to_options(ignore_submodules='all'))
 
