@@ -33,6 +33,7 @@ from datalad.interface.common_opts import publish_by_default
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import InsufficientArgumentsError
 
 
 lgr = logging.getLogger('datalad.distribution.add_sibling')
@@ -68,7 +69,8 @@ class AddSibling(Interface):
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
-            args=('name',),
+            args=('-s', '--name',),
+            metavar='NAME',
             doc="""name of the sibling to be added.  If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
@@ -109,7 +111,7 @@ class AddSibling(Interface):
 
     @staticmethod
     @datasetmethod(name='add_sibling')
-    def __call__(name=None, url=None, dataset=None,
+    def __call__(url=None, name=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
                  as_common_datasrc=None, publish_depends=None,
                  publish_by_default=None):
@@ -118,11 +120,20 @@ class AddSibling(Interface):
 
         # XXX possibly fail if fetch is False and as_common_datasrc
         # not yet sure if that is an error
-        if name is None or (url is None and pushurl is None):
-            raise ValueError("""insufficient information to add a sibling
-                (needs at least a dataset, a name and an URL).""")
+        if (url is None and pushurl is None):
+            raise InsufficientArgumentsError(
+                """insufficient information to add a sibling
+                (needs at least a dataset, and a URL).""")
         if url is None:
             url = pushurl
+
+        if not name:
+            urlri = RI(url)
+            # use the hostname as default remote name
+            name = urlri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
         ds = require_dataset(dataset, check_installed=True,
                              purpose='sibling addition')
