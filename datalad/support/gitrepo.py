@@ -1358,7 +1358,24 @@ class GitRepo(RepoInterface):
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
             if all_:
-                remotes_to_fetch = self.repo.remotes
+                remotes_to_fetch = []
+                # but not all of them could be fetched, since some might be
+                # special annex remotes, and some for some other obnoxious reason
+                # lack a url to use -- so why bother?
+                for remote in self.repo.remotes:
+                    if self.config.has_option(
+                            'remote.{}'.format(remote), 'annex-externaltype'):
+                        lgr.debug(
+                            "Skipped remote %s from being fetched since it has "
+                            "annex-externaltype set", remote)
+                        continue
+                    if not self.config.has_option(
+                            'remote.{}'.format(remote), 'url'):
+                        lgr.warning(
+                            "Skipped remote %s from being fetched since lacks url",
+                            remote)
+                        continue
+                    remotes_to_fetch.append(remote)
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:

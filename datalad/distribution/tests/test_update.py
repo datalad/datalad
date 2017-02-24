@@ -131,6 +131,10 @@ def test_update_fetch_all(src, remote_1, remote_2):
         f.write("different file load")
     rmt2.add("second.txt", git=True, commit=True, msg="Add file to git.")
 
+    # Let's init some special remote which we couldn't really update/fetch
+    ds.repo.init_remote(
+        'datalad',
+        ['encryption=none', 'type=external', 'externaltype=datalad'])
     # fetch all remotes
     ds.update(fetch_all=True)
 
