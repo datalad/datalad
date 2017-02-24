@@ -38,7 +38,7 @@ lgr = logging.getLogger('datalad.distribution.publish')
 # TODO: make consistent configurable output
 
 
-def _log_push_info(pi_list):
+def _log_push_info(pi_list, log_nothing=True):
     from git.remote import PushInfo as PI
 
     error = False
@@ -50,7 +50,8 @@ def _log_push_info(pi_list):
             else:
                 lgr.debug('Pushed: %s', push_info.summary)
     else:
-        lgr.debug("Pushed: nothing")
+        if log_nothing:
+            lgr.debug("Pushed: nothing")
     return error
 
 
@@ -173,6 +174,11 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # now we know what to push where
     lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
     _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
+    if things2push and ds.config.get('remote.{}.push'.format(remote)):
+        # since current state of ideas is to push both auto-detected and the
+        # possibly prescribed, if anything was, let's push again to possibly
+        # push left-over prescribed ones.
+        _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
 
     published.append(ds)
 
