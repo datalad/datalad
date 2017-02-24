@@ -415,7 +415,11 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ok_file_under_git(subds.path, 'sub.dat', annexed=True)
 
     target_sub = Dataset(opj(target_path, 'sub'))
-    ds.publish()  # should be ok, non recursive; BUT it (git or us?) would
+    # since we do not have yet/thus have not used an option to record to publish
+    # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
+    # -- should fail
+    assert_raises(InsufficientArgumentsError, ds.publish)
+    ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     ok_(not target_sub.is_installed())  # still not there
     with swallow_logs():  # so no warnings etc
