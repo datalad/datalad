@@ -24,6 +24,7 @@ from datalad.support.param import Parameter
 from datalad.utils import knows_annex
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import require_dataset
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -88,6 +89,10 @@ class Update(Interface):
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not dataset and not path:
+            # try to find a dataset in PWD
+            dataset = require_dataset(
+                None, check_installed=True, purpose='updating')
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -140,12 +145,10 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
 
     if not merge:
         return
-    # we need to check whether we need to convert this dataset to
-    # annex, would would be the case when we presently have a git repo
-    # and the recent fetch brought evidence for a remote annex
-    if not isinstance(repo, AnnexRepo) and knows_annex(repo.path):
-        lgr.info("Init annex at '%s' prior merge.", repo.path)
-        repo = AnnexRepo(repo.path, create=False)
+
+    # reevaluate repo instance, for it might be an annex now:
+    repo = ds.repo
+
     lgr.info("Merging updates...")
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
@@ -162,9 +165,18 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
-        if repo.cfg.get('branch.{}.remote'.format(remote), None) == remote:
-            # the branch love this remote already, let git pull do its thing
-            repo.pull(remote=remote)
+        if active_branch == (None, None):
+            # I guess we need to fetch, and then let super-dataset to update
+            # into the state it points to for this submodule, but for now let's
+            # just blow I guess :-/
+            lgr.warning(
+                "No active branch in %s - we just fetched and not changing state",
+                repo
+            )
         else:
-            # no marriage yet, be specific
-            repo.pull(remote=remote, refspec=active_branch)
+            if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
+                # the branch love this remote already, let git pull do its thing
+                repo.pull(remote=remote)
+            else:
+                # no marriage yet, be specific
+                repo.pull(remote=remote, refspec=active_branch)

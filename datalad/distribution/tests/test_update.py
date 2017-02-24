@@ -13,8 +13,10 @@ import os
 from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
+from datalad.api import update
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
+from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -75,8 +77,11 @@ def test_update_simple(origin, src_path, dst_path):
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
     # smoke-test if recursive update doesn't fail if submodule is removed
+    # and that we can run it from within a dataset without providing it
+    # explicitly
     dest.remove('subm 1')
-    dest.update(recursive=True)
+    with chpwd(dest.path):
+        update(recursive=True)
     dest.update(merge=True, recursive=True)
 
     # and now test recursive update with merging in differences
@@ -87,6 +92,18 @@ def test_update_simple(origin, src_path, dst_path):
     # and now we can get new file
     dest.get('subm 2/load.dat')
     ok_file_has_content(opj(dest.path, 'subm 2', 'load.dat'), 'heavy')
+
+
+@with_tempfile
+@with_tempfile
+def test_update_git_smoke(src_path, dst_path):
+    # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
+    ds = Dataset(src_path).create(no_annex=True)
+    target = install(dst_path, source=src_path)
+    create_tree(ds.path, {'file.dat': '123'})
+    ds.add('file.dat')
+    target.update(recursive=True, merge=True)
+    ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
 def test_update_recursive():

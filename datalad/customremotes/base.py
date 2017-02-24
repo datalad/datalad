@@ -541,7 +541,11 @@ class AnnexCustomRemote(object):
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
             while True:
-                url = self.read("VALUE", 1)[1:]
+                url = self.read("VALUE", 1)
+                if not url or len(url) <= 1:
+                    # so there were no URL output, we must be done
+                    break
+                url = url[1:]
                 if url:
                     assert(len(url) == 1)
                     urls.append(url[0])
@@ -550,8 +554,8 @@ class AnnexCustomRemote(object):
 
         self.heavydebug("Got %d URL(s) for key %s: %s", len(urls), key, urls)
 
-        if not urls:
-            raise ValueError("Did not get any URLs for %s which we support" % key)
+        #if not urls:
+        #    raise ValueError("Did not get any URLs for %s which we support" % key)
 
         return urls
 

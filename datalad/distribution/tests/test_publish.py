@@ -19,7 +19,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
-from nose.tools import eq_, assert_is_instance
+from nose.tools import eq_, ok_, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import assert_raises
@@ -81,6 +81,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
+    # MIH: Nope, we don't automatically add this anymore
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -89,15 +90,19 @@ def test_publish_simple(origin, src_path, dst_path):
                     commit=True, msg="Modified.")
     ok_clean_git(source.repo, annex=None)
 
-    res = publish(dataset=source)
+    res = publish(dataset=source, to='target')
     eq_(res, ([source], []))
 
     ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    assert(all(
-        [commit in list(target.get_branch_commits("git-annex"))
-         for commit in list(source.repo.get_branch_commits("git-annex"))]))
+    # Since git-annex 6.20170220, post-receive hook gets triggered
+    # which results in entry being added for that repo into uuid.log on remote
+    # end since then finally git-annex senses that it needs to init that remote,
+    # so it might have 1 more commit than local.
+    # see https://github.com/datalad/datalad/issues/1319
+    ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
+        set(target.get_branch_commits("git-annex"))))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])

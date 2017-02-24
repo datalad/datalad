@@ -50,3 +50,16 @@ pbs_runner = (
          default=None,
          help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
 )
+
+change_path = (
+    'change-path', ('-C',),
+    dict(action='append',
+         dest='change_path',
+         metavar='PATH',
+         help="""run as if datalad was started in <path> instead
+         of the current working directory.  When multiple -C options are given,
+         each subsequent non-absolute -C <path> is interpreted relative to the
+         preceding -C <path>.  This option affects the interpretations of the
+         path names in that they are made relative to the working directory
+         caused by the -C option""")
+)

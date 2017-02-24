@@ -11,6 +11,7 @@
 """
 
 import logging
+import re
 from os.path import curdir
 
 from datalad.interface.base import Interface
@@ -37,7 +38,7 @@ lgr = logging.getLogger('datalad.distribution.publish')
 # TODO: make consistent configurable output
 
 
-def _log_push_info(pi_list):
+def _log_push_info(pi_list, log_nothing=True):
     from git.remote import PushInfo as PI
 
     error = False
@@ -49,7 +50,8 @@ def _log_push_info(pi_list):
             else:
                 lgr.debug('Pushed: %s', push_info.summary)
     else:
-        lgr.debug("Pushed: nothing")
+        if log_nothing:
+            lgr.debug("Pushed: nothing")
     return error
 
 
@@ -129,22 +131,54 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         ds.repo.fetch(remote=remote)
         ds.repo.merge_annex(remote)
 
-    # we now know where to push to:
     # Note: git's push.default is 'matching', which doesn't work for first
     # time publication (a branch, that doesn't exist on remote yet)
     # But if we want to respect remote.*.push entries, etc. we need to
     # not pass a specific refspec (like active branch) to `git push`
     # by default.
+    # hence we amend any existing config on the fly
     # TODO: what else to push by default?
     # consider also: --follow-tags, --tags, --atomic
-    lgr.debug("Push to '%s'", remote)
-    pushvar = 'remote.{}.push'.format(remote)
-    if not ds.config.get(pushvar, None):
-        # no default push targets configured for this remote, leave our mark
-        ds.config.add(pushvar, 'master', where='local')
+    # make sure we push
+    things2push = []
+    current_branch = ds.repo.get_active_branch()
+    if current_branch:  # possibly make this conditional on a switch
+        # TODO: this should become it own helper
         if isinstance(ds.repo, AnnexRepo):
-            ds.config.add(pushvar, 'git-annex', where='local')
-    _log_push_info(ds.repo.push(remote=remote))
+            # annex could manage this branch
+            if current_branch.startswith('annex/direct') \
+                    and ds.config.getbool('annex', 'direct', default=False):
+                # this is a "fake" annex direct mode branch
+                # we want to publish the underlying branch
+                current_branch = current_branch[12:]
+            match_adjusted = re.match(
+                'adjusted/(.*)\([a-z]*\)',
+                current_branch)
+            if match_adjusted:
+                # adjusted/master(...)
+                # TODO:  this code is not tested
+                # see https://codecov.io/gh/datalad/datalad/src/17e67045a088ae0372b38aa4d8d46ecf7c821cb7/datalad/distribution/publish.py#L156
+                # and thus probably broken -- test me!
+                current_branch = match_adjusted.group(1)
+        things2push.append(current_branch)
+    if isinstance(ds.repo, AnnexRepo):
+        things2push.append('git-annex')
+    # check that all our magic found valid branches
+    things2push = [t for t in things2push if t in ds.repo.get_branches()]
+    # check that we don't ask to push things that are already configured
+    # -> would cause error
+    # TODO need to find a way to properly do this, when wildcards are used
+    # in the push configuration variable
+    things2push = [t for t in things2push
+                   if t not in ds.config.get('remote.{}.push'.format(remote), [])]
+    # now we know what to push where
+    lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
+    _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
+    if things2push and ds.config.get('remote.{}.push'.format(remote)):
+        # since current state of ideas is to push both auto-detected and the
+        # possibly prescribed, if anything was, let's push again to possibly
+        # push left-over prescribed ones.
+        _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
 
     published.append(ds)
 
