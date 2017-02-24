@@ -1744,6 +1744,36 @@ class GitRepo(RepoInterface):
             submodules = sorted(submodules, key=lambda x: x.path)
         return submodules
 
+    def submodules_is_modified(self, name, options=[]):
+        """Whether a submodule has new commits
+
+        Note: This is an adhoc method. It parses output of
+        'git submodule summary' and currently is not able to distinguish whether
+        or not this change is staged in `self` and whether this would be
+        reported 'added' or 'modified' by 'git status'.
+        Parsing isn't heavily tested yet.
+
+        Parameters
+        ----------
+        name: str
+          the submodule's name
+        options: list
+          options to pass to 'git submodule summary'
+        Returns
+        -------
+        bool
+          True if there are commits in the submodule, differing from
+          what is registered in `self`
+        --------
+        """
+
+        out, err = self._git_custom_command('',
+                                            ['git', 'submodule', 'summary'] + \
+                                            options + ['--', name])
+        return any([line.split()[1] == name
+                    for line in out.splitlines()
+                    if line and len(line.split()) > 1])
+
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.
 

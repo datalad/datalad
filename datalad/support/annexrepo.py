@@ -329,6 +329,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         git-status try to recurse into annex submodules without a working tree.
         Therefore we need to do the recursion on our own.
 
+        Note, that added submodules will just be reported dirty. It's at very
+        least difficult to distinguish whether a submodule in direct mode was
+        just added or modified. ATM not worth the effort, I think.
+        This is leads to a bit inconsistent reportings by AnnexRepo.status()
+        whenever it needs to call this subroutine and there are added submodules.
+
         Intended to be used by AnnexRepo.status() internally.
         """
 
@@ -342,9 +348,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         modified_subs = []
         for sm in self.get_submodules():
             sm_dirty = False
-            if AnnexRepo.is_valid_repo(opj(self.path, sm.path),
-                                       allow_noninitialized=False):
-                # check state of annex submodules, that might be in direct mode
+
+            # First check for changes committed in the submodule, using
+            # git submodule summary -- path,
+            # since this can't be detected from within the submodule.
+            if self.submodules_is_modified(sm.name):
+                sm_dirty = True
+
+            # check state of annex submodules, that might be in direct mode
+            elif AnnexRepo.is_valid_repo(opj(self.path, sm.path),
+                                         allow_noninitialized=False):
+
                 sm_repo = AnnexRepo(opj(self.path, sm.path),
                                     create=False, init=False)
 
@@ -355,8 +369,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if any([bool(sm_status[i]) for i in sm_status]):
                     sm_dirty = True
 
+            # check state of submodule, that is a plain git or not an
+            # initialized annex, which we can safely treat as a plain git, too.
             elif GitRepo.is_valid_repo(opj(self.path, sm.path)):
-                # not an initialized annex, we can safely assume a plain git
                 sm_repo = GitRepo(opj(self.path, sm.path))
 
                 # TODO: Clarify issue: GitRepo.dirty() doesn't fit our parameters
@@ -386,6 +401,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                type_changed=True, submodules=True, path=None):
         """
 
+
+        Note: Under certain circumstances newly added submodules might be
+        reported as 'modified' rather tha 'added'.
+        See AnnexRepo._submodules_dirty_direct_mode for details.
+
+
         :param untracked:
         :param deleted:
         :param modified:
@@ -396,25 +417,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         :return:
         """
 
-        # TODO: This check is too expensive ATM:
-        # if submodules and \
-        #     any([sm.module_exists() and
-        #          sm.module().config_reader().get_value('annex', 'direct', False)
-        #          for sm in self.get_submodules()]):
-        #     # git-annex-status cannot deal with submodules in direct mode:
-        #     # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
-        #     #
-        #     # We need to either fail, or build a workaround, which would need us
-        #     # to do the submodule traversal on our own while calling
-        #     # git-annex-status --ignore-submodules in each
-        #     #
-        #     # Note, that condition actually is incomplete: We are looking just
-        #     # at the next level of submodules. We could still run into commom
-        #     # CommandError deeper down.
-        #     raise CommandNotAvailableError(
-        #         cmd="git-annex status",
-        #         msg="Cannot deal with submodules in direct mode. "
-        #             "submodules=False required.")
         self.precommit()
 
         options = [path] if path else []

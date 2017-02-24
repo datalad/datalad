@@ -1681,27 +1681,32 @@ def test_AnnexRepo_status(path):
     # add the submodule
     ar.add_submodule('submod', url=opj(curdir, 'submod'))
 
-    if sub.is_direct_mode():
-        # ATM (annex version 6.20170220+gitgbfb38eece-1~ndall+1)
-        # 'annex status' fails, if there are submodules in direct mode
-        # Note: used version in condition to notice, when we are able to fix
-        # this
-        assert_raises(CommandNotAvailableError, ar.status)
-        # TODO: ignore_submodules instead? Better: Do all tests not involving
-        # submodules before
-        # we can't proceed, since any call to 'status' will fail now
-        raise SkipTest("Skipping due to a submodule in direct mode.")
-
     stat['untracked'].remove('submod/')
     stat['added'].append('.gitmodules')
-    stat['added'].append('submod/')
+
+    # 'submod/' might either be reported as 'added' or 'modified'.
+    # Therefore more complex assertions at this point:
+    reported_stat = ar.status()
+    eq_(stat['untracked'], reported_stat['untracked'])
+    eq_(stat['deleted'], reported_stat['deleted'])
+    eq_(stat['type_changed'], reported_stat['type_changed'])
+    ok_(stat['added'] == reported_stat['added'] or
+        stat['added'] + ['submod/'] == reported_stat['added'])
+    ok_(stat['modified'] == reported_stat['modified'] or
+        stat['modified'] + ['submod/'] == reported_stat['modified'])
+
+    # commit the submodule
+    # TODO: issue: we can't commit 'submod' by explicitly passing it to commit
+    # in direct mode. Not sure yet, whether this is about direct mode in
+    # `ar` or `sub`.
+    ar.commit(msg="submodule added")
+    stat['added'].remove('.gitmodules')
     eq_(stat, ar.status())
 
     # add another file to submodule
     with open(opj(path, 'submod', 'not_tracked'), 'w') as f:
         f.write("#LastNightInSweden")
     stat['modified'].append('submod/')
-    stat['added'].remove('submod/')  # only one state in 'annex status'
     eq_(stat, ar.status())
 
     # TODO: explicit path(s)
