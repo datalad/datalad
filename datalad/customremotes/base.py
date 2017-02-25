@@ -574,4 +574,34 @@ class AnnexCustomRemote(object):
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
     #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
 
+
+def generate_uuids():
+    """Generate UUIDs for our remotes. Even though quick, for consistency pre-generated and recorded in consts.py"""
+    import uuid
+    return {
+        remote: str(uuid.uuid5(uuid.NAMESPACE_URL, 'http://datalad.org/specialremotes/%s' % remote))
+        for remote in {'datalad', 'datalad-archives'}
+    }
+
+
+def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]):
+    """Initialize datalad special remote"""
+    from datalad.support.external_versions import external_versions
+    from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+    lgr.info("Initiating special remote %s" % remote)
+    remote_opts = [
+        'encryption=%s' % str(encryption).lower(),
+        'type=external',
+        'autoenable=%s' % str(bool(autoenable)).lower(),
+        'externaltype=%s' % remote
+    ]
+    if external_versions['cmd:annex'] >= '6.20170208':
+        # use unique uuid for our remotes
+        # This should help with merges of disconnected repos etc
+        # ATM only datalad/datalad-archives is expected,
+        # so on purpose getitem
+        remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
+    return repo.init_remote(remote, remote_opts + opts)
+
+
 lgr.log(5, "Done importing datalad.customremotes.main")
