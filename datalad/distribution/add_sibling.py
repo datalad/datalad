@@ -30,6 +30,10 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import publish_by_default
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
@@ -107,6 +111,10 @@ class AddSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
+        inherit=inherit_opt
     )
 
     @staticmethod
@@ -114,9 +122,17 @@ class AddSibling(Interface):
     def __call__(url=None, name=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
                  as_common_datasrc=None, publish_depends=None,
-                 publish_by_default=None):
+                 publish_by_default=None,
+                 annex_wanted=None, annex_group=None, annex_groupwanted=None,
+                 inherit=False):
 
         # TODO: Detect malformed URL and fail?
+
+        # TODO: allow for no url if 'inherit' and deduce from the super ds
+        #       create-sibling already does it -- generalize/use
+        #  Actually we could even inherit/deduce name from the super by checking
+        #  which remote it is actively tracking in current branch... but may be
+        #  would be too much magic
 
         # XXX possibly fail if fetch is False and as_common_datasrc
         # not yet sure if that is an error
@@ -189,6 +205,8 @@ class AddSibling(Interface):
 
         # define config var name for potential publication dependencies
         depvar = 'remote.{}.datalad-publish-depends'.format(name)
+        # and default pushes
+        dfltvar = "remote.{}.push".format(name)
 
         # collect existing remotes:
         already_existing = list()
@@ -249,6 +267,35 @@ class AddSibling(Interface):
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)
                 repo.fetch(name)
 
+            if inherit:
+                # Adjust variables which we should inherit
+                delayed_super = _DelayedSuper(repo)
+                publish_depends = AddSibling._inherit_config_var(
+                    delayed_super, depvar, publish_depends)
+                publish_by_default = AddSibling._inherit_config_var(
+                    delayed_super, dfltvar, publish_by_default)
+                # Copy relevant annex settings for the sibling
+                # makes sense only if current AND super are annexes, so it is
+                # kinda a boomer, since then forbids having a super a pure git
+                if isinstance(repo, AnnexRepo) \
+                    and isinstance(delayed_super.repo, AnnexRepo):
+                    if annex_wanted is None:
+                        annex_wanted = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'wanted'
+                        )
+                    if annex_group is None:
+                        # I think it might be worth inheritting group regardless what
+                        # value is
+                        #if annex_wanted in {'groupwanted', 'standard'}:
+                        annex_group = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'group'
+                        )
+                    if annex_wanted == 'groupwanted' and annex_groupwanted is None:
+                        # we better have a value for the expression for that group
+                        annex_groupwanted = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'groupwanted'
+                        )
+
             if publish_depends:
                 if depvar in ds.config:
                     # config vars are incremental, so make sure we start from
@@ -262,7 +309,6 @@ class AddSibling(Interface):
                 ds.config.reload()
 
             if publish_by_default:
-                dfltvar = "remote.{}.push".format(name)
                 if dfltvar in ds.config:
                     ds.config.unset(dfltvar, where='local', reload=False)
                 for refspec in assure_list(publish_by_default):
@@ -309,10 +355,37 @@ class AddSibling(Interface):
                             'Not configuring "%s" as a common data source, '
                             'URL protocol is not http or https',
                             name)
+                if annex_wanted:
+                    repo.set_wanted(name, annex_wanted)
+                if annex_group:
+                    repo.set_group(name, annex_group)
+                if annex_groupwanted:
+                    if not annex_group:
+                        raise InsufficientArgumentsError(
+                            "To set groupwanted, you need to provide annex_group option")
+                    repo.set_groupwanted(annex_group, annex_groupwanted)
 
             successfully_added.append(repo_name)
 
         return successfully_added
+
+    @staticmethod
+    def _inherit_annex_var(ds, remote, cfgvar):
+        var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
+        if var:
+            lgr.info("Inherited annex config from %s %s = %s",
+                     ds, cfgvar, var)
+        return var
+
+    @staticmethod
+    def _inherit_config_var(ds, cfgvar, var):
+        if var is None:
+            var = ds.config.get(cfgvar)
+            if var:
+                lgr.info(
+                    'Inherited publish_depends from %s: %s',
+                    ds, var)
+        return var
 
     @staticmethod
     def result_renderer_cmdline(res, args):
@@ -335,3 +408,38 @@ class AddSibling(Interface):
 # TODO: RF nicely, test, make clear how different from urljoin etc
 def _urljoin(base, url):
     return base + url if (base.endswith('/') or url.startswith('/')) else base + '/' + url
+
+
+class _DelayedSuper(object):
+    """A helper to delay deduction on super dataset until needed
+
+    But if asked and not found -- blow up
+    """
+
+    def __init__(self, repo):
+        self._child_dataset = Dataset(repo.path)
+        self._super = None
+
+    def __str__(self):
+        return str(self.super)
+
+    @property
+    def super(self):
+        if self._super is None:
+            # here we must analyze current_ds's super, not the super_ds
+            self._super = self._child_dataset.get_superdataset()
+            if not self._super:
+                raise RuntimeError(
+                    "Cannot determine super dataset for %s, thus "
+                    "cannot inherit anything" % self._child_dataset
+                )
+        return self._super
+
+    # Lean proxies going through .super
+    @property
+    def config(self):
+        return self.super.config
+
+    @property
+    def repo(self):
+        return self.super.repo

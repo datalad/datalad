@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
+from datalad.support.constraints import EnsureChoice
 
 
 dataset_description = Parameter(
@@ -108,7 +109,7 @@ nosave_opt = Parameter(
     doc="""by default all modifications to a dataset are immediately saved. Given
     this option will disable this behavior.""")
 
-save_message_opt=Parameter(
+save_message_opt = Parameter(
     args=("-m", "--message",),
     metavar='MESSAGE',
     doc="""a description of the state or the changes made to a dataset.""",
@@ -164,3 +165,43 @@ publish_by_default = Parameter(
     constraints=EnsureStr() | EnsureNone(),
     action='append')
 
+annex_wanted_opt = Parameter(
+    args=("--annex-wanted",),
+    metavar='EXP',
+    doc="""expression to specify 'wanted' content for the repository/sibling.
+    See https://git-annex.branchable.com/git-annex-wanted/ for more
+    information""",
+    constraints=EnsureStr() | EnsureNone())
+
+annex_group_opt = Parameter(
+    args=("--annex-group",),
+    metavar='GROUP',
+    doc="""expression to specify a group for the repository.
+    See https://git-annex.branchable.com/git-annex-group/ for more
+    information""",
+    constraints=EnsureStr() | EnsureNone())
+
+annex_groupwanted_opt = Parameter(
+    args=("--annex-groupwanted",),
+    metavar='EXPR',
+    doc="""expression for the groupwanted.
+    Makes sense only if [PY: annex_wanted PY][CMD: --annex-wanted CMD]="groupwanted"
+    and annex-group is given too.
+    See https://git-annex.branchable.com/git-annex-groupwanted/ for more information""",
+    constraints=EnsureStr() | EnsureNone())
+
+
+inherit_opt = Parameter(
+    args=("--inherit",),
+    action="store_true",
+    doc="""if sibling is missing, inherit settings (git config, git annex
+    wanted/group/groupwanted) from its super-dataset""")
+
+missing_sibling_opt = Parameter(
+    args=("--missing",),
+    constraints=EnsureChoice('fail', 'inherit', 'skip'),  # may be inherit-skip
+    metavar='MODE',
+    doc="""action to perform, if a sibling does not exist in a given dataset.
+    By default it would fail the run ('fail' setting).  With 'inherit' a
+    'create-sibling' with '--inherit-settings' will be used to create sibling
+    on the remote. With 'skip' - it simply will be skipped.""")
