@@ -49,6 +49,7 @@ from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.exceptions import AnnexBatchCommandError
+from ...support.external_versions import external_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -58,6 +59,7 @@ from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
+from datalad.customremotes.base import init_datalad_remote
 from datalad.dochelpers import exc_str
 
 from logging import getLogger
@@ -322,11 +324,7 @@ class Annexificator(object):
                         lgr.info("Enabling existing special remote %s" % remote)
                         self.repo.enable_remote(remote)
                     else:
-                        lgr.info("Initiating special remote %s" % remote)
-                        self.repo.init_remote(
-                            remote,
-                            ['encryption=none', 'type=external', 'autoenable=true',
-                             'externaltype=%s' % remote])
+                        init_datalad_remote(self.repo, remote, autoenable=True)
 
         self.mode = mode
         self.options = options or []

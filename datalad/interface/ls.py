@@ -459,7 +459,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
 
     # adjust path strings
     for ds_model in dsms:
-        path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        #path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        path = relpath(ds_model.path, topdir) if topdir else ds_model.path
         if not path:
             path = '.'
         ds_model.path = path

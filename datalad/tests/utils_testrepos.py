@@ -25,6 +25,7 @@ from ..utils import swallow_logs
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
 
+from datalad.customremotes.base import init_datalad_remote
 
 @add_metaclass(ABCMeta)
 class TestRepo(object):
@@ -46,10 +47,7 @@ class TestRepo(object):
             # and manage to handle all http urls and requests:
             if self.REPO_CLASS is AnnexRepo and \
                     os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
-                self.repo.init_remote(
-                    'datalad',
-                    ['encryption=none', 'type=external', 'autoenable=true',
-                     'externaltype=datalad'])
+                init_datalad_remote(self.repo, 'datalad', autoenable=True)
 
         self._created = False
 

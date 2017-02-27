@@ -36,6 +36,9 @@ from ...utils import find_files
 from ...utils import rmtree
 from datalad.log import lgr
 from ...api import add_archive_content, clean
+from datalad.support.external_versions import external_versions
+from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+from datalad.consts import ARCHIVES_SPECIAL_REMOTE
 
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
@@ -89,6 +92,11 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         leading_dirs_depth=2,
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
+
+    if external_versions['cmd:annex'] >= '6.20170208':
+        # should have fixed remotes
+        eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
+            '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
     all_files = sorted(find_files('.'))
     target_files = {

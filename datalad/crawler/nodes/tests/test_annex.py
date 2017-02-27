@@ -27,6 +27,7 @@ from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
+from ....support.external_versions import external_versions
 
 
 @with_tempfile(mkdir=True)
@@ -175,14 +176,22 @@ def test_annex_file():
                            '1.dat': 'load2'}})
 def _test_add_archive_content_tar(direct, repo_path):
     mode = 'full'
+    special_remotes = [DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE]
     annex = Annexificator(path=repo_path,
                           allow_dirty=True,
                           mode=mode,
                           direct=direct,
-                          special_remotes=[DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE],
+                          special_remotes=special_remotes,
                           options=["-c", "annex.largefiles=exclude=*.txt and exclude=SOMEOTHER"])
     output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
     assert_equal(output_add, [{'filename': '1.tar'}])
+
+    if external_versions['cmd:annex'] >= '6.20170208':
+        # should have fixed remotes
+        from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+        for remote in special_remotes:
+            eq_(annex.repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[remote]),
+                '[%s]' % remote)
 
     #stats = ActivityStats()
     #output_add[0]['datalad_stats'] = ActivityStats()
