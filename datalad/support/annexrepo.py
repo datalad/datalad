@@ -101,9 +101,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
-    # Workaround for per-call config issue with git 2.11.0
-    GIT_DIRECT_MODE_WRAPPER_ACTIVE = False
-
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
@@ -157,6 +154,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # initialize
         self._uuid = None
         self._annex_common_options = []
+        # Workaround for per-call config issue with git 2.11.0
+        self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = False
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -218,7 +217,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # adapt self._GIT_COMMON_OPTIONS by calling set_direct_mode().
         # Could happen in case we didn't specify anything, but annex forced
         # direct mode due to FS or an already existing repo was in direct mode,
-        if self.is_direct_mode():
+        if self._is_direct_mode_from_config():
             self.set_direct_mode()
 
         # - only force direct mode; don't force indirect mode
@@ -581,7 +580,13 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
-        """Return True if given path points to an annex repository"""
+        """Return True if given path points to an annex repository
+        """
+        # Note: default value for allow_noninitialized=False is important
+        # for invalidating an instance via self._flyweight_invalid. If this is
+        # changed, we also need to override _flyweight_invalid and explicitly
+        # pass allow_noninitialized=False!
+
         initialized_annex = GitRepo.is_valid_repo(path) and \
             exists(opj(path, '.git', 'annex'))
         if allow_noninitialized:
@@ -1821,63 +1826,61 @@ class AnnexRepo(GitRepo, RepoInterface):
     def commit(self, msg=None, options=None, _datalad_msg=False,
                careless=True, files=None):
         self.precommit()
-        if self.is_direct_mode():
-            # TODO: Exceptions/careless
-
-            if _datalad_msg:
-                msg = self._get_prefixed_commit_msg(msg)
-            if not msg:
-                if options:
-                    if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-                else:
-                    options = ["--allow-empty-message"]
-
-            # committing explicitly given paths in direct mode via proxy used to
-            # fail, because absolute paths are used. Using annex proxy this
-            # leads to an error (path outside repository)
-            if files:
-                if options is None:
-                    options = []
-                for i in range(len(files)):
-                    if isabs(files[i]):
-                        options.append(normpath(relpath(files[i],
-                                                        start=self.path)))
-                    else:
-                        options.append(files[i])
-            try:
-                self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
-                           (options if options else []),
-                           expect_stderr=True, expect_fail=True)
-            except CommandError as e:
-                if 'nothing to commit' in e.stdout:
-                    if careless:
-                        lgr.debug("nothing to commit in {}. "
-                                  "Ignored.".format(self))
-                    else:
-                        raise
-                elif 'no changes added to commit' in e.stdout or \
-                        'nothing added to commit' in e.stdout:
-                    if careless:
-                        lgr.debug("no changes added to commit in {}. "
-                                  "Ignored.".format(self))
-                    else:
-                        raise
-                elif "did not match any file(s) known to git." in e.stderr:
-                    # TODO: Improve FileNotInXXXXError classes to better deal with
-                    # multiple files; Also consider PathOutsideRepositoryError
-                    raise FileNotInRepositoryError(cmd=e.cmd,
-                                                   msg="File(s) unknown to git",
-                                                   code=e.code,
-                                                   filename=linesep.join(
-                                                [l for l in e.stderr.splitlines()
-                                                 if l.startswith("pathspec")]))
-                else:
-                    raise
-        else:
-            super(AnnexRepo, self).commit(msg, options,
-                                          _datalad_msg=_datalad_msg,
-                                          careless=careless, files=files)
+        # if self.is_direct_mode():
+        #     if _datalad_msg:
+        #         msg = self._get_prefixed_commit_msg(msg)
+        #     if not msg:
+        #         if options:
+        #             if "--allow-empty-message" not in options:
+        #                 options.append("--allow-empty-message")
+        #         else:
+        #             options = ["--allow-empty-message"]
+        #
+        #     # committing explicitly given paths in direct mode via proxy used to
+        #     # fail, because absolute paths are used. Using annex proxy this
+        #     # leads to an error (path outside repository)
+        #     if files:
+        #         if options is None:
+        #             options = []
+        #         for i in range(len(files)):
+        #             if isabs(files[i]):
+        #                 options.append(normpath(relpath(files[i],
+        #                                                 start=self.path)))
+        #             else:
+        #                 options.append(files[i])
+        #     try:
+        #         self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+        #                    (options if options else []),
+        #                    expect_stderr=True, expect_fail=True)
+        #     except CommandError as e:
+        #         if 'nothing to commit' in e.stdout:
+        #             if careless:
+        #                 lgr.debug("nothing to commit in {}. "
+        #                           "Ignored.".format(self))
+        #             else:
+        #                 raise
+        #         elif 'no changes added to commit' in e.stdout or \
+        #                 'nothing added to commit' in e.stdout:
+        #             if careless:
+        #                 lgr.debug("no changes added to commit in {}. "
+        #                           "Ignored.".format(self))
+        #             else:
+        #                 raise
+        #         elif "did not match any file(s) known to git." in e.stderr:
+        #             # TODO: Improve FileNotInXXXXError classes to better deal with
+        #             # multiple files; Also consider PathOutsideRepositoryError
+        #             raise FileNotInRepositoryError(cmd=e.cmd,
+        #                                            msg="File(s) unknown to git",
+        #                                            code=e.code,
+        #                                            filename=linesep.join(
+        #                                         [l for l in e.stderr.splitlines()
+        #                                          if l.startswith("pathspec")]))
+        #         else:
+        #             raise
+        # else:
+        super(AnnexRepo, self).commit(msg, options,
+                                      _datalad_msg=_datalad_msg,
+                                      careless=careless, files=files)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

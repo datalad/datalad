@@ -1573,17 +1573,9 @@ def test_AnnexRepo_dirty(path):
 
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_status(path):
-    # this test is WIP
-    #
-    # http://git-annex.branchable.com/bugs/Can__39__t_use_adjusted_branch_in_v6__44___if_submodule_already_is_using_this_feature/
-    # fixed in 6.20170220
-    #
-    # http://git-annex.branchable.com/bugs/git_annex_status_fails_with_submodule_in_direct_mode/
-    #
-    # annex version
-    # AnnexRepo.git_annex_version
 
     # TODO: git annex adjust --unlock|--fix if V6
+    # TODO: git annex unlock (indirect mode)
     ar = AnnexRepo(path, create=True)
 
     stat = {'untracked': [],
@@ -1720,13 +1712,7 @@ def test_AnnexRepo_status(path):
     eq_(stat, ar.status(submodules=False))
 
     # commit the submodule
-    # TODO: issue: we can't commit 'submod' by explicitly passing it to commit
-    # in direct mode. Not sure yet, whether this is about direct mode in
-    # `ar` or `sub`.
-    if ar.is_direct_mode():
-        ar.commit(msg="submodule added")
-    else:
-        ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
+    ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
     stat['added'].remove('.gitmodules')
     eq_(stat, ar.status())
 
@@ -1736,8 +1722,23 @@ def test_AnnexRepo_status(path):
     stat['modified'].append('submod/')
     eq_(stat, ar.status())
 
-    # TODO: modify file in submodule:
-    # TODO: unlock file
+    # add the untracked file:
+    sub.add('not_tracked')
+    if sub.is_direct_mode():
+        # 'sub' is now considered to be clean; therefore it's not reported as
+        # modified upwards
+        # This is consistent in a way, but surprising in another ...
+        pass
+    else:
+        eq_(stat, ar.status())
+    sub.commit(msg="added file not_tracked")
+    # 'submod/' still modified when looked at from above:
+    eq_(stat, ar.status())
+
+    ar.add('submod', git=True)
+    ar.commit(msg="submod modified", files='submod')
+    stat['modified'].remove('submod/')
+    eq_(stat, ar.status())
 
 
 # TODO: test dirty
