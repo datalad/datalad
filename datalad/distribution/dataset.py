@@ -171,36 +171,37 @@ class Dataset(object):
         -------
         GitRepo
         """
-        if self._repo is None:
-            with swallow_logs():
-                for cls, ckw, kw in (
-                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                        (GitRepo, {}, {})
-                ):
-                    if cls.is_valid_repo(self._path, **ckw):
-                        try:
-                            lgr.debug("Detected %s at %s", cls, self._path)
-                            self._repo = cls(self._path, create=False, **kw)
-                            break
-                        except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                            lgr.debug(
-                                "Oops -- guess on repo type was wrong?: %s",
-                                exc_str(exc))
-                            pass
-                        # version problems come as RuntimeError: DO NOT CATCH!
-            if self._repo is None:
-                # Often .repo is requested to 'sense' if anything is installed
-                # under, and if so -- to proceed forward. Thus log here only
-                # at DEBUG level and if necessary "complaint upstairs"
-                lgr.debug("Failed to detect a valid repo at %s" % self.path)
 
-        elif not isinstance(self._repo, AnnexRepo):
-            # repo was initially set to be self._repo but might become AnnexRepo
-            # at a later moment, so check if it didn't happen
-            if knows_annex(self.path):
-                # we acquired git-annex branch
-                lgr.info("Init new annex at '%s'.", self.path)
-                self._repo = AnnexRepo(self._repo.path, create=False)
+        # Note: lazy loading was disabled, since this is provided by the
+        # flyweight pattern already and a possible invalidation of an existing
+        # instance has to be done therein.
+        # TODO: Still this is somewhat problematic. We can't invalidate strong
+        # references
+
+        with swallow_logs():
+            for cls, ckw, kw in (
+                    # TODO: Do we really want allow_noninitialized=True here?
+                    # And if so, leave a proper comment!
+                    (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                    (GitRepo, {}, {})
+            ):
+                if cls.is_valid_repo(self._path, **ckw):
+                    try:
+                        lgr.debug("Detected %s at %s", cls, self._path)
+                        self._repo = cls(self._path, create=False, **kw)
+                        break
+                    except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                        lgr.debug(
+                            "Oops -- guess on repo type was wrong?: %s",
+                            exc_str(exc))
+                        pass
+                    # version problems come as RuntimeError: DO NOT CATCH!
+        if self._repo is None:
+            # Often .repo is requested to 'sense' if anything is installed
+            # under, and if so -- to proceed forward. Thus log here only
+            # at DEBUG level and if necessary "complaint upstairs"
+            lgr.debug("Failed to detect a valid repo at %s" % self.path)
+
         return self._repo
 
     @property
