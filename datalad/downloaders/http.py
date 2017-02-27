@@ -12,9 +12,11 @@
 import re
 import requests
 import requests.auth
+from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 import io
 from six import BytesIO
+from time import sleep
 
 from ..utils import assure_list_from_str, assure_dict_from_str
 from ..dochelpers import borrowkwargs
@@ -421,7 +423,20 @@ class HTTPDownloader(BaseDownloader):
         # while can't know for sure if content was gunziped and either it all went ok.
         # So safer option -- just request to not have it gzipped
         headers = {'Accept-Encoding': ''}
-        response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
+        nretries = 3
+        for retry in range(1, nretries+1):
+            try:
+                response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
+            #except (MaxRetryError, NewConnectionError) as exc:
+            except Exception as exc:
+                # happen to run into those with urls pointing to Amazon, so let's rest and try again
+                if retry >= nretries:
+                    #import epdb; epdb.serve()
+                    raise AccessFailedError("Failed to establish a new session %d times. Last exception was: %s"
+                                            % (nretries, exc_str(exc)))
+                lgr.warning("Caught exception %s. Will retry %d out of %d times", exc_str(exc), retry+1, nretries)
+                sleep(2**retry)
+
         check_response_status(response, session=self._session)
         headers = response.headers
         lgr.debug("Establishing session for url %s, response headers: %s", url, headers)

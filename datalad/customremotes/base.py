@@ -541,8 +541,12 @@ class AnnexCustomRemote(object):
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
             while True:
-                url = self.read("VALUE", 1)[1:]
+                url_orig = url = self.read("VALUE", 1)
                 if url:
+                    url = url[1:]
+                    if not url:
+                        # some times just returns VALUE
+                        break
                     assert(len(url) == 1)
                     urls.append(url[0])
                 else:
