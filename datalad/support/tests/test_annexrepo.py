@@ -1571,12 +1571,8 @@ def test_AnnexRepo_dirty(path):
     # TODO: submodules
 
 
-@with_tempfile(mkdir=True)
-def test_AnnexRepo_status(path):
-
-    # TODO: git annex adjust --unlock|--fix if V6
+def _test_status(ar):
     # TODO: git annex unlock (indirect mode)
-    ar = AnnexRepo(path, create=True)
 
     stat = {'untracked': [],
             'deleted': [],
@@ -1584,10 +1580,9 @@ def test_AnnexRepo_status(path):
             'added': [],
             'type_changed': []}
     eq_(stat, ar.status())
-
-    with open(opj(path, 'first'), 'w') as f:
+    with open(opj(ar.path, 'first'), 'w') as f:
         f.write("it's huge!")
-    with open(opj(path, 'second'), 'w') as f:
+    with open(opj(ar.path, 'second'), 'w') as f:
         f.write("looser")
 
     stat['untracked'].append('first')
@@ -1620,7 +1615,7 @@ def test_AnnexRepo_status(path):
     eq_(stat, ar.status())
 
     # modify a file in git:
-    with open(opj(path, 'first'), 'w') as f:
+    with open(opj(ar.path, 'first'), 'w') as f:
         f.write("increased tremendousness")
     stat['modified'].append('first')
     eq_(stat, ar.status())
@@ -1634,7 +1629,7 @@ def test_AnnexRepo_status(path):
         # actually: if 'second' isn't locked, which is the case in direct mode
         # need to fix/check for V6 => TODO
         ar._annex_custom_command('second', ['git', 'annex', 'unlock'])
-    with open(opj(path, 'second'), 'w') as f:
+    with open(opj(ar.path, 'second'), 'w') as f:
         f.write("Needed to unlock first. Sad!")
     if not ar.is_direct_mode():
         ar.add('second')
@@ -1643,8 +1638,8 @@ def test_AnnexRepo_status(path):
     eq_(stat, ar.status())
 
     # create something in a subdir
-    os.mkdir(opj(path, 'sub'))
-    with open(opj(path, 'sub', 'third'), 'w') as f:
+    os.mkdir(opj(ar.path, 'sub'))
+    with open(opj(ar.path, 'sub', 'third'), 'w') as f:
         f.write("tired of winning")
 
     # Note, that this is different from 'git status',
@@ -1674,12 +1669,12 @@ def test_AnnexRepo_status(path):
                                                    'type_changed')]))
 
     # create a subrepo:
-    sub = AnnexRepo(opj(path, 'submod'), create=True)
+    sub = AnnexRepo(opj(ar.path, 'submod'), create=True)
     # nothing changed, it's empty besides .git, which is ignored
     eq_(stat, ar.status())
 
     # file in subrepo
-    with open(opj(path, 'submod', 'fourth'), 'w') as f:
+    with open(opj(ar.path, 'submod', 'fourth'), 'w') as f:
         f.write("this is a birth certificate")
     stat['untracked'].append(opj('submod', 'fourth'))
     eq_(stat, ar.status())
@@ -1687,6 +1682,12 @@ def test_AnnexRepo_status(path):
     # add to subrepo
     sub.add('fourth', commit=True, msg="birther mod init'ed")
     stat['untracked'].remove(opj('submod', 'fourth'))
+
+    if ar.get_active_branch().endswith('(unlocked)') and \
+        'adjusted' in ar.get_active_branch():
+        # we are running on adjusted branch => do it in submodule, too
+        sub._run_annex_command('adjust', annex_options=['--unlock'])
+
     # Note, that now the non-empty repo is untracked
     stat['untracked'].append('submod/')
     eq_(stat, ar.status())
@@ -1717,7 +1718,7 @@ def test_AnnexRepo_status(path):
     eq_(stat, ar.status())
 
     # add another file to submodule
-    with open(opj(path, 'submod', 'not_tracked'), 'w') as f:
+    with open(opj(ar.path, 'submod', 'not_tracked'), 'w') as f:
         f.write("#LastNightInSweden")
     stat['modified'].append('submod/')
     eq_(stat, ar.status())
@@ -1739,6 +1740,22 @@ def test_AnnexRepo_status(path):
     ar.commit(msg="submod modified", files='submod')
     stat['modified'].remove('submod/')
     eq_(stat, ar.status())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_status(path, path2):
+
+    ar = AnnexRepo(path, create=True)
+    _test_status(ar)
+    if ar.config.getint("annex", "version") == 6:
+        # in case of v6 have a second run with adjusted branch feature:
+        ar2 = AnnexRepo(path2, create=True)
+        ar2.commit(msg="empty commit to create branch 'master'",
+                   options=['--allow-empty'])
+        ar2._run_annex_command('adjust', annex_options=['--unlock'])
+        _test_status(ar2)
+
 
 
 # TODO: test dirty
