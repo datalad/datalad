@@ -12,7 +12,9 @@
 import re
 import requests
 import requests.auth
-from urllib3.exceptions import MaxRetryError, NewConnectionError
+# at some point was trying to be too specific about which exceptions to
+# catch for a retry of a download.
+# from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 import io
 from six import BytesIO
@@ -423,7 +425,8 @@ class HTTPDownloader(BaseDownloader):
         # while can't know for sure if content was gunziped and either it all went ok.
         # So safer option -- just request to not have it gzipped
         headers = {'Accept-Encoding': ''}
-        nretries = 3
+        # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
+        nretries = 1
         for retry in range(1, nretries+1):
             try:
                 response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
