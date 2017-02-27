@@ -54,6 +54,7 @@ from datalad.utils import updated
 # imports from same module:
 from .external_versions import external_versions
 from .exceptions import CommandError
+from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
 from .network import RI
@@ -445,7 +446,6 @@ class GitRepo(RepoInterface):
                  git_opts=None, repo=None, **kwargs):
         """Creates representation of git repository at `path`.
 
-        If `url` is given, a clone is created at `path`.
         Can also be used to create a git repository at `path`.
 
         Parameters
@@ -453,23 +453,18 @@ class GitRepo(RepoInterface):
         path: str
           path to the git repository; In case it's not an absolute path,
           it's relative to PWD
-        url: str
+        url: str, optional
+          DEPRECATED -- use .clone() class method
           url to the to-be-cloned repository. Requires a valid git url
           according to:
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-        create: bool
+        create: bool, optional
           if true, creates a git repository at `path` if there is none. Also
           creates `path`, if it doesn't exist.
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
-        repo:
-
-
-
-
-
-
-
+        repo: git.Repo, optional
+          GitPython's Repo instance to (re)use if provided
         kwargs:
           keyword arguments serving as additional options to the git-init
           command. Therefore, it makes sense only if called with `create`.
@@ -491,7 +486,11 @@ class GitRepo(RepoInterface):
         """
 
         if url is not None:
-            RuntimeError("RF: url passed to init()")
+            raise DeprecatedError(
+                new=".clone() class method",
+                version="0.4.2",
+                msg="RF: url passed to init()"
+            )
 
         self.realpath = realpath(path)
         # note: we may also want to distinguish between a path to the worktree
@@ -1005,7 +1004,15 @@ class GitRepo(RepoInterface):
         return commit.committed_date
 
     def get_active_branch(self):
-        return self.repo.active_branch.name
+        try:
+            branch = self.repo.active_branch.name
+        except TypeError as e:
+            if "HEAD is a detached symbolic reference" in str(e):
+                lgr.debug("detached HEAD in {0}".format(self))
+                return None, None
+            else:
+                raise
+        return branch
 
     def get_branches(self):
         """Get all branches of the repo.
@@ -1048,7 +1055,7 @@ class GitRepo(RepoInterface):
         #         self.repo.git.branch(r=True).splitlines()]
 
     def get_remotes(self, with_refs_only=False):
-        """
+        """Get known remotes of the repository
 
         Parameters
         ----------
@@ -1788,14 +1795,9 @@ class GitRepo(RepoInterface):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            try:
-                branch = self.get_active_branch()
-            except TypeError as e:
-                if "HEAD is a detached symbolic reference" in str(e):
-                    lgr.debug("detached HEAD in {0}".format(self))
-                    return None, None
-                else:
-                    raise
+            branch = self.get_active_branch()
+            if branch is None:
+                return None, None
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)

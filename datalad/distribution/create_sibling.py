@@ -11,7 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
-
+from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -22,9 +22,12 @@ from datalad import ssh_manager
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.add_sibling import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
+from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
@@ -32,11 +35,17 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import publish_depends
+from datalad.interface.common_opts import inherit_opt
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.utils import filter_unmodified
+from datalad.support.network import SSHRI
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.network import RI
 from datalad.support.network import is_ssh
 from datalad.support.sshconnector import sh_quote
@@ -62,7 +71,16 @@ def _create_dataset_sibling(
         shared,
         publish_depends,
         publish_by_default,
-        as_common_datasrc):
+        as_common_datasrc,
+        annex_wanted,
+        annex_group,
+        annex_groupwanted,
+        inherit
+):
+    """Everyone is very smart here and could figure out the combinatorial
+    affluence among provided tiny (just slightly over a dozen) number of options
+    and only a few pages of code
+    """
     localds_path = ds.path
     ds_name = relpath(localds_path, start=hierarchy_basepath)
     if not replicate_local_structure:
@@ -81,7 +99,11 @@ def _create_dataset_sibling(
 
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
-    ds_sshurl = ssh_url.as_str()
+    # .git/config seems to not like all the escapes since they aren't needed
+    # XXX yoh broke consistency with this escape argument present only in SSHRI
+    #     but here it could be a simple URL as tests show
+    ds_sshurl = ssh_url.as_str(escape=False) \
+        if isinstance(ssh_url, SSHRI) else ssh_url.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%RELNAME', ds_name) \
         if target_url else ds_sshurl
@@ -92,8 +114,8 @@ def _create_dataset_sibling(
         ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
             if target_pushurl else ds_sshurl
 
-    lgr.info("Creating target dataset {0} at {1}".format(
-        localds_path, remoteds_path))
+    lgr.info("Considering to create a target dataset {0} at {1} of {2}".format(
+        localds_path, remoteds_path, ssh_url.hostname))
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
     # but it did not even exist before
@@ -112,13 +134,29 @@ def _create_dataset_sibling(
                 raise  # It's an unexpected failure here
 
         if path_exists:
+            _msg = "Target path %s already exists." % remoteds_path
+            # path might be existing but be an empty directory, which should be
+            # ok to remove
+            try:
+                lgr.debug(
+                    "Trying to rmdir %s on remote since might be an empty dir",
+                    remoteds_path
+                )
+                # should be safe since should not remove anything unless an empty dir
+                ssh("rmdir {}".format(sh_quote(remoteds_path)))
+                path_exists = False
+            except CommandError as e:
+                # If fails to rmdir -- either contains stuff no permissions
+                _msg += " And it fails to rmdir (%s)." % (e.stderr.strip(), )
+
+        if path_exists:
             if existing == 'error':
-                raise RuntimeError(
-                    "Target directory {} already exists.".format(
-                        remoteds_path))
+                raise RuntimeError(_msg)
             elif existing == 'skip':
+                lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
                 ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
                 # remove target at path
@@ -126,6 +164,7 @@ def _create_dataset_sibling(
                 # if we succeeded in removing it
                 path_exists = False
             elif existing == 'reconfigure':
+                lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
             else:
                 raise ValueError(
@@ -135,6 +174,13 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
+    if inherit and shared is None:
+        # here we must analyze current_ds's super, not the super_ds
+        delayed_super = _DelayedSuper(ds)
+        # inherit from the setting on remote end
+        shared = CreateSibling._get_ds_remote_shared_setting(
+            delayed_super, name, ssh)
+
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
@@ -142,10 +188,14 @@ def _create_dataset_sibling(
                 remoteds_path, ssh, shared, ds,
                 description=target_url):
             return
+
         if target_url and not is_ssh(target_url):
             # we are not coming in via SSH, hence cannot assume proper
             # setup for webserver access -> fix
             ssh('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
+    else:
+        # TODO -- we might still want to reconfigure 'shared' setting!
+        pass
 
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
@@ -160,7 +210,12 @@ def _create_dataset_sibling(
         force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
-        publish_depends=publish_depends)
+        publish_depends=publish_depends,
+        annex_wanted=annex_wanted,
+        annex_group=annex_group,
+        annex_groupwanted=annex_groupwanted,
+        inherit=inherit
+    )
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
@@ -226,6 +281,7 @@ class CreateSibling(Interface):
         sshurl=Parameter(
             args=("sshurl",),
             metavar='SSHURL',
+            nargs='?',
             doc="""Login information for the target server. This can be given
                 as a URL (ssh://host/path) or SSH-style (user@host:path).
                 Unless overridden, this also serves the future dataset's access
@@ -289,6 +345,7 @@ class CreateSibling(Interface):
             directory be forcefully re-initialized, and the sibling (re-)configured
             ('replace', implies 'reconfigure'), the sibling configuration be updated
             only ('reconfigure'), or to error ('error').""",),
+        inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -296,7 +353,7 @@ class CreateSibling(Interface):
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
-            constraints=EnsureStr() | EnsureBool()),
+            constraints=EnsureStr() | EnsureBool() | EnsureNone()),
         ui=Parameter(
             args=("--ui",),
             metavar='false|true|html_filename',
@@ -307,6 +364,9 @@ class CreateSibling(Interface):
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
@@ -322,33 +382,17 @@ class CreateSibling(Interface):
                  dataset=None,
                  recursive=False,
                  recursion_limit=None,
-                 existing='error', shared=False, ui=False,
+                 existing='error', shared=None, ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
                  publish_depends=None,
+                 annex_wanted=None, annex_group=None, annex_groupwanted=None,
+                 inherit=False,
                  since=None):
 
         # there is no point in doing anything further
         not_supported_on_windows(
             "Support for SSH connections is not yet implemented in Windows")
-
-        if not sshurl:
-            raise InsufficientArgumentsError(
-                "need at least an SSH URL")
-
-        # check the login URL
-        sshri = RI(sshurl)
-        if not is_ssh(sshri):
-            raise ValueError(
-                "Unsupported SSH URL: '{0}', "
-                "use ssh://host/path or host:path syntax".format(sshurl))
-
-        if not name:
-            # use the hostname as default remote name
-            name = sshri.hostname
-            lgr.debug(
-                "No sibling name given, use URL hostname '%s' as sibling name",
-                name)
 
         ds = require_dataset(dataset, check_installed=True,
                              purpose='creating a sibling')
@@ -364,7 +408,7 @@ class CreateSibling(Interface):
         assert(not unavailable_paths)
 
         # anal verification
-        assert(ds is not None and sshurl is not None and ds.repo is not None)
+        assert(ds is not None and ds.repo is not None)
 
         if since:
             mod_subs = []
@@ -381,30 +425,86 @@ class CreateSibling(Interface):
 
         # make sure dependencies are valid
         for d in datasets.values():
+            # TODO: inherit -- we might want to automagically create
+            # those dependents as well???
             _check_deps(d.repo, publish_depends)
+
+        # Finally we get to the point where sshurl is possibly used  to
+        # get the name in case if not specified
+        if not sshurl:
+            if not inherit:
+                raise InsufficientArgumentsError(
+                    "needs at least an SSH URL, if no inherit option"
+                )
+            if name is None:
+                raise ValueError(
+                    "Neither SSH URL, nor the name of sibling to inherit from "
+                    "was specified"
+                )
+            # It might well be that we already have this remote setup
+            try:
+                sshurl = CreateSibling._get_remote_url(ds, name)
+            except Exception as exc:
+                lgr.debug('%s does not know about url for %s: %s', ds, name, exc_str(exc))
+        elif inherit:
+            raise ValueError(
+                "For now, for clarity not allowing specifying a custom sshurl "
+                "while inheriting settings"
+            )
+            # may be could be safely dropped -- still WiP
+
+        if not sshurl:
+            # TODO: may be more back up before _prep?
+            super_ds = ds.get_superdataset()
+            if not super_ds:
+                raise ValueError(
+                    "Could not determine super dataset for %s to inherit URL"
+                    % ds
+                )
+            super_url = CreateSibling._get_remote_url(super_ds, name)
+            # for now assuming hierarchical setup
+            # (TODO: to be able to destinguish between the two, probably
+            # needs storing datalad.*.target_dir to have %RELNAME in there)
+            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
+
+
+        # check the login URL
+        sshri = RI(sshurl)
+        if not is_ssh(sshri):
+            raise ValueError(
+                "Unsupported SSH URL: '{0}', "
+                "use ssh://host/path or host:path syntax".format(sshurl))
+
+        if not name:
+            # use the hostname as default remote name
+            name = sshri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
         # find datasets with existing remotes with the target name
         remote_existing = [p for p in datasets
                            if name in datasets[p].repo.get_remotes()]
 
-        if existing == 'error' and remote_existing:
-            raise ValueError(
-                "sibling '{name}' already configured for dataset{plural}: "
-                "{existing}. Specify alternative sibling name, or force "
-                "reconfiguration via --existing".format(
-                    name=name,
-                    existing=remote_existing,
-                    plural='s' if len(remote_existing) > 1 else ''))
-        if existing == 'skip':
-            # no need to process already configured datasets
-            lgr.info(
-                "Skipping dataset{plural} with an already configured "
-                "sibling '{name}': {existing}".format(
-                    name=name,
-                    existing=remote_existing,
-                    plural='s' if len(remote_existing) > 1 else ''))
-            datasets = {p: d for p, d in datasets.items()
-                        if p not in remote_existing}
+        if remote_existing:
+            if existing == 'error':
+                raise ValueError(
+                    "sibling '{name}' already configured for dataset{plural}: "
+                    "{existing}. Specify alternative sibling name, or force "
+                    "reconfiguration via --existing".format(
+                        name=name,
+                        existing=remote_existing,
+                        plural='s' if len(remote_existing) > 1 else ''))
+            if existing == 'skip':
+                # no need to process already configured datasets
+                lgr.info(
+                    "Skipping dataset{plural} with an already configured "
+                    "sibling '{name}': {existing}".format(
+                        name=name,
+                        existing=remote_existing,
+                        plural='s' if len(remote_existing) > 1 else ''))
+                datasets = {p: d for p, d in datasets.items()
+                            if p not in remote_existing}
 
         if not datasets:
             # we ruled out all possibilities
@@ -421,12 +521,11 @@ class CreateSibling(Interface):
                 target_dir = '.'
 
         # TODO: centralize and generalize template symbol handling
-        replicate_local_structure = False
-        if "%RELNAME" not in target_dir:
-            replicate_local_structure = True
+        replicate_local_structure = "%RELNAME" not in target_dir
 
         # request ssh connection:
         lgr.info("Connecting ...")
+        assert(sshurl is not None)  # delayed anal verification
         ssh = ssh_manager.get_connection(sshurl)
         if not ssh.get_annex_version():
             raise MissingExternalDependency(
@@ -441,6 +540,7 @@ class CreateSibling(Interface):
         for current_dspath in \
                 sorted(datasets.keys(), key=lambda x: x.count('/')):
             current_ds = datasets[current_dspath]
+
             path = _create_dataset_sibling(
                 name,
                 current_ds,
@@ -455,7 +555,12 @@ class CreateSibling(Interface):
                 shared,
                 publish_depends,
                 publish_by_default,
-                as_common_datasrc)
+                as_common_datasrc,
+                annex_wanted,
+                annex_group,
+                annex_groupwanted,
+                inherit
+            )
             if not path:
                 # nothing new was created
                 continue
@@ -484,6 +589,44 @@ class CreateSibling(Interface):
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
+
+    @staticmethod
+    def _get_ds_remote_shared_setting(ds, name, ssh):
+        """Figure out setting of sharedrepository for dataset's `name` remote"""
+        shared = None
+        try:
+            current_super_url = CreateSibling._get_remote_url(
+                ds, name)
+            current_super_ri = RI(current_super_url)
+            out, err = ssh('git -C {} config --get core.sharedrepository'.format(
+                # TODO -- we might need to expanduser taking .user into account
+                # but then it must be done also on remote side
+                sh_quote(current_super_ri.path))
+            )
+            shared = out.strip()
+            if err:
+                lgr.warning("Got stderr while calling ssh: %s", err)
+        except CommandError as e:
+            lgr.debug(
+                "Could not figure out remote shared setting of %s for %s due "
+                "to %s",
+                ds, name, exc_str(e)
+            )
+            # could well be ok if e.g. not shared
+            # TODO: more detailed analysis may be?
+        return shared
+
+    @staticmethod
+    def _get_remote_url(ds, name):
+        """A little helper to get url from pushurl or from url if not defined"""
+        # take pushurl if present, if not -- just a url
+        url = ds.config.get('remote.%s.pushurl' % name) or \
+            ds.config.get('remote.%s.url' % name)
+        if not url:
+            raise ValueError(
+                "%s had neither pushurl or url defined for %s" % (ds, name)
+            )
+        return url
 
     @staticmethod
     def init_remote_repo(path, ssh, shared, dataset, description=None):

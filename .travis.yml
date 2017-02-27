@@ -14,6 +14,7 @@ env:
     # will be used in the matrix, where neither other variable is used
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
+    - TESTS_TO_PERFORM=
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
   matrix:
@@ -31,11 +32,13 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - _DATALAD_UPSTREAM_GITPYTHON=1
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
@@ -53,15 +56,18 @@ matrix:
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     env:
     - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
@@ -69,6 +75,7 @@ matrix:
     # Eventually we will get there, but atm causes a good number of failures
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
@@ -80,10 +87,16 @@ matrix:
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # Test under NFS mount
     env:
     - TMPDIR="/tmp/nfsmount"
+  - python: 2.7
+    # test modules that should not fail in direct mode now:
+    env:
+    - TESTS_TO_PERFORM="datalad/tests datalad/support"
+    - DATALAD_REPO_DIRECT=1
 
   allow_failures:
   # For now, don't fail entirely when direct mode fails
@@ -98,6 +111,7 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
+  - if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ] && [ ! -z "${_DATALAD_NONPR_ONLY:-}" ]; then echo "Exiting early since these tests should run only in master branch"; exit 0; fi
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
@@ -132,7 +146,7 @@ script:
   # Verify that setup.py build doesn't puke
   - python setup.py build
   # Run tests
-  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
+  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM 
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
   # Run javascript tests

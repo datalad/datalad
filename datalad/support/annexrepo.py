@@ -39,6 +39,7 @@ from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import borrowkwargs
 from datalad.utils import linux_distribution_name
 from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
@@ -427,6 +428,30 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
         self._set_shared_connection(name, url)
 
+    @borrowkwargs(GitRepo)
+    def get_remotes(self, with_refs_only=False, exclude_special_remotes=False):
+        """Get known (special-) remotes of the repository
+
+        Parameters
+        ----------
+        exclude_special_remotes: bool, optional
+          if True, don't return annex special remotes
+
+        Returns
+        -------
+        remotes : list of str
+          List of names of the remotes
+        """
+        remotes = super(AnnexRepo, self).get_remotes(
+            with_refs_only=with_refs_only)
+
+        if exclude_special_remotes:
+            return [remote for remote in remotes
+                    if not self.config.has_option('remote.{}'.format(remote),
+                                                  'annex-externaltype')]
+        else:
+            return remotes
+
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
@@ -487,6 +512,31 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                e.code, e.stdout, e.stderr)
             else:
                 raise e
+
+    def _run_simple_annex_command(self, *args, **kwargs):
+        """Run an annex command and return its output, of which expect 1 line
+
+        Just a little helper to interact with basic annex commands and process
+        their output while ignoring some messages
+
+        Parameters
+        ----------
+        **kwargs: all passed into _run
+        """
+        out, err = self._run_annex_command(
+            *args, **kwargs
+        )
+        lines = out.rstrip('\n').splitlines()
+        # ignore some lines which might appear on a fresh clone
+        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
+        lines_ = [
+            l for l in lines
+            if not re.search(
+                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+            )
+        ]
+        assert(len(lines_) <= 1)
+        return lines_[0] if lines_ else None
 
     def _is_direct_mode_from_config(self):
         """Figure out if in direct mode from the git config.
@@ -1066,16 +1116,58 @@ class AnnexRepo(GitRepo, RepoInterface):
     def merge_annex(self, remote=None):
         """Merge git-annex branch
 
+        Merely calls `sync` with the appropriate arguments.
+
         Parameters
         ----------
         remote: str, optional
           Name of a remote to be "merged".
         """
-        # this doesn't use `merge` but `sync` in order to properly
-        # trigger updating of maintained branches in e.g. v6 repos
-        args = [remote] if remote else []
-        # would commit any dirty files, we don't want that
-        args.extend(['--no-push', '--no-pull', '--no-commit', '--no-content'])
+        self.sync(
+            remotes=remote, push=False, pull=False, commit=False, content=False,
+            all=False)
+
+    def sync(self, remotes=None, push=True, pull=True, commit=True,
+             content=False, all=False, fast=False):
+        """Synchronize local repository with remotes
+
+        Use  this  command  when you want to synchronize the local repository
+        with one or more of its remotes. You can specify the remotes (or
+        remote groups) to sync with by name; the default if none are specified
+        is to sync with all remotes.
+
+        Parameters
+        ----------
+        remotes: str, list(str), optional
+          Name of one or more remotes to be sync'ed.
+        push : bool
+          By default, git pushes to remotes.
+        pull : bool
+          By default, git pulls from remotes
+        commit : bool
+          A commit is done by default. Disable to avoid  committing local
+          changes.
+        content : bool
+          Normally, syncing does not transfer the contents of annexed
+          files.  This option causes the content of files in the work tree
+          to also be uploaded and downloaded as necessary.
+        all : bool
+          This option, when combined with `content`, makes all available
+          versions of all files be synced, when preferred content settings
+          allow
+        fast : bool
+          Only sync with the remotes with the lowest annex-cost value
+          configured
+        """
+        args = []
+        args.extend(to_options(push=push, no_push=not push,
+                               # means: '--push' if push else '--no-push'
+                               pull=pull, no_pull=not pull,
+                               commit=commit, no_commit=not commit,
+                               content=content, no_content=not content,
+                               all=all,
+                               fast=fast))
+        args.extend(assure_list(remotes))
         self._run_annex_command('sync', annex_options=args)
 
     @normalize_path
@@ -1542,15 +1634,72 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self):
+    def get_annexed_files(self, with_content_only=False):
         """Get a list of files in annex
         """
-        # TODO: Review!
-
-        out, err = self._run_annex_command('find',
-                                           annex_options=['--include', "*"])
+        # TODO: Review!!
+        args = [] if with_content_only else ['--include', "*"]
+        out, err = self._run_annex_command('find', annex_options=args)
         # TODO: JSON
         return out.splitlines()
+
+    def get_wanted(self, remote=None):
+        """Get `wanted` for the remote.  "" corresponds to none set
+
+        Parameters
+        ----------
+        remote : str, optional
+           If not specified (None), returns `wanted` for current repository
+        """
+        return self._run_simple_annex_command(
+            'wanted',
+            annex_options=[remote or '.']
+        )
+
+    def set_wanted(self, remote=None, expr=None):
+        """Set `wanted` `expr` for the remote."""
+        return self._run_simple_annex_command(
+            'wanted',
+            annex_options=[remote or '.', expr]
+        )
+
+    def get_group(self, remote=None):
+        """Get `group` for the remote.  "" corresponds to none set
+
+        Parameters
+        ----------
+        remote : str, optional
+           If not specified (None), returns `group` for current repository
+        """
+        return self._run_simple_annex_command(
+            'group',
+            annex_options=[remote or '.']
+        )
+
+    def set_group(self, remote=None, group=None):
+        """Set `group` of the remote."""
+        return self._run_simple_annex_command(
+            'group',
+            annex_options=[remote or '.', group]
+        )
+
+    def get_groupwanted(self, name=None):
+        """Get `groupwanted` expression for a group `name`
+
+        Parameters
+        ----------
+        name : str, optional
+           Name of the groupwanted group
+        """
+        return self._run_simple_annex_command(
+            'groupwanted', annex_options=[name]
+        )
+
+    def set_groupwanted(self, name=None, expr=None):
+        """Set `expr` for the `name` groupwanted"""
+        return self._run_simple_annex_command(
+            'groupwanted', annex_options=[name, expr]
+        )
 
     def precommit(self):
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
@@ -1571,6 +1720,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         self.precommit()
         if self.is_direct_mode():
+            # committing explicitly given paths in direct mode via proxy used to
+            # fail, because absolute paths are used. Using annex proxy this
+            # leads to an error (path outside repository)
+            if options:
+                for i in range(len(options)):
+                    if not options[i].startswith('-'):
+                        # an option, that is not an option => it's a path
+                        # TODO: comprehensive + have dedicated parameter 'files'
+                        from os.path import isabs, relpath, normpath
+                        if isabs(options[i]):
+                            options[i] = normpath(relpath(options[i], start=self.path))
+
             if _datalad_msg:
                 msg = self._get_prefixed_commit_msg(msg)
             if not msg:
@@ -1931,6 +2092,108 @@ class AnnexRepo(GitRepo, RepoInterface):
             var = 'remote.{0}.{1}'.format(name, 'annexurl')
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
+
+    def get_metadata(self, files, timestamps=False):
+        """Query git-annex file metadata
+
+        Parameters
+        ----------
+        files : str or list(str)
+          One or more paths for which metadata is to be queried.
+        timestamps: bool, optional
+          If True, the output contains a '<metadatakey>-lastchanged'
+          key for every metadata item, reflecting the modification
+          time, as well as a 'lastchanged' key with the most recent
+          modification time of any metadata item.
+
+        Returns
+        -------
+        dict
+          One item per file (could be more items than input arguments
+          when directories are given). Keys are filenames, values are
+          dictionaries with metadata key/value pairs. Note that annex
+          metadata tags are stored under the key 'tag', which is a
+          regular metadata item that can be manipulated like any other.
+        """
+        if not files:
+            return {}
+        files = assure_list(files)
+        args = ['--json']
+        args.extend(files)
+        return {res['file']:
+                res['fields'] if timestamps else \
+                {k: v for k, v in res['fields'].items()
+                 if not k.endswith('lastchanged')}
+                for res in self._run_annex_command_json('metadata', args)}
+
+    def set_metadata(
+            self, files, reset=None, add=None, init=None,
+            remove=None, purge=None, recursive=False):
+        """Manipulate git-annex file-metadata
+
+        Parameters
+        ----------
+        files : str or list(str)
+          One or more paths for which metadata is to be manipulated.
+          The changes applied to each file item are uniform. However,
+          the result may not be uniform across files, depending on the
+          actual operation.
+        reset : dict, optional
+          Metadata items matching keys in the given dict are (re)set
+          to the respective values.
+        add : dict, optional
+          The values of matching keys in the given dict appended to
+          any possibly existing values. The metadata keys need not
+          necessarily exist before.
+        init : dict, optional
+          Metadata items for the keys in the given dict are set
+          to the respective values, if the key is not yet present
+          in a file's metadata.
+        remove : dict, optional
+          Values in the given dict are removed from the metadata items
+          matching the respective key, if they exist in a file's metadata.
+          Non-existing values, or keys do not lead to failure.
+        purge : list, optional
+          Any metadata item with a key matching an entry in the given
+          list is removed from the metadata.
+        recursive : bool, optional
+          If False, fail (with CommandError) when directory paths
+          are given as `files`.
+
+        Returns
+        -------
+        None
+        """
+
+        def _genspec(expr, d):
+            return [expr.format(k, v) for k, v in d.items()]
+
+        args = []
+        spec = []
+        for expr, d in (('{}={}', reset),
+                        ('{}+={}', add),
+                        ('{}?={}', init),
+                        ('{}-={}', remove)):
+            if d:
+                spec.extend(_genspec(expr, d))
+        # prefix all with '-s' and extend arg list
+        args.extend(j for i in zip(['-s'] * len(spec), spec) for j in i)
+        if purge:
+            # and all '-r' args
+            args.extend(j for i in zip(['-r'] * len(purge), purge)
+                        for j in i)
+        if not args:
+            return
+
+        if recursive:
+            args.append('--force')
+        # append actual file path arguments
+        args.extend(assure_list(files))
+
+        # XXX do we need the return values for anything?
+        self._run_annex_command_json(
+            'metadata',
+            args)
 
 
 # TODO: Why was this commented out?

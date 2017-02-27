@@ -183,7 +183,7 @@ class Add(Interface):
 
         if not content_by_ds:
             raise InsufficientArgumentsError(
-                "no existing content given to add")
+                "non-existing paths given to add")
 
         if dataset:
             # remeber the datasets associated with actual inputs

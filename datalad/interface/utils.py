@@ -361,13 +361,13 @@ def save_dataset(
                 lgr.debug(
                     "Was instructed to commit %s files but repository is not dirty",
                     files)
-            elif 'no changes added to commit':
+            elif 'no changes added to commit' in str(e) or 'nothing added to commit' in str(e):
                 lgr.info(
                     'Nothing to save')
             else:
                 # relay any prior whining in the exception
                 raise ValueError('{} [error log follows] {}; {}'.format(
-                    e, cml.out, cml.err))
+                    e, e.stdout, e.stderr))
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...
@@ -674,7 +674,7 @@ def filter_unmodified(content_by_ds, refds, since):
 
     This function takes a path specification dictionary, as produced by
     `Interface._prep()` and filters it such that only that subset of paths
-    remains in the dictionary that correspdong to the set of changes in
+    remains in the dictionary that corresponding to the set of changes in
     the given reference dataset since a given state.
 
     The change set is traced across all related subdatasets, i.e. if a submodule
@@ -686,7 +686,7 @@ def filter_unmodified(content_by_ds, refds, since):
     In doing so, not only unmodified given paths are removed, but also modified
     given paths are replaced by the set of actually modified paths within them.
 
-    Only commited changes are considered!
+    Only committed changes are considered!
 
     Parameters
     ----------
@@ -756,8 +756,8 @@ def filter_unmodified(content_by_ds, refds, since):
 
     paths_refds = content_by_ds[refds_path]
     keep[refds_path] = [m for m in modified
-                        if lexists(m) # still around
-                        and (m in paths_refds # listed file, or subds
+                        if lexists(m)  # still around
+                        and (m in paths_refds  # listed file, or subds
                         # or a modified path under a given directory
                         or any(m.startswith(_with_sep(p)) for p in paths_refds))]
     return keep

@@ -21,6 +21,7 @@ from datalad.api import uninstall
 from datalad.api import drop
 from datalad.api import remove
 from datalad.api import install
+from datalad.api import create
 from datalad.support.exceptions import InsufficientArgumentsError, CommandError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -347,3 +348,17 @@ def test_kill(path):
     assert_raises(CommandError, ds.remove)
     eq_(ds.remove(recursive=True, check=False), [subds, ds])
     ok_(not exists(path))
+
+
+@with_tempfile()
+def test_remove_recreation(path):
+
+    # test recreation is possible and doesn't conflict with in-memory
+    # remainings of the old instances
+    # see issue #1311
+
+    ds = create(path)
+    ds.remove()
+    ds = create(path)
+    ok_clean_git(ds.path)
+    ok_(ds.is_installed())
