@@ -17,6 +17,7 @@ import logging
 from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import eval_results
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
@@ -75,6 +76,7 @@ class Update(Interface):
 
     @staticmethod
     @datasetmethod(name='update')
+    @eval_results
     def __call__(
             path=None,
             sibling=None,
@@ -99,8 +101,6 @@ class Update(Interface):
             recursive=recursive,
             recursion_limit=recursion_limit)
 
-        results = []
-
         for ds_path in content_by_ds:
             # prepare return value
             res = {
@@ -109,8 +109,6 @@ class Update(Interface):
                 'type': 'dataset',
                 'status': None,
             }
-            # put it out right away
-            results.append(res)
             ds = Dataset(ds_path)
             repo = ds.repo
             # get all remotes which have references (would exclude
@@ -121,6 +119,7 @@ class Update(Interface):
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
                 res['status'] = 'skipped'
+                yield res
                 continue
             if not sibling:
                 # nothing given, look for tracking branch
@@ -131,6 +130,7 @@ class Update(Interface):
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
                             sibling_, repo.path)
                 res['status'] = 'skipped'
+                yield res
                 continue
             if not sibling_ and len(remotes) == 1:
                 # there is only one remote, must be this one
@@ -141,13 +141,16 @@ class Update(Interface):
                 res['error'] = (
                     'NotImplementedError',
                     "Multiple siblings, please specify from which to update.")
+                yield res
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
             dsres, file_results = _update_repo(
                 ds, sibling_, merge, fetch_all, reobtain_data)
+            # TODO put back when `get` returns newstyle results
+            #for fr in file_results:
+            #    yield fr
             res.update(dsres)
-            results.extend(file_results)
-        return results
+            yield res
 
 
 def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
