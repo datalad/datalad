@@ -45,6 +45,7 @@ from datalad.utils import optional_args, expandpath, is_explicit_path, \
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.utils import knows_annex
+from datalad.utils import better_wraps
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -545,16 +546,16 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     if not name:
         name = f.func_name if PY2 else f.__name__
 
-    @wraps(f)
+    @better_wraps(f)
     def apply_func(*args, **kwargs):
-        """Wrapper function to assign arguments of the bound function to
-        original function.
+        # Wrapper function to assign arguments of the bound function to
+        # original function.
+        #
+        # Note
+        # ----
+        # This wrapper is NOT returned by the decorator, but only used to bind
+        # the function `f` to the Dataset class.
 
-        Note
-        ----
-        This wrapper is NOT returned by the decorator, but only used to bind
-        the function `f` to the Dataset class.
-        """
         kwargs = kwargs.copy()
         from inspect import getargspec
         orig_pos = getargspec(f).args
@@ -577,9 +578,6 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         return f(**kwargs)
 
     setattr(Dataset, name, apply_func)
-    # So we could post-hoc later adjust the documentation string which is assigned
-    # within .api
-    apply_func.__orig_func__ = f
     return f
 
 

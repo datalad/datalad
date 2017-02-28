@@ -555,7 +555,7 @@ def optional_args(decorator):
 
         Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
-    @wraps(decorator)
+    @better_wraps(decorator)
     def wrapper(*args, **kwargs):
         def dec(f):
             return decorator(f, *args, **kwargs)

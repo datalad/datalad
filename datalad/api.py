@@ -105,32 +105,25 @@ def _generate_func_api():
                 if always_render:
                     globals()[get_api_name(intfspec)] = intf__
 
-
-def _fix_datasetmethod_docs():
-    """Fix up dataset methods docstrings which didn't get proper docs
-    """
-    from six import PY2
-    for attr in dir(Dataset):
-        try:
-            func = getattr(Dataset, attr)
-            orig_func = getattr(func, '__orig_func__')
-        except AttributeError:
-            continue
-        if PY2:
-            func = func.__func__
-        orig__doc__ = func.__doc__
-        if orig__doc__ and orig__doc__.strip():  # pragma: no cover
-            raise RuntimeError(
-                "No meaningful docstring should have been assigned before now. Got %r"
-                % orig__doc__
-            )
-        func.__doc__ = orig_func.__doc__
+            # apply new docs to datasetmethods, too:
+            try:
+                d_method = getattr(Dataset, get_api_name(intfspec))
+            except AttributeError:
+                continue
+            # d_method is a wrapt.decorator._BoundAdapterWrapper;
+            # actual function: d_method.im_func
+            d_method = d_method.im_func
+            orig__doc__ = d_method.func_doc
+            if orig__doc__ and orig__doc__.strip():  # pragma: no cover
+                raise RuntimeError(
+                    "No meaningful docstring should have been assigned before "
+                    "now. Got %r" % orig__doc__
+                )
+            d_method.func_doc = intf.__call__.__doc__
 
 
 # Invoke above helpers
 _generate_func_api()
-_fix_datasetmethod_docs()
 
 # Be nice and clean up the namespace properly
 del _generate_func_api
-del _fix_datasetmethod_docs
