@@ -1,3 +1,9 @@
+datalad (0.4.1+git427-ge29f6ed6-1) UNRELEASED; urgency=medium
+
+  * New upstream snapshot from 0.4.1-565-ge29f6ed6
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 27 Feb 2017 23:32:25 -0500
+
 datalad (0.4.1-1) unstable; urgency=medium
 
   * New upstream release
