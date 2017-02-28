@@ -312,3 +312,28 @@ def test_filter_unmodified(path):
             subsub.path: []
         },
         {d: sorted(p) for d, p in filter_unmodified(spec, ds, orig_base_commit).items()})
+
+
+def test_eval_results():
+
+    from ..base import Interface
+    from datalad.distribution.dataset import datasetmethod
+    from datalad.interface.utils import eval_results
+    from inspect import getargspec
+
+    class FakeCommand(Interface):
+
+        @staticmethod
+        @datasetmethod(name='fake_command')
+        @eval_results
+        def __call__(number, dataset=None):
+
+            for i in range(number):
+                yield i
+
+    result = FakeCommand().__call__(2)
+    assert_equal(result, [0, 1])
+    result = Dataset('/does/not/matter').fake_command(3)
+    assert_equal(result, [0, 1, 2])
+    assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
+    assert_equal(getargspec(FakeCommand.__call__)[0], ['number', 'dataset'])

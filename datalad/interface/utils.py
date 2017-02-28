@@ -33,6 +33,7 @@ from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import swallow_logs
+from datalad.utils import better_wraps
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
@@ -761,3 +762,21 @@ def filter_unmodified(content_by_ds, refds, since):
                         # or a modified path under a given directory
                         or any(m.startswith(_with_sep(p)) for p in paths_refds))]
     return keep
+
+
+def eval_results(func):
+    """Decorator providing functionality to evaluate return values of datalad
+    commands
+    """
+    from inspect import isgenerator
+
+    @better_wraps(func)
+    def new_func(*args, **kwargs):
+        # rudimentary wrapper to harvest generators
+        results = func(*args, **kwargs)
+        if isgenerator(results):
+            return list(results)
+        else:
+            return results
+
+    return new_func
