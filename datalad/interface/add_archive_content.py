@@ -41,6 +41,8 @@ from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 
+from datalad.customremotes.base import init_datalad_remote
+
 from six import string_types
 
 from ..log import logging
@@ -211,7 +213,7 @@ class AddArchiveContent(Interface):
             annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
                 # if not absolute -- relative to wd and thus
-                archive_path = normpath(opj(pwd, archive))
+                archive_path = normpath(opj(realpath(pwd), archive))
                 # abspath(archive) is not "good" since dereferences links in the path
                 # archive_path = abspath(archive)
         elif not isabs(archive):
@@ -287,14 +289,12 @@ class AddArchiveContent(Interface):
 
         # TODO: check if may be it was already added
         if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
-            lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
-            annex.init_remote(
-                ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
-                 'autoenable=true'])
+            init_datalad_remote(annex, ARCHIVES_SPECIAL_REMOTE, autoenable=True)
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
+        precommitted = False
+        delete_after_rpath = None
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
@@ -310,7 +310,7 @@ class AddArchiveContent(Interface):
 
             # we need to create a temporary directory at the top level which would later be
             # removed
-            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex_path)) \
+            prefix_dir = basename(tempfile.mktemp(prefix=".datalad", dir=annex_path)) \
                 if delete_after \
                 else None
 
@@ -356,6 +356,8 @@ class AddArchiveContent(Interface):
 
                 if prefix_dir:
                     target_file = opj(prefix_dir, target_file)
+                    # but also allow for it in the orig
+                    target_file_orig = opj(prefix_dir, target_file_orig)
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
@@ -434,8 +436,8 @@ class AddArchiveContent(Interface):
                     stats.add_git += 1
 
                 if delete_after:
-                    # forcing since it is only staged, not yet committed
-                    annex.remove(target_file_rpath, force=True)  # TODO: batch!
+                    # delayed removal so it doesn't interfer with batched processes since any pure
+                    # git action invokes precommit which closes batched processes. But we like to count
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
@@ -462,23 +464,42 @@ class AddArchiveContent(Interface):
 
             if outside_stats:
                 outside_stats += stats
+            if delete_after:
+                # force since not committed. r=True for -r (passed into git call
+                # to recurse)
+                delete_after_rpath = opj(extract_rpath, prefix_dir) if extract_rpath else prefix_dir
+                lgr.debug(
+                    "Removing extracted and annexed files under %s",
+                    delete_after_rpath
+                )
+                annex.remove(delete_after_rpath, r=True, force=True)
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
-                annex.commit(
-                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
-                    _datalad_msg=True
-                )
-                commit_stats.reset()
+                annex.precommit()  # so batched ones close and files become annex symlinks etc
+                precommitted = True
+                if annex.repo.is_dirty(untracked_files=False):
+                    annex.commit(
+                        "Added content extracted from %s %s\n\n%s" %
+                        (origin, archive, commit_stats.as_str(mode='full')),
+                        _datalad_msg=True
+                    )
+                    commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
-            annex.precommit()
+            # if haven't done yet.  explicitly checked to avoid any possible
+            # "double-action"
+            if not precommitted:
+                annex.precommit()
 
-            if delete_after:
-                prefix_path = opj(annex_path, prefix_dir)
-                if exists(prefix_path):  # probably would always be there
-                    lgr.info("Removing temporary directory under which extracted files were annexed: %s",
-                             prefix_path)
-                    rmtree(prefix_path)
+            if delete_after_rpath:
+                delete_after_path = opj(annex_path, delete_after_rpath)
+                if exists(delete_after_path):  # should not be there
+                    # but for paranoid yoh
+                    lgr.warning(
+                        "Removing temporary directory under which extracted "
+                        "files were annexed and should have been removed: %s",
+                        delete_after_path)
+                    rmtree(delete_after_path)
 
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure

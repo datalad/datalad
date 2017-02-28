@@ -16,13 +16,15 @@ from os.path import commonprefix
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
-from os.path import normpath
+from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from os.path import sep
+from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
+from six import add_metaclass
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -34,10 +36,15 @@ from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.repo import Flyweight
+from datalad.support.network import RI
+
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
+from datalad.utils import get_dataset_root
+from datalad.utils import knows_annex
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -71,10 +78,31 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
+@add_metaclass(Flyweight)
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id', '_cfg']
 
-    def __init__(self, path):
+    # Begin Flyweight
+    _unique_instances = WeakValueDictionary()
+
+    @classmethod
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            raise AttributeError
+
         # Custom handling for few special abbreviations
         path_ = path
         if path == '^':
@@ -87,7 +115,24 @@ class Dataset(object):
             path_ = LOCAL_CENTRAL_PATH
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
-        self._path = abspath(path_)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path_ = RI(path_).localpath
+
+        # we want an absolute path, but no resolved symlinks
+        if not isabs(path_):
+            path_ = opj(getpwd(), path_)
+
+        # use canonical paths only:
+        path_ = normpath(path_)
+        kwargs['path'] = path_
+        return path_, args, kwargs
+    # End Flyweight
+
+    def __init__(self, path):
+        self._path = path
         self._repo = None
         self._id = None
         self._cfg = None
@@ -99,6 +144,15 @@ class Dataset(object):
         if not hasattr(other, 'path'):
             return False
         return realpath(self.path) == realpath(other.path)
+
+    def close(self):
+        """Perform operations which would close any possible process using this Dataset
+        """
+        repo = self._repo
+        self._repo = None
+        if repo:
+            # might take care about lingering batched processes etc
+            del repo
 
     @property
     def path(self):
@@ -143,8 +197,9 @@ class Dataset(object):
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.get_branches():
+            if knows_annex(self.path):
                 # we acquired git-annex branch
+                lgr.info("Init new annex at '%s'.", self.path)
                 self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
 
@@ -163,6 +218,7 @@ class Dataset(object):
         """
         if self._id is None:
             # if we have one on record, stick to it!
+            self.config.reload()
             self._id = self.config.get('datalad.dataset.id', None)
         return self._id
 
@@ -175,8 +231,11 @@ class Dataset(object):
         ConfigManager
         """
         if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            if self.repo is None:
+                # associate with this dataset and read the entire config hierarchy
+                self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            else:
+                self._cfg = self.repo.config
         return self._cfg
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
@@ -222,7 +281,7 @@ class Dataset(object):
     # weakref
     # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None):
+                        recursive=False, recursion_limit=None, edges=False):
 
         """Get names/paths of all known subdatasets (sorted depth-first)
         optionally matching a specific name pattern.
@@ -240,10 +299,13 @@ class Dataset(object):
           If True, recurse into all subdatasets and report them too.
         recursion_limit: int or None
           If not None, set the number of subdataset levels to recurse into.
+        edges : bool
+          If True, return a list of tuples with superdataset and subdataset
+          path pairs that define the edges of the dataset hierarchy tree.
 
         Returns
         -------
-        list(Dataset paths) or None
+        list(Dataset paths) or list(tuple(parent path, child path)) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
@@ -287,17 +349,25 @@ class Dataset(object):
             for sm in submodules:
                 sdspath = opj(self._path, sm)
                 rsm.extend(
-                    [opj(sm, sdsh)
+                    [(normpath(opj(sm, sdsh[0])), opj(sm, sdsh[1])) if isinstance(sdsh, tuple) else opj(sm, sdsh)
                      for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive,
                          recursion_limit=(recursion_limit - 1)
-                         if isinstance(recursion_limit, int) else recursion_limit)])
-                rsm.append(sm)
+                         if isinstance(recursion_limit, int) else recursion_limit,
+                         edges=edges)])
+                rsm.append((curdir, sm) if edges else sm)
             submodules = rsm
+        elif edges:
+            submodules = [(curdir, sm) for sm in submodules]
 
         if absolute:
-            return [opj(self._path, sm) for sm in submodules]
+            if edges:
+                return [(self._path if ds == curdir else opj(self._path, ds),
+                         opj(self._path, sm))
+                        for ds, sm in submodules]
+            else:
+                return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
 
@@ -382,7 +452,7 @@ class Dataset(object):
             # normalize the path after adding .. so we guaranteed to not
             # follow into original directory if path itself is a symlink
             par_path = normpath(opj(path, pardir))
-            sds_path_ = GitRepo.get_toppath(par_path)
+            sds_path_ = get_dataset_root(par_path)
             if sds_path_ is None:
                 # no more parents, use previous found
                 break
@@ -563,7 +633,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        dspath = GitRepo.get_toppath(getpwd())
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)

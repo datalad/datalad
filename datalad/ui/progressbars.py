@@ -46,22 +46,38 @@ progressbars = {}
 
 try:
     from tqdm import tqdm
+    from datalad.support.external_versions import external_versions
+    from datalad.utils import updated
 
     class tqdmProgressBar(ProgressBarBase):
         """Adapter for tqdm.ProgressBar"""
 
         backend = 'tqdm'
 
+        # TQDM behaved a bit suboptimally with older versions -- either was
+        # completely resetting time/size in global pbar, or not updating
+        # "slave" pbars, so we had to
+        # set miniters to 1, and mininterval to 0, so it always updates
+        # amd smoothing to 0 so it produces at least consistent average.
+        # But even then it is somewhat flawed.
+        # Newer versions seems to behave more consistently so do not require
+        # those settings
+        _default_pbar_params = \
+            dict(smoothing=0, miniters=1, mininterval=0) \
+            if external_versions['tqdm'] < '4.10.0' \
+            else dict(mininterval=0)
+
         def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
             super(tqdmProgressBar, self).__init__(maxval=maxval)
-            self._pbar_params = dict(desc=label, unit=unit,
-                                     unit_scale=True, total=maxval, file=out)
+            self._pbar_params = updated(
+                self._default_pbar_params,
+                dict(desc=label, unit=unit,
+                     unit_scale=True, total=maxval, file=out))
             self._pbar = None
 
         def _create(self):
             if self._pbar is None:
-                # set miniters to 1, and mininterval to 0, so it always updates
-                self._pbar = tqdm(miniters=1, mininterval=0, **self._pbar_params)
+                self._pbar = tqdm(**self._pbar_params)
 
         def update(self, size, increment=False):
             self._create()

@@ -51,7 +51,7 @@ def _make_dataset_hierarchy(path):
     with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
         f.write('content3')
     origin_sub4 = origin_sub3.create('sub4')
-    origin.save(recursive=True, auto_add_changes=True)
+    origin.save(recursive=True, all_changes=True)
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
@@ -72,20 +72,6 @@ def test_get_invalid_call(path, file_outside):
         f.write("whatever")
     ds.add("some.txt", to_git=True)
     ds.save("Initial commit.")
-
-    # no path given:
-    assert_raises(InsufficientArgumentsError, get, dataset=path,
-                  source="some", path=None)
-
-    # get on a plain git:
-    # MIH: why do we warn? user got what was desired. if they want technical
-    # background they better read books not warnings
-    #with swallow_logs(new_level=logging.WARNING) as cml:
-    #    # but we don't fail if not annex -- just inform
-    #    out = ds.get(curdir)
-    #    assert_in('Found no annex. Could not perform any get operation.',
-    #              cml.out)
-    #    eq_(out, [])
 
     # make it an annex:
     AnnexRepo(path, init=True, create=True)
@@ -112,17 +98,8 @@ def test_get_invalid_call(path, file_outside):
         eq_(len(result), 0)
         assert_in("ignored non-existing paths", cml.out)
 
-    # path outside repo:
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(file_outside)
-        eq_(len(result), 0)
-        assert_in("{0} is not part of a dataset, ignored".format(file_outside, ds),
-                  cml.out)
-
-    # TODO: annex --json doesn't report anything when get fails to do get a
-    # file from a specified source, where the file isn't available from.
-    # File report for Joey (plus other failures like not existing when
-    # called with --json)
+    # path outside repo errors as with most other commands:
+    assert_raises(ValueError, ds.get, file_outside)
 
 
 @with_testrepos('basic_annex', flavors='clone')
@@ -195,7 +172,7 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:
     origin = Dataset(o_path).create(force=True)
-    origin.save("Initial", auto_add_changes=True)
+    origin.save("Initial", all_changes=True)
 
     ds = install(c_path, source=o_path)
 
@@ -262,7 +239,7 @@ def test_get_recurse_subdatasets(src, path):
     # now, with a path not explicitly pointing within a
     # subdataset, but recursive option:
     # get everything:
-    result = ds.get('.', recursive=True)
+    result = ds.get(recursive=True)
 
     eq_(set([item.get('file') for item in result]), annexed_files)
     ok_(all(item.get('success', False) for item in result))
@@ -343,7 +320,7 @@ def test_get_mixed_hierarchy(src, path):
         f.write('content')
     origin.add('file_in_git.txt', to_git=True)
     origin_sub.add('file_in_annex.txt')
-    origin.save(auto_add_changes=True)
+    origin.save(all_changes=True)
 
     # now, install that thing:
     ds, subds = install(path, source=src, recursive=True)
@@ -382,7 +359,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     origin_subsub = origin_sub.create('subsub')
     with open(opj(origin_subsub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.save(recursive=True, auto_add_changes=True)
+    origin.save(recursive=True, all_changes=True)
 
     ds = install(path, source=src)
     eq_(len(ds.get_subdatasets(fulfilled=True)), 0)

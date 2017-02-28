@@ -254,14 +254,16 @@ def pipeline(dataset,
                                             ('ds005\.tgz', 'ds005_raw.tgz'),
                                             # had it split into this one with derived data separately and then joined
                                             ('ds007_01-20\.tgz', 'ds007_raw.tgz'),
+                                            ('ds000107_raw\.', 'ds000107.'),
                                             # generic
                                             ('^ds0*', '^ds'),
                                             ('\.(zip|tgz|tar\.gz)$', '.ext')
                                         ],
                                         # Had manually to do this for this one since there was a switch from
                                         # overlay layout to even bigger single one within a minor 2.0.1 "release"
+                                        # 158 -- 1.0.1 changed layout completely so should not be overlayed ATM
                                         overlay=None
-                                            if dataset in ('ds000007', 'ds000114', 'ds000119')
+                                            if dataset in ('ds000007', 'ds000114', 'ds000119', 'ds000158')
                                             else versions_overlay_level,  # use major.minor to define overlays
                                         #overlay=None, # use major.minor to define overlays
                                         exclude='(README|changelog).*'),

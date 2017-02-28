@@ -9,6 +9,7 @@
 """ datalad exceptions
 """
 
+import re
 from os import linesep
 
 
@@ -53,6 +54,33 @@ class MissingExternalDependency(RuntimeError):
         return to_str
 
 
+class DeprecatedError(RuntimeError):
+    """To raise whenever a deprecated entirely feature is used"""
+    def __init__(self, new=None, version=None, msg=''):
+        """
+
+        Parameters
+        ----------
+        new : str, optional
+          What new construct to use
+        version : str, optional
+          Since which version is deprecated
+        kwargs
+        """
+        super(DeprecatedError, self).__init__()
+        self.version = version
+        self.new = new
+        self.msg = msg
+
+    def __str__(self):
+        s = self.msg if self.msg else ''
+        if self.version:
+            s += " Deprecated since version %s." % self.version
+        if self.new:
+            s += " Use %s instead." % self.new
+        return s
+
+
 class OutdatedExternalDependency(MissingExternalDependency):
     """External dependency is present but outdated"""
 
@@ -81,7 +109,7 @@ class CommandNotAvailableError(CommandError):
     pass
 
 
-class FileNotInAnnexError(CommandError, IOError):
+class FileNotInAnnexError(IOError, CommandError):
     """Thrown if a file is not under control of git-annex.
     """
     def __init__(self, cmd="", msg="", code=None, filename=""):
@@ -104,6 +132,33 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     pass
 
 
+class GitIgnoreError(CommandError):
+    """Thrown if a path was ignored by a git command due to .gitignore file
+
+    Note, that this might be thrown to indicate what was ignored, while the
+    actual operation was partially successful (regarding paths, not in .gitignore)
+
+    Note/Todo:
+    in case of a directory being ignored, git returns that directory as the
+    ignored path, even if a path within that directory was passed to the command.
+    That means, that in such cases the returned path might not match an item you
+    passed!
+    """
+
+    pattern = \
+        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
+                   flags=re.MULTILINE | re.DOTALL)
+
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
+                 paths=None):
+        super(GitIgnoreError, self).__init__(
+            cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
+        self.paths = paths
+
+    def __str__(self):
+        return self.msg
+
+
 class PathOutsideRepositoryError(Exception):
     """Thrown if a path points outside the repository that was requested to
     deal with that path."""
@@ -115,6 +170,25 @@ class PathOutsideRepositoryError(Exception):
 
     def __str__(self):
         return "path {0} not within repository {1}".format(self.file_, self.repo)
+
+
+class MissingBranchError(Exception):
+    """Thrown if accessing a repository's branch, that is not available"""
+
+    def __init__(self, repo, branch, available_branches=None, msg=None):
+        self.repo = repo
+        self.branch = branch
+        self.branches = available_branches
+        if msg is None:
+            self.msg = "branch '{0}' missing in {1}." \
+                       "".format(self.branch, self.repo)
+            if self.branches:
+                self.msg += " Available branches: {0}".format(self.branches)
+        else:
+            self.msg = msg
+
+    def __str__(self):
+        return self.msg
 
 
 class InsufficientArgumentsError(ValueError):
@@ -174,6 +248,15 @@ class RemoteNotAvailableError(CommandError):
         super_str = super(RemoteNotAvailableError, self).__str__()
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
+
+
+class InvalidInstanceRequestError(RuntimeError):
+    """Thrown if a request to create a (flyweight) instance is invalid"""
+
+    def __init__(self, id_, msg=None):
+        super(InvalidInstanceRequestError, self).__init__(msg)
+        self.id = id_
+        self.msg = msg
 
 
 class IncompleteResultsError(RuntimeError):

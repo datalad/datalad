@@ -93,4 +93,4 @@ def test_direct_install(url, path):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         ds = datalad.api.install(path=path, source=url)
         if not ds.repo.is_crippled_fs():  # otherwise forced direct mode
-            ok_(ds.repo.is_direct_mode())
+            ok_(ds.repo.is_direct_mode(), "Not in direct mode: %s" % ds)

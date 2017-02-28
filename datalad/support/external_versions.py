@@ -13,7 +13,7 @@ from os import linesep
 from six import string_types
 from six import binary_type
 
-from distutils.version import StrictVersion, LooseVersion
+from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -40,7 +40,9 @@ class UnknownVersion:
 # Custom handlers
 #
 from datalad.cmd import Runner
+from datalad.cmd import GitRunner
 _runner = Runner()
+_git_runner = GitRunner()
 
 
 def _get_annex_version():
@@ -52,9 +54,24 @@ def _get_annex_version():
         out, err = _runner.run(['git', 'annex', 'version'])
         return out.split('\n')[0].split(':')[1].strip()
 
-def _get_git_version():
+
+def __get_git_version(runner):
     """Return version of available git"""
-    return _runner.run('git version'.split())[0].split()[2]
+    return runner.run('git version'.split())[0].split()[2]
+
+
+def _get_git_version():
+    """Return version of git we use (might be bundled)"""
+    return __get_git_version(_git_runner)
+
+
+def _get_system_git_version():
+    """Return version of git available system-wide
+
+    Might be different from the one we are using, which might be
+    bundled with git-annex
+    """
+    return __get_git_version(_runner)
 
 
 class ExternalVersions(object):
@@ -63,11 +80,11 @@ class ExternalVersions(object):
     To avoid collision between names of python modules and command line tools,
     prepend names for command line tools with `cmd:`.
 
-    It maintains a dictionary of `distuil.version.StrictVersion`s to make
-    comparisons easy.  If version string doesn't conform the StrictVersion
-    LooseVersion will be used.  If version can't be deduced for the external,
-    `UnknownVersion()` is assigned.  If external is not present (can't be
-    imported, or custom check throws exception), None is returned without
+    It maintains a dictionary of `distuil.version.LooseVersion`s to make
+    comparisons easy. Note that even if version string conform the StrictVersion
+    "standard", LooseVersion will be used.  If version can't be deduced for the
+    external, `UnknownVersion()` is assigned.  If external is not present (can't
+    be imported, or custom check throws exception), None is returned without
     storing it, so later call will re-evaluate fully.
     """
 
@@ -75,7 +92,8 @@ class ExternalVersions(object):
 
     CUSTOM = {
         'cmd:annex': _get_annex_version,
-        'cmd:git': _get_git_version
+        'cmd:git': _get_git_version,
+        'cmd:system-git': _get_system_git_version,
     }
 
     def __init__(self):
@@ -84,26 +102,30 @@ class ExternalVersions(object):
     @classmethod
     def _deduce_version(klass, value):
         version = None
+
+        # see if it is something containing a version
         for attr in ('__version__', 'version'):
             if hasattr(value, attr):
                 version = getattr(value, attr)
                 break
 
-        if isinstance(version, tuple) or isinstance(version, list):
-            #  Generate string representation
-            version = ".".join(str(x) for x in version)
-
-        if version is None and isinstance(value, string_types):
+        # assume that value is the version
+        if version is None:
             version = value
 
+        # do type analysis
+        if isinstance(version, (tuple, list)):
+            #  Generate string representation
+            version = ".".join(str(x) for x in version)
+        elif isinstance(version, binary_type):
+            version = version.decode()
+        elif isinstance(version, string_types):
+            pass
+        else:
+            version = None
+
         if version:
-            if isinstance(version, binary_type):
-                version = version.decode()
-            try:
-                return StrictVersion(version)
-            except ValueError:
-                # let's then go with Loose one
-                return LooseVersion(version)
+            return LooseVersion(version)
         else:
             return klass.UNKNOWN
 
@@ -158,7 +180,7 @@ class ExternalVersions(object):
         """Return dictionary (copy) of versions"""
         return self._versions.copy()
 
-    def dumps(self, indent=False, preamble="Versions:"):
+    def dumps(self, indent=False, preamble="Versions:", query=False):
         """Return listing of versions as a string
 
         Parameters
@@ -168,7 +190,12 @@ class ExternalVersions(object):
           is used). Otherwise returned in a single line
         preamble: str, optional
           What preamble to the listing to use
+        query : bool, optional
+          To query for versions of all "registered" custom externals, so to
+          get those which weren't queried for yet
         """
+        if query:
+            [self[k] for k in self.CUSTOM]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]

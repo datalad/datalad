@@ -24,6 +24,7 @@ from ..auto import AutomagicIO
 from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
+from .utils import chpwd
 
 try:
     import h5py
@@ -81,6 +82,19 @@ def test_proxying_open_testrepobased(repo):
                 content = f.read()
                 eq_(content, TEST_CONTENT)
 
+    annex.drop(fpath2)
+    assert_raises(IOError, open, fpath2)
+
+    # Let's use relative path
+    with chpwd(opj(repo, 'd1')):
+        # Let's use context manager form
+        with AutomagicIO() as aio, \
+                swallow_outputs(), \
+                open(opj('d2', 'test2.dat')) as f:
+                    content = f.read()
+                    eq_(content, TEST_CONTENT)
+
+
 # TODO: RF to allow for quick testing of various scenarios/backends without duplication
 @with_tempfile(mkdir=True)
 def _test_proxying_open(generate_load, verify_load, repo):
@@ -98,7 +112,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
 
     # clone to another repo
     repo2 = repo + "_2"
-    annex2 = AnnexRepo(repo2, repo)
+    annex2 = AnnexRepo.clone(repo, repo2)
     # verify that can't access
     fpath1_2 = fpath1.replace(repo, repo2)
     fpath2_2 = fpath2.replace(repo, repo2)
@@ -167,6 +181,8 @@ def test_proxying_open_regular():
 def test_proxying_open_nibabel():
     if not nib:
         raise SkipTest("No nibabel found")
+    # cannot have numpy if nibabel is available
+    from numpy.testing import assert_array_equal
 
     d = np.empty((3, 3, 3))
     d[1, 1, 1] = 99
@@ -178,6 +194,6 @@ def test_proxying_open_nibabel():
 
     def verify_nii(f, mode="r"):
         ni = nib.load(f)
-        ok_(np.all(ni.get_data() == d))
+        assert_array_equal(ni.get_data(), d)
 
     yield _test_proxying_open, generate_nii, verify_nii

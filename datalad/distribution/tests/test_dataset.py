@@ -11,7 +11,7 @@
 
 import os
 import shutil
-from os.path import join as opj, abspath, normpath
+from os.path import join as opj, abspath, normpath, relpath
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
@@ -20,10 +20,11 @@ from datalad.api import get
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
+from datalad.utils import get_dataset_root
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
@@ -101,6 +102,7 @@ def test_register_sibling(remote, path):
 def test_get_subdatasets(path):
     ds = Dataset(path)
     eq_(ds.get_subdatasets(), ['sub dataset1'])
+    eq_(ds.get_subdatasets(edges=True), [(os.curdir, 'sub dataset1')])
     eq_(ds.get_subdatasets(recursive=True),
         [
             'sub dataset1/sub sub dataset1/subm 1',
@@ -109,6 +111,15 @@ def test_get_subdatasets(path):
             'sub dataset1/subm 1',
             'sub dataset1/subm 2',
             'sub dataset1'
+        ])
+    eq_(ds.get_subdatasets(recursive=True, edges=True),
+        [
+            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
+            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 2'),
+            ('sub dataset1', 'sub dataset1/sub sub dataset1'),
+            ('sub dataset1', 'sub dataset1/subm 1'),
+            ('sub dataset1', 'sub dataset1/subm 2'),
+            (os.curdir, 'sub dataset1'),
         ])
     eq_(ds.get_subdatasets(recursive=True, recursion_limit=0),
         [])
@@ -134,7 +145,7 @@ def test_is_installed(src, path):
     assert_false(ds.is_installed())
 
     # get a clone:
-    AnnexRepo(path, src)
+    AnnexRepo.clone(src, path)
     ok_(ds.is_installed())
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
@@ -262,7 +273,7 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
     # the top of a subdataset belongs to the subdataset
     eq_(ds.get_containing_subdataset(opj("sub", "subsub")).path, subsubds.path)
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub", "subsub")), subsubds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub", "subsub")), subsubds.path)
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("sub").path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
@@ -272,10 +283,10 @@ def test_get_containing_subdataset(path):
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("sub").path, subds.path)
     # # but now GitRepo disagrees...
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub")), ds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
     # and this stays, even if we give the mount point directory back
     os.makedirs(subds.path)
-    eq_(GitRepo.get_toppath(opj(ds.path, "sub")), ds.path)
+    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
     assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
@@ -320,13 +331,32 @@ def test_dataset_id(path):
     assert_equal(len(ds.id), 36)
     # creating a new object for the same path
     # yields the same ID
+
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
     assert_equal(ds.id, newds.id)
     # recreating the dataset does NOT change the id
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
     ds.create(no_annex=True, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
+    AnnexRepo._unique_instances.clear()
     ds.create(force=True)
     assert_equal(ds.id, dsorigid)
     # dataset ID and annex UUID have nothing to do with each other
@@ -334,6 +364,12 @@ def test_dataset_id(path):
     assert_true(ds.repo.uuid != ds.id)
     # creating a new object for the same dataset with an ID on record
     # yields the same ID
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
     assert_equal(ds.id, newds.id)
@@ -341,3 +377,29 @@ def test_dataset_id(path):
     # this is also not the ID
     annexds = Dataset(opj(path, 'scratch')).create()
     assert_true(annexds.id != annexds.repo.uuid)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_Dataset_flyweight(path1, path2):
+
+    ds1 = Dataset(path1)
+    assert_is_instance(ds1, Dataset)
+    # instantiate again:
+    ds2 = Dataset(path1)
+    assert_is_instance(ds2, Dataset)
+    # the very same object:
+    ok_(ds1 is ds2)
+
+    # reference the same via relative path:
+    with chpwd(path1):
+        ds3 = Dataset(relpath(path1, start=path2))
+        ok_(ds1 == ds3)
+        ok_(ds1 is ds3)
+
+    # reference the same via symlink:
+    with chpwd(path2):
+        os.symlink(path1, 'linked')
+        ds3 = Dataset('linked')
+        ok_(ds3 == ds1)
+        ok_(ds3 is not ds1)

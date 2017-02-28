@@ -12,7 +12,9 @@
 from os.path import join as opj, basename
 from datalad.api import install, add_sibling
 from datalad.support.gitrepo import GitRepo
+from datalad.support.exceptions import InsufficientArgumentsError
 
+from datalad.tests.utils import chpwd
 from datalad.tests.utils import with_tempfile, assert_in, with_testrepos
 from datalad.tests.utils import assert_raises
 
@@ -22,6 +24,11 @@ from nose.tools import eq_, ok_
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_add_sibling(origin, repo_path):
+    # insufficient arguments
+    # we need a dataset to work at
+    with chpwd(repo_path):  # not yet there
+        assert_raises(InsufficientArgumentsError,
+                      add_sibling, url="http://some.remo.te/location")
 
     # prepare src
     source = install(repo_path, source=origin, recursive=True)[0]
@@ -29,11 +36,21 @@ def test_add_sibling(origin, repo_path):
     depvar = 'remote.test-remote.datalad-publish-depends'
     source.config.add(depvar, 'stupid', where='local')
 
+    # cannot configure unknown remotes as dependencies
+    assert_raises(
+        ValueError,
+        add_sibling,
+        dataset=source,
+        name="test-remote",
+        url="http://some.remo.te/location",
+        publish_depends=['r1', 'r2'],
+        force=True)
+    # prior config was changed by failed call above
+    eq_(source.config.get(depvar, None), 'stupid')
+
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location",
-                      publish_depends=['r1', 'r2'],
                       force=True)
-    eq_(source.config.get(depvar, None), ('r1', 'r2'))
 
     eq_(res, [basename(source.path)])
     assert_in("test-remote", source.repo.get_remotes())
@@ -48,11 +65,18 @@ def test_add_sibling(origin, repo_path):
     eq_("http://some.remo.te/location",
         source.repo.get_remote_url("test-remote"))
 
+    # add to another remote automagically taking it from the url
+    # and being in the dataset directory
+    with chpwd(source.path):
+        res = add_sibling("http://some.remo.te2/location")
+    eq_(res, [basename(source.path)])
+    assert_in("some.remo.te2", source.repo.get_remotes())
+
     # fail with conflicting url:
     with assert_raises(RuntimeError) as cm:
         add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere")
-    assert_in("""'test-remote' already exists with conflicting URL""",
+    assert_in("""'test-remote' already exists with conflicting settings""",
               str(cm.exception))
 
     # don't fail with conflicting url, when using force:
@@ -68,7 +92,7 @@ def test_add_sibling(origin, repo_path):
         add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere",
                     pushurl="ssh://push.it", force=False)
-    assert_in("""'test-remote' already exists with conflicting URL""",
+    assert_in("""'test-remote' already exists with conflicting settings""",
               str(cm.exception))
 
     # add push url (force):

@@ -29,12 +29,33 @@ from ..interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
+from datalad.interface.common_opts import publish_by_default
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import InsufficientArgumentsError
 
 
-lgr = logging.getLogger('datalad.distribution.add_publication_target')
+lgr = logging.getLogger('datalad.distribution.add_sibling')
+
+
+def _check_deps(repo, deps):
+    """Check if all `deps` remotes are known to the `repo`
+
+    Raises
+    ------
+    ValueError
+      if any of the deps is an unknown remote
+    """
+    unknown_deps = set(assure_list(deps)).difference(repo.get_remotes())
+    if unknown_deps:
+        raise ValueError(
+            'unknown sibling(s) specified as publication dependency: %s'
+            % unknown_deps)
 
 
 class AddSibling(Interface):
@@ -52,7 +73,8 @@ class AddSibling(Interface):
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
-            args=('name',),
+            args=('-s', '--name',),
+            metavar='NAME',
             doc="""name of the sibling to be added.  If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
@@ -88,27 +110,52 @@ class AddSibling(Interface):
                 URLs""",),
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
+        publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
+        inherit=inherit_opt
     )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
-    def __call__(name=None, url=None, dataset=None,
+    def __call__(url=None, name=None, dataset=None,
                  pushurl=None, recursive=False, fetch=False, force=False,
-                 as_common_datasrc=None, publish_depends=None):
+                 as_common_datasrc=None, publish_depends=None,
+                 publish_by_default=None,
+                 annex_wanted=None, annex_group=None, annex_groupwanted=None,
+                 inherit=False):
 
         # TODO: Detect malformed URL and fail?
 
+        # TODO: allow for no url if 'inherit' and deduce from the super ds
+        #       create-sibling already does it -- generalize/use
+        #  Actually we could even inherit/deduce name from the super by checking
+        #  which remote it is actively tracking in current branch... but may be
+        #  would be too much magic
+
         # XXX possibly fail if fetch is False and as_common_datasrc
         # not yet sure if that is an error
-        if name is None or (url is None and pushurl is None):
-            raise ValueError("""insufficient information to add a sibling
-                (needs at least a dataset, a name and an URL).""")
+        if (url is None and pushurl is None):
+            raise InsufficientArgumentsError(
+                """insufficient information to add a sibling
+                (needs at least a dataset, and a URL).""")
         if url is None:
             url = pushurl
+
+        if not name:
+            urlri = RI(url)
+            # use the hostname as default remote name
+            name = urlri.hostname
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
         ds = require_dataset(dataset, check_installed=True,
                              purpose='sibling addition')
         assert(ds.repo is not None)
+
+        _check_deps(ds.repo, publish_depends)
 
         ds_basename = basename(ds.path)
         repos = OrderedDict()
@@ -158,6 +205,8 @@ class AddSibling(Interface):
 
         # define config var name for potential publication dependencies
         depvar = 'remote.{}.datalad-publish-depends'.format(name)
+        # and default pushes
+        dfltvar = "remote.{}.push".format(name)
 
         # collect existing remotes:
         already_existing = list()
@@ -174,17 +223,18 @@ class AddSibling(Interface):
                 existing_pushurl = \
                     repo.get_remote_url(name, push=True)
 
-                if (not existing_url or repoinfo['url'].rstrip('/') != existing_url.rstrip('/')) \
+                if existing_url and \
+                        repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and
                             repoinfo['pushurl'].rstrip('/') !=
-                                    existing_pushurl.rstrip('/')) \
+                            existing_pushurl.rstrip('/')) \
                         or (pushurl and not existing_pushurl) \
                         or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                     conflicting.append(repo_name)
 
         if not force and conflicting:
             raise RuntimeError("Sibling '{0}' already exists with conflicting"
-                               " URL for {1} dataset(s). {2}".format(
+                               " settings for {1} dataset(s). {2}".format(
                                    name, len(conflicting), conflicting))
 
         successfully_added = list()
@@ -192,11 +242,21 @@ class AddSibling(Interface):
             repoinfo = repos[repo_name]
             repo = repoinfo['repo']
             if repo_name in already_existing:
-                if repo_name not in conflicting:
+                if not force and \
+                        repo_name not in conflicting \
+                        and repo.get_remote_url(name) is not None:
                     lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
                     continue
                 # rewrite url
                 repo.set_remote_url(name, repoinfo['url'])
+                fetchvar = 'remote.{}.fetch'.format(name)
+                if fetchvar not in repo.config:
+                    # place default fetch refspec in config
+                    # same as `git remote add` would have added
+                    repo.config.add(
+                        fetchvar,
+                        '+refs/heads/*:refs/remotes/{}/*'.format(name),
+                        where='local')
             else:
                 # add the remote
                 repo.add_remote(name, repoinfo['url'])
@@ -206,6 +266,35 @@ class AddSibling(Interface):
                 # fetch the remote so we are up to date
                 lgr.debug("Fetching sibling %s of %s", name, repo_name)
                 repo.fetch(name)
+
+            if inherit:
+                # Adjust variables which we should inherit
+                delayed_super = _DelayedSuper(repo)
+                publish_depends = AddSibling._inherit_config_var(
+                    delayed_super, depvar, publish_depends)
+                publish_by_default = AddSibling._inherit_config_var(
+                    delayed_super, dfltvar, publish_by_default)
+                # Copy relevant annex settings for the sibling
+                # makes sense only if current AND super are annexes, so it is
+                # kinda a boomer, since then forbids having a super a pure git
+                if isinstance(repo, AnnexRepo) \
+                    and isinstance(delayed_super.repo, AnnexRepo):
+                    if annex_wanted is None:
+                        annex_wanted = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'wanted'
+                        )
+                    if annex_group is None:
+                        # I think it might be worth inheritting group regardless what
+                        # value is
+                        #if annex_wanted in {'groupwanted', 'standard'}:
+                        annex_group = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'group'
+                        )
+                    if annex_wanted == 'groupwanted' and annex_groupwanted is None:
+                        # we better have a value for the expression for that group
+                        annex_groupwanted = AddSibling._inherit_annex_var(
+                            delayed_super, name, 'groupwanted'
+                        )
 
             if publish_depends:
                 if depvar in ds.config:
@@ -217,6 +306,16 @@ class AddSibling(Interface):
                         'Configure additional publication dependency on "%s"',
                         d)
                     ds.config.add(depvar, d, where='local', reload=False)
+                ds.config.reload()
+
+            if publish_by_default:
+                if dfltvar in ds.config:
+                    ds.config.unset(dfltvar, where='local', reload=False)
+                for refspec in assure_list(publish_by_default):
+                    lgr.info(
+                        'Configure additional default publication refspec "%s"',
+                        refspec)
+                    ds.config.add(dfltvar, refspec, 'local')
                 ds.config.reload()
 
             assert isinstance(repo, GitRepo)  # just against silly code
@@ -256,9 +355,37 @@ class AddSibling(Interface):
                             'Not configuring "%s" as a common data source, '
                             'URL protocol is not http or https',
                             name)
+                if annex_wanted:
+                    repo.set_wanted(name, annex_wanted)
+                if annex_group:
+                    repo.set_group(name, annex_group)
+                if annex_groupwanted:
+                    if not annex_group:
+                        raise InsufficientArgumentsError(
+                            "To set groupwanted, you need to provide annex_group option")
+                    repo.set_groupwanted(annex_group, annex_groupwanted)
+
             successfully_added.append(repo_name)
 
         return successfully_added
+
+    @staticmethod
+    def _inherit_annex_var(ds, remote, cfgvar):
+        var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
+        if var:
+            lgr.info("Inherited annex config from %s %s = %s",
+                     ds, cfgvar, var)
+        return var
+
+    @staticmethod
+    def _inherit_config_var(ds, cfgvar, var):
+        if var is None:
+            var = ds.config.get(cfgvar)
+            if var:
+                lgr.info(
+                    'Inherited publish_depends from %s: %s',
+                    ds, var)
+        return var
 
     @staticmethod
     def result_renderer_cmdline(res, args):
@@ -281,3 +408,38 @@ class AddSibling(Interface):
 # TODO: RF nicely, test, make clear how different from urljoin etc
 def _urljoin(base, url):
     return base + url if (base.endswith('/') or url.startswith('/')) else base + '/' + url
+
+
+class _DelayedSuper(object):
+    """A helper to delay deduction on super dataset until needed
+
+    But if asked and not found -- blow up
+    """
+
+    def __init__(self, repo):
+        self._child_dataset = Dataset(repo.path)
+        self._super = None
+
+    def __str__(self):
+        return str(self.super)
+
+    @property
+    def super(self):
+        if self._super is None:
+            # here we must analyze current_ds's super, not the super_ds
+            self._super = self._child_dataset.get_superdataset()
+            if not self._super:
+                raise RuntimeError(
+                    "Cannot determine super dataset for %s, thus "
+                    "cannot inherit anything" % self._child_dataset
+                )
+        return self._super
+
+    # Lean proxies going through .super
+    @property
+    def config(self):
+        return self.super.config
+
+    @property
+    def repo(self):
+        return self.super.repo

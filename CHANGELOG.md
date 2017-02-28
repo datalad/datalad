@@ -9,6 +9,19 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+## 0.4.2 (Nov ??, 2016) -- will be better than ever
+
+???
+
+### Fixes
+
+???
+
+### Enhancements and new features
+
+???
+
+
 ## 0.4.1 (Nov 10, 2016) -- CA release
 
 Requires now GitPython >= 2.1.0

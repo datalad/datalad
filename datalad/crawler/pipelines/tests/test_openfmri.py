@@ -60,7 +60,7 @@ def check_dropall_get(repo):
     ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
     # --force since it would fail to verify presence in case we remove archives keys... TODO
     repo._annex_custom_command([], ["git", "annex", "drop", "--all", "--force"])
-    clean(annex=repo)  # remove possible extracted archives
+    clean(dataset=repo.path)  # remove possible extracted archives
     with assert_raises(AssertionError):
         ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
     repo.get('.')
@@ -400,7 +400,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     from datalad.api import crawl
 
     # make a brand new clone
-    GitRepo(clonedir, outd)
+    GitRepo.clone(outd, clonedir)
 
     def _pipeline(*args, **kwargs):
         """Helper to mock openfmri.pipeline invocation so it looks at our 'server'"""

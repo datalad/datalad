@@ -14,14 +14,20 @@ lgr.log(5, "Importing support.network")
 import calendar
 import email.utils
 import os
+import pickle
 import re
+import time
 import iso8601
 
+from hashlib import md5
 from collections import OrderedDict
 from os.path import abspath, isabs
+from os.path import join as opj
+from os.path import dirname
 
 from six import string_types
 from six import iteritems
+from six.moves.urllib.parse import urlsplit
 from six.moves.urllib.request import Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
@@ -29,8 +35,11 @@ from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
+from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
+from datalad.utils import assure_dir
 from datalad.consts import DATASETS_TOPURL
+from datalad import cfg
 
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
@@ -392,8 +401,8 @@ class RI(object):
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()
             if ri != ri_:
-                lgr.warning("Parsed version of %s %r differs from original %r",
-                            self.__class__.__name__, ri_, ri)
+                lgr.debug("Parsed version of %s %r differs from original %r",
+                          self.__class__.__name__, ri_, ri)
 
     @classmethod
     def _get_blank_fields(cls, **fields):
@@ -704,14 +713,15 @@ class SSHRI(RI, RegexBasedURLMixin):
         # escape path so we have direct representation of the path to work with
         fields['path'] = unescape_ssh_path(fields['path'])
 
-    def as_str(self):
+    def as_str(self, escape=True):
         fields = self.fields  # copy so we could escape symbols
         url_fmt = '{hostname}'
         if fields['username']:
             url_fmt = "{username}@" + url_fmt
         if fields['path']:
             url_fmt += ':{path}'
-        fields['path'] = escape_ssh_path(fields['path'])
+        if escape:
+            fields['path'] = escape_ssh_path(fields['path'])
         return url_fmt.format(**fields)
 
     # TODO:
@@ -856,5 +866,69 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
+
+
+def get_url_cache_filename(url, name=None):
+    """Return a filename where to cache online doc from a url"""
+    if not name:
+        name = "misc"
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), name)
+    doc_fname = opj(
+        cache_dir,
+        '{}-{}.p{}'.format(
+            urlsplit(url).netloc,
+            md5(url.encode('utf-8')).hexdigest(),
+            pickle.HIGHEST_PROTOCOL)
+    )
+    return doc_fname
+
+
+def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
+    """Loader of a document from a url, which caches loaded instance on disk
+
+    Doesn't do anything smart about http headers etc which could provide
+    information for cache/proxy servers for how long to retain etc
+
+    TODO: theoretically it is not network specific at all -- and just a memoize
+    pattern, but may be some time we would make it treat headers etc correctly.
+    And ATM would support any URL we support via providers/downloaders
+
+    Parameters
+    ----------
+    fetcher: callable, optional
+       Function to call with url if needed to be refetched
+    maxage: float, optional
+       Age in days to retain valid for.  <0 - would retain forever.  If None -
+       would consult the config, 0 - would force to reload
+    """
+    doc_fname = get_url_cache_filename(url, name)
+    if maxage is None:
+        maxage = float(cfg.get('datalad.locations.cache-maxage'))
+
+    doc = None
+    if os.path.exists(doc_fname) and maxage != 0:
+
+        fage = (time.time() - os.stat(doc_fname).st_mtime)/(24. * 3600)
+        if maxage < 0 or fage < maxage:
+            try:
+                lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
+                doc = pickle.load(open(doc_fname, 'rb'))
+            except Exception as e:  # it is OK to ignore any error and fall back on the true source
+                lgr.warning(
+                    "cannot load cache from '%s', fall back to download: %s",
+                    doc_fname, exc_str(e))
+
+    if doc is None:
+        if fetcher is None:
+            from datalad.downloaders.providers import Providers
+            providers = Providers.from_config_files()
+            fetcher = providers.fetch
+
+        doc = fetcher(url)
+        assure_dir(dirname(doc_fname))
+        # use pickle to store the entire request result dict
+        pickle.dump(doc, open(doc_fname, 'wb'))
+        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+    return doc
 
 lgr.log(5, "Done importing support.network")

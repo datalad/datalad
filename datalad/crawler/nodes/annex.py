@@ -49,6 +49,7 @@ from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.exceptions import AnnexBatchCommandError
+from ...support.external_versions import external_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -58,6 +59,7 @@ from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
+from datalad.customremotes.base import init_datalad_remote
 from datalad.dochelpers import exc_str
 
 from logging import getLogger
@@ -322,11 +324,7 @@ class Annexificator(object):
                         lgr.info("Enabling existing special remote %s" % remote)
                         self.repo.enable_remote(remote)
                     else:
-                        lgr.info("Initiating special remote %s" % remote)
-                        self.repo.init_remote(
-                            remote,
-                            ['encryption=none', 'type=external', 'autoenable=true',
-                             'externaltype=%s' % remote])
+                        init_datalad_remote(self.repo, remote, autoenable=True)
 
         self.mode = mode
         self.options = options or []
@@ -1346,7 +1344,7 @@ class Annexificator(object):
                         lgr.info("House keeping: gc, repack and clean")
                         # gc and repack
                         self.repo.gc(allow_background=False)
-                        clean(annex=self.repo)
+                        clean(dataset=self.repo.path)
                     else:
                         lgr.info("No git house-keeping performed as instructed by config")
                 else:
@@ -1399,6 +1397,16 @@ class Annexificator(object):
         else:
             lgr.warning("Was asked to remove non-existing path %s", filename)
         yield data
+
+    def drop(self, all=False, force=False):
+        """Drop crawled file or all files if all is specified"""
+        def _drop(data):
+            if not all:
+                raise NotImplementedError("provide handling to drop specific file")
+            else:
+                lgr.debug("Dropping all files in %s", self.repo)
+                self.repo.drop([], options=['--all'] + ['--force'] if force else [])
+        return _drop
 
     def initiate_dataset(self, *args, **kwargs):
         """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator

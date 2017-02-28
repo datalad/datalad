@@ -10,9 +10,12 @@
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from six import itervalues
+from six import add_metaclass
 
 import json
 
+
+@add_metaclass(ABCMeta)
 class URLDB(object):
     """Database collating urls for the content across all datasets
 
@@ -25,8 +28,6 @@ class URLDB(object):
 
     Allow to query by any known checksum
     """
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def __contains__(self, url):
