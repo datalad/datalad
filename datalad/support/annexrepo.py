@@ -2005,14 +2005,20 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Note:
         # As of now, there is no --json option for annex copy. Use it once this
         # changed.
-        std_out, std_err = self._run_annex_command(
+        results = self._run_annex_command_json(
             'copy',
-            annex_options=annex_options,
-            log_stdout=True, log_stderr=not log_online,
-            log_online=log_online, expect_stderr=True)
+            args=annex_options,
+            #log_stdout=True, log_stderr=not log_online,
+            #log_online=log_online, expect_stderr=True
+        )
 
-        return [line.split()[1] for line in std_out.splitlines()
-                if line.startswith('copy ') and line.endswith('ok')]
+        results = list(results)
+        return [
+            e['file'] for e in results
+            if e['success'] and
+               # not e.get('note', '').startswith('checking ')  # so no transfer -- could be empty!
+               e.get('note', '').startswith('to ')  # transfer did happen
+        ]
 
     @property
     def uuid(self):

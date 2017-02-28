@@ -13,6 +13,7 @@
 import logging
 import re
 from os.path import curdir
+from os.path import sep as dirsep
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import filter_unmodified
@@ -62,13 +63,23 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # `refspec`
 
     # Plan:
-    # 1. Check if there is anything to push
-    # 2. If so, process push dependencies
-    # 3. fetch and merge annex branch
-    # 4. Push non-annex branch(es)
-    # 5. copy data
+    # 0. Filter out path to the dataset itself
+    # 1. Check if there is anything to push, and if so
+    #    2. process push dependencies
+    #    3. fetch and merge annex branch
+    #    4. push non-annex branch(es)
+    # 5. copy data to the remote if paths are provided or it wants something generally
 
     published, skipped = [], []
+
+    # pre-treat paths.  If path points to entire dataset, and not its root directory
+    # i.e. dataset or dataset/  vs dataset/. - we do not invoke copying all the data
+    # TODO: move into a helper function and test
+    paths = filter(
+        lambda p: p.rstrip(dirsep) != ds.repo.path.rstrip(dirsep),
+        paths
+    )
+
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
     # no tracking refspec yet?
@@ -99,91 +110,97 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
                       active_branch, remote)
             # we don't have any remote state, need to push for sure
             diff = True
+
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
+        # there could still be paths to be copied
+    else:
+        # publishing of `remote` might depend on publishing other
+        # remote(s) first:
+        # define config var name for potential publication dependencies
+        depvar = 'remote.{}.datalad-publish-depends'.format(remote)
+        for d in assure_list(ds.config.get(depvar, [])):
+            lgr.info("Dependency detected: '%s'" % d)
+            # call this again to take care of the dependency first,
+            # but keep the paths the same, as the goal is to publish those
+            # to the primary remote, and not anything elase to a dependency
+            pblsh, skp = _publish_dataset(
+                ds,
+                d,
+                None,
+                paths,
+                annex_copy_options)
+            published.extend(pblsh)
+            skipped.extend(skp)
+
+        lgr.info("Publishing {0} to {1}".format(ds, remote))
+
+        # in order to be able to use git's config to determine what to push,
+        # we need to annex merge first. Otherwise a git push might be
+        # rejected if involving all matching branches for example.
+        # Once at it, also push the annex branch right here.
+        if isinstance(ds.repo, AnnexRepo):
+            lgr.debug("Obtain remote annex info from '%s'", remote)
+            ds.repo.fetch(remote=remote)
+            ds.repo.merge_annex(remote)
+
+        # Note: git's push.default is 'matching', which doesn't work for first
+        # time publication (a branch, that doesn't exist on remote yet)
+        # But if we want to respect remote.*.push entries, etc. we need to
+        # not pass a specific refspec (like active branch) to `git push`
+        # by default.
+        # hence we amend any existing config on the fly
+        # TODO: what else to push by default?
+        # consider also: --follow-tags, --tags, --atomic
+        # make sure we push
+        things2push = []
+        current_branch = ds.repo.get_active_branch()
+        if current_branch:  # possibly make this conditional on a switch
+            # TODO: this should become it own helper
+            if isinstance(ds.repo, AnnexRepo):
+                # annex could manage this branch
+                if current_branch.startswith('annex/direct') \
+                        and ds.config.getbool('annex', 'direct', default=False):
+                    # this is a "fake" annex direct mode branch
+                    # we want to publish the underlying branch
+                    current_branch = current_branch[12:]
+                match_adjusted = re.match(
+                    'adjusted/(.*)\([a-z]*\)',
+                    current_branch)
+                if match_adjusted:
+                    # adjusted/master(...)
+                    # TODO:  this code is not tested
+                    # see https://codecov.io/gh/datalad/datalad/src/17e67045a088ae0372b38aa4d8d46ecf7c821cb7/datalad/distribution/publish.py#L156
+                    # and thus probably broken -- test me!
+                    current_branch = match_adjusted.group(1)
+            things2push.append(current_branch)
+        if isinstance(ds.repo, AnnexRepo):
+            things2push.append('git-annex')
+        # check that all our magic found valid branches
+        things2push = [t for t in things2push if t in ds.repo.get_branches()]
+        # check that we don't ask to push things that are already configured
+        # -> would cause error
+        # TODO need to find a way to properly do this, when wildcards are used
+        # in the push configuration variable
+        things2push = [t for t in things2push
+                       if t not in ds.config.get('remote.{}.push'.format(remote), [])]
+        # now we know what to push where
+        lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
+        _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
+        if things2push and ds.config.get('remote.{}.push'.format(remote)):
+            # since current state of ideas is to push both auto-detected and the
+            # possibly prescribed, if anything was, let's push again to possibly
+            # push left-over prescribed ones.
+            _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
+
+        published.append(ds)
+
+    if not isinstance(ds.repo, AnnexRepo):
+        # nothing else to do
         return published, skipped
 
-    # publishing of `remote` might depend on publishing other
-    # remote(s) first:
-    # define config var name for potential publication dependencies
-    depvar = 'remote.{}.datalad-publish-depends'.format(remote)
-    for d in assure_list(ds.config.get(depvar, [])):
-        lgr.info("Dependency detected: '%s'" % d)
-        # call this again to take care of the dependency first,
-        # but keep the paths the same, as the goal is to publish those
-        # to the primary remote, and not anything elase to a dependency
-        pblsh, skp = _publish_dataset(
-            ds,
-            d,
-            None,
-            paths,
-            annex_copy_options)
-        published.extend(pblsh)
-        skipped.extend(skp)
-
-    lgr.info("Publishing {0} to {1}".format(ds, remote))
-
-    # in order to be able to use git's config to determine what to push,
-    # we need to annex merge first. Otherwise a git push might be
-    # rejected if involving all matching branches for example.
-    # Once at it, also push the annex branch right here.
-    if isinstance(ds.repo, AnnexRepo):
-        lgr.debug("Obtain remote annex info from '%s'", remote)
-        ds.repo.fetch(remote=remote)
-        ds.repo.merge_annex(remote)
-
-    # Note: git's push.default is 'matching', which doesn't work for first
-    # time publication (a branch, that doesn't exist on remote yet)
-    # But if we want to respect remote.*.push entries, etc. we need to
-    # not pass a specific refspec (like active branch) to `git push`
-    # by default.
-    # hence we amend any existing config on the fly
-    # TODO: what else to push by default?
-    # consider also: --follow-tags, --tags, --atomic
-    # make sure we push
-    things2push = []
-    current_branch = ds.repo.get_active_branch()
-    if current_branch:  # possibly make this conditional on a switch
-        # TODO: this should become it own helper
-        if isinstance(ds.repo, AnnexRepo):
-            # annex could manage this branch
-            if current_branch.startswith('annex/direct') \
-                    and ds.config.getbool('annex', 'direct', default=False):
-                # this is a "fake" annex direct mode branch
-                # we want to publish the underlying branch
-                current_branch = current_branch[12:]
-            match_adjusted = re.match(
-                'adjusted/(.*)\([a-z]*\)',
-                current_branch)
-            if match_adjusted:
-                # adjusted/master(...)
-                # TODO:  this code is not tested
-                # see https://codecov.io/gh/datalad/datalad/src/17e67045a088ae0372b38aa4d8d46ecf7c821cb7/datalad/distribution/publish.py#L156
-                # and thus probably broken -- test me!
-                current_branch = match_adjusted.group(1)
-        things2push.append(current_branch)
-    if isinstance(ds.repo, AnnexRepo):
-        things2push.append('git-annex')
-    # check that all our magic found valid branches
-    things2push = [t for t in things2push if t in ds.repo.get_branches()]
-    # check that we don't ask to push things that are already configured
-    # -> would cause error
-    # TODO need to find a way to properly do this, when wildcards are used
-    # in the push configuration variable
-    things2push = [t for t in things2push
-                   if t not in ds.config.get('remote.{}.push'.format(remote), [])]
-    # now we know what to push where
-    lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-    _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
-    if things2push and ds.config.get('remote.{}.push'.format(remote)):
-        # since current state of ideas is to push both auto-detected and the
-        # possibly prescribed, if anything was, let's push again to possibly
-        # push left-over prescribed ones.
-        _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
-
-    published.append(ds)
-
-    if (paths or annex_copy_opts) and \
+    remote_wanted = ds.repo.get_wanted(remote)
+    if (paths or annex_copy_options or remote_wanted) and \
             isinstance(ds.repo, AnnexRepo) and not \
             ds.config.getbool(
                 'remote.{}'.format(remote),
@@ -197,10 +214,12 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         #       ones.
         pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
         annexurl = ds.config.get('remote.{}.annexurl'.format(remote), None)
+        annex_copy_options = ''
         if pushurl and not annexurl:
-            annex_copy_options = '{}{}'.format(
-                annex_copy_options if annex_copy_options else '',
-                ' -c "remote.{}.annexurl={}"'.format(remote, pushurl))
+            annex_copy_options += ' -c "remote.{}.annexurl={}"'.format(remote, pushurl)
+        if not paths and remote_wanted:
+            lgr.debug("Invoking copy --auto")
+            annex_copy_options += ' --auto'
         pblshd = ds.repo.copy_to(files=paths,
                                  remote=remote,
                                  options=annex_copy_options)

@@ -12,6 +12,7 @@
 import logging
 from os.path import join as opj
 from os.path import exists
+from os.path import lexists
 from ..dataset import Dataset
 from datalad.api import publish, install
 from datalad.dochelpers import exc_str
@@ -250,10 +251,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # collect result paths:
     result_paths = []
     for item in res[0]:
-        if isinstance(item, Dataset):
-            result_paths.append(item.path)
-        else:
-            result_paths.append(item)
+        result_paths.append(item.path if isinstance(item, Dataset) else item)
+
     # only the subdatasets, targets are plain git repos, hence
     # no file content is pushed, all content in super was pushed
     # before
@@ -286,6 +285,8 @@ def test_publish_depends(
     # two remote sibling on two "different" hosts
     source.create_sibling(
         'ssh://localhost' + target1_path,
+        annex_wanted='standard',
+        annex_group='backup',
         name='target1')
     # fails with unknown remote
     assert_raises(
@@ -295,11 +296,13 @@ def test_publish_depends(
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
         publish_depends='bogus')
-    # for reals
+    # for real
     source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
+        annex_wanted='standard',
+        annex_group='backup',
         publish_depends='target1')
     # wiped out previous dependencies
     eq_(source.config.get(depvar, None), 'target1')
@@ -315,13 +318,21 @@ def test_publish_depends(
     # only the source has the probe
     ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
     for p in (target1_path, target2_path, target3_path):
-        assert_false(exists(opj(p, 'probe1')))
+        assert_false(lexists(opj(p, 'probe1')))
     # publish to a standalone remote
     source.publish(to='target3')
-    # no others are affected
+    ok_(lexists(opj(target3_path, 'probe1')))
+    # but it has no data copied
+    ok_(not exists(opj(target3_path, 'probe1')))
+
+    # but if we publish specifying its path, it gets copied
+    source.publish('probe1', to='target3')
     ok_file_has_content(opj(target3_path, 'probe1'), 'probe1')
+
+    # no others are affected in either case
     for p in (target1_path, target2_path):
-        assert_false(exists(opj(p, 'probe1')))
+        assert_false(lexists(opj(p, 'probe1')))
+
     # publish to all remaining, but via a dependency
     source.publish(to='target2')
     for p in (target1_path, target2_path, target3_path):

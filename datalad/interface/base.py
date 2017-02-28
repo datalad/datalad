@@ -361,7 +361,6 @@ class Interface(object):
         """
         from .utils import get_normalized_path_arguments
         from .utils import get_paths_by_dataset
-
         # upfront check prior any resolution attempt to avoid disaster
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
