@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import inspect
 import logging
 from os import curdir
 from os import pardir
@@ -26,6 +27,8 @@ from os.path import sep
 from os.path import split as psplit
 from itertools import chain
 
+import json
+
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
@@ -38,8 +41,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
+from datalad import cfg as dlcfg
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -770,13 +773,39 @@ def eval_results(func):
     """
     from inspect import isgenerator
 
+    render_mode = dlcfg.get('datalad.api.result-render-mode', None)
+    want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
+
     @better_wraps(func)
-    def new_func(*args, **kwargs):
-        # rudimentary wrapper to harvest generators
+    def generator_func(*args, **kwargs):
+        # obtain results
         results = func(*args, **kwargs)
-        if isgenerator(results):
-            return list(results)
-        else:
+        # flag whether to raise an exception
+        # TODO actually compose a meaningful exception
+        raise_exception = False
+        # inspect and render
+        for res in results:
+            if render_mode == 'json':
+                print(json.dumps(res))
+            # looks for error status, and report at the end via
+            # an exception
+            if res['status'] in ('impossible', 'error'):
+                raise_exception = True
+            yield res
+
+        if raise_exception:
+            # stupid catch all message <- tailor TODO
+            raise RuntimeError(
+                "Something didn't work, check previous messages")
+
+    if want_generator:
+        return generator_func
+    else:
+        @better_wraps(generator_func)
+        def return_func(*args, **kwargs):
+            results = generator_func(*args, **kwargs)
+            if inspect.isgenerator(results):
+                results = list(results)
             return results
 
-    return new_func
+        return return_func

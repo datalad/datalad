@@ -105,7 +105,7 @@ class Update(Interface):
             # prepare return value
             res = {
                 'action': 'update',
-                'path': path,
+                'path': ds_path,
                 'type': 'dataset',
                 'status': None,
             }
@@ -118,7 +118,7 @@ class Update(Interface):
             if not remotes:
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
-                res['status'] = 'skipped'
+                res['status'] = 'notneeded'
                 yield res
                 continue
             if not sibling:
@@ -127,9 +127,10 @@ class Update(Interface):
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
+                # TODO issue such warning in result eval
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
                             sibling_, repo.path)
-                res['status'] = 'skipped'
+                res['status'] = 'impossible'
                 yield res
                 continue
             if not sibling_ and len(remotes) == 1:
@@ -137,7 +138,7 @@ class Update(Interface):
                 sibling_ = remotes[0]
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
-                res['status'] = 'skipped'
+                res['status'] = 'impossible'
                 res['error'] = (
                     'NotImplementedError',
                     "Multiple siblings, please specify from which to update.")
@@ -164,7 +165,7 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
         prune=True)  # prune to not accumulate a mess over time
 
     if not merge:
-        dsres['status'] = 'availupdate'
+        dsres['status'] = 'ok'
         return dsres, file_results
 
     # reevaluate repo instance, for it might be an annex now:
@@ -205,5 +206,5 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
             else:
                 # no marriage yet, be specific
                 repo.pull(remote=remote, refspec=active_branch)
-    dsres['status'] = 'updated'
+    dsres['status'] = 'ok'
     return dsres, file_results
