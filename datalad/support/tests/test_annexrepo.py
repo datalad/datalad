@@ -1134,7 +1134,8 @@ def test_annex_copy_to(origin, clone):
     repo.get("test-annex.dat")
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
-    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
+    # and will not be copied again since it was already copied
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
