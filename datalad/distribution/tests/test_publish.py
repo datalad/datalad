@@ -41,7 +41,8 @@ def test_invalid_call(origin):
     # known, but not present
     assert_raises(ValueError, publish, opj(ds.path, 'subm 1'))
     # --since without dataset is not supported
-    assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # yoh: now supported since why not?
 
 
 @with_tempfile
@@ -184,9 +185,14 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     res_ = publish(dataset=source, recursive=True)
     eq_(set(r.path for r in res_[0]), set())
 
-    # still nothing gets pushed, because orgin is up to date
+    # still nothing gets pushed, because origin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
     eq_(set(r.path for r in res_[0]), set([]))
+
+    # and we should not fail if we run it from within the dataset
+    with chpwd(source.path):
+        res_ = publish(recursive=True, since='HEAD^')
+        eq_(set(r.path for r in res_[0]), set([]))
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:
