@@ -327,11 +327,6 @@ class Publish(Interface):
             annex_opts=None,
             annex_copy_opts=None):
 
-        if since and not dataset:
-            raise InsufficientArgumentsError(
-                'Modification detection (--since) without a base dataset '
-                'is not supported')
-
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = dataset.path if isinstance(dataset, Dataset) else dataset
@@ -339,6 +334,11 @@ class Publish(Interface):
             # try to find a dataset in PWD
             dataset = require_dataset(
                 None, check_installed=True, purpose='publishing')
+
+        if since and not dataset:
+            raise InsufficientArgumentsError(
+                'Modification detection (--since) without a base dataset '
+                'is not supported')
 
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
