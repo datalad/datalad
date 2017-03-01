@@ -76,7 +76,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # i.e. dataset or dataset/  vs dataset/. - we do not invoke copying all the data
     # TODO: move into a helper function and test
     paths = filter(
-        lambda p: p.rstrip(dirsep) != ds.repo.path.rstrip(dirsep),
+        lambda p: p.rstrip(dirsep) != ds.path.rstrip(dirsep),
         paths
     )
 
@@ -245,6 +245,7 @@ class Publish(Interface):
     specified reference dataset. Change sets are also evaluated recursively, i.e.
     only those subdatasets are published where a change was recorded that is
     reflected in to current state of the top-level reference dataset.
+    See "since" option for more information.
 
     Only publication of saved changes is supported. Any unsaved changes in a
     dataset (hierarchy) have to be saved before publication.
@@ -297,7 +298,12 @@ class Publish(Interface):
                 "file handle is published with its data, this implicitly means "
                 "to also publish the (sub)dataset it belongs to. '.' as a path "
                 "is treated in a special way in the sense, that it is passed "
-                "to subdatasets in case `recursive` is also given.",
+                "to subdatasets in case `recursive` is also given.  If path "
+                "points to the root directory of a dataset, and does not end "
+                "with '.', dataset's content is published according to the "
+                "\"wanted\" setting of the annex, and by default would not copy "
+                "any of its content to the remote sibling."
+            ,
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
         recursive=recursion_flag,
