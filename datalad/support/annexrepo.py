@@ -2011,8 +2011,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             #log_stdout=True, log_stderr=not log_online,
             #log_online=log_online, expect_stderr=True
         )
-
         results = list(results)
+        # check if any transfer failed since then we should just raise an Exception
+        # for now to guarantee consistent behavior with non--json output
+        # see https://github.com/datalad/datalad/pull/1349#discussion_r103639456
+        from operator import itemgetter
+        failed_copies = [e['file'] for e in results if not e['success']]
+        if failed_copies:
+            raise CommandError("Failed to copy %d file(s): %s"
+                               % (len(failed_copies), ', '.join(failed_copies)))
         return [
             e['file'] for e in results
             if e['success'] and
