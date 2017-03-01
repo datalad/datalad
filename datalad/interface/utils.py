@@ -773,7 +773,6 @@ def eval_results(func):
     """
     from inspect import isgenerator
 
-    render_mode = dlcfg.get('datalad.api.result-render-mode', None)
     want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
 
     @better_wraps(func)
@@ -784,6 +783,7 @@ def eval_results(func):
         # TODO actually compose a meaningful exception
         raise_exception = False
         # inspect and render
+        render_mode = dlcfg.get('datalad.api.result-render-mode', None)
         for res in results:
             if render_mode == 'json':
                 print(json.dumps(res))

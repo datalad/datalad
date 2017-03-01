@@ -24,6 +24,13 @@ import os
 import inspect
 
 import datalad
+# we want all commands to yield generators that are executed
+# here in main if possible, so we can tune output knowing that
+# we are talking to the parent shell
+# XXX this assumes that this file is only ever imported as an entrypoint
+# for the cmdline API. This is true right now (except for the associated
+# tests)
+datalad.cfg.overrides['datalad.api.return-generator'] = True
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -107,6 +114,10 @@ def setup_parser(
         help="""configuration variable setting. Overrides any configuration
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
+    parser.add_argument(
+        '--output-format', default='json', dest='common_output_format',
+        choices=['json'],
+        help="""select format for returned command results""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -252,6 +263,13 @@ def main(args=None):
 
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
+
+    # configure rendering of return values
+    datalad.cfg.overrides['datalad.api.result-render-mode'] = \
+        cmdlineargs.common_output_format
+
+    # enable overrides
+    datalad.cfg.reload()
 
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([
