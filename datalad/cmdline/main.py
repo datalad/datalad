@@ -101,6 +101,11 @@ def setup_parser(
         parser.add_argument(
             '--idbg', action='store_true', dest='common_idebug',
             help="enter IPython debugger when uncaught exception happens")
+    parser.add_argument(
+        '-c', action='append', dest='cfg_overrides', metavar='KEY=VALUE',
+        help="""configuration variable setting. Overrides any configuration
+        read from a file, but is potentially overridden itself by configuration
+        variables in the process environment.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -246,6 +251,12 @@ def main(args=None):
 
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
+
+    if cmdlineargs.cfg_overrides is not None:
+        overrides = dict([
+            (o.split('=')[0], '='.join(o.split('=')[1:]))
+            for o in cmdlineargs.cfg_overrides])
+        datalad.cfg.overrides.update(overrides)
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
