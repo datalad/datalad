@@ -68,6 +68,7 @@ from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
+from .exceptions import IncompleteResultsError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -2018,8 +2019,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         from operator import itemgetter
         failed_copies = [e['file'] for e in results if not e['success']]
         if failed_copies:
-            raise CommandError("Failed to copy %d file(s): %s"
-                               % (len(failed_copies), ', '.join(failed_copies)))
+            good_copies = [e['file'] for e in results if e['success']]
+            raise IncompleteResultsError(
+                results=good_copies, failed=failed_copies,
+                msg="Failed to copy %d file(s)" % len(failed_copies))
         return [
             e['file'] for e in results
             if e['success'] and

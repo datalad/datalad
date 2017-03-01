@@ -86,6 +86,7 @@ from datalad.support.exceptions import OutdatedExternalDependency
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.exceptions import IncompleteResultsError
 
 from datalad.support.gitrepo import GitRepo
 
@@ -1136,6 +1137,25 @@ def test_annex_copy_to(origin, clone):
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
     # and will not be copied again since it was already copied
     eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
+
+    # now let's test that we are correctly raising the exception in case if
+    # git-annex execution fails
+    orig_run = repo._run_annex_command
+    def fail_to_copy(command, **kwargs):
+        if command == 'copy':
+            raise CommandError(
+                "Failed to run ...",
+                stdout='{"command":"copy","note":"rsync failed ...", "success":false, '
+                    '"key":"akey", "file":"test-annex.dat"}',
+                stderr='irrelevant?')
+        else:
+            return orig_run(command, **kwargs)
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy):
+        with assert_raises(IncompleteResultsError) as cme:
+            repo.copy_to(["test-annex.dat"], "target")
+            eq_(cme.results, [])
+            eq_(cme.failed, ['test-annex.dat'])
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
