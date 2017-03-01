@@ -347,8 +347,8 @@ class Publish(Interface):
             recursion_limit=recursion_limit)
         if unavailable_paths:
             raise ValueError(
-                'cannot publish content that is not available locally: %s',
-                unavailable_paths)
+                'cannot publish content that is not available locally: %s'
+                % ', '.join(unavailable_paths))
 
         # here is the plan
         # 1. figure out remote to publish to
