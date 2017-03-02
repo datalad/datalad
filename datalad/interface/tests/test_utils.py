@@ -349,14 +349,17 @@ class Test_Utils(Interface):
 
 def test_eval_results():
 
-    from datalad.utils import swallow_logs
     import logging
-    # test eval_results is able to determine the call, a method of which it is
-    # decorating:
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        Dataset('/does/not/matter').fake_command(3)
-        cml.assert_logged("Determined class of decorated function: {}"
-                          "".format(Test_Utils().__class__), level='DEBUG')
+
+    lgr = logging.getLogger('datalad.interface.tests.test_utils')
+    lgr.warning("START TEST")
+
+
+
+    Test_Utils().__call__(1)
+    Test_Utils().__call__(1)
+    Test_Utils().__call__(1)
+    Test_Utils().__call__(1)
 
     # test docs
     doc1 = Dataset.fake_command.__doc__
@@ -365,6 +368,15 @@ def test_eval_results():
     assert_in("TestUtil's fake command", doc1)
     assert_in("Parameters", doc1)
     assert_in("It's a number", doc1)
+
+    from datalad.utils import swallow_logs
+
+    # test eval_results is able to determine the call, a method of which it is
+    # decorating:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Dataset('/does/not/matter').fake_command(3)
+        cml.assert_logged("Determined class of decorated function: {}"
+                          "".format(Test_Utils().__class__), level='DEBUG')
 
     # test results:
     result = Test_Utils().__call__(2)

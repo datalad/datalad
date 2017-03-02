@@ -45,6 +45,9 @@ from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
 
 from .base import Interface
+from .base import update_docstring_with_parameters
+from .base import alter_interface_docs_for_api
+
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -834,38 +837,84 @@ def eval_results(func):
     return new_func(func)
 
 
-from .base import update_docstring_with_parameters, alter_interface_docs_for_api
+def build_doc(func):
+    """Decorator to build docstrings for datalad commands
+    """
+
+    lgr.warning("ENTER")
+
+    # This is a bit tricky. If we do the docstring building in the decorator's
+    # part that's executed when decorated function is called, we do it over and
+    # over again and the docstring is available after first execution only.
+    # If we do it in the part that's executed when the decorator is applied, the
+    # class we need to read from is being build in this very moment and not
+    # available from the module yet.
+
+    # Therefore: Make the actual wrapper `builder` only do something if there's
+    # no docstring yet and in that case, don't do anything else. Otherwise let
+    # it be an "empty" pass-through decorator. Then, after defining it, call it
+    # once and only afterwards return the thing to be called from the outside in
+    # the future.
+    # TODO: Almost, but doesn't work entirely as intended
 
 
-@wrapt.decorator
-def build_doc(wrapped, instance, args, kwargs):
+    @wrapt.decorator
+    def builder(wrapped, instance, args, kwargs):
 
-    if PY2:
+        lgr.warning("ENTER builder")
 
-        mod = sys.modules[wrapped.__module__]
-        command_classes_in_mod = \
-            [i for i in mod.__dict__
-             if type(mod.__dict__[i]) == type and
-             issubclass(mod.__dict__[i], Interface)]
-        command_class = [i for i in command_classes_in_mod
-                         if i.lower() == wrapped.__module__.split('.')[-1]]
-        assert(len(command_class) == 1)
-        class_ = mod.__dict__[command_class[0]]
+        if wrapped.__doc__ is None:
+            # we need to build the docstring
 
-    else:
-        command_class = wrapped.__qualname__.split('.')[-2]
-        mod = sys.modules[wrapped.__module__]
-        class_ = mod.__dict__[command_class]
+            # determine class, the __call__ method of which we are decorating:
+            # Ben: Note, that this is a bit dirty in PY2 and imposes
+            # restrictions on when and how to use eval_results as well as on how
+            # to name a command's module and class. As of now, we are inline
+            # with these requirements as far as I'm aware.
+            mod = sys.modules[func.__module__]
+            if PY2:
+                # we rely on:
+                # - decorated function is method of a subclass of Interface
+                # - the name of the class matches the last part of the module's
+                #   name if converted to lower
+                # for example:
+                # ..../where/ever/mycommand.py:
+                # class MyCommand(Interface):
+                #     @eval_results
+                #     def __call__(..)
+                command_class_names = \
+                    [i for i in mod.__dict__
+                     if type(mod.__dict__[i]) == type and
+                     issubclass(mod.__dict__[i], Interface) and
+                     i.lower() == func.__module__.split('.')[-1]]
+                assert(len(command_class_names) == 1)
+                command_class_name = command_class_names[0]
+            else:
+                command_class_name = func.__qualname__.split('.')[-2]
+            _func_class = mod.__dict__[command_class_name]
+            lgr.debug("Determined class of decorated function: %s", _func_class)
 
-        lgr.warning("DEBUG build_doc: class name: %s", command_class)
-        lgr.warning("DEBUG build_doc: class: %s", class_)
+            lgr.warning("Building doc ...")
 
-    spec = getattr(class_, '_params_', dict())
-    update_docstring_with_parameters(class_.__call__, # wrapped?
-                                     spec,
-                prefix=alter_interface_docs_for_api(class_.__doc__),
-                suffix=alter_interface_docs_for_api(
-                    class_.__call__.__doc__)
-            )
+            spec = getattr(_func_class, '_params_', dict())
+            update_docstring_with_parameters(_func_class.__call__, # wrapped?
+                                             spec,
+                        prefix=alter_interface_docs_for_api(_func_class.__doc__),
+                        suffix=alter_interface_docs_for_api(
+                            _func_class.__call__.__doc__)
+                    )
+            # plain return. this should happen only once and is intentionally
+            # invoked
+            return
 
-    return wrapped(*args, **kwargs)
+        return wrapped(*args, **kwargs)
+
+    lgr.warning("EXIT")
+
+    # actually build the docs
+    # TODO: builder isn't actually executed during "compile time", while the log
+    # above is!
+    builder(func)
+
+    # and return the now-empty wrapper:
+    return builder(func)
