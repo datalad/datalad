@@ -766,6 +766,8 @@ def filter_unmodified(content_by_ds, refds, since):
 
 
 import wrapt
+import sys
+from six import PY2
 
 def eval_results(func):
     """Decorator providing functionality to evaluate return values of datalad
@@ -776,7 +778,6 @@ def eval_results(func):
     @wrapt.decorator
     def new_func(wrapped, instance, args, kwargs):
 
-        from six import PY2
 
         # determine class, the __call__ method of which we are decorating:
         # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
@@ -784,7 +785,7 @@ def eval_results(func):
         # module and class. As of now, we are inline with these requirements as far
         # as I'm aware.
         if PY2:
-            import sys
+
             mod = sys.modules[func.__module__]
             command_classes_in_mod = \
                 [i for i in mod.__dict__
@@ -796,14 +797,13 @@ def eval_results(func):
             class_ = mod.__dict__[command_class[0]]
         else:
             command_class = func.__qualname__.split('.')[-2]
-            import sys
             mod = sys.modules[func.__module__]
             class_ = mod.__dict__[command_class]
 
-        lgr.warning("DEBUG: func: %s", func)
-        lgr.warning("DEBUG: func.__module__: %s", func.__module__)
-        lgr.warning("DEBUG: class name: %s", command_class)
-        lgr.warning("DEBUG: class: %s", class_)
+        lgr.warning("DEBUG eval_results: func: %s", func)
+        lgr.warning("DEBUG eval_results: func.__module__: %s", func.__module__)
+        lgr.warning("DEBUG eval_results: class name: %s", command_class)
+        lgr.warning("DEBUG eval_results: class: %s", class_)
 
         def ext_func(*_args, **_kwargs):
             _eval_arg1 = _kwargs.pop('_eval_arg1', "default1")
@@ -824,13 +824,38 @@ def eval_results(func):
     return new_func(func)
 
 
-# @wrapt.decorator
-# def build_doc(wrapped, instance, args, kwargs):
-#
-#     lgr.warning("wrapped: %s", wrapped)
-#     lgr.warning("instance: %s", instance)
-#     lgr.warning("args: %s", args)
-#     lgr.warning("kwargs: %s", kwargs)
-#     lgr.warning("wrapped.__module__: %s", wrapped.__module__)
-#
-#     return wrapped(*args, **kwargs)
+from .base import update_docstring_with_parameters, alter_interface_docs_for_api
+
+
+@wrapt.decorator
+def build_doc(wrapped, instance, args, kwargs):
+
+    if PY2:
+
+        mod = sys.modules[wrapped.__module__]
+        command_classes_in_mod = \
+            [i for i in mod.__dict__
+             if type(mod.__dict__[i]) == type and
+             issubclass(mod.__dict__[i], Interface)]
+        command_class = [i for i in command_classes_in_mod
+                         if i.lower() == wrapped.__module__.split('.')[-1]]
+        assert(len(command_class) == 1)
+        class_ = mod.__dict__[command_class[0]]
+
+    else:
+        command_class = wrapped.__qualname__.split('.')[-2]
+        mod = sys.modules[wrapped.__module__]
+        class_ = mod.__dict__[command_class]
+
+        lgr.warning("DEBUG build_doc: class name: %s", command_class)
+        lgr.warning("DEBUG build_doc: class: %s", class_)
+
+    spec = getattr(class_, '_params_', dict())
+    update_docstring_with_parameters(class_.__call__, # wrapped?
+                                     spec,
+                prefix=alter_interface_docs_for_api(class_.__doc__),
+                suffix=alter_interface_docs_for_api(
+                    class_.__call__.__doc__)
+            )
+
+    return wrapped(*args, **kwargs)

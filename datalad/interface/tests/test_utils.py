@@ -315,14 +315,32 @@ def test_filter_unmodified(path):
 
 
 from ..base import Interface
-from datalad.distribution.dataset import datasetmethod
-from datalad.interface.utils import eval_results
+from datalad.distribution.dataset import datasetmethod, EnsureDataset
+from datalad.interface.utils import eval_results, build_doc
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.param import Parameter
+
 
 class Test_Utils(Interface):
+    """TestUtil's fake command"""
+
+    _params_ = dict(
+        number=Parameter(
+            args=("-n", "--number",),
+            doc="""It's a number""",
+            constraints=EnsureStr() | EnsureNone()),
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc=""""specify the dataset to update.  If
+            no dataset is given, an attempt is made to identify the dataset
+            based on the input and/or the current working directory""",
+            constraints=EnsureDataset() | EnsureNone()),)
 
     @staticmethod
     @datasetmethod(name='fake_command')
     @eval_results
+    @build_doc
     def __call__(number, dataset=None):
 
         for i in range(number):
@@ -331,19 +349,23 @@ class Test_Utils(Interface):
 
 def test_eval_results():
 
-    from inspect import getargspec
-
-
     result = Dataset('/does/not/matter').fake_command(3)
-    # result = Test_Utils().__call__(2)
 
+    # test docs
+    doc1 = Dataset.fake_command.__doc__
+    doc2 = Test_Utils().__call__.__doc__
+    assert_equal(doc1, doc2)
+    assert_in("TestUtil's fake command", doc1)
+    assert_in("Parameters", doc1)
+    assert_in("It's a number", doc1)
 
-    # test results:
+    # # test results:
     # result = Test_Utils().__call__(2)
     # assert_equal(result, [0, 1])
     # result = Dataset('/does/not/matter').fake_command(3)
     # assert_equal(result, [0, 1, 2])
     # # test signature:
+    # from inspect import getargspec
     # assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     # assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
     #
