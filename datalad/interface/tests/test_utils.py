@@ -320,19 +320,45 @@ def test_eval_results():
     from datalad.interface.utils import eval_results
     from inspect import getargspec
 
+    class Switcher(object):
+
+        def __init__(self, value):
+            self._value = value
+
+        def __call__(self, value=None):
+            if value is not None:
+                self._value = value
+            else:
+                return self._value
+
     class FakeCommand(Interface):
 
+        switch = Switcher(False)
+        
         @staticmethod
         @datasetmethod(name='fake_command')
-        @eval_results
+        @eval_results(switch)
         def __call__(number, dataset=None):
 
             for i in range(number):
                 yield i
 
+    # test results:
     result = FakeCommand().__call__(2)
     assert_equal(result, [0, 1])
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(result, [0, 1, 2])
+    # test signature:
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(FakeCommand.__call__)[0], ['number', 'dataset'])
+    # test switch:
+    from datalad.utils import swallow_logs
+    import logging
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        FakeCommand().__call__(2)
+        cml.assert_logged("switch OFF", level='DEBUG')
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        FakeCommand.switch(True)
+        FakeCommand().__call__(2)
+        cml.assert_logged("switch ON", level='DEBUG')
+
