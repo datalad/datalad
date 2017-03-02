@@ -110,6 +110,7 @@ class Update(Interface):
                 'type': 'dataset',
                 'status': None,
                 'logger': lgr,
+                'refds': dataset.path if isinstance(dataset, Dataset) else dataset,
             }
             ds = Dataset(ds_path)
             repo = ds.repo

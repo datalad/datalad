@@ -784,7 +784,7 @@ def eval_results(func):
 
     Result rendering/output can be triggered via the
     `datalad.api.result-render-mode` configuration variable. Supported modes
-    are: 'json' (one object/dict per line, like git-annex), 'human' (TODO,
+    are: 'json' (one object/dict per line, like git-annex), 'simple' (TODO,
     tailored output formating provided by each command class, if any).
 
     Error detection works by inspecting the `status` item of all result
@@ -838,6 +838,12 @@ def eval_results(func):
                 print(json.dumps(
                     {k: v for k, v in res.items()
                      if k not in ('message', 'logger')}))
+            elif render_mode == 'simple':
+                # simple output "STATUS: PATH"
+                # where PATH is relative to a reference dataset, if one is reported in the result
+                print('{status}: {path}'.format(
+                    status=res['status'],
+                    path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
             ## error handling
             # looks for error status, and report at the end via
             # an exception

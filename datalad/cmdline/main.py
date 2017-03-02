@@ -115,8 +115,8 @@ def setup_parser(
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
     parser.add_argument(
-        '--output-format', default='json', dest='common_output_format',
-        choices=['json'],
+        '--output-format', default='simple', dest='common_output_format',
+        choices=['simple', 'json'],
         help="""select format for returned command results""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
