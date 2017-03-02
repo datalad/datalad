@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import wrapt
+import sys
 import logging
 from os import curdir
 from os import pardir
@@ -25,6 +27,7 @@ from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
+from six import PY2
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
@@ -765,9 +768,14 @@ def filter_unmodified(content_by_ds, refds, since):
     return keep
 
 
-import wrapt
-import sys
-from six import PY2
+# define parameters to be used by eval_results to tune behavior
+# key => value corresponds to <parameter_name> => (<default value>, <docstring>)
+# Note: This is done outside eval_results in order to be available when building
+# docstrings for the decorated functions
+eval_params = {'_eval_arg1': ("default1", "first parameter"),
+               '_eval_arg2': ("default2", "second parameter")
+               }
+
 
 def eval_results(func):
     """Decorator providing functionality to evaluate return values of datalad
@@ -778,40 +786,42 @@ def eval_results(func):
     @wrapt.decorator
     def new_func(wrapped, instance, args, kwargs):
 
-
         # determine class, the __call__ method of which we are decorating:
         # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
         # when and how to use eval_results as well as on how to name a command's
-        # module and class. As of now, we are inline with these requirements as far
-        # as I'm aware.
+        # module and class. As of now, we are inline with these requirements as
+        # far as I'm aware.
+        mod = sys.modules[wrapped.__module__]
         if PY2:
-
-            mod = sys.modules[func.__module__]
-            command_classes_in_mod = \
+            # we rely on:
+            # - decorated function is method of a subclass of Interface
+            # - the name of the class matches the last part of the module's name
+            #   if converted to lower
+            # for example:
+            # ..../where/ever/mycommand.py:
+            # class MyCommand(Interface):
+            #     @eval_results
+            #     def __call__(..)
+            command_class_names = \
                 [i for i in mod.__dict__
                  if type(mod.__dict__[i]) == type and
-                 issubclass(mod.__dict__[i], Interface)]
-            command_class = [i for i in command_classes_in_mod
-                             if i.lower() == func.__module__.split('.')[-1]]
-            assert(len(command_class) == 1)
-            class_ = mod.__dict__[command_class[0]]
+                 issubclass(mod.__dict__[i], Interface) and
+                 i.lower() == wrapped.__module__.split('.')[-1]]
+            assert(len(command_class_names) == 1)
+            command_class_name = command_class_names[0]
         else:
-            command_class = func.__qualname__.split('.')[-2]
-            mod = sys.modules[func.__module__]
-            class_ = mod.__dict__[command_class]
-
-        lgr.warning("DEBUG eval_results: func: %s", func)
-        lgr.warning("DEBUG eval_results: func.__module__: %s", func.__module__)
-        lgr.warning("DEBUG eval_results: class name: %s", command_class)
-        lgr.warning("DEBUG eval_results: class: %s", class_)
+            command_class_name = wrapped.__qualname__.split('.')[-2]
+        _func_class = mod.__dict__[command_class_name]
+        lgr.debug("Determined class of decorated function: %s", _func_class)
 
         def ext_func(*_args, **_kwargs):
-            _eval_arg1 = _kwargs.pop('_eval_arg1', "default1")
-            _eval_arg2 = _kwargs.pop('_eval_arg2', "default2")
+
+            _params = {p_name: _kwargs.pop(p_name, eval_params[p_name][0])
+                       for p_name in eval_params}
 
             # use additional arguments to do stuff:
-            lgr.warning("_eval_arg1: %s", _eval_arg1)
-            lgr.warning("_eval_arg2: %s", _eval_arg2)
+            lgr.warning("_eval_arg1: %s", _params['_eval_arg1'])
+            lgr.warning("_eval_arg2: %s", _params['_eval_arg2'])
 
             # rudimentary wrapper to harvest generators
             results = wrapped(*_args, **_kwargs)
