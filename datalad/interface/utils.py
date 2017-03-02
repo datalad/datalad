@@ -766,7 +766,7 @@ def filter_unmodified(content_by_ds, refds, since):
 
 import wrapt
 
-def eval_results(switch):
+def eval_results(func):
     """Decorator providing functionality to evaluate return values of datalad
     commands
     """
@@ -774,17 +774,33 @@ def eval_results(switch):
 
     @wrapt.decorator
     def new_func(wrapped, instance, args, kwargs):
-        # rudimentary wrapper to harvest generators
-        if switch():
-            lgr.debug("switch ON")
-        else:
-            lgr.debug("switch OFF")
-        results = wrapped(*args, **kwargs)
-        if isgenerator(results):
-            return list(results)
-        else:
-            return results
-    return new_func
+
+        def ext_func(*_args, **_kwargs):
+            _eval_arg1 = _kwargs.pop('_eval_arg1', "default1")
+            _eval_arg2 = _kwargs.pop('_eval_arg2', "default2")
+
+            # use additional arguments to do stuff:
+            lgr.warning("_eval_arg1: %s", _eval_arg1)
+            lgr.warning("_eval_arg2: %s", _eval_arg2)
+
+            # rudimentary wrapper to harvest generators
+            results = wrapped(*_args, **_kwargs)
+            if isgenerator(results):
+                return list(results)
+            else:
+                return results
+        return ext_func(*args, **kwargs)
+
+    return new_func(func)
 
 
-
+# @wrapt.decorator
+# def build_doc(wrapped, instance, args, kwargs):
+#
+#     lgr.warning("wrapped: %s", wrapped)
+#     lgr.warning("instance: %s", instance)
+#     lgr.warning("args: %s", args)
+#     lgr.warning("kwargs: %s", kwargs)
+#     lgr.warning("wrapped.__module__: %s", wrapped.__module__)
+#
+#     return wrapped(*args, **kwargs)

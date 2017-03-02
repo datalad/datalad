@@ -17,6 +17,7 @@ from os.path import join as opj
 from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
+from datalad.tests.utils import assert_in
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
@@ -320,24 +321,11 @@ def test_eval_results():
     from datalad.interface.utils import eval_results
     from inspect import getargspec
 
-    class Switcher(object):
-
-        def __init__(self, value):
-            self._value = value
-
-        def __call__(self, value=None):
-            if value is not None:
-                self._value = value
-            else:
-                return self._value
-
     class FakeCommand(Interface):
 
-        switch = Switcher(False)
-        
         @staticmethod
         @datasetmethod(name='fake_command')
-        @eval_results(switch)
+        @eval_results
         def __call__(number, dataset=None):
 
             for i in range(number):
@@ -351,14 +339,27 @@ def test_eval_results():
     # test signature:
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(FakeCommand.__call__)[0], ['number', 'dataset'])
-    # test switch:
+
     from datalad.utils import swallow_logs
     import logging
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        FakeCommand().__call__(2)
-        cml.assert_logged("switch OFF", level='DEBUG')
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        FakeCommand.switch(True)
-        FakeCommand().__call__(2)
-        cml.assert_logged("switch ON", level='DEBUG')
+    # test _eval_arguments:
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        Dataset('/does/not/matter').fake_command(3, _eval_arg1="blubb")
+        assert_in("_eval_arg1: blubb", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # without anything keep defaults
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        Dataset('/does/not/matter').fake_command(3)
+        assert_in("_eval_arg1: default1", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # same for version not bound to Dataset:
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        FakeCommand().__call__(3, _eval_arg1="blubb")
+        assert_in("_eval_arg1: blubb", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # without anything keep defaults
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        FakeCommand().__call__(3)
+        assert_in("_eval_arg1: default1", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
 
