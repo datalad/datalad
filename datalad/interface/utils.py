@@ -41,6 +41,7 @@ from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
 
+from .base import Interface
 
 lgr = logging.getLogger('datalad.interface.utils')
 
@@ -774,6 +775,35 @@ def eval_results(func):
 
     @wrapt.decorator
     def new_func(wrapped, instance, args, kwargs):
+
+        from six import PY2
+
+        # determine class, the __call__ method of which we are decorating:
+        # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
+        # when and how to use eval_results as well as on how to name a command's
+        # module and class. As of now, we are inline with these requirements as far
+        # as I'm aware.
+        if PY2:
+            import sys
+            mod = sys.modules[func.__module__]
+            command_classes_in_mod = \
+                [i for i in mod.__dict__
+                 if type(mod.__dict__[i]) == type and
+                 issubclass(mod.__dict__[i], Interface)]
+            command_class = [i for i in command_classes_in_mod
+                             if i.lower() == func.__module__.split('.')[-1]]
+            assert(len(command_class) == 1)
+            class_ = mod.__dict__[command_class[0]]
+        else:
+            command_class = func.__qualname__.split('.')[-2]
+            import sys
+            mod = sys.modules[func.__module__]
+            class_ = mod.__dict__[command_class]
+
+        lgr.warning("DEBUG: func: %s", func)
+        lgr.warning("DEBUG: func.__module__: %s", func.__module__)
+        lgr.warning("DEBUG: class name: %s", command_class)
+        lgr.warning("DEBUG: class: %s", class_)
 
         def ext_func(*_args, **_kwargs):
             _eval_arg1 = _kwargs.pop('_eval_arg1', "default1")
