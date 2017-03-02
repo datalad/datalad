@@ -103,11 +103,13 @@ class Update(Interface):
 
         for ds_path in content_by_ds:
             # prepare return value
+            # TODO move into helper
             res = {
                 'action': 'update',
                 'path': ds_path,
                 'type': 'dataset',
                 'status': None,
+                'logger': lgr,
             }
             ds = Dataset(ds_path)
             repo = ds.repo
@@ -116,8 +118,8 @@ class Update(Interface):
             remotes = repo.get_remotes(
                 **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
             if not remotes:
-                lgr.debug("No siblings known to dataset at %s\nSkipping",
-                          repo.path)
+                res['message'] = ("No siblings known to dataset at %s\nSkipping",
+                                  repo.path)
                 res['status'] = 'notneeded'
                 yield res
                 continue
@@ -128,8 +130,8 @@ class Update(Interface):
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
                 # TODO issue such warning in result eval
-                lgr.warning("'%s' not known to dataset %s\nSkipping",
-                            sibling_, repo.path)
+                res['message'] = ("'%s' not known to dataset %s\nSkipping",
+                                  sibling_, repo.path)
                 res['status'] = 'impossible'
                 yield res
                 continue
@@ -139,8 +141,7 @@ class Update(Interface):
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 res['status'] = 'impossible'
-                res['error'] = (
-                    'NotImplementedError',
+                res['error'] = NotImplementedError(
                     "Multiple siblings, please specify from which to update.")
                 yield res
                 continue

@@ -768,12 +768,47 @@ def filter_unmodified(content_by_ds, refds, since):
 
 
 def eval_results(func):
-    """Decorator providing functionality to evaluate return values of datalad
-    commands
-    """
-    from inspect import isgenerator
+    """Decorator for return value evaluation of datalad commands.
 
+    Note, this decorator is only compatible with commands that return
+    status dict sequences!
+
+    Two basic modes of operation are supported: 1) "generator mode" that
+    `yields` individual results, and 2) "list mode" that returns a sequence of
+    results. The behavior can be selected via the
+    `datalad.api.return-generator` configuration variable. Default is "list
+    mode".
+
+    This decorator implements common functionality for result rendering/output,
+    error detection/handling, and logging (TODO).
+
+    Result rendering/output can be triggered via the
+    `datalad.api.result-render-mode` configuration variable. Supported modes
+    are: 'json' (one object/dict per line, like git-annex), 'human' (TODO,
+    tailored output formating provided by each command class, if any).
+
+    Error detection works by inspecting the `status` item of all result
+    dictionaries. Any occurrence of a status other than 'ok' or 'notneeded' will
+    cause an exception to be raised. TODO: The type of exception depends on the
+    nature of complete set of errors found. If all errors have a single unique
+    type, the final exception will be of this type too. In case of a heterogeneous
+    set of error a compound exception will be raised that includes information
+    on all individual errors that occurred.
+
+    Status messages will be logged automatically, by default the following
+    association of result status and log channel will be used: 'ok' (debug),
+    'notneeded' (debug), 'impossible' (warning), 'error' (error).  Logger
+    instances included in the results are used to capture the origin of a
+    status report.
+    """
     want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
+
+    default_logchannels = {
+        'ok': 'debug',
+        'notneeded': 'debug',
+        'impossible': 'warning',
+        'error': 'error',
+    }
 
     @better_wraps(func)
     def generator_func(*args, **kwargs):
@@ -785,8 +820,25 @@ def eval_results(func):
         # inspect and render
         render_mode = dlcfg.get('datalad.api.result-render-mode', None)
         for res in results:
+            ## log message
+            # use provided logger is possible, or ours if necessary
+            res_lgr = res.get('logger', lgr)
+            if isinstance(res_lgr, logging.Logger):
+                # didn't get a particular log function, go with default
+                res_lgr = getattr(res_lgr, default_logchannels[res['status']])
+            if 'message' in res:
+                msg = res['message']
+                if isinstance(msg, tuple):
+                    # support string expansion of logging to avoid runtime cost
+                    res_lgr(*msg)
+                else:
+                    res_lgr(msg)
+            ## output rendering
             if render_mode == 'json':
-                print(json.dumps(res))
+                print(json.dumps(
+                    {k: v for k, v in res.items()
+                     if k not in ('message', 'logger')}))
+            ## error handling
             # looks for error status, and report at the end via
             # an exception
             if res['status'] in ('impossible', 'error'):
