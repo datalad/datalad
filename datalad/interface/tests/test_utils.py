@@ -331,7 +331,7 @@ def test_eval_results():
             for i in range(number):
                 # this dict will need to have the minimum info required by
                 # eval_results
-                yield {'status': 'ok', 'somekey': i}
+                yield {'path': 'some', 'status': 'ok', 'somekey': i}
 
     result = FakeCommand().__call__(2)
     assert_equal(len(list(result)), 2)
