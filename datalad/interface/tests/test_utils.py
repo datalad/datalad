@@ -329,11 +329,13 @@ def test_eval_results():
         def __call__(number, dataset=None):
 
             for i in range(number):
-                yield i
+                # this dict will need to have the minimum info required by
+                # eval_results
+                yield {'status': 'ok', 'somekey': i}
 
     result = FakeCommand().__call__(2)
-    assert_equal(result, [0, 1])
+    assert_equal(len(list(result)), 2)
     result = Dataset('/does/not/matter').fake_command(3)
-    assert_equal(result, [0, 1, 2])
+    assert_equal(len(list(result)), 3)
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(FakeCommand.__call__)[0], ['number', 'dataset'])
