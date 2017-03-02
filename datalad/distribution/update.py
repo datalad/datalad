@@ -100,6 +100,11 @@ class Update(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        # report input paths that cannot be updates, because they are not there
+        for up in unavailable_paths:
+            yield {'action': 'update', 'path': up, 'status': 'impossible',
+                   'logger': lgr, 'refds': refds_path}
 
         for ds_path in content_by_ds:
             # prepare return value
@@ -110,7 +115,7 @@ class Update(Interface):
                 'type': 'dataset',
                 'status': None,
                 'logger': lgr,
-                'refds': dataset.path if isinstance(dataset, Dataset) else dataset,
+                'refds': refds_path,
             }
             ds = Dataset(ds_path)
             repo = ds.repo
