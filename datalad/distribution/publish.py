@@ -220,9 +220,24 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
         if not paths and remote_wanted:
             lgr.debug("Invoking copy --auto")
             annex_copy_options += ' --auto'
+        # TODO:  we might need additional logic comparing the state of git-annex
+        # branch locally and on remote to see if information about the 'copy'
+        # was also reflected on the remote end
+        #git_annex_hexsha = ds.repo.get_hexsha('git-annex')
+        # TODO: must be the same if we merged/pushed before, if not -- skip
+        # special logic may be with a warning
         pblshd = ds.repo.copy_to(files=paths,
                                  remote=remote,
                                  options=annex_copy_options)
+        # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
+        #     print "HERE"
+        #     # there were changes which should be pushed
+        #     lgr.debug(
+        #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
+        #         remote)
+        #     ds.repo.fetch(remote=remote, refspec='git-annex')
+        #     ds.repo.merge_annex(remote)
+        #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
         published += pblshd
 
     return published, skipped

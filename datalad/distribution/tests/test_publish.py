@@ -22,6 +22,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import chpwd
 
 from nose.tools import eq_, ok_, assert_is_instance
+from nose.tools import assert_false as nok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import assert_raises
@@ -202,7 +203,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
+@with_tempfile
+def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)[0]
@@ -231,17 +233,30 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
     eq_(res, ([source, 'test-annex.dat'], []))
+    # XXX master was not checked out in dst!
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     # TODO: last commit in git-annex branch differs. Probably fine,
     # but figure out, when exactly to expect this for proper testing:
+    # yoh: they differ because local annex records information about now
+    # file being available in that remote, and remote one does it via a call in
+    # the hook I guess.  So they both get the same information but in two
+    # different commits.  I do not observe such behavior of remote having git-annex
+    # automagically updated in older clones
+    # which do not have post-receive hook on remote side
     eq_(list(target.get_branch_commits("git-annex"))[1:],
         list(source.repo.get_branch_commits("git-annex"))[1:])
 
     # we need compare target/master:
     target.checkout("master")
-    eq_(target.file_has_content(['test-annex.dat']), [True])
+    ok_(target.file_has_content('test-annex.dat'))
+
+    # make sure that whatever we published is actually consumable
+    dst_clone = install(dst_clone_path, source=dst_path)
+    nok_(dst_clone.repo.file_has_content('test-annex.dat'))
+    res = dst_clone.get('test-annex.dat')
+    ok_(dst_clone.repo.file_has_content('test-annex.dat'))
 
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['.'])
