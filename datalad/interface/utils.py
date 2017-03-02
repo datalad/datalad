@@ -857,7 +857,6 @@ def build_doc(func):
     # the future.
     # TODO: Almost, but doesn't work entirely as intended
 
-
     @wrapt.decorator
     def builder(wrapped, instance, args, kwargs):
 
@@ -871,7 +870,7 @@ def build_doc(func):
             # restrictions on when and how to use eval_results as well as on how
             # to name a command's module and class. As of now, we are inline
             # with these requirements as far as I'm aware.
-            mod = sys.modules[func.__module__]
+            mod = sys.modules[wrapped.__module__]
             if PY2:
                 # we rely on:
                 # - decorated function is method of a subclass of Interface
@@ -886,11 +885,11 @@ def build_doc(func):
                     [i for i in mod.__dict__
                      if type(mod.__dict__[i]) == type and
                      issubclass(mod.__dict__[i], Interface) and
-                     i.lower() == func.__module__.split('.')[-1]]
+                     i.lower() == wrapped.__module__.split('.')[-1]]
                 assert(len(command_class_names) == 1)
                 command_class_name = command_class_names[0]
             else:
-                command_class_name = func.__qualname__.split('.')[-2]
+                command_class_name = wrapped.__qualname__.split('.')[-2]
             _func_class = mod.__dict__[command_class_name]
             lgr.debug("Determined class of decorated function: %s", _func_class)
 
@@ -918,3 +917,29 @@ def build_doc(func):
 
     # and return the now-empty wrapper:
     return builder(func)
+
+
+def build_doc_as_class_decorator(func):
+
+    lgr.warning("Class decorator ...")
+    lgr.warning("wrapped: %s", func)
+    lgr.warning("wrapped.__call__: %s", func.__call__)
+    lgr.warning("wrapped.__call__.__doc__: %s", func.__call__.__doc__)
+
+
+    lgr.warning("Building doc ...")
+
+    spec = getattr(func, '_params_', dict())
+    update_docstring_with_parameters(func.__call__, # wrapped?
+                                     spec,
+                prefix=alter_interface_docs_for_api(func.__doc__),
+                suffix=alter_interface_docs_for_api(
+                    func.__call__.__doc__)
+            )
+
+
+
+
+
+    # return original
+    return func

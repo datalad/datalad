@@ -321,7 +321,10 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 
+from ..utils import build_doc_as_class_decorator
 
+
+@build_doc_as_class_decorator
 class Test_Utils(Interface):
     """TestUtil's fake command"""
 
@@ -340,7 +343,7 @@ class Test_Utils(Interface):
     @staticmethod
     @datasetmethod(name='fake_command')
     @eval_results
-    @build_doc
+    #@build_doc
     def __call__(number, dataset=None):
 
         for i in range(number):
@@ -356,10 +359,10 @@ def test_eval_results():
 
 
 
-    Test_Utils().__call__(1)
-    Test_Utils().__call__(1)
-    Test_Utils().__call__(1)
-    Test_Utils().__call__(1)
+    #Test_Utils().__call__(1)
+    #Test_Utils().__call__(1)
+    #Test_Utils().__call__(1)
+    #Test_Utils().__call__(1)
 
     # test docs
     doc1 = Dataset.fake_command.__doc__
