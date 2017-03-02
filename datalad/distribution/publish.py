@@ -75,10 +75,10 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # pre-treat paths.  If path points to entire dataset, and not its root directory
     # i.e. dataset or dataset/  vs dataset/. - we do not invoke copying all the data
     # TODO: move into a helper function and test
-    paths = filter(
+    paths = list(filter(
         lambda p: p.rstrip(dirsep) != ds.path.rstrip(dirsep),
         paths
-    )
+    ))
 
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
