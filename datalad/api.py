@@ -105,24 +105,8 @@ def _generate_func_api():
                 if always_render:
                     globals()[get_api_name(intfspec)] = intf__
 
-            # apply new docs to datasetmethods, too:
-            try:
-                d_method = getattr(Dataset, get_api_name(intfspec))
-            except AttributeError:
-                continue
-            # d_method is a wrapt.decorator._BoundAdapterWrapper;
-            # actual function: d_method.im_func
-            d_method = d_method.im_func
-            orig__doc__ = d_method.func_doc
-            if orig__doc__ and orig__doc__.strip():  # pragma: no cover
-                raise RuntimeError(
-                    "No meaningful docstring should have been assigned before "
-                    "now. Got %r" % orig__doc__
-                )
-            d_method.func_doc = intf.__call__.__doc__
 
-
-# Invoke above helpers
+# Invoke above helper
 _generate_func_api()
 
 # Be nice and clean up the namespace properly

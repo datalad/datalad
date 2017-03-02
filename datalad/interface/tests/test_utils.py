@@ -297,7 +297,6 @@ def test_filter_unmodified(path):
 
     # deal with removal (force insufiicient copies error)
     ds.remove(opj(subsub.path, 'file_bbaa'), check=False)
-    #import pdb; pdb.set_trace()
     # saves all the way up
     ok_clean_git(path)
 

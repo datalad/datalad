@@ -763,20 +763,17 @@ def filter_unmodified(content_by_ds, refds, since):
                         or any(m.startswith(_with_sep(p)) for p in paths_refds))]
     return keep
 
-
-def eval_results(func):
+import wrapt
+@wrapt.decorator
+def eval_results(wrapped, instance, args, kwargs):
     """Decorator providing functionality to evaluate return values of datalad
     commands
     """
     from inspect import isgenerator
 
-    @better_wraps(func)
-    def new_func(*args, **kwargs):
-        # rudimentary wrapper to harvest generators
-        results = func(*args, **kwargs)
-        if isgenerator(results):
-            return list(results)
-        else:
-            return results
-
-    return new_func
+    # rudimentary wrapper to harvest generators
+    results = wrapped(*args, **kwargs)
+    if isgenerator(results):
+        return list(results)
+    else:
+        return results

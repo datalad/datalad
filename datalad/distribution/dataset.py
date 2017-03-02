@@ -10,7 +10,6 @@
 """
 
 import logging
-from functools import wraps
 from os.path import abspath
 from os.path import commonprefix
 from os.path import curdir
@@ -25,6 +24,7 @@ from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
 from six import add_metaclass
+import wrapt
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -546,8 +546,8 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     if not name:
         name = f.func_name if PY2 else f.__name__
 
-    @better_wraps(f)
-    def apply_func(*args, **kwargs):
+    @wrapt.decorator
+    def apply_func(wrapped, instance, args, kwargs):
         # Wrapper function to assign arguments of the bound function to
         # original function.
         #
@@ -563,21 +563,21 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or dataset_argname in kwargs:
+        if len(args) >= len(orig_pos) or dataset_argname in kwargs:
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
                                                       if a != dataset_argname]))
-        kwargs[dataset_argname] = args[0]
+        kwargs[dataset_argname] = instance
         ds_index = orig_pos.index(dataset_argname)
-        for i in range(1, len(args)):
-            if i <= ds_index:
-                kwargs[orig_pos[i-1]] = args[i]
-            elif i > ds_index:
+        for i in range(0, len(args)):
+            if i < ds_index:
                 kwargs[orig_pos[i]] = args[i]
+            elif i >= ds_index:
+                kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func)
+    setattr(Dataset, name, apply_func(f))
     return f
 
 
