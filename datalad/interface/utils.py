@@ -772,17 +772,42 @@ def filter_unmodified(content_by_ds, refds, since):
 
 
 # define parameters to be used by eval_results to tune behavior
-# key => value corresponds to <parameter_name> => (<default value>, <docstring>)
 # Note: This is done outside eval_results in order to be available when building
 # docstrings for the decorated functions
-eval_params = {'_eval_arg1': ("default1", "first parameter"),
-               '_eval_arg2': ("default2", "second parameter")
-               }
+# TODO: May be we want to move them to be part of the classes _params. Depends
+# on when and how eval_results actually has to determine the class.
+# Alternatively build a callable class with these to even have a fake signature
+# that matches the parameters, so they can be evaluated and defined the exact
+# same way.
+
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.param import Parameter
+
+eval_params = dict(
+    _eval_arg1=Parameter(
+        doc="first parameter",
+        constraints=EnsureStr() | EnsureNone()),
+    _eval_arg2=Parameter(
+        doc="second parameter",
+        constraints=EnsureStr() | EnsureNone()),
+)
+eval_defaults = dict(
+    _eval_arg1="default1",
+    _eval_arg2="default2",
+)
 
 
 def eval_results(func):
     """Decorator providing functionality to evaluate return values of datalad
     commands
+
+    Parameters
+    ----------
+    func: function
+      __call__ method of a subclass of Interface,
+      i.e. a datalad command definition
+
     """
     from inspect import isgenerator
 
@@ -819,12 +844,19 @@ def eval_results(func):
 
         def ext_func(*_args, **_kwargs):
 
-            _params = {p_name: _kwargs.pop(p_name, eval_params[p_name][0])
+            # MARKER for merging:
+            # this should correspond to former 'new_func' within 'eval_results'
+            # therefore this is the level of 'generator_func' in PR #1350
+            # PR #1350 is based on ecd8d8e1b86f0676db22c87182e52899a80d800e in
+            # PR #1348, which corresponds to
+            # 3825b9b177b0f67a2e93f1d5dbbd5f206c4aa2d in #1350
+
+            _params = {p_name: _kwargs.pop(p_name, eval_defaults[p_name])
                        for p_name in eval_params}
 
             # use additional arguments to do stuff:
-            lgr.warning("_eval_arg1: %s", _params['_eval_arg1'])
-            lgr.warning("_eval_arg2: %s", _params['_eval_arg2'])
+            lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
+            lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
 
             # rudimentary wrapper to harvest generators
             results = wrapped(*_args, **_kwargs)
@@ -839,107 +871,48 @@ def eval_results(func):
 
 def build_doc(func):
     """Decorator to build docstrings for datalad commands
+
+    It's intended to decorate the class, the __call__-method of which is the
+    actual command. It expects that __call__-method to be decorated by
+    eval_results.
+
+    Parameters
+    ----------
+    func: Interface
+      class defining a datalad command
     """
 
-    lgr.warning("ENTER")
+    # Note, that this is a class decorator, which is executed only once when the
+    # class is imported. It builds the docstring for the class' __call__ method
+    # and returns the original class.
+    #
+    # This is because a decorator for the actual function would not be able to
+    # behave like this. To build the docstring we need to access the attribute
+    # _params of the class. From within a function decorator we cannot do this
+    # during import time, since the class is being built in this very moment and
+    # is not yet available in the module. And if we do it from within the part
+    # of a function decorator, that is executed when the function is called, we
+    # would need to actually call the command once in order to build this
+    # docstring.
 
-    # This is a bit tricky. If we do the docstring building in the decorator's
-    # part that's executed when decorated function is called, we do it over and
-    # over again and the docstring is available after first execution only.
-    # If we do it in the part that's executed when the decorator is applied, the
-    # class we need to read from is being build in this very moment and not
-    # available from the module yet.
+    lgr.debug("Building doc for {}".format(func))
 
-    # Therefore: Make the actual wrapper `builder` only do something if there's
-    # no docstring yet and in that case, don't do anything else. Otherwise let
-    # it be an "empty" pass-through decorator. Then, after defining it, call it
-    # once and only afterwards return the thing to be called from the outside in
-    # the future.
-    # TODO: Almost, but doesn't work entirely as intended
+    # get docs for eval_results parameters:
+    eval_doc = ""
+    for p in eval_params:
+        eval_doc += eval_params[p].get_autodoc(
+            p, default=eval_defaults[p], has_default=True)
+    # suffix for update_docstring_with_parameters:
+    if func.__call__.__doc__:
+        eval_doc += func.__call__.__doc__
 
-    @wrapt.decorator
-    def builder(wrapped, instance, args, kwargs):
-
-        lgr.warning("ENTER builder")
-
-        if wrapped.__doc__ is None:
-            # we need to build the docstring
-
-            # determine class, the __call__ method of which we are decorating:
-            # Ben: Note, that this is a bit dirty in PY2 and imposes
-            # restrictions on when and how to use eval_results as well as on how
-            # to name a command's module and class. As of now, we are inline
-            # with these requirements as far as I'm aware.
-            mod = sys.modules[wrapped.__module__]
-            if PY2:
-                # we rely on:
-                # - decorated function is method of a subclass of Interface
-                # - the name of the class matches the last part of the module's
-                #   name if converted to lower
-                # for example:
-                # ..../where/ever/mycommand.py:
-                # class MyCommand(Interface):
-                #     @eval_results
-                #     def __call__(..)
-                command_class_names = \
-                    [i for i in mod.__dict__
-                     if type(mod.__dict__[i]) == type and
-                     issubclass(mod.__dict__[i], Interface) and
-                     i.lower() == wrapped.__module__.split('.')[-1]]
-                assert(len(command_class_names) == 1)
-                command_class_name = command_class_names[0]
-            else:
-                command_class_name = wrapped.__qualname__.split('.')[-2]
-            _func_class = mod.__dict__[command_class_name]
-            lgr.debug("Determined class of decorated function: %s", _func_class)
-
-            lgr.warning("Building doc ...")
-
-            spec = getattr(_func_class, '_params_', dict())
-            update_docstring_with_parameters(_func_class.__call__, # wrapped?
-                                             spec,
-                        prefix=alter_interface_docs_for_api(_func_class.__doc__),
-                        suffix=alter_interface_docs_for_api(
-                            _func_class.__call__.__doc__)
-                    )
-            # plain return. this should happen only once and is intentionally
-            # invoked
-            return
-
-        return wrapped(*args, **kwargs)
-
-    lgr.warning("EXIT")
-
-    # actually build the docs
-    # TODO: builder isn't actually executed during "compile time", while the log
-    # above is!
-    builder(func)
-
-    # and return the now-empty wrapper:
-    return builder(func)
-
-
-def build_doc_as_class_decorator(func):
-
-    lgr.warning("Class decorator ...")
-    lgr.warning("wrapped: %s", func)
-    lgr.warning("wrapped.__call__: %s", func.__call__)
-    lgr.warning("wrapped.__call__.__doc__: %s", func.__call__.__doc__)
-
-
-    lgr.warning("Building doc ...")
-
+    # build standard doc and insert eval_doc
     spec = getattr(func, '_params_', dict())
-    update_docstring_with_parameters(func.__call__, # wrapped?
-                                     spec,
-                prefix=alter_interface_docs_for_api(func.__doc__),
-                suffix=alter_interface_docs_for_api(
-                    func.__call__.__doc__)
-            )
-
-
-
-
+    update_docstring_with_parameters(
+        func.__call__, spec,
+        prefix=alter_interface_docs_for_api(func.__doc__),
+        suffix=alter_interface_docs_for_api(eval_doc)
+    )
 
     # return original
     return func
