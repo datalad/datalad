@@ -179,6 +179,14 @@ def test_something(path, new_home):
         globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
 
+    cfg = ConfigManager(
+        Dataset(opj(path, 'ds')),
+        dataset_only=True,
+        overrides={'datalad.godgiven': True})
+    assert_equal(cfg.get('datalad.godgiven'), True)
+    # setter has no effect
+    cfg.set('datalad.godgiven', 'false')
+    assert_equal(cfg.get('datalad.godgiven'), True)
 
 @with_tree(tree={
     'ds': {
@@ -299,3 +307,12 @@ def test_from_env():
     # not in dataset-only mode
     cfg = ConfigManager(Dataset('nowhere'), dataset_only=True)
     assert_not_in('datalad.crazy.cfg', cfg)
+    # check env trumps override
+    cfg = ConfigManager()
+    assert_not_in('datalad.crazy.override', cfg)
+    cfg.overrides['datalad.crazy.override'] = 'fromoverride'
+    cfg.reload()
+    assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
+    os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
+    cfg.reload()
+    assert_equal(cfg['datalad.crazy.override'], 'fromenv')

@@ -111,7 +111,22 @@ def test_subcmd_usage_on_unknown_args():
 
 
 def check_incorrect_option(opts, err_str):
-    stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    # The first line used to be:
+    # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    # But: what do we expect to be in sys.argv[0] here?
+    # It depends on how we invoke the test.
+    # - nosetests -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0}=='nosetests'
+    # - python -m nose -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0}=='python -m nose'
+    # - python -c "import nose; nose.main()" -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0]=='-c'
+    # This led to failure in case sys.argv[0] contained an option, that was
+    # defined to be a datalad option too, therefore was a 'known_arg' and was
+    # checked to meet its constraints.
+    # But sys.argv[0] actually isn't used by main at all. It simply doesn't
+    # matter what's in there. The only thing important to pass here is `opts`.
+    stdout, stderr = run_main(('datalad',) + opts, expect_stderr=True, exit_code=2)
     out = stdout + stderr
     assert_in("usage: ", out)
     assert_re_in(err_str, out, match=False)
