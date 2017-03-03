@@ -563,11 +563,14 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) >= len(orig_pos) or dataset_argname in kwargs:
+        if len(args) >= len(orig_pos):
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
                                                       if a != dataset_argname]))
+        if dataset_argname in kwargs:
+            raise TypeError("{}() got an unexpected keyword argument {}"
+                            "".format(name, dataset_argname))
         kwargs[dataset_argname] = instance
         ds_index = orig_pos.index(dataset_argname)
         for i in range(0, len(args)):
@@ -581,7 +584,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     return f
 
 
-# Note: Cannot be defined with constraints.py, since then dataset.py needs to
+# Note: Cannot be defined within constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
@@ -594,8 +597,6 @@ class EnsureDataset(Constraint):
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
-    # commandline doc!
     def short_description(self):
         return "Dataset"
 
