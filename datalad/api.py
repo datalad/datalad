@@ -85,7 +85,10 @@ def _generate_func_api():
             # turn the interface spec into an instance
             mod = import_module(intfspec[0], package='datalad')
             intf = getattr(mod, intfspec[1])
+
+            # TODO: BEGIN to be removed, when @build_doc is applied everywhere
             spec = getattr(intf, '_params_', dict())
+
 
             # FIXME no longer using an interface class instance
             # convert the parameter SPEC into a docstring for the function
@@ -96,6 +99,7 @@ def _generate_func_api():
                 suffix=alter_interface_docs_for_api(
                     intf.__call__.__doc__)
             )
+            # TODO: END to be removed, when @build_doc is applied everywhere
             globals()[get_api_name(intfspec)] = intf.__call__
             # And the one with '_' suffix which would use cmdline results
             # renderer
@@ -104,7 +108,6 @@ def _generate_func_api():
                 globals()[get_api_name(intfspec) + '_'] = intf__
                 if always_render:
                     globals()[get_api_name(intfspec)] = intf__
-
 
 # Invoke above helper
 _generate_func_api()

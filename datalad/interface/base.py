@@ -12,6 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.interface.base')
+
 import sys
 import re
 import textwrap
@@ -409,6 +412,8 @@ class Interface(object):
                 raise ValueError(
                     "will not touch paths outside of installed datasets: %s"
                     % nondataset_paths)
+        if unavailable_paths:
+            lgr.debug('Encountered unavaliable paths: %s', unavailable_paths)
         return content_by_ds, unavailable_paths
 
 

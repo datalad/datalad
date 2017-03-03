@@ -12,9 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
+import inspect
+import logging
 import wrapt
 import sys
-import logging
 from os import curdir
 from os import pardir
 from os import listdir
@@ -29,6 +30,8 @@ from os.path import split as psplit
 from itertools import chain
 from six import PY2
 
+import json
+
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
@@ -41,8 +44,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
+from datalad import cfg as dlcfg
 
 from .base import Interface
 from .base import update_docstring_with_parameters
@@ -799,8 +802,38 @@ eval_defaults = dict(
 
 
 def eval_results(func):
-    """Decorator providing functionality to evaluate return values of datalad
-    commands
+    """Decorator for return value evaluation of datalad commands.
+
+    Note, this decorator is only compatible with commands that return
+    status dict sequences!
+
+    Two basic modes of operation are supported: 1) "generator mode" that
+    `yields` individual results, and 2) "list mode" that returns a sequence of
+    results. The behavior can be selected via the
+    `datalad.api.return-generator` configuration variable. Default is "list
+    mode".
+
+    This decorator implements common functionality for result rendering/output,
+    error detection/handling, and logging (TODO).
+
+    Result rendering/output can be triggered via the
+    `datalad.api.result-render-mode` configuration variable. Supported modes
+    are: 'json' (one object/dict per line, like git-annex), 'simple' (TODO,
+    tailored output formating provided by each command class, if any).
+
+    Error detection works by inspecting the `status` item of all result
+    dictionaries. Any occurrence of a status other than 'ok' or 'notneeded' will
+    cause an exception to be raised. TODO: The type of exception depends on the
+    nature of complete set of errors found. If all errors have a single unique
+    type, the final exception will be of this type too. In case of a heterogeneous
+    set of error a compound exception will be raised that includes information
+    on all individual errors that occurred.
+
+    Status messages will be logged automatically, by default the following
+    association of result status and log channel will be used: 'ok' (debug),
+    'notneeded' (debug), 'impossible' (warning), 'error' (error).  Logger
+    instances included in the results are used to capture the origin of a
+    status report.
 
     Parameters
     ----------
@@ -809,10 +842,18 @@ def eval_results(func):
       i.e. a datalad command definition
 
     """
-    from inspect import isgenerator
+
+    want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
+
+    default_logchannels = {
+        'ok': 'debug',
+        'notneeded': 'debug',
+        'impossible': 'warning',
+        'error': 'error',
+    }
 
     @wrapt.decorator
-    def new_func(wrapped, instance, args, kwargs):
+    def eval_func(wrapped, instance, args, kwargs):
 
         # determine class, the __call__ method of which we are decorating:
         # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
@@ -842,14 +883,7 @@ def eval_results(func):
         _func_class = mod.__dict__[command_class_name]
         lgr.debug("Determined class of decorated function: %s", _func_class)
 
-        def ext_func(*_args, **_kwargs):
-
-            # MARKER for merging:
-            # this should correspond to former 'new_func' within 'eval_results'
-            # therefore this is the level of 'generator_func' in PR #1350
-            # PR #1350 is based on ecd8d8e1b86f0676db22c87182e52899a80d800e in
-            # PR #1348, which corresponds to
-            # 3825b9b177b0f67a2e93f1d5dbbd5f206c4aa2d in #1350
+        def generator_func(*_args, **_kwargs):
 
             _params = {p_name: _kwargs.pop(p_name, eval_defaults[p_name])
                        for p_name in eval_params}
@@ -858,15 +892,63 @@ def eval_results(func):
             lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
             lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
 
-            # rudimentary wrapper to harvest generators
+            # obtain results
             results = wrapped(*_args, **_kwargs)
-            if isgenerator(results):
-                return list(results)
-            else:
-                return results
-        return ext_func(*args, **kwargs)
+            # flag whether to raise an exception
+            # TODO actually compose a meaningful exception
+            raise_exception = False
+            # inspect and render
+            render_mode = dlcfg.get('datalad.api.result-render-mode', None)
+            for res in results:
+                ## log message
+                # use provided logger is possible, or ours if necessary
+                res_lgr = res.get('logger', lgr)
+                if isinstance(res_lgr, logging.Logger):
+                    # didn't get a particular log function, go with default
+                    res_lgr = getattr(res_lgr, default_logchannels[res['status']])
+                if 'message' in res:
+                    msg = res['message']
+                    if isinstance(msg, tuple):
+                        # support string expansion of logging to avoid runtime cost
+                        res_lgr(*msg)
+                    else:
+                        res_lgr(msg)
+                ## output rendering
+                if render_mode == 'json':
+                    print(json.dumps(
+                        {k: v for k, v in res.items()
+                         if k not in ('message', 'logger')}))
+                elif render_mode == 'simple':
+                    # simple output "STATUS: PATH"
+                    # where PATH is relative to a reference dataset, if one is reported in the result
+                    print('{status}: {path}'.format(
+                        status=res['status'],
+                        path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
+                ## error handling
+                # looks for error status, and report at the end via
+                # an exception
+                if res['status'] in ('impossible', 'error'):
+                    raise_exception = True
+                yield res
 
-    return new_func(func)
+            if raise_exception:
+                # stupid catch all message <- tailor TODO
+                raise RuntimeError(
+                    "Something didn't work, check previous messages")
+
+        if want_generator:
+            return generator_func(*args, **kwargs)
+        else:
+            @wrapt.decorator
+            def return_func(wrapped_, instance_, args_, kwargs_):
+                results = wrapped_(*args_, **kwargs_)
+                if inspect.isgenerator(results):
+                    results = list(results)
+                return results
+
+            return return_func(generator_func)(*args, **kwargs)
+
+    return eval_func(func)
 
 
 def build_doc(func):

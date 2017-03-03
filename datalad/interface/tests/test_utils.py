@@ -349,7 +349,9 @@ class Test_Utils(Interface):
     def __call__(number, dataset=None):
 
         for i in range(number):
-            yield i
+            # this dict will need to have the minimum info required by
+            # eval_results
+            yield {'path': 'some', 'status': 'ok', 'somekey': i}
 
 
 def test_eval_results_plus_build_doc():
@@ -382,14 +384,14 @@ def test_eval_results_plus_build_doc():
     # decorating:
     with swallow_logs(new_level=logging.DEBUG) as cml:
         Dataset('/does/not/matter').fake_command(3)
-        cml.assert_logged("Determined class of decorated function: {}"
-                          "".format(Test_Utils().__class__), level='DEBUG')
+        assert_in("Determined class of decorated function: {}"
+                  "".format(Test_Utils().__class__), cml.out)
 
     # test results:
     result = Test_Utils().__call__(2)
-    assert_equal(result, [0, 1])
+    assert_equal(len(list(result)), 2)
     result = Dataset('/does/not/matter').fake_command(3)
-    assert_equal(result, [0, 1, 2])
+    assert_equal(len(list(result)), 3)
 
     # test signature:
     from inspect import getargspec

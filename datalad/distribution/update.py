@@ -17,6 +17,7 @@ import logging
 from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import eval_results
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
@@ -75,6 +76,7 @@ class Update(Interface):
 
     @staticmethod
     @datasetmethod(name='update')
+    @eval_results
     def __call__(
             path=None,
             sibling=None,
@@ -98,13 +100,23 @@ class Update(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
-
-        # TODO: check parsed inputs if any paths within a dataset were given
-        # and issue a message that we will update the associate dataset as a whole
-        # or fail -- see #1185 for a potential discussion
-        results = []
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        # report input paths that cannot be updates, because they are not there
+        for up in unavailable_paths:
+            yield {'action': 'update', 'path': up, 'status': 'impossible',
+                   'logger': lgr, 'refds': refds_path}
 
         for ds_path in content_by_ds:
+            # prepare return value
+            # TODO move into helper
+            res = {
+                'action': 'update',
+                'path': ds_path,
+                'type': 'dataset',
+                'status': None,
+                'logger': lgr,
+                'refds': refds_path,
+            }
             ds = Dataset(ds_path)
             repo = ds.repo
             # get all remotes which have references (would exclude
@@ -112,8 +124,10 @@ class Update(Interface):
             remotes = repo.get_remotes(
                 **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
             if not remotes:
-                lgr.debug("No siblings known to dataset at %s\nSkipping",
-                          repo.path)
+                res['message'] = ("No siblings known to dataset at %s\nSkipping",
+                                  repo.path)
+                res['status'] = 'notneeded'
+                yield res
                 continue
             if not sibling:
                 # nothing given, look for tracking branch
@@ -121,21 +135,35 @@ class Update(Interface):
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
-                lgr.warning("'%s' not known to dataset %s\nSkipping",
-                            sibling_, repo.path)
+                # TODO issue such warning in result eval
+                res['message'] = ("'%s' not known to dataset %s\nSkipping",
+                                  sibling_, repo.path)
+                res['status'] = 'impossible'
+                yield res
                 continue
             if not sibling_ and len(remotes) == 1:
                 # there is only one remote, must be this one
                 sibling_ = remotes[0]
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
-                raise NotImplementedError(
+                res['status'] = 'impossible'
+                res['error'] = NotImplementedError(
                     "Multiple siblings, please specify from which to update.")
+                yield res
+                continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
-            _update_repo(ds, sibling_, merge, fetch_all, reobtain_data)
+            dsres, file_results = _update_repo(
+                ds, sibling_, merge, fetch_all, reobtain_data)
+            # TODO put back when `get` returns newstyle results
+            #for fr in file_results:
+            #    yield fr
+            res.update(dsres)
+            yield res
 
 
 def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
+    dsres = {}
+    file_results = []
     repo = ds.repo
     # fetch remote
     repo.fetch(
@@ -144,7 +172,8 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
         prune=True)  # prune to not accumulate a mess over time
 
     if not merge:
-        return
+        dsres['status'] = 'ok'
+        return dsres, file_results
 
     # reevaluate repo instance, for it might be an annex now:
     repo = ds.repo
@@ -154,13 +183,17 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
         if reobtain_data:
             # get all annexed files that have data present
             lgr.info('Recording file content availability to re-obtain update files later on')
-            reobtain_data = repo.get_annexed_files(with_content_only=True)
+            reobtain_data = \
+                [opj(ds.path, p)
+                 for p in repo.get_annexed_files(with_content_only=True)]
         # this runs 'annex sync' and should deal with anything
         repo.sync(remotes=remote, push=False, pull=True, commit=False)
         if reobtain_data:
-            reobtain_data = [p for p in reobtain_data if lexists(opj(ds.path, p))]
+            reobtain_data = [p for p in reobtain_data if lexists(p)]
         if reobtain_data:
             lgr.info('Ensure content availability for %i previously available files', len(reobtain_data))
+            # TODO once `get` returns new-style return values
+            #file_results.extend()
             ds.get(reobtain_data, recursive=False)
     else:
         # handle merge in plain git
@@ -180,3 +213,5 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
             else:
                 # no marriage yet, be specific
                 repo.pull(remote=remote, refspec=active_branch)
+    dsres['status'] = 'ok'
+    return dsres, file_results
