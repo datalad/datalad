@@ -18,6 +18,7 @@ __docformat__ = 'restructuredtext'
 import mimetypes
 
 from os.path import splitext
+from datalad.support.network import urlquote
 
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
@@ -138,10 +139,11 @@ class VersionedFilesPool(object):
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
+    e.name_urlquoted = urlquote(e.name)
     if schema == 'http':
-        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}"
+        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name_urlquoted}"
     elif schema == 's3':
-        fmt = "s3://{e.bucket.name}/{e.name}"
+        fmt = "s3://{e.bucket.name}/{e.name_urlquoted}"
     else:
         raise ValueError(schema)
     if versioned:
