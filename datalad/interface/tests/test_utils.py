@@ -40,6 +40,7 @@ from ..utils import save_dataset_hierarchy
 from ..utils import get_dataset_directories
 from ..utils import filter_unmodified
 from ..save import Save
+from datalad.api import create
 
 
 __docformat__ = 'restructuredtext'
