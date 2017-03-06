@@ -378,7 +378,7 @@ def test_eval_results_plus_build_doc():
     assert_in("return_type", doc1)
     assert_in("list", doc1)
     assert_in("None", doc1)
-    assert_in("choose how in what way", doc1)
+    assert_in("return value behavior", doc1)
     assert_in("callable to filter return values", doc1)
 
     # test eval_results is able to determine the call, a method of which it is

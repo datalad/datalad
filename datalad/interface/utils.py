@@ -790,16 +790,20 @@ def filter_unmodified(content_by_ds, refds, since):
 
 eval_params = dict(
     return_type=Parameter(
-        doc="choose how in what way return values are provided",
+        doc="return value behavior",
         constraints=EnsureChoice('generator', 'list')),
     filter_results=Parameter(
         doc="""callable to filter return values. Each to-be-returned
         status dictionary is tested with the given callable (if any)
-        and is only returned of the callable returns True.""")
+        and is only returned of the callable returns True."""),
+    render_results=Parameter(
+        doc="""format of return value rendering on stdout""",
+        constraints=EnsureChoice('json', 'simple') | EnsureNone()),
 )
 eval_defaults = dict(
     return_type='list',
     filter_results=None,
+    render_results=None,
 )
 
 
@@ -897,7 +901,9 @@ def eval_results(func):
             # TODO actually compose a meaningful exception
             raise_exception = False
             # inspect and render
-            render_mode = dlcfg.get('datalad.api.result-render-mode', None)
+            render_mode = common_params['render_results']
+            if not render_mode:
+                render_mode = dlcfg.get('datalad.api.result-render-mode', None)
             for res in results:
                 ## log message
                 # use provided logger is possible, or ours if necessary
