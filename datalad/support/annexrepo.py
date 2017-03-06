@@ -1171,6 +1171,95 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise FileNotInAnnexError("Could not get a key for a file(s) %s -- empty output" % files)
             return entries[0]
 
+    @normalize_paths
+    def lock(self, files, options=None):
+        """undo unlock
+
+        Use  this to undo an unlock command if you don't want to modify the
+        files any longer, or have made modifications you want to discard.
+
+        Parameters
+        ----------
+        files: list of str
+        options: list of str
+        """
+
+        options = options[:] if options else []
+        self._run_annex_command('lock', annex_options=files + options)
+        # note: there seems to be no output by annex if success.
+
+    @normalize_paths
+    def unlock(self, files, options=None):
+        """unlock files for modification
+
+        Parameters
+        ----------
+        files: list of str
+        options: list of str
+
+        Returns
+        -------
+        list of str
+          successfully unlocked files
+        """
+
+        options = options[:] if options else []
+        std_out, std_err = self._run_annex_command('unlock',
+                                                   annex_options=files + options)
+
+        return [line.split()[1] for line in std_out.splitlines()
+                if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
+
+    def adjust(self, options=None):
+        """enter an adjusted branch
+
+        This command is only available in a v6 git-annex repository.
+
+        Parameters
+        ----------
+        options: list of str
+          currently requires '--unlock' or '--fix';
+          default: --unlock
+        """
+        # TODO: Do we want to catch the case that
+        # "adjusted/<current_branch_name>(unlocked)" already exists and
+        # just check it out? Or fail like annex itself does?
+
+        # version check:
+        if not self.config.get("annex.version") == '6':
+            raise CommandNotAvailableError(cmd='git annex adjust',
+                                           msg='git-annex-adjust requires a '
+                                               'version 6 repository')
+
+        options = options[:] if options else to_options(unlock=True)
+        self._run_annex_command('adjust', annex_options=options)
+
+    @normalize_paths
+    def unannex(self, files, options=None):
+        """undo accidental add command
+
+        Use this to undo an accidental git annex add command. Note that for
+        safety, the content of the file remains in the annex, until you use git
+        annex unused and git annex dropunused.
+
+        Parameters
+        ----------
+        files: list of str
+        options: list of str
+
+        Returns
+        -------
+        list of str
+          successfully unannexed files
+        """
+
+        options = options[:] if options else []
+
+        std_out, std_err = self._run_annex_command('unannex',
+                                                   annex_options=files + options)
+        return [line.split()[1] for line in std_out.splitlines()
+                if line.split()[0] == 'unannex' and line.split()[-1] == 'ok']
+
     @normalize_paths(map_filenames_back=True)
     def find(self, files, batch=False):
         """Provide annex info for file(s).

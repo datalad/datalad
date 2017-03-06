@@ -1628,12 +1628,12 @@ def _test_status(ar):
     if not ar.is_direct_mode():
         # actually: if 'second' isn't locked, which is the case in direct mode
         # need to fix/check for V6 => TODO
-        ar._annex_custom_command('second', ['git', 'annex', 'unlock'])
+        ar.unlock('second')
     with open(opj(ar.path, 'second'), 'w') as f:
         f.write("Needed to unlock first. Sad!")
     if not ar.is_direct_mode():
-        ar.add('second')
-        # TODO: is it locked now?
+        ar.add('second')  # => modified
+        # ar.lock('second') => type_changed
     stat['modified'].append('second')
     eq_(stat, ar.status())
 
@@ -1684,9 +1684,9 @@ def _test_status(ar):
     stat['untracked'].remove(opj('submod', 'fourth'))
 
     if ar.get_active_branch().endswith('(unlocked)') and \
-        'adjusted' in ar.get_active_branch():
+       'adjusted' in ar.get_active_branch():
         # we are running on adjusted branch => do it in submodule, too
-        sub._run_annex_command('adjust', annex_options=['--unlock'])
+        sub.adjust()
 
     # Note, that now the non-empty repo is untracked
     stat['untracked'].append('submod/')
@@ -1740,6 +1740,9 @@ def _test_status(ar):
     ar.commit(msg="submod modified", files='submod')
     stat['modified'].remove('submod/')
     eq_(stat, ar.status())
+
+    # TODO: remove (file, submodule); unannex!
+    # TODO: annex-sync; when sth gets committed where?
 
 
 @with_tempfile(mkdir=True)

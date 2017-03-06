@@ -64,6 +64,8 @@ class Unlock(Interface):
             recursive=False,
             recursion_limit=None):
 
+        # TODO: require dataset
+
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
                 "insufficient arguments for unlocking: needs at least "
@@ -95,12 +97,7 @@ class Unlock(Interface):
 
             files = content_by_ds[ds_path]
 
-            std_out, std_err = ds.repo._annex_custom_command(
-                files, ['git', 'annex', 'unlock'])
-
-            unlocked.extend(
-                [line.split()[1] for line in std_out.splitlines()
-                 if line.strip().endswith('ok')])
+            unlocked = ds.repo.unlock(files)
         return unlocked
 
     @staticmethod
