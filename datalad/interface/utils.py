@@ -19,6 +19,7 @@ import sys
 from os import curdir
 from os import pardir
 from os import listdir
+from os import linesep
 from os.path import join as opj
 from os.path import lexists
 from os.path import isabs
@@ -982,8 +983,11 @@ def build_doc(func):
     # get docs for eval_results parameters:
     eval_doc = ""
     for p in eval_params:
-        eval_doc += eval_params[p].get_autodoc(
-            p, default=eval_defaults[p], has_default=True)
+        eval_doc += '{}{}'.format(
+            eval_params[p].get_autodoc(
+                p, default=eval_defaults[p], has_default=True),
+            linesep)
+
     # suffix for update_docstring_with_parameters:
     if func.__call__.__doc__:
         eval_doc += func.__call__.__doc__
