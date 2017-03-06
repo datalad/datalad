@@ -799,8 +799,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             lgr.debug("detected git version: %s" % external_versions['cmd:git'])
 
-            if external_versions['cmd:git'] >= '2.11.0':
-                # workaround for git 2.11.0, which for some reason ignores the
+            if external_versions['cmd:git'] >= '2.9.0':
+                # workaround for git 2.9.0, which for some reason ignores the
                 # per-call config "-c core.bare=False", but respects the value
                 # if it is set in .git/config
                 self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = True
