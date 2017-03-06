@@ -88,19 +88,19 @@ def _generate_func_api():
 
             # TODO: BEGIN to be removed, when @build_doc is applied everywhere
             spec = getattr(intf, '_params_', dict())
-
-
-            # FIXME no longer using an interface class instance
-            # convert the parameter SPEC into a docstring for the function
-            update_docstring_with_parameters(
-                intf.__call__, spec,
-                prefix=alter_interface_docs_for_api(
-                    intf.__doc__),
-                suffix=alter_interface_docs_for_api(
-                    intf.__call__.__doc__)
-            )
-            # TODO: END to be removed, when @build_doc is applied everywhere
-            globals()[get_api_name(intfspec)] = intf.__call__
+            api_name = get_api_name(intfspec)
+            if api_name not in ('update',):
+                # FIXME no longer using an interface class instance
+                # convert the parameter SPEC into a docstring for the function
+                update_docstring_with_parameters(
+                    intf.__call__, spec,
+                    prefix=alter_interface_docs_for_api(
+                        intf.__doc__),
+                    suffix=alter_interface_docs_for_api(
+                        intf.__call__.__doc__)
+                )
+                # TODO: END to be removed, when @build_doc is applied everywhere
+            globals()[api_name] = intf.__call__
             # And the one with '_' suffix which would use cmdline results
             # renderer
             if hasattr(intf, 'result_renderer_cmdline'):
