@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import inspect
 import logging
+import wrapt
+import sys
 from os import curdir
 from os import pardir
 from os import listdir
@@ -26,6 +28,7 @@ from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
+from six import PY2
 
 import json
 
@@ -43,6 +46,10 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
+
+from .base import Interface
+from .base import update_docstring_with_parameters
+from .base import alter_interface_docs_for_api
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -767,6 +774,33 @@ def filter_unmodified(content_by_ds, refds, since):
     return keep
 
 
+# define parameters to be used by eval_results to tune behavior
+# Note: This is done outside eval_results in order to be available when building
+# docstrings for the decorated functions
+# TODO: May be we want to move them to be part of the classes _params. Depends
+# on when and how eval_results actually has to determine the class.
+# Alternatively build a callable class with these to even have a fake signature
+# that matches the parameters, so they can be evaluated and defined the exact
+# same way.
+
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.param import Parameter
+
+eval_params = dict(
+    _eval_arg1=Parameter(
+        doc="first parameter",
+        constraints=EnsureStr() | EnsureNone()),
+    _eval_arg2=Parameter(
+        doc="second parameter",
+        constraints=EnsureStr() | EnsureNone()),
+)
+eval_defaults = dict(
+    _eval_arg1="default1",
+    _eval_arg2="default2",
+)
+
+
 def eval_results(func):
     """Decorator for return value evaluation of datalad commands.
 
@@ -800,7 +834,15 @@ def eval_results(func):
     'notneeded' (debug), 'impossible' (warning), 'error' (error).  Logger
     instances included in the results are used to capture the origin of a
     status report.
+
+    Parameters
+    ----------
+    func: function
+      __call__ method of a subclass of Interface,
+      i.e. a datalad command definition
+
     """
+
     want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
 
     default_logchannels = {
@@ -810,60 +852,149 @@ def eval_results(func):
         'error': 'error',
     }
 
-    @better_wraps(func)
-    def generator_func(*args, **kwargs):
-        # obtain results
-        results = func(*args, **kwargs)
-        # flag whether to raise an exception
-        # TODO actually compose a meaningful exception
-        raise_exception = False
-        # inspect and render
-        render_mode = dlcfg.get('datalad.api.result-render-mode', None)
-        for res in results:
-            ## log message
-            # use provided logger is possible, or ours if necessary
-            res_lgr = res.get('logger', lgr)
-            if isinstance(res_lgr, logging.Logger):
-                # didn't get a particular log function, go with default
-                res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-            if 'message' in res:
-                msg = res['message']
-                if isinstance(msg, tuple):
-                    # support string expansion of logging to avoid runtime cost
-                    res_lgr(*msg)
-                else:
-                    res_lgr(msg)
-            ## output rendering
-            if render_mode == 'json':
-                print(json.dumps(
-                    {k: v for k, v in res.items()
-                     if k not in ('message', 'logger')}))
-            elif render_mode == 'simple':
-                # simple output "STATUS: PATH"
-                # where PATH is relative to a reference dataset, if one is reported in the result
-                print('{status}: {path}'.format(
-                    status=res['status'],
-                    path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
-            ## error handling
-            # looks for error status, and report at the end via
-            # an exception
-            if res['status'] in ('impossible', 'error'):
-                raise_exception = True
-            yield res
+    @wrapt.decorator
+    def eval_func(wrapped, instance, args, kwargs):
 
-        if raise_exception:
-            # stupid catch all message <- tailor TODO
-            raise RuntimeError(
-                "Something didn't work, check previous messages")
+        # determine class, the __call__ method of which we are decorating:
+        # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
+        # when and how to use eval_results as well as on how to name a command's
+        # module and class. As of now, we are inline with these requirements as
+        # far as I'm aware.
+        mod = sys.modules[wrapped.__module__]
+        if PY2:
+            # we rely on:
+            # - decorated function is method of a subclass of Interface
+            # - the name of the class matches the last part of the module's name
+            #   if converted to lower
+            # for example:
+            # ..../where/ever/mycommand.py:
+            # class MyCommand(Interface):
+            #     @eval_results
+            #     def __call__(..)
+            command_class_names = \
+                [i for i in mod.__dict__
+                 if type(mod.__dict__[i]) == type and
+                 issubclass(mod.__dict__[i], Interface) and
+                 i.lower() == wrapped.__module__.split('.')[-1]]
+            assert(len(command_class_names) == 1)
+            command_class_name = command_class_names[0]
+        else:
+            command_class_name = wrapped.__qualname__.split('.')[-2]
+        _func_class = mod.__dict__[command_class_name]
+        lgr.debug("Determined class of decorated function: %s", _func_class)
 
-    if want_generator:
-        return generator_func
-    else:
-        @better_wraps(generator_func)
-        def return_func(*args, **kwargs):
-            results = generator_func(*args, **kwargs)
-            if inspect.isgenerator(results):
-                results = list(results)
-            return results
+        def generator_func(*_args, **_kwargs):
 
-        return return_func
+            _params = {p_name: _kwargs.pop(p_name, eval_defaults[p_name])
+                       for p_name in eval_params}
+
+            # use additional arguments to do stuff:
+            lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
+            lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
+
+            # obtain results
+            results = wrapped(*_args, **_kwargs)
+            # flag whether to raise an exception
+            # TODO actually compose a meaningful exception
+            raise_exception = False
+            # inspect and render
+            render_mode = dlcfg.get('datalad.api.result-render-mode', None)
+            for res in results:
+                ## log message
+                # use provided logger is possible, or ours if necessary
+                res_lgr = res.get('logger', lgr)
+                if isinstance(res_lgr, logging.Logger):
+                    # didn't get a particular log function, go with default
+                    res_lgr = getattr(res_lgr, default_logchannels[res['status']])
+                if 'message' in res:
+                    msg = res['message']
+                    if isinstance(msg, tuple):
+                        # support string expansion of logging to avoid runtime cost
+                        res_lgr(*msg)
+                    else:
+                        res_lgr(msg)
+                ## output rendering
+                if render_mode == 'json':
+                    print(json.dumps(
+                        {k: v for k, v in res.items()
+                         if k not in ('message', 'logger')}))
+                elif render_mode == 'simple':
+                    # simple output "STATUS: PATH"
+                    # where PATH is relative to a reference dataset, if one is reported in the result
+                    print('{status}: {path}'.format(
+                        status=res['status'],
+                        path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
+                ## error handling
+                # looks for error status, and report at the end via
+                # an exception
+                if res['status'] in ('impossible', 'error'):
+                    raise_exception = True
+                yield res
+
+            if raise_exception:
+                # stupid catch all message <- tailor TODO
+                raise RuntimeError(
+                    "Something didn't work, check previous messages")
+
+        if want_generator:
+            return generator_func(*args, **kwargs)
+        else:
+            @wrapt.decorator
+            def return_func(wrapped_, instance_, args_, kwargs_):
+                results = wrapped_(*args_, **kwargs_)
+                if inspect.isgenerator(results):
+                    results = list(results)
+                return results
+
+            return return_func(generator_func)(*args, **kwargs)
+
+    return eval_func(func)
+
+
+def build_doc(func):
+    """Decorator to build docstrings for datalad commands
+
+    It's intended to decorate the class, the __call__-method of which is the
+    actual command. It expects that __call__-method to be decorated by
+    eval_results.
+
+    Parameters
+    ----------
+    func: Interface
+      class defining a datalad command
+    """
+
+    # Note, that this is a class decorator, which is executed only once when the
+    # class is imported. It builds the docstring for the class' __call__ method
+    # and returns the original class.
+    #
+    # This is because a decorator for the actual function would not be able to
+    # behave like this. To build the docstring we need to access the attribute
+    # _params of the class. From within a function decorator we cannot do this
+    # during import time, since the class is being built in this very moment and
+    # is not yet available in the module. And if we do it from within the part
+    # of a function decorator, that is executed when the function is called, we
+    # would need to actually call the command once in order to build this
+    # docstring.
+
+    lgr.debug("Building doc for {}".format(func))
+
+    # get docs for eval_results parameters:
+    eval_doc = ""
+    for p in eval_params:
+        eval_doc += eval_params[p].get_autodoc(
+            p, default=eval_defaults[p], has_default=True)
+    # suffix for update_docstring_with_parameters:
+    if func.__call__.__doc__:
+        eval_doc += func.__call__.__doc__
+
+    # build standard doc and insert eval_doc
+    spec = getattr(func, '_params_', dict())
+    update_docstring_with_parameters(
+        func.__call__, spec,
+        prefix=alter_interface_docs_for_api(func.__doc__),
+        suffix=alter_interface_docs_for_api(eval_doc)
+    )
+
+    # return original
+    return func

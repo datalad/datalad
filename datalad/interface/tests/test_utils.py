@@ -6,31 +6,44 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test dirty dataset handling
+"""Test interface.utils
 
 """
 
-__docformat__ = 'restructuredtext'
-
 import os
+import logging
 from os.path import join as opj
 from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
-from datalad.interface.utils import handle_dirty_dataset
-from datalad.interface.utils import get_paths_by_dataset
-from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import get_dataset_directories
-from datalad.interface.utils import filter_unmodified
-from datalad.interface.save import Save
+from datalad.utils import swallow_logs
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.utils import _install_subds_inplace
-from datalad.api import save
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
 
+from ..base import Interface
+from ..utils import eval_results
+from ..utils import build_doc
+from ..utils import handle_dirty_dataset
+from ..utils import get_paths_by_dataset
+from ..utils import save_dataset_hierarchy
+from ..utils import get_dataset_directories
+from ..utils import filter_unmodified
+from ..save import Save
+
+
+__docformat__ = 'restructuredtext'
+lgr = logging.getLogger('datalad.interface.tests.test_utils')
 _dirty_modes = ('fail', 'ignore', 'save-before')
 
 
@@ -297,7 +310,6 @@ def test_filter_unmodified(path):
 
     # deal with removal (force insufiicient copies error)
     ds.remove(opj(subsub.path, 'file_bbaa'), check=False)
-    #import pdb; pdb.set_trace()
     # saves all the way up
     ok_clean_git(path)
 
@@ -314,28 +326,96 @@ def test_filter_unmodified(path):
         {d: sorted(p) for d, p in filter_unmodified(spec, ds, orig_base_commit).items()})
 
 
-def test_eval_results():
+# Note: class name needs to match module's name
+@build_doc
+class Test_Utils(Interface):
+    """TestUtil's fake command"""
 
-    from ..base import Interface
-    from datalad.distribution.dataset import datasetmethod
-    from datalad.interface.utils import eval_results
-    from inspect import getargspec
+    _params_ = dict(
+        number=Parameter(
+            args=("-n", "--number",),
+            doc="""It's a number""",
+            constraints=EnsureStr() | EnsureNone()),
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc=""""specify the dataset to update.  If
+            no dataset is given, an attempt is made to identify the dataset
+            based on the input and/or the current working directory""",
+            constraints=EnsureDataset() | EnsureNone()),)
 
-    class FakeCommand(Interface):
+    @staticmethod
+    @datasetmethod(name='fake_command')
+    @eval_results
+    def __call__(number, dataset=None):
 
-        @staticmethod
-        @datasetmethod(name='fake_command')
-        @eval_results
-        def __call__(number, dataset=None):
+        for i in range(number):
+            # this dict will need to have the minimum info required by
+            # eval_results
+            yield {'path': 'some', 'status': 'ok', 'somekey': i}
 
-            for i in range(number):
-                # this dict will need to have the minimum info required by
-                # eval_results
-                yield {'path': 'some', 'status': 'ok', 'somekey': i}
 
-    result = FakeCommand().__call__(2)
+def test_eval_results_plus_build_doc():
+
+    # test docs
+
+    # docstring was build already:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Test_Utils().__call__(1)
+        assert_not_in("Building doc for", cml.out)
+    # docstring accessible both ways:
+    doc1 = Dataset.fake_command.__doc__
+    doc2 = Test_Utils().__call__.__doc__
+
+    # docstring was built from Test_Util's definition:
+    assert_equal(doc1, doc2)
+    assert_in("TestUtil's fake command", doc1)
+    assert_in("Parameters", doc1)
+    assert_in("It's a number", doc1)
+
+    # docstring also contains eval_result's parameters:
+    assert_in("_eval_arg1", doc1)
+    assert_in("_eval_arg2", doc1)
+    assert_in("default1", doc1)
+    assert_in("default2", doc1)
+    assert_in("first parameter", doc1)
+    assert_in("second parameter", doc1)
+
+    # test eval_results is able to determine the call, a method of which it is
+    # decorating:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Dataset('/does/not/matter').fake_command(3)
+        assert_in("Determined class of decorated function: {}"
+                  "".format(Test_Utils().__class__), cml.out)
+
+    # test results:
+    result = Test_Utils().__call__(2)
     assert_equal(len(list(result)), 2)
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(len(list(result)), 3)
+
+    # test signature:
+    from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(FakeCommand.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
+
+    # test _eval_arguments:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Dataset('/does/not/matter').fake_command(3, _eval_arg1="blubb")
+        assert_in("_eval_arg1: blubb", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # without anything keep defaults
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Dataset('/does/not/matter').fake_command(3)
+        assert_in("_eval_arg1: default1", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # same for version not bound to Dataset:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Test_Utils().__call__(3, _eval_arg1="blubb")
+        assert_in("_eval_arg1: blubb", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+    # without anything keep defaults
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        Test_Utils().__call__(3)
+        assert_in("_eval_arg1: default1", cml.out)
+        assert_in("_eval_arg2: default2", cml.out)
+
