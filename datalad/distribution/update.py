@@ -18,6 +18,7 @@ from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
@@ -34,6 +35,7 @@ from .dataset import datasetmethod
 lgr = logging.getLogger('datalad.distribution.update')
 
 
+@build_doc
 class Update(Interface):
     """Update a dataset from a sibling.
 
