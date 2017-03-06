@@ -24,13 +24,6 @@ import os
 import inspect
 
 import datalad
-# we want all commands to yield generators that are executed
-# here in main if possible, so we can tune output knowing that
-# we are talking to the parent shell
-# XXX this assumes that this file is only ever imported as an entrypoint
-# for the cmdline API. This is true right now (except for the associated
-# tests)
-datalad.cfg.overrides['datalad.api.return-generator'] = True
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError

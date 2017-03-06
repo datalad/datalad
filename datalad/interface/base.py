@@ -307,6 +307,13 @@ class Interface(object):
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
+        # we are coming from the entry point, this is the toplevel command,
+        # let it run like generator so we can act on partial results quicker
+        # TODO remove following condition test when transition is complete and
+        # run indented code unconditionally
+        if cls.__name__ in ('Update'):
+            kwargs['return_type'] = 'generator'
+        # TODO compose filter function from to be invented cmdline options
         try:
             return cls.__call__(**kwargs)
         except KeyboardInterrupt as exc:

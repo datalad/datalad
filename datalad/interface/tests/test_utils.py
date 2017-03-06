@@ -374,12 +374,12 @@ def test_eval_results_plus_build_doc():
     assert_in("It's a number", doc1)
 
     # docstring also contains eval_result's parameters:
-    assert_in("_eval_arg1", doc1)
-    assert_in("_eval_arg2", doc1)
-    assert_in("default1", doc1)
-    assert_in("default2", doc1)
-    assert_in("first parameter", doc1)
-    assert_in("second parameter", doc1)
+    assert_in("filter_results", doc1)
+    assert_in("return_type", doc1)
+    assert_in("list", doc1)
+    assert_in("None", doc1)
+    assert_in("choose how in what way", doc1)
+    assert_in("callable to filter return values", doc1)
 
     # test eval_results is able to determine the call, a method of which it is
     # decorating:
@@ -398,25 +398,3 @@ def test_eval_results_plus_build_doc():
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
-
-    # test _eval_arguments:
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        Dataset('/does/not/matter').fake_command(3, _eval_arg1="blubb")
-        assert_in("_eval_arg1: blubb", cml.out)
-        assert_in("_eval_arg2: default2", cml.out)
-    # without anything keep defaults
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        Dataset('/does/not/matter').fake_command(3)
-        assert_in("_eval_arg1: default1", cml.out)
-        assert_in("_eval_arg2: default2", cml.out)
-    # same for version not bound to Dataset:
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        Test_Utils().__call__(3, _eval_arg1="blubb")
-        assert_in("_eval_arg1: blubb", cml.out)
-        assert_in("_eval_arg2: default2", cml.out)
-    # without anything keep defaults
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        Test_Utils().__call__(3)
-        assert_in("_eval_arg1: default1", cml.out)
-        assert_in("_eval_arg2: default2", cml.out)
-

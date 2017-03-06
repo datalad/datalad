@@ -48,6 +48,10 @@ from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 
+from datalad.support.constraints import EnsureChoice
+from datalad.support.constraints import EnsureNone
+from datalad.support.param import Parameter
+
 from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
@@ -784,21 +788,18 @@ def filter_unmodified(content_by_ds, refds, since):
 # that matches the parameters, so they can be evaluated and defined the exact
 # same way.
 
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
-from datalad.support.param import Parameter
-
 eval_params = dict(
-    _eval_arg1=Parameter(
-        doc="first parameter",
-        constraints=EnsureStr() | EnsureNone()),
-    _eval_arg2=Parameter(
-        doc="second parameter",
-        constraints=EnsureStr() | EnsureNone()),
+    return_type=Parameter(
+        doc="choose how in what way return values are provided",
+        constraints=EnsureChoice('generator', 'list')),
+    filter_results=Parameter(
+        doc="""callable to filter return values. Each to-be-returned
+        status dictionary is tested with the given callable (if any)
+        and is only returned of the callable returns True.""")
 )
 eval_defaults = dict(
-    _eval_arg1="default1",
-    _eval_arg2="default2",
+    return_type='list',
+    filter_results=None,
 )
 
 
@@ -810,9 +811,8 @@ def eval_results(func):
 
     Two basic modes of operation are supported: 1) "generator mode" that
     `yields` individual results, and 2) "list mode" that returns a sequence of
-    results. The behavior can be selected via the
-    `datalad.api.return-generator` configuration variable. Default is "list
-    mode".
+    results. The behavior can be selected via the kwarg `return_type`.
+    Default is "list mode".
 
     This decorator implements common functionality for result rendering/output,
     error detection/handling, and logging (TODO).
@@ -843,8 +843,6 @@ def eval_results(func):
       i.e. a datalad command definition
 
     """
-
-    want_generator = dlcfg.getbool('datalad.api', 'return-generator', False)
 
     default_logchannels = {
         'ok': 'debug',
@@ -884,14 +882,14 @@ def eval_results(func):
         _func_class = mod.__dict__[command_class_name]
         lgr.debug("Determined class of decorated function: %s", _func_class)
 
+        common_params = {p_name: kwargs.pop(p_name, eval_defaults[p_name])
+                         for p_name in eval_params}
+
         def generator_func(*_args, **_kwargs):
 
-            _params = {p_name: _kwargs.pop(p_name, eval_defaults[p_name])
-                       for p_name in eval_params}
-
             # use additional arguments to do stuff:
-            lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
-            lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
+            #lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
+            #lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
 
             # obtain results
             results = wrapped(*_args, **_kwargs)
@@ -937,7 +935,7 @@ def eval_results(func):
                 raise RuntimeError(
                     "Something didn't work, check previous messages")
 
-        if want_generator:
+        if common_params['return_type'] == 'generator':
             return generator_func(*args, **kwargs)
         else:
             @wrapt.decorator
