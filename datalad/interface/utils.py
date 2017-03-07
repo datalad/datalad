@@ -795,8 +795,9 @@ eval_params = dict(
         constraints=EnsureChoice('generator', 'list')),
     filter_results=Parameter(
         doc="""callable to filter return values. Each to-be-returned
-        status dictionary is tested with the given callable (if any)
-        and is only returned of the callable returns True."""),
+        status dictionary is passed to the given callable (if any)
+        and is only returned if the callable's return value does not
+        evaluate to False or a ValueError exception is raised."""),
     render_results=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),
