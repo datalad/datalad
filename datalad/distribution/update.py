@@ -19,6 +19,7 @@ from os.path import lexists, join as opj
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
@@ -105,22 +106,14 @@ class Update(Interface):
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         # report input paths that cannot be updates, because they are not there
         for up in unavailable_paths:
-            yield {'action': 'update', 'path': up, 'status': 'impossible',
-                   'logger': lgr, 'refds': refds_path}
+            yield get_status_dict('update', path=up, status=impossible,
+                                  logger=lgr, refds=refds_path)
 
         for ds_path in content_by_ds:
-            # prepare return value
-            # TODO move into helper
-            res = {
-                'action': 'update',
-                'path': ds_path,
-                'type': 'dataset',
-                'status': None,
-                'logger': lgr,
-                'refds': refds_path,
-            }
             ds = Dataset(ds_path)
             repo = ds.repo
+            # prepare return value
+            res = get_status_dict('update', ds=ds, logger=lgr, refds=refds_path)
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
