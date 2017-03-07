@@ -63,7 +63,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # `refspec`
 
     # Plan:
-    # 0. Filter out path to the dataset itself
     # 1. Check if there is anything to push, and if so
     #    2. process push dependencies
     #    3. fetch and merge annex branch
@@ -71,14 +70,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # 5. copy data to the remote if paths are provided or it wants something generally
 
     published, skipped = [], []
-
-    # pre-treat paths.  If path points to entire dataset, and not its root directory
-    # i.e. dataset or dataset/  vs dataset/. - we do not invoke copying all the data
-    # TODO: move into a helper function and test
-    paths = list(filter(
-        lambda p: p.rstrip(dirsep) != ds.path.rstrip(dirsep),
-        paths
-    ))
 
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
@@ -313,12 +304,7 @@ class Publish(Interface):
                 "file handle is published with its data, this implicitly means "
                 "to also publish the (sub)dataset it belongs to. '.' as a path "
                 "is treated in a special way in the sense, that it is passed "
-                "to subdatasets in case `recursive` is also given.  If path "
-                "points to the root directory of a dataset, and does not end "
-                "with '.', dataset's content is published according to the "
-                "\"wanted\" setting of the annex, and by default would not copy "
-                "any of its content to the remote sibling."
-            ,
+                "to subdatasets in case `recursive` is also given.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
         recursive=recursion_flag,
