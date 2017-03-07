@@ -256,6 +256,29 @@ class EnsureChoice(Constraint):
         return '{%s}' % ', '.join([str(c) for c in self._allowed])
 
 
+class EnsureKeyChoice(EnsureChoice):
+    """Ensure value under a key in an input is in a set of possible values"""
+
+    def __init__(self, key, values):
+        """
+        Parameters
+        ----------
+        key : str
+          The to-be-tested values are looked up under the given key in
+          a dict-like input object.
+        values : tuple
+           Possible accepted values.
+        """
+        self._key = key
+        super(EnsureKeyChoice, self).__init__(*values)
+
+    def __call__(self, value):
+        if self._key not in value:
+            raise ValueError("value not dict-like")
+        super(EnsureKeyChoice, self).__call__(value[self._key])
+        return value
+
+
 class EnsureRange(Constraint):
     """Ensure an input is within a particular range
 

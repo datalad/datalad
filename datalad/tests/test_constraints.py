@@ -117,6 +117,18 @@ def test_choice():
     assert_raises(ValueError, lambda: c('None'))
 
 
+def test_keychoice():
+    c = ct.EnsureKeyChoice(key='some', values=('choice1', 'choice2', None))
+    assert_equal(c({'some': 'choice1'}), {'some': 'choice1'})
+    assert_equal(c({'some': None}), {'some': None})
+    assert_equal(c({'some': None, 'ign': 'ore'}), {'some': None, 'ign': 'ore'})
+    assert_raises(ValueError, c, 'fail')
+    assert_raises(ValueError, c, 'None')
+    assert_raises(ValueError, c, {'nope': 'None'})
+    assert_raises(ValueError, c, {'some': 'None'})
+    assert_raises(ValueError, c, {'some': ('a', 'b')})
+
+
 def test_range():
     c = ct.EnsureRange(min=3, max=7)
     # this should always work
