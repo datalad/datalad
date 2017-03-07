@@ -35,16 +35,20 @@ from datalad.tests.utils import skip_ssh
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
-def test_invalid_call(origin):
+@with_tempfile(mkdir=True)
+def test_invalid_call(origin, tdir):
     ds = Dataset(origin)
     ds.uninstall('subm 1', check=False)
     # nothing
     assert_raises(ValueError, publish, '/notthere')
     # known, but not present
     assert_raises(ValueError, publish, opj(ds.path, 'subm 1'))
-    # --since without dataset is not supported
+    # --since without dataset is now supported as long as it
+    # could be identified
     # assert_raises(InsufficientArgumentsError, publish, since='HEAD')
-    # yoh: now supported since why not?
+    # but if it couldn't be, then should indeed crash
+    with chpwd(tdir):
+        assert_raises(InsufficientArgumentsError, publish, since='HEAD')
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
