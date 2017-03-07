@@ -278,6 +278,12 @@ class EnsureKeyChoice(EnsureChoice):
         super(EnsureKeyChoice, self).__call__(value[self._key])
         return value
 
+    def long_description(self):
+        return "value in '%s' must be one of %s" % (self._key, str(self._allowed),)
+
+    def short_description(self):
+        return '%s:{%s}' % (self._key, ', '.join([str(c) for c in self._allowed]))
+
 
 class EnsureRange(Constraint):
     """Ensure an input is within a particular range

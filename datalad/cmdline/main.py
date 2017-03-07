@@ -111,6 +111,18 @@ def setup_parser(
         '--output-format', dest='common_output_format',
         choices=['simple', 'json'],
         help="""select format for returned command results""")
+    parser.add_argument(
+        '--report-status', dest='common_report_status',
+        choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
+        help="""constrain command result report to records matching the given
+        status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands
+        for 'impossible' OR 'error'.""")
+    parser.add_argument(
+        '--report-type', dest='common_report_type',
+        choices=['dataset', 'file'],
+        action='append',
+        help="""constrain command result report to records matching the given
+        type. Can be given more than once to match multiple types.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now

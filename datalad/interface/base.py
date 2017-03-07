@@ -25,6 +25,7 @@ from ..dochelpers import exc_str
 
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
+from datalad.support.constraints import EnsureKeyChoice
 
 
 def get_api_name(intfspec):
@@ -314,7 +315,19 @@ class Interface(object):
         if cls.__name__ in ('Update',):
             kwargs['return_type'] = 'generator'
             kwargs['render_results'] = args.common_output_format
-            # TODO compose filter function from to be invented cmdline options
+            # compose filter function from to be invented cmdline options
+            filter_results = None
+            if args.common_report_status:
+                if args.common_report_status == 'success':
+                    filter_results = EnsureKeyChoice('status', ('ok', 'notneeded'))
+                elif args.common_report_status == 'failure':
+                    filter_results = EnsureKeyChoice('status', ('impossible', 'error'))
+                else:
+                    filter_results = EnsureKeyChoice('status', (args.common_report_status,))
+            if args.common_report_type:
+                tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
+                filter_results = filter_results & tfilt if filter_results else tfilt
+            kwargs['filter_results'] = filter_results
         try:
             return cls.__call__(**kwargs)
         except KeyboardInterrupt as exc:
