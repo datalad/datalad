@@ -18,6 +18,7 @@ from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
@@ -30,6 +31,7 @@ from datalad.distribution.utils import _install_subds_inplace
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureKeyChoice
 
 from ..base import Interface
 from ..utils import eval_results
@@ -398,3 +400,28 @@ def test_eval_results_plus_build_doc():
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
+
+
+def test_filter_results():
+    # ensure baseline without filtering
+    assert_equal(
+        [r['somekey'] for r in Test_Utils().__call__(4)],
+        [0, 1, 2, 3])
+    # test two functionally equivalent ways to filter results
+    # 1. Constraint-based -- filter by exception
+    #    we have a full set of AND and OR operators for this
+    # 2. custom filer function -- filter by boolean return value
+    for filt in (
+            EnsureKeyChoice('somekey', (0, 2)),
+            lambda x: x['somekey'] in (0, 2)):
+        assert_equal(
+            [r['somekey'] for r in Test_Utils().__call__(
+                4,
+                filter_results=filt)],
+            [0, 2])
+        # constraint returns full dict
+        assert_dict_equal(
+            Test_Utils().__call__(
+                4,
+                filter_results=filt)[-1],
+            {'path': 'some', 'status': 'ok', 'somekey': 2})

@@ -47,6 +47,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
+from datalad.dochelpers import exc_str
 
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
@@ -890,11 +891,6 @@ def eval_results(func):
                          for p_name in eval_params}
 
         def generator_func(*_args, **_kwargs):
-
-            # use additional arguments to do stuff:
-            #lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
-            #lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
-
             # obtain results
             results = wrapped(*_args, **_kwargs)
             # flag whether to raise an exception
@@ -902,6 +898,7 @@ def eval_results(func):
             raise_exception = False
             # inspect and render
             render_mode = common_params['render_results']
+            filter_results = common_params['filter_results']
             if not render_mode:
                 render_mode = dlcfg.get('datalad.api.result-render-mode', None)
             for res in results:
@@ -918,6 +915,18 @@ def eval_results(func):
                         res_lgr(*msg)
                     else:
                         res_lgr(msg)
+                ## error handling
+                # looks for error status, and report at the end via
+                # an exception
+                if res['status'] in ('impossible', 'error'):
+                    raise_exception = True
+                if filter_results:
+                    try:
+                        if not filter_results(res):
+                            raise ValueError('excluded by filter')
+                    except ValueError as e:
+                        lgr.debug('not reporting result (%s)', exc_str(e))
+                        continue
                 ## output rendering
                 if render_mode == 'json':
                     print(json.dumps(
@@ -929,11 +938,6 @@ def eval_results(func):
                     print('{status}: {path}'.format(
                         status=res['status'],
                         path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
-                ## error handling
-                # looks for error status, and report at the end via
-                # an exception
-                if res['status'] in ('impossible', 'error'):
-                    raise_exception = True
                 yield res
 
             if raise_exception:
