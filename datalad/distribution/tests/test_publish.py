@@ -137,7 +137,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub1_target = GitRepo(sub1_pub, create=True)
     sub1_target.checkout("TMP", ["-b"])
     sub2_target = AnnexRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", ["-b"])
+    # we will be testing presence of the file content, so let's make it progress
+    sub2_target.config.set('receive.denyCurrentBranch', 'updateInstead', where='local')
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
     sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
@@ -189,17 +190,37 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         eq_(set(r.path for r in res_[0]), set([]))
 
     # Let's now update one subm
-    with open(opj(sub2.path, "file.txt"), 'w') as f:
-        f.write('')
-    # add to subdataset, does not alter super dataset!
-    # MIH: use `to_git` because original test author used
-    # and explicit `GitRepo.add` -- keeping this for now
-    Dataset(sub2.path).add('file.txt', to_git=True)
+    create_tree(sub2.path, {'file.dat': 'content'})
+    # add to subdataset, without reflecting the change in its super(s)
+    Dataset(sub2.path).add('file.dat')
 
-    res_ = publish(dataset=source, recursive=True)
-    # only updates published, i.e. just the subdataset
-    # super wasn't altered and there was no new annexed content
-    eq_(set(r.path for r in res_[0]), {sub2.path})
+    # note: will publish to origin here since that is what it tracks
+    res_published, res_skipped = publish(dataset=source, recursive=True)
+    # only updates published, i.e. just the subdataset, super wasn't altered
+    # XXX ??? Why file.dat is there although, as subsequent test shows it was not
+    # annex copied (as that was not instructed to happen)
+    eq_(set(res_published), {Dataset(sub2.path), 'file.dat'})
+    eq_(res_skipped, [])
+
+    # since published to origin -- destination should not get that file
+    nok_(lexists(opj(sub2_target.path, 'file.dat')))
+    res_published, res_skipped = publish(dataset=source, to='target', recursive=True)
+    eq_(set(res_published), {Dataset(sub2.path), 'file.dat'})
+    # Note: with updateInstead only in target2 and not saving change in
+    # super-dataset we would have made remote dataset, if we had entire
+    # hierarchy, to be somewhat inconsistent.
+    # But here, since target datasets are independent -- it is ok
+
+    # and the file itself was not transferred but now exists
+    ok_(lexists(opj(sub2_target.path, 'file.dat')))
+    # XXX And here it will blow since content is transferred!  I guess because of
+    # the special treatment of '.' path for submodules?
+    nok_(sub2_target.file_has_content('file.dat'))  # BLOWS since all data gets copied in subdatasets
+
+    # but now we can redo publish recursively, at least stating to consider
+    # explicitly to copy .
+    # TODO
+
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
