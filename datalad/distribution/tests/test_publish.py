@@ -56,6 +56,9 @@ def test_smth_about_not_supported(p1, p2):
     with chpwd(p1):
         # since we have only a single commit -- there is no HEAD^
         assert_raises(ValueError, publish, to='target1', since='HEAD^')
+        # but now let's add one more commit, we should be able to pusblish
+        source.repo.commit("msg", options=['--allow-empty'])
+        publish(to='target1', since='HEAD^')  # must not fail now
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
