@@ -328,9 +328,6 @@ class Publish(Interface):
             annex_opts=None,
             annex_copy_opts=None):
 
-        if dataset and not path:
-            # act on the whole dataset if nothing else was specified
-            path = dataset.path if isinstance(dataset, Dataset) else dataset
         if not dataset and not path:
             # try to find a dataset in PWD
             dataset = require_dataset(
@@ -345,7 +342,12 @@ class Publish(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive,
-            recursion_limit=recursion_limit)
+            recursion_limit=recursion_limit,
+            # we do not want for this command state that we want to publish
+            # content by default by assigning paths for each sub-dataset
+            # automagically
+            sub_paths=False
+        )
         if unavailable_paths:
             raise ValueError(
                 'cannot publish content that is not available locally: %s'

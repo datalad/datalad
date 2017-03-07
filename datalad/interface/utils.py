@@ -436,7 +436,7 @@ def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
-                         out=None, dir_lookup=None):
+                         out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.
 
     Any paths that are not part of a dataset, or presently unavailable are
@@ -454,9 +454,12 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     out : dict or None
       By default a new output dictionary is created, however an existing one
       can be provided via this argument to enable incremental processing.
-    dir_lookup : dict or None
+    dir_lookup : dict or None, optional
       Optional lookup cache that maps paths to previously determined datasets.
       This can speed up repeated processing.
+    sub_paths : bool, optional
+      Provide a list containing the sub-dataset path, as the entry for that
+      sub-dataset.  If False, empty list is assigned
 
     Returns
     -------
@@ -517,12 +520,11 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                     subdspath = opj(dspath, sub)
                     if subdspath.startswith(_with_sep(path)):
                         # this subdatasets is underneath the search path
-                        # we want it all
                         # be careful to not overwrite anything, in case
                         # this subdataset has been processed before
                         out[subdspath] = out.get(
                             subdspath,
-                            [subdspath])
+                            [subdspath] if sub_paths else [])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 

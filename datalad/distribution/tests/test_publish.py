@@ -197,15 +197,14 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # note: will publish to origin here since that is what it tracks
     res_published, res_skipped = publish(dataset=source, recursive=True)
     # only updates published, i.e. just the subdataset, super wasn't altered
-    # XXX ??? Why file.dat is there although, as subsequent test shows it was not
-    # annex copied (as that was not instructed to happen)
-    eq_(set(res_published), {Dataset(sub2.path), 'file.dat'})
+    # nothing copied!
+    eq_(set(res_published), {Dataset(sub2.path)})
     eq_(res_skipped, [])
 
     # since published to origin -- destination should not get that file
     nok_(lexists(opj(sub2_target.path, 'file.dat')))
     res_published, res_skipped = publish(dataset=source, to='target', recursive=True)
-    eq_(set(res_published), {Dataset(sub2.path), 'file.dat'})
+    eq_(set(res_published), {Dataset(sub2.path)})
     # Note: with updateInstead only in target2 and not saving change in
     # super-dataset we would have made remote dataset, if we had entire
     # hierarchy, to be somewhat inconsistent.
