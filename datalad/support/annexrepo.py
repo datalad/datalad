@@ -1427,29 +1427,33 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Note:
             # doesn't depend on anything in stdout. Therefore check this before
             # dealing with stdout
-            out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
+            out_of_space_re = re.search(
+                "not enough free space, need (.*) more", e.stderr
+            )
             if out_of_space_re:
                 raise OutOfSpaceError(cmd="annex %s" % command,
                                       sizemore_msg=out_of_space_re.groups()[0])
+
             # RemoteNotAvailableError:
             remote_na_re = re.search(
-                "there is no available git remote named \"(.*)\"",
-                e.stderr
+                "there is no available git remote named \"(.*)\"", e.stderr
             )
             if remote_na_re:
                 raise RemoteNotAvailableError(cmd="annex %s" % command,
                                               remote=remote_na_re.groups()[0])
 
             # TEMP: Workaround for git-annex bug, where it reports success=True
-            # for annex add, while simultanously complaining, that it is in
+            # for annex add, while simultaneously complaining, that it is in
             # a submodule:
             # TODO: For now just reraise. But independently on this bug, it
             # makes sense to have an exception for that case
-            in_subm_re = re.search("fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr)
+            in_subm_re = re.search(
+                "fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr
+            )
             if in_subm_re:
                 raise e
 
-            # Note: A try to approach the covering of potential annex failures
+            # Note: try to approach the covering of potential annex failures
             # in a more general way:
             # first check stdout:
             if all([line.startswith('{') and line.endswith('}')
@@ -1463,9 +1467,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # Note: Workaround for not existing files as long as annex doesn't
             # report it within JSON response:
-            not_existing = [line.split()[1] for line in e.stderr.splitlines()
-                            if line.startswith('git-annex:') and
-                            line.endswith('not found')]
+            # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+            not_existing = [
+                line.split()[1] for line in e.stderr.splitlines()
+                if line.startswith('git-annex:') and
+                   line.endswith('not found')
+            ]
             if not_existing:
                 if out is None:
                     # we create the error reporting herein. If all files were
@@ -2023,6 +2030,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise IncompleteResultsError(
                 results=good_copies, failed=failed_copies,
                 msg="Failed to copy %d file(s)" % len(failed_copies))
+
         return [
             e['file'] for e in results
             if e['success'] and
