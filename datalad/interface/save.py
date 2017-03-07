@@ -26,6 +26,8 @@ from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import amend_pathspec_with_superdatasets
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import get_dataset_root
 
@@ -77,6 +79,7 @@ def process_vanished_paths(unavailable_paths, content_by_ds):
     return content_by_ds, nonexistent_paths
 
 
+@build_doc
 class Save(Interface):
     """Save the current state of a dataset
 
@@ -125,6 +128,7 @@ class Save(Interface):
 
     @staticmethod
     @datasetmethod(name='save')
+    @eval_results
     def __call__(message=None, files=None, dataset=None,
                  all_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False):

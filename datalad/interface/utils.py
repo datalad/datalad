@@ -56,6 +56,7 @@ from datalad.support.param import Parameter
 from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
+from .results import get_status_dict
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -266,18 +267,24 @@ def save_dataset_hierarchy(
         target_subs = superdss[superds_path]
         sort_paths_into_subdatasets(superds_path, target_subs, info)
     # iterate over all datasets, starting at the bottom
-    saved = []
     for dpath in sorted(info.keys(), reverse=True):
         ds = Dataset(dpath)
-        if ds.is_installed():
-            saved_state = save_dataset(
-                ds,
-                info[dpath],
-                message=message,
-                version_tag=version_tag)
-            if saved_state:
-                saved.append(ds)
-    return saved
+        res = get_status_dict('save', ds=ds, logger=lgr)
+        if not ds.is_installed():
+            res['status'] = 'impossible'
+            res['message'] = ('dataset %s is not installed', ds)
+            yield res
+            continue
+        saved_state = save_dataset(
+            ds,
+            info[dpath],
+            message=message,
+            version_tag=version_tag)
+        if saved_state:
+            res['status'] = 'ok'
+        else:
+            res['status'] = 'notneeded'
+        yield res
 
 
 def save_dataset(

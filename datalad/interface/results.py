@@ -34,3 +34,7 @@ def get_status_dict(action, ds=None, path=None, type_=None, logger=None,
     if message:
         d['message'] = message
     return d
+
+
+def is_ok_dataset(r):
+    return r.get('status', None) == 'ok' and r.get('type', None) == 'dataset'

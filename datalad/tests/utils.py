@@ -931,6 +931,21 @@ def assert_dict_equal(d1, d2):
     eq_(d1, d2)
 
 
+def assert_status(label, results):
+    """Verify that each status dict in the results has a given status label"""
+    for r in assure_list(results):
+        assert_in('status', r)
+        assert_equal(r['status'], label)
+
+
+def assert_fields_equal(field, results, comp):
+    """Verify that the values of a given field in the status dicts match the
+    given sequence"""
+    assert_equal(
+        [r[field] for r in results],
+        comp)
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
