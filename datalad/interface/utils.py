@@ -938,6 +938,11 @@ def eval_results(func):
                     print('{status}: {path}'.format(
                         status=res['status'],
                         path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
+                elif render_mode == 'tailored':
+                    if hasattr(_func_class, 'custom_result_renderer'):
+                        _func_class.custom_result_renderer(res, **_kwargs)
+                elif hasattr(render_mode, '__call__'):
+                    render_mode(res, **_kwargs)
                 yield res
 
             if raise_exception:
