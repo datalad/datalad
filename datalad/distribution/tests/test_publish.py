@@ -45,6 +45,7 @@ def test_invalid_call(origin):
     # yoh: now supported since why not?
 
 
+@skip_ssh
 @with_tempfile
 @with_tempfile
 def test_smth_about_not_supported(p1, p2):
