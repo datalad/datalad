@@ -43,12 +43,14 @@ from datalad.utils import swallow_logs
 from datalad.utils import better_wraps
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
+from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -810,11 +812,19 @@ eval_params = dict(
     render_results=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),
+    raise_on_failure=Parameter(
+        doc="""flag whether to raise an exception on failure. If True,
+        an IncompleteResultsError exception is raised whenever one or
+        more results have a failure status ('impossible', 'error').
+        The exception carries the result dictionaries of the failures
+        in its `failed` attribute.""",
+        constraints=EnsureBool()),
 )
 eval_defaults = dict(
     return_type='list',
     filter_results=None,
     render_results=None,
+    raise_on_failure=True,
 )
 
 
@@ -830,20 +840,19 @@ def eval_results(func):
     Default is "list mode".
 
     This decorator implements common functionality for result rendering/output,
-    error detection/handling, and logging (TODO).
+    error detection/handling, and logging.
 
     Result rendering/output can be triggered via the
-    `datalad.api.result-render-mode` configuration variable. Supported modes
-    are: 'json' (one object/dict per line, like git-annex), 'simple' (TODO,
-    tailored output formating provided by each command class, if any).
+    `datalad.api.result-render-mode` configuration variable, or the
+    `render_results` keyword argument of each decorated command. Supported
+    modes are: 'json' (one object per result, like git-annex), 'simple'
+    (status: path), 'tailored' custom output formating provided by each command
+    class (if any).
 
     Error detection works by inspecting the `status` item of all result
-    dictionaries. Any occurrence of a status other than 'ok' or 'notneeded' will
-    cause an exception to be raised. TODO: The type of exception depends on the
-    nature of complete set of errors found. If all errors have a single unique
-    type, the final exception will be of this type too. In case of a heterogeneous
-    set of error a compound exception will be raised that includes information
-    on all individual errors that occurred.
+    dictionaries. Any occurrence of a status other than 'ok' or 'notneeded'
+    will cause an IncompleteResultsError exception to be raised that carries
+    the failed actions' status dictionaries in its `failed` attribute.
 
     Status messages will be logged automatically, by default the following
     association of result status and log channel will be used: 'ok' (debug),
@@ -856,7 +865,6 @@ def eval_results(func):
     func: function
       __call__ method of a subclass of Interface,
       i.e. a datalad command definition
-
     """
 
     default_logchannels = {
@@ -905,10 +913,11 @@ def eval_results(func):
             results = wrapped(*_args, **_kwargs)
             # flag whether to raise an exception
             # TODO actually compose a meaningful exception
-            raise_exception = False
+            incomplete_results = []
             # inspect and render
             render_mode = common_params['render_results']
             filter_results = common_params['filter_results']
+            raise_on_failure = common_params['raise_on_failure']
             if not render_mode:
                 render_mode = dlcfg.get('datalad.api.result-render-mode', None)
             for res in results:
@@ -928,8 +937,8 @@ def eval_results(func):
                 ## error handling
                 # looks for error status, and report at the end via
                 # an exception
-                if res['status'] in ('impossible', 'error'):
-                    raise_exception = True
+                if raise_on_failure and res['status'] in ('impossible', 'error'):
+                    incomplete_results.append(res)
                 if filter_results:
                     try:
                         if not filter_results(res):
@@ -955,10 +964,11 @@ def eval_results(func):
                     render_mode(res, **_kwargs)
                 yield res
 
-            if raise_exception:
+            if incomplete_results:
                 # stupid catch all message <- tailor TODO
-                raise RuntimeError(
-                    "Something didn't work, check previous messages")
+                raise IncompleteResultsError(
+                    failed=incomplete_results,
+                    msg="Command did not complete successfully")
 
         if common_params['return_type'] == 'generator':
             return generator_func(*args, **kwargs)
