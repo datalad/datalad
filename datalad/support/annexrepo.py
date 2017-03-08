@@ -2025,18 +2025,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         # see https://github.com/datalad/datalad/pull/1349#discussion_r103639456
         from operator import itemgetter
         failed_copies = [e['file'] for e in results if not e['success']]
+        good_copies = [
+            e['file'] for e in results
+            if e['success'] and
+               e.get('note', '').startswith('to ')  # transfer did happen
+        ]
         if failed_copies:
-            good_copies = [e['file'] for e in results if e['success']]
             raise IncompleteResultsError(
                 results=good_copies, failed=failed_copies,
                 msg="Failed to copy %d file(s)" % len(failed_copies))
-
-        return [
-            e['file'] for e in results
-            if e['success'] and
-               # not e.get('note', '').startswith('checking ')  # so no transfer -- could be empty!
-               e.get('note', '').startswith('to ')  # transfer did happen
-        ]
+        return good_copies
 
     @property
     def uuid(self):

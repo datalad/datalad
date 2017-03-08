@@ -1173,8 +1173,8 @@ def test_annex_copy_to(origin, clone):
     with patch.object(repo, '_run_annex_command', fail_to_copy):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
-            eq_(cme.results, ["copied"])
-            eq_(cme.failed, ['nonex1', 'nonex2'])
+    eq_(cme.exception.results, ["copied"])
+    eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
