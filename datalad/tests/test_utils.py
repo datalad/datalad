@@ -47,6 +47,7 @@ from ..utils import _path_
 from ..utils import get_timestamp_suffix
 from ..utils import get_trace
 from ..utils import get_dataset_root
+from ..utils import better_wraps
 
 from ..support.annexrepo import AnnexRepo
 
@@ -70,6 +71,38 @@ def test_get_func_kwargs_doc():
     def some_func(arg1, kwarg1=None, kwarg2="bu"):
         return
     eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
+
+
+def test_better_wraps():
+    from functools import wraps
+    from inspect import getargspec
+
+    def wraps_decorator(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return new_func
+
+    def better_decorator(func):
+        @better_wraps(func)
+        def new_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return new_func
+
+    @wraps_decorator
+    def function1(a, b, c):
+        return "function1"
+
+    @better_decorator
+    def function2(a, b, c):
+        return "function2"
+
+    eq_("function1", function1(1, 2, 3))
+    eq_(getargspec(function1)[0], [])
+    eq_("function2", function2(1, 2, 3))
+    eq_(getargspec(function2)[0], ['a', 'b', 'c'])
 
 
 @with_tempfile(mkdir=True)
@@ -214,6 +247,7 @@ def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
 
+
 def test_updated():
     d = {}
     eq_(updated(d, {1: 2}), {1: 2})
@@ -232,6 +266,7 @@ def test_updated():
 
 def test_get_local_file_url_windows():
     raise SkipTest("TODO")
+
 
 @assert_cwd_unchanged
 def test_getpwd_basic():

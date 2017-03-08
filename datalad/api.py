@@ -106,31 +106,8 @@ def _generate_func_api():
                     globals()[get_api_name(intfspec)] = intf__
 
 
-def _fix_datasetmethod_docs():
-    """Fix up dataset methods docstrings which didn't get proper docs
-    """
-    from six import PY2
-    for attr in dir(Dataset):
-        try:
-            func = getattr(Dataset, attr)
-            orig_func = getattr(func, '__orig_func__')
-        except AttributeError:
-            continue
-        if PY2:
-            func = func.__func__
-        orig__doc__ = func.__doc__
-        if orig__doc__ and orig__doc__.strip():  # pragma: no cover
-            raise RuntimeError(
-                "No meaningful docstring should have been assigned before now. Got %r"
-                % orig__doc__
-            )
-        func.__doc__ = orig_func.__doc__
-
-
-# Invoke above helpers
+# Invoke above helper
 _generate_func_api()
-_fix_datasetmethod_docs()
 
 # Be nice and clean up the namespace properly
 del _generate_func_api
-del _fix_datasetmethod_docs

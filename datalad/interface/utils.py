@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import wrapt
+import sys
 import logging
 from os import curdir
 from os import pardir
@@ -25,6 +27,7 @@ from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
+from six import PY2
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
@@ -33,12 +36,17 @@ from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import swallow_logs
+from datalad.utils import better_wraps
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
+
+from .base import Interface
+from .base import update_docstring_with_parameters
+from .base import alter_interface_docs_for_api
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -761,3 +769,150 @@ def filter_unmodified(content_by_ds, refds, since):
                         # or a modified path under a given directory
                         or any(m.startswith(_with_sep(p)) for p in paths_refds))]
     return keep
+
+
+# define parameters to be used by eval_results to tune behavior
+# Note: This is done outside eval_results in order to be available when building
+# docstrings for the decorated functions
+# TODO: May be we want to move them to be part of the classes _params. Depends
+# on when and how eval_results actually has to determine the class.
+# Alternatively build a callable class with these to even have a fake signature
+# that matches the parameters, so they can be evaluated and defined the exact
+# same way.
+
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.param import Parameter
+
+eval_params = dict(
+    _eval_arg1=Parameter(
+        doc="first parameter",
+        constraints=EnsureStr() | EnsureNone()),
+    _eval_arg2=Parameter(
+        doc="second parameter",
+        constraints=EnsureStr() | EnsureNone()),
+)
+eval_defaults = dict(
+    _eval_arg1="default1",
+    _eval_arg2="default2",
+)
+
+
+def eval_results(func):
+    """Decorator providing functionality to evaluate return values of datalad
+    commands
+
+    Parameters
+    ----------
+    func: function
+      __call__ method of a subclass of Interface,
+      i.e. a datalad command definition
+
+    """
+    from inspect import isgenerator
+
+    @wrapt.decorator
+    def new_func(wrapped, instance, args, kwargs):
+
+        # determine class, the __call__ method of which we are decorating:
+        # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
+        # when and how to use eval_results as well as on how to name a command's
+        # module and class. As of now, we are inline with these requirements as
+        # far as I'm aware.
+        mod = sys.modules[wrapped.__module__]
+        if PY2:
+            # we rely on:
+            # - decorated function is method of a subclass of Interface
+            # - the name of the class matches the last part of the module's name
+            #   if converted to lower
+            # for example:
+            # ..../where/ever/mycommand.py:
+            # class MyCommand(Interface):
+            #     @eval_results
+            #     def __call__(..)
+            command_class_names = \
+                [i for i in mod.__dict__
+                 if type(mod.__dict__[i]) == type and
+                 issubclass(mod.__dict__[i], Interface) and
+                 i.lower() == wrapped.__module__.split('.')[-1]]
+            assert(len(command_class_names) == 1)
+            command_class_name = command_class_names[0]
+        else:
+            command_class_name = wrapped.__qualname__.split('.')[-2]
+        _func_class = mod.__dict__[command_class_name]
+        lgr.debug("Determined class of decorated function: %s", _func_class)
+
+        def ext_func(*_args, **_kwargs):
+
+            # MARKER for merging:
+            # this should correspond to former 'new_func' within 'eval_results'
+            # therefore this is the level of 'generator_func' in PR #1350
+            # PR #1350 is based on ecd8d8e1b86f0676db22c87182e52899a80d800e in
+            # PR #1348, which corresponds to
+            # 3825b9b177b0f67a2e93f1d5dbbd5f206c4aa2d in #1350
+
+            _params = {p_name: _kwargs.pop(p_name, eval_defaults[p_name])
+                       for p_name in eval_params}
+
+            # use additional arguments to do stuff:
+            lgr.debug("_eval_arg1: %s", _params['_eval_arg1'])
+            lgr.debug("_eval_arg2: %s", _params['_eval_arg2'])
+
+            # rudimentary wrapper to harvest generators
+            results = wrapped(*_args, **_kwargs)
+            if isgenerator(results):
+                return list(results)
+            else:
+                return results
+        return ext_func(*args, **kwargs)
+
+    return new_func(func)
+
+
+def build_doc(func):
+    """Decorator to build docstrings for datalad commands
+
+    It's intended to decorate the class, the __call__-method of which is the
+    actual command. It expects that __call__-method to be decorated by
+    eval_results.
+
+    Parameters
+    ----------
+    func: Interface
+      class defining a datalad command
+    """
+
+    # Note, that this is a class decorator, which is executed only once when the
+    # class is imported. It builds the docstring for the class' __call__ method
+    # and returns the original class.
+    #
+    # This is because a decorator for the actual function would not be able to
+    # behave like this. To build the docstring we need to access the attribute
+    # _params of the class. From within a function decorator we cannot do this
+    # during import time, since the class is being built in this very moment and
+    # is not yet available in the module. And if we do it from within the part
+    # of a function decorator, that is executed when the function is called, we
+    # would need to actually call the command once in order to build this
+    # docstring.
+
+    lgr.debug("Building doc for {}".format(func))
+
+    # get docs for eval_results parameters:
+    eval_doc = ""
+    for p in eval_params:
+        eval_doc += eval_params[p].get_autodoc(
+            p, default=eval_defaults[p], has_default=True)
+    # suffix for update_docstring_with_parameters:
+    if func.__call__.__doc__:
+        eval_doc += func.__call__.__doc__
+
+    # build standard doc and insert eval_doc
+    spec = getattr(func, '_params_', dict())
+    update_docstring_with_parameters(
+        func.__call__, spec,
+        prefix=alter_interface_docs_for_api(func.__doc__),
+        suffix=alter_interface_docs_for_api(eval_doc)
+    )
+
+    # return original
+    return func

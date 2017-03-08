@@ -10,7 +10,6 @@
 """
 
 import logging
-from functools import wraps
 from os.path import abspath
 from os.path import commonprefix
 from os.path import curdir
@@ -25,6 +24,7 @@ from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
 from six import add_metaclass
+import wrapt
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -45,6 +45,7 @@ from datalad.utils import optional_args, expandpath, is_explicit_path, \
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.utils import knows_annex
+from datalad.utils import better_wraps
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -545,16 +546,16 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     if not name:
         name = f.func_name if PY2 else f.__name__
 
-    @wraps(f)
-    def apply_func(*args, **kwargs):
-        """Wrapper function to assign arguments of the bound function to
-        original function.
+    @wrapt.decorator
+    def apply_func(wrapped, instance, args, kwargs):
+        # Wrapper function to assign arguments of the bound function to
+        # original function.
+        #
+        # Note
+        # ----
+        # This wrapper is NOT returned by the decorator, but only used to bind
+        # the function `f` to the Dataset class.
 
-        Note
-        ----
-        This wrapper is NOT returned by the decorator, but only used to bind
-        the function `f` to the Dataset class.
-        """
         kwargs = kwargs.copy()
         from inspect import getargspec
         orig_pos = getargspec(f).args
@@ -562,28 +563,28 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or dataset_argname in kwargs:
+        if len(args) >= len(orig_pos):
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
                                                       if a != dataset_argname]))
-        kwargs[dataset_argname] = args[0]
+        if dataset_argname in kwargs:
+            raise TypeError("{}() got an unexpected keyword argument {}"
+                            "".format(name, dataset_argname))
+        kwargs[dataset_argname] = instance
         ds_index = orig_pos.index(dataset_argname)
-        for i in range(1, len(args)):
-            if i <= ds_index:
-                kwargs[orig_pos[i-1]] = args[i]
-            elif i > ds_index:
+        for i in range(0, len(args)):
+            if i < ds_index:
                 kwargs[orig_pos[i]] = args[i]
+            elif i >= ds_index:
+                kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func)
-    # So we could post-hoc later adjust the documentation string which is assigned
-    # within .api
-    apply_func.__orig_func__ = f
+    setattr(Dataset, name, apply_func(f))
     return f
 
 
-# Note: Cannot be defined with constraints.py, since then dataset.py needs to
+# Note: Cannot be defined within constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
@@ -596,8 +597,6 @@ class EnsureDataset(Constraint):
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
-    # commandline doc!
     def short_description(self):
         return "Dataset"
 
