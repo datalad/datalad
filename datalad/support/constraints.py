@@ -231,6 +231,21 @@ class EnsureNone(Constraint):
         return 'value must be `None`'
 
 
+class EnsureCallable(Constraint):
+    """Ensure an input is of value `None`"""
+    def __call__(self, value):
+        if hasattr(value, '__call__'):
+            return value
+        else:
+            raise ValueError("value must be a callable")
+
+    def short_description(self):
+        return 'callable'
+
+    def long_description(self):
+        return 'value must be a callable'
+
+
 class EnsureChoice(Constraint):
     """Ensure an input is element of a set of possible values"""
 

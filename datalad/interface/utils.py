@@ -53,6 +53,7 @@ from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureCallable
 from datalad.support.param import Parameter
 
 from .base import Interface
@@ -805,10 +806,11 @@ eval_params = dict(
         doc="return value behavior",
         constraints=EnsureChoice('generator', 'list')),
     filter_results=Parameter(
-        doc="""callable to filter return values. Each to-be-returned
-        status dictionary is passed to the given callable (if any)
-        and is only returned if the callable's return value does not
-        evaluate to False or a ValueError exception is raised."""),
+        doc="""if given, each to-be-returned
+        status dictionary is passed to this callable, and is only
+        returned if the callable's return value does not
+        evaluate to False or a ValueError exception is raised.""",
+        constraints=EnsureCallable()),
     render_results=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),

@@ -107,6 +107,13 @@ def test_none():
     assert_raises(ValueError, lambda: c([]))
 
 
+def test_callable():
+    c = ct.EnsureCallable()
+    # this should always work
+    assert_equal(c(range), range)
+    assert_raises(ValueError, c, 'range')
+
+
 def test_choice():
     c = ct.EnsureChoice('choice1', 'choice2', None)
     # this should always work
