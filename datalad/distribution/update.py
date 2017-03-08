@@ -106,7 +106,7 @@ class Update(Interface):
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         # report input paths that cannot be updates, because they are not there
         for up in unavailable_paths:
-            yield get_status_dict('update', path=up, status=impossible,
+            yield get_status_dict('update', path=up, status='impossible',
                                   logger=lgr, refds=refds_path)
 
         for ds_path in content_by_ds:
