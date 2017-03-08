@@ -197,7 +197,8 @@ def test_save_hierarchy(path):
     da.repo.remove('file_da')
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
-    save_dataset_hierarchy((d.path, da.path, db.path))
+    # generator
+    list(save_dataset_hierarchy((d.path, da.path, db.path)))
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)

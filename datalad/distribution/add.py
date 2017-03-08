@@ -238,7 +238,8 @@ class Add(Interface):
             results.extend(added)
 
         if results and save:
-            # TODO new returns a generator and yields status dicts
+            # TODO GENERATOR
+            # new returns a generator and yields status dicts
             # pass through as embedded results
             list(save_dataset_hierarchy(
                 content_by_ds,

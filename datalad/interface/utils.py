@@ -128,10 +128,12 @@ def handle_dirty_datasets(dpaths,
     None
     """
     if mode == 'save-before':
-        save_dataset_hierarchy(
+        # TODO GENERATOR
+        # new returns a generator and yields status dicts
+        list(save_dataset_hierarchy(
             {d: [d] for d in dpaths},
             base=base,
-            message=msg)
+            message=msg))
     elif mode == 'ignore':
         return
     elif mode == 'fail':
