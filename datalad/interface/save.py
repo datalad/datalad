@@ -28,6 +28,7 @@ from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import amend_pathspec_with_superdatasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import get_dataset_root
 
@@ -144,9 +145,16 @@ class Save(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+
         if unavailable_paths:
-            lgr.warning("ignoring non-existent path(s): %s",
-                        unavailable_paths)
+            for p in unavailable_paths:
+                yield get_status_dict(
+                    'get', path=p, status='impossible', refds=refds_path,
+                    logger=lgr, message=(
+                        "ignored non-existing path: %s",
+                        p))
+
         # here we know all datasets associated with any inputs
         # so we can expand "all_changes" right here to avoid confusion
         # wrt to "super" and "intermediate" datasets discovered later on
@@ -172,21 +180,20 @@ class Save(Interface):
                 bp.extend(content_by_ds[c])
             content_by_ds[dataset.path] = list(set(bp))
 
-        saved_ds = save_dataset_hierarchy(
-            content_by_ds,
-            base=dataset.path if dataset and dataset.is_installed() else None,
-            message=message,
-            version_tag=version_tag)
-
-        return saved_ds
+        for res in save_dataset_hierarchy(
+                content_by_ds,
+                base=dataset.path if dataset and dataset.is_installed() else None,
+                message=message,
+                version_tag=version_tag):
+            yield res
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if not res:
+        if not res or res.get('type', None) != 'dataset' or 'path' not in res:
             return
-        for ds in res:
-            commit = ds.repo.repo.head.commit
-            ui.message('Saved state: {0} for {1}'.format(
-                commit.hexsha,
-                ds))
+        ds = Dataset(res['path'])
+        commit = ds.repo.repo.head.commit
+        ui.message('Saved state: {0} for {1}'.format(
+            commit.hexsha,
+            ds))
