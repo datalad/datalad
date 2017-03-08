@@ -345,8 +345,10 @@ class Publish(Interface):
             recursion_limit=recursion_limit,
             # we do not want for this command state that we want to publish
             # content by default by assigning paths for each sub-dataset
-            # automagically
-            sub_paths=False
+            # automagically. But if paths were provided -- sorting would
+            # happen to point only to the submodules under those paths, and
+            # then to stay consistent we want to copy those paths data
+            sub_paths=bool(path)
         )
         if unavailable_paths:
             raise ValueError(

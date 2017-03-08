@@ -212,14 +212,17 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # and the file itself was not transferred but now exists
     ok_(lexists(opj(sub2_target.path, 'file.dat')))
-    # XXX And here it will blow since content is transferred!  I guess because of
-    # the special treatment of '.' path for submodules?
-    nok_(sub2_target.file_has_content('file.dat'))  # BLOWS since all data gets copied in subdatasets
+    nok_(sub2_target.file_has_content('file.dat'))
 
     # but now we can redo publish recursively, at least stating to consider
     # explicitly to copy .
-    # TODO
-
+    res_published, res_skipped = publish(
+        '.',
+        dataset=source, to='target',
+        recursive=True
+    )
+    ok_(sub2_target.file_has_content('file.dat'))
+    eq_(res_published, ['file.dat'])  # note that this report makes little sense without path to the repository
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
