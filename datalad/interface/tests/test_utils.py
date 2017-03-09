@@ -377,7 +377,7 @@ def test_eval_results_plus_build_doc():
     assert_in("It's a number", doc1)
 
     # docstring also contains eval_result's parameters:
-    assert_in("filter_results", doc1)
+    assert_in("result_filter", doc1)
     assert_in("return_type", doc1)
     assert_in("list", doc1)
     assert_in("None", doc1)
@@ -403,7 +403,7 @@ def test_eval_results_plus_build_doc():
     assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
 
 
-def test_filter_results():
+def test_result_filter():
     # ensure baseline without filtering
     assert_equal(
         [r['somekey'] for r in Test_Utils().__call__(4)],
@@ -418,11 +418,11 @@ def test_filter_results():
         assert_equal(
             [r['somekey'] for r in Test_Utils().__call__(
                 4,
-                filter_results=filt)],
+                result_filter=filt)],
             [0, 2])
         # constraint returns full dict
         assert_dict_equal(
             Test_Utils().__call__(
                 4,
-                filter_results=filt)[-1],
+                result_filter=filt)[-1],
             {'path': 'some', 'status': 'ok', 'somekey': 2})

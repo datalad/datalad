@@ -805,13 +805,13 @@ eval_params = dict(
     return_type=Parameter(
         doc="return value behavior",
         constraints=EnsureChoice('generator', 'list')),
-    filter_results=Parameter(
+    result_filter=Parameter(
         doc="""if given, each to-be-returned
         status dictionary is passed to this callable, and is only
         returned if the callable's return value does not
         evaluate to False or a ValueError exception is raised.""",
         constraints=EnsureCallable()),
-    render_results=Parameter(
+    result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),
     raise_on_failure=Parameter(
@@ -824,8 +824,8 @@ eval_params = dict(
 )
 eval_defaults = dict(
     return_type='list',
-    filter_results=None,
-    render_results=None,
+    result_filter=None,
+    result_renderer=None,
     raise_on_failure=True,
 )
 
@@ -845,8 +845,8 @@ def eval_results(func):
     error detection/handling, and logging.
 
     Result rendering/output can be triggered via the
-    `datalad.api.result-render-mode` configuration variable, or the
-    `render_results` keyword argument of each decorated command. Supported
+    `datalad.api.result-renderer` configuration variable, or the
+    `result_renderer` keyword argument of each decorated command. Supported
     modes are: 'json' (one object per result, like git-annex), 'simple'
     (status: path), 'tailored' custom output formating provided by each command
     class (if any).
@@ -920,11 +920,11 @@ def eval_results(func):
             # TODO actually compose a meaningful exception
             incomplete_results = []
             # inspect and render
-            render_mode = common_params['render_results']
-            filter_results = common_params['filter_results']
+            result_renderer = common_params['result_renderer']
+            result_filter = common_params['result_filter']
             raise_on_failure = common_params['raise_on_failure']
-            if not render_mode:
-                render_mode = dlcfg.get('datalad.api.result-render-mode', None)
+            if not result_renderer:
+                result_renderer = dlcfg.get('datalad.api.result-renderer', None)
             for res in results:
                 ## log message
                 # use provided logger is possible, or ours if necessary
@@ -944,29 +944,29 @@ def eval_results(func):
                 # an exception
                 if raise_on_failure and res['status'] in ('impossible', 'error'):
                     incomplete_results.append(res)
-                if filter_results:
+                if result_filter:
                     try:
-                        if not filter_results(res):
+                        if not result_filter(res):
                             raise ValueError('excluded by filter')
                     except ValueError as e:
                         lgr.debug('not reporting result (%s)', exc_str(e))
                         continue
                 ## output rendering
-                if render_mode == 'json':
+                if result_renderer == 'json':
                     print(json.dumps(
                         {k: v for k, v in res.items()
                          if k not in ('message', 'logger')}))
-                elif render_mode == 'simple':
+                elif result_renderer == 'simple':
                     # simple output "STATUS: PATH"
                     # where PATH is relative to a reference dataset, if one is reported in the result
                     print('{status}: {path}'.format(
                         status=res['status'],
                         path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
-                elif render_mode == 'tailored':
+                elif result_renderer == 'tailored':
                     if hasattr(_func_class, 'custom_result_renderer'):
                         _func_class.custom_result_renderer(res, **_kwargs)
-                elif hasattr(render_mode, '__call__'):
-                    render_mode(res, **_kwargs)
+                elif hasattr(result_renderer, '__call__'):
+                    result_renderer(res, **_kwargs)
                 yield res
 
             if incomplete_results:

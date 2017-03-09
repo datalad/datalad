@@ -111,7 +111,7 @@ def test_recursive_save(path):
     # saves the status change of the subdataset due to the subsubdataset addition
     assert_fields_equal(
         'path',
-        ds.save(all_changes=True, filter_results=is_ok_dataset),
+        ds.save(all_changes=True, result_filter=is_ok_dataset),
         [ds.path])
 
     # make the new file known to its dataset
@@ -127,7 +127,7 @@ def test_recursive_save(path):
     # with recursive pick up the change in subsubds
     assert_fields_equal(
         'path',
-        ds.save(all_changes=True, recursive=True, filter_results=is_ok_dataset),
+        ds.save(all_changes=True, recursive=True, result_filter=is_ok_dataset),
         [subsubds.path, subds.path, ds.path])
     # modify content in subsub and try saving
     testfname = newfile_name
@@ -147,7 +147,7 @@ def test_recursive_save(path):
     # plain recursive without any files given will save the beast
     assert_fields_equal(
         'path',
-        ds.save(recursive=True, filter_results=is_ok_dataset),
+        ds.save(recursive=True, result_filter=is_ok_dataset),
         [subds.path, ds.path])
     # there is nothing else to save
     assert_status('notneeded', ds.save(all_changes=True, recursive=True))

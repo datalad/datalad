@@ -314,20 +314,20 @@ class Interface(object):
         # run indented code unconditionally
         if cls.__name__ in ('Update', 'Save'):
             kwargs['return_type'] = 'generator'
-            kwargs['render_results'] = args.common_output_format
+            kwargs['result_renderer'] = args.common_output_format
             # compose filter function from to be invented cmdline options
-            filter_results = None
+            result_filter = None
             if args.common_report_status:
                 if args.common_report_status == 'success':
-                    filter_results = EnsureKeyChoice('status', ('ok', 'notneeded'))
+                    result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
                 elif args.common_report_status == 'failure':
-                    filter_results = EnsureKeyChoice('status', ('impossible', 'error'))
+                    result_filter = EnsureKeyChoice('status', ('impossible', 'error'))
                 else:
-                    filter_results = EnsureKeyChoice('status', (args.common_report_status,))
+                    result_filter = EnsureKeyChoice('status', (args.common_report_status,))
             if args.common_report_type:
                 tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
-                filter_results = filter_results & tfilt if filter_results else tfilt
-            kwargs['filter_results'] = filter_results
+                result_filter = result_filter & tfilt if result_filter else tfilt
+            kwargs['result_filter'] = result_filter
         try:
             return cls.__call__(**kwargs)
         except KeyboardInterrupt as exc:

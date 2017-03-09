@@ -274,7 +274,7 @@ def main(args=None):
     args_ = args or sys.argv
 
     # configure rendering of return values
-    datalad.cfg.overrides['datalad.api.result-render-mode'] = \
+    datalad.cfg.overrides['datalad.api.result-renderer'] = \
         cmdlineargs.common_output_format
 
     # enable overrides
