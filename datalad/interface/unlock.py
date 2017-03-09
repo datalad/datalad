@@ -91,7 +91,7 @@ class Unlock(Interface):
 
         for r in results_from_paths(
                 nondataset_paths, status='impossible',
-                message="path does not belong to any dataset",
+                message="path does not belong to any dataset: %s",
                 **res_kwargs):
             yield r
         for r in results_from_paths(

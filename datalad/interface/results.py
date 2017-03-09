@@ -48,10 +48,17 @@ def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
 
 def results_from_paths(paths, action=None, type_=None, logger=None, refds=None,
                        status=None, message=None):
+    """
+    Parameters
+    ----------
+    message: str
+      A result message. May contain `%s` which will be replaced by the
+      respective `path`.
+    """
     for p in assure_list(paths):
         yield get_status_dict(
             action, path=p, type_=type_, logger=logger, refds=refds,
-            status=status, message=message)
+            status=status, message=(message, p) if '%s' in message else message)
 
 
 def is_ok_dataset(r):
