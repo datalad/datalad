@@ -110,6 +110,7 @@ def setup_parser(
     parser.add_argument(
         '--output-format', dest='common_output_format',
         choices=['simple', 'json', 'tailored'],
+        default='tailored',
         help="""select format for returned command results. 'simple' give one line
         per result using a '<status>: <path>' syntax; 'json' renders a JSON object
         with all properties for each result (one per line); 'tailored' enables a
