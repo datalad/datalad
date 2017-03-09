@@ -907,8 +907,11 @@ def eval_results(func):
         _func_class = mod.__dict__[command_class_name]
         lgr.debug("Determined class of decorated function: %s", _func_class)
 
-        common_params = {p_name: kwargs.pop(p_name, eval_defaults[p_name])
-                         for p_name in eval_params}
+        common_params = {
+            p_name: kwargs.pop(
+                p_name,
+                getattr(_func_class, p_name, eval_defaults[p_name]))
+            for p_name in eval_params}
 
         def generator_func(*_args, **_kwargs):
             # obtain results
@@ -1020,7 +1023,9 @@ def build_doc(func):
     for p in eval_params:
         eval_doc += '{}{}'.format(
             eval_params[p].get_autodoc(
-                p, default=eval_defaults[p], has_default=True),
+                p,
+                default=getattr(func, p, eval_defaults[p]),
+                has_default=True),
             linesep)
 
     # suffix for update_docstring_with_parameters:
