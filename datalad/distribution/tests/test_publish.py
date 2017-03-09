@@ -18,6 +18,7 @@ from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.utils import chpwd
 
 from nose.tools import eq_, ok_, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, \
@@ -40,7 +41,25 @@ def test_invalid_call(origin):
     # known, but not present
     assert_raises(ValueError, publish, opj(ds.path, 'subm 1'))
     # --since without dataset is not supported
-    assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # yoh: now supported since why not?
+
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_smth_about_not_supported(p1, p2):
+    source = Dataset(p1).create()
+    source.create_sibling(
+        'ssh://localhost' + p2,
+        name='target1')
+    # source.publish(to='target1')
+    with chpwd(p1):
+        # since we have only a single commit -- there is no HEAD^
+        assert_raises(ValueError, publish, to='target1', since='HEAD^')
+        # but now let's add one more commit, we should be able to pusblish
+        source.repo.commit("msg", options=['--allow-empty'])
+        publish(to='target1', since='HEAD^')  # must not fail now
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -171,9 +190,14 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     res_ = publish(dataset=source, recursive=True)
     eq_(set(r.path for r in res_[0]), set())
 
-    # still nothing gets pushed, because orgin is up to date
+    # still nothing gets pushed, because origin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
     eq_(set(r.path for r in res_[0]), set([]))
+
+    # and we should not fail if we run it from within the dataset
+    with chpwd(source.path):
+        res_ = publish(recursive=True, since='HEAD^')
+        eq_(set(r.path for r in res_[0]), set([]))
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:

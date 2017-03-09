@@ -398,7 +398,11 @@ class Remove(Interface):
                 submodule = [sm for sm in superds.repo.repo.submodules
                              if sm.path == subds_relpath]
                 # there can only be one!
-                assert(len(submodule) == 1)
+                assert len(submodule) == 1, \
+                    "Found multiple subdatasets with registered path {}:" \
+                    "{}{}{}There should be only one." \
+                    "".format(subds_relpath, os.linesep,
+                              submodule, os.linesep)
                 submodule = submodule[0]
                 submodule.remove()
                 if exists(ds_path):

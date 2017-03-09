@@ -90,13 +90,18 @@ def test_help_np():
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
     # rewrite-urls
+    import shutil
+    accepted_width = shutil.get_terminal_size()[0] \
+        if hasattr(shutil, 'get_terminal_size') else 80
+
     long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
-                  if len(l) > 80 and '{' not in l  # on nd70 summary line is unsplit
+                  if len(l) > accepted_width and
+                  '{' not in l  # on nd70 summary line is unsplit
                   ]
     if long_lines:
         raise AssertionError(
-            "Following lines in --help output were longer than 80 chars:\n%s"
-            % '\n'.join(long_lines)
+            "Following lines in --help output were longer than %s chars:\n%s"
+            % (accepted_width, '\n'.join(long_lines))
         )
 
 

@@ -41,7 +41,9 @@ from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import swallow_logs
 from datalad.utils import better_wraps
+from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.distribution.dataset import Dataset
@@ -758,7 +760,29 @@ def filter_unmodified(content_by_ds, refds, since):
     # we cannot really limit the diff paths easily because we might get
     # or miss content (e.g. subdatasets) if we don't figure out which ones
     # are known -- and we don't want that
-    diff = repo.commit().diff(since)
+    try:
+        diff = repo.commit().diff(since)
+    except GitCommandError as exc:
+        # could fail because `since` points to non existing location.
+        # Unfortunately there might be no meaningful message
+        # e.g. "fatal: ambiguous argument 'HEAD^': unknown revision or path not in the working tree"
+        # logged within this GitCommandError for some reason! So let's check
+        # that value of since post-error for being correct:
+        try:
+            refds.repo._git_custom_command(
+                [],
+                ['git', 'show', '--stat', since, '--'],
+                expect_stderr=True, expect_fail=True)
+            raise  # re-raise since our idea was incorrect
+        except CommandError as ce_exc:
+            if ce_exc.stderr.startswith('fatal: bad revision'):
+                raise ValueError(
+                    "Value since=%r is not valid. Git reports: %s" %
+                    (since, exc_str(ce_exc))
+                )
+            else:
+                raise  # re-raise
+
     # get all modified paths (with original? commit) that are still
     # present
     modified = dict((opj(refds_path, d.b_path),
