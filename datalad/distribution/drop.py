@@ -24,7 +24,11 @@ from datalad.interface.base import report_result_objects
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
 from datalad.interface.utils import handle_dirty_datasets
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
 
 lgr = logging.getLogger('datalad.distribution.drop')
 
@@ -46,19 +50,26 @@ check_argument = Parameter(
     dest='check')
 
 
+res_kwargs = dict(action='drop', logger=lgr)
+
+
 def _drop_files(ds, files, check):
-    results = []
-    if hasattr(ds.repo, 'drop'):
-        opts = ['--force'] if not check else []
-        # TODO capture for which files it fails and report them properly
-        # not embedded in a command error
-        dropped = ds.repo.drop(files, options=opts)
-        results.extend([opj(ds.path, f) for f in dropped])
-    else:
-        lgr.info("skip dropping files in %s, no annex", ds)
-    return results
+    if not hasattr(ds.repo, 'drop'):
+        msg = 'no annex in dataset'
+        for f in files:
+            yield get_status_dict(
+                status='impossible', path=f, message=msg, **res_kwargs)
+        return
+
+    opts = ['--force'] if not check else []
+    # TODO capture for which files it fails and report them properly
+    # not embedded in a command error
+    for f in ds.repo.drop(files, options=opts):
+        yield get_status_dict(
+            status='ok', path=opj(ds.path, f), **res_kwargs)
 
 
+@build_doc
 class Drop(Interface):
     """Drop file content from datasets
 
@@ -105,6 +116,7 @@ class Drop(Interface):
 
     @staticmethod
     @datasetmethod(name=_action)
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -121,20 +133,20 @@ class Drop(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        for r in results_from_paths(
+                unavailable_paths, status='impossible',
+                message="path does not exist: %s",
+                **res_kwargs):
+            yield r
+        # TODO generator
+        # this should yield what it did
         handle_dirty_datasets(
             content_by_ds.keys(), mode=if_dirty, base=dataset)
-
-        results = []
 
         # iterate over all datasets, order doesn't matter
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            res = _drop_files(ds, paths, check=check)
-            results.extend(res)
+            for r in _drop_files(ds, paths, check=check):
+                yield r
         # there is nothing to save at the end
-        return results
-
-    @classmethod
-    def result_renderer_cmdline(cls, res, args):
-        report_result_objects(cls, res, args, 'dropped')
