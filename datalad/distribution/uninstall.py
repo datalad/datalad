@@ -24,27 +24,39 @@ from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
 from datalad.distribution.drop import check_argument
 from datalad.interface.base import Interface
-from datalad.interface.base import report_result_objects
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
 from datalad.utils import rmtree
 
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
+res_kwargs = dict(action='uninstall', logger=lgr)
+
 
 def _uninstall_dataset(ds, check, has_super):
-    results = []
     if check and ds.is_installed():
-        results.extend(_drop_files(ds, curdir, check=True))
+        for r in _drop_files(ds, curdir, check=True):
+            yield r
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
     # TODO check that the relevant branched are pushed to a remote
     if ds.get_subdatasets(fulfilled=True):
-        raise ValueError('to be uninstalled dataset has present subdatasets, forgot --recursive?')
+        yield get_status_dict(
+            status='error',
+            ds=ds,
+            message=(
+                'to be uninstalled dataset %s has present subdatasets, forgot --recursive?',
+                ds),
+            **res_kwargs)
+        return
     # Close any possibly associated process etc with underlying repo.
     # Otherwise - rmtree could fail to remove e.g. under NFS which would
     # still have some files opened by them (thus having .nfs00000xxxx
@@ -57,10 +69,10 @@ def _uninstall_dataset(ds, check, has_super):
         os.makedirs(ds.path)
     # invalidate loaded ConfigManager:
     ds._cfg = None
-    results.append(ds)
-    return results
+    yield get_status_dict(status='ok', ds=ds, **res_kwargs)
 
 
+@build_doc
 class Uninstall(Interface):
     """Uninstall subdatasets
 
@@ -107,6 +119,7 @@ class Uninstall(Interface):
 
     @staticmethod
     @datasetmethod(name=_action)
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -121,50 +134,53 @@ class Uninstall(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive)
-        if unavailable_paths:
-            lgr.warning('ignored non-installed paths: %s', unavailable_paths)
-        # upfront sanity and compliance checks
         if path_is_under(content_by_ds.keys()):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
                 "refusing to uninstall current or parent directory")
+        for r in results_from_paths(
+                unavailable_paths, status='impossible',
+                message="path does not exist: %s",
+                **res_kwargs):
+            yield r
+        # upfront sanity and compliance checks
         # check that we have no top-level datasets and not files to process
         args_ok = True
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
             if ds_path not in paths:
-                lgr.error(
-                    "will not act on files at %s (consider the `drop` command)",
-                    paths)
+                yield get_status_dict(
+                    status='error',
+                    message=(
+                        "will not act on files at %s (consider the `drop` command)",
+                        paths),
+                    ds=ds,
+                    **res_kwargs)
                 args_ok = False
-            if not ds.get_superdataset(
-                    datalad_only=False,
-                    topmost=False):
-                lgr.error(
-                    "will not uninstall top-level dataset at %s (consider the `remove` command)",
-                    ds.path)
+            if not ds.get_superdataset(datalad_only=False, topmost=False):
+                yield get_status_dict(
+                    status='error',
+                    message=(
+                        "will not uninstall top-level dataset at %s (consider the `remove` command)",
+                        ds.path),
+                    ds=ds,
+                    **res_kwargs)
                 args_ok = False
         if not args_ok:
             raise ValueError(
                 'inappropriate arguments, see previous error message(s)')
 
+        # TODO generator
+        # this should yield what it did
         handle_dirty_datasets(
             content_by_ds, mode=if_dirty, base=dataset)
-
-        results = []
 
         # iterate over all datasets, starting at the bottom
         # to deinit contained submodules first
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
-            paths = content_by_ds[ds_path]
-            results.extend(
-                # we confirmed the super dataset presence above
-                _uninstall_dataset(ds, check=check, has_super=True))
+            # we confirmed the super dataset presence above
+            for r in _uninstall_dataset(ds, check=check, has_super=True):
+                yield r
         # there is nothing to save at the end
-        return results
-
-    @classmethod
-    def result_renderer_cmdline(cls, res, args):
-        report_result_objects(cls, res, args, 'uninstalled')
