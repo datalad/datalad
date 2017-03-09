@@ -21,9 +21,11 @@ from datalad.distribution.dataset import Dataset
 lgr = logging.getLogger('datalad.interface.results')
 
 
-def get_status_dict(action, ds=None, path=None, type_=None, logger=None,
+def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
                     refds=None, status=None, message=None):
-    d = {'action': action}
+    d = {}
+    if action:
+        d['action'] = action
     if ds:
         d['path'] = ds.path
         d['type'] = 'dataset'
@@ -44,7 +46,7 @@ def get_status_dict(action, ds=None, path=None, type_=None, logger=None,
     return d
 
 
-def results_from_paths(action, paths, type_=None, logger=None, refds=None,
+def results_from_paths(paths, action=None, type_=None, logger=None, refds=None,
                        status=None, message=None):
     for p in assure_list(paths):
         yield get_status_dict(

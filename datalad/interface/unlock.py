@@ -84,17 +84,18 @@ class Unlock(Interface):
             get_paths_by_dataset(resolved_paths,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        res_kwargs = dict(
+            action='unlock', logger=lgr,
+            refds=dataset.path if isinstance(dataset, Dataset) else dataset)
 
         for r in results_from_paths(
-                'unlock', nondataset_paths, logger=lgr, refds=refds_path,
-                status='impossible',
-                message="path does not belong to any dataset"):
+                nondataset_paths, status='impossible',
+                message="path does not belong to any dataset",
+                **res_kwargs):
             yield r
         for r in results_from_paths(
-                'unlock', unavailable_paths, logger=lgr, refds=refds_path,
-                status='impossible',
-                message="path does not exist"):
+                unavailable_paths, status='impossible',
+                message="path does not exist", **res_kwargs):
             yield r
 
         for ds_path in sorted(content_by_ds.keys()):
@@ -113,8 +114,7 @@ class Unlock(Interface):
             for r in [line.split()[1] for line in std_out.splitlines()
                       if line.strip().endswith('ok')]:
                 yield get_status_dict(
-                    action='unlock', path=r, status='ok', logger=lgr,
-                    type_='file', refds=refds_path)
+                    path=r, status='ok', type_='file', **res_kwargs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
