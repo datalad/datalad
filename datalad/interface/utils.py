@@ -857,7 +857,7 @@ eval_params = dict(
         exception will be raised at the end, but processing other actions will
         continue for as long as possible; 'stop': processing will stop on first
         failure and an exception is raised. A failure is any result with status
-        'impossible' or 'error'). Raised exception is an IncompleteResultsError
+        'impossible' or 'error'. Raised exception is an IncompleteResultsError
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
         constraints=EnsureChoice('ignore', 'continue', 'stop')),

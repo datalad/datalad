@@ -136,7 +136,7 @@ def setup_parser(
         operations, the error is logged but does not lead to a non-zero exit code
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
-        code. A failure is any result with status 'impossible' or 'error').""")
+        code. A failure is any result with status 'impossible' or 'error'.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
