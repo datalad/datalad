@@ -60,6 +60,7 @@ from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
 from .results import get_status_dict
+from .results import known_result_xfms
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -813,6 +814,16 @@ eval_params = dict(
         returned if the callable's return value does not
         evaluate to False or a ValueError exception is raised.""",
         constraints=EnsureCallable()),
+    result_xfm=Parameter(
+        doc="""if given, each to-be-returned result
+        status dictionary is passed to this callable, and its return value
+        becomes the result instead. This is different from
+        `result_filter`, as it can perform arbitrary transformation of the
+        result value. This is mostly useful for top-level command invocations
+        that need to provide the results in a particular format. Instead of
+        a callable, a label for a pre-crafted result transformation can be
+        given.""",
+        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),
@@ -828,6 +839,7 @@ eval_defaults = dict(
     return_type='list',
     result_filter=None,
     result_renderer=None,
+    result_xfm=None,
     raise_on_failure=True,
 )
 
