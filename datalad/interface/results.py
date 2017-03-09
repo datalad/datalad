@@ -54,22 +54,13 @@ class ResultXFM(object):
 
 
 class YieldDatasets(ResultXFM):
-    def __init__(self, status=None, action=None):
-        self.action = action
-        self.status = assure_list(status)
-
     def __call__(self, res):
-        if res.get('type', None) == 'dataset' \
-                and (self.action is None or
-                     res.get('action', None) is self.action) \
-                and (self.status is None or
-                     res.get('status', None) in self.status):
+        if res.get('type', None) == 'dataset':
             return Dataset(res['path'])
         else:
             lgr.debug('rejected by return value configuration: %s', res)
 
 
 known_result_xfms = {
-    'ds_success': YieldDatasets(('ok', 'notneeded')),
-    'ds_fail': YieldDatasets(('impossible', 'error')),
+    'datasets': YieldDatasets(),
 }

@@ -29,6 +29,7 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureKeyChoice
 from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
@@ -84,7 +85,9 @@ class Create(Interface):
     # in general this command will yield exactly one result
     return_type = 'item-or-list'
     # in general users expect to get an instance of the created dataset
-    result_xfm = 'ds_success'
+    result_xfm = 'datasets'
+    # result filter
+    result_filter = EnsureKeyChoice('action', ('create',)) & EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _params_ = dict(
         path=Parameter(
