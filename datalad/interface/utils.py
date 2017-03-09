@@ -936,6 +936,9 @@ def eval_results(func):
             # inspect and render
             result_renderer = common_params['result_renderer']
             result_filter = common_params['result_filter']
+            result_xfm = common_params['result_xfm']
+            if result_xfm in known_result_xfms:
+                result_xfm = known_result_xfms[result_xfm]
             raise_on_failure = common_params['raise_on_failure']
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
@@ -981,6 +984,10 @@ def eval_results(func):
                         _func_class.custom_result_renderer(res, **_kwargs)
                 elif hasattr(result_renderer, '__call__'):
                     result_renderer(res, **_kwargs)
+                if result_xfm:
+                    res = result_xfm(res)
+                    if res is None:
+                        continue
                 yield res
 
             if incomplete_results:
