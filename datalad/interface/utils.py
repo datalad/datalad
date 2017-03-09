@@ -803,8 +803,10 @@ def filter_unmodified(content_by_ds, refds, since):
 
 eval_params = dict(
     return_type=Parameter(
-        doc="return value behavior",
-        constraints=EnsureChoice('generator', 'list')),
+        doc="""return value behavior switch. If 'item-or-list' a single
+        value is returned instead of a one-item return value list, or a
+        list in case of multiple return values.""",
+        constraints=EnsureChoice('generator', 'list', 'item-or-list')),
     result_filter=Parameter(
         doc="""if given, each to-be-returned
         status dictionary is passed to this callable, and is only
@@ -983,7 +985,11 @@ def eval_results(func):
                 results = wrapped_(*args_, **kwargs_)
                 if inspect.isgenerator(results):
                     results = list(results)
-                return results
+                if common_params['return_type'] == 'item-or-list' and \
+                        len(results) == 1:
+                    return results[0]
+                else:
+                    return results
 
             return return_func(generator_func)(*args, **kwargs)
 
