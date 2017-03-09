@@ -990,7 +990,7 @@ def eval_results(func):
     return eval_func(func)
 
 
-def build_doc(func):
+def build_doc(cls):
     """Decorator to build docstrings for datalad commands
 
     It's intended to decorate the class, the __call__-method of which is the
@@ -999,7 +999,7 @@ def build_doc(func):
 
     Parameters
     ----------
-    func: Interface
+    cls: Interface
       class defining a datalad command
     """
 
@@ -1016,7 +1016,7 @@ def build_doc(func):
     # would need to actually call the command once in order to build this
     # docstring.
 
-    lgr.debug("Building doc for {}".format(func))
+    lgr.debug("Building doc for {}".format(cls))
 
     # get docs for eval_results parameters:
     eval_doc = ""
@@ -1024,21 +1024,21 @@ def build_doc(func):
         eval_doc += '{}{}'.format(
             eval_params[p].get_autodoc(
                 p,
-                default=getattr(func, p, eval_defaults[p]),
+                default=getattr(cls, p, eval_defaults[p]),
                 has_default=True),
             linesep)
 
     # suffix for update_docstring_with_parameters:
-    if func.__call__.__doc__:
-        eval_doc += func.__call__.__doc__
+    if cls.__call__.__doc__:
+        eval_doc += cls.__call__.__doc__
 
     # build standard doc and insert eval_doc
-    spec = getattr(func, '_params_', dict())
+    spec = getattr(cls, '_params_', dict())
     update_docstring_with_parameters(
-        func.__call__, spec,
-        prefix=alter_interface_docs_for_api(func.__doc__),
+        cls.__call__, spec,
+        prefix=alter_interface_docs_for_api(cls.__doc__),
         suffix=alter_interface_docs_for_api(eval_doc)
     )
 
     # return original
-    return func
+    return cls
