@@ -61,6 +61,18 @@ class YieldDatasets(ResultXFM):
             lgr.debug('rejected by return value configuration: %s', res)
 
 
+class YieldField(ResultXFM):
+    def __init__(self, field):
+        self.field = field
+
+    def __call__(self, res):
+        if self.field in res:
+            return res[field]
+        else:
+            lgr.debug('rejected by return value configuration: %s', res)
+
+
 known_result_xfms = {
     'datasets': YieldDatasets(),
+    'paths': YieldField('path'),
 }
