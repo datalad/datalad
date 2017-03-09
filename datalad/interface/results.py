@@ -44,6 +44,14 @@ def get_status_dict(action, ds=None, path=None, type_=None, logger=None,
     return d
 
 
+def results_from_paths(action, paths, type_=None, logger=None, refds=None,
+                       status=None, message=None):
+    for p in assure_list(paths):
+        yield get_status_dict(
+            action, path=p, type_=type_, logger=logger, refds=refds,
+            status=status, message=message)
+
+
 def is_ok_dataset(r):
     return r.get('status', None) == 'ok' and r.get('type', None) == 'dataset'
 
@@ -67,7 +75,7 @@ class YieldField(ResultXFM):
 
     def __call__(self, res):
         if self.field in res:
-            return res[field]
+            return res[self.field]
         else:
             lgr.debug('rejected by return value configuration: %s', res)
 

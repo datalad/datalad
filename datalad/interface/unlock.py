@@ -25,6 +25,10 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 
@@ -33,11 +37,14 @@ from .base import Interface
 lgr = logging.getLogger('datalad.interface.unlock')
 
 
+@build_doc
 class Unlock(Interface):
     """Unlock file(s) of a dataset
 
     Unlock files of a dataset in order to be able to edit the actual content
     """
+
+    result_xfm = 'paths'
 
     _params_ = dict(
         path=Parameter(
@@ -58,6 +65,7 @@ class Unlock(Interface):
 
     @staticmethod
     @datasetmethod(name='unlock')
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -76,15 +84,19 @@ class Unlock(Interface):
             get_paths_by_dataset(resolved_paths,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
 
-        if nondataset_paths:
-            lgr.warning(
-                "ignored paths that do not belong to any dataset: %s",
-                nondataset_paths)
-        if unavailable_paths:
-            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
+        for r in results_from_paths(
+                'unlock', nondataset_paths, logger=lgr, refds=refds_path,
+                status='impossible',
+                message="path does not belong to any dataset"):
+            yield r
+        for r in results_from_paths(
+                'unlock', unavailable_paths, logger=lgr, refds=refds_path,
+                status='impossible',
+                message="path does not exist"):
+            yield r
 
-        unlocked = []
         for ds_path in sorted(content_by_ds.keys()):
             ds = Dataset(ds_path)
 
@@ -98,13 +110,14 @@ class Unlock(Interface):
             std_out, std_err = ds.repo._annex_custom_command(
                 files, ['git', 'annex', 'unlock'])
 
-            unlocked.extend(
-                [line.split()[1] for line in std_out.splitlines()
-                 if line.strip().endswith('ok')])
-        return unlocked
+            for r in [line.split()[1] for line in std_out.splitlines()
+                      if line.strip().endswith('ok')]:
+                yield get_status_dict(
+                    action='unlock', path=r, status='ok', logger=lgr,
+                    type_='file', refds=refds_path)
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
         if res is None:
             res = []
