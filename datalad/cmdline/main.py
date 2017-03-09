@@ -128,6 +128,15 @@ def setup_parser(
         action='append',
         help="""constrain command result report to records matching the given
         type. Can be given more than once to match multiple types.""")
+    parser.add_argument(
+        '--on-failure', dest='common_on_failure',
+        choices=['ignore', 'continue', 'stop'],
+        # no default: better be configure per-command
+        help="""when an operation fails: 'ignore' and continue with remaining
+        operations, the error is logged but does not lead to a non-zero exit code
+        of the command; 'continue' works like 'ignore', but an error causes a
+        non-zero exit code; 'stop' halts on first failure and yields non-zero exit
+        code. A failure is any result with status 'impossible' or 'error').""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now

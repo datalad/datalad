@@ -318,6 +318,8 @@ class Interface(object):
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
             kwargs['result_renderer'] = args.common_output_format
+            if args.common_on_failure:
+                kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
             result_filter = None
             if args.common_report_status:

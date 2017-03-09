@@ -45,6 +45,7 @@ class Unlock(Interface):
     """
 
     result_xfm = 'paths'
+    on_failure = 'continue'
 
     _params_ = dict(
         path=Parameter(

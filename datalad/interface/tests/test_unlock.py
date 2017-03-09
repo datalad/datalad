@@ -49,7 +49,7 @@ def test_unlock_raises(path, path2, path3):
                   unlock, dataset=None, path=None)
     # no dataset and path not within a dataset:
     res = unlock(dataset=None, path=path2, result_xfm=None,
-                 raise_on_failure=False, return_type='item-or-list')
+                 on_failure='ignore', return_type='item-or-list')
     eq_(res['message'], "path does not belong to any dataset")
     eq_(res['path'], path2)
 
@@ -61,7 +61,7 @@ def test_unlock_raises(path, path2, path3):
     # make it annex, but call unlock with invalid path:
     AnnexRepo(path, create=True)
     res = ds.unlock(path="notexistent.txt", result_xfm=None,
-                    raise_on_failure=False, return_type='item-or-list')
+                    on_failure='ignore', return_type='item-or-list')
     eq_(res['message'], "path does not exist")
 
     chpwd(_cwd)

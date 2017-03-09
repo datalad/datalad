@@ -851,20 +851,23 @@ eval_params = dict(
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('json', 'simple') | EnsureNone()),
-    raise_on_failure=Parameter(
-        doc="""flag whether to raise an exception on failure. If True,
-        an IncompleteResultsError exception is raised whenever one or
-        more results have a failure status ('impossible', 'error').
-        The exception carries the result dictionaries of the failures
-        in its `failed` attribute.""",
-        constraints=EnsureBool()),
+    on_failure=Parameter(
+        doc="""behavior to perform on failure: 'ignore' any failure is reported,
+        but does not cause an exception; 'continue' if any failure occurs an
+        exception will be raised at the end, but processing other actions will
+        continue for as long as possible; 'stop': processing will stop on first
+        failure and an exception is raised. A failure is any result with status
+        'impossible' or 'error'). Raised exception is an IncompleteResultsError
+        that carries the result dictionaries of the failures in its `failed`
+        attribute.""",
+        constraints=EnsureChoice('ignore', 'continue', 'stop')),
 )
 eval_defaults = dict(
     return_type='list',
     result_filter=None,
     result_renderer=None,
     result_xfm=None,
-    raise_on_failure=True,
+    on_failure='stop',
 )
 
 
@@ -963,7 +966,7 @@ def eval_results(func):
             result_xfm = common_params['result_xfm']
             if result_xfm in known_result_xfms:
                 result_xfm = known_result_xfms[result_xfm]
-            raise_on_failure = common_params['raise_on_failure']
+            on_failure = common_params['on_failure']
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
             for res in results:
@@ -983,8 +986,13 @@ def eval_results(func):
                 ## error handling
                 # looks for error status, and report at the end via
                 # an exception
-                if raise_on_failure and res['status'] in ('impossible', 'error'):
+                if on_failure in ('continue', 'stop') \
+                        and res['status'] in ('impossible', 'error'):
                     incomplete_results.append(res)
+                    if on_failure == 'stop':
+                        # first fail -> that's it
+                        # raise will happen after the loop
+                        break
                 if result_filter:
                     try:
                         if not result_filter(res):
