@@ -87,7 +87,8 @@ class Create(Interface):
     # in general users expect to get an instance of the created dataset
     result_xfm = 'datasets'
     # result filter
-    result_filter = EnsureKeyChoice('action', ('create',)) & EnsureKeyChoice('status', ('ok', 'notneeded'))
+    result_filter = EnsureKeyChoice('action', ('create',)) & \
+                    EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _params_ = dict(
         path=Parameter(
@@ -197,7 +198,7 @@ class Create(Interface):
         # straight from input arg, no messing around before this
         if path is None:
             if dataset is None:
-                # nothing given explicity, assume create fresh right here
+                # nothing given explicitly, assume create fresh right here
                 path = getpwd()
             else:
                 # no path, but dataset -> create that dataset
@@ -279,7 +280,7 @@ class Create(Interface):
             # comes around
             gitattr.write('** annex.largefiles=nothing\n')
 
-        # save everthing
+        # save everything
         tbds.add('.datalad', to_git=True, save=False)
 
         if save:

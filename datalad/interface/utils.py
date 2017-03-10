@@ -889,7 +889,7 @@ def eval_results(func):
     `datalad.api.result-renderer` configuration variable, or the
     `result_renderer` keyword argument of each decorated command. Supported
     modes are: 'json' (one object per result, like git-annex), 'simple'
-    (status: path), 'tailored' custom output formating provided by each command
+    (status: path), 'tailored' custom output formatting provided by each command
     class (if any).
 
     Error detection works by inspecting the `status` item of all result
