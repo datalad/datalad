@@ -118,7 +118,8 @@ def pipeline(dataset,
 
     if s3_prefix is None:
         # some datasets available (fresh enough or old) from S3, so let's sense if this one is
-        s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)
+        # s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)  # openfmri bucket
+        s3_prefix = dataset
         if dataset == 'ds000017':
             # we had some custom prefixing going on
             assert(prefix)
@@ -126,7 +127,7 @@ def pipeline(dataset,
             assert suf in 'AB'
             s3_prefix = 'ds017' + suf
 
-        openfmri_s3_prefix = 's3://openfmri/'
+        openfmri_s3_prefix = 's3://openneuro/'
         try:
             if not ls('%s%s' % (openfmri_s3_prefix, s3_prefix)):
                 s3_prefix = None  # not there
@@ -167,8 +168,8 @@ def pipeline(dataset,
         s3_pipeline_here = \
             [
                 [
-                    annex.switch_branch('incoming-s3'),
-                    s3_pipeline(s3_prefix, tag=False), # for 31 ;) skip_problematic=True),
+                    annex.switch_branch('incoming-s3-openneuro'),
+                    s3_pipeline(s3_prefix, bucket='openneuro', tag=False), # for 31 ;) skip_problematic=True),
                     annex.switch_branch('master'),
                 ]
             ]
@@ -292,4 +293,7 @@ def pipeline(dataset,
         ],
         annex.switch_branch('master'),
         annex.finalize(cleanup=True, aggregate=True),
+        # TODO:  drop all files which aren't in master or incoming  since now many extracted arrive from s3
+        #  - no need to keep all versions locally for all of them
+
     ]
