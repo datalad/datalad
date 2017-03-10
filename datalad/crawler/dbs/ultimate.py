@@ -51,6 +51,7 @@ LEN_TO_ALGO = {
     64: 'sha256',
     128: 'sha512'
 }
+# TODO:  sha2-256-ipfs   -- chunked
 KNOWN_ALGO = set(LEN_TO_ALGO.values())
 assert(set(Digester.DEFAULT_DIGESTS) == KNOWN_ALGO)
 DEFAULT_ALGO = "sha256"

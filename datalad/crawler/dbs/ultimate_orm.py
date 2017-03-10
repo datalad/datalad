@@ -69,6 +69,7 @@ class File(DBTable):
     sha1 = Column(CHAR(40))
     sha256 = Column(CHAR(64), index=True, unique=True)  # if we hit collision at this digest -- wooo
     sha512 = Column(CHAR(128), unique=True)
+    # TODO ipfs = Column(CHAR(46), unique=True)
     # Additional info from output of file
     content_type = Column(String(256))
     content_charset = Column(String(64))
