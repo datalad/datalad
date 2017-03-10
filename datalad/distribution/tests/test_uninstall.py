@@ -35,6 +35,7 @@ from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
 from datalad.utils import chpwd
 from datalad.support.external_versions import external_versions
 from datalad.utils import swallow_logs
@@ -369,3 +370,14 @@ def test_remove_recreation(path):
     ds = create(path)
     ok_clean_git(ds.path)
     ok_(ds.is_installed())
+
+
+@with_tempfile()
+def test_no_interaction_with_untracked_content(path):
+    # extracted from what was a metadata test originally
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    create_tree(ds.path, {'sub': {'subsub': {'dat': 'lots of data'}}})
+    subds = ds.create('sub', force=True)
+    subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
+    ok_(not exists(opj(subds.path, '.datalad', 'config')))
+    subds.create('subsub', force=True)
