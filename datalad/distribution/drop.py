@@ -134,7 +134,9 @@ class Drop(Interface):
             recursive=recursive,
             recursion_limit=recursion_limit)
         for r in results_from_paths(
-                unavailable_paths, status='impossible',
+                # justification for status:
+                # content need not be drop where there is none
+                unavailable_paths, status='notneeded',
                 message="path does not exist: %s",
                 **res_kwargs):
             yield r

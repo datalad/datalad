@@ -139,7 +139,10 @@ class Uninstall(Interface):
             raise ValueError(
                 "refusing to uninstall current or parent directory")
         for r in results_from_paths(
-                unavailable_paths, status='impossible',
+                # justification for status:
+                # no dataset at target -> already uninstalled
+                # (or never was there)
+                unavailable_paths, status='notneeded',
                 message="path does not exist: %s",
                 **res_kwargs):
             yield r
