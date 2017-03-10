@@ -30,6 +30,10 @@ from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import _discover_trace_to_known
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
 from datalad.utils import get_dataset_root
 from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
@@ -38,8 +42,10 @@ from datalad.distribution.uninstall import _uninstall_dataset
 
 
 lgr = logging.getLogger('datalad.distribution.remove')
+res_kwargs = dict(action='remove', logger=lgr)
 
 
+@build_doc
 class Remove(Interface):
     """Remove components from datasets
 
@@ -83,6 +89,7 @@ class Remove(Interface):
 
     @staticmethod
     @datasetmethod(name=_action)
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -94,7 +101,10 @@ class Remove(Interface):
                 dataset, check_installed=False, purpose='removal')
             if not dataset.is_installed() and not path:
                 # all done already
-                return []
+                yield get_status_dict(
+                    status='notneeded',
+                    ds=dataset,
+                    **res_kwargs)
             if not path:
                 # act on the whole dataset if nothing else was specified
                 path = dataset.path if isinstance(dataset, Dataset) else dataset
@@ -102,6 +112,10 @@ class Remove(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive)
+        if path_is_under(content_by_ds):
+            # behave like `rm` and refuse to remove where we are
+            raise ValueError(
+                "refusing to uninstall current or parent directory")
 
         nonexistent_paths = []
         for p in unavailable_paths:
@@ -118,19 +132,17 @@ class Remove(Interface):
                 pl = content_by_ds.get(p, [])
                 pl.append(p)
                 content_by_ds[p] = pl
-        if nonexistent_paths:
-            lgr.warning("ignoring non-existent path(s): %s",
-                        nonexistent_paths)
+        for r in results_from_paths(
+                nonexistent_paths, status='notneeded',
+                message="path does not exist: %s",
+                **res_kwargs):
+            yield r
 
-        if path_is_under(content_by_ds):
-            # behave like `rm` and refuse to remove where we are
-            raise ValueError(
-                "refusing to uninstall current or parent directory")
-
+        # TODO generator
+        # this should yield what it did
         handle_dirty_datasets(
             content_by_ds, mode=if_dirty, base=dataset)
         ds2save = set()
-        results = []
         # iterate over all datasets, starting at the bottom
         # to make the removal of dataset content known upstairs
         for ds_path in sorted(content_by_ds, reverse=True):
@@ -141,11 +153,8 @@ class Remove(Interface):
                 superds = ds.get_superdataset(
                     datalad_only=False,
                     topmost=False)
-                res = _uninstall_dataset(ds, check=check, has_super=False)
-                results.extend(res)
-                if ds.path in ds2save:
-                    # we just uninstalled it, no need to save anything
-                    ds2save.discard(ds.path)
+                for r in _uninstall_dataset(ds, check=check, has_super=False):
+                    yield r
                 if not superds:
                     continue
                 subds_relpath = relpath(ds_path, start=superds.path)
@@ -172,24 +181,24 @@ class Remove(Interface):
                 ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):
-                    _drop_files(ds, paths, check=True)
-                results.extend(ds.repo.remove(paths, r=True))
-                ds2save.add(ds.path)
+                    for r in _drop_files(ds, paths, check=True):
+                        yield r
+                for r in ds.repo.remove(paths, r=True):
+                    yield get_status_dict(
+                        status='ok',
+                        path=r,
+                        **res_kwargs)
 
         if dataset and dataset.is_installed():
             # forge chain from base dataset to any leaf dataset
             # in order to save state changes all the way up
             _discover_trace_to_known(dataset.path, [], content_by_ds)
 
-        # TODO GENERATOR
-        # new returns a generator and yields status dicts
-        # pass through as embedded results
-        list(save_dataset_hierarchy(
-            content_by_ds,
-            base=dataset.path if dataset and dataset.is_installed() else None,
-            message='[DATALAD] removed content'))
-        return results
-
-    @classmethod
-    def result_renderer_cmdline(cls, res, args):
-        report_result_objects(cls, res, args, 'removed')
+        ds2save = ds2save.union(content_by_ds.keys())
+        for r in save_dataset_hierarchy(
+                # pass list of datasets to save that excludes known
+                # removed datasets to avoid "impossible" to save messages
+                [d for d in ds2save if Dataset(d).is_installed()],
+                base=dataset.path if dataset and dataset.is_installed() else None,
+                message='[DATALAD] removed content'):
+            yield r
