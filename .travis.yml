@@ -15,7 +15,7 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - TESTS_TO_PERFORM=
-    - NOSE_OPTS=
+    - NOSE_OPTS=-s
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
   matrix:
@@ -34,6 +34,8 @@ matrix:
     env:
     - _DATALAD_UPSTREAM_GITPYTHON=1
     - _DATALAD_NONPR_ONLY=1
+    # Just so we test if we did not screw up running under nose without -s as well
+    - NOSE_OPTS=
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
@@ -43,7 +45,6 @@ matrix:
   - python: 2.7
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
-    - NOSE_OPTS=-s
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
