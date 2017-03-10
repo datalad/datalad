@@ -397,7 +397,8 @@ def test_publish_depends(
     source.publish(to='target3')
     ok_(lexists(opj(target3_path, 'probe1')))
     # but it has no data copied
-    ok_(not exists(opj(target3_path, 'probe1')))
+    target3 = Dataset(target3_path)
+    nok_(target3.repo.file_has_content('probe1'))
 
     # but if we publish specifying its path, it gets copied
     source.publish('probe1', to='target3')
