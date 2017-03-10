@@ -145,10 +145,11 @@ class Uninstall(Interface):
             yield r
         # upfront sanity and compliance checks
         # check that we have no top-level datasets and not files to process
-        args_ok = True
+        clean_content_by_ds = {}
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
+            args_ok = True
             if ds_path not in paths:
                 yield get_status_dict(
                     status='error',
@@ -167,9 +168,10 @@ class Uninstall(Interface):
                     ds=ds,
                     **res_kwargs)
                 args_ok = False
-        if not args_ok:
-            raise ValueError(
-                'inappropriate arguments, see previous error message(s)')
+            if not args_ok:
+                continue
+            clean_content_by_ds[ds_path] = paths
+        content_by_ds = clean_content_by_ds
 
         # TODO generator
         # this should yield what it did
