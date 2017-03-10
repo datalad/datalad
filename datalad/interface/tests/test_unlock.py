@@ -50,7 +50,7 @@ def test_unlock_raises(path, path2, path3):
     # no dataset and path not within a dataset:
     res = unlock(dataset=None, path=path2, result_xfm=None,
                  on_failure='ignore', return_type='item-or-list')
-    eq_(res['message'], "path does not belong to any dataset")
+    eq_(res['message'][0], "path does not belong to any dataset: %s")
     eq_(res['path'], path2)
 
     create(path=path, no_annex=True)
