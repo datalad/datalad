@@ -1760,10 +1760,24 @@ class GitRepo(RepoInterface):
         init : bool
           If True, initialize all submodules for which "git submodule init" has
           not been called so far before updating.
+          Primarily provided for internal purposes and should not be used directly
+          since would result in not so annex-friendly .git symlinks/references
+          instead of full featured .git/ directories in the submodules
         """
         cmd = ['git', 'submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
+            subgitpath = opj(self.path, path, '.git')
+            if not exists(subgitpath):
+                # TODO:  wouldn't with --init we get all those symlink'ed .git/?
+                # At least let's warn
+                lgr.warning(
+                    "Do not use update_submodule with init=True to avoid git creating "
+                    "symlinked .git/ directories in submodules"
+                )
+            #  yoh: I thought I saw one recently but thought it was some kind of
+            #  an artifact from running submodule update --init manually at
+            #  some point, but looking at this code now I worry that it was not
         cmd += ['--', path]
         self._git_custom_command('', cmd)
         # TODO: return value
