@@ -1094,3 +1094,14 @@ def test_GitRepo_set_remote_url(path):
     gr.set_remote_url('some', 'ssh://whatever.ru', push=True)
     assert_equal(gr.config['remote.some.pushurl'],
                  'ssh://whatever.ru')
+
+    # add remote without url
+    url2 = 'http://repo2.example.com/.git'
+    gr.add_remote('some-without-url', url2)
+    assert_equal(gr.config['remote.some-without-url.url'], url2)
+    # "remove" it
+    gr.config.unset('remote.some-without-url.url', where='local')
+    with assert_raises(KeyError):
+        gr.config['remote.some-without-url.url']
+    eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
+    eq_(set(gr.get_remotes(with_urls_only=True)), {'some'})
