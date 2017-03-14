@@ -1363,7 +1363,10 @@ class GitRepo(RepoInterface):
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
             if all_:
-                remotes_to_fetch = self.get_remotes(with_urls_only=True)
+                remotes_to_fetch = [
+                    self.repo.remote(r)
+                    for r in self.get_remotes(with_urls_only=True)
+                ]
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:

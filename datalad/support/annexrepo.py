@@ -429,7 +429,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._set_shared_connection(name, url)
 
     @borrowkwargs(GitRepo)
-    def get_remotes(self, with_refs_only=False, exclude_special_remotes=False):
+    def get_remotes(self, with_refs_only=False, with_urls_only=False,
+                    exclude_special_remotes=False):
         """Get known (special-) remotes of the repository
 
         Parameters
@@ -443,7 +444,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           List of names of the remotes
         """
         remotes = super(AnnexRepo, self).get_remotes(
-            with_refs_only=with_refs_only)
+            with_refs_only=with_refs_only, with_urls_only=with_urls_only)
 
         if exclude_special_remotes:
             return [remote for remote in remotes
