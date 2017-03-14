@@ -88,7 +88,13 @@ definitions = {
     },
     'datalad.tests.protocolremote': {
         'ui': ('yesno', {
-               'title': 'Binary flag to specify whether to test protocol interactions of custom remote with annex'}),
+            'title': 'Binary flag to specify whether to test protocol '
+                     'interactions of custom remote with annex'}),
+        'type': EnsureBool(),
+    },
+    'datalad.tests.dataladremote': {
+        'ui': ('yesno', {
+               'title': 'Binary flag to specify whether each annex repository should get datalad special remote in every test repository'}),
         'type': EnsureBool(),
     },
     'datalad.tests.runcmdline': {
