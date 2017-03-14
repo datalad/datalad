@@ -1782,6 +1782,28 @@ class GitRepo(RepoInterface):
         self._git_custom_command('', cmd)
         # TODO: return value
 
+    def update_ref(self, ref, value, symbolic=False):
+        """Update the object name stored in a ref "safely".
+
+        Just a shim for `git update-ref` call if not symbolic, and
+        `git symbolic-ref` if symbolic
+
+        Parameters
+        ----------
+        ref : str
+          Reference, such as `ref/heads/BRANCHNAME` or HEAD.
+        value : str
+          Value to update to, e.g. hexsha of a commit when updating for a
+          branch ref, or branch ref if updating HEAD
+        symbolic : None
+          To instruct if ref is symbolic, e.g. should be used in case of
+          ref=HEAD
+        """
+        self._git_custom_command(
+            '',
+            ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
+        )
+
     def tag(self, tag):
         """Assign a tag to current commit
 
