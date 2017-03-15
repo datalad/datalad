@@ -124,7 +124,25 @@ def test_something(path, new_home):
     assert_true('mike.wants.to' in cfg)
     assert_equal(len(cfg['mike.wants.to']), 2)
 
-    # fails unkown location
+    # set a new one:
+    cfg.set('mike.should.have', 'known')
+    assert_in('mike.should.have', cfg)
+    assert_equal(cfg['mike.should.have'], 'known')
+    # set an existing one:
+    cfg.set('mike.should.have', 'known better')
+    assert_equal(cfg['mike.should.have'], 'known better')
+    # set, while there are several matching ones already:
+    cfg.add('mike.should.have', 'a meal')
+    assert_equal(len(cfg['mike.should.have']), 2)
+    # raises with force=False
+    assert_raises(CommandError,
+                  cfg.set, 'mike.should.have', 'a beer', force=False)
+    assert_equal(len(cfg['mike.should.have']), 2)
+    # replaces all matching ones with force=True
+    cfg.set('mike.should.have', 'a beer', force=True)
+    assert_equal(cfg['mike.should.have'], 'a beer')
+
+    # fails unknown location
     assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
 
     # very carefully test non-local config
@@ -161,6 +179,14 @@ def test_something(path, new_home):
         globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
 
+    cfg = ConfigManager(
+        Dataset(opj(path, 'ds')),
+        dataset_only=True,
+        overrides={'datalad.godgiven': True})
+    assert_equal(cfg.get('datalad.godgiven'), True)
+    # setter has no effect
+    cfg.set('datalad.godgiven', 'false')
+    assert_equal(cfg.get('datalad.godgiven'), True)
 
 @with_tree(tree={
     'ds': {
@@ -281,3 +307,12 @@ def test_from_env():
     # not in dataset-only mode
     cfg = ConfigManager(Dataset('nowhere'), dataset_only=True)
     assert_not_in('datalad.crazy.cfg', cfg)
+    # check env trumps override
+    cfg = ConfigManager()
+    assert_not_in('datalad.crazy.override', cfg)
+    cfg.overrides['datalad.crazy.override'] = 'fromoverride'
+    cfg.reload()
+    assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
+    os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
+    cfg.reload()
+    assert_equal(cfg['datalad.crazy.override'], 'fromenv')

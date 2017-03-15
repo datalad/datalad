@@ -29,7 +29,16 @@ ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 DATALAD_GIT_DIR = join('.git', 'datalad')
 
+# pregenerated using
+# python3 -c 'from datalad.customremotes.base import generate_uuids as guuid; print(guuid())'
+DATALAD_SPECIAL_REMOTES_UUIDS = {
+    # should not be changed from now on!
+    DATALAD_SPECIAL_REMOTE: 'cf13d535-b47c-5df6-8590-0793cb08a90a',
+    ARCHIVES_SPECIAL_REMOTE: 'c04eb54b-4b4e-5755-8436-866b043170fa'
+}
+
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
+ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
 
 DATASETS_TOPURL = "http://datasets.datalad.org/"
 

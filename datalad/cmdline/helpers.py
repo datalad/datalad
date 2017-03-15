@@ -61,7 +61,7 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         # for main command -- should be different sections. And since we are in
-        # heavy output messaging mode...
+        # heavy output massaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
@@ -121,7 +121,8 @@ def strip_arg_from_argv(args, value, opt_names):
     """Strip an originally listed option (with its value) from the list cmdline args
     """
     # Yarik doesn't know better
-    args = args or sys.argv
+    if args is None:
+        args = sys.argv
     # remove present pbs-runner option
     args_clean = []
     skip = 0

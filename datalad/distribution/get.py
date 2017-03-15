@@ -33,11 +33,11 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.dochelpers import single_or_plural
+from datalad.utils import get_dataset_root
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -171,7 +171,7 @@ class Get(Interface):
     @staticmethod
     @datasetmethod(name='get')
     def __call__(
-            path,
+            path=None,
             source=None,
             dataset=None,
             recursive=False,
@@ -192,45 +192,33 @@ class Get(Interface):
     ):
         # IMPLEMENTATION CONCEPT:
         #
-        # 1. turn all input paths into absolute paths
-        # 2. Sort the world into existing handles and the rest
-        # 3. Try locate missing handles (obtain subdatasets along the way)
-        # 4. Expand into subdatasets with recursion enables (potentially
+        # 1. Sort the world into existing handles and the rest
+        # 2. Try locate missing handles (obtain subdatasets along the way)
+        # 3. Expand into subdatasets with recursion enables (potentially
         #    obtain even more subdatasets
-        # 5. Shoot info of which handles to get in each subdataset to,
+        # 4. Shoot info of which handles to get in each subdataset to,
         #    git-annex, once at the very end
 
-        # TODO: consider allowing an empty `path` argument, as with other commands,
-        # to indicate CWD
-        resolved_paths, dataset_path = get_normalized_path_arguments(
-            path, dataset, default=None)
-        if not resolved_paths:
+        dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not (dataset or path):
             raise InsufficientArgumentsError(
-                "`get` needs at least one path as argument")
-
-        # sort paths into the respective datasets
+                "Neither dataset nor target path(s) provided")
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset_path
+        # use lookup cache -- we need that info further down
         dir_lookup = {}
-        content_by_ds, unavailable_paths, nondataset_paths = \
-            get_paths_by_dataset(resolved_paths,
-                                 recursive=recursive,
-                                 recursion_limit=recursion_limit,
-                                 dir_lookup=dir_lookup)
-        lgr.debug(
-            "Found %i existing dataset(s) to get content in "
-            "and %d unavailable paths",
-            len(content_by_ds), len(unavailable_paths)
-        )
-        # IMPORTANT NOTE re `content_by_ds`
-        # each key is a subdataset that we need to get something in
-        # if the value[0] is the subdataset's path, we want all of it
-        # if the value[0] == curdir, we just installed it as part of
-        # resolving file handles and we did not say anything but "give
-        # me the dataset handle"
+        content_by_ds, unavailable_paths = Interface._prep(
+            path=path,
+            dataset=dataset,
+            recursive=recursive,
+            recursion_limit=recursion_limit,
+            dir_lookup=dir_lookup)
 
         # explore the unknown
         for path in sorted(unavailable_paths):
             # how close can we get?
-            dspath = GitRepo.get_toppath(path)
+            dspath = get_dataset_root(path)
             if dspath is None:
                 # nothing we can do for this path
                 continue
@@ -284,7 +272,7 @@ class Get(Interface):
         ## we have now done everything we could to obtain whatever subdataset
         ## to get something on the file system for previously unavailable paths
         ## check and sort one last
-        content_by_ds, unavailable_paths, nondataset_paths2 = \
+        content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(
                 unavailable_paths,
                 recursive=recursive,
@@ -292,8 +280,8 @@ class Get(Interface):
                 out=content_by_ds,
                 dir_lookup=dir_lookup)
 
-        nondataset_paths.extend(nondataset_paths2)
         if nondataset_paths:
+            # XXX likely can never get here
             lgr.warning(
                 "ignored paths that do not belong to any dataset: %s",
                 nondataset_paths)

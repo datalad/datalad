@@ -15,8 +15,7 @@ if PY2:
     import cPickle as pickle
 else:
     import pickle
-from hashlib import md5
-from six.moves.urllib.parse import urlsplit
+
 from six import string_types
 from os.path import join as opj, exists
 from os.path import dirname
@@ -26,7 +25,6 @@ from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
-from datalad import cfg
 
 
 # common format
@@ -248,39 +246,11 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
 def _cached_load_document(url):
     """Loader of pyld document from a url, which caches loaded instance on disk
     """
-    doc_fname = _get_schema_url_cache_filename(url)
-
-    doc = None
-    if os.path.exists(doc_fname):
-        try:
-            lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
-            doc = pickle.load(open(doc_fname, 'rb'))
-        except Exception as e:  # it is OK to ignore any error and fall back on the true source
-            lgr.warning(
-                "cannot load cache from '%s', fall back on schema download: %s",
-                doc_fname, exc_str(e))
-
-    if doc is None:
-        from pyld.jsonld import load_document
-        doc = load_document(url)
-        assure_dir(dirname(doc_fname))
-        # use pickle to store the entire request result dict
-        pickle.dump(doc, open(doc_fname, 'wb'))
-        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
-    return doc
-
-
-def _get_schema_url_cache_filename(url):
-    """Return a filename where to cache schema doc from a url"""
-    cache_dir = opj(cfg.obtain('datalad.locations.cache'), 'schema')
-    doc_fname = opj(
-        cache_dir,
-        '{}-{}.p{}'.format(
-            urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest(),
-            pickle.HIGHEST_PROTOCOL)
+    from datalad.support.network import get_cached_url_content
+    from pyld.jsonld import load_document
+    return get_cached_url_content(
+        url, name='schema', fetcher=load_document, maxage=1
     )
-    return doc_fname
 
 
 def flatten_metadata_graph(obj):

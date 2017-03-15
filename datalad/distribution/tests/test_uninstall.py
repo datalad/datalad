@@ -21,6 +21,7 @@ from datalad.api import uninstall
 from datalad.api import drop
 from datalad.api import remove
 from datalad.api import install
+from datalad.api import create
 from datalad.support.exceptions import InsufficientArgumentsError, CommandError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -65,7 +66,6 @@ def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
     subds2 = ds.create('two')
-    ds.save(auto_add_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
@@ -79,7 +79,7 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
-    ds.save(auto_add_changes=True)
+    ds.save(all_changes=True)
     eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
@@ -109,7 +109,7 @@ def test_uninstall_invalid(path):
 def test_uninstall_annex_file(path):
     ds = Dataset(path)
     ok_(ds.is_installed())
-    ok_file_under_git(path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     ds.repo.get('test-annex.dat')
     ok_(ds.repo.file_has_content('test-annex.dat'))
 
@@ -117,7 +117,7 @@ def test_uninstall_annex_file(path):
     res = ds.drop(path='test-annex.dat')
     # test it happened:
     ok_(not ds.repo.file_has_content('test-annex.dat'))
-    ok_file_under_git(path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     # test result:
     eq_(res, [opj(ds.path, 'test-annex.dat')])
 
@@ -125,9 +125,9 @@ def test_uninstall_annex_file(path):
 
     # remove file:
     ds.remove(path='test-annex.dat')
-    assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'test-annex.dat',
                   annexed=True)
-    assert_raises(AssertionError, ok_file_under_git, path, 'test-annex.dat',
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'test-annex.dat',
                   annexed=False)
     ok_(not exists(opj(path, 'test-annex.dat')))
 
@@ -137,10 +137,11 @@ def test_uninstall_git_file(path):
     ds = Dataset(path)
     ok_(ds.is_installed())
     ok_(exists(opj(path, 'INFO.txt')))
-    ok_file_under_git(path, 'INFO.txt')
+    ok_file_under_git(ds.repo.path, 'INFO.txt')
 
     if not hasattr(ds.repo, 'drop'):
-        assert_raises(ValueError, ds.drop, path='INFO.txt')
+        # nothing can be dropped in a plain GitRepo
+        eq_([], ds.drop(path='INFO.txt'))
 
     with swallow_logs(new_level=logging.ERROR) as cml:
         assert_raises(ValueError, ds.uninstall, path="INFO.txt")
@@ -148,7 +149,7 @@ def test_uninstall_git_file(path):
 
     # uninstall removes the file:
     res = ds.remove(path='INFO.txt')
-    assert_raises(AssertionError, ok_file_under_git, path, 'INFO.txt')
+    assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
     ok_(not exists(opj(path, 'INFO.txt')))
     eq_(res, ['INFO.txt'])
 
@@ -202,24 +203,22 @@ def test_uninstall_subdataset(src, dst):
     'kill': 'kill2'})
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
-    subds = ds.create('deep', force=True, if_dirty='ignore')
+    subds = ds.create('deep', force=True)
     subds.add('.', recursive=True)
     ds.add('.', recursive=True)
-    ds.save(auto_add_changes=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
-    # must not work without recursive
     topfile = 'kill'
     deepfile = opj('deep', 'dir', 'kill')
     # use a tuple not a list! should also work
-    ds.drop((topfile, deepfile), recursive=True, check=False)
+    ds.drop((topfile, deepfile), check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
     ok_(not ds.repo.file_has_content(topfile))
     ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
     # remove handles for all 'kill' files
-    ds.remove([topfile, deepfile], recursive=True, check=False)
+    ds.remove([topfile, deepfile], check=False)
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
@@ -270,12 +269,12 @@ def test_remove_file_handle_only(path):
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
-    ds = Dataset(path).create(force=True, if_dirty='ignore')
-    subds = ds.create('deep', force=True, if_dirty='ignore')
+    ds = Dataset(path).create(force=True)
+    subds = ds.create('deep', force=True)
     # we add one file
-    eq_(len(subds.add('.', if_dirty='ignore')), 1)
+    eq_(len(subds.add('.')), 1)
     # save all -> all clean
-    ds.save(auto_add_changes=True, recursive=True)
+    ds.save(all_changes=True, recursive=True)
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
     # now uninstall in subdataset through superdataset
@@ -305,7 +304,7 @@ def test_uninstall_recursive(path):
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
-    ds.save(auto_add_changes=True)
+    ds.save(all_changes=True)
     ok_clean_git(ds.path)
     # fail on missing --recursive because subdataset is present
     assert_raises(ValueError, ds.remove)
@@ -340,7 +339,7 @@ def test_kill(path):
     ds = Dataset(path).create()
     with open(opj(ds.path, "file.dat"), 'w') as f:
         f.write("load")
-    ds.repo.add("file.dat")
+    ds.add("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.get_subdatasets()), ['deep1'])
     ok_clean_git(ds.path)
@@ -349,3 +348,17 @@ def test_kill(path):
     assert_raises(CommandError, ds.remove)
     eq_(ds.remove(recursive=True, check=False), [subds, ds])
     ok_(not exists(path))
+
+
+@with_tempfile()
+def test_remove_recreation(path):
+
+    # test recreation is possible and doesn't conflict with in-memory
+    # remainings of the old instances
+    # see issue #1311
+
+    ds = create(path)
+    ds.remove()
+    ds = create(path)
+    ok_clean_git(ds.path)
+    ok_(ds.is_installed())

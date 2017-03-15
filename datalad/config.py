@@ -114,11 +114,16 @@ class ConfigManager(object):
     written during normal operation. If such need arises, various solutions are
     possible (via GitPython, or an independent writer).
 
+    Each instance carries a public `overrides` attribute. This dictionary
+    contains variables that override any setting read from a file. The overrides
+    are persistent across reloads, and are not modified by any of the manipulation
+    methods, such as `set` or `unset`.
+
     Any DATALAD_* environment variable is also presented as a configuration
     item. Settings read from environment variables are not stored in any of the
     configuration file, but are read dynamically from the environment at each
     `reload()` call. Their values take precedence over any specification in
-    configuration files.
+    configuration files, and even overrides.
 
     Parameters
     ----------
@@ -130,16 +135,21 @@ class ConfigManager(object):
       If True, configuration items are only read from a datasets persistent
       configuration file, if any present (the one in ``.datalad/config``, not
       ``.git/config``).
+    overrides : dict, optional
+      Variable overrides, see general class documentation for details.
     """
-    def __init__(self, dataset=None, dataset_only=False):
+    def __init__(self, dataset=None, dataset_only=False, overrides=None):
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
-        self._dataset = dataset
+        # public dict to store variables that always override any setting
+        # read from a file
+        self.overrides = {} if overrides is None else overrides
+        self._dataset_path = dataset.path if dataset else None
         self._dataset_only = dataset_only
         # Since configs could contain sensitive information, to prevent
-        # any "facilitated" leakage -- just disable loging of outputs for
+        # any "facilitated" leakage -- just disable logging of outputs for
         # this runner
         run_kwargs = dict(log_outputs=False)
         if dataset is not None:
@@ -158,9 +168,9 @@ class ConfigManager(object):
         # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
-        if self._dataset:
+        if self._dataset_path:
             # now any dataset config
-            dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
+            dscfg_fname = opj(self._dataset_path, '.datalad', 'config')
             if exists(dscfg_fname):
                 stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
                                            log_stderr=True)
@@ -169,13 +179,20 @@ class ConfigManager(object):
                 self._store = _parse_gitconfig_dump(
                     stdout, self._store, replace=False)
 
-        if not self._dataset_only:
-            stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
-            self._store = _parse_gitconfig_dump(
-                stdout, self._store, replace=True)
+        if self._dataset_only:
+            # superimpose overrides
+            self._store.update(self.overrides)
+            return
 
-            # override with environment variables
-            self._store = _parse_env(self._store)
+        stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
+        self._store = _parse_gitconfig_dump(
+            stdout, self._store, replace=True)
+
+        # superimpose overrides
+        self._store.update(self.overrides)
+
+        # override with environment variables
+        self._store = _parse_env(self._store)
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
@@ -442,18 +459,18 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._dataset:
+            if not self._dataset_path:
                 raise ValueError(
                     'ConfigManager cannot store to configuration to dataset, none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset.path, '.datalad')
+            dscfg_dirname = opj(self._dataset_path, '.datalad')
             dscfg_fname = opj(dscfg_dirname, 'config')
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(dscfg_fname):
                 open(dscfg_fname, 'w').close()
-            args.extend(['--file', opj(self._dataset.path, '.datalad', 'config')])
+            args.extend(['--file', opj(self._dataset_path, '.datalad', 'config')])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':
@@ -473,6 +490,30 @@ class ConfigManager(object):
           Variable value
         %s"""
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
+
+    @_where_reload
+    def set(self, var, value, where='dataset', reload=True, force=False):
+        """Set a variable to a value.
+
+        In opposition to `add`, this replaces the value of `var` if there is
+        one already.
+
+        Parameters
+        ----------
+        var : str
+          Variable name including any section like `git config` expects them, e.g.
+          'core.editor'
+        value : str
+          Variable value
+        force: bool
+          if set, replaces all occurrences of `var` by a single one with the
+          given `value`. Otherwise raise if multiple entries for `var` exist
+          already
+        %s"""
+        from datalad.support.gitrepo import to_options
+
+        self._run(to_options(replace_all=force) + [var, value],
+                  where=where, reload=reload, log_stderr=True)
 
     @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):

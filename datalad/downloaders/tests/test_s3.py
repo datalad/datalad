@@ -57,7 +57,11 @@ def test_s3_download_basic():
 def test_mtime(tempfile):
     url = url_2versions_nonversioned1_ver2
     with swallow_outputs():
-        get_test_providers(url).download(url, path=tempfile)
+        # without allow_old=False it might be reusing previous connection
+        # which had already vcr tape for it, leading to failure.
+        # TODO:  make allow_old configurable and then within tests disallow
+        # allow_old
+        get_test_providers(url).download(url, path=tempfile, allow_old_session=False)
     assert_equal(os.stat(tempfile).st_mtime, 1446873817)
 
     # and if url is wrong

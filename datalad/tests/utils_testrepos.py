@@ -11,6 +11,7 @@ import os
 import tempfile
 
 from abc import ABCMeta, abstractmethod
+from six import add_metaclass
 from os.path import dirname, join as opj, exists, pardir
 
 from ..support.gitrepo import GitRepo
@@ -24,10 +25,10 @@ from ..utils import swallow_logs
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
 
+from datalad.customremotes.base import init_datalad_remote
 
+@add_metaclass(ABCMeta)
 class TestRepo(object):
-
-    __metaclass__ = ABCMeta
 
     REPO_CLASS = None  # Assign to the class to be used in the subclass
 
@@ -46,10 +47,7 @@ class TestRepo(object):
             # and manage to handle all http urls and requests:
             if self.REPO_CLASS is AnnexRepo and \
                     os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
-                self.repo.init_remote(
-                    'datalad',
-                    ['encryption=none', 'type=external', 'autoenable=true',
-                     'externaltype=datalad'])
+                init_datalad_remote(self.repo, 'datalad', autoenable=True)
 
         self._created = False
 

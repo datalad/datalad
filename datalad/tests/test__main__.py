@@ -17,6 +17,8 @@ from nose.tools import assert_raises, assert_equal
 from .. import __main__, __version__
 from ..auto import AutomagicIO
 
+from datalad.tests.utils import skip_ssh
+from datalad.cmdline.main import main
 
 @patch('sys.stdout', new_callable=StringIO)
 def test_main_help(stdout):
@@ -41,3 +43,9 @@ def test_main_run_a_script(stdout, mock_activate):
     # And we have "activated"
     mock_activate.assert_called_once_with()
 
+@skip_ssh
+def test_exit_code():
+    # will relay actual exit code on CommandError
+    with assert_raises(SystemExit) as cme:
+        main(['sshrun', 'localhost', 'exit 42'])
+    assert_equal(cme.exception.code, 42)

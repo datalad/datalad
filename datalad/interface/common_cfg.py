@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
 from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import EnsureInt
+
 dirs = AppDirs("datalad", "datalad.org")
 
 
@@ -177,5 +179,17 @@ definitions = {
     'datalad.cmd.protocol.prefix': {
         'ui': ('question', {
                'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
+    },
+    'datalad.repo.direct': {
+        'ui': ('yesno', {
+               'title': 'Direct Mode for git-annex repositories',
+               'text': 'Set this flag to create annex repositories in direct mode by default'}),
+        'type': EnsureBool(),
+    },
+    'datalad.repo.version': {
+        'ui': ('question', {
+               'title': 'git-annex repository version',
+               'text': 'Specifies the repository version for git-annex to be used by default'}),
+        'type': EnsureInt(),
     },
 }

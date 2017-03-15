@@ -8,10 +8,14 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
+from io import open
 from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
+from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
 
+import logging
+lgr = logging.getLogger('datalad.meta.bids')
 
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = ['dataset_description.json']
@@ -36,7 +40,17 @@ class MetadataParser(BaseMetadataParser):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            meta['description'] = open(README_fname).read().strip()
+            try:
+                desc = open(README_fname, encoding="utf-8").read()
+            except UnicodeDecodeError as exc:
+                lgr.warning(
+                    "Failed to decode content of %s. "
+                    "Re-loading allowing for UTF-8 errors with replacement: %s"
+                    % (README_fname, exc_str(exc))
+                )
+                desc = open(README_fname, encoding="utf-8", errors="replace").read()
+
+            meta['description'] = desc.strip()
 
         compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
 

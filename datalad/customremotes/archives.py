@@ -19,6 +19,7 @@ import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 lgr.log(5, "Importing datalad.customremotes.archive")
 
+from ..dochelpers import exc_str
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
@@ -356,12 +357,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             except Exception as exc:
                 # from celery.contrib import rdb
                 # rdb.set_trace()
-                from datalad.dochelpers import exc_str
                 exc_ = exc_str(exc)
                 self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
                 continue
 
-        self.error("Failed to fetch any archive containing {key}. Tried: {akeys}".format(**locals()))
+        self.error("Failed to fetch any archive containing {key}. Tried: {akeys_tried}".format(**locals()))
 
 
 def main():
