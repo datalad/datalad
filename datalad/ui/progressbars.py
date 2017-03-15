@@ -67,12 +67,15 @@ try:
             if external_versions['tqdm'] < '4.10.0' \
             else dict(mininterval=0)
 
-        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
+        def __init__(self, label='', fill_text=None,
+                     maxval=None, unit='B', out=sys.stdout, leave=False):
             super(tqdmProgressBar, self).__init__(maxval=maxval)
             self._pbar_params = updated(
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
-                     unit_scale=True, total=maxval, file=out))
+                     unit_scale=True, total=maxval, file=out,
+                     leave=leave
+                     ))
             self._pbar = None
 
         def _create(self):
@@ -96,9 +99,23 @@ try:
             if hasattr(tqdm, 'refresh'):
                 self._pbar.refresh()
 
-        def finish(self):
-            self.clear()
-            # be tollerant to bugs in those
+        def finish(self, clear=False):
+            """
+
+            Parameters
+            ----------
+            clear : bool, optional
+              Explicitly clear the progress bar. Note that we are
+              creating them with leave=False so they should disappear on their
+              own and explicit clear call should not be necessary
+
+            Returns
+            -------
+
+            """
+            if clear:
+                self.clear()
+            # be tolerant to bugs in those
             try:
                 if self._pbar is not None:
                     self._pbar.close()
