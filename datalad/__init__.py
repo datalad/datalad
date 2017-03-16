@@ -95,7 +95,8 @@ def setup_package():
     # Set to non-interactive UI
     from datalad.ui import ui
     _test_states['ui_backend'] = ui.backend
-    ui.set_backend('tests-noninteractive')
+    # obtain() since that one consults for the default value
+    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
 
 def teardown_package():

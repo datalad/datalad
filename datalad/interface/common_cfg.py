@@ -118,6 +118,13 @@ definitions = {
         'ui': ('question', {
                'title': 'Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation'}),
     },
+    'datalad.tests.ui.backend': {
+        'ui': ('question', {
+            'title': 'Tests UI backend',
+            # XXX we could add choices...
+            'text': 'Which UI backend to use'}),
+        'default': 'tests-noninteractive',
+    },
     'datalad.tests.usecassette': {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
