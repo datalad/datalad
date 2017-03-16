@@ -20,7 +20,6 @@ from os.path import relpath
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import get_paths_by_dataset
-from datalad.interface.utils import get_normalized_path_arguments
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
@@ -42,6 +41,7 @@ from datalad.utils import get_dataset_root
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
+from .dataset import require_dataset
 from .utils import install_necessary_subdatasets
 from .utils import _recursive_install_subds_underneath
 
@@ -57,12 +57,18 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
     for ds_path in sorted(content_by_ds.keys()):
         cur_ds = Dataset(ds_path)
         content = content_by_ds[ds_path]
+        # TODO generator
+        # remove list
         results = []
+        # TODO generator
+        # install result already reported before -> remove completely
         if len(content) >= 1 and content[0] == curdir:
             # we hit a subdataset that just got installed few lines above, and was
             # requested specifically, as opposed to some of its content.
             results.append(cur_ds)
 
+        # TODO generator
+        # simply return/continue, nothing to report anymore
         if not get_data:
             lgr.debug(
                 "Will not get any content in %s, as instructed.",
@@ -73,18 +79,26 @@ def _get(content_by_ds, refpath=None, source=None, jobs=None,
         # needs to be an annex:
         found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
         if not found_an_annex:
+            # TODO generator
+            # yield `content` items as 'notneeded' results
+            # and just return/continue
             lgr.debug("Found no annex at %s. Skipped.", cur_ds)
             if results:
                 yield results
             continue
+        # TODO move this message into AnnexRepo.get()
         lgr.info("Getting %i items of dataset %s ...",
                  len(content), cur_ds)
 
+        # TODO generator
+        # convert annex report dict into our format and yield one-by-one
         results.extend(cur_ds.repo.get(
             content,
             options=['--from=%s' % source] if source else [],
             jobs=jobs))
-
+        # TODO generator
+        # do not relpath here, but put refpath into result dict
+        # relpathing will be done outside if desired
         if refpath:
             # adapt relative paths reported by annex to be relative some
             # reference
@@ -188,6 +202,9 @@ class Get(Interface):
             # Install.__call__ and done so to avoid creating another reusable
             # function which would need to duplicate all this heavy list of
             # kwargs
+            # TODO generator
+            # remove and replace with result transformation at the receiving end
+            # (i.e. `install`)
             _return_datasets=False
     ):
         # IMPLEMENTATION CONCEPT:
@@ -214,6 +231,8 @@ class Get(Interface):
             recursive=recursive,
             recursion_limit=recursion_limit,
             dir_lookup=dir_lookup)
+        # NOTE: Do not act upon unavailable paths yet! Done below after testing
+        # which ones could be obtained
 
         # explore the unknown
         for path in sorted(unavailable_paths):
@@ -227,11 +246,18 @@ class Get(Interface):
             # any dataset at the very top
             assert ds.is_installed()
             # now actually obtain whatever is necessary to get to this path
+            # TODO generator
+            # needs to yield intermediate results inside
             containing_ds = install_necessary_subdatasets(ds, path, reckless)
             if containing_ds.path != ds.path:
+                # TODO generator
+                # turn log message into result message
                 lgr.debug("Installed %s to fulfill request for content for "
                           "path %s", containing_ds, path)
                 # mark resulting dataset as auto-installed
+                # TODO generator
+                # check where this "markup" is needed and see if/how it could be
+                # read from a result dict
                 if containing_ds.path == path:
                     # we had to get the entire dataset, not something within
                     # mark that it just appeared
@@ -256,6 +282,11 @@ class Get(Interface):
                         ("underneath %s" % content_path
                          if subds.path != content_path
                          else ""))
+                    # TODO generator
+                    # needs to yield obtained datasets inside
+                    # inspect results, should only get datasets, complain if not
+                    # convert result info into content_by_ds update below
+                    # but also yield the completed install results right here
                     cbysubds = _recursive_install_subds_underneath(
                         subds,
                         # `content_path` was explicitly given as input
@@ -269,9 +300,9 @@ class Get(Interface):
                     # gets file content for all freshly installed subdatasets
                     content_by_ds.update(cbysubds)
 
-        ## we have now done everything we could to obtain whatever subdataset
-        ## to get something on the file system for previously unavailable paths
-        ## check and sort one last
+        # we have now done everything we could to obtain whatever subdataset
+        # to get something on the file system for previously unavailable paths
+        # check and sort one last
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(
                 unavailable_paths,
@@ -280,19 +311,22 @@ class Get(Interface):
                 out=content_by_ds,
                 dir_lookup=dir_lookup)
 
-        if nondataset_paths:
-            # XXX likely can never get here
-            lgr.warning(
-                "ignored paths that do not belong to any dataset: %s",
-                nondataset_paths)
+        assert not nondataset_paths, "Somehow broken implementation logic"
 
+        # TODO generator
+        # yield unavailable_paths as 'impossible' results
         if unavailable_paths:
             lgr.warning('ignored non-existing paths: %s', unavailable_paths)
 
         # hand over to git-annex
+        # TODO generator
+        # needs to yield file `get` results individually
+        # evaluate to factor the dataset loop out of _get() and put it here
         results = list(chain.from_iterable(
             _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
                  get_data=get_data)))
+        # TODO generator
+        # the remainder of the function is obsolete after generator RF
         # ??? should we in _return_datasets case just return both content_by_ds
         # and unavailable_paths may be so we provide consistent across runs output
         # and then issue outside similar IncompleteResultsError?
@@ -303,6 +337,8 @@ class Get(Interface):
         else:
             return sorted(content_by_ds) if _return_datasets else results
 
+    # TODO generator
+    # RF for new interface
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
