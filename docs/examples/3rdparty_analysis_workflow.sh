@@ -2,6 +2,7 @@
 
 set -e
 
+OLD_PWD=$PWD
 # BOILERPLATE
 
 BOBS_HOME=$(readlink -f "$(mktemp --tmpdir -d datalad_demo_bob.XXXX)")
@@ -251,7 +252,7 @@ datalad save -a -m "Alice always helps"
 
 HOME="$BOBS_HOME"
 cd ~/myanalysis
-datalad add-sibling alice "$ALICES_HOME/bobs_analysis"
+datalad add-sibling -s alice "$ALICES_HOME/bobs_analysis"
 
 #%
 # Once registered, Bob can update his dataset based on Alice's version, and merge
@@ -279,7 +280,7 @@ datalad get result.txt
 #%
 
 # this generated sibling for the dataset and all subdatasets
-datalad create-sibling --recursive "$SERVER_URL" public
+datalad create-sibling --recursive -s public "$SERVER_URL"
 
 #%
 # Once the remote sibling is created and registered under the name "public",
@@ -299,4 +300,5 @@ testEquality() {
   assertEquals 1 1
 }
 
+cd "$OLD_PWD"
 [ -n "$DATALAD_TESTS_RUNCMDLINE" ] && . shunit2 || true
