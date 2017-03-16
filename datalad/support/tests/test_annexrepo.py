@@ -1573,8 +1573,11 @@ def test_AnnexRepo_dirty(path):
 
 def _test_status(ar):
     # TODO: plain git submodule and even deeper hierarchy?
+    #       => complete recursion to work if started from within plain git;
+    #       But this is then relevant for Dataset.status() - not herein
     # TODO: when to use annex-sync
-    # TODO:
+    # TODO: Figure out, how to RF/fix the issue with committing direct mode
+    #       submodules
 
     stat = {'untracked': [],
             'deleted': [],
@@ -1732,7 +1735,23 @@ def _test_status(ar):
     eq_(stat, ar.status(submodules=False))
 
     # commit the submodule
-    ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
+    # TODO
+    # in direct mode, commit of a removed submodule fails with:
+    #  error: unable to index file submod
+    #  fatal: updating files failed
+    #
+    # - this happens, when commit is called with -c core.bare=False
+    # - it works when called via annex proxy
+    # - if we add a submodule instead of removing one, it's vice versa with
+    #   the very same error message
+
+    if ar.is_direct_mode():
+        ar.precommit()
+        _workaround_commit = super(AnnexRepo, ar).commit
+    else:
+        _workaround_commit = ar.commit
+    _workaround_commit(msg="submodule added", files=['.gitmodules', 'submod'])
+
     stat['added'].remove('.gitmodules')
     eq_(stat, ar.status())
 
@@ -1756,7 +1775,13 @@ def _test_status(ar):
     eq_(stat, ar.status())
 
     ar.add('submod', git=True)
-    ar.commit(msg="submod modified", files='submod')
+    if ar.is_direct_mode():
+        ar.precommit()
+        _workaround_commit = super(AnnexRepo, ar).commit
+    else:
+        _workaround_commit = ar.commit
+    _workaround_commit(msg="submodule modified", files='submod')
+
     stat['modified'].remove('submod/')
     eq_(stat, ar.status())
 
@@ -1822,7 +1847,14 @@ def _test_status(ar):
             # git-annex: user error (xargs ["-0","git","--git-dir=.git","--work-tree=.","--literal-pathspecs","add","-f"] exited 123)
 
             # just commit is all we need for this test
-            ar.commit(files=['first', 'fifth', opj('sub', 'third'), 'second'])
+            # But, strange: using annex proxy, the commit just hangs
+            if ar.is_direct_mode():
+                ar.precommit()
+                _workaround_commit = super(AnnexRepo, ar).commit
+            else:
+                _workaround_commit = ar.commit
+            _workaround_commit(files=['first', 'fifth',
+                                      opj('sub', 'third'), 'second'])
 
     eq_(stat, ar.status())
 
@@ -1841,19 +1873,22 @@ def _test_status(ar):
     from datalad.utils import rmtree
     rmtree(opj(ar.path, 'submod'))
     stat['deleted'].append('submod')
-    if not ar.is_direct_mode():
-        eq_(stat, ar.status())
-        # Note: in direct mode status fails in the submodule
-    ar.remove('submod')
-    stat['modified'].append('.gitmodules')
-    if not ar.is_direct_mode():
-        eq_(stat, ar.status())
-        # Note: in direct mode status fails in the submodule
-    ar.commit("submod removed", files=['submod', '.gitmodules'])
-    stat['modified'].remove('.gitmodules')
+    eq_(stat, ar.status())
+    # recreate an empty mountpoint, since we currently do it in uninstall:
+    os.makedirs(opj(ar.path, 'submod'))
     stat['deleted'].remove('submod')
     eq_(stat, ar.status())
 
+    ar.remove('submod')
+    # TODO: Why the difference?
+    stat['deleted'].append('submod/' if ar.is_direct_mode() else 'submod')
+    stat['modified'].append('.gitmodules')
+    eq_(stat, ar.status())
+
+    ar.commit("submod removed", files=['submod', '.gitmodules'])
+    stat['modified'].remove('.gitmodules')
+    stat['deleted'].remove('submod/' if ar.is_direct_mode() else 'submod')
+    eq_(stat, ar.status())
 
 
 @with_tempfile(mkdir=True)
