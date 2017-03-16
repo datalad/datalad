@@ -89,7 +89,7 @@ def _generate_func_api():
             # TODO: BEGIN to be removed, when @build_doc is applied everywhere
             spec = getattr(intf, '_params_', dict())
             api_name = get_api_name(intfspec)
-            if api_name not in ('update', 'save', 'create', 'unlock', 'clean', 'drop', 'uninstall'):
+            if api_name not in ('update', 'save', 'create', 'unlock', 'clean', 'drop', 'uninstall', 'get'):
                 # FIXME no longer using an interface class instance
                 # convert the parameter SPEC into a docstring for the function
                 update_docstring_with_parameters(

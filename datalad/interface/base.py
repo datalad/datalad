@@ -312,7 +312,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall'):
+        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Get'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'

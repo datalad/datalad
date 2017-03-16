@@ -12,7 +12,6 @@
 
 import logging
 
-from itertools import chain
 from os import curdir
 from os.path import isdir
 from os.path import join as opj
@@ -20,6 +19,12 @@ from os.path import relpath
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
+from datalad.interface.results import YieldDatasets
+from datalad.interface.results import annexjson2result
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
@@ -34,7 +39,6 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -51,7 +55,7 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _install_necessary_subdatasets(ds, path, reckless):
+def _install_necessary_subdatasets(ds, path, reckless, refds_path):
     """Installs subdatasets of `ds`, that are necessary to obtain in order
     to have access to `path`.
 
@@ -78,7 +82,7 @@ def _install_necessary_subdatasets(ds, path, reckless):
     start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
 
     if start_ds.is_installed():
-        return start_ds
+        return
 
     # we try to install subdatasets as long as there is anything to
     # install in between the last one installed and the actual thing
@@ -91,16 +95,13 @@ def _install_necessary_subdatasets(ds, path, reckless):
     assert cur_par_ds is not None
 
     while not cur_subds.is_installed():
-        lgr.info("Installing subdataset %s%s",
-                 cur_subds,
-                 ' in order to get %s' % path if cur_subds.path != path else '')
         # get submodule info
         submodules = cur_par_ds.repo.get_submodules()
         submodule = [sm for sm in submodules
                      if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
         # install using helper that give some flexibility regarding where to
         # get the module from
-        _install_subds_from_flexible_source(
+        sd = _install_subds_from_flexible_source(
             cur_par_ds,
             submodule.path,
             submodule.url,
@@ -119,13 +120,18 @@ def _install_necessary_subdatasets(ds, path, reckless):
         except PathOutsideRepositoryError as e:
             raise RuntimeError("Unexpected failure: {0}".format(exc_str(e)))
 
-    return cur_subds
+        yield get_status_dict(
+            'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
+            message=(
+                "Installed subdataset %s%s",
+                cur_subds,
+                ' in order to get %s' % path if cur_subds.path != path else ''))
 
 
-def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None):
-    content_by_ds = {}
+def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
+                                        refds_path=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
-        return content_by_ds
+        return
     # loop over submodules not subdatasets to get the url right away
     # install using helper that give some flexibility regarding where to
     # get the module from
@@ -134,90 +140,58 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         if start is not None and not subds.path.startswith(_with_sep(start)):
             # this one we can ignore, not underneath the start path
             continue
-        if not subds.is_installed():
-            try:
-                lgr.info("Installing subdataset %s", subds.path)
-                subds = _install_subds_from_flexible_source(
-                    ds, sub.path, sub.url, reckless)
-                # we want the entire thing, but mark this subdataset
-                # as automatically installed
-                content_by_ds[subds.path] = [curdir]
-            except Exception as e:
-                # skip, if we didn't manage to install subdataset
-                lgr.warning(
-                    "Installation of subdatasets %s failed, skipped", subds)
-                lgr.debug("Installation attempt failed with exception: %s",
-                          exc_str(e))
-                continue
-            # otherwise recurse
-            # we can skip the start expression, we know we are within
-            content_by_ds.update(_recursive_install_subds_underneath(
+        if subds.is_installed():
+            yield get_status_dict(
+                'install', ds=subds, status='notneeded', logger=lgr, refds=refds_path)
+            continue
+        try:
+            subds = _install_subds_from_flexible_source(
+                ds, sub.path, sub.url, reckless)
+            yield get_status_dict(
+                'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
+                message=("Installed subdataset %s", subds))
+        except Exception as e:
+            # skip all of downstairs, if we didn't manage to install subdataset
+            yield get_status_dict(
+                'install', ds=subds, status='error', logger=lgr, refds=refds_path,
+                message=("Installation of subdatasets %s failed with exception: %s",
+                         subds, exc_str(e)))
+            continue
+        # otherwise recurse
+        # we can skip the start expression, we know we are within
+        for res in _recursive_install_subds_underneath(
                 subds,
                 recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
-                reckless=reckless
-            ))
-    return content_by_ds
+                reckless=reckless,
+                refds_path=refds_path):
+            yield res
 
 
-def _get(content_by_ds, refpath=None, source=None, jobs=None,
-         get_data=True):
+def _get(ds, content, refds_path=None, source=None, jobs=None):
     """Loops through datasets and calls git-annex call where appropriate
     """
-    for ds_path in sorted(content_by_ds.keys()):
-        cur_ds = Dataset(ds_path)
-        content = content_by_ds[ds_path]
-        # TODO generator
-        # remove list
-        results = []
-        # TODO generator
-        # install result already reported before -> remove completely
-        if len(content) >= 1 and content[0] == curdir:
-            # we hit a subdataset that just got installed few lines above, and was
-            # requested specifically, as opposed to some of its content.
-            results.append(cur_ds)
-
-        # TODO generator
-        # simply return/continue, nothing to report anymore
-        if not get_data:
-            lgr.debug(
-                "Will not get any content in %s, as instructed.",
-                cur_ds)
-            yield results
-            continue
-
-        # needs to be an annex:
-        found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
-        if not found_an_annex:
-            # TODO generator
-            # yield `content` items as 'notneeded' results
-            # and just return/continue
-            lgr.debug("Found no annex at %s. Skipped.", cur_ds)
-            if results:
-                yield results
-            continue
-        # TODO move this message into AnnexRepo.get()
-        lgr.info("Getting %i items of dataset %s ...",
-                 len(content), cur_ds)
-
-        # TODO generator
-        # convert annex report dict into our format and yield one-by-one
-        results.extend(cur_ds.repo.get(
+    # needs to be an annex:
+    found_an_annex = isinstance(ds.repo, AnnexRepo)
+    if not found_an_annex:
+        for r in results_from_paths(
+                content, status='notneeded',
+                message="no dataset annex, content already present: %s",
+                action='get', logger=lgr,
+                refds=refds_path):
+            yield r
+        return
+    # TODO generator
+    # convert annex report dict into our format and yield one-by-one
+    for res in ds.repo.get(
             content,
             options=['--from=%s' % source] if source else [],
-            jobs=jobs))
-        # TODO generator
-        # do not relpath here, but put refpath into result dict
-        # relpathing will be done outside if desired
-        if refpath:
-            # adapt relative paths reported by annex to be relative some
-            # reference
-            if ds_path != refpath:
-                for lr in results:
-                    if isinstance(lr, dict):
-                        lr['file'] = relpath(opj(ds_path, lr['file']), refpath)
-        yield results
+            jobs=jobs):
+        res = annexjson2result(res, ds, type_='file', logger=lgr,
+                               refds=refds_path)
+        yield res
 
 
+@build_doc
 class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
@@ -293,6 +267,7 @@ class Get(Interface):
 
     @staticmethod
     @datasetmethod(name='get')
+    @eval_results
     def __call__(
             path=None,
             source=None,
@@ -316,6 +291,8 @@ class Get(Interface):
             # (i.e. `install`)
             _return_datasets=False
     ):
+        # helper
+        as_ds = YieldDatasets()
         # IMPLEMENTATION CONCEPT:
         #
         # 1. Sort the world into existing handles and the rest
@@ -340,6 +317,7 @@ class Get(Interface):
             recursive=recursive,
             recursion_limit=recursion_limit,
             dir_lookup=dir_lookup)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         # NOTE: Do not act upon unavailable paths yet! Done below after testing
         # which ones could be obtained
 
@@ -352,14 +330,18 @@ class Get(Interface):
                 continue
             ds = Dataset(dspath)
             # now actually obtain whatever is necessary to get to this path
-            # TODO generator
-            # needs to yield intermediate results inside
-            containing_ds = _install_necessary_subdatasets(ds, path, reckless)
+            containing_ds = ds
+            for res in _install_necessary_subdatasets(
+                    ds, path, reckless, refds_path):
+                # yield immediately so errors could be acted upon outside, before
+                # we continue
+                yield res
+                # update to the current innermost dataset
+                containing_ds = as_ds(res)
+
+            # important to only do the next for the innermost subdataset
+            # as the `recursive` logic below relies on that!
             if containing_ds.path != ds.path:
-                # TODO generator
-                # turn log message into result message
-                lgr.debug("Installed %s to fulfill request for content for "
-                          "path %s", containing_ds, path)
                 # mark resulting dataset as auto-installed
                 # TODO generator
                 # check where this "markup" is needed and see if/how it could be
@@ -367,10 +349,10 @@ class Get(Interface):
                 if containing_ds.path == path:
                     # we had to get the entire dataset, not something within
                     # mark that it just appeared
-                    content_by_ds[path] = [curdir]
+                    content_by_ds[containing_ds.path] = [curdir]
                 else:
                     # we need to get content within
-                    content_by_ds[path] = [path]
+                    content_by_ds[containing_ds.path] = [path]
 
         if recursive and not recursion_limit == 'existing':
             # obtain any subdatasets underneath the paths given inside the
@@ -388,23 +370,29 @@ class Get(Interface):
                         ("underneath %s" % content_path
                          if subds.path != content_path
                          else ""))
-                    # TODO generator
-                    # needs to yield obtained datasets inside
-                    # inspect results, should only get datasets, complain if not
-                    # convert result info into content_by_ds update below
-                    # but also yield the completed install results right here
-                    cbysubds = _recursive_install_subds_underneath(
-                        subds,
-                        # `content_path` was explicitly given as input
-                        # we count recursions from the input, hence we
-                        # can start with the full number
-                        recursion_limit,
-                        reckless,
-                        # protect against magic marker misinterpretation
-                        # only relevant for _get, hence replace here
-                        start=content_path if content_path != curdir else None)
-                    # gets file content for all freshly installed subdatasets
-                    content_by_ds.update(cbysubds)
+                    for res in _recursive_install_subds_underneath(
+                            subds,
+                            # `content_path` was explicitly given as input
+                            # we count recursions from the input, hence we
+                            # can start with the full number
+                            recursion_limit,
+                            reckless,
+                            # protect against magic marker misinterpretation
+                            # only relevant for _get, hence replace here
+                            start=content_path if content_path != curdir else None,
+                            refds_path=refds_path):
+                        # yield immediately so errors could be acted upon
+                        # outside, before we continue
+                        yield res
+                        if not (res['status'] == 'ok' and res['type'] == 'dataset'):
+                            # nothing that we could act upon, we just reported it
+                            # upstairs
+                            continue
+                        sd = as_ds(res)
+                        # paranoia, so popular these days...
+                        assert sd.is_installed()
+                        # TODO: again the magic marker (like above) figure out if needed
+                        content_by_ds[sd.path] = [curdir]
 
         # we have now done everything we could to obtain whatever subdataset
         # to get something on the file system for previously unavailable paths
@@ -419,29 +407,26 @@ class Get(Interface):
 
         assert not nondataset_paths, "Somehow broken implementation logic"
 
-        # TODO generator
-        # yield unavailable_paths as 'impossible' results
-        if unavailable_paths:
-            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
+        for r in results_from_paths(
+                unavailable_paths, status='impossible',
+                message="path does not exist: %s",
+                action='get', logger=lgr,
+                refds=refds_path):
+            yield r
+
+        if not get_data:
+            # done already
+            return
 
         # hand over to git-annex
-        # TODO generator
-        # needs to yield file `get` results individually
-        # evaluate to factor the dataset loop out of _get() and put it here
-        results = list(chain.from_iterable(
-            _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
-                 get_data=get_data)))
-        # TODO generator
-        # the remainder of the function is obsolete after generator RF
-        # ??? should we in _return_datasets case just return both content_by_ds
-        # and unavailable_paths may be so we provide consistent across runs output
-        # and then issue outside similar IncompleteResultsError?
-        if unavailable_paths:  # and likely other error flags
-            if _return_datasets:
-                results = sorted(set(content_by_ds).difference(unavailable_paths))
-            raise IncompleteResultsError(results, failed=unavailable_paths)
-        else:
-            return sorted(content_by_ds) if _return_datasets else results
+        for ds_path in sorted(content_by_ds.keys()):
+            for res in _get(
+                    Dataset(ds_path),
+                    content_by_ds[ds_path],
+                    refds_path=refds_path,
+                    source=source,
+                    jobs=jobs):
+                yield res
 
     # TODO generator
     # RF for new interface

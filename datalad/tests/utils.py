@@ -938,6 +938,18 @@ def assert_status(label, results):
         assert_equal(r['status'], label)
 
 
+def assert_message(message, results):
+    """Verify that each status dict in the results has a message
+
+    This only tests the message template string, and not a formatted message
+    with args expanded.
+    """
+    for r in assure_list(results):
+        assert_in('message', r)
+        m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
+        assert_equal(m, message)
+
+
 def assert_fields_equal(field, results, comp):
     """Verify that the values of a given field in the status dicts match the
     given sequence"""

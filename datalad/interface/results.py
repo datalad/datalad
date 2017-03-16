@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from os.path import join as opj
 from datalad.utils import assure_list
 from datalad.distribution.dataset import Dataset
 
@@ -93,3 +94,12 @@ known_result_xfms = {
     'datasets': YieldDatasets(),
     'paths': YieldField('path'),
 }
+
+
+def annexjson2result(d, ds, **kwargs):
+    res = get_status_dict(**kwargs)
+    res['status'] = 'ok' if d.get('success', False) is True else 'error'
+    res['path'] = opj(ds.path, d['file'])
+    res['action'] = d['command']
+    res['annexkey'] = d['key']
+    return res
