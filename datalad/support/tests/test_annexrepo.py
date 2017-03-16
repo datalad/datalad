@@ -1415,7 +1415,8 @@ def test_ProcessAnnexProgressIndicators():
     proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
     # when without any target downloads, there is no total_pbar
     assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar._pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.current, 0)
     # for regular lines -- should still just return them without side-effects
     for l in irrelevant_lines:
         with swallow_outputs() as cmo:
@@ -1432,7 +1433,12 @@ def test_ProcessAnnexProgressIndicators():
         eq_(proc(success_lines[0]), success_lines[0])
         eq_(proc.pbars, {})
         out = cmo.out
-    assert out  # just assert that something was output
+
+    from datalad.ui import ui
+    from datalad.ui.dialog import SilentConsoleLog
+
+    assert out \
+        if not isinstance(ui.ui, SilentConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:

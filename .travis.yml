@@ -49,6 +49,7 @@ matrix:
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
     - DATALAD_LOG_OUTPUTS=1
+    - DATALAD_TESTS_UI_BACKEND=console
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to

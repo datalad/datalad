@@ -2457,7 +2457,7 @@ class ProcessAnnexProgressIndicators(object):
             from datalad.ui import ui
             total = sum(filter(bool, self.expected.values()))
             self.total_pbar = ui.get_progressbar(
-                label="Total", maxval=total)
+                label="Total", total=total)
             self.total_pbar.start()
 
     def _update_pbar(self, pbar, new_value):
@@ -2483,7 +2483,7 @@ class ProcessAnnexProgressIndicators(object):
             if j.get('success') in {True, 'true'}:
                 self._succeeded += 1
                 if pbar:
-                    self._update_pbar(pbar, pbar.maxval)
+                    self._update_pbar(pbar, pbar.total)
                 elif self.total_pbar:
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
@@ -2502,13 +2502,13 @@ class ProcessAnnexProgressIndicators(object):
                                                   ansi_colors.RED)) \
                     if self._failed else ''
 
-                self.total_pbar._pbar.desc = \
+                self.total_pbar.set_desc(
                     "Total (%d ok%s out of %d)" % (
                         self._succeeded,
                         failed_str,
                         len(self.expected)
                         if self.expected
-                        else self._succeeded + self._failed)
+                        else self._succeeded + self._failed))
                 # seems to be of no effect to force it repaint
                 self.total_pbar.refresh()
 
@@ -2550,7 +2550,7 @@ class ProcessAnnexProgressIndicators(object):
                 half = title_len//2 - 2
                 title = '%s .. %s' % (title[:half], title[-half:])
             pbar = self.pbars[download_id] = ui.get_progressbar(
-                label=title, maxval=target_size)
+                label=title, total=target_size)
             pbar.start()
 
         self._update_pbar(
