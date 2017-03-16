@@ -87,7 +87,7 @@ class SSHConnection(object):
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
         self.ctrl_path = ctrl_path
-        self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
+        self.ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
             self.ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
@@ -192,11 +192,19 @@ class SSHConnection(object):
         # start control master:
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
         proc = Popen(cmd)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
+        stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
         # open or not at this point
-        return proc.wait() == 0
+        exit_code = proc.wait()
+        ret = exit_code == 0
+
+        if not ret:
+            lgr.warning(
+                "Failed to run cmd %s. Exit code=%s\nstdout: %s\nstderr: %s",
+                cmd, exit_code, stdout, stderr
+            )
+        return ret
 
     def close(self):
         """Closes the connection.

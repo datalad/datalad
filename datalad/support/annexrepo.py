@@ -303,7 +303,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             c = ssh_manager.get_connection(url)
             ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
             # options to add:
-            cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
+            cfg_string = "-o ControlMaster=auto -S \"%s\"" % c.ctrl_path
             # read user-defined options from .git/config:
             cfg_string_old = self.config.get(ssh_cfg_var, None)
             self._annex_common_options += \
