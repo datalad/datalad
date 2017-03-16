@@ -1572,7 +1572,9 @@ def test_AnnexRepo_dirty(path):
 
 
 def _test_status(ar):
-    # TODO: git annex unlock (indirect mode)
+    # TODO: plain git submodule and even deeper hierarchy?
+    # TODO: when to use annex-sync
+    # TODO:
 
     stat = {'untracked': [],
             'deleted': [],
@@ -1580,6 +1582,8 @@ def _test_status(ar):
             'added': [],
             'type_changed': []}
     eq_(stat, ar.status())
+
+    # untracked files:
     with open(opj(ar.path, 'first'), 'w') as f:
         f.write("it's huge!")
     with open(opj(ar.path, 'second'), 'w') as f:
@@ -1614,6 +1618,21 @@ def _test_status(ar):
             'type_changed': []}
     eq_(stat, ar.status())
 
+    # create a file to be unannexed:
+    with open(opj(ar.path, 'fifth'), 'w') as f:
+        f.write("total disaster")
+    ar.add('fifth')
+    # instead of committing the addition use 'sync':
+    # Otherwise there are plenty of issues if not v5 indirect mode
+    ar.sync(pull=False, push=False)
+    eq_(stat, ar.status())
+
+    ar.unannex('fifth')
+    ar.sync(pull=False, push=False)
+
+    stat['untracked'].append('fifth')
+    eq_(stat, ar.status())
+
     # modify a file in git:
     with open(opj(ar.path, 'first'), 'w') as f:
         f.write("increased tremendousness")
@@ -1621,20 +1640,20 @@ def _test_status(ar):
     eq_(stat, ar.status())
 
     # modify an annexed file:
-    # TODO: provide AnnexRepo.unlock()
-
-    # v6: locked/unlocked file ; adjusted branch
-
     if not ar.is_direct_mode():
         # actually: if 'second' isn't locked, which is the case in direct mode
-        # need to fix/check for V6 => TODO
         ar.unlock('second')
+        if not ar.get_active_branch().endswith('(unlocked)'):
+            stat['type_changed'].append('second')
+        eq_(stat, ar.status())
     with open(opj(ar.path, 'second'), 'w') as f:
         f.write("Needed to unlock first. Sad!")
     if not ar.is_direct_mode():
         ar.add('second')  # => modified
-        # ar.lock('second') => type_changed
+        if not ar.get_active_branch().endswith('(unlocked)'):
+            stat['type_changed'].remove('second')
     stat['modified'].append('second')
+
     eq_(stat, ar.status())
 
     # create something in a subdir
@@ -1741,8 +1760,100 @@ def _test_status(ar):
     stat['modified'].remove('submod/')
     eq_(stat, ar.status())
 
-    # TODO: remove (file, submodule); unannex!
-    # TODO: annex-sync; when sth gets committed where?
+    # clean again:
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+
+    ar.add('first', git=True)
+    ar.add(opj('sub', 'third'))
+    ar.add('fifth')
+
+    # Note: 'second' is now committed (modified if we use commit)
+    # This is a concept issue: staged vs unstaged vs annex add (dm commit)
+    # ar.commit(files=['first', 'fifth', opj('sub', 'third')])
+
+    try:
+        ar.sync(pull=False, push=False)
+    except CommandError as e:
+        if "fatal: entry 'submod' object type (blob) doesn't match mode type " \
+           "(commit)" in e.stderr:
+            # some bug in adjusted branch(?) + submodule
+            # TODO: figure out and probably report
+            # stdout:
+            # commit
+            # [adjusted/master(unlocked) ae3e9a7] git-annex in ben@tree:/tmp/datalad_temp_test_AnnexRepo_status7qKhRQ
+            #  4 files changed, 4 insertions(+), 2 deletions(-)
+            #  create mode 100644 fifth
+            #  create mode 100644 sub/third
+            # ok
+            #
+            # failed
+            # stderr:
+            # fatal: entry 'submod' object type (blob) doesn't match mode type (commit)
+            # git-annex: user error (git ["--git-dir=.git","--work-tree=.","--literal-pathspecs","mktree","--batch","-z"] exited 128)
+            # git-annex: sync: 1 failed
+
+            # But wrt to cleaning the repo, it almost works
+            pass
+
+        elif "fatal: This operation must be run in a work tree" in e.stderr \
+            and "fatal: 'git status --porcelain' failed in submodule submod" \
+                in e.stderr:
+            # direct mode fails, too.
+            # apparently sync is calling git status internally, which then fails
+            # in the submodule.
+            # TODO: Bug report
+            # stdout:
+            # commit  add second ok
+            # (recording state in git...)
+            #
+            # failed
+            # (recording state in git...)
+            #
+            # stderr:
+            # fatal: This operation must be run in a work tree
+            # fatal: 'git status --porcelain' failed in submodule submod
+            # git-annex: user error (xargs ["-0","git","--git-dir=.git","--work-tree=.","--literal-pathspecs","add","-f"] exited 123)
+            # fatal: This operation must be run in a work tree
+            # fatal: 'git status --porcelain' failed in submodule submod
+            # git-annex: user error (xargs ["-0","git","--git-dir=.git","--work-tree=.","--literal-pathspecs","add","-f"] exited 123)
+
+            # just commit is all we need for this test
+            ar.commit(files=['first', 'fifth', opj('sub', 'third'), 'second'])
+
+    eq_(stat, ar.status())
+
+    # remove a file in annex:
+    ar.remove('fifth')
+    stat['deleted'].append('fifth')
+    eq_(stat, ar.status())
+
+    # remove a file in git:
+    ar.remove('first')
+    stat['deleted'].append('first')
+    eq_(stat, ar.status())
+
+    # remove a submodule:
+    # rm; git rm; git commit
+    from datalad.utils import rmtree
+    rmtree(opj(ar.path, 'submod'))
+    stat['deleted'].append('submod')
+    if not ar.is_direct_mode():
+        eq_(stat, ar.status())
+        # Note: in direct mode status fails in the submodule
+    ar.remove('submod')
+    stat['modified'].append('.gitmodules')
+    if not ar.is_direct_mode():
+        eq_(stat, ar.status())
+        # Note: in direct mode status fails in the submodule
+    ar.commit("submod removed", files=['submod', '.gitmodules'])
+    stat['modified'].remove('.gitmodules')
+    stat['deleted'].remove('submod')
+    eq_(stat, ar.status())
+
 
 
 @with_tempfile(mkdir=True)
