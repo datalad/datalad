@@ -9,18 +9,38 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.4.2 (Nov ??, 2016) -- will be better than ever
+## 0.5.0 (Mar 19, 2017) -- it's huge
 
-???
+This release includes an avalanche of bug fixes, enhancements, and
+additions which at large should stay consistent with previous behavior
+but provide better functioning.  Lots of code was refactored to provide
+more consistent code-base, and some API breakage has happened.
+
+### Most notable changes
+
+- requires [git-annex] >= 6.20161210 (or better even >= 6.20161210 for
+  improved functionality)
+- [save] `-S` does no longer store the originating dataset in its commit
+  message
+- [save] `-a` is no longer for `--auto-add-changes` but for `--all-changes`
+  so only known components get saved, no new files automagically added
 
 ### Fixes
 
-???
+- More consistent interaction through ssh - all ssh connections go
+  through [ssh-run] shim for a "single point of authentication", etc.
+- More robust [ls] operation outside of the datasets
 
 ### Enhancements and new features
 
-???
+- New [drop] and [remove] commands
+- [clean] got `--what` to specify explicitly what cleaning steps to perform
+  and now could be invoked with `-r`
 
+### Internal refactoring
+
+- Majority of the commands go through `_prep` for arguments validation
+  and pre-processing to avoid recursive invocations
 
 ## 0.4.1 (Nov 10, 2016) -- CA release
 
@@ -183,7 +203,10 @@ publishing
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
+[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
+[remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
+[sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
 [Configuration documentation]: http://docs.datalad.org/config.html
 [rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
