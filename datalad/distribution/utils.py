@@ -205,6 +205,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
 
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
+    got_installed = not subds.is_installed()
     try:
         clone_url = _clone_from_any_source(clone_urls, subds.path)
     except GitCommandError as e:
@@ -217,9 +218,9 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         # TODO: move all of that into update_submodule ??
         # TODO: direct mode ramifications?
-        branch = ds.repo.get_active_branch()
         # track branch originally cloned
         subrepo = subds.repo
+        branch = subds.repo.get_active_branch()
         branch_hexsha = subrepo.get_hexsha(branch)
         ds.repo.update_submodule(sm_path, init=True)
         updated_branch = subrepo.get_active_branch()
@@ -230,7 +231,8 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
                 "Detected detached HEAD after updating submodule %s which was "
                 "in %s branch before", subds.path, branch)
             detached_hexsha = subrepo.get_hexsha()
-            if subrepo.get_merge_base(
+            if got_installed and \
+                subrepo.get_merge_base(
                     [branch_hexsha, detached_hexsha]) == detached_hexsha:
                 # TODO: config option?
                 # in all likely event it is of the same branch since
@@ -247,10 +249,18 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
                 assert(subrepo.get_hexsha(branch) == detached_hexsha)
                 subrepo.update_ref('HEAD', branch_ref, symbolic=True)
                 assert(subrepo.get_active_branch() == branch)
-            else:
+            elif got_installed:
                 lgr.warning(
-                    "%s has a detached HEAD since original branch %s has another common ancestor with %s",
+                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
                     subrepo.path, branch, detached_hexsha[:8]
+                )
+            else:
+                # actually this point should never be reached atm since here
+                # datasets are assumed to be installed afresh, but logic is kept
+                # in "just in case" we later support it
+                lgr.info(
+                    "%s has a detached HEAD since we operated on pre-installed dataset",
+                    subrepo.path
                 )
     else:
         # submodule is brand-new and previously unknown
