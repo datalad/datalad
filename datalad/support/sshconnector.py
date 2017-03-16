@@ -51,12 +51,18 @@ def get_connection_hash(hostname, port='', username=''):
     port and login username). The hash also contains the local
     host name.
     """
+    # returning only first 8 characters to minimize our chance
+    # of hitting a limit on the max path length for the Unix socket.
+    # Collisions would be very unlikely even if we used less than 8.
+    # References:
+    #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
+    #  https://github.com/datalad/datalad/pull/1377
     return md5(
         '{lhost}{rhost}{port}{username}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
-            username=username).encode('utf-8')).hexdigest()
+            username=username).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
