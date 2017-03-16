@@ -249,11 +249,13 @@ class Install(Interface):
                         # if_dirty=if_dirty,
                         # save=save,
                         # git_clone_opts=git_clone_opts,
-                        # annex_init_opts=annex_init_opts
-                        _return_datasets=True,
+                        # annex_init_opts=annex_init_opts,
+                        result_xfm='datasets',
                         **common_kwargs
                     )
                 except IncompleteResultsError as exc:
+                    # TODO generator
+                    # pass through `get` errors by re-yielding
                     exc_str_ = ': ' + exc_str(exc) if exc.results else ''
                     lgr.warning("Some items failed to install: %s",
                                 exc_str_)
@@ -490,6 +492,7 @@ class Install(Interface):
                     # TODO expose this
                     # yoh: exactly!
                     #annex_get_opts=annex_get_opts,
+                    result_xfm='datasets',
                     **kwargs
                 )
                 # TODO do we want to filter this so `install` only returns

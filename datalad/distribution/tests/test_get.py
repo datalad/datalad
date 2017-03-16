@@ -10,9 +10,6 @@
 """
 
 
-import logging
-import re
-
 from os import curdir
 from os.path import join as opj, basename
 from glob import glob
@@ -21,7 +18,6 @@ from datalad.api import get
 from datalad.api import install
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -34,8 +30,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import assert_re_in
-from datalad.utils import swallow_logs, with_pathsep
+from datalad.utils import with_pathsep
 from datalad.utils import chpwd
 from datalad.utils import assure_list
 from datalad.utils import rmtree
@@ -325,14 +320,12 @@ def test_get_mixed_hierarchy(src, path):
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        result = ds.get(curdir, recursive=True)
-        assert_re_in('.*Found no annex at {0}. Skipped.'.format(ds),
-                     cml.out, flags=re.DOTALL)
-        eq_(len(result), 1)
-        eq_(result[0]['file'], opj("subds", "file_in_annex.txt"))
-        ok_(result[0]['success'] is True)
-        ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
+    result = ds.get(curdir, recursive=True)
+    # git repo and subds
+    assert_status('notneeded', result[:-1])
+    assert_status('ok', [result[-1]])
+    eq_(result[-1]['path'], opj(subds.path, "file_in_annex.txt"))
+    ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
 
 
 @with_testrepos('submodule_annex', flavors='local')
@@ -397,11 +390,13 @@ def test_recurse_existing(src, path):
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
     ok_(not sub3.is_installed())
     # now pull down all remaining datasets, no data
-    sub3, sub4 = root.get(curdir, recursive=True, get_data=False)
+    sub3, sub4 = root.get(
+        curdir, recursive=True, get_data=False,
+        result_xfm='datasets', result_filter=lambda x: x['status'] == 'ok')
     ok_(sub4.is_installed())
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
     # aaannd all data
-    files = root.get(curdir, recursive=True)
+    files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok')
     eq_(len(files), 1)
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
 
@@ -409,7 +404,7 @@ def test_recurse_existing(src, path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_in_unavailable_subdataset(src, path):
-    origin_ds = _make_dataset_hierarchy(src)
+    _make_dataset_hierarchy(src)
     root = install(path, source=src)
     targetpath = opj('sub1', 'sub2')
     targetabspath = opj(root.path, targetpath)

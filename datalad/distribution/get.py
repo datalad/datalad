@@ -281,15 +281,6 @@ class Get(Interface):
             annex_get_opts=None,
             jobs=None,
             verbose=False,
-            # internal -- instead of returning 'get'ed items, return final
-            # content_by_ds, unavailable_paths.  To be used by the call from
-            # Install.__call__ and done so to avoid creating another reusable
-            # function which would need to duplicate all this heavy list of
-            # kwargs
-            # TODO generator
-            # remove and replace with result transformation at the receiving end
-            # (i.e. `install`)
-            _return_datasets=False
     ):
         # helper
         as_ds = YieldDatasets()
