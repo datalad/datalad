@@ -35,19 +35,128 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
+from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import require_dataset
-from .utils import install_necessary_subdatasets
-from .utils import _recursive_install_subds_underneath
+from .utils import _install_subds_from_flexible_source
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
+
+
+def _install_necessary_subdatasets(ds, path, reckless):
+    """Installs subdatasets of `ds`, that are necessary to obtain in order
+    to have access to `path`.
+
+    Gets the subdataset containing `path` regardless of whether or not it was
+    already installed. While doing so, installs everything necessary in between
+    the uppermost installed one and `path`.
+
+    Note: `ds` itself has to be installed.
+
+    Parameters
+    ----------
+    ds: Dataset
+    path: str
+    reckless: bool
+
+    Returns
+    -------
+    Dataset
+      the last (deepest) subdataset, that was installed
+    """
+    assert ds.is_installed()
+
+    # figuring out what dataset to start with:
+    start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
+
+    if start_ds.is_installed():
+        return start_ds
+
+    # we try to install subdatasets as long as there is anything to
+    # install in between the last one installed and the actual thing
+    # to get (which is `path`):
+    cur_subds = start_ds
+
+    # Note, this is not necessarily `ds`:
+    # MIH: would be good to know why?
+    cur_par_ds = cur_subds.get_superdataset()
+    assert cur_par_ds is not None
+
+    while not cur_subds.is_installed():
+        lgr.info("Installing subdataset %s%s",
+                 cur_subds,
+                 ' in order to get %s' % path if cur_subds.path != path else '')
+        # get submodule info
+        submodules = cur_par_ds.repo.get_submodules()
+        submodule = [sm for sm in submodules
+                     if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
+        # install using helper that give some flexibility regarding where to
+        # get the module from
+        _install_subds_from_flexible_source(
+            cur_par_ds,
+            submodule.path,
+            submodule.url,
+            reckless)
+
+        cur_par_ds = cur_subds
+
+        # Note: PathOutsideRepositoryError should not happen here.
+        # If so, there went something fundamentally wrong, so raise something
+        # different, to not let the caller mix it up with a "regular"
+        # PathOutsideRepositoryError from above. (Although it could be
+        # detected via its `repo` attribute)
+        try:
+            cur_subds = \
+                cur_subds.get_containing_subdataset(path, recursion_limit=None)
+        except PathOutsideRepositoryError as e:
+            raise RuntimeError("Unexpected failure: {0}".format(exc_str(e)))
+
+    return cur_subds
+
+
+def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None):
+    content_by_ds = {}
+    if isinstance(recursion_limit, int) and recursion_limit <= 0:
+        return content_by_ds
+    # loop over submodules not subdatasets to get the url right away
+    # install using helper that give some flexibility regarding where to
+    # get the module from
+    for sub in ds.repo.get_submodules():
+        subds = Dataset(opj(ds.path, sub.path))
+        if start is not None and not subds.path.startswith(_with_sep(start)):
+            # this one we can ignore, not underneath the start path
+            continue
+        if not subds.is_installed():
+            try:
+                lgr.info("Installing subdataset %s", subds.path)
+                subds = _install_subds_from_flexible_source(
+                    ds, sub.path, sub.url, reckless)
+                # we want the entire thing, but mark this subdataset
+                # as automatically installed
+                content_by_ds[subds.path] = [curdir]
+            except Exception as e:
+                # skip, if we didn't manage to install subdataset
+                lgr.warning(
+                    "Installation of subdatasets %s failed, skipped", subds)
+                lgr.debug("Installation attempt failed with exception: %s",
+                          exc_str(e))
+                continue
+            # otherwise recurse
+            # we can skip the start expression, we know we are within
+            content_by_ds.update(_recursive_install_subds_underneath(
+                subds,
+                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
+                reckless=reckless
+            ))
+    return content_by_ds
 
 
 def _get(content_by_ds, refpath=None, source=None, jobs=None,
@@ -242,13 +351,10 @@ class Get(Interface):
                 # nothing we can do for this path
                 continue
             ds = Dataset(dspath)
-            # must always yield a dataset -- we sorted out the ones outside
-            # any dataset at the very top
-            assert ds.is_installed()
             # now actually obtain whatever is necessary to get to this path
             # TODO generator
             # needs to yield intermediate results inside
-            containing_ds = install_necessary_subdatasets(ds, path, reckless)
+            containing_ds = _install_necessary_subdatasets(ds, path, reckless)
             if containing_ds.path != ds.path:
                 # TODO generator
                 # turn log message into result message
