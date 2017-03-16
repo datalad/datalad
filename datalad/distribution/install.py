@@ -261,7 +261,7 @@ class Install(Interface):
                 # pass through `get` errors by re-yielding
                 #exc_str_ = ': ' + exc_str(exc) if exc.results else ''
                 installed_datasets = [r['path'] for r in get_results
-                                      if r.get('type') == 'dataset' and r['status'] == 'ok']
+                                      if r.get('type') == 'dataset' and r['status'] in ('ok', 'notneeded')]
                 failed = [r['path'] for r in get_results
                           if r['status'] in ('impossible', 'error')]
                 if failed:

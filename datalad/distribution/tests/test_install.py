@@ -44,6 +44,7 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -167,8 +168,8 @@ def test_install_crcns(tdir, ds_path):
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
         # and we could repeat installation and get the same result
         ds1 = install(_path_("all-nonrecursive/crcns"))
-        ds2 = Dataset('all-nonrecursive').install('crcns')
         ok_(ds1.is_installed())
+        ds2 = Dataset('all-nonrecursive').install('crcns')
         eq_(ds1, ds2)
         eq_(ds1.path, ds2.path)  # to make sure they are a single dataset
 
@@ -675,15 +676,16 @@ def test_install_skip_failed_recursive(src, path):
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
 
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(os.curdir, recursive=True)
-        # toplevel dataset was in the house already
-        assert_not_in(ds, result)
-        assert_in(sub2, result)
-        assert_not_in(sub1, result)
-        cml.assert_logged(
-            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
-            regex=False, level='WARNING')
+    result = ds.get(os.curdir, recursive=True, on_failure='ignore')
+    # toplevel dataset was in the house already
+    assert_not_in(ds.path, [r['path'] for r in result])
+    assert_status('error', [result[0]])
+    assert_status('ok', result[1:])
+    eq_(sub2.path, result[1]['path'])
+    assert_in(
+        "destination path '{}' already exists and is not an empty directory".format(
+            sub1.path),
+        result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',

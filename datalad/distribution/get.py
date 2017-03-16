@@ -82,6 +82,12 @@ def _install_necessary_subdatasets(ds, path, reckless, refds_path):
     start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
 
     if start_ds.is_installed():
+        if not start_ds.path == refds_path:
+            # we don't want to report the base dataset as notneeded
+            # when `get` was called as a method of that dataset
+            yield get_status_dict(
+                'install', ds=start_ds, status='notneeded', logger=lgr,
+                refds=refds_path, message=('%s is already installed', start_ds))
         return
 
     # we try to install subdatasets as long as there is anything to
@@ -142,7 +148,8 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             continue
         if subds.is_installed():
             yield get_status_dict(
-                'install', ds=subds, status='notneeded', logger=lgr, refds=refds_path)
+                'install', ds=subds, status='notneeded', logger=lgr,
+                refds=refds_path)
             continue
         try:
             subds = _install_subds_from_flexible_source(
@@ -309,6 +316,18 @@ class Get(Interface):
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         # NOTE: Do not act upon unavailable paths yet! Done below after testing
         # which ones could be obtained
+
+        # report dataset we already have and don't need to get
+        for dspath in content_by_ds:
+            d = Dataset(dspath)
+            if not d.is_installed() or (dspath == refds_path):
+                # do not report what hasn't arived yet
+                # also do not report the base dataset that is already
+                # present -- no surprise
+                continue
+            yield get_status_dict(
+                'install', ds=d, status='notneeded', logger=lgr,
+                refds=refds_path, message=('%s is already installed', d))
 
         # explore the unknown
         for path in sorted(unavailable_paths):
