@@ -155,8 +155,8 @@ script:
   - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
-  # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
-  - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
+  # Run doc examples
+  - tools/testing/run_doc_examples
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*
