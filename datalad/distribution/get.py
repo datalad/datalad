@@ -180,8 +180,6 @@ def _get(ds, content, refds_path=None, source=None, jobs=None):
                 refds=refds_path):
             yield r
         return
-    # TODO generator
-    # convert annex report dict into our format and yield one-by-one
     for res in ds.repo.get(
             content,
             options=['--from=%s' % source] if source else [],
