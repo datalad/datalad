@@ -297,7 +297,7 @@ class BaseDownloader(object):
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
                 t0 = time.time()
                 downloader_session.download(fp, pbar, size=size)
                 downloaded_time = time.time() - t0
@@ -427,7 +427,7 @@ class BaseDownloader(object):
         # FETCH CONTENT
         try:
             # Consider to improve to make it animated as well, or shorten here
-            #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+            #pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
             content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)

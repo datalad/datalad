@@ -22,9 +22,10 @@ import sys
 
 class ProgressBarBase(object):
     """Base class for any progress bar"""
-    def __init__(self, maxval=None):
-        self._prev_value = 0
-        self.maxval = maxval
+
+    def __init__(self, total=None, fill_text=None, out=None, label=None, initial=0):
+        self._current = initial
+        self.total = total
 
     def refresh(self):
         """Force update"""
@@ -32,17 +33,35 @@ class ProgressBarBase(object):
 
     def update(self, size, increment=False):
         if increment:
-            self._prev_value += size
+            self._current += size
         else:
-            self._prev_value = size
+            self._current = size
 
-    def start(self):
-        pass
+    @property
+    def current(self):
+        return self._current
+
+    @current.setter
+    def current(self, value):
+        assert value >= 0, "Total cannot be negative"
+        self._current = value
+
+    def start(self, initial=0):
+        self._current = initial
 
     def finish(self):
-        self._prev_value = 0
+        pass
 
-progressbars = {}
+    def set_desc(self, value):
+        pass  # to override in subclass on how to handle description
+
+
+class SilentProgressBar(ProgressBarBase):
+    def __init__(self, label='', fill_text=None, total=None, unit='B', out=sys.stdout):
+        super(SilentProgressBar, self).__init__(total=total)
+
+
+progressbars = {'silent':  SilentProgressBar}
 
 try:
     from tqdm import tqdm
@@ -68,12 +87,12 @@ try:
             else dict(mininterval=0)
 
         def __init__(self, label='', fill_text=None,
-                     maxval=None, unit='B', out=sys.stdout, leave=False):
-            super(tqdmProgressBar, self).__init__(maxval=maxval)
+                     total=None, unit='B', out=sys.stdout, leave=False):
+            super(tqdmProgressBar, self).__init__(total=total)
             self._pbar_params = updated(
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
-                     unit_scale=True, total=maxval, file=out,
+                     unit_scale=True, total=total, file=out,
                      leave=leave
                      ))
             self._pbar = None
@@ -84,7 +103,7 @@ try:
 
         def update(self, size, increment=False):
             self._create()
-            inc = size - self._prev_value
+            inc = size - self.current
             self._pbar.update(size if increment else inc)
             super(tqdmProgressBar, self).update(size, increment=increment)
 
@@ -135,6 +154,9 @@ try:
                 # 4.7.4 seems to have it
                 pass
 
+        def set_desc(self, value):
+            self._pbar.desc = value
+
 
     progressbars['tqdm'] = tqdmProgressBar
 except ImportError:  # pragma: no cover
@@ -156,6 +178,6 @@ class AnnexSpecialRemoteProgressBar(ProgressBarBase):
         super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
         # now use stored value
         if self.remote:
-            self.remote.progress(self._prev_value)
+            self.remote.progress(self.current)
 
 progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar
