@@ -1054,7 +1054,7 @@ class GitRepo(RepoInterface):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self, with_refs_only=False):
+    def get_remotes(self, with_refs_only=False, with_urls_only=False):
         """Get known remotes of the repository
 
         Parameters
@@ -1080,9 +1080,14 @@ class GitRepo(RepoInterface):
                     if "not have any references" not in str(exc):
                         # was some other reason
                         raise
-            return remotes
         else:
-            return [remote.name for remote in self.repo.remotes]
+            remotes = [remote.name for remote in self.repo.remotes]
+        if with_urls_only:
+            remotes = [
+                r for r in remotes
+                if self.config.get('remote.%s.url' % r)
+            ]
+        return remotes
 
     def get_files(self, branch=None):
         """Get a list of files in git.
@@ -1358,7 +1363,10 @@ class GitRepo(RepoInterface):
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
             if all_:
-                remotes_to_fetch = self.repo.remotes
+                remotes_to_fetch = [
+                    self.repo.remote(r)
+                    for r in self.get_remotes(with_urls_only=True)
+                ]
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
