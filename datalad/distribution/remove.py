@@ -142,7 +142,6 @@ class Remove(Interface):
         # this should yield what it did
         handle_dirty_datasets(
             content_by_ds, mode=if_dirty, base=dataset)
-        ds2save = set()
         # iterate over all datasets, starting at the bottom
         # to make the removal of dataset content known upstairs
         for ds_path in sorted(content_by_ds, reverse=True):
@@ -178,7 +177,6 @@ class Remove(Interface):
                     content_by_ds.get(superds.path, []) \
                     + [opj(superds.path, '.gitmodules'),
                        ds_path]
-                ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):
                     for r in _drop_files(ds, paths, check=True):
@@ -194,11 +192,11 @@ class Remove(Interface):
             # in order to save state changes all the way up
             _discover_trace_to_known(dataset.path, [], content_by_ds)
 
-        ds2save = ds2save.union(content_by_ds.keys())
         for r in save_dataset_hierarchy(
                 # pass list of datasets to save that excludes known
                 # removed datasets to avoid "impossible" to save messages
-                [d for d in ds2save if Dataset(d).is_installed()],
+                {d: p for d, p in content_by_ds.items()
+                 if Dataset(d).is_installed()},
                 base=dataset.path if dataset and dataset.is_installed() else None,
                 message='[DATALAD] removed content'):
             yield r

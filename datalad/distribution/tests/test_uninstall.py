@@ -380,4 +380,6 @@ def test_no_interaction_with_untracked_content(path):
     subds = ds.create('sub', force=True)
     subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
     ok_(not exists(opj(subds.path, '.datalad', 'config')))
+    # this will only work, if `remove` didn't do anything stupid and
+    # caused all content to be saved
     subds.create('subsub', force=True)
