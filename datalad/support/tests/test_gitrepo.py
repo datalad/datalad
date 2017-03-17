@@ -855,7 +855,10 @@ def test_submodule_deinit(path):
 
     top_repo = GitRepo(path, create=False)
     eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
-    top_repo.update_submodule('subm 1', init=True)
+    # note: here init=True is ok, since we are using it just for testing
+    with swallow_logs(new_level=logging.WARN) as cml:
+        top_repo.update_submodule('subm 1', init=True)
+        assert_in('Do not use update_submodule with init=True', cml.out)
     top_repo.update_submodule('subm 2', init=True)
     ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
 
@@ -1094,3 +1097,14 @@ def test_GitRepo_set_remote_url(path):
     gr.set_remote_url('some', 'ssh://whatever.ru', push=True)
     assert_equal(gr.config['remote.some.pushurl'],
                  'ssh://whatever.ru')
+
+    # add remote without url
+    url2 = 'http://repo2.example.com/.git'
+    gr.add_remote('some-without-url', url2)
+    assert_equal(gr.config['remote.some-without-url.url'], url2)
+    # "remove" it
+    gr.config.unset('remote.some-without-url.url', where='local')
+    with assert_raises(KeyError):
+        gr.config['remote.some-without-url.url']
+    eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
+    eq_(set(gr.get_remotes(with_urls_only=True)), {'some'})

@@ -707,11 +707,11 @@ def swallow_outputs():
 
 
 @contextmanager
-def swallow_logs(new_level=None, file_=None):
+def swallow_logs(new_level=None, file_=None, name='datalad'):
     """Context manager to consume all logs.
 
     """
-    lgr = logging.getLogger("datalad")
+    lgr = logging.getLogger(name)
 
     # Keep old settings
     old_level = lgr.level
@@ -808,6 +808,8 @@ def swallow_logs(new_level=None, file_=None):
     # we want to log levelname so we could test against it
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
+    # Inherit filters
+    swallow_handler.filters = sum([h.filters for h in old_handlers], [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
