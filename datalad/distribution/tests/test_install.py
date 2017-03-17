@@ -45,6 +45,8 @@ from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -468,8 +470,7 @@ def test_install_known_subdataset(src, path):
     ok_(subds.repo.file_has_content('test-annex.dat') is False)
     with chpwd(ds.path):
         result = get(path='subm 1', dataset=os.curdir)
-        eq_(len(result), 1)
-        eq_(result[0]['path'], opj(subds.path, 'test-annex.dat'))
+        assert_in_results(result, path=opj(subds.path, 'test-annex.dat'))
         ok_(subds.repo.file_has_content('test-annex.dat') is True)
         ok_(subds.is_installed())
 
@@ -571,7 +572,7 @@ def test_install_list(path, top_path):
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
     # and if we request it again via get, result should be empty
     get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
-    eq_(get_result, [])
+    assert_status('notneeded', get_result)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -658,7 +659,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # return of get is always a list, even if just one thing was gotten
     # in this case 'subm1' was already obtained above, so this will get this
     # content of the subdataset
-    with assert_raises(InstallFailedError) as cme:
+    with assert_raises(IncompleteResultsError) as cme:
         ds.install(path=['subm 1', 'not_existing'])
     with assert_raises(IncompleteResultsError) as cme:
         ds.get(path=['subm 1', 'not_existing'])
@@ -678,10 +679,9 @@ def test_install_skip_failed_recursive(src, path):
 
     result = ds.get(os.curdir, recursive=True, on_failure='ignore')
     # toplevel dataset was in the house already
-    assert_not_in(ds.path, [r['path'] for r in result])
+    assert_not_in_results(result, path=ds.path)
     assert_status('error', [result[0]])
-    assert_status('ok', result[1:])
-    eq_(sub2.path, result[1]['path'])
+    assert_in_results(result, status='ok', path=sub2.path)
     assert_in(
         "destination path '{}' already exists and is not an empty directory".format(
             sub1.path),

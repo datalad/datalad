@@ -28,6 +28,9 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import assert_not_in_results
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import serve_path_via_http
 from datalad.utils import with_pathsep
@@ -102,7 +105,7 @@ def test_get_single_file(path):
     ok_(ds.is_installed())
     ok_(ds.repo.file_has_content('test-annex.dat') is False)
     result = ds.get("test-annex.dat")
-    eq_(len(result), 1)
+    assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
     eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
@@ -220,9 +223,11 @@ def test_get_recurse_subdatasets(src, path):
     #      imply fulfilling all file handles
     result = ds.get(rel_path_sub1, recursive=True)
     # all good actions
-    assert_status('ok', result)
+    assert_status(('ok', 'notneeded'), result)
+    # pre-existing subds is reported as notneeded
+    assert_in_results(result, status='notneeded', path=subds1.path)
 
-    eq_(result[0].get('path')[len(ds.path) + 1:], rel_path_sub1)
+    assert_in_results(result, path=opj(ds.path, rel_path_sub1), status='ok')
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
 
     # drop it:
@@ -336,7 +341,7 @@ def test_autoresolve_multiple_datasets(src, path):
         ds2 = install('ds2', source=src)
         results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
         # each ds has one file
-        eq_(len(results), 2)
+        assert_result_count(results, 2, type='file', action='get', status='ok')
         ok_(ds1.repo.file_has_content('test-annex.dat') is True)
         ok_(ds2.repo.file_has_content('test-annex.dat') is True)
 
@@ -386,7 +391,8 @@ def test_recurse_existing(src, path):
     # now get all content in all existing datasets, no new datasets installed
     # in the process
     files = root.get(curdir, recursive=True, recursion_limit='existing')
-    eq_(len(files), 1)
+    assert_not_in_results(files, type='dataset', status='ok')
+    assert_result_count(files, 1, type='file', status='ok')
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
     ok_(not sub3.is_installed())
     # now pull down all remaining datasets, no data
