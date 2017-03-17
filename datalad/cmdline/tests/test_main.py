@@ -15,9 +15,12 @@ from mock import patch
 
 import datalad
 from ..main import main
+from datalad import __version__
+from datalad.cmd import Runner
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_not_in
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -146,3 +149,22 @@ def test_incorrect_options():
     err_insufficient = err_invalid # "specify"
     yield check_incorrect_option, ('--dbg',), err_insufficient
     yield check_incorrect_option, tuple(), err_insufficient
+
+def test_script_shims():
+    runner = Runner()
+    for script in [
+        'datalad',
+        'git-annex-remote-datalad-archives',
+        'git-annex-remote-datalad']:
+        # those must be available for execution, and should not contain
+        which, _ = runner(['which', script])
+        # test if there is no easy install shim in there
+        with open(which.rstrip()) as f:
+            content = f.read()
+        assert_not_in('EASY', content) # NOTHING easy should be there
+        assert_not_in('pkg_resources', content)
+
+        # and let's check that it is our script
+        out, err = runner([script, '--version'])
+        version = (out + err).splitlines()[0]
+        assert_equal('datalad %s' % __version__, version)

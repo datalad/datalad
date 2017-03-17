@@ -8,6 +8,7 @@
 
 import os
 import platform
+import sys
 from genericpath import exists
 from os import linesep, makedirs
 from os.path import dirname, join as opj
@@ -213,7 +214,6 @@ def setup_entry_points(entry_points):
 
     It will never break, I promise!
     """
-    from distutils.command.install_scripts import install_scripts
 
     def patch_write_script(mod):
         """Patches write_script of the module with our shim to provide
@@ -241,31 +241,18 @@ def setup_entry_points(entry_points):
 
         setattr(mod, 'write_script', _provide_lean_script_contents)
 
-    def generate_entry_points(entry_points):
-        """We still need this one so that setuptools known about the scripts
+    # We still need this one so that setuptools known about the scripts
+    # So we generate some bogus ones, and provide a list of them ;)
+    # pre-generate paths so we could give them to setuptools
+    scripts_build_dir = opj('build', 'scripts_generated')
+    scripts = [opj(scripts_build_dir, x) for x in entry_points]
 
-        So we generate some bogus ones, and provide a list of them ;)
-        """
-        # pre-generate paths so we could give them to setuptools
-        scripts_build_dir = opj('build', '_scripts_')
-        script_path_gen = lambda s: opj(scripts_build_dir, s)
-        scripts = map(script_path_gen, entry_points)
-
-        class _install_bogus_scripts(install_scripts):
-            def run(self):
-                # first we will actually generate those tiny scripts
-                if not exists(scripts_build_dir):
-                    makedirs(scripts_build_dir)
-                for s, mod in entry_points.items():
-                    with open(opj(scripts_build_dir, s), 'w') as f:
-                        f.write("""#!/usr/bin/env python\ni='BOGUS'""")
-                # pass back to our super
-                install_scripts.run(self)
-                # and now we can clean up
-                import shutil
-                shutil.rmtree(scripts_build_dir)
-
-        return scripts, _install_bogus_scripts
+    if 'clean' not in sys.argv:
+        if not exists(scripts_build_dir):
+            makedirs(scripts_build_dir)
+        for s, mod in entry_points.items():
+            with open(opj(scripts_build_dir, s), 'w') as f:
+                f.write("""#!/usr/bin/env python\ni='BOGUS'""")
 
     platform_system = platform.system().lower()
     setup_kwargs = {}
@@ -286,8 +273,6 @@ def setup_entry_points(entry_points):
         patch_write_script(stinstall_scripts)
         patch_write_script(easy_install)
 
-        scripts, install_scripts_ = generate_entry_points(entry_points)
-        cmdclass['install_scripts'] = install_scripts_
         setup_kwargs['scripts'] = scripts
 
     return cmdclass, setup_kwargs

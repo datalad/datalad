@@ -155,7 +155,8 @@ cmdclass_, setup_kwargs = setup_entry_points(
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
     })
 cmdclass.update(cmdclass_)
-
+#import pdb; pdb.set_trace()
+#import epdb; epdb.serve()
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
