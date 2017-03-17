@@ -147,6 +147,18 @@ definitions = {
             'title': 'Used for control the verbosity of logs printed to '
                      'stdout while running datalad commands/debugging'}),
     },
+    'datalad.log.name': {
+        'ui': ('question', {
+            'title': 'Include name of the log target in the log line'}),
+    },
+    'datalad.log.names': {
+        'ui': ('question', {
+            'title': 'Which names (,-separated) to print log lines for'}),
+    },
+    'datalad.log.namesre': {
+        'ui': ('question', {
+            'title': 'Regular expression for which names to print log lines for'}),
+    },
     'datalad.log.outputs': {
         'ui': ('question', {
                'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
