@@ -1204,10 +1204,21 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-        std_out, std_err = self._run_annex_command('unlock',
-                                                   annex_options=files + options)
 
-        return [line.split()[1] for line in std_out.splitlines()
+        if self.is_direct_mode():
+            lgr.debug("'%s' is in direct mode, "
+                      "'annex unlock' not available", ds)
+            lgr.warning("In direct mode there is no 'unlock'. However if "
+                        "the file's content is present, it is kind of "
+                        "unlocked. Therefore just checking whether this is "
+                        "the case.")
+            return [f for f in files if self.file_has_content(f)]
+
+        else:
+            std_out, std_err = \
+                self._run_annex_command('unlock', annex_options=files + options)
+
+            return [line.split()[1] for line in std_out.splitlines()
                 if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
 
     def adjust(self, options=None):

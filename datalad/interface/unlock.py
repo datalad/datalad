@@ -98,6 +98,13 @@ class Unlock(Interface):
             files = content_by_ds[ds_path]
 
             unlocked = ds.repo.unlock(files)
+            # Note for merging with PR #1350:
+            # Replace the list comprehension
+            # [line.split()[1] for line in std_out.splitlines() if line.strip().endswith('ok')]
+            # by
+            # ds.repo.unlock(files)
+            # and delete the ds.repo._annex_custom_command call
+
         return unlocked
 
     @staticmethod
