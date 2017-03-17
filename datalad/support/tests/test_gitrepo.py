@@ -855,7 +855,10 @@ def test_submodule_deinit(path):
 
     top_repo = GitRepo(path, create=False)
     eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
-    top_repo.update_submodule('subm 1', init=True)
+    # note: here init=True is ok, since we are using it just for testing
+    with swallow_logs(new_level=logging.WARN) as cml:
+        top_repo.update_submodule('subm 1', init=True)
+        assert_in('Do not use update_submodule with init=True', cml.out)
     top_repo.update_submodule('subm 2', init=True)
     ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
 

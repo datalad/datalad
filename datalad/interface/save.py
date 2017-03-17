@@ -110,6 +110,11 @@ class Save(Interface):
         message=save_message_opt,
         all_changes=Parameter(
             args=("-a", "--all-changes"),
+            doc="""save all changes (even to not yet added files) of all components
+            in datasets that contain any of the given paths [DEPRECATED!].""",
+            action="store_true"),
+        all_updated=Parameter(
+            args=("-u", "--all-updated"),
             doc="""save changes of all known components in datasets that contain
             any of the given paths.""",
             action="store_true"),
@@ -126,8 +131,16 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     def __call__(message=None, files=None, dataset=None,
-                 all_changes=False, version_tag=None,
-                 recursive=False, recursion_limit=None, super_datasets=False):
+                 all_updated=False, all_changes=None, version_tag=None,
+                 recursive=False, recursion_limit=None, super_datasets=False
+                 ):
+        if all_changes is not None:
+            from datalad.support.exceptions import DeprecatedError
+            raise DeprecatedError(
+                new="all_updated option where fits and/or datalad add",
+                version="0.5.0",
+                msg="RF: all_changes option passed to the save"
+            )
         if not dataset and not files:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
@@ -144,9 +157,9 @@ class Save(Interface):
             lgr.warning("ignoring non-existent path(s): %s",
                         unavailable_paths)
         # here we know all datasets associated with any inputs
-        # so we can expand "all_changes" right here to avoid confusion
+        # so we can expand "all_updated" right here to avoid confusion
         # wrt to "super" and "intermediate" datasets discovered later on
-        if all_changes:
+        if all_updated:
             # and we do this by replacing any given paths with the respective
             # datasets' base path
             for ds in content_by_ds:

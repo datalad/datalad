@@ -75,7 +75,7 @@ class DeprecatedError(RuntimeError):
     def __str__(self):
         s = self.msg if self.msg else ''
         if self.version:
-            s += " Deprecated since version %s." % self.version
+            s += (" is deprecated" if s else "Deprecated") + " since version %s." % self.version
         if self.new:
             s += " Use %s instead." % self.new
         return s

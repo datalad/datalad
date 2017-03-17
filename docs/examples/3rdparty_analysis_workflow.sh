@@ -237,7 +237,7 @@ bash code/run_analysis.sh
 # Once Alice is satisfied with her modifications she can save the new state.
 #%
 # -a make datalad auto-detect modifications
-datalad save -a -m "Alice always helps"
+datalad save -u -m "Alice always helps"
 
 #%
 # Full circle
