@@ -44,6 +44,9 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -168,8 +171,8 @@ def test_install_crcns(tdir, ds_path):
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
         # and we could repeat installation and get the same result
         ds1 = install(_path_("all-nonrecursive/crcns"))
-        ds2 = Dataset('all-nonrecursive').install('crcns')
         ok_(ds1.is_installed())
+        ds2 = Dataset('all-nonrecursive').install('crcns')
         eq_(ds1, ds2)
         eq_(ds1.path, ds2.path)  # to make sure they are a single dataset
 
@@ -348,7 +351,9 @@ def test_install_recursive_with_data(src, path):
     # now again; with data:
     ds_list = install(path, source=src, recursive=True, get_data=True)
     # installed a dataset and two subdatasets, and two files:
-    eq_(len(ds_list), 5)
+    # TODO generator (after RF of get only return datasets, waiting for install RF)
+    #eq_(len(ds_list), 5)
+    eq_(len(ds_list), 3)
     eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
@@ -466,8 +471,7 @@ def test_install_known_subdataset(src, path):
     ok_(subds.repo.file_has_content('test-annex.dat') is False)
     with chpwd(ds.path):
         result = get(path='subm 1', dataset=os.curdir)
-        eq_(len(result), 1)
-        eq_(result[0]['file'], opj('subm 1', 'test-annex.dat'))
+        assert_in_results(result, path=opj(subds.path, 'test-annex.dat'))
         ok_(subds.repo.file_has_content('test-annex.dat') is True)
         ok_(subds.is_installed())
 
@@ -506,7 +510,7 @@ def test_implicit_install(src, dst):
     result = ds.install(path=opj("sub", "subsub"))
     ok_(sub.is_installed())
     ok_(subsub.is_installed())
-    eq_(result, subsub)
+    eq_(result, [sub, subsub])
 
     # fail on obscure non-existing one in subds
     assert_raises(InstallFailedError, ds.install, source=opj('sub', 'obscure'))
@@ -528,10 +532,10 @@ def test_implicit_install(src, dst):
     with chpwd(dst):
         # don't ask for the file content to make return value comparison
         # simpler
-        result = get(path=opj("sub", "subsub"), get_data=False)
+        result = get(path=opj("sub", "subsub"), get_data=False, result_xfm='datasets')
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
-        eq_(result, [subsub])
+        eq_(result, [sub, subsub])
 
 
 @with_tempfile(mkdir=True)
@@ -569,7 +573,7 @@ def test_install_list(path, top_path):
     eq_(set([i.path for i in result]), {sub1.path, sub2.path})
     # and if we request it again via get, result should be empty
     get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
-    eq_(get_result, [])
+    assert_status('notneeded', get_result)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -608,7 +612,8 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1)
+    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1,
+                 result_xfm='datasets')
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
     assert_in(sub1, result)
@@ -639,9 +644,12 @@ def test_install_skip_list_arguments(src, path, path_outside):
                 get_data=False)
         result = cme.exception.results
         for skipped in [opj(ds.path, 'not_existing'), path_outside]:
-            cml.assert_logged(msg="ignored non-existing paths: {}\n".format(
-                              [opj(ds.path, 'not_existing'), path_outside]),
+            # TODO original test is below, but back when install is a generator
+            cml.assert_logged(msg="path does not exist",
                               regex=False, level='WARNING')
+            #cml.assert_logged(msg="ignored non-existing paths: {}\n".format(
+            #                  [opj(ds.path, 'not_existing'), path_outside]),
+            #                  regex=False, level='WARNING')
             pass
         ok_(isinstance(result, list))
         eq_(len(result), 2)
@@ -656,9 +664,6 @@ def test_install_skip_list_arguments(src, path, path_outside):
         ds.install(path=['subm 1', 'not_existing'])
     with assert_raises(IncompleteResultsError) as cme:
         ds.get(path=['subm 1', 'not_existing'])
-    result = cme.exception.results
-    eq_(len(result), 1)
-    eq_(result[0]['file'], 'subm 1/test-annex.dat')
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -673,15 +678,15 @@ def test_install_skip_failed_recursive(src, path):
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
 
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(os.curdir, recursive=True)
-        # toplevel dataset was in the house already
-        assert_not_in(ds, result)
-        assert_in(sub2, result)
-        assert_not_in(sub1, result)
-        cml.assert_logged(
-            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
-            regex=False, level='WARNING')
+    result = ds.get(os.curdir, recursive=True, on_failure='ignore')
+    # toplevel dataset was in the house already
+    assert_not_in_results(result, path=ds.path)
+    assert_status('error', [result[0]])
+    assert_in_results(result, status='ok', path=sub2.path)
+    assert_in(
+        "destination path '{}' already exists and is not an empty directory".format(
+            sub1.path),
+        result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',

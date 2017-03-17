@@ -18,6 +18,9 @@ from os.path import isdir, realpath, relpath, join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import save_dataset
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
@@ -26,6 +29,7 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureKeyChoice
 from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
@@ -44,6 +48,7 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.create')
 
 
+@build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
 
@@ -76,6 +81,14 @@ class Create(Interface):
       superdataset is performed via a :command:`git submodule add` operation
       in the discovered superdataset.
     """
+
+    # in general this command will yield exactly one result
+    return_type = 'item-or-list'
+    # in general users expect to get an instance of the created dataset
+    result_xfm = 'datasets'
+    # result filter
+    result_filter = EnsureKeyChoice('action', ('create',)) & \
+                    EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _params_ = dict(
         path=Parameter(
@@ -139,6 +152,7 @@ class Create(Interface):
 
     @staticmethod
     @datasetmethod(name='create')
+    @eval_results
     def __call__(
             path=None,
             force=False,
@@ -184,7 +198,7 @@ class Create(Interface):
         # straight from input arg, no messing around before this
         if path is None:
             if dataset is None:
-                # nothing given explicity, assume create fresh right here
+                # nothing given explicitly, assume create fresh right here
                 path = getpwd()
             else:
                 # no path, but dataset -> create that dataset
@@ -209,6 +223,8 @@ class Create(Interface):
             if not real_targetpath.startswith(  # realpath OK
                     with_pathsep(realpath(dataset.path))):  # realpath OK
                 raise ValueError("path {} outside {}".format(path, dataset))
+
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
@@ -264,7 +280,7 @@ class Create(Interface):
             # comes around
             gitattr.write('** annex.largefiles=nothing\n')
 
-        # save everthing
+        # save everything
         tbds.add('.datalad', to_git=True, save=False)
 
         if save:
@@ -281,12 +297,19 @@ class Create(Interface):
                 # -> make submodule
                 dataset.add(tbds.path, save=save, ds2super=True)
 
-        return tbds
+        yield get_status_dict(
+            action='create',
+            ds=tbds,
+            logger=lgr,
+            refds=refds_path,
+            status='ok')
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if res is None:
+        if res.get('action', None) == 'create' and \
+               res.get('status', None) == 'ok' and \
+               res.get('type', None) == 'dataset':
+            ui.message("Created dataset at {}.".format(res['path']))
+        else:
             ui.message("Nothing was created")
-        elif isinstance(res, Dataset):
-            ui.message("Created dataset at %s." % res.path)

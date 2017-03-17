@@ -26,6 +26,9 @@ from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import amend_pathspec_with_superdatasets
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import get_dataset_root
 
@@ -34,49 +37,7 @@ from .base import Interface
 lgr = logging.getLogger('datalad.interface.save')
 
 
-def process_vanished_paths(unavailable_paths, content_by_ds):
-    # presently unavailable paths could be, e.g., deleted files, or
-    # uninstalled subdatasets, or simply nothing -> figure it out and act
-    # accordingly
-    dsinfo = {}
-    nonexistent_paths = []
-    for p in unavailable_paths:
-        # we need to check whether any of these correspond
-        # to a known subdataset, and add those to the list of
-        # things to be removed
-        toppath = get_dataset_root(p)
-        if not toppath:
-            nonexistent_paths.append(p)
-            continue
-        ds = Dataset(toppath)
-        dinfo = dsinfo.get(toppath,
-                           {'deleted': ds.repo.get_deleted_files(),
-                            'subds': ds.get_subdatasets(
-                                recursive=False, absolute=True)})
-        # cache for a potentially following request
-        dsinfo[toppath] = dinfo
-        if p in dinfo['subds']:
-            # test for subds needs to come first, as it would also show
-            # up in "deleted_files"
-            # this is a known subdataset that has vanished
-            lgr.debug('deinit vanished subdataset {} in {}'.format(p, ds))
-            # simply deinit to complete a "forced uninstallation", without
-            # an explicit "remove" there is nothing to be save in this
-            # case
-            ds.repo.deinit_submodule(p[len(_with_sep(ds.path)):])
-        elif p in dinfo['deleted']:
-            # vanished file -> 'git rm' it to stage the change
-            ds.repo.remove(p)
-            # record that we are "saving" this path
-            dpaths = content_by_ds.get(ds.path, [])
-            dpaths.append(p)
-            content_by_ds[ds.path] = dpaths
-        else:
-            # this is nothing we can anyhow handle
-            nonexistent_paths.append(p)
-    return content_by_ds, nonexistent_paths
-
-
+@build_doc
 class Save(Interface):
     """Save the current state of a dataset
 
@@ -125,6 +86,7 @@ class Save(Interface):
 
     @staticmethod
     @datasetmethod(name='save')
+    @eval_results
     def __call__(message=None, files=None, dataset=None,
                  all_changes=False, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False):
@@ -140,9 +102,16 @@ class Save(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+
         if unavailable_paths:
-            lgr.warning("ignoring non-existent path(s): %s",
-                        unavailable_paths)
+            for p in unavailable_paths:
+                yield get_status_dict(
+                    'get', path=p, status='impossible', refds=refds_path,
+                    logger=lgr, message=(
+                        "ignored non-existing path: %s",
+                        p))
+
         # here we know all datasets associated with any inputs
         # so we can expand "all_changes" right here to avoid confusion
         # wrt to "super" and "intermediate" datasets discovered later on
@@ -168,21 +137,20 @@ class Save(Interface):
                 bp.extend(content_by_ds[c])
             content_by_ds[dataset.path] = list(set(bp))
 
-        saved_ds = save_dataset_hierarchy(
-            content_by_ds,
-            base=dataset.path if dataset and dataset.is_installed() else None,
-            message=message,
-            version_tag=version_tag)
-
-        return saved_ds
+        for res in save_dataset_hierarchy(
+                content_by_ds,
+                base=dataset.path if dataset and dataset.is_installed() else None,
+                message=message,
+                version_tag=version_tag):
+            yield res
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if not res:
+        if not res or res.get('type', None) != 'dataset' or 'path' not in res:
             return
-        for ds in res:
-            commit = ds.repo.repo.head.commit
-            ui.message('Saved state: {0} for {1}'.format(
-                commit.hexsha,
-                ds))
+        ds = Dataset(res['path'])
+        commit = ds.repo.repo.head.commit
+        ui.message('Saved state: {0} for {1}'.format(
+            commit.hexsha,
+            ds))

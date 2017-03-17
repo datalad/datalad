@@ -238,10 +238,13 @@ class Add(Interface):
             results.extend(added)
 
         if results and save:
-            save_dataset_hierarchy(
+            # TODO GENERATOR
+            # new returns a generator and yields status dicts
+            # pass through as embedded results
+            list(save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
-                message=message if message else '[DATALAD] added content')
+                message=message if message else '[DATALAD] added content'))
 
         return results
 

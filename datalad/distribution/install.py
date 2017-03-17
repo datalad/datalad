@@ -205,6 +205,7 @@ class Install(Interface):
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             handle_dirty_dataset(ds, if_dirty)
+            common_kwargs['dataset'] = dataset
 
         # switch into scenario without --source:
         if source is None:
@@ -214,8 +215,6 @@ class Install(Interface):
             for urlpath in path:
                 ri = RI(urlpath)
                 (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
-
-            common_kwargs['dataset'] = dataset
 
             # first install, and then get
             for s in to_install:
@@ -242,23 +241,31 @@ class Install(Interface):
                 # into underlying install-related calls.
                 # Also need to pass from get:
                 #  annex_get_opts
-                try:
-                    installed_datasets = Get.__call__(
-                        to_get,
-                        # description=description,
-                        # if_dirty=if_dirty,
-                        # save=save,
-                        # git_clone_opts=git_clone_opts,
-                        # annex_init_opts=annex_init_opts
-                        _return_datasets=True,
-                        **common_kwargs
-                    )
-                except IncompleteResultsError as exc:
-                    exc_str_ = ': ' + exc_str(exc) if exc.results else ''
-                    lgr.warning("Some items failed to install: %s",
-                                exc_str_)
-                    installed_datasets = exc.results
-                    failed_items.extend(exc.failed)
+
+                # TODO generator
+                # this is not just about datasets
+                # for not limit to not overwhelm poor install
+                get_results = Get.__call__(
+                    to_get,
+                    # description=description,
+                    # if_dirty=if_dirty,
+                    # save=save,
+                    # git_clone_opts=git_clone_opts,
+                    # annex_init_opts=annex_init_opts,
+                    # TODO stupid in general, but install is not a generator yet
+                    on_failure='ignore',
+                    **common_kwargs
+                )
+                # TODO generator
+                # pass through `get` errors by re-yielding
+                #exc_str_ = ': ' + exc_str(exc) if exc.results else ''
+                installed_datasets = [r['path'] for r in get_results
+                                      if r.get('type') == 'dataset' and r['status'] in ('ok', 'notneeded')]
+                failed = [r['path'] for r in get_results
+                          if r['status'] in ('impossible', 'error')]
+                if failed:
+                    lgr.warning("Some items failed to install: %s", failed)
+                failed_items.extend(failed)
 
                 # compose content_by_ds into result
                 for dspath in installed_datasets:
@@ -490,6 +497,7 @@ class Install(Interface):
                     # TODO expose this
                     # yoh: exactly!
                     #annex_get_opts=annex_get_opts,
+                    result_xfm='datasets',
                     **kwargs
                 )
                 # TODO do we want to filter this so `install` only returns

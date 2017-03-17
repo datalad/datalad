@@ -12,6 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.interface.base')
+
 import sys
 import re
 import textwrap
@@ -22,6 +25,7 @@ from ..dochelpers import exc_str
 
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
+from datalad.support.constraints import EnsureKeyChoice
 
 
 def get_api_name(intfspec):
@@ -304,6 +308,31 @@ class Interface(object):
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
+        # we are coming from the entry point, this is the toplevel command,
+        # let it run like generator so we can act on partial results quicker
+        # TODO remove following condition test when transition is complete and
+        # run indented code unconditionally
+        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Get'):
+            # set all common args explicitly  to override class defaults
+            # that are tailored towards the the Python API
+            kwargs['return_type'] = 'generator'
+            kwargs['result_xfm'] = None
+            kwargs['result_renderer'] = args.common_output_format
+            if args.common_on_failure:
+                kwargs['on_failure'] = args.common_on_failure
+            # compose filter function from to be invented cmdline options
+            result_filter = None
+            if args.common_report_status:
+                if args.common_report_status == 'success':
+                    result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
+                elif args.common_report_status == 'failure':
+                    result_filter = EnsureKeyChoice('status', ('impossible', 'error'))
+                else:
+                    result_filter = EnsureKeyChoice('status', (args.common_report_status,))
+            if args.common_report_type:
+                tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
+                result_filter = result_filter & tfilt if result_filter else tfilt
+            kwargs['result_filter'] = result_filter
         try:
             return cls.__call__(**kwargs)
         except KeyboardInterrupt as exc:
@@ -414,6 +443,8 @@ class Interface(object):
                 raise ValueError(
                     "will not touch paths outside of installed datasets: %s"
                     % nondataset_paths)
+        if unavailable_paths:
+            lgr.debug('Encountered unavaliable paths: %s', unavailable_paths)
         return content_by_ds, unavailable_paths
 
 

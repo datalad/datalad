@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import wrapt
 
 from contextlib import contextmanager
 from functools import wraps
@@ -525,10 +526,25 @@ def saved_generator(gen):
 #
 # Decorators
 #
+def better_wraps(to_be_wrapped):
+    """Decorator to replace `functools.wraps`
+
+    This is based on `wrapt` instead of `functools` and in opposition to `wraps`
+    preserves the correct signature of the decorated function.
+    It is written with the intention to replace the use of `wraps` without any
+    need to rewrite the actual decorators.
+    """
+
+    @wrapt.decorator(adapter=to_be_wrapped)
+    def intermediator(to_be_wrapper, instance, args, kwargs):
+        return to_be_wrapper(*args, **kwargs)
+
+    return intermediator
+
 
 # Borrowed from pandas
 # Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
-# Licese: BSD-3
+# License: BSD-3
 def optional_args(decorator):
     """allows a decorator to take optional positional and keyword arguments.
         Assumes that taking a single, callable, positional argument means that
@@ -539,7 +555,7 @@ def optional_args(decorator):
 
         Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
-    @wraps(decorator)
+    @better_wraps(decorator)
     def wrapper(*args, **kwargs):
         def dec(f):
             return decorator(f, *args, **kwargs)

@@ -45,8 +45,6 @@ def test_dont_trip_over_missing_subds(path):
     subds2.uninstall()
     assert_in('subds2', ds1.get_subdatasets())
     assert_false(subds2.is_installed())
-    # this will deinit the submodule
-    ds1.save(files=['subds2'])
     # see if it wants to talk to github (and fail), or if it trips over something
     # before
     assert_raises(gh.BadCredentialsException, ds1.create_sibling_github, 'bogus', recursive=True, github_login='disabledloginfortesting')

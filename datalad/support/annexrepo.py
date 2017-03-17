@@ -728,8 +728,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        # TODO: fail api.get -- must exit in cmdline with non-0 if anything
-        # failed to download
         with cm:
             results = self._run_annex_command_json(
                 'get', args=options + fetch_files,

@@ -931,6 +931,66 @@ def assert_dict_equal(d1, d2):
     eq_(d1, d2)
 
 
+def assert_status(label, results):
+    """Verify that each status dict in the results has a given status label
+
+    `label` can be a sequence, in which case status must be one of the items
+    in this sequence.
+    """
+    label = assure_list(label)
+    for r in assure_list(results):
+        assert_in('status', r)
+        assert_in(r['status'], label)
+
+
+def assert_message(message, results):
+    """Verify that each status dict in the results has a message
+
+    This only tests the message template string, and not a formatted message
+    with args expanded.
+    """
+    for r in assure_list(results):
+        assert_in('message', r)
+        m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
+        assert_equal(m, message)
+
+
+def assert_result_count(results, n, **kwargs):
+    """Verify specific number of results (matching criteria, if any)"""
+    count = 0
+    for r in assure_list(results):
+        if not len(kwargs):
+            count += 1
+        elif all(k in r and r[k] == v for k, v in kwargs.items()):
+            count += 1
+    assert_equal(n, count)
+
+
+def assert_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is found in
+    one of the results"""
+    found = False
+    for r in assure_list(results):
+        if all(k in r and r[k] == v for k, v in kwargs.items()):
+            found = True
+    assert found
+
+
+def assert_not_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is not in any
+    of the results"""
+    for r in assure_list(results):
+        assert any(k not in r or r[k] != v for k, v in kwargs.items())
+
+
+def assert_result_values_equal(results, prop, values):
+    """Verify that the values of all results for a given key in the status dicts
+    match the given sequence"""
+    assert_equal(
+        [r[prop] for r in results],
+        values)
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
