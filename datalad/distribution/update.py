@@ -130,7 +130,6 @@ class Update(Interface):
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
-                # TODO issue such warning in result eval
                 res['message'] = ("'%s' not known to dataset %s\nSkipping",
                                   sibling_, repo.path)
                 res['status'] = 'impossible'
@@ -147,30 +146,22 @@ class Update(Interface):
                 yield res
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
-            dsres, file_results = _update_repo(
-                ds, sibling_, merge, fetch_all, reobtain_data)
-            # TODO put back when `get` returns newstyle results
-            #for fr in file_results:
-            #    yield fr
-            res.update(dsres)
+            # fetch remote
+            repo.fetch(
+                remote=None if fetch_all else sibling_,
+                all_=fetch_all,
+                prune=True)  # prune to not accumulate a mess over time
+            # NOTE if any further acces to `repo` is needed, reevaluate
+            # ds.repo again, as it might have be converted from an GitRepo
+            # to an AnnexRepo
+            if merge:
+                for fr in _update_repo(ds, sibling_, reobtain_data):
+                    yield fr
+            res['status'] = 'ok'
             yield res
 
 
-def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
-    dsres = {}
-    file_results = []
-    repo = ds.repo
-    # fetch remote
-    repo.fetch(
-        remote=None if fetch_all else remote,
-        all_=fetch_all,
-        prune=True)  # prune to not accumulate a mess over time
-
-    if not merge:
-        dsres['status'] = 'ok'
-        return dsres, file_results
-
-    # reevaluate repo instance, for it might be an annex now:
+def _update_repo(ds, remote, reobtain_data):
     repo = ds.repo
 
     lgr.info("Merging updates...")
@@ -187,9 +178,9 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
             reobtain_data = [p for p in reobtain_data if lexists(p)]
         if reobtain_data:
             lgr.info('Ensure content availability for %i previously available files', len(reobtain_data))
-            # TODO once `get` returns new-style return values
-            #file_results.extend()
-            ds.get(reobtain_data, recursive=False)
+            for res in ds.get(
+                    reobtain_data, recursive=False, return_type='generator'):
+                yield res
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
@@ -208,5 +199,3 @@ def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
             else:
                 # no marriage yet, be specific
                 repo.pull(remote=remote, refspec=active_branch)
-    dsres['status'] = 'ok'
-    return dsres, file_results
