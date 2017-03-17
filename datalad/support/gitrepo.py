@@ -1768,13 +1768,49 @@ class GitRepo(RepoInterface):
         init : bool
           If True, initialize all submodules for which "git submodule init" has
           not been called so far before updating.
+          Primarily provided for internal purposes and should not be used directly
+          since would result in not so annex-friendly .git symlinks/references
+          instead of full featured .git/ directories in the submodules
         """
         cmd = ['git', 'submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
+            subgitpath = opj(self.path, path, '.git')
+            if not exists(subgitpath):
+                # TODO:  wouldn't with --init we get all those symlink'ed .git/?
+                # At least let's warn
+                lgr.warning(
+                    "Do not use update_submodule with init=True to avoid git creating "
+                    "symlinked .git/ directories in submodules"
+                )
+            #  yoh: I thought I saw one recently but thought it was some kind of
+            #  an artifact from running submodule update --init manually at
+            #  some point, but looking at this code now I worry that it was not
         cmd += ['--', path]
         self._git_custom_command('', cmd)
         # TODO: return value
+
+    def update_ref(self, ref, value, symbolic=False):
+        """Update the object name stored in a ref "safely".
+
+        Just a shim for `git update-ref` call if not symbolic, and
+        `git symbolic-ref` if symbolic
+
+        Parameters
+        ----------
+        ref : str
+          Reference, such as `ref/heads/BRANCHNAME` or HEAD.
+        value : str
+          Value to update to, e.g. hexsha of a commit when updating for a
+          branch ref, or branch ref if updating HEAD
+        symbolic : None
+          To instruct if ref is symbolic, e.g. should be used in case of
+          ref=HEAD
+        """
+        self._git_custom_command(
+            '',
+            ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
+        )
 
     def tag(self, tag):
         """Assign a tag to current commit
