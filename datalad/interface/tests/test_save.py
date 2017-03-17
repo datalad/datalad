@@ -26,7 +26,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_fields_equal
+from datalad.tests.utils import assert_result_values_equal
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -109,9 +109,9 @@ def test_recursive_save(path):
     with open(newfile_name, 'w') as f:
         f.write('some')
     # saves the status change of the subdataset due to the subsubdataset addition
-    assert_fields_equal(
-        'path',
+    assert_result_values_equal(
         ds.save(all_changes=True, result_filter=is_ok_dataset),
+        'path',
         [ds.path])
 
     # make the new file known to its dataset
@@ -125,9 +125,9 @@ def test_recursive_save(path):
     assert_status('notneeded', ds.save(all_changes=True))
     assert ds.repo.dirty
     # with recursive pick up the change in subsubds
-    assert_fields_equal(
-        'path',
+    assert_result_values_equal(
         ds.save(all_changes=True, recursive=True, result_filter=is_ok_dataset),
+        'path',
         [subsubds.path, subds.path, ds.path])
     # modify content in subsub and try saving
     testfname = newfile_name
@@ -140,14 +140,14 @@ def test_recursive_save(path):
     # no recursive
     assert_status('notneeded', ds.save(all_changes=True))
     # an explicit target saves only the corresponding dataset
-    assert_fields_equal(
-        'path',
+    assert_result_values_equal(
         save(files=[testfname]),
+        'path',
         [subsubds.path])
     # plain recursive without any files given will save the beast
-    assert_fields_equal(
-        'path',
+    assert_result_values_equal(
         ds.save(recursive=True, result_filter=is_ok_dataset),
+        'path',
         [subds.path, ds.path])
     # there is nothing else to save
     assert_status('notneeded', ds.save(all_changes=True, recursive=True))

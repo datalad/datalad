@@ -983,12 +983,12 @@ def assert_not_in_results(results, **kwargs):
         assert any(k not in r or r[k] != v for k, v in kwargs.items())
 
 
-def assert_fields_equal(field, results, comp):
-    """Verify that the values of a given field in the status dicts match the
-    given sequence"""
+def assert_result_values_equal(results, prop, values):
+    """Verify that the values of all results for a given key in the status dicts
+    match the given sequence"""
     assert_equal(
-        [r[field] for r in results],
-        comp)
+        [r[prop] for r in results],
+        values)
 
 
 def ignore_nose_capturing_stdout(func):
