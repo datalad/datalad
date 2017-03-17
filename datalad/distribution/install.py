@@ -205,6 +205,7 @@ class Install(Interface):
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             handle_dirty_dataset(ds, if_dirty)
+            common_kwargs['dataset'] = dataset
 
         # switch into scenario without --source:
         if source is None:
@@ -214,8 +215,6 @@ class Install(Interface):
             for urlpath in path:
                 ri = RI(urlpath)
                 (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
-
-            common_kwargs['dataset'] = dataset
 
             # first install, and then get
             for s in to_install:
