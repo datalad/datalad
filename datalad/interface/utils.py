@@ -86,7 +86,7 @@ def handle_dirty_dataset(ds, mode, msg=None):
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
         from datalad.interface.save import Save
-        Save.__call__(dataset=ds, message=msg, all_changes=True)
+        Save.__call__(dataset=ds, message=msg, all_updated=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 

@@ -574,7 +574,7 @@ def _save_installed_datasets(ds, installed_datasets):
         ds.save(
             files=paths + ['.gitmodules'],
             message='[DATALAD] ' + msg,
-            all_changes=False,
+            all_updated=False,
             recursive=False)
     except ValueError as e:
         if "did not match any file(s) known to git" in str(e):
