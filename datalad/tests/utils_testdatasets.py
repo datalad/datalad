@@ -55,7 +55,7 @@ def make_studyforrest_mockup(path):
     # (just doing 3, actual status quo is just shy of 10)
     # and also the real goal -> meta analysis
     metaanalysis = public.create('metaanalysis', description="analysis of analyses")
-    for i in range(1,4):
+    for i in range(1, 3):
         ana = public.create('analysis{}'.format(i),
                             description='analysis{}'.format(i))
         ana.install(source=annot.path, path=opj('src', 'annot'), reckless=True)
