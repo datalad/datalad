@@ -166,5 +166,11 @@ def test_script_shims():
 
         # and let's check that it is our script
         out, err = runner([script, '--version'])
-        version = (out + err).splitlines()[0]
-        assert_equal('datalad %s' % __version__, version)
+        version = (out + err).splitlines()[0].split(' ', 1)[1]
+        # we can get git and non git .dev version... so for now
+        # relax
+        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
+        # extract numeric portion
+        assert get_numeric_portion(version) # that my lambda is correctish
+        assert_equal(get_numeric_portion(__version__),
+                     get_numeric_portion(version))
