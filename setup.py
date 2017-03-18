@@ -147,13 +147,12 @@ except ImportError:
 #
 # Avoid using entry_points due to their hefty overhead
 #
-cmdclass_, setup_kwargs = setup_entry_points(
+setup_kwargs = setup_entry_points(
     {
         'datalad': 'datalad.cmdline.main',
         'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
     })
-cmdclass.update(cmdclass_)
 
 setup(
     name="datalad",
