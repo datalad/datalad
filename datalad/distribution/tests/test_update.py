@@ -87,7 +87,7 @@ def test_update_simple(origin, src_path, dst_path):
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, 'subm 2'), {'load.dat': 'heavy'})
     source.save(message="saving changes within subm2",
-                recursive=True, all_changes=True)
+                recursive=True, all_updated=True)
     dest.update(merge=True, recursive=True)
     # and now we can get new file
     dest.get('subm 2/load.dat')
@@ -131,6 +131,11 @@ def test_update_fetch_all(src, remote_1, remote_2):
         f.write("different file load")
     rmt2.add("second.txt", git=True, commit=True, msg="Add file to git.")
 
+    # Let's init some special remote which we couldn't really update/fetch
+    if not os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
+        ds.repo.init_remote(
+            'datalad',
+            ['encryption=none', 'type=external', 'externaltype=datalad'])
     # fetch all remotes
     ds.update(fetch_all=True)
 

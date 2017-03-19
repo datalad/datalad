@@ -50,6 +50,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import put_file_under_git
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -714,3 +715,61 @@ def test_install_source_relpath(src, dest):
     src_ = basename(src)
     with chpwd(dirname(src)):
         ds2 = install(dest, source=src_)
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_install_consistent_state(src, dest, dest2, dest3):
+    # if we install a dataset, where sub-dataset "went ahead" in that branch,
+    # while super-dataset was not yet updated (e.g. we installed super before)
+    # then it is desired to get that default installed branch to get to the
+    # position where previous location was pointing to.
+    # It is indeed a mere heuristic which might not hold the assumption in some
+    # cases, but it would work for most simple and thus mostly used ones
+    ds1 = create(src)
+    sub1 = ds1.create('sub1')
+
+    def check_consistent_installation(ds):
+        datasets = [ds] + list(
+            map(Dataset, ds.get_subdatasets(recursive=True, absolute=True, fulfilled=True)))
+        assert len(datasets) == 2  # in this test
+        for ds in datasets:
+            # all of them should be in master branch
+            eq_(ds.repo.get_active_branch(), "master")
+            # all of them should be clean, so sub should be installed in a "version"
+            # as pointed by the super
+            ok_(not ds.repo.dirty)
+
+    dest_ds = install(dest, source=src)
+    # now we progress sub1 by adding sub2
+    subsub2 = sub1.create('sub2')
+
+    # and progress subsub2 forward to stay really thorough
+    put_file_under_git(subsub2.path, 'file.dat', content="data")
+    subsub2.save("added a file")  # above function does not commit
+
+    # just installing a submodule -- apparently different code/logic
+    # but also the same story should hold - we should install the version pointed
+    # by the super, and stay all clean
+    dest_sub1 = dest_ds.install('sub1')
+    check_consistent_installation(dest_ds)
+
+    # So now we have source super-dataset "dirty" with sub1 progressed forward
+    # Our install should try to "retain" consistency of the installation
+    # whenever possible.
+
+    # install entire hierarchy without specifying dataset
+    dest2_ds = install(dest2, source=src, recursive=True)
+    check_consistent_installation(dest2_ds[0])  # [1] is the subdataset
+
+    # install entire hierarchy by first installing top level ds
+    # and then specifying sub-dataset
+    dest3_ds = install(dest3, source=src, recursive=False)
+    # and then install both submodules recursively while pointing
+    # to it based on dest3_ds
+    dest3_ds.install('sub1', recursive=True)
+    check_consistent_installation(dest3_ds)
+
+    # TODO: makes a nice use-case for an update operation

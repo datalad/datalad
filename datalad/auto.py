@@ -16,11 +16,6 @@ from six import PY2
 import six.moves.builtins as __builtin__
 builtins_name = '__builtin__' if PY2 else 'builtins'
 
-try:
-    import h5py
-except ImportError:
-    h5py = None
-
 import logging
 import os
 
@@ -37,6 +32,20 @@ from .cmdline.helpers import get_repo_instance
 
 lgr = logging.getLogger("datalad.auto")
 
+h5py = None
+try:
+    import h5py
+except ImportError:
+    pass
+except Exception as exc:
+    # could happen due to misbehaving handlers provided by git module
+    # see https://github.com/gitpython-developers/GitPython/issues/600
+    # we could overload the handler by providing a blank one, but I do not
+    # think it is worthwhile at this point.  So let's just issue a warning
+    lgr.warning(
+        "Failed to import h5py, so no automagic handling for it atm: %s",
+        exc_str(exc)
+    )
 
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""

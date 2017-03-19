@@ -114,11 +114,16 @@ class ConfigManager(object):
     written during normal operation. If such need arises, various solutions are
     possible (via GitPython, or an independent writer).
 
+    Each instance carries a public `overrides` attribute. This dictionary
+    contains variables that override any setting read from a file. The overrides
+    are persistent across reloads, and are not modified by any of the manipulation
+    methods, such as `set` or `unset`.
+
     Any DATALAD_* environment variable is also presented as a configuration
     item. Settings read from environment variables are not stored in any of the
     configuration file, but are read dynamically from the environment at each
     `reload()` call. Their values take precedence over any specification in
-    configuration files.
+    configuration files, and even overrides.
 
     Parameters
     ----------
@@ -130,12 +135,17 @@ class ConfigManager(object):
       If True, configuration items are only read from a datasets persistent
       configuration file, if any present (the one in ``.datalad/config``, not
       ``.git/config``).
+    overrides : dict, optional
+      Variable overrides, see general class documentation for details.
     """
-    def __init__(self, dataset=None, dataset_only=False):
+    def __init__(self, dataset=None, dataset_only=False, overrides=None):
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
+        # public dict to store variables that always override any setting
+        # read from a file
+        self.overrides = {} if overrides is None else overrides
         self._dataset_path = dataset.path if dataset else None
         self._dataset_only = dataset_only
         # Since configs could contain sensitive information, to prevent
@@ -169,13 +179,20 @@ class ConfigManager(object):
                 self._store = _parse_gitconfig_dump(
                     stdout, self._store, replace=False)
 
-        if not self._dataset_only:
-            stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
-            self._store = _parse_gitconfig_dump(
-                stdout, self._store, replace=True)
+        if self._dataset_only:
+            # superimpose overrides
+            self._store.update(self.overrides)
+            return
 
-            # override with environment variables
-            self._store = _parse_env(self._store)
+        stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
+        self._store = _parse_gitconfig_dump(
+            stdout, self._store, replace=True)
+
+        # superimpose overrides
+        self._store.update(self.overrides)
+
+        # override with environment variables
+        self._store = _parse_env(self._store)
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
