@@ -10,7 +10,7 @@ Last-Update: 2016-05-20
 
 --- a/setup.py
 +++ b/setup.py
-@@ -52,6 +52,11 @@ dist = platform.dist()
+@@ -50,6 +50,11 @@ dist = platform.dist()
  if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
      keyring_requires = ['keyring<8.0']
  
