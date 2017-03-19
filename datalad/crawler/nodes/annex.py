@@ -897,7 +897,11 @@ class Annexificator(object):
             'A ': staged,
             'M ': staged,
             ' M': notstaged,
-            ' D': deleted
+            ' D': deleted,  #     rm-ed  smth committed before
+            'D ': deleted,  # git rm-ed  smth committed before
+            'AD': (staged, deleted)  # so we added, but then removed before committing
+                                     # generaly shouldn't happen but in some tricky S3 cases crawling did happen :-/
+                                     # TODO: handle "properly" by committing before D happens
         }
 
         if isinstance(self.repo, AnnexRepo) and self.repo.is_direct_mode():
@@ -913,7 +917,12 @@ class Annexificator(object):
             act = l[:2]  # first two characters is what is happening to the file
             fname = l[3:]
             try:
-                statuses[act].append(fname)
+                act_list = statuses[act]
+                if isinstance(act_list, tuple):  # like in case of AD
+                    for l in act_list:
+                        l.append(fname)
+                else:
+                    act_list.append(fname)
                 # for the purpose of this use, we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)

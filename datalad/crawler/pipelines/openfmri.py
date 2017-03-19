@@ -53,7 +53,7 @@ def superdataset_pipeline(url=TOPURL, **kwargs):
         a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-        skip_if({'dataset_name': 'ds000017'}), # was split into A/B
+        # skip_if({'dataset_name': 'ds000017'}), # was split into A/B
         # TODO:  crawl into the dataset url, and check if there is any tarball available
         # if not -- do not bother (e.g. ds000053)
         annex.initiate_dataset(
@@ -120,12 +120,14 @@ def pipeline(dataset,
         # some datasets available (fresh enough or old) from S3, so let's sense if this one is
         # s3_prefix = re.sub('^ds0*([0-9]{3})/*', r'ds\1/', dataset)  # openfmri bucket
         s3_prefix = dataset
-        if dataset == 'ds000017':
-            # we had some custom prefixing going on
-            assert(prefix)
-            suf = prefix[-3]
-            assert suf in 'AB'
-            s3_prefix = 'ds017' + suf
+        # was relevant only for openfmri bucket. for openneuro -- it is all under the same
+        # directory, separated deep inside between A and B, so we just crawl for both
+        # if dataset == 'ds000017':
+        #     # we had some custom prefixing going on
+        #     assert(prefix)
+        #     suf = prefix[-3]
+        #     assert suf in 'AB'
+        #     s3_prefix = 'ds017' + suf
 
         openfmri_s3_prefix = 's3://openneuro/'
         try:
