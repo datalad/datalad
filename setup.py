@@ -7,19 +7,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import platform
-
-from os.path import sep as pathsep
-from os.path import join as opj
-from os.path import splitext
 from os.path import dirname
+from os.path import join as opj
+from os.path import sep as pathsep
+from os.path import splitext
 
 from setuptools import findall
 from setuptools import setup, find_packages
 
-# manpage build imports
-from setup_support import BuildManPage
-from setup_support import BuildRSTExamplesFromScripts
 from setup_support import BuildConfigInfo
+from setup_support import BuildManPage, setup_entry_points
+from setup_support import BuildRSTExamplesFromScripts
 from setup_support import get_version
 
 
@@ -145,6 +143,17 @@ try:
 except ImportError:
     long_description = open(README).read()
 
+
+#
+# Avoid using entry_points due to their hefty overhead
+#
+setup_kwargs = setup_entry_points(
+    {
+        'datalad': 'datalad.cmdline.main',
+        'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
+        'git-annex-remote-datalad': 'datalad.customremotes.datalad',
+    })
+
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
@@ -157,17 +166,11 @@ setup(
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
     extras_require=requires,
-    entry_points={
-        'console_scripts': [
-            'datalad=datalad.cmdline.main:main',
-            'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
-            'git-annex-remote-datalad=datalad.customremotes.datalad:main',
-        ],
-    },
     cmdclass=cmdclass,
     package_data={
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
             findsome('downloaders/configs', {'cfg'})
-    }
+    },
+    **setup_kwargs
 )
