@@ -38,6 +38,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import rmtree
 from datalad.utils import knows_annex
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import unique
 
 from .dataset import Dataset
 
@@ -204,6 +205,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
 
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, sm_path))
+    got_installed = not subds.is_installed()
     try:
         clone_url = _clone_from_any_source(clone_urls, subds.path)
     except GitCommandError as e:
@@ -214,7 +216,52 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
     # do fancy update
     if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
+        # TODO: move all of that into update_submodule ??
+        # TODO: direct mode ramifications?
+        # track branch originally cloned
+        subrepo = subds.repo
+        branch = subds.repo.get_active_branch()
+        branch_hexsha = subrepo.get_hexsha(branch)
         ds.repo.update_submodule(sm_path, init=True)
+        updated_branch = subrepo.get_active_branch()
+        if branch and (not updated_branch or updated_branch == (None, None)):
+            # got into 'detached' mode
+            # trace if current state is a predecessor of the branch_hexsha
+            lgr.debug(
+                "Detected detached HEAD after updating submodule %s which was "
+                "in %s branch before", subds.path, branch)
+            detached_hexsha = subrepo.get_hexsha()
+            if got_installed and \
+                subrepo.get_merge_base(
+                    [branch_hexsha, detached_hexsha]) == detached_hexsha:
+                # TODO: config option?
+                # in all likely event it is of the same branch since
+                # it is an ancestor -- so we could update that original branch
+                # to point to the state desired by the submodule, and update
+                # HEAD to point to that location
+                lgr.info(
+                    "Submodule HEAD got detached. Resetting branch %s to point "
+                    "to %s. Original location was %s",
+                    branch, detached_hexsha[:8], branch_hexsha[:8]
+                )
+                branch_ref = 'refs/heads/%s' % branch
+                subrepo.update_ref(branch_ref, detached_hexsha)
+                assert(subrepo.get_hexsha(branch) == detached_hexsha)
+                subrepo.update_ref('HEAD', branch_ref, symbolic=True)
+                assert(subrepo.get_active_branch() == branch)
+            elif got_installed:
+                lgr.warning(
+                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
+                    subrepo.path, branch, detached_hexsha[:8]
+                )
+            else:
+                # actually this point should never be reached atm since here
+                # datasets are assumed to be installed afresh, but logic is kept
+                # in "just in case" we later support it
+                lgr.info(
+                    "%s has a detached HEAD since we operated on pre-installed dataset",
+                    subrepo.path
+                )
     else:
         # submodule is brand-new and previously unknown
         ds.repo.add_submodule(sm_path, url=clone_url)
@@ -327,7 +374,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
             sm_url,
             remote_url if remote_url else ds.path)
 
-    return clone_urls
+    return unique(clone_urls)
 
 
 def _clone_from_any_source(sources, dest):

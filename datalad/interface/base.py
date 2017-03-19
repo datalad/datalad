@@ -316,7 +316,8 @@ class Interface(object):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            dir_lookup=None):
+            dir_lookup=None,
+            sub_paths=True):
         """Common input argument validation and pre-processing
 
         This method pre-processes the two most common input argument types:
@@ -349,6 +350,8 @@ class Interface(object):
           Optional recursion limit specification (max levels of recursion)
         dir_lookup : dict, optional
           Passed to `get_paths_by_dataset`
+        sub_paths : bool, optional
+          Passed to `get_paths_by_dataset`  :-P
 
         Returns
         -------
@@ -361,7 +364,6 @@ class Interface(object):
         """
         from .utils import get_normalized_path_arguments
         from .utils import get_paths_by_dataset
-
         # upfront check prior any resolution attempt to avoid disaster
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
@@ -374,14 +376,17 @@ class Interface(object):
             # the dataset path to the sorting to make it work
             # but we also need to fish it out again afterwards
             tosort = [dataset_path]
+            fishout_dataset_path = True
         else:
             tosort = path
+            fishout_dataset_path = False
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(tosort,
                                  recursive=recursive,
                                  recursion_limit=recursion_limit,
-                                 dir_lookup=dir_lookup)
-        if not path and dataset_path and recursive:
+                                 dir_lookup=dir_lookup,
+                                 sub_paths=sub_paths)
+        if fishout_dataset_path:  # explicit better than implicit, duplication is evil
             # fish out the dataset path that we inserted above
             content_by_ds[dataset_path] = [p for p in content_by_ds[dataset_path]
                                            if p != dataset_path]

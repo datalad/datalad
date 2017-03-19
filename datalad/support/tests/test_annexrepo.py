@@ -86,6 +86,7 @@ from datalad.support.exceptions import OutdatedExternalDependency
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.exceptions import IncompleteResultsError
 
 from datalad.support.gitrepo import GitRepo
 
@@ -1021,11 +1022,19 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     try:
         # Note: For some reason, it hangs if log_stdout/err True
         # TODO: Figure out what's going on
-        ar._run_annex_command('sync',
-                              expect_stderr=True,
-                              log_stdout=False,
-                              log_stderr=False,
-                              expect_fail=True)
+        #  yoh: I think it is because of what is "TODOed" within cmd.py --
+        #       trying to log/obtain both through PIPE could lead to lock
+        #       downs.
+        # here we use our swallow_logs to overcome a problem of running under
+        # nosetests without -s, when nose then tries to swallow stdout by
+        # mocking it with StringIO, which is not fully compatible with Popen
+        # which needs its .fileno()
+        with swallow_outputs():
+            ar._run_annex_command('sync',
+                                  expect_stderr=True,
+                                  log_stdout=False,
+                                  log_stderr=False,
+                                  expect_fail=True)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
@@ -1047,13 +1056,12 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # sync with the new remote:
     try:
-        # Note: For some reason, it hangs if log_stdout/err True
-        # TODO: Figure out what's going on
-        ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
-                              expect_stderr=True,
-                              log_stdout=False,
-                              log_stderr=False,
-                              expect_fail=True)
+        with swallow_outputs():
+            ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
+                                  expect_stderr=True,
+                                  log_stdout=False,
+                                  log_stderr=False,
+                                  expect_fail=True)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
@@ -1134,7 +1142,46 @@ def test_annex_copy_to(origin, clone):
     repo.get("test-annex.dat")
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
-    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
+    # and will not be copied again since it was already copied
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
+
+    # Test that if we pass a list of items and annex processes them nicely,
+    # we would obtain a list back. To not stress our tests even more -- let's mock
+    def ok_copy(command, **kwargs):
+        return """
+{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
+{"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
+{"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
+""", ""
+    with patch.object(repo, '_run_annex_command', ok_copy):
+        eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
+            ["copied1", "copied2"])
+
+    # now let's test that we are correctly raising the exception in case if
+    # git-annex execution fails
+    orig_run = repo._run_annex_command
+    def fail_to_copy(command, **kwargs):
+        if command == 'copy':
+            # That is not how annex behaves
+            # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+            # for non-existing files output goes into stderr
+            raise CommandError(
+                "Failed to run ...",
+                stdout=
+                    '{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied"}\n'
+                    '{"command":"copy","note":"checking target ...", "success":true, "key":"akey2", "file":"existed"}\n',
+                stderr=
+                    'git-annex: nonex1 not found\n'
+                    'git-annex: nonex2 not found\n'
+            )
+        else:
+            return orig_run(command, **kwargs)
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy):
+        with assert_raises(IncompleteResultsError) as cme:
+            repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
+    eq_(cme.exception.results, ["copied"])
+    eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
@@ -1375,7 +1422,8 @@ def test_ProcessAnnexProgressIndicators():
     proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
     # when without any target downloads, there is no total_pbar
     assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar._pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.current, 0)
     # for regular lines -- should still just return them without side-effects
     for l in irrelevant_lines:
         with swallow_outputs() as cmo:
@@ -1392,7 +1440,12 @@ def test_ProcessAnnexProgressIndicators():
         eq_(proc(success_lines[0]), success_lines[0])
         eq_(proc.pbars, {})
         out = cmo.out
-    assert out  # just assert that something was output
+
+    from datalad.ui import ui
+    from datalad.ui.dialog import SilentConsoleLog
+
+    assert out \
+        if not isinstance(ui.ui, SilentConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:

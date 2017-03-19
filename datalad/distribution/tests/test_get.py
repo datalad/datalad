@@ -51,7 +51,7 @@ def _make_dataset_hierarchy(path):
     with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
         f.write('content3')
     origin_sub4 = origin_sub3.create('sub4')
-    origin.save(recursive=True, all_changes=True)
+    origin.save(recursive=True, all_updated=True)
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
@@ -172,7 +172,7 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:
     origin = Dataset(o_path).create(force=True)
-    origin.save("Initial", all_changes=True)
+    origin.save("Initial", all_updated=True)
 
     ds = install(c_path, source=o_path)
 
@@ -320,7 +320,7 @@ def test_get_mixed_hierarchy(src, path):
         f.write('content')
     origin.add('file_in_git.txt', to_git=True)
     origin_sub.add('file_in_annex.txt')
-    origin.save(all_changes=True)
+    origin.save(all_updated=True)
 
     # now, install that thing:
     ds, subds = install(path, source=src, recursive=True)
@@ -359,7 +359,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     origin_subsub = origin_sub.create('subsub')
     with open(opj(origin_subsub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.save(recursive=True, all_changes=True)
+    origin.save(recursive=True, all_updated=True)
 
     ds = install(path, source=src)
     eq_(len(ds.get_subdatasets(fulfilled=True)), 0)

@@ -88,7 +88,13 @@ definitions = {
     },
     'datalad.tests.protocolremote': {
         'ui': ('yesno', {
-               'title': 'Binary flag to specify whether to test protocol interactions of custom remote with annex'}),
+            'title': 'Binary flag to specify whether to test protocol '
+                     'interactions of custom remote with annex'}),
+        'type': EnsureBool(),
+    },
+    'datalad.tests.dataladremote': {
+        'ui': ('yesno', {
+               'title': 'Binary flag to specify whether each annex repository should get datalad special remote in every test repository'}),
         'type': EnsureBool(),
     },
     'datalad.tests.runcmdline': {
@@ -118,6 +124,13 @@ definitions = {
         'ui': ('question', {
                'title': 'Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation'}),
     },
+    'datalad.tests.ui.backend': {
+        'ui': ('question', {
+            'title': 'Tests UI backend',
+            # XXX we could add choices...
+            'text': 'Which UI backend to use'}),
+        'default': 'tests-noninteractive',
+    },
     'datalad.tests.usecassette': {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
@@ -133,6 +146,18 @@ definitions = {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
                      'stdout while running datalad commands/debugging'}),
+    },
+    'datalad.log.name': {
+        'ui': ('question', {
+            'title': 'Include name of the log target in the log line'}),
+    },
+    'datalad.log.names': {
+        'ui': ('question', {
+            'title': 'Which names (,-separated) to print log lines for'}),
+    },
+    'datalad.log.namesre': {
+        'ui': ('question', {
+            'title': 'Regular expression for which names to print log lines for'}),
     },
     'datalad.log.outputs': {
         'ui': ('question', {
