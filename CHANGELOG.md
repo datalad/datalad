@@ -9,38 +9,71 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
-## 0.5.0 (Mar 19, 2017) -- it's huge
+## 0.5.0 (Mar 20, 2017) -- it's huge
 
 This release includes an avalanche of bug fixes, enhancements, and
 additions which at large should stay consistent with previous behavior
 but provide better functioning.  Lots of code was refactored to provide
-more consistent code-base, and some API breakage has happened.
+more consistent code-base, and some API breakage has happened.  Further
+work is ongoing to standardize output and results reporting
+(see [PR 1350])
 
 ### Most notable changes
 
 - requires [git-annex] >= 6.20161210 (or better even >= 6.20161210 for
   improved functionality)
-- [save] `-S` does no longer store the originating dataset in its commit
-  message
-- [save] `-a` is no longer for `--auto-add-changes` but for `--all-changes`
-  so only known components get saved, no new files automagically added
+- commands should now operate on paths specified (if any), without
+  causing side-effects on other dirty/staged files
+- [save]
+    - `-a` is deprecated in favor of `-u` or `--all-updates`
+      so only changes known components get saved, and no new files
+      automagically added
+    - `-S` does no longer store the originating dataset in its commit
+       message
+- [add]
+    - can specify commit/save message with `-m`
+- [add-sibling] and [create-sibling]
+    - now take the name of the sibling (remote) as a `-s` (`--name`)
+      option, not a positional argument
+    - `--publish-depends` to setup publishing data and code to multiple
+      repositories (e.g. github + webserve) should now be functional
+      see [this comment](https://github.com/datalad/datalad/issues/335#issuecomment-277240733)
+    - got `--publish-by-default` to specify what refs should be published
+      by default
+    - got `--annex-wanted`, `--annex-groupwanted` and `--annex-group`
+      settings which would be used to instruct annex about preferred
+      content. [publish] then will publish data using those settings if
+      `wanted` is set.
+    - got `--inherit` option to automagically figure out url/wanted and
+      other git/annex settings for new remote sub-dataset to be constructed
+- [publish]
+    - got `--skip-failing` refactored into `--missing` option
+      which could use new feature of [create-sibling] `--inherit`
 
 ### Fixes
 
 - More consistent interaction through ssh - all ssh connections go
-  through [ssh-run] shim for a "single point of authentication", etc.
+  through [sshrun] shim for a "single point of authentication", etc.
 - More robust [ls] operation outside of the datasets
+- A number of fixes for direct and v6 mode of annex
 
 ### Enhancements and new features
 
 - New [drop] and [remove] commands
-- [clean] got `--what` to specify explicitly what cleaning steps to perform
-  and now could be invoked with `-r`
+- [clean]
+    - got `--what` to specify explicitly what cleaning steps to perform
+      and now could be invoked with `-r`
+- `datalad` and `git-annex-remote*` scripts now do not use setuptools
+  entry points mechanism and rely on simple import to shorten start up time
+- `Dataset` is also now using Flyweight pattern, so the same instance is
+  reused for the same dataset
+- progressbars should not add more empty lines
 
 ### Internal refactoring
 
-- Majority of the commands go through `_prep` for arguments validation
+- Majority of the commands now go through `_prep` for arguments validation
   and pre-processing to avoid recursive invocations
+
 
 ## 0.4.1 (Nov 10, 2016) -- CA release
 
@@ -210,3 +243,5 @@ publishing
 [sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
 [Configuration documentation]: http://docs.datalad.org/config.html
 [rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
+
+[PR 1350]: https://github.com/datalad/datalad/pull/1350
