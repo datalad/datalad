@@ -675,7 +675,7 @@ def _get_testrepos_uris(regex, flavors):
 
 
 @optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
+def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=1):
     """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
