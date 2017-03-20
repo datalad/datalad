@@ -488,7 +488,7 @@ class GitRepo(RepoInterface):
         if url is not None:
             raise DeprecatedError(
                 new=".clone() class method",
-                version="0.4.2",
+                version="0.5.0",
                 msg="RF: url passed to init()"
             )
 
