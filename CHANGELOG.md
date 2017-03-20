@@ -65,7 +65,7 @@ work is ongoing to standardize output and results reporting
       and now could be invoked with `-r`
 - `datalad` and `git-annex-remote*` scripts now do not use setuptools
   entry points mechanism and rely on simple import to shorten start up time
-- `Dataset` is also now using Flyweight pattern, so the same instance is
+- [Dataset] is also now using [Flyweight pattern], so the same instance is
   reused for the same dataset
 - progressbars should not add more empty lines
 
@@ -218,6 +218,7 @@ Major RFing to switch from relying on rdf to git native submodules etc
 Release primarily focusing on interface functionality including initial
 publishing
 
+[git-annex]: http://git-annex.branchable.com/
 
 [Kaggle]: https://www.kaggle.com
 [BALSA]: http://balsa.wustl.edu
@@ -227,21 +228,31 @@ publishing
 [FCON1000]: http://fcon_1000.projects.nitrc.org
 [OpenfMRI]: http://openfmri.org
 
-[git-annex]: http://git-annex.branchable.com/ 
+[Configuration documentation]: http://docs.datalad.org/config.html
+
+[Dataset]: http://docs.datalad.org/en/latest/generated/datalad.api.html#dataset
+
+[rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
+
+[add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
+[add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
+[clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
+[create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
+[create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
+[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
+[export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
+[get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
-[save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
-[get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
-[create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
-[create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
-[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
+[publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
+[save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
-[export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
 [sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
-[Configuration documentation]: http://docs.datalad.org/config.html
-[rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
+[update]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html
+
+[Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 
 [PR 1350]: https://github.com/datalad/datalad/pull/1350
