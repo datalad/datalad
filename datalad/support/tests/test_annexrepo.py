@@ -1726,3 +1726,12 @@ def test_AnnexRepo_metadata(path):
     ar.set_metadata(playfile, add={'novel': 'best'})
     eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
 
+
+@with_tempfile(mkdir=True)
+def test_change_description(path):
+    # prelude
+    ar = AnnexRepo(path, create=True, description='some')
+    eq_(ar.get_description(), 'some')
+    # try change it
+    ar = AnnexRepo(path, create=False, init=True, description='someother')
+    eq_(ar.get_description(), 'someother')
