@@ -12,7 +12,6 @@
 
 
 import logging
-from os import curdir
 from os import listdir
 from os.path import relpath
 from os.path import pardir
@@ -22,8 +21,6 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import git_clone_opts
@@ -87,8 +84,6 @@ class Clone(Interface):
             destination path will be derived from a source URL
             similar to :command:`git clone`"""),
         description=dataset_description,
-        recursive=recursion_flag,
-        recursion_limit=recursion_limit,
         reckless=reckless_opt,
         git_opts=git_opts,
         git_clone_opts=git_clone_opts,
@@ -104,8 +99,6 @@ class Clone(Interface):
             path=None,
             dataset=None,
             description=None,
-            recursive=False,
-            recursion_limit=None,
             reckless=False,
             git_opts=None,
             git_clone_opts=None,
@@ -233,28 +226,10 @@ class Clone(Interface):
             dataset.add(dest_path, save=True, ds2super=True)
 
         # TODO make sure `get` does this too
+        # handle description arg
         _handle_possible_annex_dataset(destination_dataset, reckless)
 
         # yield sucessful clone of the base dataset now, as any possible
         # subdataset clone down below will not alter the Git-state of the
         # parent
         yield get_status_dict(status='ok', **status_kwargs)
-
-        if not recursive:
-            # we are done here
-            return
-
-        # make call to `get` to retrieve the rest (if there is anything)
-        for res in destination_dataset.get(
-                path=curdir,  # get the entire dataset, so recursion_limit is valid
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                get_data=False,
-                reckless=reckless,
-                git_opts=git_opts,
-                annex_opts=annex_opts):
-                # annex_init_opts=None):  # this needs to come when `get` inits annexes
-            yield res
-            # TODO for newly installed (status=ok) subdatasets
-            # handle description arg
-            # and then yield

@@ -184,10 +184,8 @@ def test_clone_dataladri(src, topurl, path):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_recursive(src, path_nr, path_r):
-    # first clone non-recursive:
-    ds = clone(src, path_nr, recursive=False,
-               result_xfm='datasets', return_type='item-or-list')
+def test_clone_isnot_recursive(src, path_nr, path_r):
+    ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
     for sub in ds.get_subdatasets(recursive=True):
         ok_(not Dataset(opj(path_nr, sub)).is_installed(),
@@ -195,35 +193,6 @@ def test_clone_recursive(src, path_nr, path_r):
     # this also means, subdatasets to be listed as not fulfilled:
     eq_(set(ds.get_subdatasets(recursive=True, fulfilled=False)),
         {'subm 1', 'subm 2'})
-
-    # now recursively:
-    ds_list = clone(src, path_r, recursive=True, result_xfm='datasets')
-    # installed a dataset and two subdatasets
-    eq_(len(ds_list), 3)
-    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
-    # we recurse top down during installation, so toplevel should appear at
-    # first position in returned list
-    eq_(ds_list[0].path, path_r)
-    top_ds = ds_list[0]
-    ok_(top_ds.is_installed())
-
-    # the subdatasets are contained in returned list:
-    # (Note: Until we provide proper (singleton) instances for Datasets,
-    # need to check for their paths)
-    assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
-    assert_in(opj(top_ds.path, 'subm 2'), [i.path for i in ds_list])
-
-    eq_(len(top_ds.get_subdatasets(recursive=True)), 2)
-
-    for sub in top_ds.get_subdatasets(recursive=True):
-        subds = Dataset(opj(path_r, sub))
-        ok_(subds.is_installed(),
-            "Not installed: %s" % opj(path_r, sub))
-        # no content was installed:
-        ok_(not any(subds.repo.file_has_content(
-            subds.repo.get_annexed_files())))
-    # no unfulfilled subdatasets:
-    ok_(top_ds.get_subdatasets(recursive=True, fulfilled=False) == [])
 
 
 @with_testrepos(flavors=['local'])
@@ -308,31 +277,6 @@ def test_reckless(path, top_path):
                result_xfm='datasets', return_type='item-or-list')
     eq_(ds.config.get('annex.hardlink', None), 'true')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
-
-
-@with_tree(tree={'top_file.txt': 'some',
-                 'sub 1': {'sub1file.txt': 'something else',
-                           'subsub': {'subsubfile.txt': 'completely different',
-                                      }
-                           },
-                 'sub 2': {'sub2file.txt': 'meaningless',
-                           }
-                 })
-@with_tempfile(mkdir=True)
-def test_clone_noautoget_data(src, path):
-    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
-    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
-    Dataset(opj(src, 'sub 2')).create(force=True)
-    top_src = Dataset(src).create(force=True)
-    top_src.add('.', recursive=True)
-
-    # install top level:
-    cdss = clone(src, path, recursive=True,
-                 result_xfm='datasets', return_type='item-or-list')
-    # there should only be datasets in the list of installed items,
-    # and none of those should have any data for their annexed files yet
-    for ds in cdss:
-        assert_false(any(ds.repo.file_has_content(ds.repo.get_annexed_files())))
 
 
 @with_tempfile
