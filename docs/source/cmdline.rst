@@ -23,6 +23,7 @@ Dataset operations
 
    generated/man/datalad-add
    generated/man/datalad-add-sibling
+   generated/man/datalad-clone
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github

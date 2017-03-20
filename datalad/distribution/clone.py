@@ -60,7 +60,13 @@ lgr = logging.getLogger('datalad.distribution.clone')
 
 @build_doc
 class Clone(Interface):
-    """
+    """In limbo
+
+    .. note::
+      Power-user info: This command uses :command:`git clone`, and
+      :command:`git annex init` to prepare the dataset. Registering to a
+      superdataset is performed via a :command:`git submodule add` operation
+      in the superdataset.
     """
 
     _params_ = dict(
