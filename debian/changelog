@@ -1,10 +1,10 @@
-datalad (0.4.1+git645-g23a11815-1) UNRELEASED; urgency=medium
+datalad (0.5.0-1) experimental; urgency=medium
 
-  * New upstream snapshot from 0.4.1-645-g23a11815 
+  * Fresh upstream "it's huge" release
   * debian/control
     - boosted required git-annex to 6.20170101~
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 19 Mar 2017 02:35:28 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 20 Mar 2017 10:36:53 -0400
 
 datalad (0.4.1-1) unstable; urgency=medium
 
