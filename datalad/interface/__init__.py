@@ -23,7 +23,6 @@ _group_dataset = (
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
         ('datalad.distribution.create', 'Create'),
-        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
         ('datalad.distribution.add', 'Add'),
@@ -73,6 +72,7 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
