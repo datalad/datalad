@@ -149,8 +149,11 @@ def test_invalid_args(path):
     assert_raises(ValueError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
-# XXX Temporarily disable to see how critical this test is wrt the segfault
-# functionality is still tested in the corresponding `clone` test
+# This test caused a mysterious segvault in gh-1350. I reimplementation of
+# the same test functionality in test_clone.py:test_clone_crcns that uses
+# `clone` instead of `install` passes without showing this behavior
+# This test is disabled until some insight into the cause of the issue
+# materializes.
 #@skip_if_no_network
 #@use_cassette('test_install_crcns')
 #@with_tempfile(mkdir=True)
