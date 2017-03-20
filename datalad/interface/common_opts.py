@@ -21,7 +21,7 @@ dataset_description = Parameter(
     args=("-D", "--description",),
     constraints=EnsureStr() | EnsureNone(),
     doc="""short description of this dataset instance that humans can use to
-    identify the repository/location, e.g. "Precious data on my laptop.""")
+    identify the repository/location, e.g. "Precious data on my laptop".""")
 
 recursion_flag = Parameter(
     args=("-r", "--recursive",),

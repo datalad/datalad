@@ -6,9 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for dataset (component) installation
-
-"""
+"""Plumbing command for dataset installation"""
 
 
 import logging
@@ -22,10 +20,10 @@ from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import dataset_description
-from datalad.interface.common_opts import git_opts
-from datalad.interface.common_opts import git_clone_opts
-from datalad.interface.common_opts import annex_opts
-from datalad.interface.common_opts import annex_init_opts
+# from datalad.interface.common_opts import git_opts
+# from datalad.interface.common_opts import git_clone_opts
+# from datalad.interface.common_opts import annex_opts
+# from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import reckless_opt
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
@@ -59,22 +57,35 @@ lgr = logging.getLogger('datalad.distribution.clone')
 class Clone(Interface):
     """Obtain a dataset copy from a URL or local source (path)
 
-    .. note::
-      Power-user info: This command uses :command:`git clone`, and
-      :command:`git annex init` to prepare the dataset. Registering to a
-      superdataset is performed via a :command:`git submodule add` operation
-      in the superdataset.
+    The purpose of this command is to obtain a new clone (copy) of a dataset
+    and place it into a not-yet-existing or empty directory. As such `clone`
+    provides a strict subset of the functionality offered by `install`. Only a
+    single dataset can be obtained, recursion is not supported. However, once
+    installed, arbitrary dataset components can be obtained via a subsequent
+    `get` command.
+
+    Primary differences over a direct `git clone` call are 1) the automatic
+    initialization of a dataset annex (pure Git repositories are equally
+    supported); 2) automatic registration of the newly obtained dataset
+    as a subdataset (submodule), if a parent dataset is specified; and
+    3) support for datalad's resource identifiers and automatic generation of
+    alternative access URL for common cases (such as appending '.git' to the
+    URL in case the accessing the base URL failed).
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""""",
+            doc="""(parent) dataset to clone into. If given, the newly cloned
+            dataset is registered as a subdataset of the parent. Also, if given,
+            relative paths are interpreted as being relative to the parent
+            dataset, and not relative to the working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
         source=Parameter(
             args=("source",),
             metavar='SOURCE',
-            doc="URL, local path or instance of dataset to be cloned",
+            doc="""URL, Datalad resource identifier, local path or instance of
+            dataset to be cloned""",
             constraints=EnsureStr() | EnsureNone()),
         path=Parameter(
             args=("path",),
@@ -85,10 +96,11 @@ class Clone(Interface):
             similar to :command:`git clone`"""),
         description=dataset_description,
         reckless=reckless_opt,
-        git_opts=git_opts,
-        git_clone_opts=git_clone_opts,
-        annex_opts=annex_opts,
-        annex_init_opts=annex_init_opts,
+        # TODO next ones should be there, but cannot go anywhere
+        # git_opts=git_opts,
+        # git_clone_opts=git_clone_opts,
+        # annex_opts=annex_opts,
+        # annex_init_opts=annex_init_opts,
     )
 
     @staticmethod
@@ -99,11 +111,12 @@ class Clone(Interface):
             path=None,
             dataset=None,
             description=None,
-            reckless=False,
-            git_opts=None,
-            git_clone_opts=None,
-            annex_opts=None,
-            annex_init_opts=None):
+            reckless=False):
+            # TODO next ones should be there, but cannot go anywhere
+            # git_opts=None,
+            # git_clone_opts=None,
+            # annex_opts=None,
+            # annex_init_opts=None
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -232,7 +245,7 @@ class Clone(Interface):
             reckless,
             description=description)
 
-        # yield sucessful clone of the base dataset now, as any possible
+        # yield successful clone of the base dataset now, as any possible
         # subdataset clone down below will not alter the Git-state of the
         # parent
         yield get_status_dict(status='ok', **status_kwargs)
