@@ -1734,4 +1734,8 @@ def test_change_description(path):
     eq_(ar.get_description(), 'some')
     # try change it
     ar = AnnexRepo(path, create=False, init=True, description='someother')
+    # this doesn't cut the mustard, still old
+    eq_(ar.get_description(), 'some')
+    # need to resort to "internal" helper
+    ar._init(description='someother')
     eq_(ar.get_description(), 'someother')
