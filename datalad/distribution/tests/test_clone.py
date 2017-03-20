@@ -9,13 +9,10 @@
 
 """
 
-import logging
-import os
 
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
-from os.path import realpath
 from os.path import basename
 from os.path import dirname
 
@@ -23,14 +20,9 @@ from mock import patch
 
 from datalad.api import create
 from datalad.api import clone
-from datalad.api import get
-from datalad.consts import DATASETS_TOPURL
 from datalad.utils import chpwd
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import create_tree
@@ -46,24 +38,19 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_message
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
-from datalad.utils import _path_
-from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_installationpath_from_url
-from ..utils import _get_git_url_from_source
 
 
 @with_tempfile(mkdir=True)
-def test_invalid_args(path):
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_invalid_args(path, otherpath, alienpath):
     assert_raises(ValueError, clone, 'Zoidberg', path='Zoidberg')
     # install to an invalid URL
     assert_raises(ValueError, clone, 'Zoidberg', path='ssh://mars:Zoidberg')
@@ -72,6 +59,10 @@ def test_invalid_args(path):
     # make fake dataset
     ds = create(path)
     assert_raises(IncompleteResultsError, ds.clone, '/higherup.', 'Zoidberg')
+    # make real dataset, try to install outside
+    ds_target = create(opj(otherpath, 'target'))
+    assert_raises(ValueError, ds_target.clone, ds.path, path=ds.path)
+    assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
 
 @skip_if_no_network
