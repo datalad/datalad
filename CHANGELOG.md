@@ -9,6 +9,20 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+
+## 0.5.1 (??? ??, 2017) -- will be better than ever
+
+???
+
+### Fixes
+
+???
+
+### Enhancements and new features
+
+???
+
+
 ## 0.5.0 (Mar 20, 2017) -- it's huge
 
 This release includes an avalanche of bug fixes, enhancements, and
