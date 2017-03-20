@@ -56,28 +56,11 @@ from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
 from .utils import _clone_from_any_source
 from .utils import _handle_possible_annex_dataset
+from .utils import _get_installationpath_from_url
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.install')
-
-
-def _get_installationpath_from_url(url):
-    """Returns a relative path derived from the trailing end of a URL
-
-    This can be used to determine an installation path of a Dataset
-    from a URL, analog to what `git clone` does.
-    """
-    path = url.rstrip('/')
-    if '/' in path:
-        path = path.split('/')
-        if path[-1] == '.git':
-            path = path[-2]
-        else:
-            path = path[-1]
-    if path.endswith('.git'):
-        path = path[:-4]
-    return path
 
 
 class Install(Interface):
