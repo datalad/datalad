@@ -311,7 +311,7 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _handle_possible_annex_dataset(dataset, reckless):
+def _handle_possible_annex_dataset(dataset, reckless, description=None):
     # in any case check whether we need to annex-init the installed thing:
     if knows_annex(dataset.path):
         # init annex when traces of a remote annex can be detected
@@ -322,7 +322,12 @@ def _handle_possible_annex_dataset(dataset, reckless):
             dataset.config.add(
                 'annex.hardlink', 'true', where='local', reload=True)
         lgr.debug("Initializing annex repo at %s", dataset.path)
+        # XXX this is rather convoluted, init does init, but cannot
+        # set a description without `create=True`
         repo = AnnexRepo(dataset.path, init=True)
+        # so do manually see #1403
+        if description:
+            repo._init(description=description)
         if reckless:
             repo._run_annex_command('untrust', annex_options=['here'])
 

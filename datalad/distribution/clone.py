@@ -227,7 +227,10 @@ class Clone(Interface):
 
         # TODO make sure `get` does this too
         # handle description arg
-        _handle_possible_annex_dataset(destination_dataset, reckless)
+        _handle_possible_annex_dataset(
+            destination_dataset,
+            reckless,
+            description=description)
 
         # yield sucessful clone of the base dataset now, as any possible
         # subdataset clone down below will not alter the Git-state of the

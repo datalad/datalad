@@ -115,7 +115,8 @@ def test_clone_simple_local(src, path):
     origin = Dataset(path)
 
     # now install it somewhere else
-    ds = clone(src, path, result_xfm='datasets', return_type='item-or-list')
+    ds = clone(src, path, description='mydummy',
+               result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     ok_(ds.is_installed())
     if not isinstance(origin.repo, AnnexRepo):
@@ -138,6 +139,7 @@ def test_clone_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
     res = clone(src, path)

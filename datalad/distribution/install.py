@@ -435,7 +435,10 @@ class Install(Interface):
             lgr.error("Installation failed.")
             return None
 
-        _handle_possible_annex_dataset(destination_dataset, reckless)
+        _handle_possible_annex_dataset(
+            destination_dataset,
+            reckless,
+            description=description)
 
         lgr.debug("Installation of %s done.", destination_dataset)
 
