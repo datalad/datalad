@@ -93,9 +93,15 @@ matrix:
     - TMPDIR="/tmp/d i r"
     - _DATALAD_NONPR_ONLY=1
   - python: 2.7
-    # Test under NFS mount
+    # Test under NFS mount  (only selected sub-set)
     env:
     - TMPDIR="/tmp/nfsmount"
+    - TESTS_TO_PERFORM="datalad/tests datalad/support"
+  - python: 2.7
+    # Test under NFS mount  (full, only in master)
+    env:
+    - TMPDIR="/tmp/nfsmount"
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # test modules that should not fail in direct mode now:
     env:
