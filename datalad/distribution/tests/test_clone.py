@@ -342,3 +342,21 @@ def test_install_source_relpath(src, dest):
     src_ = basename(src)
     with chpwd(dirname(src)):
         clone(src_, dest)
+
+
+@with_tempfile
+@with_tempfile
+def test_clone_isnt_a_smartass(origin_path, path):
+    origin = create(origin_path)
+    cloned = clone(origin, path,
+                   result_xfm='datasets', return_type='item-or-list')
+    with chpwd(path):
+        # no were are inside a dataset clone, and we make another one
+        # we do not want automatic subdatasetification without given a dataset
+        # explicitely
+        clonedsub = clone(origin, 'testsub',
+                          result_xfm='datasets', return_type='item-or-list')
+    # correct destination
+    assert clonedsub.path.startswith(path)
+    # no subdataset relation
+    eq_(cloned.get_subdatasets(), [])

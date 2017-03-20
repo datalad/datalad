@@ -60,7 +60,7 @@ lgr = logging.getLogger('datalad.distribution.clone')
 
 @build_doc
 class Clone(Interface):
-    """In limbo
+    """Obtain a dataset copy from a URL or local source (path)
 
     .. note::
       Power-user info: This command uses :command:`git clone`, and
@@ -77,7 +77,7 @@ class Clone(Interface):
         source=Parameter(
             args=("source",),
             metavar='SOURCE',
-            doc="URL or local path of the source",
+            doc="URL, local path or instance of dataset to be cloned",
             constraints=EnsureStr() | EnsureNone()),
         path=Parameter(
             args=("path",),
@@ -119,6 +119,9 @@ class Clone(Interface):
             dataset, check_installed=True, purpose='cloning') \
             if dataset is not None else dataset
         refds_path = dataset.path if dataset else None
+
+        if isinstance(source, Dataset):
+            source = source.path
 
         if source == path:
             # even if they turn out to be identical after resolving symlinks
