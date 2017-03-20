@@ -18,6 +18,7 @@ chance of producing syntax-compliant content with the first attempt.
 """
 
 import email
+import email.parser  # necessary on Python 2.7.6 (trusty)
 from os.path import join as opj
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.interface.base import dedent_docstring
