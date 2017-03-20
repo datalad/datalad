@@ -217,7 +217,7 @@ class Search(Interface):
 
             # sort entries by location (if present)
             sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
+            meta = sorted(meta, key=lambda m: tuple(str(m.get(x, "")) for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(
