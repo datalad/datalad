@@ -103,3 +103,9 @@ def annexjson2result(d, ds, **kwargs):
     res['action'] = d['command']
     res['annexkey'] = d['key']
     return res
+
+
+def count_results(res, **kwargs):
+    """Return number if results that match all property values in kwargs"""
+    return sum(
+        all(k in r and r[k] == v for k, v in kwargs.items()) for r in res)
