@@ -309,7 +309,7 @@ class Dataset(object):
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
-
+        # OPT TODO: make it a generator for a possible early termination?
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return []
 

@@ -228,6 +228,8 @@ class Add(Interface):
                     'success': True,
                     'file': Dataset(subds_path)})
             # make sure any last minute additions make it to the saving stage
+            # XXX? should content_by_ds become OrderedDict so that possible
+            # super here gets processed last?
             content_by_ds[ds_path] = toadd
             added = ds.repo.add(
                 toadd,
@@ -238,6 +240,7 @@ class Add(Interface):
             results.extend(added)
 
         if results and save:
+            # OPT: tries to save even unrelated stuff
             save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
