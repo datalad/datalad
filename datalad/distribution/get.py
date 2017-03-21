@@ -26,9 +26,10 @@ from datalad.interface.results import results_from_paths
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import annexjson2result
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import git_opts
-from datalad.interface.common_opts import annex_opts
-from datalad.interface.common_opts import annex_get_opts
+# from datalad.interface.common_opts import git_opts
+# from datalad.interface.common_opts import annex_opts
+# from datalad.interface.common_opts import annex_get_opts
+from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
@@ -55,7 +56,8 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _install_necessary_subdatasets(ds, path, reckless, refds_path):
+def _install_necessary_subdatasets(
+        ds, path, reckless, refds_path, description=None):
     """Installs subdatasets of `ds`, that are necessary to obtain in order
     to have access to `path`.
 
@@ -70,11 +72,6 @@ def _install_necessary_subdatasets(ds, path, reckless, refds_path):
     ds: Dataset
     path: str
     reckless: bool
-
-    Returns
-    -------
-    Dataset
-      the last (deepest) subdataset, that was installed
     """
     assert ds.is_installed()
 
@@ -111,7 +108,8 @@ def _install_necessary_subdatasets(ds, path, reckless, refds_path):
             cur_par_ds,
             submodule.path,
             submodule.url,
-            reckless)
+            reckless,
+            description=description)
 
         cur_par_ds = cur_subds
 
@@ -135,7 +133,7 @@ def _install_necessary_subdatasets(ds, path, reckless, refds_path):
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                                        refds_path=None):
+                                        refds_path=None, description=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
     # loop over submodules not subdatasets to get the url right away
@@ -153,7 +151,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             continue
         try:
             subds = _install_subds_from_flexible_source(
-                ds, sub.path, sub.url, reckless)
+                ds, sub.path, sub.url, reckless, description=description)
             yield get_status_dict(
                 'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
                 message=("Installed subdataset %s", subds))
@@ -172,28 +170,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 reckless=reckless,
                 refds_path=refds_path):
             yield res
-
-
-def _get(ds, content, refds_path=None, source=None, jobs=None):
-    """Loops through datasets and calls git-annex call where appropriate
-    """
-    # needs to be an annex:
-    found_an_annex = isinstance(ds.repo, AnnexRepo)
-    if not found_an_annex:
-        for r in results_from_paths(
-                content, status='notneeded',
-                message="no dataset annex, content already present: %s",
-                action='get', logger=lgr,
-                refds=refds_path):
-            yield r
-        return
-    for res in ds.repo.get(
-            content,
-            options=['--from=%s' % source] if source else [],
-            jobs=jobs):
-        res = annexjson2result(res, ds, type_='file', logger=lgr,
-                               refds=refds_path)
-        yield res
 
 
 @build_doc
@@ -259,10 +235,11 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        description=dataset_description,
         reckless=reckless_opt,
-        git_opts=git_opts,
-        annex_opts=annex_opts,
-        annex_get_opts=annex_get_opts,
+        # git_opts=git_opts,
+        # annex_opts=annex_opts,
+        # annex_get_opts=annex_get_opts,
         jobs=jobs_opt,
         verbose=verbose)
 
@@ -280,10 +257,11 @@ class Get(Interface):
             recursive=False,
             recursion_limit=None,
             get_data=True,
+            description=None,
             reckless=False,
-            git_opts=None,
-            annex_opts=None,
-            annex_get_opts=None,
+            #git_opts=None,
+            #annex_opts=None,
+            #annex_get_opts=None,
             jobs=None,
             verbose=False,
     ):
@@ -340,7 +318,7 @@ class Get(Interface):
             # now actually obtain whatever is necessary to get to this path
             containing_ds = ds
             for res in _install_necessary_subdatasets(
-                    ds, path, reckless, refds_path):
+                    ds, path, reckless, refds_path, description=description):
                 # yield immediately so errors could be acted upon outside, before
                 # we continue
                 yield res
@@ -388,7 +366,8 @@ class Get(Interface):
                             # protect against magic marker misinterpretation
                             # only relevant for _get, hence replace here
                             start=content_path if content_path != curdir else None,
-                            refds_path=refds_path):
+                            refds_path=refds_path,
+                            description=description):
                         # yield immediately so errors could be acted upon
                         # outside, before we continue
                         yield res
@@ -426,15 +405,28 @@ class Get(Interface):
             # done already
             return
 
-        # hand over to git-annex
+        # hand over to git-annex, get files content,
+        # repo files in git as 'notneeded' to get
         for ds_path in sorted(content_by_ds.keys()):
-            for res in _get(
-                    Dataset(ds_path),
-                    content_by_ds[ds_path],
-                    refds_path=refds_path,
-                    source=source,
+            ds = Dataset(ds_path)
+            content = content_by_ds[ds_path]
+            # needs to be an annex to get content
+            if not isinstance(ds.repo, AnnexRepo):
+                for r in results_from_paths(
+                        content, status='notneeded',
+                        message="no dataset annex, content already present: %s",
+                        action='get', logger=lgr,
+                        refds=refds_path):
+                    yield r
+                continue
+            for res in ds.repo.get(
+                    content,
+                    options=['--from=%s' % source] if source else [],
                     jobs=jobs):
+                res = annexjson2result(res, ds, type_='file', logger=lgr,
+                                       refds=refds_path)
                 yield res
+
 
     # TODO generator
     # RF for new interface

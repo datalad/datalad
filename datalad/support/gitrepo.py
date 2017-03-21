@@ -430,15 +430,16 @@ class GitRepo(RepoInterface):
     def _flyweight_reject(cls, id_, *args, **kwargs):
         # TODO:
         # This is a temporary approach. See PR # ...
-        create = kwargs.pop('create', None)
-        kwargs.pop('path', None)
-        if create and kwargs:
-            # we have `create` plus options other than `path`
-            return "Call to {0}() with args {1} and kwargs {2} conflicts " \
-                   "with existing instance {3}." \
-                   "This is likely to be caused by inconsistent logic in " \
-                   "your code." \
-                   "".format(cls, args, kwargs, cls._unique_instances[id_])
+        # create = kwargs.pop('create', None)
+        # kwargs.pop('path', None)
+        # if create and kwargs:
+        #     # we have `create` plus options other than `path`
+        #     return "Call to {0}() with args {1} and kwargs {2} conflicts " \
+        #            "with existing instance {3}." \
+        #            "This is likely to be caused by inconsistent logic in " \
+        #            "your code." \
+        #            "".format(cls, args, kwargs, cls._unique_instances[id_])
+        pass
 
     # End Flyweight
 

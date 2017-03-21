@@ -204,7 +204,11 @@ def test_get_recurse_subdatasets(src, path):
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
-    subds1, subds2 = ds.get(['subm 1', 'subm 2'], get_data=False, result_xfm='datasets')
+    subds1, subds2 = ds.get(['subm 1', 'subm 2'], get_data=False,
+                            description="youcouldnotmakethisup",
+                            result_xfm='datasets')
+    for d in (subds1, subds2):
+        eq_(d.repo.get_description(), 'youcouldnotmakethisup')
 
     # there are 3 files to get: test-annex.dat within each dataset:
     rel_path_sub1 = opj(basename(subds1.path), 'test-annex.dat')
