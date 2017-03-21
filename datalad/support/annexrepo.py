@@ -654,6 +654,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         there shouldn't be a need to 'init' again.
 
         """
+        # MIH: this function is required for re-initing repos. The logic
+        # in the contructor is rather convoluted and doesn't acknowledge
+        # the case of a perfectly healthy annex that just needs a new
+        # description
+        # will keep leading underscore in the name for know, but this is
+        # not private
         # TODO: provide git and git-annex options.
         # TODO: Document (or implement respectively) behaviour in special cases
         # like direct mode (if it's different), not existing paths, etc.
