@@ -95,7 +95,8 @@ def setup_package():
     # Set to non-interactive UI
     from datalad.ui import ui
     _test_states['ui_backend'] = ui.backend
-    ui.set_backend('tests-noninteractive')
+    # obtain() since that one consults for the default value
+    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
 
 def teardown_package():
@@ -123,6 +124,12 @@ def teardown_package():
 
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
+    # request versioning for few others which we do not check at runtime
+    for m in ('git',):
+        try:  # Let's make sure to not blow up when we are almost done
+            ev[m]
+        except Exception:
+            pass
     print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")

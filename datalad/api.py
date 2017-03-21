@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
-# Should have no spurious imports/definitions at the module leve
+# Should have no spurious imports/definitions at the module level
 from .distribution.dataset import Dataset
 
 

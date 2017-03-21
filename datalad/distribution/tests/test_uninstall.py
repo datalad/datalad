@@ -84,7 +84,7 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
-    ds.save(all_changes=True)
+    ds.save(all_updated=True)
     eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
@@ -281,7 +281,7 @@ def test_uninstall_recursive(path):
     # we add one file
     eq_(len(subds.add('.')), 1)
     # save all -> all clean
-    ds.save(all_changes=True, recursive=True)
+    ds.save(all_updated=True, recursive=True)
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
     # now uninstall in subdataset through superdataset
@@ -311,7 +311,7 @@ def test_uninstall_recursive(path):
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
-    ds.save(all_changes=True)
+    ds.save(all_updated=True)
     ok_clean_git(ds.path)
     # fail on missing --recursive because subdataset is present
     assert_raises(IncompleteResultsError, ds.remove)

@@ -158,7 +158,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
-    ds.save(recursive=True, all_changes=True)
+    ds.save(recursive=True, all_updated=True)
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 
@@ -174,7 +174,7 @@ def test_nested_create(path):
     os.makedirs(opj(ds.path, 'lvl1', 'empty'))
     with open(opj(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.save(all_changes=True))
+    ok_(ds.save(all_updated=True))
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)

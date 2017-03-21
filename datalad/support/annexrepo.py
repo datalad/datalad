@@ -68,6 +68,7 @@ from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
+from .exceptions import IncompleteResultsError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -429,7 +430,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._set_shared_connection(name, url)
 
     @borrowkwargs(GitRepo)
-    def get_remotes(self, with_refs_only=False, exclude_special_remotes=False):
+    def get_remotes(self, with_refs_only=False, with_urls_only=False,
+                    exclude_special_remotes=False):
         """Get known (special-) remotes of the repository
 
         Parameters
@@ -443,7 +445,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           List of names of the remotes
         """
         remotes = super(AnnexRepo, self).get_remotes(
-            with_refs_only=with_refs_only)
+            with_refs_only=with_refs_only, with_urls_only=with_urls_only)
 
         if exclude_special_remotes:
             return [remote for remote in remotes
@@ -652,6 +654,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         there shouldn't be a need to 'init' again.
 
         """
+        # MIH: this function is required for re-initing repos. The logic
+        # in the contructor is rather convoluted and doesn't acknowledge
+        # the case of a perfectly healthy annex that just needs a new
+        # description
+        # will keep leading underscore in the name for know, but this is
+        # not private
         # TODO: provide git and git-annex options.
         # TODO: Document (or implement respectively) behaviour in special cases
         # like direct mode (if it's different), not existing paths, etc.
@@ -1424,29 +1432,33 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Note:
             # doesn't depend on anything in stdout. Therefore check this before
             # dealing with stdout
-            out_of_space_re = re.search("not enough free space, need (.*) more", e.stderr)
+            out_of_space_re = re.search(
+                "not enough free space, need (.*) more", e.stderr
+            )
             if out_of_space_re:
                 raise OutOfSpaceError(cmd="annex %s" % command,
                                       sizemore_msg=out_of_space_re.groups()[0])
+
             # RemoteNotAvailableError:
             remote_na_re = re.search(
-                "there is no available git remote named \"(.*)\"",
-                e.stderr
+                "there is no available git remote named \"(.*)\"", e.stderr
             )
             if remote_na_re:
                 raise RemoteNotAvailableError(cmd="annex %s" % command,
                                               remote=remote_na_re.groups()[0])
 
             # TEMP: Workaround for git-annex bug, where it reports success=True
-            # for annex add, while simultanously complaining, that it is in
+            # for annex add, while simultaneously complaining, that it is in
             # a submodule:
             # TODO: For now just reraise. But independently on this bug, it
             # makes sense to have an exception for that case
-            in_subm_re = re.search("fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr)
+            in_subm_re = re.search(
+                "fatal: Pathspec '(.*)' is in submodule '(.*)'", e.stderr
+            )
             if in_subm_re:
                 raise e
 
-            # Note: A try to approach the covering of potential annex failures
+            # Note: try to approach the covering of potential annex failures
             # in a more general way:
             # first check stdout:
             if all([line.startswith('{') and line.endswith('}')
@@ -1460,9 +1472,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # Note: Workaround for not existing files as long as annex doesn't
             # report it within JSON response:
-            not_existing = [line.split()[1] for line in e.stderr.splitlines()
-                            if line.startswith('git-annex:') and
-                            line.endswith('not found')]
+            # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+            not_existing = [
+                line.split()[1] for line in e.stderr.splitlines()
+                if line.startswith('git-annex:') and
+                   line.endswith('not found')
+            ]
             if not_existing:
                 if out is None:
                     # we create the error reporting herein. If all files were
@@ -2003,14 +2018,28 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Note:
         # As of now, there is no --json option for annex copy. Use it once this
         # changed.
-        std_out, std_err = self._run_annex_command(
+        results = self._run_annex_command_json(
             'copy',
-            annex_options=annex_options,
-            log_stdout=True, log_stderr=not log_online,
-            log_online=log_online, expect_stderr=True)
-
-        return [line.split()[1] for line in std_out.splitlines()
-                if line.startswith('copy ') and line.endswith('ok')]
+            args=annex_options,
+            #log_stdout=True, log_stderr=not log_online,
+            #log_online=log_online, expect_stderr=True
+        )
+        results = list(results)
+        # check if any transfer failed since then we should just raise an Exception
+        # for now to guarantee consistent behavior with non--json output
+        # see https://github.com/datalad/datalad/pull/1349#discussion_r103639456
+        from operator import itemgetter
+        failed_copies = [e['file'] for e in results if not e['success']]
+        good_copies = [
+            e['file'] for e in results
+            if e['success'] and
+               e.get('note', '').startswith('to ')  # transfer did happen
+        ]
+        if failed_copies:
+            raise IncompleteResultsError(
+                results=good_copies, failed=failed_copies,
+                msg="Failed to copy %d file(s)" % len(failed_copies))
+        return good_copies
 
     @property
     def uuid(self):
@@ -2433,7 +2462,7 @@ class ProcessAnnexProgressIndicators(object):
             from datalad.ui import ui
             total = sum(filter(bool, self.expected.values()))
             self.total_pbar = ui.get_progressbar(
-                label="Total", maxval=total)
+                label="Total", total=total)
             self.total_pbar.start()
 
     def _update_pbar(self, pbar, new_value):
@@ -2459,7 +2488,7 @@ class ProcessAnnexProgressIndicators(object):
             if j.get('success') in {True, 'true'}:
                 self._succeeded += 1
                 if pbar:
-                    self._update_pbar(pbar, pbar.maxval)
+                    self._update_pbar(pbar, pbar.total)
                 elif self.total_pbar:
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
@@ -2478,13 +2507,13 @@ class ProcessAnnexProgressIndicators(object):
                                                   ansi_colors.RED)) \
                     if self._failed else ''
 
-                self.total_pbar._pbar.desc = \
+                self.total_pbar.set_desc(
                     "Total (%d ok%s out of %d)" % (
                         self._succeeded,
                         failed_str,
                         len(self.expected)
                         if self.expected
-                        else self._succeeded + self._failed)
+                        else self._succeeded + self._failed))
                 # seems to be of no effect to force it repaint
                 self.total_pbar.refresh()
 
@@ -2526,7 +2555,7 @@ class ProcessAnnexProgressIndicators(object):
                 half = title_len//2 - 2
                 title = '%s .. %s' % (title[:half], title[-half:])
             pbar = self.pbars[download_id] = ui.get_progressbar(
-                label=title, maxval=target_size)
+                label=title, total=target_size)
             pbar.start()
 
         self._update_pbar(

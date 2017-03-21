@@ -245,6 +245,35 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
+### CI setup
+
+We are using Travis-CI and have [buildbot setup](https://github.com/datalad/buildbot) which also
+exercises our tests battery for every PR and on the master.  Note that buildbot runs tests only submitted
+by datalad developers, or if a PR acquires 'buildbot' label.
+
+In case if you want to enter buildbot's environment
+
+1. Login to our development server (`smaug`)
+
+2. Find container ID associated with the environment you are interested in, e.g.
+
+       ```docker ps | grep nd16.04```
+
+3. Enter that docker container environment using
+
+       ```docker exec -it <CONTAINER ID> /bin/bash```
+
+4. Become buildbot user
+
+       ```su - buildbot```
+
+5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
+   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+
+And now you should be in the same environment as the very last tested PR.
+Note that the same path/venv is reused for all the PRs, so you might want
+first to check using `git show` under the `build/` directory if it corresponds
+to the commit you are interested to troubleshoot.
 
 ### Coverage
 

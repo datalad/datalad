@@ -73,7 +73,8 @@ def test_question_choices():
 def _test_progress_bar(backend, len, increment):
     out = StringIO()
     fill_str = ('123456890' * (len//10))[:len]
-    pb = DialogUI(out).get_progressbar('label', fill_str, maxval=10, backend=backend)
+    pb = DialogUI(out).get_progressbar(
+        'label', fill_str, total=10, backend=backend)
     pb.start()
     # we can't increment 11 times
     for x in range(11):
@@ -82,14 +83,15 @@ def _test_progress_bar(backend, len, increment):
             pb.update(x if not increment else 1, increment=increment)
         out.flush()  # needed atm
         pstr = out.getvalue()
-        if backend not in ('annex-remote',):  # no str repr
+        if backend not in ('annex-remote', 'silent'):  # no str repr
             ok_startswith(pstr.lstrip('\r'), 'label:')
             assert_re_in(r'.*\b%d%%.*' % (10*x), pstr)
         if backend == 'progressbar':
             assert_in('ETA', pstr)
     pb.finish()
-    if backend not in ('annex-remote',):
-        ok_endswith(out.getvalue(), '\n')
+    if backend not in ('annex-remote', 'silent'):
+        # returns back and there is no spurious newline
+        ok_endswith(out.getvalue(), '\r')
 
 
 def test_progress_bar():

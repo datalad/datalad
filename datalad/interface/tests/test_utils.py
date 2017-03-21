@@ -298,7 +298,7 @@ def test_filter_unmodified(path):
     # dataset does not have the recent change saved
     assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
 
-    ds.save(all_changes=True)
+    ds.save(all_updated=True)
 
     modspec, unavail = Save._prep('.', ds, recursive=True)
     # arg sorting is not affected
