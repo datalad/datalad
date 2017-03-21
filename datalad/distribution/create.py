@@ -281,21 +281,16 @@ class Create(Interface):
             gitattr.write('** annex.largefiles=nothing\n')
 
         # save everything
-        tbds.add('.datalad', to_git=True, save=False)
+        tbds.add('.datalad', to_git=True, save=save,
+                 message='[DATALAD] new dataset')
 
-        if save:
-            save_dataset(
-                tbds,
-                paths=['.datalad'],
-                message='[DATALAD] new dataset')
-
-            # the next only makes sense if we saved the created dataset,
-            # otherwise we have no committed state to be registered
-            # in the parent
-            if dataset is not None and dataset.path != tbds.path:
-                # we created a dataset in another dataset
-                # -> make submodule
-                dataset.add(tbds.path, save=save, ds2super=True)
+        # the next only makes sense if we saved the created dataset,
+        # otherwise we have no committed state to be registered
+        # in the parent
+        if save and dataset is not None and dataset.path != tbds.path:
+            # we created a dataset in another dataset
+            # -> make submodule
+            dataset.add(tbds.path, save=save, ds2super=True)
 
         yield get_status_dict(
             action='create',

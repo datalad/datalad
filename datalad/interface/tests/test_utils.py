@@ -155,21 +155,15 @@ demo_hierarchy = {
 }
 
 
-def make_demo_hierarchy_datasets(path, tree):
-    created_ds = []
+def make_demo_hierarchy_datasets(path, tree, parent=None):
+    if parent is None:
+        parent = Dataset(path).create(force=True)
     for node, items in tree.items():
-        node_path = opj(path, node)
         if isinstance(items, dict):
-            ds = make_demo_hierarchy_datasets(node_path, items)
-            created_ds.append(ds)
-    topds = Dataset(path)
-    if not topds.is_installed():
-        topds.create(force=True)
-        # TODO this farce would not be necessary if add() could add subdatasets
-        for ds in created_ds:
-            _install_subds_inplace(ds=topds, path=ds.path, relativepath=relpath(ds.path, topds.path))
-            ds.save()
-        return topds
+            node_path = opj(path, node)
+            nodeds = Dataset(node_path).create(force=True)
+            make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
+    return parent
 
 
 @with_tree(demo_hierarchy)

@@ -13,19 +13,17 @@
 
 import logging
 from os import curdir
-from os import linesep
 from os.path import relpath
-from os.path import pardir
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import jobs_opt
-from datalad.interface.common_opts import git_opts
-from datalad.interface.common_opts import git_clone_opts
-from datalad.interface.common_opts import annex_opts
-from datalad.interface.common_opts import annex_init_opts
+# from datalad.interface.common_opts import git_opts
+# from datalad.interface.common_opts import git_clone_opts
+# from datalad.interface.common_opts import annex_opts
+# from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import reckless_opt
@@ -39,7 +37,6 @@ from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI
 from datalad.support.network import is_datalad_compat_ri
-from datalad.support.network import get_local_file_url
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -50,34 +47,11 @@ from .dataset import resolve_path
 from .dataset import require_dataset
 from .dataset import EnsureDataset
 from .get import Get
-from .utils import _get_git_url_from_source
-from .utils import _install_subds_from_flexible_source
-from .utils import _get_flexible_source_candidates
-from .utils import _get_tracking_source
-from .utils import _clone_from_any_source
-from .utils import _handle_possible_annex_dataset
+from .clone import Clone
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.install')
-
-
-def _get_installationpath_from_url(url):
-    """Returns a relative path derived from the trailing end of a URL
-
-    This can be used to determine an installation path of a Dataset
-    from a URL, analog to what `git clone` does.
-    """
-    path = url.rstrip('/')
-    if '/' in path:
-        path = path.split('/')
-        if path[-1] == '.git':
-            path = path[-2]
-        else:
-            path = path[-1]
-    if path.endswith('.git'):
-        path = path[:-4]
-    return path
 
 
 class Install(Interface):
@@ -141,10 +115,10 @@ class Install(Interface):
         if_dirty=if_dirty_opt,
         save=nosave_opt,
         reckless=reckless_opt,
-        git_opts=git_opts,
-        git_clone_opts=git_clone_opts,
-        annex_opts=annex_opts,
-        annex_init_opts=annex_init_opts,
+        # git_opts=git_opts,
+        # git_clone_opts=git_clone_opts,
+        # annex_opts=annex_opts,
+        # annex_init_opts=annex_init_opts,
         jobs=jobs_opt,
     )
 
@@ -161,10 +135,10 @@ class Install(Interface):
             if_dirty='save-before',
             save=True,
             reckless=False,
-            git_opts=None,
-            git_clone_opts=None,
-            annex_opts=None,
-            annex_init_opts=None,
+            # git_opts=None,
+            # git_clone_opts=None,
+            # annex_opts=None,
+            # annex_init_opts=None,
             jobs=None):
 
         # normalize path argument to be equal when called from cmdline and
@@ -175,8 +149,7 @@ class Install(Interface):
             raise InsufficientArgumentsError(
                 "Please provide at least a source or a path")
 
-
-        ## Common kwargs to pass to underlying git/install calls.
+        #  Common kwargs to pass to underlying git/install calls.
         #  They might need adjustments (e.g. for recursion_limit, but
         #  otherwise would be applicable throughout
         #
@@ -188,8 +161,8 @@ class Install(Interface):
             get_data=get_data,
             recursive=recursive,
             recursion_limit=recursion_limit,
-            git_opts=git_opts,
-            annex_opts=annex_opts,
+            # git_opts=git_opts,
+            # annex_opts=annex_opts,
             reckless=reckless,
             jobs=jobs,
         )
@@ -225,8 +198,8 @@ class Install(Interface):
                                     description=description,
                                     if_dirty=if_dirty,
                                     save=save,
-                                    git_clone_opts=git_clone_opts,
-                                    annex_init_opts=annex_init_opts,
+                                    # git_clone_opts=git_clone_opts,
+                                    # annex_init_opts=annex_init_opts,
                                     **common_kwargs
                                 )
                     installed_items += assure_list(result)
@@ -343,175 +316,32 @@ class Install(Interface):
                     raise ValueError("Invalid path argument {0}".format(path))
         # `path` resolved, if there was any.
 
-        # Possibly do conversion from source into a git-friendly url
-        # luckily GitRepo will undo any fancy file:/// url to make use of Git's
-        # optimization for local clones....
-        source = _get_git_url_from_source(source)
-        lgr.debug("Resolved source: {0}".format(source))
-        # TODO: we probably need to resolve source, if it is a local path;
-        # expandpath, normpath, ... Where exactly is the point to do it?
+        # TODO generator: fish out clones dataset and yield everything
+        destination_dataset = Clone.__call__(
+            source, path, dataset=ds, description=description,
+            reckless=reckless,
+            result_xfm='datasets', return_type='item-or-list')
+        installed_items.append(destination_dataset)
 
-        # derive target from source:
-        if path is None:
-            # we got nothing but a source. do something similar to git clone
-            # and derive the path from the source and continue
-            lgr.debug(
-                "Neither dataset nor target installation path provided. "
-                "Deriving destination path from given source %s",
-                source)
-            path = _get_installationpath_from_url(source)
-            # since this is a relative `path`, resolve it:
-            path = resolve_path(path, dataset)
-
-        # there is no other way -- my intoxicated brain tells me
-        assert(path is not None)
-
-        lgr.debug("Resolved installation target: {0}".format(path))
-        destination_dataset = Dataset(path)
-
-        if destination_dataset.is_installed():
-            # this should not be, check if this is an error, or a reinstall
-            # from the same source
-            # this is where we would have installed this from
-            candidate_sources = _get_flexible_source_candidates(
-                source, destination_dataset.path)
-            # this is where it was installed from
-            track_name, track_url = _get_tracking_source(destination_dataset)
-            if track_url in candidate_sources or get_local_file_url(track_url):
-                # TODO: this one breaks "promise" assumptions of the repeated
-                # invocations of install.
-                # yoh thinks that we actually should be the ones to run update
-                # (without merge) after basic
-                # check that it is clean and up-to-date with its super dataset
-                # and if so, not return here but continue with errands (recursive
-                # installation and get_data) so we could provide the same
-                # result if we rerun the same install twice.
-                lgr.info(
-                    "%s was already installed from %s. Use `update` to obtain "
-                    "latest updates, or `get` or `install` with a path, not URL, "
-                    "to (re)fetch data and / or subdatasets",
-                    destination_dataset, track_url)
-                return destination_dataset
-            else:
-                raise ValueError("There is already a dataset installed at the "
-                                 "destination: %s", destination_dataset)
-
-        ###########
-        # we should know everything necessary by now
-        # actual installation starts
-        ###########
-
-        # FLOW GUIDE:
-        # four cases:
-        # 1. install into a dataset
-        #   1.1. we install a known subdataset
-        #        => git submodule update --init
-        #   1.2. we install an existing repo as a subdataset inplace
-        #        => git submodule add + magic
-        #   1.3. we (recursively) try to install implicit subdatasets between
-        #        ds and path
-        #   1.4. we install a new subdataset from an explicit source
-        #        => git submodule add
-        # 2. we "just" install from an explicit source
-        #    => git clone
-
-        if ds is not None:
-            # FLOW GUIDE: 1.
-
-            # express the destination path relative to the root of
-            # the dataset
-            relativepath = relpath(path, start=ds.path)
-            if relativepath.startswith(pardir):
-                raise ValueError("installation path outside dataset "
-                                 "({0})".format(path))
-            lgr.debug("Resolved installation target relative to dataset "
-                      "{0}: {1}".format(ds, relativepath))
-
-            # FLOW_GUIDE 1.4.
-            lgr.info("Installing subdataset from '{0}' at: {1}".format(
-                source, relativepath))
-            destination_dataset = _install_subds_from_flexible_source(
-                ds,
-                relativepath,
-                source,
-                reckless)
-        else:
-            # FLOW GUIDE: 2.
-            lgr.info("Installing dataset at {0} from {1}".format(path, source))
-
-            # Currently assuming there is nothing at the target to deal with
-            # and rely on failures raising from the git call ...
-
-            # We possibly need to consider /.git URL
-            candidate_sources = _get_flexible_source_candidates(source)
-            _clone_from_any_source(candidate_sources, destination_dataset.path)
-
-        # FLOW GUIDE: All four cases done.
-        if not destination_dataset.is_installed():
-            # XXX  shouldn't we just fail!? (unless some explicit --skip-failing?)
-            lgr.error("Installation failed.")
-            return None
-
-        _handle_possible_annex_dataset(destination_dataset, reckless)
-
-        lgr.debug("Installation of %s done.", destination_dataset)
-
-        if not destination_dataset.is_installed():
-            # log error and don't report as installed item, but don't raise,
-            # since we might be in a process of recursive installation where
-            # a lot of other datasets can still be installed successfully.
-            lgr.error("Installation of {0} failed.".format(destination_dataset))
-        else:
-            installed_items.append(destination_dataset)
-
-        # we need to decrease the recursion limit, relative to
-        # subdatasets now
-        subds_recursion_limit = max(0, recursion_limit - 1) \
-                                  if isinstance(recursion_limit, int) \
-                                  else recursion_limit
         # Now, recursive calls:
-        if recursive:
+        if recursive or get_data:
             if description:
                 # yoh: why?  especially if we somehow allow for templating them
                 # with e.g. '%s' to catch the subdataset path
                 lgr.warning("Description can't be assigned recursively.")
 
-            subs = destination_dataset.get_subdatasets(
-                # yes, it does make sense to combine no recursion with
-                # recursion_limit: when the latter is 0 we get no subdatasets
-                # reported, otherwise we always get the 1st-level subs
-                recursive=False,
-                recursion_limit=recursion_limit,
-                absolute=False)
-
-            if subs:
-                lgr.debug("Obtaining subdatasets of %s: %s",
-                          destination_dataset,
-                          subs)
-
-                kwargs = common_kwargs.copy()
-                kwargs['recursion_limit'] = subds_recursion_limit
-                rec_installed = Get.__call__(
-                    subs,  # all at once
-                    dataset=destination_dataset,
-                    # TODO expose this
-                    # yoh: exactly!
-                    #annex_get_opts=annex_get_opts,
-                    result_xfm='datasets',
-                    **kwargs
-                )
-                # TODO do we want to filter this so `install` only returns
-                # the datasets?
-                if isinstance(rec_installed, list):
-                    installed_items.extend(rec_installed)
-                else:
-                    installed_items.append(rec_installed)
-
-        if get_data:
-            lgr.debug("Getting data of {0}".format(destination_dataset))
-            kwargs = common_kwargs.copy()
-            kwargs['recursive'] = False
-            destination_dataset.get(curdir, **kwargs)
+            # TODO generator: just yield it all
+            rec_installed = destination_dataset.get(
+                curdir,
+                # TODO expose this
+                # yoh: exactly!
+                #annex_get_opts=annex_get_opts,
+                result_xfm='datasets',
+                **common_kwargs)
+            if isinstance(rec_installed, list):
+                installed_items.extend(rec_installed)
+            else:
+                installed_items.append(rec_installed)
 
         return Install._handle_and_return_installed_items(
             ds, installed_items, failed_items, save)

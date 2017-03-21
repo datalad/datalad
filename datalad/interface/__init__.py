@@ -72,6 +72,7 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
