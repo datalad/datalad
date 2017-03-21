@@ -20,10 +20,10 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import jobs_opt
-from datalad.interface.common_opts import git_opts
-from datalad.interface.common_opts import git_clone_opts
-from datalad.interface.common_opts import annex_opts
-from datalad.interface.common_opts import annex_init_opts
+# from datalad.interface.common_opts import git_opts
+# from datalad.interface.common_opts import git_clone_opts
+# from datalad.interface.common_opts import annex_opts
+# from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import reckless_opt
@@ -115,10 +115,10 @@ class Install(Interface):
         if_dirty=if_dirty_opt,
         save=nosave_opt,
         reckless=reckless_opt,
-        git_opts=git_opts,
-        git_clone_opts=git_clone_opts,
-        annex_opts=annex_opts,
-        annex_init_opts=annex_init_opts,
+        # git_opts=git_opts,
+        # git_clone_opts=git_clone_opts,
+        # annex_opts=annex_opts,
+        # annex_init_opts=annex_init_opts,
         jobs=jobs_opt,
     )
 
@@ -135,10 +135,10 @@ class Install(Interface):
             if_dirty='save-before',
             save=True,
             reckless=False,
-            git_opts=None,
-            git_clone_opts=None,
-            annex_opts=None,
-            annex_init_opts=None,
+            # git_opts=None,
+            # git_clone_opts=None,
+            # annex_opts=None,
+            # annex_init_opts=None,
             jobs=None):
 
         # normalize path argument to be equal when called from cmdline and
@@ -161,8 +161,8 @@ class Install(Interface):
             get_data=get_data,
             recursive=recursive,
             recursion_limit=recursion_limit,
-            git_opts=git_opts,
-            annex_opts=annex_opts,
+            # git_opts=git_opts,
+            # annex_opts=annex_opts,
             reckless=reckless,
             jobs=jobs,
         )
@@ -198,8 +198,8 @@ class Install(Interface):
                                     description=description,
                                     if_dirty=if_dirty,
                                     save=save,
-                                    git_clone_opts=git_clone_opts,
-                                    annex_init_opts=annex_init_opts,
+                                    # git_clone_opts=git_clone_opts,
+                                    # annex_init_opts=annex_init_opts,
                                     **common_kwargs
                                 )
                     installed_items += assure_list(result)

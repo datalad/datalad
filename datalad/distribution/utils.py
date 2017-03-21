@@ -119,7 +119,8 @@ def _get_git_url_from_source(source):
     return source
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
+def _install_subds_from_flexible_source(
+        ds, sm_path, sm_url, reckless, description=None):
     """Tries to obtain a given subdataset from several meaningful locations"""
     # compose a list of candidate clone URLs
     clone_urls = _get_flexible_source_candidates_for_submodule(
@@ -142,7 +143,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
         # submodule is brand-new and previously unknown
         ds.repo.add_submodule(sm_path, url=clone_url)
     _fixup_submodule_dotgit_setup(ds, sm_path)
-    _handle_possible_annex_dataset(subds, reckless)
+    _handle_possible_annex_dataset(subds, reckless, description=description)
     return subds
 
 

@@ -238,8 +238,6 @@ class Clone(Interface):
             # TODO generator: yield when `add` is converted
             dataset.add(dest_path, save=True, ds2super=True)
 
-        # TODO make sure `get` does this too
-        # handle description arg
         _handle_possible_annex_dataset(
             destination_dataset,
             reckless,
