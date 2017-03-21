@@ -450,54 +450,25 @@ class Install(Interface):
         else:
             installed_items.append(destination_dataset)
 
-        # we need to decrease the recursion limit, relative to
-        # subdatasets now
-        subds_recursion_limit = max(0, recursion_limit - 1) \
-                                  if isinstance(recursion_limit, int) \
-                                  else recursion_limit
         # Now, recursive calls:
-        if recursive:
+        if recursive or get_data:
             if description:
                 # yoh: why?  especially if we somehow allow for templating them
                 # with e.g. '%s' to catch the subdataset path
                 lgr.warning("Description can't be assigned recursively.")
 
-            subs = destination_dataset.get_subdatasets(
-                # yes, it does make sense to combine no recursion with
-                # recursion_limit: when the latter is 0 we get no subdatasets
-                # reported, otherwise we always get the 1st-level subs
-                recursive=False,
-                recursion_limit=recursion_limit,
-                absolute=False)
-
-            if subs:
-                lgr.debug("Obtaining subdatasets of %s: %s",
-                          destination_dataset,
-                          subs)
-
-                kwargs = common_kwargs.copy()
-                kwargs['recursion_limit'] = subds_recursion_limit
-                rec_installed = Get.__call__(
-                    subs,  # all at once
-                    dataset=destination_dataset,
-                    # TODO expose this
-                    # yoh: exactly!
-                    #annex_get_opts=annex_get_opts,
-                    result_xfm='datasets',
-                    **kwargs
-                )
-                # TODO do we want to filter this so `install` only returns
-                # the datasets?
-                if isinstance(rec_installed, list):
-                    installed_items.extend(rec_installed)
-                else:
-                    installed_items.append(rec_installed)
-
-        if get_data:
-            lgr.debug("Getting data of {0}".format(destination_dataset))
-            kwargs = common_kwargs.copy()
-            kwargs['recursive'] = False
-            destination_dataset.get(curdir, **kwargs)
+            # TODO generator: just yield it all
+            rec_installed = destination_dataset.get(
+                curdir,
+                # TODO expose this
+                # yoh: exactly!
+                #annex_get_opts=annex_get_opts,
+                result_xfm='datasets',
+                **common_kwargs)
+            if isinstance(rec_installed, list):
+                installed_items.extend(rec_installed)
+            else:
+                installed_items.append(rec_installed)
 
         return Install._handle_and_return_installed_items(
             ds, installed_items, failed_items, save)
