@@ -70,11 +70,6 @@ def _install_necessary_subdatasets(ds, path, reckless, refds_path):
     ds: Dataset
     path: str
     reckless: bool
-
-    Returns
-    -------
-    Dataset
-      the last (deepest) subdataset, that was installed
     """
     assert ds.is_installed()
 
@@ -172,28 +167,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 reckless=reckless,
                 refds_path=refds_path):
             yield res
-
-
-def _get(ds, content, refds_path=None, source=None, jobs=None):
-    """Loops through datasets and calls git-annex call where appropriate
-    """
-    # needs to be an annex:
-    found_an_annex = isinstance(ds.repo, AnnexRepo)
-    if not found_an_annex:
-        for r in results_from_paths(
-                content, status='notneeded',
-                message="no dataset annex, content already present: %s",
-                action='get', logger=lgr,
-                refds=refds_path):
-            yield r
-        return
-    for res in ds.repo.get(
-            content,
-            options=['--from=%s' % source] if source else [],
-            jobs=jobs):
-        res = annexjson2result(res, ds, type_='file', logger=lgr,
-                               refds=refds_path)
-        yield res
 
 
 @build_doc
@@ -426,15 +399,28 @@ class Get(Interface):
             # done already
             return
 
-        # hand over to git-annex
+        # hand over to git-annex, get files content,
+        # repo files in git as 'notneeded' to get
         for ds_path in sorted(content_by_ds.keys()):
-            for res in _get(
-                    Dataset(ds_path),
-                    content_by_ds[ds_path],
-                    refds_path=refds_path,
-                    source=source,
+            ds = Dataset(ds_path)
+            content = content_by_ds[ds_path]
+            # needs to be an annex to get content
+            if not isinstance(ds.repo, AnnexRepo):
+                for r in results_from_paths(
+                        content, status='notneeded',
+                        message="no dataset annex, content already present: %s",
+                        action='get', logger=lgr,
+                        refds=refds_path):
+                    yield r
+                continue
+            for res in ds.repo.get(
+                    content,
+                    options=['--from=%s' % source] if source else [],
                     jobs=jobs):
+                res = annexjson2result(res, ds, type_='file', logger=lgr,
+                                       refds=refds_path)
                 yield res
+
 
     # TODO generator
     # RF for new interface
