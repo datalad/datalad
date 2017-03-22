@@ -429,41 +429,63 @@ class AnnexRepo(GitRepo, RepoInterface):
             options.extend(to_options(ignore_submodules='all'))
 
         # BEGIN workaround bug (see self._submodules_dirty_direct_mode)
-        # TODO: To be catched bug ATM results in empty json and zero-exit
-        # We need to get the indication from the log instead an exception:
-        old_log_state = self.cmd_call_wrapper._log_outputs
-        self.cmd_call_wrapper._log_outputs = True
-        with swallow_logs(new_level=logging.ERROR) as cml:
-            # Note, that _run_annex_command_json returns a generator
-            json_list = list(
-                self._run_annex_command_json('status',
-                                             args=options, expect_stderr=False))
-        if submodules and \
-           "fatal: This operation must be run in a work tree" in cml.out and \
-           "failed in submodule" in cml.out:
+        # internal call to 'git status' by 'git annex status' will fail
+        # in submodules without a working tree (direct mode)
+        # How to catch this case depends on annex version, since annex
+        # exits zero until version 6.20170307
 
-            lgr.debug("git-annex-status failed probably due to submodule in "
-                      "direct mode. Trying to workaround.")
-            # try again, ignoring submodules:
-            options = [path] if path else []
-            options.extend(to_options(ignore_submodules='all'))
-            json_list = list(
-                self._run_annex_command_json('status', args=options)
-            )
-            # separately get modified submodules:
-            m_subs = \
-                self._submodules_dirty_direct_mode(untracked=untracked,
-                                                   deleted=deleted,
-                                                   modified=modified,
-                                                   added=added,
-                                                   type_changed=type_changed,
-                                                   path=path)
-            json_list.extend({'file': p, 'status': 'M'} for p in m_subs)
-        elif cml.out:
-            lgr.warning("Unexpected stderr by git-annex-status: %s%s",
-                        linesep, cml.out)
+        def _fake_exception_wrapper(self, options_):
+            """generate a faked `CommandError` from logged stderr output"""
 
-        self.cmd_call_wrapper._log_outputs = old_log_state
+            # this is for use with older annex, which didn't exit non-zero
+            # in case of the failure we are interested in
+
+            old_log_state = self.cmd_call_wrapper._log_outputs
+            self.cmd_call_wrapper._log_outputs = True
+            with swallow_logs(new_level=logging.ERROR) as cml:
+                # Note, that _run_annex_command_json returns a generator
+                json_list = \
+                    list(self._run_annex_command_json(
+                        'status', args=options_, expect_stderr=False))
+            self.cmd_call_wrapper._log_outputs = old_log_state
+            if "fatal:" in cml.out:
+                raise CommandError(cmd="git annex status",
+                                   msg=cml.out, stderr=cml.out)
+            return json_list
+
+        try:
+            if self.git_annex_version < '6.20170307':
+                json_list = _fake_exception_wrapper(self, options_=options)
+            else:
+                json_list = \
+                    list(self._run_annex_command_json(
+                        'status', args=options, expect_stderr=False))
+        except CommandError as e:
+            if submodules and \
+               "fatal: " \
+               "This operation must be run in a work tree" in e.stderr and \
+               "failed in submodule" in e.stderr:
+                lgr.debug("git-annex-status failed probably due to submodule in"
+                          " direct mode. Trying to workaround.")
+                # try again, ignoring submodules:
+                options = [path] if path else []
+                options.extend(to_options(ignore_submodules='all'))
+                json_list = list(
+                    self._run_annex_command_json('status', args=options)
+                )
+                # separately get modified submodules:
+                m_subs = \
+                    self._submodules_dirty_direct_mode(untracked=untracked,
+                                                       deleted=deleted,
+                                                       modified=modified,
+                                                       added=added,
+                                                       type_changed=type_changed,
+                                                       path=path)
+                json_list.extend({'file': p, 'status': 'M'} for p in m_subs)
+            else:
+                # not the known bug we want to catch
+                raise e
+
         # END workaround
 
         key_mapping = [(untracked, 'untracked', '?'),
@@ -1220,7 +1242,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if self.is_direct_mode():
             lgr.debug("'%s' is in direct mode, "
-                      "'annex unlock' not available", ds)
+                      "'annex unlock' not available", self)
             lgr.warning("In direct mode there is no 'unlock'. However if "
                         "the file's content is present, it is kind of "
                         "unlocked. Therefore just checking whether this is "
@@ -1231,8 +1253,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             std_out, std_err = \
                 self._run_annex_command('unlock', annex_options=files + options)
 
-            return [line.split()[1] for line in std_out.splitlines()
-                if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
+            return [line.split()[1]
+                    for line in std_out.splitlines()
+                    if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
 
     def adjust(self, options=None):
         """enter an adjusted branch
