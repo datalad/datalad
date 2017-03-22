@@ -19,6 +19,7 @@ import sys
 import re
 import textwrap
 from os.path import curdir
+import inspect
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -334,7 +335,13 @@ class Interface(object):
                 result_filter = result_filter & tfilt if result_filter else tfilt
             kwargs['result_filter'] = result_filter
         try:
-            return cls.__call__(**kwargs)
+            ret = cls.__call__(**kwargs)
+            if inspect.isgenerator(ret):
+                ret = list(ret)
+            if args.common_output_format == 'tailored' and \
+                    hasattr(cls, 'custom_result_summary_renderer'):
+                cls.custom_result_summary_renderer(ret)
+            return ret
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)

@@ -852,7 +852,7 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('json', 'simple') | EnsureNone()),
+        constraints=EnsureChoice('json', 'simple', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an
@@ -955,6 +955,7 @@ def eval_results(func):
                 p_name,
                 getattr(_func_class, p_name, eval_defaults[p_name]))
             for p_name in eval_params}
+        result_renderer = common_params['result_renderer']
 
         def generator_func(*_args, **_kwargs):
             # obtain results
@@ -963,8 +964,8 @@ def eval_results(func):
             # TODO actually compose a meaningful exception
             incomplete_results = []
             # inspect and render
-            result_renderer = common_params['result_renderer']
             result_filter = common_params['result_filter']
+            result_renderer = common_params['result_renderer']
             result_xfm = common_params['result_xfm']
             if result_xfm in known_result_xfms:
                 result_xfm = known_result_xfms[result_xfm]
@@ -1041,6 +1042,11 @@ def eval_results(func):
                 results = wrapped_(*args_, **kwargs_)
                 if inspect.isgenerator(results):
                     results = list(results)
+                # render summaries
+                if not common_params['result_xfm'] and result_renderer == 'tailored':
+                    # cannot render transformed results
+                    if hasattr(_func_class, 'custom_result_summary_renderer'):
+                        _func_class.custom_result_summary_renderer(results)
                 if common_params['return_type'] == 'item-or-list' and \
                         len(results) == 1:
                     return results[0]

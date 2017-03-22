@@ -25,6 +25,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.results import results_from_paths
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import annexjson2result
+from datalad.interface.results import count_results
 from datalad.interface.common_opts import recursion_flag
 # from datalad.interface.common_opts import git_opts
 # from datalad.interface.common_opts import annex_opts
@@ -427,39 +428,31 @@ class Get(Interface):
                                        refds=refds_path)
                 yield res
 
-
-    # TODO generator
-    # RF for new interface
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_summary_renderer(res):
         from datalad.ui import ui
         from os import linesep
-        if res is None:
-            res = []
-        if not isinstance(res, list):
-            res = [res]
         if not len(res):
             ui.message("Got nothing new")
             return
 
-        # provide summary
-        nsuccess = sum(item.get('success', False) if isinstance(item, dict) else True
-                       for item in res)
-        nfailure = len(res) - nsuccess
-        msg = "Tried to get %d %s." % (
-            len(res), single_or_plural("file", "files", len(res)))
-        if nsuccess:
-            msg += " Got %d. " % nsuccess
+        nfiles = count_results(res, type='file')
+        nsuccess_file = count_results(res, type='file', status='ok')
+        nfailure = nfiles - nsuccess_file
+        msg = "Tried to get %d %s that had no content yet." % (
+            nfiles, single_or_plural("file", "files", nfiles))
+        if nsuccess_file:
+            msg += " Successfully obtained %d. " % nsuccess_file
         if nfailure:
-            msg += " Failed to get %d." % (nfailure,)
+            msg += " %d (failed)." % (nfailure,)
         ui.message(msg)
 
         # if just a few or less than initially explicitly requested
-        if len(res) < 10 or args.verbose:
+        if len(res) < 10:
             msg = linesep.join([
-                "{path} ... {suc}".format(
-                    suc="ok." if isinstance(item, Dataset) or item.get('success', False)
-                        else "failed. (%s)" % item.get('note', 'unknown reason'),
-                    path=item.get('file') if isinstance(item, dict) else item.path)
+                "{path}{type} ... {suc}".format(
+                    suc=item.get('status'),
+                    path=item.get('path'),
+                    type=' [{}]'.format(item['type']) if 'type' in item else '')
                 for item in res])
             ui.message(msg)
