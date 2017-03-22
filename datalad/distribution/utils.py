@@ -137,6 +137,10 @@ def _install_subds_from_flexible_source(
             msg="Failed to install %s from %s (%s)" % (
                 subds, clone_urls, exc_str(e))
             )
+    # ATM above _clone_from_any_source would just return None and not
+    # crash if clone has failed for any reason.  May be it is because that
+    # submodule already was installed and all is good?
+
     # do fancy update
     if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
@@ -144,7 +148,11 @@ def _install_subds_from_flexible_source(
         # TODO: direct mode ramifications?
         # track branch originally cloned
         subrepo = subds.repo
-        branch = subds.repo.get_active_branch()
+        # Here we can endup with subrepo being None and thus None e.g.
+        # if clone above has failed.  yoh has no idea on the assumptions
+        # of _clone_from_any_source (seems to not want to fail), so just let
+        # it fail 'natively' at some point after
+        branch = subrepo.get_active_branch()
         branch_hexsha = subrepo.get_hexsha(branch)
         ds.repo.update_submodule(sm_path, init=True)
         updated_branch = subrepo.get_active_branch()

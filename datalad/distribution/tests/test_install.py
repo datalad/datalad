@@ -683,15 +683,21 @@ def test_install_skip_failed_recursive(src, path):
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
 
-    result = ds.get(os.curdir, recursive=True, on_failure='ignore')
-    # toplevel dataset was in the house already
-    assert_not_in_results(result, path=ds.path)
-    assert_status('error', [result[0]])
-    assert_in_results(result, status='ok', path=sub2.path)
-    assert_in(
-        "destination path '{}' already exists and is not an empty directory".format(
-            sub1.path),
-        result[0]['message'][2])
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        result = ds.get(os.curdir, recursive=True, on_failure='ignore')
+        # toplevel dataset was in the house already
+        assert_not_in_results(result, path=ds.path)
+        assert_status('error', [result[0]])
+        assert_in_results(result, status='ok', path=sub2.path)
+
+        cml.assert_logged(
+            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
+            regex=False, level='WARNING')
+    # this is not in effect that this message is not propagated up
+    # assert_in(
+    #     "destination path '{}' already exists and is not an empty directory".format(
+    #         sub1.path),
+    #     result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',
