@@ -17,8 +17,10 @@ from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import DeprecatedError
 from datalad.tests.utils import ok_, assert_false, assert_true, assert_not_equal
 from datalad.api import save
+from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
@@ -37,21 +39,25 @@ def test_save(path):
     ds.repo.add("new_file.tst", git=True)
     ok_(ds.repo.dirty())
 
-    ds.save("add a new file", all_changes=False)
+    # no all_changes any longer
+    with assert_raises(DeprecatedError):
+        ds.save("add a new file", all_changes=True)
+
+    ds.save("add a new file", all_updated=False)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     with open(opj(path, "new_file.tst"), "w") as f:
         f.write("modify")
 
     ok_(ds.repo.dirty())
-    ds.save("modified new_file.tst", all_changes=True)
+    ds.save("modified new_file.tst", all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # save works without ds and files given in the PWD
     with open(opj(path, "new_file.tst"), "w") as f:
         f.write("rapunzel")
     with chpwd(path):
-        save("love rapunzel", all_changes=True)
+        save("love rapunzel", all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # and also without `-a` when things are staged
@@ -59,7 +65,7 @@ def test_save(path):
         f.write("exotic")
     ds.repo.add("new_file.tst", git=True)
     with chpwd(path):
-        save("love marsians", all_changes=False)
+        save("love marsians", all_updated=False)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
 
@@ -86,7 +92,7 @@ def test_save(path):
     # uncommited .datalad (probably caused within create)
     ok_(ds.repo.dirty())
     # ensure modified subds is committed
-    ds.save(all_changes=True)
+    ds.save(all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
 
@@ -106,7 +112,7 @@ def test_recursive_save(path):
     with open(newfile_name, 'w') as f:
         f.write('some')
     # saves the status change of the subdataset due to the subsubdataset addition
-    assert_equal(ds.save(all_changes=True), [ds])
+    assert_equal(ds.save(all_updated=True), [ds])
 
     # make the new file known to its dataset
     # with #1141 this would be
@@ -116,10 +122,10 @@ def test_recursive_save(path):
     # but remains dirty because of the untracked file down below
     assert ds.repo.dirty()
     # auto-add will save nothing deep down without recursive
-    assert_equal(ds.save(all_changes=True), [])
+    assert_equal(ds.save(all_updated=True), [])
     assert ds.repo.dirty()
     # with recursive pick up the change in subsubds
-    assert_equal(ds.save(all_changes=True, recursive=True), [subsubds, subds, ds])
+    assert_equal(ds.save(all_updated=True, recursive=True), [subsubds, subds, ds])
     # modify content in subsub and try saving
     testfname = newfile_name
     subsubds.unlock(testfname)
@@ -129,19 +135,19 @@ def test_recursive_save(path):
     # no auto_add
     assert_false(ds.save())
     # no recursive
-    assert_false(ds.save(all_changes=True))
+    assert_false(ds.save(all_updated=True))
     # an explicit target saves only the corresponding dataset
     assert_equal(save(files=[testfname]), [subsubds])
     # plain recursive without any files given will save the beast
     assert_equal(ds.save(recursive=True), [subds, ds])
     # there is nothing else to save
-    assert_false(ds.save(all_changes=True, recursive=True))
+    assert_false(ds.save(all_updated=True, recursive=True))
     # one more time and check that all datasets in the hierarchy get updated
     states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     testfname = opj('sub', 'subsub', 'saveme2')
     with open(opj(ds.path, testfname), 'w') as f:
         f.write('I am in here!')
-    assert_true(ds.save(all_changes=True, recursive=True))
+    assert_true(ds.save(all_updated=True, recursive=True))
     newstates = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     for old, new in zip(states, newstates):
         assert_not_equal(old, new)
@@ -161,7 +167,7 @@ def test_recursive_save(path):
     ok_clean_git(subds.repo, untracked=['testnew'],
                  index_modified=['subsub'], head_modified=['testadded'])
     subsubds.save(message="savingtestmessage", super_datasets=True,
-                  all_changes=True)
+                  all_updated=True)
     ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
     # not the file we created

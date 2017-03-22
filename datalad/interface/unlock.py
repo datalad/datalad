@@ -97,7 +97,7 @@ class Unlock(Interface):
 
             files = content_by_ds[ds_path]
 
-            unlocked = ds.repo.unlock(files)
+            unlocked.extend(ds.repo.unlock(files))
             # Note for merging with PR #1350:
             # Replace the list comprehension
             # [line.split()[1] for line in std_out.splitlines() if line.strip().endswith('ok')]

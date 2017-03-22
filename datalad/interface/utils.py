@@ -33,12 +33,15 @@ from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import swallow_logs
+from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.utils import _install_subds_inplace
 from datalad.distribution.utils import get_git_dir
+from datalad.dochelpers import exc_str
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -82,7 +85,7 @@ def handle_dirty_dataset(ds, mode, msg=None):
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
         from datalad.interface.save import Save
-        Save.__call__(dataset=ds, message=msg, all_changes=True)
+        Save.__call__(dataset=ds, message=msg, all_updated=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
@@ -414,7 +417,7 @@ def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
 
 
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
-                         out=None, dir_lookup=None):
+                         out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.
 
     Any paths that are not part of a dataset, or presently unavailable are
@@ -432,9 +435,12 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     out : dict or None
       By default a new output dictionary is created, however an existing one
       can be provided via this argument to enable incremental processing.
-    dir_lookup : dict or None
+    dir_lookup : dict or None, optional
       Optional lookup cache that maps paths to previously determined datasets.
       This can speed up repeated processing.
+    sub_paths : bool, optional
+      Provide a list containing the sub-dataset path, as the entry for that
+      sub-dataset.  If False, empty list is assigned
 
     Returns
     -------
@@ -495,12 +501,11 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                     subdspath = opj(dspath, sub)
                     if subdspath.startswith(_with_sep(path)):
                         # this subdatasets is underneath the search path
-                        # we want it all
                         # be careful to not overwrite anything, in case
                         # this subdataset has been processed before
                         out[subdspath] = out.get(
                             subdspath,
-                            [subdspath])
+                            [subdspath] if sub_paths else [])
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 
@@ -706,7 +711,29 @@ def filter_unmodified(content_by_ds, refds, since):
     # we cannot really limit the diff paths easily because we might get
     # or miss content (e.g. subdatasets) if we don't figure out which ones
     # are known -- and we don't want that
-    diff = repo.commit().diff(since)
+    try:
+        diff = repo.commit().diff(since)
+    except GitCommandError as exc:
+        # could fail because `since` points to non existing location.
+        # Unfortunately there might be no meaningful message
+        # e.g. "fatal: ambiguous argument 'HEAD^': unknown revision or path not in the working tree"
+        # logged within this GitCommandError for some reason! So let's check
+        # that value of since post-error for being correct:
+        try:
+            refds.repo._git_custom_command(
+                [],
+                ['git', 'show', '--stat', since, '--'],
+                expect_stderr=True, expect_fail=True)
+            raise  # re-raise since our idea was incorrect
+        except CommandError as ce_exc:
+            if ce_exc.stderr.startswith('fatal: bad revision'):
+                raise ValueError(
+                    "Value since=%r is not valid. Git reports: %s" %
+                    (since, exc_str(ce_exc))
+                )
+            else:
+                raise  # re-raise
+
     # get all modified paths (with original? commit) that are still
     # present
     modified = dict((opj(refds_path, d.b_path),

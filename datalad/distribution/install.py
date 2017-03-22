@@ -575,7 +575,7 @@ def _save_installed_datasets(ds, installed_datasets):
         ds.save(
             files=paths + ['.gitmodules'],
             message='[DATALAD] ' + msg,
-            all_changes=False,
+            all_updated=False,
             recursive=False)
     except FileNotInRepositoryError:
         # install doesn't add; therefore save call might included

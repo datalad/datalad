@@ -312,6 +312,14 @@ class Runner(object):
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
         errstream = subprocess.PIPE if log_stderr else sys.stderr
 
+        # TODO: if outputstream is sys.stdout and that one is set to StringIO
+        #       we have to "shim" it with something providing fileno().
+        # This happens when we do not swallow outputs, while allowing nosetest's
+        # StringIO to be provided as stdout, crashing the Popen requiring
+        # fileno().  In out swallow_outputs, we just use temporary files
+        # to overcome this problem.
+        # For now necessary test code should be wrapped into swallow_outputs cm
+        # to avoid the problem
         self.log("Running: %s\ncwd: %s" % (cmd, cwd or self.cwd))
 
         if self.protocol.do_execute_ext_commands:
