@@ -61,7 +61,7 @@ def test_crawl_api_chdir(run_pipeline_, load_pipeline_from_config_, chpwd_):
            [], [], [], [], Exception("crawling failed")
        ]
 )
-@patch('datalad.distribution.dataset.Dataset.get_subdatasets',  # return_value=['path1', 'path2'])
+@patch('datalad.distribution.dataset.Dataset.subdatasets',  # return_value=['path1', 'path2'])
     side_effect=[
         ['path1', 'path1/path1_1', 'path2', 'path_to_fail'],
         # ATM we will not recursively crawl within sub-datasets
