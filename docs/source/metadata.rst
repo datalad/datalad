@@ -1,3 +1,5 @@
+.. _chap_metadata:
+
 Meta data
 *********
 
