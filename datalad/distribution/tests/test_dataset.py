@@ -80,23 +80,6 @@ def test_resolve_path(somedir):
 
 # TODO: test remember/recall more extensive?
 
-@with_testrepos(flavors=['local', 'local-url'])
-@with_tempfile(mkdir=True)
-def test_register_sibling(remote, path):
-    AnnexRepo(path)
-    ds = Dataset(path)
-    ds.register_sibling('my_sibling', remote)
-    assert_in('my_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_sibling'), remote)
-
-    ds.register_sibling('my_other_sibling', remote,
-                        publish_url='http://fake.pushurl.com')
-    assert_in('my_other_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_other_sibling'), remote)
-    # TODO: GitRepo method for push-url!
-
-    # TODO: Validation!
-
 
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_subdatasets(path):

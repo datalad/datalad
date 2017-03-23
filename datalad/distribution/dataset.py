@@ -44,7 +44,6 @@ from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
-from datalad.utils import knows_annex
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -239,45 +238,6 @@ class Dataset(object):
                 self._cfg = self.repo.config
         return self._cfg
 
-    def register_sibling(self, name, url, publish_url=None, verify=None):
-        """Register the location of a sibling dataset under a given name.
-
-        Optionally, different URLs can be given for retrieving information from
-        the sibling and for publishing information to it.
-        This is a cheap operation that does not confirm that at the given
-        location an actual sibling dataset is available, unless verify is set.
-        The value "dataset" verifies, that at the given URL an accessible
-        dataset is available and the value "sibling" furthermore verifies, that
-        this dataset shares at least one commit with self.
-
-        Parameters
-        ----------
-        name
-        url
-        publish_url
-        verify
-          None | "dataset" | "sibling"
-        """
-        repo = self.repo
-
-        if verify is not None:
-            raise NotImplementedError("TODO: verify not implemented yet")
-
-        if name not in repo.get_remotes():
-            # Add remote
-            repo.add_remote(name, url)
-            if publish_url is not None:
-                # set push url:
-                repo._git_custom_command('', ["git", "remote",
-                                              "set-url",
-                                              "--push", name,
-                                              publish_url])
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-                     (name, url, publish_url if publish_url else url))
-        else:
-            lgr.warning("Remote '%s' already exists. Ignore.")
-            raise ValueError("'%s' already exists. Couldn't register sibling.")
-
     # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
     # weakref
     # singleton
@@ -371,25 +331,6 @@ class Dataset(object):
                 return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
-
-#    def get_file_handles(self, pattern=None, fulfilled=None):
-#        """Get paths to all known file_handles, optionally matching a specific
-#        name pattern.
-#
-#        If fulfilled is True, only paths to fullfiled handles are returned,
-#        if False, only paths to unfulfilled handles are returned.
-#
-#        Parameters
-#        ----------
-#        pattern: str
-#        fulfilled: bool
-#
-#        Returns
-#        -------
-#        list of str
-#          (paths)
-#        """
-#        raise NotImplementedError("TODO")
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
