@@ -259,7 +259,7 @@ datalad add-sibling -s alice "$ALICES_HOME/bobs_analysis"
 # here changes with his own.
 #%
 
-datalad update alice --merge
+datalad update -s alice --merge
 
 #%
 # He can, once again, use the ``get`` command to obtain the latest version

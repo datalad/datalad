@@ -19,5 +19,6 @@ export DATALAD_TESTS_RUNCMDLINE=1
 export PS4=+
 grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null \
 | while read t; do
-    bash "$t"
+    echo "RUNNING $t"
+    bash -x "$t"
 done
