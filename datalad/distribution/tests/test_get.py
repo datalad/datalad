@@ -277,7 +277,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ds.get(['subm 1', 'subm 2'])
 
     # We got all content in the subdatasets
-    subds1, subds2 = [Dataset(d) for d in ds.get_subdatasets(absolute=True)]
+    subds1, subds2 = ds.subdatasets(result_xfm='datasets')
     ok_(ds.repo.file_has_content('test-annex.dat') is False)
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
@@ -289,7 +289,7 @@ def test_get_install_missing_subdataset(src, path):
 
     ds = install(path=path, source=src)
     ds.create(force=True)  # force, to cause dataset initialization
-    subs = [Dataset(s_path) for s_path in ds.get_subdatasets(absolute=True)]
+    subs = ds.subdatasets(result_xfm='datasets')
     ok_(all([not sub.is_installed() for sub in subs]))
 
     # we don't install anything, if no explicitly given path points into a
@@ -362,10 +362,10 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     origin.save(recursive=True, all_updated=True)
 
     ds = install(path, source=src)
-    eq_(len(ds.get_subdatasets(fulfilled=True)), 0)
+    eq_(len(ds.subdatasets(fulfilled=True)), 0)
 
     results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
-    eq_(len(ds.get_subdatasets(fulfilled=True, recursive=True)), 2)
+    eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)

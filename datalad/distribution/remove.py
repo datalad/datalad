@@ -126,8 +126,8 @@ class Remove(Interface):
             if not toppath:
                 nonexistent_paths.append(p)
                 continue
-            if p in Dataset(toppath).get_subdatasets(
-                    recursive=False, absolute=True):
+            if p in Dataset(toppath).subdatasets(
+                    recursive=False, result_xfm='paths'):
                 # this is a known subdataset that needs to be removed
                 pl = content_by_ds.get(p, [])
                 pl.append(p)

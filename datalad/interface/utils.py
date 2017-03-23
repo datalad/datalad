@@ -208,17 +208,18 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
     # Delay expensive operation
     subds_graph = None
     # so we first get immediate children, delaying even check for being fulfilled
-    subdss = subds.get_subdatasets(absolute=True, recursive=False, fulfilled=None)
+    subdss = subds.subdatasets(recursive=False, fulfilled=None, result_xfm='paths')
     if not subdss:
         # no subdatasets, nothing to sort
         return
     for t in target_subs:
-        if t in subdss and Dataset(t).is_installed():  # yoh guesses is_installed is as good or better than fulfilled
+        if t in subdss and GitRepo.is_valid_repo(t):  # fastest possible test for "installed?"
             # immediate known kiddo
             continue
         if subds_graph is None:
-            subds_graph = subds.get_subdatasets(
-                absolute=True, recursive=True, edges=True, fulfilled=True)
+            subds_graph = [(r['parentpath'], r['path'])
+                           for r in Dataset(superds_path).subdatasets(
+                           recursive=True, fulfilled=True)]
 
         trace = get_trace(
             subds_graph,
@@ -503,7 +504,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     recursive : bool
       Flag whether to report subdatasets under any of the given paths
     recursion_limit :
-      Depth constraint for recursion. See `Dataset.get_subdatasets()` for more
+      Depth constraint for recursion. See `subdatasets()` for more
       information.
     out : dict or None
       By default a new output dictionary is created, however an existing one
@@ -567,11 +568,11 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                 # make sure we get everything relevant in all _checked out_
                 # subdatasets, obtaining of previously unavailable subdataset
                 # else done elsewhere
-                subs = ds.get_subdatasets(fulfilled=True,
-                                          recursive=recursive,
-                                          recursion_limit=recursion_limit)
-                for sub in subs:
-                    subdspath = opj(dspath, sub)
+                for subdspath in ds.subdatasets(
+                        fulfilled=True,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        result_xfm='paths'):
                     if subdspath.startswith(_with_sep(path)):
                         # this subdatasets is underneath the search path
                         # be careful to not overwrite anything, in case

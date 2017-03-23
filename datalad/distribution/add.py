@@ -211,10 +211,10 @@ class Add(Interface):
             for subds_path in [d for d in toadd
                                if GitRepo.is_valid_repo(d) and
                                d != ds_path and
-                               d not in ds.get_subdatasets(
+                               d not in ds.subdatasets(
                                    recursive=False,
-                                   absolute=True,
-                                   fulfilled=True)]:
+                                   fulfilled=True,
+                                   result_xfm='paths')]:
                 # TODO add check that the subds has a commit, and refuse
                 # to operate on it otherwise, or we would get a bastard
                 # submodule that cripples git operations

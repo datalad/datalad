@@ -156,7 +156,7 @@ class Ls(Interface):
                             subdatasets = Ls._cached_subdatasets[superds.path]
                         except KeyError:
                             subdatasets = Ls._cached_subdatasets[superds.path] \
-                                = superds.get_subdatasets()
+                                = superds.subdatasets(result_xfm='relpaths')
                         if relpath(ds.path, superds.path) in subdatasets:
                             loc_type = "not installed"
             else:
@@ -441,7 +441,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_subdatasets(recursive=recursive)]
+         for sm in topds.subdatasets(recursive=recursive, result_xfm='relpaths')]
         if recursive else [])
 
     dsms = []
@@ -726,23 +726,21 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
     # (recursively) traverse each subdataset
     children = []
-    for subds_path in rootds.get_subdatasets():
+    for subds in rootds.subdatasets(result_xfm='datasets'):
 
-        subds_path = opj(rootds.path, subds_path)
-        subds = Dataset(subds_path)
-        subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+        subds_json = metadata_locator(path=subds.path, ds_path=subds.path)
 
         def handle_not_installed():
             # for now just traverse as fs
             lgr.warning("%s is either not installed or lacks meta-data", subds)
-            subfs = fs_extract(subds_path, rootds)
+            subfs = fs_extract(subds.path, rootds)
             # but add a custom type that it is a not installed subds
             subfs['type'] = 'uninitialized'
             # we need to kick it out from 'children'
             # TODO:  this is inefficient and cruel -- "ignored" should be made
             # smarted to ignore submodules for the repo
             if fs['nodes']:
-                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_path]
+                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds.path]
             return subfs
 
         if not subds.is_installed():
@@ -757,7 +755,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
             size_list.append(subfs['size'])
         # else just pick the data from metadata_file of each subdataset
         else:
-            lgr.info(subds_path)
+            lgr.info(subds.path)
             if exists(subds_json):
                 with open(subds_json) as data_file:
                     subfs = js.load(data_file)

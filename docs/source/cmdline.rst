@@ -70,3 +70,4 @@ Plumbing commands
    generated/man/datalad-clone
    generated/man/datalad-create-test-dataset
    generated/man/datalad-sshrun
+   generated/man/datalad-subdatasets

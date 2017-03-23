@@ -48,7 +48,7 @@ def _uninstall_dataset(ds, check, has_super):
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
     # TODO check that the relevant branched are pushed to a remote
-    if ds.get_subdatasets(fulfilled=True):
+    if ds.subdatasets(fulfilled=True):
         yield get_status_dict(
             status='error',
             ds=ds,

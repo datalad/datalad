@@ -142,7 +142,7 @@ def _install_subds_from_flexible_source(
     # submodule already was installed and all is good?
 
     # do fancy update
-    if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
+    if sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         # TODO: move all of that into update_submodule ??
         # TODO: direct mode ramifications?
