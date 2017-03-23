@@ -303,6 +303,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             c = ssh_manager.get_connection(url)
             ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
             # options to add:
+            # Note: must use -S to overload -S provided by annex itself
+            # if we provide -o ControlPath=... it is not in effect
+            # Note: ctrl_path must not contain spaces, since it seems to be
+            # impossible to anyhow guard them here
+            # http://git-annex.branchable.com/bugs/cannot___40__or_how__63____41___to_pass_socket_path_with_a_space_in_its_path_via_annex-ssh-options/
             cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
             # read user-defined options from .git/config:
             cfg_string_old = self.config.get(ssh_cfg_var, None)

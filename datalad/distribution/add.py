@@ -117,7 +117,8 @@ class Add(Interface):
             doc="""flag whether to add data directly to Git, instead of
             tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport"""),
+            transport. If not specified - it will be up to git-annex to
+            decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         ds2super=Parameter(
@@ -142,7 +143,7 @@ class Add(Interface):
     def __call__(
             path=None,
             dataset=None,
-            to_git=False,
+            to_git=None,
             save=True,
             message=None,
             recursive=False,
@@ -228,6 +229,8 @@ class Add(Interface):
                     'success': True,
                     'file': Dataset(subds_path)})
             # make sure any last minute additions make it to the saving stage
+            # XXX? should content_by_ds become OrderedDict so that possible
+            # super here gets processed last?
             content_by_ds[ds_path] = toadd
             added = ds.repo.add(
                 toadd,
@@ -241,6 +244,7 @@ class Add(Interface):
             # TODO GENERATOR
             # new returns a generator and yields status dicts
             # pass through as embedded results
+            # OPT: tries to save even unrelated stuff
             list(save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,

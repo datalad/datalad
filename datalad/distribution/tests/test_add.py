@@ -20,6 +20,7 @@ from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -265,3 +266,24 @@ def test_add_subdataset(path):
     # to ds
     ds.add(subds.path)
     assert_in('dir', ds.get_subdatasets())
+
+
+@with_tree(tree={
+    'file.txt': 'some text',
+    'empty': '',
+    '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
+)
+def test_add_mimetypes(path):
+    # XXX apparently there is symlinks dereferencing going on while deducing repo
+    #    type there!!!! so can't use following invocation  -- TODO separately
+    import os
+    path = os.path.realpath(path)  # yoh gives up for now
+    ds = Dataset(path).create(force=True)
+    ds.repo.add('.gitattributes')
+    ds.repo.commit('added attributes to git explicitly')
+    # now test that those files will go into git/annex correspondingly
+    __not_tested__ = ds.add(['file.txt', 'empty'])
+    ok_clean_git(path)
+    # Empty one considered to be  application/octet-stream  i.e. non-text
+    ok_file_under_git(path, 'empty', annexed=True)
+    ok_file_under_git(path, 'file.txt', annexed=False)

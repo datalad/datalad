@@ -2,6 +2,7 @@
 
 set -e
 
+OLD_PWD=$PWD
 # BOILERPLATE
 
 BOBS_HOME=$(readlink -f "$(mktemp --tmpdir -d datalad_demo_bob.XXXX)")
@@ -299,4 +300,5 @@ testEquality() {
   assertEquals 1 1
 }
 
+cd "$OLD_PWD"
 [ -n "$DATALAD_TESTS_RUNCMDLINE" ] && . shunit2 || true

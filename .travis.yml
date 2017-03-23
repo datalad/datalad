@@ -93,9 +93,15 @@ matrix:
     - TMPDIR="/tmp/d i r"
     - _DATALAD_NONPR_ONLY=1
   - python: 2.7
-    # Test under NFS mount
+    # Test under NFS mount  (only selected sub-set)
     env:
     - TMPDIR="/tmp/nfsmount"
+    - TESTS_TO_PERFORM="datalad/tests datalad/support"
+  - python: 2.7
+    # Test under NFS mount  (full, only in master)
+    env:
+    - TMPDIR="/tmp/nfsmount"
+    - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # test modules that should not fail in direct mode now:
     env:
@@ -156,8 +162,8 @@ script:
   - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
   # Run javascript tests
   - grunt test --verbose
-  # do not run them with custom TMPDIR with spaces for now : https://github.com/datalad/datalad/issues/893
-  - if [[ ${TMPDIR:-} =~ ".* .*" ]]; then tools/testing/run_doc_examples; else echo "not running since has spaces"; fi
+  # Run doc examples if no spaces in the TMPDIR
+  - if echo "${TMPDIR:-}" | grep -q ' '; then echo "skipping due spaces in $TMPDIR"; else tools/testing/run_doc_examples; fi
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*
