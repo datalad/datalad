@@ -14,6 +14,8 @@ from datalad.dochelpers import exc_str
 import re
 import os
 from os.path import join as opj, exists
+from os.path import getmtime
+from os.path import abspath
 
 cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
@@ -39,19 +41,24 @@ def _where_reload(obj):
     return obj
 
 
-def _parse_gitconfig_dump(dump, store, replace):
+def _parse_gitconfig_dump(dump, store, fileset, replace):
     if replace:
         # if we want to replace existing values in the store
         # collect into a new dict and `update` the store at the
         # end. This way we get the desired behavior of multi-value
         # keys, but only for the current source
         dct = {}
+        fileset = set()
     else:
         # if we don't want to replace value, perform the multi-value
         # preserving addition on the existing store right away
         dct = store
     for line in dump.split('\0'):
         if not line:
+            continue
+        if line.startswith('file:'):
+            # origin line
+            fileset.add(abspath(line[5:]))
             continue
         k, v = cfg_kv_regex.match(line).groups()
         present_v = dct.get(k, None)
@@ -64,7 +71,7 @@ def _parse_gitconfig_dump(dump, store, replace):
                 dct[k] = (present_v, v)
     if replace:
         store.update(dct)
-    return store
+    return store, fileset
 
 
 def _parse_env(store):
@@ -143,10 +150,14 @@ class ConfigManager(object):
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
+        self._cfgfiles = set()
+        self._cfgmtimes = None
         # public dict to store variables that always override any setting
         # read from a file
         self.overrides = {} if overrides is None else overrides
         self._dataset_path = dataset.path if dataset else None
+        self._dataset_cfgfname = opj(self._dataset_path, '.datalad', 'config') \
+            if self._dataset_path else None
         self._dataset_only = dataset_only
         # Since configs could contain sensitive information, to prevent
         # any "facilitated" leakage -- just disable logging of outputs for
@@ -157,10 +168,28 @@ class ConfigManager(object):
             # to pick up the right config files
             run_kwargs['cwd'] = dataset.path
         self._runner = Runner(**run_kwargs)
-        self.reload()
+        self.reload(force=True)
 
-    def reload(self):
-        """Reload all configuration items from the configured sources"""
+    def reload(self, force=False):
+        """Reload all configuration items from the configured sources
+
+        If `force` is False, all files configuration was previously read from
+        are checked for differences in the modification times. If no difference
+        is found for any file no reload is performed. This mechanism will not
+        detect newly created global configuration files, use `force` in this case.
+        """
+        if not force and self._cfgmtimes:
+            # we aren't forcing and we have read files before
+            # check if any file we read from has changed
+            curmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
+            if all(curmtimes[c] == self._cfgmtimes.get(c) for c in curmtimes):
+                # all the same, nothing to do, except for
+                # superimpose overrides, could have changed in the meantime
+                self._store.update(self.overrides)
+                # reread env, is quick
+                self._store = _parse_env(self._store)
+                return
+
         self._store = {}
         # 2-step strategy:
         #   - load datalad dataset config from dataset
@@ -168,25 +197,28 @@ class ConfigManager(object):
         # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
-        if self._dataset_path:
-            # now any dataset config
-            dscfg_fname = opj(self._dataset_path, '.datalad', 'config')
-            if exists(dscfg_fname):
-                stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
+        if self._dataset_cfgfname:
+            if exists(self._dataset_cfgfname):
+                stdout, stderr = self._run(['-z', '-l', '--show-origin', '--file', self._dataset_cfgfname],
                                            log_stderr=True)
                 # overwrite existing value, do not amend to get multi-line
                 # values
-                self._store = _parse_gitconfig_dump(
-                    stdout, self._store, replace=False)
+                self._store, self._cfgfiles = _parse_gitconfig_dump(
+                    stdout, self._store, self._cfgfiles, replace=False)
 
         if self._dataset_only:
             # superimpose overrides
             self._store.update(self.overrides)
             return
 
-        stdout, stderr = self._run(['-z', '-l'], log_stderr=True)
-        self._store = _parse_gitconfig_dump(
-            stdout, self._store, replace=True)
+        stdout, stderr = self._run(['-z', '-l', '--show-origin'], log_stderr=True)
+        self._store, self._cfgfiles = _parse_gitconfig_dump(
+            stdout, self._store, self._cfgfiles, replace=True)
+
+        # always monitor the dataset cfg location, we know where it is in all cases
+        if self._dataset_cfgfname:
+            self._cfgfiles.add(self._dataset_cfgfname)
+        self._cfgmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
 
         # superimpose overrides
         self._store.update(self.overrides)
@@ -459,18 +491,17 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._dataset_path:
+            if not self._dataset_cfgfname:
                 raise ValueError(
                     'ConfigManager cannot store to configuration to dataset, none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
             dscfg_dirname = opj(self._dataset_path, '.datalad')
-            dscfg_fname = opj(dscfg_dirname, 'config')
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
-            if not exists(dscfg_fname):
-                open(dscfg_fname, 'w').close()
-            args.extend(['--file', opj(self._dataset_path, '.datalad', 'config')])
+            if not exists(self._dataset_cfgfname):
+                open(self._dataset_cfgfname, 'w').close()
+            args.extend(['--file', self._dataset_cfgfname])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':
