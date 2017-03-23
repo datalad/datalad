@@ -15,9 +15,15 @@ topdir=$(dirname `which $0 | xargs readlink -f `)/../..
 
 cd $topdir
 
+exitcode=0
+
 export DATALAD_TESTS_RUNCMDLINE=1
 export PS4=+
-grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null \
-| while read t; do
-    bash "$t"
+# no more sed but kept for future needs
+# set -o pipefail   # so that | sed   doesn't mask failures of $t
+for t in `grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null`; do
+    echo -e "\n\nI: running $t"
+    bash "$t" && status=ok || { exitcode=$?; status=failed; }
+    echo "I: done running $t: $status"
 done
+exit $exitcode
