@@ -74,7 +74,7 @@ def _parse_git_submodules(dspath):
     # as they also pull in all of GitPython's magic
     stdout, stderr = GitRunner(cwd=dspath).run(
         # this will not work in direct mode, need better way #1422
-        ['git', 'submodule'],
+        ['git', '--work-tree=.', 'submodule'],
         log_stderr=False,
         log_stdout=True,
         log_online=False,
