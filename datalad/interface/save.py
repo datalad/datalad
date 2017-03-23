@@ -162,6 +162,8 @@ class Save(Interface):
         if all_updated:
             # and we do this by replacing any given paths with the respective
             # datasets' base path
+            # XXX this implies no "boundary" possibly imposed by specified paths!
+            #  see our use-case spreadsheet -- TODO
             for ds in content_by_ds:
                 content_by_ds[ds] = [ds]
 

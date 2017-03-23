@@ -69,10 +69,12 @@ def test_dirty(path):
     ds.create()
     orig_state = ds.repo.get_hexsha()
     _check_all_clean(ds, orig_state)
-    # tainted: untracked
-    with open(opj(ds.path, 'something'), 'w') as f:
+    # tainted: untracked -- no automagic save
+    somefile = opj(ds.path, 'something')
+    with open(somefile, 'w') as f:
         f.write('some')
-    orig_state = _check_auto_save(ds, orig_state)
+    assert_raises(AssertionError, _check_auto_save, ds, orig_state)
+    os.unlink(somefile)
     # tainted: staged
     with open(opj(ds.path, 'staged'), 'w') as f:
         f.write('some')
