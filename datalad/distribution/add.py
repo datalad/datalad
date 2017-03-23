@@ -117,7 +117,8 @@ class Add(Interface):
             doc="""flag whether to add data directly to Git, instead of
             tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport"""),
+            transport. If not specified - it will be up to git-annex to
+            decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         ds2super=Parameter(
@@ -142,7 +143,7 @@ class Add(Interface):
     def __call__(
             path=None,
             dataset=None,
-            to_git=False,
+            to_git=None,
             save=True,
             message=None,
             recursive=False,

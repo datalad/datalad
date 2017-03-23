@@ -12,13 +12,23 @@ for more details ATM.
 
 ## 0.5.1 (??? ??, 2017) -- will be better than ever
 
+
 ???
+
+
 
 ### Fixes
 
-???
+- [add] was forcing addition of files to annex regardless of settings
+  in `.gitattributes`.  Now that decision is left to annex by default
+
+
+  ???
+
 
 ### Enhancements and new features
+
+
 
 ???
 
