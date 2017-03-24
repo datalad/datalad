@@ -197,7 +197,7 @@ class Runner(object):
                 line = proc.stdout.readline()
                 if line and callable(log_stdout_):
                     # Let it be processed
-                    line = log_stdout_(line)
+                    line = log_stdout_(line.decode())
                 if line:
                     stdout += line
                     self._log_out(line.decode())
