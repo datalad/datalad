@@ -9,8 +9,10 @@
 """
 """
 
-from datalad.cmd import Runner
+from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
+from distutils.version import LooseVersion
+
 import re
 import os
 from os.path import join as opj, exists
@@ -33,6 +35,13 @@ _where_reload_doc = """
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
           modifications slightly more efficient.""".lstrip()
+
+
+# we cannot import external_versions here, as the cfg comes before anything
+# and we would have circular imports
+def get_git_version(runner):
+    """Return version of available git"""
+    return runner.run('git version'.split())[0].split()[2]
 
 
 def _where_reload(obj):
@@ -173,7 +182,15 @@ class ConfigManager(object):
             # make sure we run the git config calls in the dataset
             # to pick up the right config files
             run_kwargs['cwd'] = dataset.path
-        self._runner = Runner(**run_kwargs)
+        self._runner = GitRunner(**run_kwargs)
+        try:
+            self._gitconfig_has_showorgin = \
+                LooseVersion(get_git_version(self._runner)) >= '2.8.0'
+        except:
+            # no git something else broken, assume git is present anyway
+            # to not delay this, but assume it is old
+            self._gitconfig_has_showorgin = False
+
         self.reload(force=True)
 
     def reload(self, force=False):
@@ -203,9 +220,13 @@ class ConfigManager(object):
         # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
+        run_args = ['-z', '-l']
+        if self._gitconfig_has_showorgin:
+            run_args.append('--show-origin')
+
         if self._dataset_cfgfname:
             if exists(self._dataset_cfgfname):
-                stdout, stderr = self._run(['-z', '-l', '--show-origin', '--file', self._dataset_cfgfname],
+                stdout, stderr = self._run(run_args + ['--file', self._dataset_cfgfname],
                                            log_stderr=True)
                 # overwrite existing value, do not amend to get multi-line
                 # values
@@ -217,7 +238,7 @@ class ConfigManager(object):
             self._store.update(self.overrides)
             return
 
-        stdout, stderr = self._run(['-z', '-l', '--show-origin'], log_stderr=True)
+        stdout, stderr = self._run(run_args, log_stderr=True)
         self._store, self._cfgfiles = _parse_gitconfig_dump(
             stdout, self._store, self._cfgfiles, replace=True)
 
