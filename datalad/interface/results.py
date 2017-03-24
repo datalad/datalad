@@ -108,9 +108,14 @@ known_result_xfms = {
 def annexjson2result(d, ds, **kwargs):
     res = get_status_dict(**kwargs)
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
-    res['path'] = opj(ds.path, d['file'])
-    res['action'] = d['command']
-    res['annexkey'] = d['key']
+    # we cannot rely on any of these to be available as the feed from
+    # git annex (or its wrapper) is not always homogeneous
+    if 'file' in d:
+        res['path'] = opj(ds.path, d['file'])
+    if 'action' in d:
+        res['action'] = d['command']
+    if 'annexkey' in d:
+        res['annexkey'] = d['key']
     return res
 
 
