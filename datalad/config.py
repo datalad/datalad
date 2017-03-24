@@ -155,9 +155,15 @@ class ConfigManager(object):
         # public dict to store variables that always override any setting
         # read from a file
         self.overrides = {} if overrides is None else overrides
-        self._dataset_path = dataset.path if dataset else None
-        self._dataset_cfgfname = opj(self._dataset_path, '.datalad', 'config') \
-            if self._dataset_path else None
+        if dataset is None:
+            self._dataset_path = None
+            self._dataset_cfgfname = None
+            self._repo_cfgfname = None
+        else:
+            self._dataset_path = dataset.path
+            self._dataset_cfgfname = opj(self._dataset_path, '.datalad', 'config')
+            if not dataset_only:
+                self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
         self._dataset_only = dataset_only
         # Since configs could contain sensitive information, to prevent
         # any "facilitated" leakage -- just disable logging of outputs for
@@ -218,6 +224,7 @@ class ConfigManager(object):
         # always monitor the dataset cfg location, we know where it is in all cases
         if self._dataset_cfgfname:
             self._cfgfiles.add(self._dataset_cfgfname)
+            self._cfgfiles.add(self._repo_cfgfname)
         self._cfgmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
 
         # superimpose overrides
