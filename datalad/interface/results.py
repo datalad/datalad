@@ -112,7 +112,7 @@ def annexjson2result(d, ds, **kwargs):
     # git annex (or its wrapper) is not always homogeneous
     if 'file' in d:
         res['path'] = opj(ds.path, d['file'])
-    if 'action' in d:
+    if 'command' in d:
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
