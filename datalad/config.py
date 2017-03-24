@@ -69,6 +69,9 @@ def _parse_gitconfig_dump(dump, store, fileset, replace):
             # origin line
             fileset.add(abspath(line[5:]))
             continue
+        if line.startswith('command line:'):
+            # nothing we could handle
+            continue
         k, v = cfg_kv_regex.match(line).groups()
         present_v = dct.get(k, None)
         if present_v is None:
