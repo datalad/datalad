@@ -2475,27 +2475,25 @@ class ProcessAnnexProgressIndicators(object):
     def _update_pbar(self, pbar, new_value):
         """Updates pbar while also updating possibly total pbar"""
         old_value = getattr(pbar, '_old_value', 0)
+        # due to http://git-annex.branchable.com/bugs/__34__byte-progress__34___could_jump_down_upon_initiating_re-download_--_report_actual_one_first__63__/?updated
+        # we will just skip the first update to avoid possible incorrect
+        # reporting
+        if not getattr(pbar, '_first_skipped', False):
+            setattr(pbar, '_first_skipped', True)
+            lgr.log(1, "Skipped first update of pbar %s", pbar)
+            return
+        setattr(pbar, '_old_value', new_value)
         diff = new_value - old_value
         if diff < 0:
-            # something went wrong, although not sure yet what
-            # but seems to happen when download was interrupted and I guess
-            # git annex starts from that position
-            # since possibilities are
-            # - annex reported wrong size (unlikely)
-            # - there is some clash among progressbars (possible)
-            #   - if download_id (command, key) is somehow reused?
-            # - providing incorrect _old_value here?
-            #   not sure how could happen
-            # - smth else
-            # to identify would need consistent replication and adding
-            # a bunch of log messages to pin point one of above cases
-            # For now we just would assume that it was the _old_value
-            # inconsistent with what annex reported for some reason, and
-            # just assume that old_value was 0
-            diff = new_value
-            # I think we wouldn't be anyhow correct total_pbar since tqdm
-            # would forbid negative increment
-        setattr(pbar, '_old_value', new_value)
+            # so above didn't help!
+            # use warnings not lgr.warn since we apparently swallow stuff
+            # upstairs!  Also it would take care about issuing it only once
+            import warnings
+            warnings.warn(
+                "Got negative diff for progressbar. old_value=%r, new_value=%r"
+                " no more warnings should come for this one and we will not update"
+                " until values start to make sense" % (old_value, new_value))
+            return
         if self.total_pbar:
             self.total_pbar.update(diff, increment=True)
         pbar.update(new_value)
@@ -2585,6 +2583,8 @@ class ProcessAnnexProgressIndicators(object):
                 label=title, total=target_size)
             pbar.start()
 
+        lgr.log(1, "Updating pbar for download_id=%s. annex: %s.\n",
+                download_id, j)
         self._update_pbar(
             self.pbars[download_id],
             int(j.get('byte-progress'))
