@@ -114,7 +114,7 @@ def annexjson2result(d, ds, **kwargs):
         res['path'] = opj(ds.path, d['file'])
     if 'action' in d:
         res['action'] = d['command']
-    if 'annexkey' in d:
+    if 'key' in d:
         res['annexkey'] = d['key']
     return res
 
