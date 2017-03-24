@@ -22,6 +22,10 @@ export PS4=+
 # no more sed but kept for future needs
 # set -o pipefail   # so that | sed   doesn't mask failures of $t
 for t in `grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null`; do
+    if [ ! -z "${DATALAD_REPO_DIRECT:-}" ] && grep -q SKIP_IN_DIRECT "$t"; then
+        echo -e "\n\nI: not running $t in direct mode";
+        continue
+    fi
     echo -e "\n\nI: running $t"
     bash "$t" && status=ok || { exitcode=$?; status=failed; }
     echo "I: done running $t: $status"

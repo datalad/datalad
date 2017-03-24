@@ -14,6 +14,9 @@ echo "
 
 set -e
 
+# due to https://github.com/datalad/datalad/issues/1432
+SKIP_IN_DIRECT=1
+
 OLD_PWD=$PWD
 TOPDIR=$(readlink -f "$(mktemp --tmpdir -d datalad_demo_nipype.XXXX)")
 # In general it is our location for http://datasets.datalad.org on the development
