@@ -1,3 +1,9 @@
+datalad (0.5.1-1) experimental; urgency=medium
+
+  * Fresh upstream bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 25 Mar 2017 00:47:58 -0400
+
 datalad (0.5.0-1) experimental; urgency=medium
 
   * Fresh upstream "it's huge" release
