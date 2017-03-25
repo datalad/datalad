@@ -104,7 +104,13 @@ try:
         def update(self, size, increment=False):
             self._create()
             inc = size - self.current
-            self._pbar.update(size if increment else inc)
+            try:
+                self._pbar.update(size if increment else inc)
+            except ValueError:
+                # Do not crash entire process because of some glitch with
+                # progressbar update
+                # TODO: issue a warning?
+                pass
             super(tqdmProgressBar, self).update(size, increment=increment)
 
         def start(self):

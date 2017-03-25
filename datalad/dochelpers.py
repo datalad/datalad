@@ -155,7 +155,7 @@ def _split_out_parameters(initdoc):
 
 
 __re_params = re.compile('(?:\n\S.*?)+$')
-__re_spliter1 = re.compile('(?:\n|\A)(?=\S)')
+__re_spliter1 = re.compile('\n(?=\S)')
 __re_spliter2 = re.compile('[\n:]')
 
 
