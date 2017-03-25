@@ -163,7 +163,7 @@ script:
   # Run javascript tests
   - grunt test --verbose
   # Run doc examples if no spaces in the TMPDIR
-  - if echo "${TMPDIR:-}" | grep -q ' '; then echo "skipping due spaces in $TMPDIR"; else tools/testing/run_doc_examples; fi
+  - if echo "${TMPDIR:-}" | grep -q ' '; then echo "skipping due spaces in $TMPDIR"; else $NOSE_WRAPPER tools/testing/run_doc_examples; fi
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*
