@@ -297,7 +297,8 @@ def cmdline_example_to_rst(src, out=None, ref=None):
             out.write(line[(min(2, len(line) - 1)):])
             continue
         if incodeblock:
-            out.write('  %s' % line)
+            if not line.rstrip().endswith('#% SKIP'):
+                out.write('  %s' % line)
             continue
         if not len(line.strip()):
             continue

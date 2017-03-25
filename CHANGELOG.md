@@ -9,6 +9,33 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+
+## 0.5.1 (Mar 25, 2017) -- cannot stop the progress
+
+A bugfix release
+
+### Fixes
+
+- [add] was forcing addition of files to annex regardless of settings
+  in `.gitattributes`.  Now that decision is left to annex by default
+- `tools/testing/run_doc_examples` used to run
+  doc examples as tests, fixed up to provide status per each example
+  and not fail at once
+- `doc/examples`
+  - [3rdparty_analysis_workflow.sh](http://docs.datalad.org/en/latest/generated/examples/3rdparty_analysis_workflow.html)
+    was fixed up to reflect changes in the API of 0.5.0.
+- progress bars
+  - should no longer crash **datalad** and report correct sizes and speeds
+  - should provide progress reports while using Python 3.x
+
+### Enhancements and new features
+
+- `doc/examples`
+  - [nipype_workshop_dataset.sh](http://docs.datalad.org/en/latest/generated/examples/nipype_workshop_dataset.html)
+    new example to demonstrate how new super- and sub- datasets were established
+    as a part of our datasets collection
+
+
 ## 0.5.0 (Mar 20, 2017) -- it's huge
 
 This release includes an avalanche of bug fixes, enhancements, and

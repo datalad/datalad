@@ -303,6 +303,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             c = ssh_manager.get_connection(url)
             ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
             # options to add:
+            # Note: must use -S to overload -S provided by annex itself
+            # if we provide -o ControlPath=... it is not in effect
+            # Note: ctrl_path must not contain spaces, since it seems to be
+            # impossible to anyhow guard them here
+            # http://git-annex.branchable.com/bugs/cannot___40__or_how__63____41___to_pass_socket_path_with_a_space_in_its_path_via_annex-ssh-options/
             cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
             # read user-defined options from .git/config:
             cfg_string_old = self.config.get(ssh_cfg_var, None)
@@ -654,6 +659,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         there shouldn't be a need to 'init' again.
 
         """
+        # MIH: this function is required for re-initing repos. The logic
+        # in the contructor is rather convoluted and doesn't acknowledge
+        # the case of a perfectly healthy annex that just needs a new
+        # description
+        # will keep leading underscore in the name for know, but this is
+        # not private
         # TODO: provide git and git-annex options.
         # TODO: Document (or implement respectively) behaviour in special cases
         # like direct mode (if it's different), not existing paths, etc.
@@ -2463,8 +2474,26 @@ class ProcessAnnexProgressIndicators(object):
 
     def _update_pbar(self, pbar, new_value):
         """Updates pbar while also updating possibly total pbar"""
-        diff = new_value - getattr(pbar, '_old_value', 0)
+        old_value = getattr(pbar, '_old_value', 0)
+        # due to http://git-annex.branchable.com/bugs/__34__byte-progress__34___could_jump_down_upon_initiating_re-download_--_report_actual_one_first__63__/?updated
+        # we will just skip the first update to avoid possible incorrect
+        # reporting
+        if not getattr(pbar, '_first_skipped', False):
+            setattr(pbar, '_first_skipped', True)
+            lgr.log(1, "Skipped first update of pbar %s", pbar)
+            return
         setattr(pbar, '_old_value', new_value)
+        diff = new_value - old_value
+        if diff < 0:
+            # so above didn't help!
+            # use warnings not lgr.warn since we apparently swallow stuff
+            # upstairs!  Also it would take care about issuing it only once
+            import warnings
+            warnings.warn(
+                "Got negative diff for progressbar. old_value=%r, new_value=%r"
+                " no more warnings should come for this one and we will not update"
+                " until values start to make sense" % (old_value, new_value))
+            return
         if self.total_pbar:
             self.total_pbar.update(diff, increment=True)
         pbar.update(new_value)
@@ -2554,6 +2583,8 @@ class ProcessAnnexProgressIndicators(object):
                 label=title, total=target_size)
             pbar.start()
 
+        lgr.log(1, "Updating pbar for download_id=%s. annex: %s.\n",
+                download_id, j)
         self._update_pbar(
             self.pbars[download_id],
             int(j.get('byte-progress'))
