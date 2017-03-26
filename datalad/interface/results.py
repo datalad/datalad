@@ -106,6 +106,7 @@ known_result_xfms = {
 
 
 def annexjson2result(d, ds, **kwargs):
+    lgr.debug('received JSON result from annex: %s', d)
     res = get_status_dict(**kwargs)
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
     # we cannot rely on any of these to be available as the feed from

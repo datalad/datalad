@@ -1513,6 +1513,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
+        # protect against progress leakage
+        json_objects = [j for j in json_objects if not 'byte-progress' in j]
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
