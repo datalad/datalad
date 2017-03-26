@@ -282,10 +282,6 @@ def main(args=None):
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
 
-    # configure rendering of return values
-    datalad.cfg.overrides['datalad.api.result-renderer'] = \
-        cmdlineargs.common_output_format
-
     # enable overrides
     datalad.cfg.reload()
 

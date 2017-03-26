@@ -99,16 +99,16 @@ def _install_necessary_subdatasets(
     assert cur_par_ds is not None
 
     while not cur_subds.is_installed():
-        # get submodule info
-        submodules = cur_par_ds.repo.get_submodules()
-        submodule = [sm for sm in submodules
-                     if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
+        # get subdataset info
+        subdatasets = cur_par_ds.subdatasets()
+        subdataset = [sm for sm in subdatasets
+                      if sm['path'] == cur_subds.path][0]
         # install using helper that give some flexibility regarding where to
         # get the module from
         sd = _install_subds_from_flexible_source(
             cur_par_ds,
-            submodule.path,
-            submodule.url,
+            relpath(subdataset['path'], start=cur_par_ds.path),
+            subdataset['url'],
             reckless,
             description=description)
 
@@ -137,22 +137,26 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                                         refds_path=None, description=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
-    # loop over submodules not subdatasets to get the url right away
     # install using helper that give some flexibility regarding where to
     # get the module from
-    for sub in ds.repo.get_submodules():
-        subds = Dataset(opj(ds.path, sub.path))
+    for sub in ds.subdatasets(
+            return_type='generator', result_renderer='disabled'):
+        subds = Dataset(sub['path'])
         if start is not None and not subds.path.startswith(_with_sep(start)):
             # this one we can ignore, not underneath the start path
             continue
-        if subds.is_installed():
+        if sub['state'] != 'absent':
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,
                 refds=refds_path)
             continue
         try:
             subds = _install_subds_from_flexible_source(
-                ds, sub.path, sub.url, reckless, description=description)
+                ds,
+                relpath(sub['path'], start=ds.path),
+                sub['url'],
+                reckless,
+                description=description)
             yield get_status_dict(
                 'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
                 message=("Installed subdataset %s", subds))

@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os.path import join as opj
+from os.path import relpath
 from datalad.utils import assure_list
 from datalad.distribution.dataset import Dataset
 
@@ -79,6 +80,13 @@ class YieldDatasets(ResultXFM):
             lgr.debug('rejected by return value configuration: %s', res)
 
 
+class YieldRelativePaths(ResultXFM):
+    def __call__(self, res):
+        refpath = res.get('refds', None)
+        if refpath:
+            return relpath(res['path'], start=refpath)
+
+
 class YieldField(ResultXFM):
     def __init__(self, field):
         self.field = field
@@ -93,15 +101,22 @@ class YieldField(ResultXFM):
 known_result_xfms = {
     'datasets': YieldDatasets(),
     'paths': YieldField('path'),
+    'relpaths': YieldRelativePaths(),
 }
 
 
 def annexjson2result(d, ds, **kwargs):
+    lgr.debug('received JSON result from annex: %s', d)
     res = get_status_dict(**kwargs)
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
-    res['path'] = opj(ds.path, d['file'])
-    res['action'] = d['command']
-    res['annexkey'] = d['key']
+    # we cannot rely on any of these to be available as the feed from
+    # git annex (or its wrapper) is not always homogeneous
+    if 'file' in d:
+        res['path'] = opj(ds.path, d['file'])
+    if 'command' in d:
+        res['action'] = d['command']
+    if 'key' in d:
+        res['annexkey'] = d['key']
     return res
 
 

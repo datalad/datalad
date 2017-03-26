@@ -38,6 +38,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_message
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -79,7 +80,7 @@ def test_clone_crcns(tdir, ds_path):
     crcns = ds.clone("///crcns", result_xfm='datasets', return_type='item-or-list')
     ok_(crcns.is_installed())
     eq_(crcns.path, opj(ds_path, "crcns"))
-    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
+    assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
 @skip_if_no_network
@@ -189,11 +190,11 @@ def test_clone_dataladri(src, topurl, path):
 def test_clone_isnot_recursive(src, path_nr, path_r):
     ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
-    for sub in ds.get_subdatasets(recursive=True):
-        ok_(not Dataset(opj(path_nr, sub)).is_installed(),
-            "Unintentionally installed: %s" % opj(path_nr, sub))
+    # check nothin is unintentionally installed
+    subdss = ds.subdatasets(recursive=True)
+    assert_result_count(subdss, len(subdss), state='absent')
     # this also means, subdatasets to be listed as not fulfilled:
-    eq_(set(ds.get_subdatasets(recursive=True, fulfilled=False)),
+    eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
         {'subm 1', 'subm 2'})
 
 
@@ -215,7 +216,7 @@ def test_clone_into_dataset(source, top_path):
     else:
         ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
-    assert_in('sub', ds.get_subdatasets())
+    assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:
     ok_clean_git(subds.path, annex=None)
     # top is clean:
@@ -242,8 +243,8 @@ def test_notclone_known_subdataset(src, path):
     # subdataset not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    assert_in('subm 1', ds.get_subdatasets(fulfilled=False))
-    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=True))
+    assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # clone is not meaningful
     res = ds.clone('subm 1', on_failure='ignore')
     assert_status('error', res)
@@ -258,8 +259,8 @@ def test_notclone_known_subdataset(src, path):
     # new repository initiated
     eq_(set(subds.repo.get_indexed_files()),
         {'test.dat', 'INFO.txt', 'test-annex.dat'})
-    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
-    assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
+    assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
 
 @with_tempfile(mkdir=True)
@@ -305,4 +306,4 @@ def test_clone_isnt_a_smartass(origin_path, path):
     # correct destination
     assert clonedsub.path.startswith(path)
     # no subdataset relation
-    eq_(cloned.get_subdatasets(), [])
+    eq_(cloned.subdatasets(), [])
