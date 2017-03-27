@@ -1632,6 +1632,34 @@ def _test_status(ar):
     # TODO: Figure out, how to RF/fix the issue with committing direct mode
     #       submodules
 
+    def sync_wrapper(push=False, pull=False, commit=False):
+        # wraps common annex-sync call, since it currently fails under
+        # mysterious circumstances in V6 adjusted branch setups
+        try:
+            ar.sync(push=push, pull=pull, commit=commit)
+        except CommandError as e:
+            if "fatal: entry 'submod' object type (blob) doesn't match mode type " \
+               "(commit)" in e.stderr:
+                # some bug in adjusted branch(?) + submodule
+                # TODO: figure out and probably report
+                # stdout:
+                # commit
+                # [adjusted/master(unlocked) ae3e9a7] git-annex in ben@tree:/tmp/datalad_temp_test_AnnexRepo_status7qKhRQ
+                #  4 files changed, 4 insertions(+), 2 deletions(-)
+                #  create mode 100644 fifth
+                #  create mode 100644 sub/third
+                # ok
+                #
+                # failed
+                # stderr:
+                # fatal: entry 'submod' object type (blob) doesn't match mode type (commit)
+                # git-annex: user error (git ["--git-dir=.git","--work-tree=.","--literal-pathspecs","mktree","--batch","-z"] exited 128)
+                # git-annex: sync: 1 failed
+
+                # But it almost works - so apperently nothing to do
+                print "DEBUG: v6 sync failure"
+                pass
+
     stat = {'untracked': [],
             'deleted': [],
             'modified': [],
@@ -1651,17 +1679,17 @@ def _test_status(ar):
 
     # add a file to git
     ar.add('first', git=True)
+    sync_wrapper()
     stat['untracked'].remove('first')
     stat['added'].append('first')
-    # TODO: V6: modified instead of added!?
     eq_(stat, ar.status())
 
     # add a file to annex
     ar.add('second')
+    sync_wrapper()
     stat['untracked'].remove('second')
     if not ar.is_direct_mode():
-        # in direct mode an annexed file is committed to the
-        # annex/direct/.. branch when annexed
+        # in direct mode annex-status doesn't report an added file 'added'
         stat['added'].append('second')
     eq_(stat, ar.status())
 
@@ -1673,19 +1701,18 @@ def _test_status(ar):
             'added': [],
             'type_changed': []}
     eq_(stat, ar.status())
-
     # create a file to be unannexed:
     with open(opj(ar.path, 'fifth'), 'w') as f:
         f.write("total disaster")
     ar.add('fifth')
-    # instead of committing the addition use 'sync':
-    # Otherwise there are plenty of issues if not v5 indirect mode
-    ar.sync(pull=False, push=False)
+    sync_wrapper()
+    # Note: For some reason this seems to be the only place, where we actually
+    # need to call commit via annex-proxy
+    ar.commit(msg="fifth to be unannexed", files='fifth', proxy=ar.is_direct_mode())
     eq_(stat, ar.status())
 
     ar.unannex('fifth')
-    ar.sync(pull=False, push=False)
-
+    sync_wrapper(pull=False, push=False, commit=True)
     stat['untracked'].append('fifth')
     eq_(stat, ar.status())
 
@@ -1709,7 +1736,7 @@ def _test_status(ar):
         if not ar.get_active_branch().endswith('(unlocked)'):
             stat['type_changed'].remove('second')
     stat['modified'].append('second')
-
+    sync_wrapper()
     eq_(stat, ar.status())
 
     # create something in a subdir
@@ -1788,7 +1815,6 @@ def _test_status(ar):
     eq_(stat, ar.status(submodules=False))
 
     # commit the submodule
-    # TODO
     # in direct mode, commit of a removed submodule fails with:
     #  error: unable to index file submod
     #  fatal: updating files failed
@@ -1798,12 +1824,7 @@ def _test_status(ar):
     # - if we add a submodule instead of removing one, it's vice versa with
     #   the very same error message
 
-    if ar.is_direct_mode():
-        ar.precommit()
-        _workaround_commit = super(AnnexRepo, ar).commit
-    else:
-        _workaround_commit = ar.commit
-    _workaround_commit(msg="submodule added", files=['.gitmodules', 'submod'])
+    ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
 
     stat['added'].remove('.gitmodules')
     eq_(stat, ar.status())
@@ -1828,13 +1849,7 @@ def _test_status(ar):
     eq_(stat, ar.status())
 
     ar.add('submod', git=True)
-    if ar.is_direct_mode():
-        ar.precommit()
-        _workaround_commit = super(AnnexRepo, ar).commit
-    else:
-        _workaround_commit = ar.commit
-    _workaround_commit(msg="submodule modified", files='submod')
-
+    ar.commit(msg="submodule modified", files='submod')
     stat['modified'].remove('submod/')
     eq_(stat, ar.status())
 
@@ -1848,67 +1863,16 @@ def _test_status(ar):
     ar.add('first', git=True)
     ar.add(opj('sub', 'third'))
     ar.add('fifth')
+    sync_wrapper()
 
-    # Note: 'second' is now committed (modified if we use commit)
-    # This is a concept issue: staged vs unstaged vs annex add (dm commit)
-    # ar.commit(files=['first', 'fifth', opj('sub', 'third')])
-
-    try:
-        ar.sync(pull=False, push=False)
-    except CommandError as e:
-        if "fatal: entry 'submod' object type (blob) doesn't match mode type " \
-           "(commit)" in e.stderr:
-            # some bug in adjusted branch(?) + submodule
-            # TODO: figure out and probably report
-            # stdout:
-            # commit
-            # [adjusted/master(unlocked) ae3e9a7] git-annex in ben@tree:/tmp/datalad_temp_test_AnnexRepo_status7qKhRQ
-            #  4 files changed, 4 insertions(+), 2 deletions(-)
-            #  create mode 100644 fifth
-            #  create mode 100644 sub/third
-            # ok
-            #
-            # failed
-            # stderr:
-            # fatal: entry 'submod' object type (blob) doesn't match mode type (commit)
-            # git-annex: user error (git ["--git-dir=.git","--work-tree=.","--literal-pathspecs","mktree","--batch","-z"] exited 128)
-            # git-annex: sync: 1 failed
-
-            # But wrt to cleaning the repo, it almost works
-            pass
-
-        elif "fatal: This operation must be run in a work tree" in e.stderr \
-            and "fatal: 'git status --porcelain' failed in submodule submod" \
-                in e.stderr:
-            # direct mode fails, too.
-            # apparently sync is calling git status internally, which then fails
-            # in the submodule.
-            # TODO: Bug report
-            # stdout:
-            # commit  add second ok
-            # (recording state in git...)
-            #
-            # failed
-            # (recording state in git...)
-            #
-            # stderr:
-            # fatal: This operation must be run in a work tree
-            # fatal: 'git status --porcelain' failed in submodule submod
-            # git-annex: user error (xargs ["-0","git","--git-dir=.git","--work-tree=.","--literal-pathspecs","add","-f"] exited 123)
-            # fatal: This operation must be run in a work tree
-            # fatal: 'git status --porcelain' failed in submodule submod
-            # git-annex: user error (xargs ["-0","git","--git-dir=.git","--work-tree=.","--literal-pathspecs","add","-f"] exited 123)
-
-            # just commit is all we need for this test
-            # But, strange: using annex proxy, the commit just hangs
-            if ar.is_direct_mode():
-                ar.precommit()
-                _workaround_commit = super(AnnexRepo, ar).commit
-            else:
-                _workaround_commit = ar.commit
-            _workaround_commit(files=['first', 'fifth',
-                                      opj('sub', 'third'), 'second'])
-
+    if ar.config.getint("annex", "version") == 6:
+        # mixed annexed/not-annexed files ATm can't be committed with explicitly
+        # given paths in v6
+        # See:
+        # http://git-annex.branchable.com/bugs/committing_files_into_git_doesn__39__t_work_with_explicitly_given_paths_in_V6
+        ar.commit()
+    else:
+        super(AnnexRepo, ar).commit(files=['first', 'fifth', opj('sub', 'third'), 'second'])
     eq_(stat, ar.status())
 
     # remove a file in annex:
@@ -1938,7 +1902,12 @@ def _test_status(ar):
     stat['modified'].append('.gitmodules')
     eq_(stat, ar.status())
 
-    ar.commit("submod removed", files=['submod', '.gitmodules'])
+    # Note: Here again we need to use annex-proxy; This contradicts the addition
+    # of the very same submodule, which we needed to commit via
+    # -c core.bare=False instead. Otherwise the very same failure happens.
+    # Just vice versa. See above where 'submod' is added.
+    ar.commit("submod removed", files=['submod', '.gitmodules'],
+              proxy=ar.is_direct_mode())
     stat['modified'].remove('.gitmodules')
     stat['deleted'].remove('submod/' if ar.is_direct_mode() else 'submod')
     eq_(stat, ar.status())
