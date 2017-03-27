@@ -197,7 +197,10 @@ class Runner(object):
                 line = proc.stdout.readline()
                 if line and callable(log_stdout_):
                     # Let it be processed
-                    line = log_stdout_(line)
+                    line = log_stdout_(line.decode())
+                    if line is not None:
+                        # we are working with binary type here
+                        line = line.encode()
                 if line:
                     stdout += line
                     self._log_out(line.decode())
@@ -216,7 +219,10 @@ class Runner(object):
                 line = proc.stderr.readline()
                 if line and callable(log_stderr_):
                     # Let it be processed
-                    line = log_stderr_(line)
+                    line = log_stderr_(line.decode())
+                    if line is not None:
+                        # we are working with binary type here
+                        line = line.encode()
                 if line:
                     stderr += line
                     self._log_err(line.decode() if PY3 else line,

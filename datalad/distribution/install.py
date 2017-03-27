@@ -422,7 +422,7 @@ class Install(Interface):
                       "{0}: {1}".format(ds, relativepath))
 
             # FLOW_GUIDE 1.4.
-            lgr.info("Installing subdataset from '{0}' at: {1}".format(
+            lgr.info("Installing subdataset from '{0}' at {1}".format(
                 source, relativepath))
             destination_dataset = _install_subds_from_flexible_source(
                 ds,

@@ -33,6 +33,7 @@ from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import swallow_logs
+from datalad.utils import unique
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
@@ -167,14 +168,33 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
     # of all datasets in a completely independent fashion
     # (except for order of processing)
 
+    subds = Dataset(superds_path)
+
     # get all existing subdataset as candidate nodes of the graph
     # that needs to be built and checked
-    subds_graph = Dataset(superds_path).get_subdatasets(
-        absolute=True, recursive=True, edges=True, fulfilled=True)
-    if not subds_graph:
+    # OPT TODO:  this is the expensive one!  e.g we might have a big
+    #       hierarchy of datasets and interested in analyzing only a single
+    #       target_subds -- now it gets the entire hierarchy first (EXPENSIVE)
+    #       to look/check just one... bleh... and then even better -- would continue
+    #       out of the loop if that dataset is already known
+    #       Moreover possibly causing entire recursive traversal of sub-datasets
+    #       multiple times if operating from some higher level super and sorted
+    #       target_subds in multiple subs
+    # Delay expensive operation
+    subds_graph = None
+    # so we first get immediate children, delaying even check for being fulfilled
+    subdss = subds.get_subdatasets(absolute=True, recursive=False, fulfilled=None)
+    if not subdss:
         # no subdatasets, nothing to sort
         return
     for t in target_subs:
+        if t in subdss and Dataset(t).is_installed():  # yoh guesses is_installed is as good or better than fulfilled
+            # immediate known kiddo
+            continue
+        if subds_graph is None:
+            subds_graph = subds.get_subdatasets(
+                absolute=True, recursive=True, edges=True, fulfilled=True)
+
         trace = get_trace(
             subds_graph,
             superds_path,
@@ -201,7 +221,7 @@ def sort_paths_into_subdatasets(superds_path, target_subs, spec):
             spec[d] = keep_paths
     # tidy up -- deduplicate
     for c in spec:
-        spec[c] = list(set(spec[c]))
+        spec[c] = unique(spec[c])
 
 
 def save_dataset_hierarchy(
@@ -237,7 +257,9 @@ def save_dataset_hierarchy(
     if base:
         # just a convenience...
         dpaths = assure_list(dpaths)
-        dpaths.append(base.path if isinstance(base, Dataset) else base)
+        base_path = base.path if isinstance(base, Dataset) else base
+        if base_path not in dpaths:
+            dpaths.append(base_path)
     # sort all datasets under their potential superdatasets
     # start from the top to get all subdatasets down the line
     # and collate them into as few superdatasets as possible
@@ -630,7 +652,7 @@ def get_dataset_directories(top, ignore_datalad=True):
 # this one here seems more leightweight and less convoluted
 def _discover_trace_to_known(path, trace, spec):
     # this beast walks the directory tree from a given `path` until
-    # it discoveres a known dataset (i.e. recorded in the spec)
+    # it discovers a known dataset (i.e. recorded in the spec)
     # if it finds one, it commits any accummulated trace of visited
     # datasets on this edge to the spec
     valid_repo = GitRepo.is_valid_repo(path)
@@ -642,9 +664,12 @@ def _discover_trace_to_known(path, trace, spec):
                 spec[p] = list(set(spec.get(p, []) + [trace[i + 1]]))
             # this edge is not done, we need to try to reach any downstream
             # dataset
+    # OPT TODO? listdir might be large and we could have only few items
+    #  in spec -- so why not to traverse only those in spec which have
+    #  leading dir path???
     for p in listdir(path):
         if valid_repo and p == '.git':
-            # ignore gitdir to steed things up
+            # ignore gitdir to speed things up
             continue
         p = opj(path, p)
         if not isdir(p):
