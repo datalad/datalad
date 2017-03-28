@@ -25,7 +25,7 @@ lgr = getLogger('datalad.crawler')
 try:
     from scrapy.http import Response
     from scrapy.selector import Selector
-except ImportError:
+except ImportError:  # pragma: no cover
     lgr.debug("Failed to import Selector from scrapy, so matches would not be functional")
     class Selector(object):
         xpath = css = None

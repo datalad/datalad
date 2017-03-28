@@ -45,6 +45,7 @@ from .utils import assert_dict_equal
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
+from .utils import skip_if_no_module
 from .utils import run_under_dir
 from .utils import skip_if
 from .utils import ok_file_has_content
@@ -137,6 +138,20 @@ def test_with_testrepos():
                 or
                 not exists(opj(repo, '.git', 'remove-me')))
 
+
+def test_get_resolved_values():
+    from datalad.tests.utils import _get_resolved_flavors
+    flavors = ['networkish', 'local']
+    eq_(flavors, _get_resolved_flavors(flavors))
+
+    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        eq_(_get_resolved_flavors(flavors), ['local'])
+
+        # and one more to see the exception being raised if nothing to teston
+        @with_testrepos(flavors=['network'])
+        def magical():
+            raise AssertionError("Must not be ran")
+        assert_raises(SkipTest, magical)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
@@ -477,6 +492,19 @@ def test_skip_if_no_network():
             assert_raises(SkipTest, skip_if_no_network)
         with patch.dict('os.environ', {}):
             eq_(skip_if_no_network(), None)
+
+
+def test_skip_if_no_module():
+    @skip_if_no_module("nonexistingforsuremodule")
+    def testish():
+        raise ValueError
+    assert_raises(SkipTest, testish)
+
+    @skip_if_no_module("datalad")
+    def testish2():
+        raise "magic"
+    eq_(testish2(), "magic")
+
 
 
 def test_skip_if():
