@@ -17,7 +17,7 @@ import logging
 try:
     # optional direct dependency we might want to kick out
     import bs4
-except ImportError:
+except ImportError:  # pragma: no cover
     bs4 = None
 
 from glob import glob
@@ -201,7 +201,7 @@ def test_get_most_obscure_supported_name():
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
+    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):  # pragma: no cover
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []
@@ -227,7 +227,7 @@ def test_keeptemp_via_env_variable():
 @with_tempfile
 def test_ok_symlink_helpers(tmpfile):
 
-    if on_windows:
+    if on_windows:  # pragma: no cover
         raise SkipTest("no sylmlinks on windows")
 
     assert_raises(AssertionError, ok_symlink, tmpfile)
@@ -274,7 +274,7 @@ def test_nok_startswith():
 def test_ok_generator():
     def func(a, b=1):
         return a+b
-    def gen(a, b=1):
+    def gen(a, b=1):  # pragma: no cover
         yield a+b
     # not sure how to determine if xrange is a generator
     if PY2:
@@ -367,16 +367,16 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 
 @with_tempfile(mkdir=True)
-def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
+def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
 
     # First verify that filesystem layer can encode this filename
     # verify first that we could encode file name in this environment
     try:
         filesysencoding = sys.getfilesystemencoding()
         test_fpath_encoded = test_fpath.encode(filesysencoding)
-    except UnicodeEncodeError:
+    except UnicodeEncodeError:  # pragma: no cover
         raise SkipTest("Environment doesn't support unicode filenames")
-    if test_fpath_encoded.decode(filesysencoding) != test_fpath:
+    if test_fpath_encoded.decode(filesysencoding) != test_fpath:  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
@@ -409,7 +409,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         html = u.read().decode()
         assert(test_txt == html)
 
-    if bs4 is None:
+    if bs4 is None:  # pragma: no cover
         raise SkipTest("bs4 is absent")
     test_path_and_url()
 
@@ -495,23 +495,23 @@ def test_skip_if_no_network():
 
 
 def test_skip_if_no_module():
-    @skip_if_no_module("nonexistingforsuremodule")
+
     def testish():
+        skip_if_no_module("nonexistingforsuremodule")
         raise ValueError
     assert_raises(SkipTest, testish)
 
-    @skip_if_no_module("datalad")
     def testish2():
-        raise "magic"
+        skip_if_no_module("datalad")
+        return "magic"
     eq_(testish2(), "magic")
-
 
 
 def test_skip_if():
 
     with assert_raises(SkipTest):
         @skip_if(True)
-        def f():
+        def f():  # pragma: no cover
             raise AssertionError("must have not been ran")
         f()
 
@@ -552,7 +552,7 @@ def test_assert_dict_equal():
     assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4, 1: 'a'})
     try:
         import numpy as np
-    except:
+    except:  # pragma: no cover
         raise SkipTest("need numpy for this tiny one")
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})

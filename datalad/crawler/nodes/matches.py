@@ -55,7 +55,7 @@ class ExtractorMatch(object):
         self._min_count = min_count
         self._max_count = max_count
 
-    def _select_and_extract(self, selector, query, data):
+    def _select_and_extract(self, selector, query, data):  # pragma: no cover
         raise NotImplementedError
 
     def __call__(self, data):
