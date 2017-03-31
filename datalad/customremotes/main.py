@@ -81,7 +81,7 @@ def setup_parser(backend):
     return parser
 
 
-def _main(args, backend=None):
+def _main(args, backend=None, leftout_args=None):
     """Unprotected portion"""
     # TODO: For now we have only one, but we might need to actually become aware
     # of multiple and provide multiple helpers/symlinks
@@ -121,9 +121,9 @@ def _main(args, backend=None):
     #   get-uri [options] with [options] being backend specific
     #           e.g. for archive --key KEY(archive) --file FILE
     command = args.command
-    if command == 'get-uri-prefix':
-        print(remote.url_prefix)
-    elif args.command is None:
+    if command is None:
+        assert not leftout_args, "not expecting any additional arguments"
+        ui.set_backend('annex')  # stdin/stdout will be used for interactions with annex
         # If no command - run the special remote
         if 'DATALAD_TESTS_USECASSETTE' in os.environ:
             # optionally feeding it a cassette, used by tests
@@ -132,8 +132,20 @@ def _main(args, backend=None):
                 remote.main()
         else:
             remote.main()
+    elif command == 'get-uri-prefix':
+        print(remote.url_prefix)
     else:
-        raise ValueError("Unknown command %s" % command)
+        # might be a command provided by the corresponding backend
+        cmd_funcname = 'cmd_%s' % command
+        cmd_func = getattr(remote, cmd_funcname, None)
+        if not cmd_func:
+            known = [f[4:] for f in dir(remote) if f.startswith('cmd_')]
+            raise ValueError(
+                "Unknown command %r. Known for %s: %s"
+                % (command, backend, ', '.join(known) or 'none')
+            )
+        # pass all leftout args into the command
+        cmd_func(leftout_args)
 
 
 def main(args=None, backend=None):
@@ -143,19 +155,17 @@ def main(args=None, backend=None):
     #
     parser = setup_parser(backend=backend)
     # parse cmd args
-    args = parser.parse_args(args)
-
-    ui.set_backend('annex')  # stdin/stdout will be used for interactions with annex
+    args, leftout_args = parser.parse_known_args(args)
 
     if args.common_debug:
         # So we could see/stop clearly at the point of failure
         setup_exceptionhook()
-        _main(args, backend)
+        _main(args, backend, leftout_args)
     else:
         # Otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
-            _main(args, backend)
+            _main(args, backend, leftout_args)
         except Exception as exc:
             lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
             sys.exit(1)

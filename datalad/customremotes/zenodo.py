@@ -28,9 +28,10 @@ from ..downloaders.http import HTTPDownloader
 from ..ui import ui
 from ..ui.progressbars import FileReadProgressbar
 
-# API_URL = "https://zenodo.org/api/"
-# for now
-API_URL = "https://sandbox.zenodo.org/api/"
+API_URLs = {
+    'sandbox': "https://sandbox.zenodo.org/api/",
+    'default': "https://zenodo.org/api/"
+}
 
 
 class ZenodoAnnexCustomRemote(AnnexCustomRemote):
@@ -64,7 +65,10 @@ class ZenodoAnnexCustomRemote(AnnexCustomRemote):
     def api_url(self):
         if self._api_url is None:
             api_url = self.req_GETCONFIG('api_url')
+            if api_url in API_URLs:
+                api_url = API_URLs[api_url]
             if not api_url:
+                API_URL = API_URLs['default']
                 self.debug(
                     "api_url was not set for the special remote -- "
                     "assuming %s" % API_URL)
@@ -79,7 +83,10 @@ class ZenodoAnnexCustomRemote(AnnexCustomRemote):
         return self._deposition_id
 
     def _requests_call(self, m, url, success=None, **kwargs):
-
+        """A wrapper around requests calls
+        
+        to interpolate deposition_id, do basic checks and conversion
+        """
         url_ = self.api_url + url
         if '%s' in url:
             url_ = url_ % self.deposition_id
@@ -284,6 +291,9 @@ files can be cloned from TODO""" % rec,
             if not isinstance(r, dict):
                 assert len(r) == 1  # just a single item uploaded
                 r = r[0]
+            if r.get('status', 0) == 403:
+                self.send('TRANSFER-FAILURE', cmd, key, \
+                          "Permission denied -- TODO: check if already published")
             assert r['filename'] == key
             message = r.get('message')
             if message and 'Filename already exists' in message:
@@ -382,6 +392,25 @@ files can be cloned from TODO""" % rec,
             #self.send("CHECKPRESENT-UNKNOWN", key, "No key associated yet, so most likely not there")
             self.send("CHECKPRESENT-FAILURE", key)
 
+    def cmd_publish(self, args):
+        assert not args, "not expecting any args for publish. Got %s" % str(args)
+        # since we need to communicate to annex
+        self._prepare()
+        if not ui.yesno(
+            """\
+Published on Zenodo datasets acquire publicly visible URL, doi, etc. Also, 
+depending on the access_type, files could be fetched from regular URLs which 
+we will assign to every file.  But you will not be able to introduce any further
+changes to the uploaded files""",
+            title='Are you sure you want to finalize/publish your Zenodo dataset?'
+        ):
+            return
+        import pdb; pdb.set_trace()
+        # and now we can officially publish!
+        r = self._post('deposit/depositions/%s/actions/publish')
+        # assign URLs for all files so people could download directly from the web
+        # report back URL
+        pass
 
 def main():
     """cmdline entry point"""
