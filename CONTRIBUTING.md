@@ -347,7 +347,7 @@ Various hints for developers
 
 - For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
-  `python -c "import epdb; epdb.connect()".`
+  `python -c "import epdb; epdb.connect()"`
 
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.

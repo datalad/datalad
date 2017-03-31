@@ -65,6 +65,9 @@ requires = {
         'msgpack-python',
         'requests>=1.2',
     ] + keyring_requires,
+    'zenodo': [
+        'requests',
+    ] + keyring_requires,
     'downloaders-extra': [
         'requests_ftp',
     ],
@@ -152,6 +155,7 @@ setup_kwargs = setup_entry_points(
         'datalad': 'datalad.cmdline.main',
         'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
+        'git-annex-remote-datalad-zenodo': 'datalad.customremotes.zenodo',
     })
 
 setup(

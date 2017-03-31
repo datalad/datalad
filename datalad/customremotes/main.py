@@ -22,24 +22,34 @@ from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
 from ..ui import ui
+from ..dochelpers import exc_str
 
-backends = ['archive']
+BACKENDS = {
+        'datalad': (
+            '',
+            'datalad.DataladAnnexCustomRemote',
+            "download content from various URLs (http{,s}, s3, etc) possibly "
+            "requiring authentication or custom access mechanisms using "
+            "DataLad's downloaders"),
+        'archive': (     # heh -- life would have been easier if consistent
+            '-archive',  # suffix for cmdline
+            'archives.ArchiveAnnexCustomRemote',
+            "extract content from archives (.tar{,.gz}, .zip, etc) which are "
+            "in turn managed by git-annex.  See `datalad add-archive-content` "
+            "command"),
+        'zenodo': (
+            '-zenodo',
+            'zenodo.ZenodoAnnexCustomRemote',
+            "creates a deposition and uploads data to zenodo.org. You could "
+            "later finalize that dataset and officially 'publish' by "
+            "visiting its page on zenodo. Finalized datasets though cannot "
+            "be changed"),
+}
 
 
 def setup_parser(backend):
 
-    suffix, desc = {
-        'datalad': (
-            '',
-            "download content from various URLs (http{,s}, s3, etc) possibly "
-            "requiring authentication or custom access mechanisms using "
-            "DataLad's downloaders"),
-        'archive': (
-            '-archive',
-            "extract content from archives (.tar{,.gz}, .zip, etc) which are "
-            "in turn managed by git-annex.  See `datalad add-archive-content` "
-            "command")
-    }[backend]
+    suffix, _, desc = BACKENDS[backend]
     # setup cmdline args parser
     # main parser
     # TODO: should be encapsulated for resharing with the main datalad's
@@ -79,15 +89,31 @@ def _main(args, backend=None):
     # single beast -- probably wouldn't fly since we do might need different
     # initializations etc.
     assert(backend is not None)
-    if backend == 'archive':
-        from .archives import ArchiveAnnexCustomRemote
-        remote = ArchiveAnnexCustomRemote()
-    elif backend == 'datalad':
-        from .datalad import DataladAnnexCustomRemote
-        remote = DataladAnnexCustomRemote()
-    else:
+    if backend not in BACKENDS:
         raise ValueError("I don't know anything about %r backend. "
-                         "Known are: %s" % backends)
+                         "Known are: %s" % list(BACKENDS))
+    _, module_cls, _ = BACKENDS[backend]
+    try:
+        module_name, cls_name = module_cls.rsplit('.', 1)
+        backend_module = __import__(
+            'datalad.customremotes.%s' % module_name,
+            fromlist=['datalad.customremotes']
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "Failed to import module corresponding with %s custom special "
+            "remote backend: %s" % (backend, exc_str(exc))
+        )
+
+    # find subclass
+    backend_cls = getattr(backend_module, cls_name)
+    from .base import AnnexCustomRemote
+    assert issubclass(backend_cls, AnnexCustomRemote)
+    remote = backend_cls()
+    if not remote:
+        raise RuntimeError(
+            "Failed to find an *AnnexCustomRemote class within %s"
+            % backend_module)
 
     # TODO: handle args -- not used ATM
     # Generic commands to support:

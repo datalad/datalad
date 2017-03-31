@@ -426,6 +426,7 @@ class AnnexCustomRemote(object):
 
     def req_CLAIMURL(self, url):
         scheme = urlparse(url).scheme
+
         if scheme in self.SUPPORTED_SCHEMES:
             self.debug("Claiming url %r" % url)
             self.send("CLAIMURL-SUCCESS")
