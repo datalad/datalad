@@ -172,6 +172,14 @@ class UserPassword(Credential):
     is_expired = False  # no expiration provisioned
 
 
+class Token(Credential):
+    """Simple type of a credential which provides a single token"""
+
+    _FIELDS = OrderedDict([('token', {'hidden': True})])
+
+    is_expired = False  # no expiration provisioned
+
+
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
@@ -292,4 +300,5 @@ CREDENTIAL_TYPES = {
     'user_password': UserPassword,
     'aws-s3': AWS_S3,
     'nda-s3': NDA_S3,
+    'token': Token,
 }

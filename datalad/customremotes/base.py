@@ -25,6 +25,7 @@ import logging
 lgr = logging.getLogger('datalad.customremotes')
 lgr.log(5, "Importing datalad.customremotes.main")
 
+from ..dochelpers import exc_str
 from ..ui import ui
 from ..support.protocol import ProtocolInterface
 from ..support.cache import DictCache
@@ -177,6 +178,8 @@ class AnnexCustomRemote(object):
 
     CUSTOM_REMOTE_NAME = None  # if None -- no additional custom remote name
     # SUPPORTED_SCHEMES = ()
+    # Could also support "STORE"
+    SUPPORTED_TRANSFERS = ("RETRIEVE",)
 
     COST = DEFAULT_COST
     AVAILABILITY = DEFAULT_AVAILABILITY
@@ -287,7 +290,7 @@ class AnnexCustomRemote(object):
             if self._protocol is not None:
                 self._protocol += "send %s" % msg
         except IOError as exc:
-            lgr.debug("Failed to send due to %s" % str(exc))
+            lgr.debug("Failed to send due to %s" % exc_str(exc))
             if exc.errno == errno.EPIPE:
                 self.stop()
             else:
@@ -351,7 +354,7 @@ class AnnexCustomRemote(object):
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
         except Exception as e:
-            self.stop(str(e))
+            self.stop(exc_str(e))
         finally:
             self._in_the_loop = False
 
@@ -400,7 +403,7 @@ class AnnexCustomRemote(object):
         try:
             self._initremote(*args)
         except Exception as e:
-            self.error("Failed to initialize %s due to %s" % (self, e),
+            self.error("Failed to initialize %s due to %s" % (self, exc_str(e)),
                        "INITREMOTE-FAILURE")
         else:
             self.send("INITREMOTE-SUCCESS")
@@ -413,7 +416,7 @@ class AnnexCustomRemote(object):
         try:
             self._prepare(*args)
         except Exception as e:
-            self.error("Failed to prepare %s due to %s" % (self, e),
+            self.error("Failed to prepare %s due to %s" % (self, exc_str(e)),
                        "PREPARE-FAILURE")
         else:
             self.send("PREPARE-SUCCESS")
@@ -437,9 +440,13 @@ class AnnexCustomRemote(object):
     # TODO: we should unify what to be overriden and some will provide CHECKURL
 
     def req_TRANSFER(self, cmd, key, file):
-        if cmd in ("RETRIEVE",):
+
+        if cmd in self.SUPPORTED_TRANSFERS:
             lgr.debug("%s key %s into/from %s" % (cmd, key, file))  # was INFO level
-            self._transfer(cmd, key, file)
+            try:
+                self._transfer(cmd, key, file)
+            except Exception as exc:
+                self.send('TRANSFER-FAILURE', cmd, key, exc_str(exc))
         else:
             self.error("Retrieved unsupported for TRANSFER command %s" % cmd)
             self.send_unsupported()
@@ -571,7 +578,36 @@ class AnnexCustomRemote(object):
         # we need to catch and throw our exception
         return opj(self.path, out.rstrip(os.linesep))
 
-    # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
+    def req_GETVALUE(self, value_name, name):
+        self.send('GET' + value_name.upper(), name)
+        val = self.read('VALUE', 1)
+        if not val:
+            self.error('Empty response?!')
+            return None
+        elif val[0] != 'VALUE':
+            self.error('First term should have been VALUE, got: %s' % str(val))
+            return None
+        if len(val) == 2:
+            return val[1]
+        elif len(val) == 1:
+            # no value was returned
+            return None
+        else:
+            raise ValueError("Shouldn't happen")
+
+    def req_GETCONFIG(self, name):
+        return self.req_GETVALUE('CONFIG', name)
+
+    def req_SETCONFIG(self, name, value):
+        self.send('SETCONFIG', name, value)
+
+    def req_GETSTATE(self, key):
+        return self.req_GETVALUE('STATE', key)
+
+    def req_SETSTATE(self, key, value):
+        self.send('SETSTATE', key, value)
+
+            # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
     #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
 
@@ -601,7 +637,8 @@ def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]
         # This should help with merges of disconnected repos etc
         # ATM only datalad/datalad-archives is expected,
         # so on purpose getitem
-        remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
+        if remote in DATALAD_SPECIAL_REMOTES_UUIDS:
+            remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
     return repo.init_remote(remote, remote_opts + opts)
 
 

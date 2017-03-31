@@ -186,4 +186,30 @@ class AnnexSpecialRemoteProgressBar(ProgressBarBase):
         if self.remote:
             self.remote.progress(self.current)
 
+
+class FileReadProgressbar(file):
+    """A little helper to decorate an open file object which would
+    also report progress back to the provided progress bar
+    
+    Actually makes any effect ATM only if 'n' given to read(). Otherwise read
+    just returns entire thing at once and there is no point in this helper...
+    TODO: think about some other way to monitor the progress with requests
+    """
+    def __init__(self, open_file, pbar):
+        self._file_pbar = (open_file, pbar)
+
+    def read(self, *args, **kwargs):
+        open_file, pbar = self._file_pbar
+        c = open_file.read(*args, **kwargs)
+        pbar.update(len(c), increment=True)
+        return c
+
+    # Delegate everything to the file
+    def __getattribute__(self, item):
+        return super(FileReadProgressbar, self).__getattribute__(item)
+
+    def __setattr__(self, item, value):
+        super(FileReadProgressbar, self).__setattr__(item, value)
+
+
 progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar
