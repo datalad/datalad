@@ -18,6 +18,7 @@ import os
 from os.path import join as opj, exists
 from os.path import getmtime
 from os.path import abspath
+from time import time
 
 cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
@@ -207,8 +208,13 @@ class ConfigManager(object):
         if not force and self._cfgmtimes:
             # we aren't forcing and we have read files before
             # check if any file we read from has changed
+            current_time = time()
             curmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
-            if all(curmtimes[c] == self._cfgmtimes.get(c) for c in curmtimes):
+            if all(curmtimes[c] == self._cfgmtimes.get(c) and
+                   # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
+                   # if mtime age is less than worst resolution assume modified
+                   (current_time - curmtimes[c]) > 2.0
+                   for c in curmtimes):
                 # all the same, nothing to do, except for
                 # superimpose overrides, could have changed in the meantime
                 self._store.update(self.overrides)
