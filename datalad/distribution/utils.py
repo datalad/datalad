@@ -318,8 +318,7 @@ def _clone_from_any_source(sources, dest):
         try:
             lgr.debug("Retrieving a dataset from URL: "
                       "{0}".format(source_))
-            with swallow_logs():
-                GitRepo.clone(path=dest, url=source_, create=True)
+            GitRepo.clone(path=dest, url=source_, create=True)
             return source_  # do not bother with other sources if succeeded
         except GitCommandError as e:
             lgr.debug("Failed to retrieve from URL: "
@@ -368,6 +367,11 @@ def _clone_from_any_source(sources, dest):
 
 
 def _handle_possible_annex_dataset(dataset, reckless, description=None):
+    """If dataset "knows annex" -- annex init it, set into reckless etc
+    
+    Provides additional tune up to a possibly an annex repo, e.g.
+    "enables" reckless mode, sets up description
+    """
     # in any case check whether we need to annex-init the installed thing:
     if knows_annex(dataset.path):
         # init annex when traces of a remote annex can be detected
