@@ -1053,7 +1053,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         for f in filenames:
             try:
                 rmtemp(f)
-            except OSError:
+            except OSError:  # pragma: no cover
                 pass
 
 
