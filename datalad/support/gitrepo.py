@@ -558,12 +558,16 @@ class GitRepo(RepoInterface):
         ----------
         url : str
         path : str
+        expect_fail : bool
+          Either expect that command might fail, so error should be logged then
+          at DEBUG level instead of ERROR
         """
 
         if 'repo' in kwargs:
             raise TypeError("argument 'repo' conflicts with cloning")
             # TODO: what about 'create'?
 
+        expect_fail = kwargs.pop('expect_fail', False)
         # fail early on non-empty target:
         from os import listdir
         if exists(path) and listdir(path):
@@ -623,7 +627,7 @@ class GitRepo(RepoInterface):
                         "retrying",
                         trial)
                     continue
-                lgr.error(e_str)
+                    (lgr.debug if expect_fail else lgr.error)(e_str)
                 raise
             except ValueError as e:
                 if gitpy.__version__ == '1.0.2' \

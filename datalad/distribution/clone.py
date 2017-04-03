@@ -203,9 +203,10 @@ class Clone(Interface):
         # generate candidate URLs from source argument to overcome a few corner cases
         # and hopefully be more robust than git clone
         candidate_sources = _get_flexible_source_candidates(source)
+        lgr.info("Cloning dataset from '%s' to '%s'", source, dest_path)
         for source_ in candidate_sources:
             try:
-                lgr.info("Attempting to clone dataset from '%s' to '%s'",
+                lgr.debug("Attempting to clone dataset from '%s' to '%s'",
                          source_, dest_path)
                 GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
