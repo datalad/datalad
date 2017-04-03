@@ -9,40 +9,18 @@
 
 """
 
-import logging
 import os
-
 from os.path import join as opj
-from os.path import isdir
-from os.path import exists
-from os.path import realpath
-from os.path import basename
-from os.path import dirname
-
-from mock import patch
 
 from datalad.distribution.utils import _get_flexible_source_candidates
 from datalad.distribution.utils import _get_flexible_source_candidates_for_submodule
+from datalad.distribution.utils import get_git_dir
 
-from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import use_cassette
-from datalad.tests.utils import skip_if_no_network
-from datalad.utils import _path_
-from datalad.utils import rmtree
+
+from datalad.utils import on_windows
 
 
 def test_get_flexible_source_candidates():
@@ -109,3 +87,24 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
     # TODO: check that http:// urls for the dataset itself get resolved
 
     # TODO: many more!!
+
+
+@with_tempfile
+def test_get_git_dir(path):
+    # minimal, only missing coverage
+    assert_raises(RuntimeError, get_git_dir, path)
+
+    srcpath = opj(path, 'src')
+    targetpath = opj(path, 'target')
+    targetgitpath = opj(targetpath, '.git')
+    os.makedirs(srcpath)
+    os.makedirs(targetpath)
+    if not on_windows:
+        # with PY3 would also work with Windows 6+
+        os.symlink(srcpath, targetgitpath)
+        eq_(srcpath, get_git_dir(targetpath))
+        # cleanup for following test
+        os.unlink(targetgitpath)
+    with open(targetgitpath, 'w') as f:
+        f.write('gitdir: {}'.format(srcpath))
+    eq_(srcpath, get_git_dir(targetpath))
