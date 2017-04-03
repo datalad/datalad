@@ -1240,36 +1240,30 @@ def test_annex_drop(src, dst):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_remove(path1, path2):
-    ar1 = AnnexRepo(path1, create=False)
-    ar2 = AnnexRepo.clone(path1, path2, create=True, direct=True)
+def test_annex_remove(path):
+    repo = AnnexRepo(path, create=False)
 
-    for repo in (ar1, ar2):
-        file_list = repo.get_annexed_files()
-        assert len(file_list) >= 1
-        # remove a single file
-        out = repo.remove(file_list[0])
-        assert_not_in(file_list[0], repo.get_annexed_files())
-        eq_(out[0], file_list[0])
+    file_list = repo.get_annexed_files()
+    assert len(file_list) >= 1
+    # remove a single file
+    out = repo.remove(file_list[0])
+    assert_not_in(file_list[0], repo.get_annexed_files())
+    eq_(out[0], file_list[0])
 
-        with open(opj(repo.path, "rm-test.dat"), "w") as f:
-            f.write("whatever")
+    with open(opj(repo.path, "rm-test.dat"), "w") as f:
+        f.write("whatever")
 
-        # add it
-        repo.add("rm-test.dat")
+    # add it
+    repo.add("rm-test.dat")
 
-        # remove without '--force' should fail, due to staged changes:
-        if repo.is_direct_mode():
-            assert_raises(CommandError, repo.remove, "rm-test.dat")
-        else:
-            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
-        assert_in("rm-test.dat", repo.get_annexed_files())
+    # remove without '--force' should fail, due to staged changes:
+    assert_raises(CommandError, repo.remove, "rm-test.dat")
+    assert_in("rm-test.dat", repo.get_annexed_files())
 
-        # now force:
-        out = repo.remove("rm-test.dat", force=True)
-        assert_not_in("rm-test.dat", repo.get_annexed_files())
-        eq_(out[0], "rm-test.dat")
+    # now force:
+    out = repo.remove("rm-test.dat", force=True)
+    assert_not_in("rm-test.dat", repo.get_annexed_files())
+    eq_(out[0], "rm-test.dat")
 
 
 @with_batch_direct
@@ -1628,9 +1622,6 @@ def _test_status(ar):
     # TODO: plain git submodule and even deeper hierarchy?
     #       => complete recursion to work if started from within plain git;
     #       But this is then relevant for Dataset.status() - not herein
-    # TODO: when to use annex-sync
-    # TODO: Figure out, how to RF/fix the issue with committing direct mode
-    #       submodules
 
     def sync_wrapper(push=False, pull=False, commit=False):
         # wraps common annex-sync call, since it currently fails under
@@ -1704,14 +1695,21 @@ def _test_status(ar):
     # create a file to be unannexed:
     with open(opj(ar.path, 'fifth'), 'w') as f:
         f.write("total disaster")
+
     ar.add('fifth')
     sync_wrapper()
+    # TODO:
     # Note: For some reason this seems to be the only place, where we actually
-    # need to call commit via annex-proxy
-    ar.commit(msg="fifth to be unannexed", files='fifth', proxy=ar.is_direct_mode())
+    # need to call commit via annex-proxy. If called via '-c core.bare=False'
+    # and/or '--work-tree=.' the file ends up in git instead of annex.
+    # Note 2: This is only if we explicitly pass a path. Otherwise it works
+    # without annex-proxy.
+    ar.commit(msg="fifth to be unannexed", files='fifth',
+              proxy=ar.is_direct_mode())
     eq_(stat, ar.status())
 
     ar.unannex('fifth')
+
     sync_wrapper(pull=False, push=False, commit=True)
     stat['untracked'].append('fifth')
     eq_(stat, ar.status())
@@ -1898,7 +1896,7 @@ def _test_status(ar):
 
     ar.remove('submod')
     # TODO: Why the difference?
-    stat['deleted'].append('submod/' if ar.is_direct_mode() else 'submod')
+    stat['deleted'].append('submod')
     stat['modified'].append('.gitmodules')
     eq_(stat, ar.status())
 
@@ -1906,10 +1904,9 @@ def _test_status(ar):
     # of the very same submodule, which we needed to commit via
     # -c core.bare=False instead. Otherwise the very same failure happens.
     # Just vice versa. See above where 'submod' is added.
-    ar.commit("submod removed", files=['submod', '.gitmodules'],
-              proxy=ar.is_direct_mode())
+    ar.commit("submod removed", files=['submod', '.gitmodules'])
     stat['modified'].remove('.gitmodules')
-    stat['deleted'].remove('submod/' if ar.is_direct_mode() else 'submod')
+    stat['deleted'].remove('submod')
     eq_(stat, ar.status())
 
 

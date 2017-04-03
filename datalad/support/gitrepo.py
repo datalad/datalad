@@ -834,6 +834,8 @@ class GitRepo(RepoInterface):
     def remove(self, files, **kwargs):
         """Remove files.
 
+        Calls git-rm.
+
         Parameters
         ----------
         files: str
@@ -849,27 +851,13 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
 
-        # todo: we are able to remove objects, not necessarily specified by a
-        #       path (see below). We may want to make this available at some
-        #       point.
-        # Multiple types of items are supported which may be be freely mixed.
-        #
-        #     - path string
-        #         Remove the given path at all stages. If it is a directory, you must
-        #         specify the r=True keyword argument to remove all file entries
-        #         below it. If absolute paths are given, they will be converted
-        #         to a path relative to the git repository directory containing
-        #         the working tree
-        #
-        #         The path string may include globs, such as *.c.
-        #
-        #     - Blob Object
-        #         Only the path portion is used in this case.
-        #
-        #     - BaseIndexEntry or compatible type
-        #         The only relevant information here Yis the path. The stage is ignored.
+        stdout, stderr = self._git_custom_command(
+            files, ['git', 'rm'] + to_options(**kwargs))
 
-        return self.repo.index.remove(files, working_tree=True, **kwargs)
+        # output per removed file is expected to be "rm 'PATH'":
+        return [line.strip()[4:-1] for line in stdout.splitlines()]
+
+        #return self.repo.git.rm(files, cached=False, **kwargs)
 
     def precommit(self):
         """Perform pre-commit maintenance tasks

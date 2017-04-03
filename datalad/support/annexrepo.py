@@ -834,11 +834,14 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # if it is set in .git/config
                 self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = True
 
-            # TEMP: nevertheless use this option to inject it to gitpython
+            # TEMP: nevertheless use this option to inject it into gitpython
             # TODO: Solve it and change to "elif"
             if 'core.bare=False' not in self._GIT_COMMON_OPTIONS:
-                # standard procedure:
+                # standard direct mode procedure part I:
                 self._GIT_COMMON_OPTIONS.extend(['-c', 'core.bare=False'])
+            if '--work-tree=' not in self._GIT_COMMON_OPTIONS:
+                # standard direct mode procedure part II:
+                self._GIT_COMMON_OPTIONS.append('--work-tree=.')
 
     def _git_custom_command(self, *args, **kwargs):
 
@@ -1040,23 +1043,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
         if dry_run:
+
             git_options = ['--dry-run', '-N', '--ignore-missing']
+            try:
+                return_list = super(AnnexRepo, self).add(
+                    files, git_options=git_options)
+            except CommandError as e:
+                if "fatal: This operation must be run in a work tree" \
+                   in e.stderr and \
+                   "fatal: 'git status --porcelain' failed in submodule" \
+                   in e.stderr:
 
-            # add to git instead of annex
-            if self.is_direct_mode():
-                # TODO:  may be there should be a generic decorator to avoid
-                # duplication and just augment how git commands are called (i.e.
-                # with proxy
-                add_out = self.proxy(['git', 'add'] + options + git_options + files)
-                return_list = self._process_git_get_output(*add_out)
-
-                # Note/TODO:
-                # There was a reason to use the following instead of self.proxy:
-                #cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
-                #           files
-                #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
-            else:
-                return_list = super(AnnexRepo, self).add(files, git_options=git_options)
+                    lgr.warning(
+                        "Known bug in direct mode."
+                        "We can't use --dry-run when there are submodules in"
+                        "direct mode, because the internal call to git status "
+                        "fails. To be resolved by using (Dataset's) status "
+                        "instead of a git-add --dry-run altogether.")
+                    # fake the return for now
+                    return_list = self._process_git_get_output(
+                        linesep.join(["'{}'".format(f) for f in files]))
+                else:
+                    # unexpected failure
+                    raise e
         else:
             # Theoretically we could have done for git as well, if it could have
             # been batched
@@ -2146,28 +2155,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         force: bool, optional
         """
 
+        # TODO: parameter 'force' unnecessary => kwargs / to_options
         self.precommit()  # since might interfere
-        if self.is_direct_mode():
-            stdout, stderr = self.proxy(['git', 'rm'] +
-                                        to_options(**kwargs) +
-                                        (['--force'] if force else []) +
-                                        files)
-            # output per removed file is expected to be "rm 'PATH'":
-            r_list = [line.strip()[4:-1] for line in stdout.splitlines()]
 
-            # yoh gives up -- for some reason sometimes it remains,
-            # so if we force -- we mean it!
-            if force:
-                for f in files:
-                    filepath = opj(self.path, f)
-                    if lexists(filepath):
-                        unlink(filepath)
-                        r_list.append(f)
-            return r_list
-        else:
-            return super(AnnexRepo, self).remove(files, force=force,
-                                                 normalize_paths=False,
-                                                 **kwargs)
+        return super(AnnexRepo, self).remove(files, force=force,
+                                             normalize_paths=False,
+                                             **kwargs)
 
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content
