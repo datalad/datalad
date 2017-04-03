@@ -136,8 +136,8 @@ class ConfigManager(object):
 
     Each instance carries a public `overrides` attribute. This dictionary
     contains variables that override any setting read from a file. The overrides
-    are persistent across reloads, and are not modified by any of the manipulation
-    methods, such as `set` or `unset`.
+    are persistent across reloads, and are not modified by any of the
+    manipulation methods, such as `set` or `unset`.
 
     Any DATALAD_* environment variable is also presented as a configuration
     item. Settings read from environment variables are not stored in any of the
@@ -235,8 +235,10 @@ class ConfigManager(object):
 
         if self._dataset_cfgfname:
             if exists(self._dataset_cfgfname):
-                stdout, stderr = self._run(run_args + ['--file', self._dataset_cfgfname],
-                                           log_stderr=True)
+                stdout, stderr = self._run(
+                    run_args + ['--file', self._dataset_cfgfname],
+                    log_stderr=True
+                )
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store, self._cfgfiles = _parse_gitconfig_dump(
@@ -485,7 +487,7 @@ class ConfigManager(object):
         """Like `get()`, but with an optional default value
 
         If the default is not None, the given default value will be returned in
-        case the option did not exist. This behavior immitates GitPython's
+        case the option did not exist. This behavior imitates GitPython's
         config parser.
         """
         try:
@@ -530,7 +532,8 @@ class ConfigManager(object):
         if where == 'dataset':
             if not self._dataset_cfgfname:
                 raise ValueError(
-                    'ConfigManager cannot store to configuration to dataset, none specified')
+                    'ConfigManager cannot store to configuration to dataset, '
+                    'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
             dscfg_dirname = opj(self._dataset_path, '.datalad')
