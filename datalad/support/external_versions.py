@@ -17,6 +17,9 @@ from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
+# import version helper from config to have only one implementation
+# config needs this to avoid circular imports
+from datalad.config import get_git_version as __get_git_version
 from .exceptions import CommandError
 
 __all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
@@ -53,11 +56,6 @@ def _get_annex_version():
         # fall back on method that could work with older installations
         out, err = _runner.run(['git', 'annex', 'version'])
         return out.split('\n')[0].split(':')[1].strip()
-
-
-def __get_git_version(runner):
-    """Return version of available git"""
-    return runner.run('git version'.split())[0].split()[2]
 
 
 def _get_git_version():
