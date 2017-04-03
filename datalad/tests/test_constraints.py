@@ -107,6 +107,13 @@ def test_none():
     assert_raises(ValueError, lambda: c([]))
 
 
+def test_callable():
+    c = ct.EnsureCallable()
+    # this should always work
+    assert_equal(c(range), range)
+    assert_raises(ValueError, c, 'range')
+
+
 def test_choice():
     c = ct.EnsureChoice('choice1', 'choice2', None)
     # this should always work
@@ -115,6 +122,18 @@ def test_choice():
     # this should always fail
     assert_raises(ValueError, lambda: c('fail'))
     assert_raises(ValueError, lambda: c('None'))
+
+
+def test_keychoice():
+    c = ct.EnsureKeyChoice(key='some', values=('choice1', 'choice2', None))
+    assert_equal(c({'some': 'choice1'}), {'some': 'choice1'})
+    assert_equal(c({'some': None}), {'some': None})
+    assert_equal(c({'some': None, 'ign': 'ore'}), {'some': None, 'ign': 'ore'})
+    assert_raises(ValueError, c, 'fail')
+    assert_raises(ValueError, c, 'None')
+    assert_raises(ValueError, c, {'nope': 'None'})
+    assert_raises(ValueError, c, {'some': 'None'})
+    assert_raises(ValueError, c, {'some': ('a', 'b')})
 
 
 def test_range():

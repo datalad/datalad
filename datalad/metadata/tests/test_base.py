@@ -302,9 +302,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True)
-    subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
-    assert_false(exists(opj(subds.path, '.datalad', 'config')))
-    subsubds = subds.create('subsub', force=True)
+    subds.create('subsub', force=True)
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second native set for the topmost dataset

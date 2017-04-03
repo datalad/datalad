@@ -270,6 +270,10 @@ class IncompleteResultsError(RuntimeError):
         self.results = results
         self.failed = failed
 
+    def __str__(self):
+        super_str = super(IncompleteResultsError, self).__str__()
+        return "{} {}" \
+               "".format(super_str, self.failed)
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""

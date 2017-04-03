@@ -949,8 +949,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        # TODO: fail api.get -- must exit in cmdline with non-0 if anything
-        # failed to download
         with cm:
             results = self._run_annex_command_json(
                 'get', args=options + fetch_files,
@@ -1863,6 +1861,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
+        # protect against progress leakage
+        json_objects = [j for j in json_objects if not 'byte-progress' in j]
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always

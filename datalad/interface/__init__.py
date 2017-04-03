@@ -28,8 +28,8 @@ _group_dataset = (
         ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.uninstall', 'Drop', 'drop', 'drop'),
-        ('datalad.distribution.uninstall', 'Remove', 'remove', 'remove'),
+        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
+        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
@@ -72,7 +72,9 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
+        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])

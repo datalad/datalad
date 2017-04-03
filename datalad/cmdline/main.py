@@ -106,6 +106,36 @@ def setup_parser(
         help="""configuration variable setting. Overrides any configuration
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
+    parser.add_argument(
+        '--output-format', dest='common_output_format',
+        choices=['simple', 'json', 'tailored'],
+        default='tailored',
+        help="""select format for returned command results. 'simple' give one line
+        per result using a '<status>: <path>' syntax; 'json' renders a JSON object
+        with all properties for each result (one per line); 'tailored' enables a
+        command-specific rendering style that is typically tailored to human
+        consumption (no result output otherwise).""")
+    parser.add_argument(
+        '--report-status', dest='common_report_status',
+        choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
+        help="""constrain command result report to records matching the given
+        status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands
+        for 'impossible' OR 'error'.""")
+    parser.add_argument(
+        '--report-type', dest='common_report_type',
+        choices=['dataset', 'file'],
+        action='append',
+        help="""constrain command result report to records matching the given
+        type. Can be given more than once to match multiple types.""")
+    parser.add_argument(
+        '--on-failure', dest='common_on_failure',
+        choices=['ignore', 'continue', 'stop'],
+        # no default: better be configure per-command
+        help="""when an operation fails: 'ignore' and continue with remaining
+        operations, the error is logged but does not lead to a non-zero exit code
+        of the command; 'continue' works like 'ignore', but an error causes a
+        non-zero exit code; 'stop' halts on first failure and yields non-zero exit
+        code. A failure is any result with status 'impossible' or 'error'.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -251,6 +281,9 @@ def main(args=None):
 
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
+
+    # enable overrides
+    datalad.cfg.reload()
 
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([

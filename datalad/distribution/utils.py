@@ -17,8 +17,6 @@ from os.path import isdir
 from os.path import join as opj
 from os.path import islink
 from os.path import isabs
-from os.path import relpath
-from os.path import curdir
 from os.path import normpath
 
 from six.moves.urllib.parse import quote as urlquote
@@ -27,7 +25,6 @@ from six.moves.urllib.parse import quote as urlquote
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
@@ -37,7 +34,6 @@ from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs
 from datalad.utils import rmtree
 from datalad.utils import knows_annex
-from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import unique
 
 from .dataset import Dataset
@@ -105,79 +101,6 @@ def get_git_dir(path):
     return git_dir
 
 
-# TODO: evolved to sth similar to get_containing_subdataset. Therefore probably
-# should move into this one as an option. But: consider circular imports!
-def install_necessary_subdatasets(ds, path, reckless):
-    """Installs subdatasets of `ds`, that are necessary to obtain in order
-    to have access to `path`.
-
-    Gets the subdataset containing `path` regardless of whether or not it was
-    already installed. While doing so, installs everything necessary in between
-    the uppermost installed one and `path`.
-
-    Note: `ds` itself has to be installed.
-
-    Parameters
-    ----------
-    ds: Dataset
-    path: str
-    reckless: bool
-
-    Returns
-    -------
-    Dataset
-      the last (deepest) subdataset, that was installed
-    """
-    assert ds.is_installed()
-
-    # figuring out what dataset to start with:
-    start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
-
-    if start_ds.is_installed():
-        return start_ds
-
-    # we try to install subdatasets as long as there is anything to
-    # install in between the last one installed and the actual thing
-    # to get (which is `path`):
-    cur_subds = start_ds
-
-    # Note, this is not necessarily `ds`:
-    # MIH: would be good to know why?
-    cur_par_ds = cur_subds.get_superdataset()
-    assert cur_par_ds is not None
-
-    while not cur_subds.is_installed():
-        lgr.info("Installing subdataset %s%s",
-                 cur_subds,
-                 ' in order to get %s' % path if cur_subds.path != path else '')
-        # get submodule info
-        submodules = cur_par_ds.repo.get_submodules()
-        submodule = [sm for sm in submodules
-                     if sm.path == relpath(cur_subds.path, start=cur_par_ds.path)][0]
-        # install using helper that give some flexibility regarding where to
-        # get the module from
-        _install_subds_from_flexible_source(
-            cur_par_ds,
-            submodule.path,
-            submodule.url,
-            reckless)
-
-        cur_par_ds = cur_subds
-
-        # Note: PathOutsideRepositoryError should not happen here.
-        # If so, there went something fundamentally wrong, so raise something
-        # different, to not let the caller mix it up with a "regular"
-        # PathOutsideRepositoryError from above. (Although it could be
-        # detected via its `repo` attribute)
-        try:
-            cur_subds = \
-                cur_subds.get_containing_subdataset(path, recursion_limit=None)
-        except PathOutsideRepositoryError as e:
-            raise RuntimeError("Unexpected failure: {0}".format(exc_str(e)))
-
-    return cur_subds
-
-
 def _get_git_url_from_source(source):
     """Return URL for cloning associated with a source specification
 
@@ -197,7 +120,8 @@ def _get_git_url_from_source(source):
     return source
 
 
-def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
+def _install_subds_from_flexible_source(
+        ds, sm_path, sm_url, reckless, description=None):
     """Tries to obtain a given subdataset from several meaningful locations"""
     # compose a list of candidate clone URLs
     clone_urls = _get_flexible_source_candidates_for_submodule(
@@ -213,14 +137,22 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
             msg="Failed to install %s from %s (%s)" % (
                 subds, clone_urls, exc_str(e))
             )
+    # ATM above _clone_from_any_source would just return None and not
+    # crash if clone has failed for any reason.  May be it is because that
+    # submodule already was installed and all is good?
+
     # do fancy update
-    if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
+    if sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'):
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         # TODO: move all of that into update_submodule ??
         # TODO: direct mode ramifications?
         # track branch originally cloned
         subrepo = subds.repo
-        branch = subds.repo.get_active_branch()
+        # Here we can endup with subrepo being None and thus None e.g.
+        # if clone above has failed.  yoh has no idea on the assumptions
+        # of _clone_from_any_source (seems to not want to fail), so just let
+        # it fail 'natively' at some point after
+        branch = subrepo.get_active_branch()
         branch_hexsha = subrepo.get_hexsha(branch)
         ds.repo.update_submodule(sm_path, init=True)
         updated_branch = subrepo.get_active_branch()
@@ -266,7 +198,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, reckless):
         # submodule is brand-new and previously unknown
         ds.repo.add_submodule(sm_path, url=clone_url)
     _fixup_submodule_dotgit_setup(ds, sm_path)
-    _handle_possible_annex_dataset(subds, reckless)
+    _handle_possible_annex_dataset(subds, reckless, description=description)
     return subds
 
 
@@ -435,44 +367,7 @@ def _clone_from_any_source(sources, dest):
                 raise
 
 
-def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None):
-    content_by_ds = {}
-    if isinstance(recursion_limit, int) and recursion_limit <= 0:
-        return content_by_ds
-    # loop over submodules not subdatasets to get the url right away
-    # install using helper that give some flexibility regarding where to
-    # get the module from
-    for sub in ds.repo.get_submodules():
-        subds = Dataset(opj(ds.path, sub.path))
-        if start is not None and not subds.path.startswith(_with_sep(start)):
-            # this one we can ignore, not underneath the start path
-            continue
-        if not subds.is_installed():
-            try:
-                lgr.info("Installing subdataset %s", subds.path)
-                subds = _install_subds_from_flexible_source(
-                    ds, sub.path, sub.url, reckless)
-                # we want the entire thing, but mark this subdataset
-                # as automatically installed
-                content_by_ds[subds.path] = [curdir]
-            except Exception as e:
-                # skip, if we didn't manage to install subdataset
-                lgr.warning(
-                    "Installation of subdatasets %s failed, skipped", subds)
-                lgr.debug("Installation attempt failed with exception: %s",
-                          exc_str(e))
-                continue
-            # otherwise recurse
-            # we can skip the start expression, we know we are within
-            content_by_ds.update(_recursive_install_subds_underneath(
-                subds,
-                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
-                reckless=reckless
-            ))
-    return content_by_ds
-
-
-def _handle_possible_annex_dataset(dataset, reckless):
+def _handle_possible_annex_dataset(dataset, reckless, description=None):
     # in any case check whether we need to annex-init the installed thing:
     if knows_annex(dataset.path):
         # init annex when traces of a remote annex can be detected
@@ -483,6 +378,29 @@ def _handle_possible_annex_dataset(dataset, reckless):
             dataset.config.add(
                 'annex.hardlink', 'true', where='local', reload=True)
         lgr.debug("Initializing annex repo at %s", dataset.path)
+        # XXX this is rather convoluted, init does init, but cannot
+        # set a description without `create=True`
         repo = AnnexRepo(dataset.path, init=True)
+        # so do manually see #1403
+        if description:
+            repo._init(description=description)
         if reckless:
             repo._run_annex_command('untrust', annex_options=['here'])
+
+
+def _get_installationpath_from_url(url):
+    """Returns a relative path derived from the trailing end of a URL
+
+    This can be used to determine an installation path of a Dataset
+    from a URL, analog to what `git clone` does.
+    """
+    path = url.rstrip('/')
+    if '/' in path:
+        path = path.split('/')
+        if path[-1] == '.git':
+            path = path[-2]
+        else:
+            path = path[-1]
+    if path.endswith('.git'):
+        path = path[:-4]
+    return path

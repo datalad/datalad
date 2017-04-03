@@ -211,10 +211,10 @@ class Add(Interface):
             for subds_path in [d for d in toadd
                                if GitRepo.is_valid_repo(d) and
                                d != ds_path and
-                               d not in ds.get_subdatasets(
+                               d not in ds.subdatasets(
                                    recursive=False,
-                                   absolute=True,
-                                   fulfilled=True)]:
+                                   fulfilled=True,
+                                   result_xfm='paths')]:
                 # TODO add check that the subds has a commit, and refuse
                 # to operate on it otherwise, or we would get a bastard
                 # submodule that cripples git operations
@@ -241,11 +241,14 @@ class Add(Interface):
             results.extend(added)
 
         if results and save:
+            # TODO GENERATOR
+            # new returns a generator and yields status dicts
+            # pass through as embedded results
             # OPT: tries to save even unrelated stuff
-            save_dataset_hierarchy(
+            list(save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
-                message=message if message else '[DATALAD] added content')
+                message=message if message else '[DATALAD] added content'))
 
         return results
 
