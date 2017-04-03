@@ -314,10 +314,10 @@ def _clone_from_any_source(sources, dest):
     # of git-clone, due to existing target and an unsuccessful clone
     # attempt. See below.
     existed = dest and exists(dest)
+    lgr.info("Installing dataset %s", dest)
     for source_ in sources:
         try:
-            lgr.debug("Retrieving a dataset from URL: "
-                      "{0}".format(source_))
+            lgr.debug("Attempting to clone {0}".format(source_))
             GitRepo.clone(path=dest, url=source_, create=True)
             return source_  # do not bother with other sources if succeeded
         except GitCommandError as e:
