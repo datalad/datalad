@@ -45,9 +45,6 @@ from .utils import _get_flexible_source_candidates
 from .utils import _handle_possible_annex_dataset
 from .utils import _get_installationpath_from_url
 
-# TODO make this unnecessary
-from datalad.tests.utils import swallow_logs
-
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.clone')
@@ -206,22 +203,19 @@ class Clone(Interface):
         # generate candidate URLs from source argument to overcome a few corner cases
         # and hopefully be more robust than git clone
         candidate_sources = _get_flexible_source_candidates(source)
+        lgr.info("Cloning dataset from '%s' to '%s'", source, dest_path)
         for source_ in candidate_sources:
             try:
-                lgr.info("Attempting to clone dataset from '%s' to '%s'",
+                lgr.debug("Attempting to clone dataset from '%s' to '%s'",
                          source_, dest_path)
-                # TODO this is a shame. we should be able to instruct GitRepo
-                # how to behave wrt logging, and not stick a pillow in its face
-                with swallow_logs():
-                    GitRepo.clone(
-                        path=dest_path, url=source_, create=True)
+                GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
                 lgr.debug("Failed to clone from URL: %s (%s)",
                           source_, exc_str(e))
-                lgr.debug("Wiping out unsuccessful clone attempt at: %s",
-                          dest_path)
                 if exists(dest_path):
+                    lgr.debug("Wiping out unsuccessful clone attempt at: %s",
+                              dest_path)
                     rmtree(dest_path)
 
         if not destination_dataset.is_installed():
