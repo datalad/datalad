@@ -379,7 +379,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             elif GitRepo.is_valid_repo(opj(self.path, sm.path)):
                 sm_repo = GitRepo(opj(self.path, sm.path))
 
-                # TODO: Clarify issue: GitRepo.dirty() doesn't fit our parameters
+                # TODO: Clarify issue: GitRepo.is_dirty() doesn't fit our parameters
                 if sm_repo.is_dirty(index=deleted or modified or added or type_changed,
                                     working_tree=deleted or modified or added or type_changed,
                                     untracked_files=untracked,
@@ -507,8 +507,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     @borrowdoc(GitRepo)
     def is_dirty(self, index=True, working_tree=False, untracked_files=True,
                  submodules=True, path=None):
-        # TODO: Add doc on how this differs from GitRepo.dirty()
-        # Parameter working_tree exists to meet the signature of GitRepo.dirty()
+        # TODO: Add doc on how this differs from GitRepo.is_dirty()
+        # Parameter working_tree exists to meet the signature of GitRepo.is_dirty()
 
         if working_tree:
             # Note: annex repos don't always have a git working tree and the

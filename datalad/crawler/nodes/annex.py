@@ -697,7 +697,7 @@ class Annexificator(object):
 
         def switch_branch(data):
             """Switches to the branch %s""" % branch
-            # if self.repo.dirty()
+            # if self.repo.dirty
             list(self.finalize()(data))
             # statusdb is valid only within the same branch
             self._statusdb = None
