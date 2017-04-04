@@ -87,7 +87,7 @@ def test_add_files(path):
             result = ds.add(arg[0], to_git=arg[1], save=False)
         # TODO eq_(result, arg[0])
         # added, but not committed:
-        ok_(ds.repo.dirty())
+        ok_(ds.repo.dirty)
 
         # get sets for comparison:
         annexed = set(ds.repo.get_annexed_files())
@@ -115,14 +115,14 @@ def test_add_recursive(path):
     ds.create(force=True, save=False)
     subds = ds.create('dir', force=True)
     ds.save("Submodule added.")
-    ok_(subds.repo.dirty())
+    ok_(subds.repo.dirty)
 
     # no subds without recursive:
     ds.add('.', recursive=False)
-    ok_(subds.repo.dirty())
+    ok_(subds.repo.dirty)
     # nosubds with recursion limit too low:
     ds.add('.', recursive=True, recursion_limit=0)
-    ok_(subds.repo.dirty())
+    ok_(subds.repo.dirty)
 
     # add while also instructing annex to add in parallel 2 jobs (smoke testing
     # for that effect ATM)
@@ -158,7 +158,7 @@ def test_relpath_add(path):
         # and now add all
         add('..')
     # auto-save enabled
-    assert_false(ds.repo.dirty())
+    assert_false(ds.repo.dirty)
 
 
 @with_tree(tree={'file1.txt': 'whatever 1',
@@ -254,8 +254,8 @@ def test_add_source(path, url, ds_dir):
 def test_add_subdataset(path):
     subds = create(opj(path, 'dir'), force=True)
     ds = create(path, force=True)
-    ok_(subds.repo.dirty())
-    ok_(ds.repo.dirty())
+    ok_(subds.repo.dirty)
+    ok_(ds.repo.dirty)
     assert_not_in('dir', ds.get_subdatasets())
     # without a base dataset the next is interpreted as "add everything
     # in subds to subds"

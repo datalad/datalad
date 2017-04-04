@@ -1692,8 +1692,8 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
-    def dirty(self, index=True, working_tree=True, untracked_files=True,
-              submodules=True, path=None):
+    def is_dirty(self, index=True, working_tree=True, untracked_files=True,
+                 submodules=True, path=None):
         """Returns true if the repo is considered to be dirty
 
         Parameters
@@ -1716,6 +1716,10 @@ class GitRepo(RepoInterface):
         return self.repo.is_dirty(index=index, working_tree=working_tree,
                                   untracked_files=untracked_files,
                                   submodules=submodules, path=path)
+
+    @property
+    def dirty(self):
+        return self.is_dirty()
 
     @property
     def untracked_files(self):

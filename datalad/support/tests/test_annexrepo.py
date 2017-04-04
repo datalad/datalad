@@ -745,9 +745,9 @@ def test_AnnexRepo_add_to_annex(path):
     # uncommitted:
     # but not in direct mode branch
     if repo.is_direct_mode():
-        ok_(not repo.dirty(submodules=False))
+        ok_(not repo.is_dirty(submodules=False))
     else:
-        ok_(repo.dirty(submodules=False))
+        ok_(repo.is_dirty(submodules=False))
 
     repo.commit("Added file to annex.")
     ok_clean_git(repo, annex=True, ignore_submodules=True)
@@ -785,7 +785,7 @@ def test_AnnexRepo_add_to_git(path):
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
     # uncommitted:
-    ok_(repo.dirty(submodules=False))
+    ok_(repo.is_dirty(submodules=False))
     repo.commit("Added file to annex.")
     ok_clean_git(repo, annex=True, ignore_submodules=True)
 
@@ -945,7 +945,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
     assert_in(ar.WEB_UUID, ar.whereis(testfile))
-    assert(not ar.dirty())
+    assert(not ar.dirty)
     ar.add_url_to_file(testfile2_, testurl2_, batch=True)
     assert(ar.info(testfile2_))
     assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
@@ -979,7 +979,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(len(ar._batched), 1)
     ar._batched.close()
     eq_(len(ar._batched), 1)  # doesn't remove them, just closes
-    assert(not ar.dirty())
+    assert(not ar.dirty)
 
     ar._batched.clear()
     eq_(len(ar._batched), 0)  # .clear also removes
@@ -1308,28 +1308,28 @@ def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
     print(ar.path)
     assert_true(os.path.exists(ar.path))
-    assert_false(ar.dirty())
+    assert_false(ar.dirty)
     os.makedirs(opj(ar.path, '.datalad'))
     # we don't care about empty directories
-    assert_false(ar.dirty())
+    assert_false(ar.dirty)
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    assert_true(ar.dirty())  # TODO: has been more detailed assertion (untracked file)
+    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # no file is being added, as dotfiles/directories are ignored by default
     ar.add('.', git=False)
     # double check, still dirty
-    assert_true(ar.dirty())  # TODO: has been more detailed assertion (untracked file)
+    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
     ar.add('.', git=True)
     # all in index
-    assert_true(ar.dirty())
+    assert_true(ar.dirty)
     # TODO: has been more specific:
     # assert_false(ar.repo.is_dirty(
     #     index=False, working_tree=True, untracked_files=True, submodules=True))
     ar.commit(msg="some")
     # all committed
-    assert_false(ar.dirty())
+    assert_false(ar.dirty)
     # not known to annex
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
 
@@ -1572,46 +1572,46 @@ def test_AnnexRepo_get_submodules():
 def test_AnnexRepo_dirty(path):
 
     repo = AnnexRepo(path, create=True)
-    ok_(not repo.dirty())
+    ok_(not repo.dirty)
 
     # pure git operations:
     # untracked file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    ok_(repo.dirty())
+    ok_(repo.dirty)
     # staged file
     repo.add('file1.txt', git=True)
-    ok_(repo.dirty())
+    ok_(repo.dirty)
     # clean again
     repo.commit("file1.txt added")
-    ok_(not repo.dirty())
+    ok_(not repo.dirty)
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
     if not repo.config.getint("annex", "version") == 6:
-        ok_(not repo.dirty())
+        ok_(not repo.dirty)
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('something else')
-    ok_(repo.dirty())
+    ok_(repo.dirty)
     # clean again
     repo.add('file1.txt', git=True)
     repo.commit("file1.txt modified")
-    ok_(not repo.dirty())
+    ok_(not repo.dirty)
 
     # annex operations:
     # untracked file
     with open(opj(path, 'file2.txt'), 'w') as f:
         f.write('different content')
-    ok_(repo.dirty())
+    ok_(repo.dirty)
     # annexed file
     repo.add('file2.txt', git=False)
     if not repo.is_direct_mode():
         # in direct mode 'annex add' results in a clean repo
-        ok_(repo.dirty())
+        ok_(repo.dirty)
         # commit
         repo.commit("file2.txt annexed")
-    ok_(not repo.dirty())
+    ok_(not repo.dirty)
 
     # TODO: unlock/modify
 
@@ -1656,7 +1656,7 @@ def _test_status(ar):
             'modified': [],
             'added': [],
             'type_changed': []}
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # untracked files:
     with open(opj(ar.path, 'first'), 'w') as f:
@@ -1666,14 +1666,14 @@ def _test_status(ar):
 
     stat['untracked'].append('first')
     stat['untracked'].append('second')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add a file to git
     ar.add('first', git=True)
     sync_wrapper()
     stat['untracked'].remove('first')
     stat['added'].append('first')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add a file to annex
     ar.add('second')
@@ -1682,7 +1682,7 @@ def _test_status(ar):
     if not ar.is_direct_mode():
         # in direct mode annex-status doesn't report an added file 'added'
         stat['added'].append('second')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # commit to be clean again:
     ar.commit("added first and second")
@@ -1691,7 +1691,7 @@ def _test_status(ar):
             'modified': [],
             'added': [],
             'type_changed': []}
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
     # create a file to be unannexed:
     with open(opj(ar.path, 'fifth'), 'w') as f:
         f.write("total disaster")
@@ -1706,19 +1706,19 @@ def _test_status(ar):
     # without annex-proxy.
     ar.commit(msg="fifth to be unannexed", files='fifth',
               proxy=ar.is_direct_mode())
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     ar.unannex('fifth')
 
     sync_wrapper(pull=False, push=False, commit=True)
     stat['untracked'].append('fifth')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # modify a file in git:
     with open(opj(ar.path, 'first'), 'w') as f:
         f.write("increased tremendousness")
     stat['modified'].append('first')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # modify an annexed file:
     if not ar.is_direct_mode():
@@ -1726,7 +1726,7 @@ def _test_status(ar):
         ar.unlock('second')
         if not ar.get_active_branch().endswith('(unlocked)'):
             stat['type_changed'].append('second')
-        eq_(stat, ar.status())
+        eq_(stat, ar.get_status())
     with open(opj(ar.path, 'second'), 'w') as f:
         f.write("Needed to unlock first. Sad!")
     if not ar.is_direct_mode():
@@ -1735,7 +1735,7 @@ def _test_status(ar):
             stat['type_changed'].remove('second')
     stat['modified'].append('second')
     sync_wrapper()
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # create something in a subdir
     os.mkdir(opj(ar.path, 'sub'))
@@ -1745,24 +1745,24 @@ def _test_status(ar):
     # Note, that this is different from 'git status',
     # which would just say 'sub/':
     stat['untracked'].append(opj('sub', 'third'))
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # test parameters for status to restrict results:
     # limit requested states:
-    limited_status = ar.status(untracked=True, deleted=False, modified=True,
-                               added=True, type_changed=False)
+    limited_status = ar.get_status(untracked=True, deleted=False, modified=True,
+                                   added=True, type_changed=False)
     eq_(len(limited_status), 3)
     ok_(all([k in ('untracked', 'modified', 'added') for k in limited_status]))
     eq_(stat['untracked'], limited_status['untracked'])
     eq_(stat['modified'], limited_status['modified'])
     eq_(stat['added'], limited_status['added'])
     # limit requested files:
-    limited_status = ar.status(path=opj('sub', 'third'))
+    limited_status = ar.get_status(path=opj('sub', 'third'))
     eq_(limited_status['untracked'], [opj('sub', 'third')])
     ok_(all([len(limited_status[l]) == 0 for l in ('modified', 'added',
                                                    'deleted', 'type_changed')]))
     # again, with a list:
-    limited_status = ar.status(path=[opj('sub', 'third'), 'second'])
+    limited_status = ar.get_status(path=[opj('sub', 'third'), 'second'])
     eq_(limited_status['untracked'], [opj('sub', 'third')])
     eq_(limited_status['modified'], ['second'])
     ok_(all([len(limited_status[l]) == 0 for l in ('added', 'deleted',
@@ -1771,13 +1771,13 @@ def _test_status(ar):
     # create a subrepo:
     sub = AnnexRepo(opj(ar.path, 'submod'), create=True)
     # nothing changed, it's empty besides .git, which is ignored
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # file in subrepo
     with open(opj(ar.path, 'submod', 'fourth'), 'w') as f:
         f.write("this is a birth certificate")
     stat['untracked'].append(opj('submod', 'fourth'))
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add to subrepo
     sub.add('fourth', commit=True, msg="birther mod init'ed")
@@ -1790,7 +1790,7 @@ def _test_status(ar):
 
     # Note, that now the non-empty repo is untracked
     stat['untracked'].append('submod/')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add the submodule
     ar.add_submodule('submod', url=opj(curdir, 'submod'))
@@ -1800,7 +1800,7 @@ def _test_status(ar):
 
     # 'submod/' might either be reported as 'added' or 'modified'.
     # Therefore more complex assertions at this point:
-    reported_stat = ar.status()
+    reported_stat = ar.get_status()
     eq_(stat['untracked'], reported_stat['untracked'])
     eq_(stat['deleted'], reported_stat['deleted'])
     eq_(stat['type_changed'], reported_stat['type_changed'])
@@ -1810,7 +1810,7 @@ def _test_status(ar):
         stat['modified'] + ['submod/'] == reported_stat['modified'])
 
     # simpler assertion if we ignore submodules:
-    eq_(stat, ar.status(submodules=False))
+    eq_(stat, ar.get_status(submodules=False))
 
     # commit the submodule
     # in direct mode, commit of a removed submodule fails with:
@@ -1825,13 +1825,13 @@ def _test_status(ar):
     ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
 
     stat['added'].remove('.gitmodules')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add another file to submodule
     with open(opj(ar.path, 'submod', 'not_tracked'), 'w') as f:
         f.write("#LastNightInSweden")
     stat['modified'].append('submod/')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # add the untracked file:
     sub.add('not_tracked')
@@ -1841,15 +1841,15 @@ def _test_status(ar):
         # This is consistent in a way, but surprising in another ...
         pass
     else:
-        eq_(stat, ar.status())
+        eq_(stat, ar.get_status())
     sub.commit(msg="added file not_tracked")
     # 'submod/' still modified when looked at from above:
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     ar.add('submod', git=True)
     ar.commit(msg="submodule modified", files='submod')
     stat['modified'].remove('submod/')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # clean again:
     stat = {'untracked': [],
@@ -1871,34 +1871,34 @@ def _test_status(ar):
         ar.commit()
     else:
         super(AnnexRepo, ar).commit(files=['first', 'fifth', opj('sub', 'third'), 'second'])
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # remove a file in annex:
     ar.remove('fifth')
     stat['deleted'].append('fifth')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # remove a file in git:
     ar.remove('first')
     stat['deleted'].append('first')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # remove a submodule:
     # rm; git rm; git commit
     from datalad.utils import rmtree
     rmtree(opj(ar.path, 'submod'))
     stat['deleted'].append('submod')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
     # recreate an empty mountpoint, since we currently do it in uninstall:
     os.makedirs(opj(ar.path, 'submod'))
     stat['deleted'].remove('submod')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     ar.remove('submod')
     # TODO: Why the difference?
     stat['deleted'].append('submod')
     stat['modified'].append('.gitmodules')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
     # Note: Here again we need to use annex-proxy; This contradicts the addition
     # of the very same submodule, which we needed to commit via
@@ -1907,7 +1907,7 @@ def _test_status(ar):
     ar.commit("submod removed", files=['submod', '.gitmodules'])
     stat['modified'].remove('.gitmodules')
     stat['deleted'].remove('submod')
-    eq_(stat, ar.status())
+    eq_(stat, ar.get_status())
 
 
 @with_tempfile(mkdir=True)

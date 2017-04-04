@@ -367,10 +367,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 sm_repo = AnnexRepo(opj(self.path, sm.path),
                                     create=False, init=False)
 
-                sm_status = sm_repo.status(untracked=untracked, deleted=deleted,
-                                           modified=modified, added=added,
-                                           type_changed=type_changed,
-                                           submodules=False, path=path)
+                sm_status = sm_repo.get_status(untracked=untracked, deleted=deleted,
+                                               modified=modified, added=added,
+                                               type_changed=type_changed,
+                                               submodules=False, path=path)
                 if any([bool(sm_status[i]) for i in sm_status]):
                     sm_dirty = True
 
@@ -380,10 +380,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 sm_repo = GitRepo(opj(self.path, sm.path))
 
                 # TODO: Clarify issue: GitRepo.dirty() doesn't fit our parameters
-                if sm_repo.dirty(index=deleted or modified or added or type_changed,
-                                 working_tree=deleted or modified or added or type_changed,
-                                 untracked_files=untracked,
-                                 submodules=False, path=path):
+                if sm_repo.is_dirty(index=deleted or modified or added or type_changed,
+                                    working_tree=deleted or modified or added or type_changed,
+                                    untracked_files=untracked,
+                                    submodules=False, path=path):
                     sm_dirty = True
             else:
                 raise InvalidGitRepositoryError
@@ -402,24 +402,27 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return modified_subs
 
-    def status(self, untracked=True, deleted=True, modified=True, added=True,
-               type_changed=True, submodules=True, path=None):
-        """
-
+    def get_status(self, untracked=True, deleted=True, modified=True, added=True,
+                   type_changed=True, submodules=True, path=None):
+        """Return various aspects of the status of the annex repository
 
         Note: Under certain circumstances newly added submodules might be
         reported as 'modified' rather tha 'added'.
-        See AnnexRepo._submodules_dirty_direct_mode for details.
+        See `AnnexRepo._submodules_dirty_direct_mode` for details.
 
+        Parameters
+        ----------
+        untracked
+        deleted
+        modified
+        added
+        type_changed
+        submodules
+        path
 
-        :param untracked:
-        :param deleted:
-        :param modified:
-        :param added:
-        :param type_changed:
-        :param submodules:
-        :param path:
-        :return:
+        Returns
+        -------
+
         """
 
         self.precommit()
@@ -502,8 +505,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 for cond, key, st in key_mapping if cond}
 
     @borrowdoc(GitRepo)
-    def dirty(self, index=True, working_tree=False, untracked_files=True,
-              submodules=True, path=None):
+    def is_dirty(self, index=True, working_tree=False, untracked_files=True,
+                 submodules=True, path=None):
         # TODO: Add doc on how this differs from GitRepo.dirty()
         # Parameter working_tree exists to meet the signature of GitRepo.dirty()
 
@@ -523,19 +526,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # unstaged changes, since this makes little sense for an annex repo
         # in general. Therefore we use only 'index' and 'untracked_files' to
         # specify what kind of dirtyness we are interested in:
-        status = self.status(untracked=untracked_files, deleted=index,
-                             modified=index, added=index,
-                             type_changed=index, submodules=submodules,
-                             path=path)
+        status = self.get_status(untracked=untracked_files, deleted=index,
+                                 modified=index, added=index,
+                                 type_changed=index, submodules=submodules,
+                                 path=path)
         return any([bool(status[i]) for i in status])
 
     @property
     def untracked_files(self):
         """Get a list of untracked files
         """
-        return self.status(untracked=True, deleted=False, modified=False,
-                           added=False, type_changed=False, submodules=False,
-                           path=None)['untracked']
+        return self.get_status(untracked=True, deleted=False, modified=False,
+                               added=False, type_changed=False, submodules=False,
+                               path=None)['untracked']
 
     @classmethod
     def _check_git_annex_version(cls):
