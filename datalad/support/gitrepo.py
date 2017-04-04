@@ -1741,7 +1741,7 @@ class GitRepo(RepoInterface):
             submodules = sorted(submodules, key=lambda x: x.path)
         return submodules
 
-    def submodules_is_modified(self, name, options=[]):
+    def is_submodule_modified(self, name, options=[]):
         """Whether a submodule has new commits
 
         Note: This is an adhoc method. It parses output of

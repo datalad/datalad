@@ -357,7 +357,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # First check for changes committed in the submodule, using
             # git submodule summary -- path,
             # since this can't be detected from within the submodule.
-            if self.submodules_is_modified(sm.name):
+            if self.is_submodule_modified(sm.name):
                 sm_dirty = True
 
             # check state of annex submodules, that might be in direct mode
