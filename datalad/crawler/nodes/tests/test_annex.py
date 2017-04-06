@@ -204,13 +204,13 @@ def _test_add_archive_content_tar(direct, repo_path):
                  [{'datalad_stats': ActivityStats(add_annex=1, add_git=1, files=3, renamed=2),
                    'filename': '1.tar'}])
     if not direct:  # Notimplemented otherwise
-        assert_true(annex.repo.dirty())
+        assert_true(annex.repo.dirty)
     annex.repo.commit("added")
     ok_file_under_git(annex.repo.path, 'file.txt', annexed=False)
     ok_file_under_git(annex.repo.path, '1.dat', annexed=True)
     assert_false(lexists(opj(repo_path, '1.tar')))
     if not direct:  # Notimplemented otherwise
-        assert_false(annex.repo.dirty())
+        assert_false(annex.repo.dirty)
 
 
 def test_add_archive_content_tar():

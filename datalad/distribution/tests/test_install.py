@@ -756,7 +756,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
             eq_(ds.repo.get_active_branch(), "master")
             # all of them should be clean, so sub should be installed in a "version"
             # as pointed by the super
-            ok_(not ds.repo.dirty())
+            ok_(not ds.repo.dirty)
 
     dest_ds = install(dest, source=src)
     # now we progress sub1 by adding sub2

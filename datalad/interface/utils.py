@@ -99,9 +99,9 @@ def handle_dirty_dataset(ds, mode, msg=None):
     if mode == 'ignore':
         return
     elif mode == 'fail':
-        if not ds.repo or ds.repo.dirty(index=True,
-                                        untracked_files=True,
-                                        submodules=True):
+        if not ds.repo or ds.repo.is_dirty(index=True,
+                                           untracked_files=True,
+                                           submodules=True):
             raise RuntimeError('dataset {} has unsaved changes'.format(ds))
     elif mode == 'save-before':
         if not ds.is_installed():
@@ -148,9 +148,9 @@ def handle_dirty_datasets(dpaths,
             if not ds.repo:
                 continue
             ds.repo.precommit()
-            if ds.repo.dirty(index=True,
-                             untracked_files=True,
-                             submodules=True):
+            if ds.repo.is_dirty(index=True,
+                                untracked_files=True,
+                                submodules=True):
                 raise RuntimeError(
                     'dataset {} has unsaved changes'.format(ds))
     else:
@@ -386,7 +386,7 @@ def save_dataset(
         _datalad_msg = True
 
     # TODO: Remove dirty() altogether???
-    if files or ds.repo.dirty(
+    if files or ds.repo.is_dirty(
             index=True,
             untracked_files=False,
             submodules=True):

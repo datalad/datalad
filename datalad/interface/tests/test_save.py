@@ -40,7 +40,7 @@ def test_save(path):
         f.write("something")
 
     ds.repo.add("new_file.tst", git=True)
-    ok_(ds.repo.dirty())
+    ok_(ds.repo.dirty)
 
     # no all_changes any longer
     with assert_raises(DeprecatedError):
@@ -52,7 +52,7 @@ def test_save(path):
     with open(opj(path, "new_file.tst"), "w") as f:
         f.write("modify")
 
-    ok_(ds.repo.dirty())
+    ok_(ds.repo.dirty)
     ds.save("modified new_file.tst", all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
@@ -93,7 +93,7 @@ def test_save(path):
     ok_clean_git(subds.path, annex=isinstance(subds.repo, AnnexRepo))
     # Note/TODO: ok_clean_git is failing in direct mode, due to staged but
     # uncommited .datalad (probably caused within create)
-    ok_(ds.repo.dirty())
+    ok_(ds.repo.dirty)
     # ensure modified subds is committed
     ds.save(all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
@@ -126,10 +126,10 @@ def test_recursive_save(path):
     subsubds.add(newfile_name, save=False)
 
     # but remains dirty because of the untracked file down below
-    assert ds.repo.dirty()
+    assert ds.repo.dirty
     # auto-add will save nothing deep down without recursive
     assert_status('notneeded', ds.save(all_updated=True))
-    assert ds.repo.dirty()
+    assert ds.repo.dirty
     # with recursive pick up the change in subsubds
     assert_result_values_equal(
         ds.save(all_updated=True, recursive=True, result_filter=is_ok_dataset),
@@ -167,16 +167,16 @@ def test_recursive_save(path):
     for old, new in zip(states, newstates):
         assert_not_equal(old, new)
     # now let's check saving "upwards"
-    assert not subds.repo.dirty()
+    assert not subds.repo.dirty
     create_tree(subds.path, {"testnew": 'smth', "testadded": "added"})
     subds.repo.add("testadded")
     indexed_files = subds.repo.get_indexed_files()
-    assert subds.repo.dirty()
-    assert ds.repo.dirty()
+    assert subds.repo.dirty
+    assert ds.repo.dirty
 
-    assert not subsubds.repo.dirty()
+    assert not subsubds.repo.dirty
     create_tree(subsubds.path, {"testnew2": 'smth'})
-    assert subsubds.repo.dirty()
+    assert subsubds.repo.dirty
     # and indexed files didn't change
     assert_equal(indexed_files, subds.repo.get_indexed_files())
     ok_clean_git(subds.repo, untracked=['testnew'],

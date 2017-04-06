@@ -229,7 +229,7 @@ class GitModel(object):
 
     @property
     def clean(self):
-        return not self.repo.dirty()
+        return not self.repo.dirty
 
     @property
     def describe(self):
