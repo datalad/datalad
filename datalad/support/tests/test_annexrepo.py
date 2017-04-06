@@ -1648,8 +1648,9 @@ def _test_status(ar):
                 # git-annex: sync: 1 failed
 
                 # But it almost works - so apperently nothing to do
-                print "DEBUG: v6 sync failure"
-                pass
+                import logging
+                lgr = logging.getLogger("datalad.support.tests.test-status")
+                lgr.warning("DEBUG: v6 sync failure")
 
     stat = {'untracked': [],
             'deleted': [],
