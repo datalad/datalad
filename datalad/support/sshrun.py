@@ -29,7 +29,7 @@ class SSHRun(Interface):
     """Run command on remote machines via SSH.
 
     This is a replacement for a small part of the functionality of SSH.
-    In addition to SSH alaon, this command can make use ofdatalad's SSH
+    In addition to SSH alone, this command can make use of datalad's SSH
     connection management. Its primary use case is to be used with Git
     as 'core.sshCommand' or via "GIT_SSH_COMMAND".
     """
@@ -44,14 +44,26 @@ class SSHRun(Interface):
         port=Parameter(
             args=("-p", '--port'),
             doc="port to connect to on the remote host"),
+        no_stdin=Parameter(
+            args=("-n",),
+            action="store_true",
+            dest="no_stdin",
+            doc="Redirect stdin from /dev/null"),
     )
 
     @staticmethod
-    def __call__(login, cmd, port=None):
+    def __call__(login, cmd, port=None, no_stdin=False):
+        # when heavy debugging if needed
+        #with open('/tmp/log', 'a') as f:
+        #    f.write("call: %s %s %s %s\n" % (login, cmd, port, no_stdin))
         sshurl = 'ssh://{}{}'.format(
             login,
             ':{}'.format(port) if port else '')
         ssh = ssh_manager.get_connection(sshurl)
-        out, err = ssh(cmd, stdin=sys.stdin, log_output=False)
+        # TODO: /dev/null on windows ;)  or may be could be just None?
+        out, err = ssh(
+            cmd,
+            stdin=open('/dev/null', 'r') if no_stdin else sys.stdin,
+            log_output=False)
         os.write(1, out.encode('UTF-8'))
         os.write(2, err.encode('UTF-8'))
