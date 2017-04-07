@@ -56,6 +56,14 @@ class SSHRun(Interface):
     @staticmethod
     def __call__(login, cmd, port=None, no_stdin=False):
         lgr.debug("sshrun invoked: %r %r %r %r", login, cmd, port, no_stdin)
+        # Perspective workarounds for git-annex invocation, see
+        # https://github.com/datalad/datalad/issues/1456#issuecomment-292641319
+        
+        # if cmd.startswith("'") and cmd.endswith("'"):
+        #     cmd = cmd[1:-1]
+        # tripequote = """'"'"'"""
+        # if tripequote in cmd:
+        #     cmd = cmd.replace(tripequote, "'")
         sshurl = 'ssh://{}{}'.format(
             login,
             ':{}'.format(port) if port else '')
