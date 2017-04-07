@@ -320,11 +320,7 @@ def _get_flexible_source_candidates(src, base_url=None):
             base_suffix = ''
         ri.path = normpath(opj(base_path, src, base_suffix))
 
-    # TODO:  fix up for all this ssh special handling of RI!  Clearly
-    #        some urlencoding should be happening for some but not for sshri
-    #        So best probably to make it not escape by default and see what
-    #        breaks ;)
-    src = str(ri) if not isinstance(ri, SSHRI) else ri.as_str(escape=False)
+    src = str(ri)
 
     candidates.append(src)
     if isinstance(ri, URL):

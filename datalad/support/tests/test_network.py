@@ -326,7 +326,7 @@ def _test_url_quote_path(cls, clskwargs, target_url):
 
 
 def test_url_quote_path():
-    yield _test_url_quote_path, SSHRI, {}, r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
+    yield _test_url_quote_path, SSHRI, {}, r'example.com:/ "' + r"';a&b&cd `| "
     yield _test_url_quote_path, URL, {'scheme': "http"}, 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
     yield _test_url_quote_path, PathRI, {}, r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
 
