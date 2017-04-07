@@ -96,7 +96,7 @@ Data files version control                   |tup|             |tup|
 Auto-crawling available resources            |tup| newsfeeds   |tup| flexible
 Unified authentication frontend                                |tup|
 Unified distribution                                           |tup|
-- recursive operation on datasets                              |tup|                                                  |tup|
+- recursive operation on datasets                              |tup|
 - crossing datasets boundaries                                 |tup|
 - meta-data support                          |tup| per-file    |tup| flexible
 - meta-data aggregation                                        |tup| flexible
