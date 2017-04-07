@@ -165,7 +165,7 @@ class SSHConnection(object):
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         try:
-            out, err = self.runner.run(cmd)
+            out, err = self.runner.run(cmd, stdin=open('/dev/null'))
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -273,7 +273,9 @@ class SSHConnection(object):
         try:
             annex_install_dir = self(
                 # use sh -e to be able to fail at each stage of the process
-                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
+                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
+                , stdin=open('/dev/null')
+            )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
                       exc_str(e))

@@ -326,7 +326,7 @@ class Runner(object):
         # to overcome this problem.
         # For now necessary test code should be wrapped into swallow_outputs cm
         # to avoid the problem
-        self.log("Running: %s\ncwd: %s" % (cmd, cwd or self.cwd))
+        self.log("Running: %s\ncwd: %s. stdin=%r" % (cmd, cwd or self.cwd, stdin))
 
         if self.protocol.do_execute_ext_commands:
 
