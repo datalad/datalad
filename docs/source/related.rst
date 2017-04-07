@@ -73,3 +73,36 @@ git-annex.
 .. _comparison: http://git-annex.branchable.com/not}
 .. _git-media: https://github.com/schacon/git-media
 .. _git-fat: https://github.com/jedbrown/git-fat}
+
+.. _chap-git-annex-datalad-comparison:
+
+Git/Git-annex/DataLad
+=====================
+
+Although DataLad could be used in many usecases without invoking underlying
+git or git-annex directly, it is useful to appreciate that DataLad is build
+atop of very flexible and powerful tools.  Knowing basics of git and git-annex
+in addition to DataLad would help to not only make better use of DataLad but
+also to enable more advanced and more efficient data management scenarios.
+
+To explain better how datalad compliments existing ecosystem of tools, let's
+review major additions each additional "toolkit layer" adds to the picture:
+
+===================================   =====  ===============   ==============
+Feature                                Git      Git-annex      DataLad
+===================================   =====  ===============   ==============
+Text files version control            |tup|  |tup| can mix     |tup| can mix
+Data files version control                   |tup|             |tup|
+Auto-crawling available resources            |tup| newsfeeds   |tup| flexible
+Unified authentication frontend                                |tup|
+Unified distribution                                           |tup|
+- recursive operation on datasets                              |tup|                                                  |tup|
+- crossing datasets boundaries                                 |tup|
+- meta-data support                          |tup| per-file    |tup| flexible
+- meta-data aggregation                                        |tup| flexible
+===================================   =====  ===============   ==============
+
+.. |tup| unicode:: U+1F592 .. thumbs up
+   :trim:
+.. |tdo| unicode:: U+1F593 .. thumbs down
+   :trim:
