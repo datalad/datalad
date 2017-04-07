@@ -24,6 +24,8 @@ from datalad.interface.base import Interface
 
 from datalad import ssh_manager
 
+lgr = logging.getLogger('datalad.sshrun')
+
 
 class SSHRun(Interface):
     """Run command on remote machines via SSH.
@@ -53,9 +55,7 @@ class SSHRun(Interface):
 
     @staticmethod
     def __call__(login, cmd, port=None, no_stdin=False):
-        # when heavy debugging if needed
-        #with open('/tmp/log', 'a') as f:
-        #    f.write("call: %s %s %s %s\n" % (login, cmd, port, no_stdin))
+        lgr.debug("sshrun invoked: %r %r %r %r", login, cmd, port, no_stdin)
         sshurl = 'ssh://{}{}'.format(
             login,
             ':{}'.format(port) if port else '')
