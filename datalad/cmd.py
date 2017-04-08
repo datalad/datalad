@@ -504,8 +504,10 @@ class Runner(object):
         if isinstance(self.protocol, NullProtocol):
             lgr.log(level, msg, *args, **kwargs)
         else:
+            if args:
+                msg = msg % args
             lgr.log(level, "{%s} %s" % (
-                self.protocol.__class__.__name__, msg % args)
+                self.protocol.__class__.__name__, msg)
             )
 
 
