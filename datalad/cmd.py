@@ -26,6 +26,7 @@ from six import PY3, PY2
 from six import string_types, binary_type
 from os.path import abspath, isabs
 
+from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
@@ -573,7 +574,7 @@ class GitRunner(Runner):
                     lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
 
         if 'GIT_SSH_COMMAND' not in git_env:
-            git_env['GIT_SSH_COMMAND'] = 'datalad sshrun'
+            git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
 
         return git_env
 

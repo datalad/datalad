@@ -42,6 +42,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 from datalad.utils import assure_list
@@ -384,6 +385,9 @@ class GitRepo(RepoInterface):
     overridden accidentally by AnnexRepo.
     """
 
+    # We use our sshrun helper
+    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
+
     # Just a non-functional example:
     # must be implemented, since abstract in RepoInterface:
     def sth_like_file_has_content(self):
@@ -597,7 +601,7 @@ class GitRepo(RepoInterface):
             ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = {'GIT_SSH_COMMAND': "datalad sshrun"}
+            env = GitRepo.GIT_SSH_ENV
         else:
             env = None
         ntries = 5  # 3 is not enough for robust workaround
@@ -1392,8 +1396,7 @@ class GitRepo(RepoInterface):
                 ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="datalad sshrun"):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1435,8 +1438,7 @@ class GitRepo(RepoInterface):
             ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            with remote.repo.git.custom_environment(
-                    GIT_SSH_COMMAND="datalad sshrun"):
+            with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                 return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
@@ -1518,8 +1520,7 @@ class GitRepo(RepoInterface):
                 ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="datalad sshrun"):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
