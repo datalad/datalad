@@ -99,11 +99,7 @@ def _create_dataset_sibling(
 
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
-    # .git/config seems to not like all the escapes since they aren't needed
-    # XXX yoh broke consistency with this escape argument present only in SSHRI
-    #     but here it could be a simple URL as tests show
-    ds_sshurl = ssh_url.as_str(escape=False) \
-        if isinstance(ssh_url, SSHRI) else ssh_url.as_str()
+    ds_sshurl = ssh_url.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%RELNAME', ds_name) \
         if target_url else ds_sshurl
