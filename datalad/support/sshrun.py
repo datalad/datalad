@@ -59,11 +59,20 @@ class SSHRun(Interface):
         # Perspective workarounds for git-annex invocation, see
         # https://github.com/datalad/datalad/issues/1456#issuecomment-292641319
         
-        # if cmd.startswith("'") and cmd.endswith("'"):
-        #     cmd = cmd[1:-1]
-        # tripequote = """'"'"'"""
-        # if tripequote in cmd:
-        #     cmd = cmd.replace(tripequote, "'")
+        if cmd.startswith("'") and cmd.endswith("'"):
+            lgr.debug(
+                "Detected additional level of quotations in %r so performing "
+                "shlex split", cmd
+            )
+            # there is an additional layer of quotes
+            # Let's strip them off using shlex
+            import shlex
+            cmd_ = shlex.split(cmd)
+            if len(cmd_) != 1:
+                raise RuntimeError(
+                    "Obtained more or less than a single argument upon shlex "
+                    "split: %s" % repr(cmd_))
+            cmd = cmd_[0]
         sshurl = 'ssh://{}{}'.format(
             login,
             ':{}'.format(port) if port else '')
@@ -72,6 +81,7 @@ class SSHRun(Interface):
         out, err = ssh(
             cmd,
             stdin=open('/dev/null', 'r') if no_stdin else sys.stdin,
-            log_output=False)
+            log_output=False
+        )
         os.write(1, out.encode('UTF-8'))
         os.write(2, err.encode('UTF-8'))

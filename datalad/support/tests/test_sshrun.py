@@ -46,3 +46,10 @@ def test_no_stdin_swallow(fname):
     out, err = Runner().run(cmd + ['-n'], stdin=open(fname))
     assert_equal(out, '')
 
+
+@skip_ssh
+@with_tempfile(suffix="1 space", content="magic")
+def test_fancy_quotes(f):
+    cmd = ['datalad', 'sshrun', 'localhost', """'cat '"'"'%s'"'"''""" % f]
+    out, err = Runner().run(cmd)
+    assert_equal(out, 'magic')
