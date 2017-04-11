@@ -2066,3 +2066,49 @@ def test_change_description(path):
     # need to resort to "internal" helper
     ar._init(description='someother')
     eq_(ar.get_description(), 'someother')
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_get_corresponding_branch(path):
+
+    ar = AnnexRepo(path)
+
+    # we should be on master or a corresponding branch like annex/direct/master
+    # respectively if ran in direct mode build.
+    # We want to get 'master' in any case
+    eq_('master', ar.get_corresponding_branch())
+
+    # special case v6 adjusted branch is not provided by a dedicated build:
+    if ar.config.getint("annex", "version") == 6:
+        ar.adjust()
+        # as above, we still want to get 'master', while being on
+        # 'adjusted/master(unlocked)'
+        eq_('adjusted/master(unlocked)', ar.get_active_branch())
+        eq_('master', ar.get_corresponding_branch())
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_get_tracking_branch(path):
+
+    ar = AnnexRepo(path)
+
+    # we want the relation to original branch, especially in direct mode
+    # or even in v6 adjusted branch
+    eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_is_managed_branch(path):
+
+    ar = AnnexRepo(path)
+
+    if ar.is_direct_mode():
+        ok_(ar.is_managed_branch())
+    else:
+        # ATM only direct mode and v6 adjusted branches should return True.
+        # Adjusted branch requires a call of git-annex-adjust and shouldn't
+        # be the state of a fresh clone
+        ok_(not ar.is_managed_branch())
+    if ar.config.getint("annex", "version") == 6:
+        ar.adjust()
+        ok_(ar.is_managed_branch())

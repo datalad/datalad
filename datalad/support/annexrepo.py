@@ -323,6 +323,111 @@ class AnnexRepo(GitRepo, RepoInterface):
                                  (cfg_string_old + " ") if cfg_string_old else "",
                                  cfg_string)]
 
+    def is_managed_branch(self, branch=None):
+        """Whether `branch` is managed by git-annex.
+
+        ATM this returns true in direct mode (branch 'annex/direct/my_branch')
+        and if on an adjusted branch (annex v6 repository:
+        either 'adjusted/my_branch(unlocked)' or 'adjusted/my_branch(fixed)'
+
+        Note: The term 'managed branch' is used to make clear it's meant to be
+        more general than the v6 'adjusted branch'.
+
+        Parameters:
+        -----------
+        branch: str
+          name of the branch; default: active branch
+
+        Returns:
+        --------
+        bool
+          True if on a managed branch, False otherwise
+        """
+
+        if branch is None:
+            branch = self.get_active_branch()
+        # Note: `branch` might still be None, due to detached HEAD
+        # (or no checkout at all)
+        if branch and \
+            (branch.startswith('annex/direct/') or
+             branch.startswith('adjusted/')):
+            return True
+        return False
+
+    def get_corresponding_branch(self, branch=None):
+        """In case of a managed branch, get the corresponding one.
+
+        If `branch` is not a managed branch, return that branch without any
+        changes.
+
+        Note: Since default for `branch` is the active branch,
+        `get_corresponding_branch()` is equivalent to `get_active_branch()` if
+        the active branch is not a managed branch.
+
+        Parameters:
+        -----------
+        branch: str
+          name of the branch; defaults to active branch
+
+        Returns:
+        --------
+        str
+          name of the corresponding branch if there is any, name of the queried
+          branch otherwise.
+        """
+
+        if branch is None:
+            branch = self.get_active_branch()
+
+        if self.is_managed_branch(branch):
+            if branch.startswith('annex/direct/'):
+                cor_branch = branch[13:]
+            elif branch.startswith('adjusted/'):
+                if branch.endswith('(unlocked)'):
+                    cor_branch = branch[9:-10]
+                elif branch.endswith('(fixed)'):
+                    cor_branch = branch[9:-7]
+                else:
+                    cor_branch = branch[9:]
+                    lgr.warning("Unexpected naming of adjusted branch '{}'.{}"
+                                "Assuming '{}' to be the corresponding branch."
+                                "".format(branch, linesep, cor_branch))
+            else:
+                raise NotImplementedError(
+                    "Detection of annex-managed branch '{}' follows a pattern "
+                    "not implemented herein.".format(branch))
+            return cor_branch
+
+        else:
+            return branch
+
+    def get_tracking_branch(self, branch=None, corresponding=True):
+        """Get the tracking branch for `branch` if there is any.
+
+        By default returns the tracking branch of the corresponding branch if
+        `branch` is a managed branch.
+
+        Parameters
+        ----------
+        branch: str
+          local branch to look up. If none is given, active branch is used.
+        corresponding: bool
+          If True actually look up the corresponding branch of `branch` (also if
+          `branch` isn't explicitly given)
+
+        Returns
+        -------
+        tuple
+            (remote or None, refspec or None) of the tracking branch
+        """
+
+        if branch is None:
+            branch = self.get_active_branch()
+
+        return super(AnnexRepo, self).get_tracking_branch(
+                        branch=self.get_corresponding_branch(branch)
+                        if corresponding else branch)
+
     def _submodules_dirty_direct_mode(self,
             untracked=True, deleted=True, modified=True, added=True,
             type_changed=True, path=None):
@@ -870,7 +975,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         """
         # MIH: this function is required for re-initing repos. The logic
-        # in the contructor is rather convoluted and doesn't acknowledge
+        # in the constructor is rather convoluted and doesn't acknowledge
         # the case of a perfectly healthy annex that just needs a new
         # description
         # will keep leading underscore in the name for know, but this is
@@ -885,6 +990,30 @@ class AnnexRepo(GitRepo, RepoInterface):
             opts += ['--version', '{0}'.format(version)]
         if not len(opts):
             opts = None
+
+        # Note: git-annex-init kills a possible tracking branch for
+        # 'annex/direct/my_branch', if we just cloned from a repo in direct
+        # mode. We want to preserve the information about the tracking branch,
+        # as if the source repo wasn't in direct mode.
+        # Note 2: Actually we do it for all 'managed branches'. This might turn
+        # out to not be necessary
+        sections_to_preserve = ["branch.{}".format(branch)
+                                for branch in self.get_branches()
+                                if self.is_managed_branch(branch)
+                                and "branch.{}".format(branch) in
+                                self.config.sections()]
+        for sct in sections_to_preserve:
+            orig_branch = sct[7:]
+            new_branch = self.get_corresponding_branch(orig_branch)
+            new_section = "branch.{}".format(new_branch)
+            for opt in self.config.options(sct):
+                orig_value = self.config.get_value(sct, opt)
+                new_value = orig_value.replace(orig_branch, new_branch)
+                self.config.add(var=new_section + "." + opt,
+                                value=new_value,
+                                where='local',
+                                reload=False)
+
         self._run_annex_command('init', annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
@@ -1054,7 +1183,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
                     lgr.warning(
                         "Known bug in direct mode."
-                        "We can't use --dry-run when there are submodules in"
+                        "We can't use --dry-run when there are submodules in "
                         "direct mode, because the internal call to git status "
                         "fails. To be resolved by using (Dataset's) status "
                         "instead of a git-add --dry-run altogether.")
