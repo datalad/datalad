@@ -151,13 +151,13 @@ def test_create_subdataset_hierarchy_from_top(path):
     # we got a dataset ....
     ok_(ds.is_installed())
     # ... but it has untracked content
-    ok_(ds.repo.dirty())
+    ok_(ds.repo.dirty)
     subds = ds.create('sub', force=True)
     ok_(subds.is_installed())
-    ok_(subds.repo.dirty())
+    ok_(subds.repo.dirty)
     subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
-    ok_(subsubds.repo.dirty())
+    ok_(subsubds.repo.dirty)
     ds.save(recursive=True, all_updated=True)
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
@@ -211,7 +211,7 @@ def test_saving_prior(topdir):
     # so we create first top one
     ds1 = create(topdir, force=True)
     # and everything is ok, stuff is not added BUT ds1 will be considered dirty
-    ok_(ds1.repo.dirty())
+    ok_(ds1.repo.dirty)
     # And then we would like to initiate a sub1 subdataset
     ds2 = create('ds2', dataset=ds1, force=True)
     # But what will happen is file1.txt under ds2 would get committed first into

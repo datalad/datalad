@@ -173,7 +173,7 @@ def _within_metadata_store(ds, guess_native_type, metapath):
 
 def _save_helper(ds, save, modified_ds):
     old_state = ds.repo.get_hexsha()
-    if save and ds.repo.dirty(
+    if save and ds.repo.is_dirty(
             index=True,
             working_tree=False,
             submodules=True):
