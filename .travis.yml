@@ -14,6 +14,7 @@ env:
     # will be used in the matrix, where neither other variable is used
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
+    - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=
     - NOSE_OPTS=-s
     # Special settings/helper for combined coverage from special remotes execution
@@ -51,7 +52,10 @@ matrix:
     - DATALAD_API_ALWAYSRENDER=1
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
-    - DATALAD_LOG_OUTPUTS=1
+    - DATALAD_LOG_CMD_CWD=1
+    - DATALAD_LOG_CMD_OUTPUTS=1
+    - DATALAD_LOG_CMD_ENV=1
+    - DATALAD_LOG_CMD_STDIN=1
     - DATALAD_TESTS_UI_BACKEND=console
   - python: 2.7
     env:

@@ -315,7 +315,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
                        ''.format(remote_name,
                                  (cfg_string_old + " ") if cfg_string_old else "",
-                                 cfg_string)]
+                                 cfg_string
+                                 )]
 
     @property
     def dirty(self):

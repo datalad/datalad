@@ -72,6 +72,24 @@ def _get_system_git_version():
     return __get_git_version(_runner)
 
 
+def _get_system_ssh_version():
+    """Return version of ssh available system-wide
+
+    Annex prior 20170302 was using bundled version, but now would use system one
+    if installed
+    """
+    try:
+        out, err = _runner.run('ssh -V'.split())
+        # apparently spits out to err but I wouldn't trust it blindly
+        if err.startswith('OpenSSH'):
+            out = err
+        assert out.startswith('OpenSSH')  # that is the only one we care about atm
+        return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
+    except CommandError as exc:
+        lgr.warn("Could not determine version of ssh available: %s", exc_str(exc))
+        return None
+
+
 class ExternalVersions(object):
     """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
 
@@ -92,6 +110,7 @@ class ExternalVersions(object):
         'cmd:annex': _get_annex_version,
         'cmd:git': _get_git_version,
         'cmd:system-git': _get_system_git_version,
+        'cmd:system-ssh': _get_system_ssh_version,
     }
 
     def __init__(self):
