@@ -1484,8 +1484,8 @@ class GitRepo(RepoInterface):
              **kwargs):
         """Push to remote repository
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         remote: str
           name of the remote to push to
         refspec: str

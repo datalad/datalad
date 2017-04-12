@@ -333,13 +333,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         Note: The term 'managed branch' is used to make clear it's meant to be
         more general than the v6 'adjusted branch'.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         branch: str
           name of the branch; default: active branch
 
-        Returns:
-        --------
+        Returns
+        -------
         bool
           True if on a managed branch, False otherwise
         """
@@ -364,13 +364,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         `get_corresponding_branch()` is equivalent to `get_active_branch()` if
         the active branch is not a managed branch.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         branch: str
           name of the branch; defaults to active branch
 
-        Returns:
-        --------
+        Returns
+        -------
         str
           name of the corresponding branch if there is any, name of the queried
           branch otherwise.
