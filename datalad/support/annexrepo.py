@@ -321,7 +321,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
                        ''.format(remote_name,
                                  (cfg_string_old + " ") if cfg_string_old else "",
-                                 cfg_string)]
+                                 cfg_string
+                                 )]
 
     def is_managed_branch(self, branch=None):
         """Whether `branch` is managed by git-annex.

@@ -51,3 +51,7 @@ WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
+
+# We use custom ssh runner while interacting with git
+#GIT_SSH_COMMAND = "/tmp/sshrun"  # was a little shell script to help troubleshooting
+GIT_SSH_COMMAND = "datalad sshrun"

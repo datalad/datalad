@@ -713,7 +713,7 @@ class SSHRI(RI, RegexBasedURLMixin):
         # escape path so we have direct representation of the path to work with
         fields['path'] = unescape_ssh_path(fields['path'])
 
-    def as_str(self, escape=True):
+    def as_str(self, escape=False):
         fields = self.fields  # copy so we could escape symbols
         url_fmt = '{hostname}'
         if fields['username']:
