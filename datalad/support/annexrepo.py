@@ -549,14 +549,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             # this is for use with older annex, which didn't exit non-zero
             # in case of the failure we are interested in
 
-            old_log_state = self.cmd_call_wrapper._log_outputs
-            self.cmd_call_wrapper._log_outputs = True
+            old_log_state = self.cmd_call_wrapper.log_outputs
+            self.cmd_call_wrapper._log_opts['outputs'] = True
+
             with swallow_logs(new_level=logging.ERROR) as cml:
                 # Note, that _run_annex_command_json returns a generator
                 json_list = \
                     list(self._run_annex_command_json(
                         'status', args=options_, expect_stderr=False))
-            self.cmd_call_wrapper._log_outputs = old_log_state
+            self.cmd_call_wrapper._log_opts['outputs'] = old_log_state
             if "fatal:" in cml.out:
                 raise CommandError(cmd="git annex status",
                                    msg=cml.out, stderr=cml.out)
