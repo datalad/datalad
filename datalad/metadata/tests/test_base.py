@@ -20,9 +20,11 @@ from os.path import join as opj, exists
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
 from datalad.metadata import _cached_load_document
+from datalad.metadata import _sanitize_annex_description
 from datalad.utils import swallow_logs
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
@@ -183,6 +185,13 @@ def test_aggregation(path):
     # differ, but the rest not
     clonemeta = get_metadata(
         clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+
+    for m in clonemeta:
+        # could be a list or a single entry
+        for r in assure_list(m.get('availableFrom', []), iterate=False):
+            # if there is a description, it shouldn't have any [ in it
+            # (enabled state should have been pruned, local remote name pruned)
+            assert_not_in('[', r.get('description', ''))
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
@@ -389,3 +398,10 @@ def test_ignore_nondatasets(path):
         assert_equal(len(ds.get_subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
+
+
+def test_sanitize_annex_description():
+    assert_equal(_sanitize_annex_description("[d-a]"), "d-a")
+    assert_equal(_sanitize_annex_description("d-a"), "d-a")
+    assert_equal(_sanitize_annex_description("lo c [d-a]"), "lo c")
+    assert_equal(_sanitize_annex_description("lo c"), "lo c")
