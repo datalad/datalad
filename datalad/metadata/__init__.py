@@ -10,6 +10,7 @@
 
 
 import os
+import re
 from six import PY2
 if PY2:
     import cPickle as pickle
@@ -125,6 +126,22 @@ def _get_implicit_metadata(ds, ds_identifier=None):
     return meta
 
 
+def _sanitize_annex_description(desc):
+    """Sanitize annex description of the remote
+
+    Should not depict name of the local remote (enabled if within [])
+    or status (e.g. [datalad-archives] would be for enabled datalad-archives)
+
+    Assumption is that no [ or ] used within remote name, which is hopefully
+    a safe one
+    """
+    # [datalad-archives] -> datalad-archives
+    desc = re.sub('^\[(.*)\]$', r'\1', desc)
+    # some description [local-remote] -> some description
+    desc = re.sub('^(.*) \[.*\]$', r'\1', desc)
+    return desc
+
+
 def _add_annex_metadata(repo, meta):
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
@@ -148,7 +165,8 @@ def _add_annex_metadata(repo, meta):
                     continue
                 anx_meta = {'@id': anxid}
                 if 'description' in anx:
-                    anx_meta['description'] = anx['description']
+                    anx_meta['description'] = \
+                        _sanitize_annex_description(anx['description'])
                 # XXX maybe report which one is local? Available in anx['here']
                 # XXX maybe report the type of annex remote?
                 annex_meta.append(anx_meta)
