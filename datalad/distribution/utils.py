@@ -29,6 +29,7 @@ from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import SSHRI
 from datalad.support.network import PathRI
 from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs
@@ -206,16 +207,15 @@ def _get_tracking_source(ds):
     """Returns name and url of a potential configured source
     tracking remote"""
     vcs = ds.repo
-    repo = vcs.repo
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
-    tracking_branch = repo.active_branch.tracking_branch()
-    remote_name = None
+
+    remote_name, tracking_branch = vcs.get_tracking_branch()
+    # TODO: better default `None`? Check where we might rely on '':
     remote_url = ''
-    if tracking_branch:
-        # name of the default remote for the active branch
-        remote_name = repo.active_branch.tracking_branch().remote_name
+    if remote_name:
         remote_url = vcs.get_remote_url(remote_name, push=False)
+
     return remote_name, remote_url
 
 

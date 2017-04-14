@@ -39,7 +39,7 @@ def test_ssh_get_connection():
     # subsequent call returns the very same instance:
     ok_(manager.get_connection('ssh://localhost') is c1)
 
-    # fail on malformed URls (meaning: out fancy URL parser can't correctly
+    # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
     assert_raises(ValueError, manager.get_connection, 'localhost')
     # we can do what urlparse cannot
@@ -49,6 +49,8 @@ def test_ssh_get_connection():
     # path='/localhost') -- which is fair IMHO -> invalid test
     # assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
 
+    manager.close()
+
 
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
@@ -56,10 +58,15 @@ def test_ssh_get_connection():
 def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
-    c1 = manager.get_connection('ssh://localhost')
+
     path = opj(manager.socket_dir, get_connection_hash('localhost'))
+    # TODO: facilitate the test when it didn't exist
+    existed_before = exists(path)
+    print("%s existed: %s" % (path, existed_before))
+
+    c1 = manager.get_connection('ssh://localhost')
     c1.open()
-    # control master exists:
+    # control master exists for sure now
     ok_(exists(path))
 
     # use connection to execute remote command:
@@ -76,7 +83,7 @@ def test_ssh_open_close(tfile1):
 
     c1.close()
     # control master doesn't exist anymore:
-    ok_(not exists(path))
+    ok_(exists(path) == existed_before)
 
 
 @skip_ssh
@@ -180,6 +187,7 @@ def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
     out, err = ssh('[ 1 = 2 ] && echo no || echo success')
     eq_(out.strip(), 'success')
+    ssh.close()  # so we get rid of the possibly lingering connections
 
 
 @skip_ssh
@@ -192,3 +200,4 @@ def test_ssh_git_props():
     # cannot compare to locally detected, might differ depending on
     # how annex was installed
     ok_(ssh.get_git_version())
+    manager.close()  # close possibly still present connections
