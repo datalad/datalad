@@ -165,7 +165,7 @@ class Clone(Interface):
 
         status_kwargs = dict(
             action='clone', ds=destination_dataset, logger=lgr,
-            refds=refds_path)
+            refds=refds_path, source_url=source)
 
         # important test! based on this `rmtree` will happen below after failed clone
         if exists(dest_path) and listdir(dest_path):

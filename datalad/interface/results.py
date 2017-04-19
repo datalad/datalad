@@ -24,7 +24,7 @@ lgr = logging.getLogger('datalad.interface.results')
 
 
 def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
-                    refds=None, status=None, message=None):
+                    refds=None, status=None, message=None, **kwargs):
     d = {}
     if action:
         d['action'] = action
@@ -45,6 +45,8 @@ def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
         d['status'] = status
     if message:
         d['message'] = message
+    if kwargs:
+        d.update(kwargs)
     return d
 
 
