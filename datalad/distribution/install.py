@@ -154,9 +154,7 @@ class Install(Interface):
         #  otherwise would be applicable throughout
         #
         # There should have been more of common options!
-        # since underneath get could do similar installs, but now they
-        # have duplicated implementations which differ (e.g. get does not
-        # annex init installed annexes)
+        # since underneath get could do similar installs
         common_kwargs = dict(
             get_data=get_data,
             recursive=recursive,
