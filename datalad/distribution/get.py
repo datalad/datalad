@@ -356,9 +356,9 @@ class Get(Interface):
                         continue
                     subds = Dataset(subdspath)
                     lgr.info(
-                        "Obtaining %s %s recursively",
+                        "Installing %s%s recursively",
                         subds,
-                        ("underneath %s" % content_path
+                        (" underneath %s" % content_path
                          if subds.path != content_path
                          else ""))
                     for res in _recursive_install_subds_underneath(
