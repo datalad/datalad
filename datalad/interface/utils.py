@@ -53,6 +53,7 @@ from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
+from datalad.support.constraints import Constraint
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
@@ -864,7 +865,9 @@ eval_params = dict(
         doc="""if given, each to-be-returned
         status dictionary is passed to this callable, and is only
         returned if the callable's return value does not
-        evaluate to False or a ValueError exception is raised.""",
+        evaluate to False or a ValueError exception is raised. If the given
+        callable supports `**kwargs` it will additionally be passed the
+        keyword arguments of the original API call.""",
         constraints=EnsureCallable()),
     result_xfm=Parameter(
         doc="""if given, each to-be-returned result
@@ -991,6 +994,18 @@ def eval_results(func):
             incomplete_results = []
             # inspect and render
             result_filter = common_params['result_filter']
+            # wrap the filter into a helper to be able to pass additional arguments
+            # if the filter supports it, but at the same time keep the required interface
+            # as minimal as possible. Also do this here, in order to avoid this test
+            # to be performed for each return value
+            _result_filter = result_filter
+            if result_filter:
+                if isinstance(result_filter, Constraint):
+                    _result_filter = result_filter.__call__
+                if (PY2 and inspect.getargspec(_result_filter).keywords) or \
+                        (not PY2 and inspect.getfullargspec(_result_filter).varkw):
+                    def _result_filter(res):
+                        return result_filter(res, **_kwargs)
             result_renderer = common_params['result_renderer']
             result_xfm = common_params['result_xfm']
             if result_xfm in known_result_xfms:
@@ -1025,9 +1040,9 @@ def eval_results(func):
                         # first fail -> that's it
                         # raise will happen after the loop
                         break
-                if result_filter:
+                if _result_filter:
                     try:
-                        if not result_filter(res):
+                        if not _result_filter(res):
                             raise ValueError('excluded by filter')
                     except ValueError as e:
                         lgr.debug('not reporting result (%s)', exc_str(e))

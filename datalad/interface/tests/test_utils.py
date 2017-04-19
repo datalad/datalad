@@ -420,3 +420,15 @@ def test_result_filter():
                 4,
                 result_filter=filt)[-1],
             {'path': 'some', 'status': 'ok', 'somekey': 2})
+
+    # test more sophisticated filters that actually get to see the
+    # API call's kwargs
+    def greatfilter(res, **kwargs):
+        assert_in('dataset', kwargs)
+        return True
+    Test_Utils().__call__(4, dataset='awesome', result_filter=greatfilter)
+
+    def sadfilter(res, **kwargs):
+        assert_not_in('dataset', kwargs)
+        return True
+    Test_Utils().__call__(4, result_filter=sadfilter)
