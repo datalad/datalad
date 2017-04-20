@@ -126,7 +126,7 @@ def _get_tracking_source(ds):
     return remote_name, remote_url
 
 
-def _get_flexible_source_candidates(src, base_url=None):
+def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
     """Get candidates to try cloning from.
 
     Primarily to mitigate the problem that git doesn't append /.git
@@ -139,6 +139,8 @@ def _get_flexible_source_candidates(src, base_url=None):
     src : string or RI
       Full or relative (then considered within base_url if provided) path
     base_url : string or RI, optional
+    alternate_suffix : bool
+      Whether to generate URL candidates with and without '/.git' suffixes.
 
     Returns
     -------
@@ -161,7 +163,7 @@ def _get_flexible_source_candidates(src, base_url=None):
     src = str(ri)
 
     candidates.append(src)
-    if isinstance(ri, URL):
+    if alternate_suffix and isinstance(ri, URL):
         if ri.scheme in {'http', 'https'}:
             # additionally try to consider .git:
             if not src.rstrip('/').endswith('/.git'):
