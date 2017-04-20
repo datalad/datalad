@@ -13,9 +13,13 @@
 import logging
 
 from os import curdir
+from os import linesep
+from os.path import exists
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
+
+from six.moves.urllib.parse import quote as urlquote
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import get_paths_by_dataset
@@ -39,22 +43,211 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.exceptions import InstallFailedError
+from datalad.support.network import URL
+from datalad.support.network import RI
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import rmtree
+from datalad.utils import unique
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .utils import _install_subds_from_flexible_source
+from .utils import _get_flexible_source_candidates
+from .utils import _get_tracking_source
+from .utils import _fixup_submodule_dotgit_setup
+from .utils import _handle_possible_annex_dataset
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
+
+
+def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
+    """Retrieve candidates from where to install the submodule
+
+    Even if url for submodule is provided explicitly -- first tries urls under
+    parent's module tracking branch remote.
+
+    TODO: reconsider?  yoh just maintained prev behavior for now
+    """
+    clone_urls = []
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+    remote_name, remote_url = _get_tracking_source(ds)
+
+    # Directly on parent's ds url
+    if remote_url:
+        # attempt: submodule checkout at parent remote URL
+        # We might need to quote sm_path portion, e.g. for spaces etc
+        if isinstance(RI(remote_url), URL):
+            sm_path_url = urlquote(sm_path)
+        else:
+            sm_path_url = sm_path
+
+        clone_urls += [
+            u for u in _get_flexible_source_candidates(sm_path_url, remote_url)
+            if u not in clone_urls
+            ]
+
+    # attempt: provided (configured?) submodule URL
+    # TODO: consider supporting DataLadRI here?  or would confuse
+    #  git and we wouldn't want that (i.e. not allow pure git clone
+    #  --recursive)
+    if sm_url:
+        clone_urls += _get_flexible_source_candidates(
+            sm_url,
+            remote_url if remote_url else ds.path)
+
+    return unique(clone_urls)
+
+
+def _install_subds_from_flexible_source(
+        ds, sm_path, sm_url, reckless, description=None):
+    """Tries to obtain a given subdataset from several meaningful locations"""
+    # compose a list of candidate clone URLs
+    clone_urls = _get_flexible_source_candidates_for_submodule(
+        ds, sm_path, sm_url)
+
+    # now loop over all candidates and try to clone
+    subds = Dataset(opj(ds.path, sm_path))
+    got_installed = not subds.is_installed()
+    try:
+        clone_url = _clone_from_any_source(clone_urls, subds.path)
+    except GitCommandError as e:
+        raise InstallFailedError(
+            msg="Failed to install %s from %s (%s)" % (
+                subds, clone_urls, exc_str(e))
+            )
+    # ATM above _clone_from_any_source would just return None and not
+    # crash if clone has failed for any reason.  May be it is because that
+    # submodule already was installed and all is good?
+
+    # do fancy update
+    if sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'):
+        lgr.debug("Update cloned subdataset {0} in parent".format(subds))
+        # TODO: move all of that into update_submodule ??
+        # TODO: direct mode ramifications?
+        # track branch originally cloned
+        subrepo = subds.repo
+        # Here we can endup with subrepo being None and thus None e.g.
+        # if clone above has failed.  yoh has no idea on the assumptions
+        # of _clone_from_any_source (seems to not want to fail), so just let
+        # it fail 'natively' at some point after
+        branch = subrepo.get_active_branch()
+        branch_hexsha = subrepo.get_hexsha(branch)
+        ds.repo.update_submodule(sm_path, init=True)
+        updated_branch = subrepo.get_active_branch()
+        if branch and (not updated_branch or updated_branch == (None, None)):
+            # got into 'detached' mode
+            # trace if current state is a predecessor of the branch_hexsha
+            lgr.debug(
+                "Detected detached HEAD after updating submodule %s which was "
+                "in %s branch before", subds.path, branch)
+            detached_hexsha = subrepo.get_hexsha()
+            if got_installed and \
+                subrepo.get_merge_base(
+                    [branch_hexsha, detached_hexsha]) == detached_hexsha:
+                # TODO: config option?
+                # in all likely event it is of the same branch since
+                # it is an ancestor -- so we could update that original branch
+                # to point to the state desired by the submodule, and update
+                # HEAD to point to that location
+                lgr.info(
+                    "Submodule HEAD got detached. Resetting branch %s to point "
+                    "to %s. Original location was %s",
+                    branch, detached_hexsha[:8], branch_hexsha[:8]
+                )
+                branch_ref = 'refs/heads/%s' % branch
+                subrepo.update_ref(branch_ref, detached_hexsha)
+                assert(subrepo.get_hexsha(branch) == detached_hexsha)
+                subrepo.update_ref('HEAD', branch_ref, symbolic=True)
+                assert(subrepo.get_active_branch() == branch)
+            elif got_installed:
+                lgr.warning(
+                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
+                    subrepo.path, branch, detached_hexsha[:8]
+                )
+            else:
+                # actually this point should never be reached atm since here
+                # datasets are assumed to be installed afresh, but logic is kept
+                # in "just in case" we later support it
+                lgr.info(
+                    "%s has a detached HEAD since we operated on pre-installed dataset",
+                    subrepo.path
+                )
+    else:
+        # submodule is brand-new and previously unknown
+        ds.repo.add_submodule(sm_path, url=clone_url)
+    _fixup_submodule_dotgit_setup(ds, sm_path)
+    _handle_possible_annex_dataset(subds, reckless, description=description)
+    return subds
+
+
+# TODO wipe this old code out completely and replace with `clone` command
+def _clone_from_any_source(sources, dest):
+    # should not be the case, but we need to distinguish between failure
+    # of git-clone, due to existing target and an unsuccessful clone
+    # attempt. See below.
+    existed = dest and exists(dest)
+    lgr.info("Installing dataset %s", dest)
+    for source_ in sources:
+        try:
+            lgr.debug("Attempting to clone {0}".format(source_))
+            GitRepo.clone(path=dest, url=source_, create=True)
+            return source_  # do not bother with other sources if succeeded
+        except GitCommandError as e:
+            lgr.debug("Failed to retrieve from URL: "
+                      "{0}".format(source_))
+            if not existed and dest \
+                    and exists(dest):
+                lgr.debug("Wiping out unsuccessful clone attempt at "
+                          "{}".format(dest))
+                rmtree(dest)
+
+            if source_ == sources[-1]:
+                # Note: The following block is evaluated whenever we
+                # fail even with the last try. Not nice, but currently
+                # necessary until we get a more precise exception:
+                ####################################
+                # TODO: We may want to introduce a --force option to
+                # overwrite the target.
+                # TODO: Currently assuming if `existed` and there is a
+                # GitCommandError means that these both things are connected.
+                # Need newer GitPython to get stderr from GitCommandError
+                # (already fixed within GitPython.)
+                if existed:
+                    # rudimentary check for an installed dataset at target:
+                    # (TODO: eventually check for being the one, that this
+                    # is about)
+                    dest_ds = Dataset(dest)
+                    if dest_ds.is_installed():
+                        lgr.info("{0} appears to be installed already."
+                                 "".format(dest_ds))
+                        break
+                    else:
+                        lgr.warning("Target {0} already exists and is not "
+                                    "an installed dataset. Skipped."
+                                    "".format(dest))
+                        # Keep original in debug output:
+                        lgr.debug("Original failure:{0}"
+                                  "{1}".format(linesep, exc_str(e)))
+                        return None
+                ##################
+
+                # Re-raise if failed even with the last candidate
+                lgr.debug("Unable to establish repository instance at "
+                          "{0} from {1}"
+                          "".format(dest, sources))
+                raise
 
 
 def _install_necessary_subdatasets(
