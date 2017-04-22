@@ -691,8 +691,8 @@ def test_install_skip_failed_recursive(src, path):
         assert_in_results(result, status='ok', path=sub2.path)
 
         cml.assert_logged(
-            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
-            regex=False, level='WARNING')
+            msg="target path already exists and not empty".format(sub1.path),
+            regex=False, level='ERROR')
     # this is not in effect that this message is not propagated up
     # assert_in(
     #     "destination path '{}' already exists and is not an empty directory".format(
