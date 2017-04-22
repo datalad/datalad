@@ -68,7 +68,9 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
     # first one could just know about itself or explicit url provided
     sshurl = 'ssh://e.c'
     httpurl = 'http://e.c'
-    sm_httpurls = [httpurl, httpurl + '/.git']
+    # Expansion with '/.git' no longer done in this helper
+    #sm_httpurls = [httpurl, httpurl + '/.git']
+    sm_httpurls = [httpurl]
     eq_(f(ds, 'sub'), [])
     eq_(f(ds, 'sub', sshurl), [sshurl])
     eq_(f(ds, 'sub', httpurl), sm_httpurls)
