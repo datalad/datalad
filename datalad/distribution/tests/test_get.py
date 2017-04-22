@@ -14,8 +14,10 @@ from os import curdir
 from os.path import join as opj, basename
 from glob import glob
 
+from datalad.api import create
 from datalad.api import get
 from datalad.api import install
+from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import RemoteNotAvailableError
@@ -53,6 +55,34 @@ def _make_dataset_hierarchy(path):
     origin_sub4 = origin_sub3.create('sub4')
     origin.save(recursive=True, all_updated=True)
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
+
+
+@with_tempfile
+@with_tempfile
+def test_get_flexible_source_candidates_for_submodule(t, t2):
+    f = _get_flexible_source_candidates_for_submodule
+    # for now without mocking -- let's just really build a dataset
+    ds = create(t)
+    clone = install(t2, source=t)
+
+    # first one could just know about itself or explicit url provided
+    sshurl = 'ssh://e.c'
+    httpurl = 'http://e.c'
+    sm_httpurls = [httpurl, httpurl + '/.git']
+    eq_(f(ds, 'sub'), [])
+    eq_(f(ds, 'sub', sshurl), [sshurl])
+    eq_(f(ds, 'sub', httpurl), sm_httpurls)
+    eq_(f(ds, 'sub', None), [])  # otherwise really we have no clue were to get from
+
+    # but if we work on dsclone then it should also add urls deduced from its
+    # own location default remote for current branch
+    eq_(f(clone, 'sub'), [t + '/sub'])
+    eq_(f(clone, 'sub', sshurl), [t + '/sub', sshurl])
+    eq_(f(clone, 'sub', httpurl), [t + '/sub'] + sm_httpurls)
+    eq_(f(clone, 'sub'), [t + '/sub'])  # otherwise really we have no clue were to get from
+    # TODO: check that http:// urls for the dataset itself get resolved
+
+    # TODO: many more!!
 
 
 @with_tempfile(mkdir=True)
