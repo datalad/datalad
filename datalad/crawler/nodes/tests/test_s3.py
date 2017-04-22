@@ -195,7 +195,7 @@ def test_crawl_s3_file_to_directory(path):
     with externals_use_cassette('test_crawl_s3_file_to_directory-pipeline1'):
         with swallow_logs() as cml:
             out = run_pipeline(pipeline)
-    assert(annex.repo.dirty)
+    assert(annex.repo.dirty())
     list(annex.finalize()(out[0]))
     # things are committed and thus stats are empty
     eq_(out, [{'datalad_stats': ActivityStats()}])

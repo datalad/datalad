@@ -78,10 +78,9 @@ def handle_dirty_dataset(ds, mode, msg=None):
     if mode == 'ignore':
         return
     elif mode == 'fail':
-        if not ds.repo or ds.repo.repo.is_dirty(index=True,
-                                                working_tree=True,
-                                                untracked_files=True,
-                                                submodules=True):
+        if not ds.repo or ds.repo.dirty(index=True,
+                                        untracked_files=True,
+                                        submodules=True):
             raise RuntimeError('dataset {} has unsaved changes'.format(ds))
     elif mode == 'save-before':
         if not ds.is_installed():
@@ -126,10 +125,9 @@ def handle_dirty_datasets(dpaths,
             if not ds.repo:
                 continue
             ds.repo.precommit()
-            if ds.repo.repo.is_dirty(index=True,
-                                     working_tree=True,
-                                     untracked_files=True,
-                                     submodules=True):
+            if ds.repo.dirty(index=True,
+                             untracked_files=True,
+                             submodules=True):
                 raise RuntimeError(
                     'dataset {} has unsaved changes'.format(ds))
     else:
@@ -357,42 +355,22 @@ def save_dataset(
         message = 'Recorded existing changes'
         _datalad_msg = True
 
-    if files or ds.repo.repo.is_dirty(
+    # TODO: Remove dirty() altogether???
+    if files or ds.repo.dirty(
             index=True,
-            working_tree=False,
             untracked_files=False,
             submodules=True):
         # either we have an explicit list of files, or we have something
         # stages otherwise do not attempt to commit, as the underlying
         # repo will happily commit any non-change
         # not checking the working tree or untracked files should make this
-        # relavtively cheap
+        # relatively cheap
 
-        # TODO: commit() should rather report a dedicated ValueError
-        # waiting for #1170
-        from datalad.support.exceptions import CommandError
-        try:
-            # we will blindly call commit not knowing if there is anything to
-            # commit -- this is cheaper than to anticipate all possible ways
-            # a repo in whatever mode is dirty
-            # however, if nothing is dirty the whining wil start
-            # --> sucking it up right here
-            with swallow_logs(new_level=logging.ERROR) as cml:
-                ds.repo.commit(message, options=files, _datalad_msg=_datalad_msg)
-        except CommandError as e:
-            # TODO until #1171 is resolved, test here for "normal" failure
-            # to commit
-            if 'nothing to commit' in str(e):
-                lgr.debug(
-                    "Was instructed to commit %s files but repository is not dirty",
-                    files)
-            elif 'no changes added to commit' in str(e) or 'nothing added to commit' in str(e):
-                lgr.info(
-                    'Nothing to save')
-            else:
-                # relay any prior whining in the exception
-                raise ValueError('{} [error log follows] {}; {}'.format(
-                    e, e.stdout, e.stderr))
+        # we will blindly call commit not knowing if there is anything to
+        # commit -- this is cheaper than to anticipate all possible ways
+        # a repo in whatever mode is dirty
+        ds.repo.commit(message, files=files, _datalad_msg=_datalad_msg,
+                       careless=True)
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...

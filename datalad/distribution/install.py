@@ -35,6 +35,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI
@@ -576,10 +577,7 @@ def _save_installed_datasets(ds, installed_datasets):
             message='[DATALAD] ' + msg,
             all_updated=False,
             recursive=False)
-    except ValueError as e:
-        if "did not match any file(s) known to git" in str(e):
-            # install doesn't add; therefore save call might included
-            # not yet added paths.
-            pass
-        else:
-            raise
+    except FileNotInRepositoryError:
+        # install doesn't add; therefore save call might included
+        # not yet added paths.
+        pass

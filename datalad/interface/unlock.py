@@ -64,6 +64,8 @@ class Unlock(Interface):
             recursive=False,
             recursion_limit=None):
 
+        # TODO: require dataset
+
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
                 "insufficient arguments for unlocking: needs at least "
@@ -95,38 +97,14 @@ class Unlock(Interface):
 
             files = content_by_ds[ds_path]
 
-            # workaround for direct mode.
-            # TODO: Needs to go into AnnexRepo.unlock() as well
-            #       Note that this RF'ing is done in PR #1277
+            unlocked.extend(ds.repo.unlock(files))
             # Note for merging with PR #1350:
-            # There was the else-branch only and its diff is:
-            #   - unlocked.extend(
-            #   -                [line.split()[1] for line in std_out.splitlines()
-            #   -                 if line.strip().endswith('ok')])
-            #   -        return unlocked
-            #   +            for r in [line.split()[1] for line in std_out.splitlines()
-            #   +                      if line.strip().endswith('ok')]:
-            #   +                yield get_status_dict(
-            #   +                    path=r, status='ok', type_='file', **res_kwargs)
-            #
-            # same has to be done in if-branch: just a different unlocked.extend statement
-            if ds.repo.is_direct_mode():
-                lgr.debug("'%s' is in direct mode, "
-                          "'annex unlock' not available", ds)
-                lgr.warning("In direct mode there is no 'unlock'. However if "
-                            "the file's content is present, it is kind of "
-                            "unlocked. Therefore just checking whether this is "
-                            "the case.")
-                unlocked.extend([f for f in files
-                                 if ds.repo.file_has_content(f)])
+            # Replace the list comprehension
+            # [line.split()[1] for line in std_out.splitlines() if line.strip().endswith('ok')]
+            # by
+            # ds.repo.unlock(files)
+            # and delete the ds.repo._annex_custom_command call
 
-            else:
-                std_out, std_err = ds.repo._annex_custom_command(
-                    files, ['git', 'annex', 'unlock'])
-
-                unlocked.extend(
-                    [line.split()[1] for line in std_out.splitlines()
-                     if line.strip().endswith('ok')])
         return unlocked
 
     @staticmethod

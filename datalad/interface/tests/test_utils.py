@@ -168,13 +168,13 @@ def test_save_hierarchy(path):
     # introduce a change at the lowest level
     ds_bbaa.repo.remove('file_bbaa')
     for d in (ds, ds_bb, ds_bba, ds_bbaa):
-        ok_(d.repo.dirty)
+        ok_(d.repo.dirty())
     ds_bb.save(files=ds_bbaa.path, super_datasets=True)
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
         ok_clean_git(d.path)
-    ok_(ds.repo.dirty)
+    ok_(ds.repo.dirty())
     # now with two modified repos
     d = Dataset(opj(ds.path, 'd'))
     da = Dataset(opj(d.path, 'da'))
@@ -184,7 +184,7 @@ def test_save_hierarchy(path):
     save_dataset_hierarchy((d.path, da.path, db.path))
     for d in (d, da, db):
         ok_clean_git(d.path)
-    ok_(ds.repo.dirty)
+    ok_(ds.repo.dirty())
     # and now with files all over the place and saving
     # all the way to the root
     aa = Dataset(opj(ds.path, 'a', 'aa'))
