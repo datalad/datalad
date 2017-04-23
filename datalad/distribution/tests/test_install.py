@@ -405,7 +405,7 @@ def test_install_into_dataset(source, top_path):
     # Create a dummy change
     create_tree(ds.path, {'dummy.txt': 'buga'})
     ok_clean_git(ds.path, untracked=['dummy.txt'])
-    subds_ = ds.install("sub2", source=source, if_dirty='ignore')
+    subds_ = ds.install("sub2", source=source)
     eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 

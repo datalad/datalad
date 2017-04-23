@@ -24,10 +24,8 @@ from datalad.interface.common_opts import jobs_opt
 # from datalad.interface.common_opts import git_clone_opts
 # from datalad.interface.common_opts import annex_opts
 # from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import reckless_opt
-from datalad.interface.utils import handle_dirty_dataset
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -112,7 +110,6 @@ class Install(Interface):
         description=dataset_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        if_dirty=if_dirty_opt,
         save=nosave_opt,
         reckless=reckless_opt,
         # git_opts=git_opts,
@@ -132,7 +129,6 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
-            if_dirty='save-before',
             save=True,
             reckless=False,
             # git_opts=None,
@@ -175,7 +171,6 @@ class Install(Interface):
         if dataset is not None:
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
-            handle_dirty_dataset(ds, if_dirty)
             common_kwargs['dataset'] = dataset
 
         # switch into scenario without --source:
@@ -194,7 +189,6 @@ class Install(Interface):
                     result = Install.__call__(
                                     source=s,
                                     description=description,
-                                    if_dirty=if_dirty,
                                     save=save,
                                     # git_clone_opts=git_clone_opts,
                                     # annex_init_opts=annex_init_opts,
@@ -219,7 +213,6 @@ class Install(Interface):
                 get_results = Get.__call__(
                     to_get,
                     # description=description,
-                    # if_dirty=if_dirty,
                     # save=save,
                     # git_clone_opts=git_clone_opts,
                     # annex_init_opts=annex_init_opts,
@@ -267,6 +260,7 @@ class Install(Interface):
             # and more sophisticated witchcraft, it would still happily say
             # "it appears to be already installed", so we just catch an
             # obviously pointless input combination
+            # TODO this should say "use `add`"
             raise ValueError(
                 "installation `source` and destination `path` are identical. "
                 "If you are trying to add a subdataset simply use `save` %s".format(
