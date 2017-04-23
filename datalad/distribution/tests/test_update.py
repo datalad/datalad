@@ -36,13 +36,18 @@ from datalad.tests.utils import assert_result_count
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    # TODO candidate for install default return value RF test
+    source = install(
+        src_path, source=origin, recursive=True,
+        result_xfm='datasets')[0]
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
 
     # get a clone to update later on:
-    dest = install(dst_path, source=src_path, recursive=True)[0]
+    dest = install(
+        dst_path, source=src_path, recursive=True,
+        result_xfm='datasets')[0]
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)
@@ -105,7 +110,9 @@ def test_update_simple(origin, src_path, dst_path):
 def test_update_git_smoke(src_path, dst_path):
     # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
     ds = Dataset(src_path).create(no_annex=True)
-    target = install(dst_path, source=src_path)
+    target = install(
+        dst_path, source=src_path,
+        result_xfm='datasets', return_type='item-or-list')
     create_tree(ds.path, {'file.dat': '123'})
     ds.add('file.dat')
     assert_result_count(
@@ -179,7 +186,9 @@ def test_newthings_coming_down(originpath, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
     Dataset(originpath).add('load.dat')
-    ds = install(source=originpath, path=destpath)
+    ds = install(
+        source=originpath, path=destpath,
+        result_xfm='datasets', return_type='item-or-list')
     assert_is_instance(ds.repo, GitRepo)
     assert_in('origin', ds.repo.get_remotes())
     # turn origin into an annex
@@ -231,7 +240,9 @@ def test_newthings_coming_down(originpath, destpath):
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, destpath):
     origin = Dataset(originpath).create()
-    ds = install(source=originpath, path=destpath)
+    ds = install(
+        source=originpath, path=destpath,
+        result_xfm='datasets', return_type='item-or-list')
     # as a submodule
     sname = 'subm 1'
     osm1 = origin.create(sname)
@@ -275,7 +286,9 @@ def test_update_volatile_subds(originpath, destpath):
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):
     origin = Dataset(originpath).create()
-    ds = install(source=originpath, path=destpath)
+    ds = install(
+        source=originpath, path=destpath,
+        result_xfm='datasets', return_type='item-or-list')
     # no harm
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     # content

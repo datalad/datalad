@@ -167,7 +167,8 @@ def test_subdatasets(path):
     eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
-    subds = ds.install('subds', source=path)
+    subds = ds.install('subds', source=path,
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subds.is_installed())
     eq_(subds.get_superdataset(), ds)
     eq_(subds.get_superdataset(topmost=True), ds)
@@ -183,7 +184,9 @@ def test_subdatasets(path):
     eq_(ds.subdatasets(), [])
 
     # very nested subdataset to test topmost
-    subsubds = subds.install(_path_('d1/subds'), source=path)
+    subsubds = subds.install(
+        _path_('d1/subds'), source=path,
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subsubds.is_installed())
     eq_(subsubds.get_superdataset(), subds)
     eq_(subsubds.get_superdataset(topmost=True), ds)

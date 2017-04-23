@@ -31,7 +31,10 @@ def test_add_sibling(origin, repo_path):
                       add_sibling, url="http://some.remo.te/location")
 
     # prepare src
-    source = install(repo_path, source=origin, recursive=True)[0]
+    # TODO candidate for install default return value RF test
+    source = install(
+        repo_path, source=origin, recursive=True,
+        result_xfm='datasets')[0]
     # pollute config
     depvar = 'remote.test-remote.datalad-publish-depends'
     source.config.add(depvar, 'stupid', where='local')

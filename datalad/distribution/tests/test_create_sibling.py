@@ -117,7 +117,9 @@ def test_invalid_call(path):
 def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
-    source = install(src_path, source=origin)
+    source = install(
+        src_path, source=origin,
+        result_xfm='datasets', return_type='item-or-list')
 
     target_path = opj(target_rootpath, "basic")
     with swallow_logs(new_level=logging.ERROR) as cml:
@@ -273,7 +275,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    # TODO candidate for install default return value RF test
+    source = install(
+        src_path, source=origin, recursive=True,
+        result_xfm='datasets')[0]
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))
@@ -338,7 +343,10 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    # TODO candidate for install default return value RF test
+    source = install(
+        src_path, source=origin, recursive=True,
+        result_xfm='datasets')[0]
     eq_(len(source.get_subdatasets()), 2)
     # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
