@@ -27,6 +27,7 @@ from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import reckless_opt
 from datalad.interface.results import get_status_dict
+from datalad.interface.results import YieldDatasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.support.constraints import EnsureNone
@@ -185,6 +186,14 @@ class Install(Interface):
             # we need to collect URLs and paths
             to_install = []
             to_get = []
+            # TODO: this approach is problematic, it disrupts the order of input args.
+            # consequently results will be returned in an unexpected order when a
+            # mixture of source URL and paths is given. Reordering is only possible when
+            # everything in here is fully processed before any results can be yielded.
+            # moreover, I think the semantics of the status quo implementation are a
+            # bit complicated: in a mixture list a source URL will lead to a new dataset
+            # at a generated default location, but a path will lead to a subdataset
+            # at that exact location
             for urlpath in path:
                 ri = RI(urlpath)
                 (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
@@ -198,6 +207,11 @@ class Install(Interface):
                         save=save,
                         # git_clone_opts=git_clone_opts,
                         # annex_init_opts=annex_init_opts,
+                        # we need to disable error handling in order to have it done at
+                        # the very top, otherwise we are not able to order a global
+                        # "ignore-and-keep-going"
+                        on_failure='ignore',
+                        return_type='generator',
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
@@ -221,6 +235,11 @@ class Install(Interface):
                         # save=save,
                         # git_clone_opts=git_clone_opts,
                         # annex_init_opts=annex_init_opts,
+                        # we need to disable error handling in order to have it done at
+                        # the very top, otherwise we are not able to order a global
+                        # "ignore-and-keep-going"
+                        on_failure='ignore',
+                        return_type='generator',
                         **common_kwargs):
                     # no post-processing of get'ed content on disk should be
                     # necessary here, this is the responsibility of `get`
@@ -323,7 +342,11 @@ class Install(Interface):
         # is given
         res = Clone.__call__(
             source, path, dataset=ds, description=description,
-            reckless=reckless)
+            reckless=reckless,
+            # we need to disable error handling in order to have it done at
+            # the very top, otherwise we are not able to order a global
+            # "ignore-and-keep-going"
+            on_failure='ignore')
         # make sure logic below is valid, only one dataset result is coming back
         assert(len(res) == 1)
         yield res[0]
@@ -340,6 +363,11 @@ class Install(Interface):
                     # TODO expose this
                     # yoh: exactly!
                     #annex_get_opts=annex_get_opts,
+                    # we need to disable error handling in order to have it done at
+                    # the very top, otherwise we are not able to order a global
+                    # "ignore-and-keep-going"
+                    on_failure='ignore',
+                    return_type='generator',
                     **common_kwargs):
                 yield r
         # at this point no futher post-processing should be necessary,
