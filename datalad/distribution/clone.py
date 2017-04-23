@@ -142,6 +142,7 @@ class Clone(Interface):
         # Possibly do conversion from source into a git-friendly url
         # luckily GitRepo will undo any fancy file:/// url to make use of Git's
         # optimization for local clones....
+        source_url = source
         source_ = _get_git_url_from_source(source)
         lgr.debug("Resolved clone source from '%s' to '%s'",
                   source, source_)
@@ -165,7 +166,7 @@ class Clone(Interface):
 
         status_kwargs = dict(
             action='clone', ds=destination_dataset, logger=lgr,
-            refds=refds_path, source_url=source)
+            refds=refds_path, source_url=source_url)
 
         # important test! based on this `rmtree` will happen below after failed clone
         if exists(dest_path) and listdir(dest_path):
