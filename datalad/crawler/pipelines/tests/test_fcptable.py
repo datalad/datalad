@@ -78,6 +78,8 @@ def _test_dataset(dataset, error, create, skip, tmpdir):
 
 
 def test_dataset():
+    # Bring back when NITRC is back (gh-1472)
+    raise SkipTest
     yield _test_dataset, 'Baltimore', None, False, False
     yield _test_dataset, 'AnnArbor_b', None, False, False
     yield _test_dataset, 'Ontario', None, False, False
