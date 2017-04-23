@@ -191,3 +191,10 @@ def count_results(res, **kwargs):
     """Return number if results that match all property values in kwargs"""
     return sum(
         all(k in r and r[k] == v for k, v in kwargs.items()) for r in res)
+
+
+def only_matching_paths(res, **kwargs):
+    # TODO handle relative paths by using a contained 'refds' value
+    paths = assure_list(kwargs.get('path', []))
+    respath = res.get('path', None)
+    return respath in paths

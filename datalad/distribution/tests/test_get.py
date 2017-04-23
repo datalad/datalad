@@ -17,6 +17,7 @@ from glob import glob
 from datalad.api import create
 from datalad.api import get
 from datalad.api import install
+from datalad.interface.results import only_matching_paths
 from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -450,7 +451,14 @@ def test_get_in_unavailable_subdataset(src, path):
     root = install(path, source=src)
     targetpath = opj('sub1', 'sub2')
     targetabspath = opj(root.path, targetpath)
-    get(targetabspath)
+    res = get(targetabspath)
+    assert_result_count(res, 2, status='ok', action='install', type='dataset')
+    # dry-fit result filter that only returns the result that matched the requested
+    # path
+    filtered = [r for r in res if only_matching_paths(r, path=targetabspath)]
+    assert_result_count(
+        filtered, 1, status='ok', action='install', type='dataset',
+        path=targetabspath)
     # we got the dataset, and its immediate content, but nothing below
     sub2 = Dataset(targetabspath)
     ok_(sub2.is_installed())
