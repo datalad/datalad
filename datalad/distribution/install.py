@@ -213,6 +213,7 @@ class Install(Interface):
                         # "ignore-and-keep-going"
                         on_failure='ignore',
                         return_type='generator',
+                        result_xfm=None,
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
@@ -241,6 +242,7 @@ class Install(Interface):
                         # "ignore-and-keep-going"
                         on_failure='ignore',
                         return_type='generator',
+                        result_xfm=None,
                         **common_kwargs):
                     # no post-processing of get'ed content on disk should be
                     # necessary here, this is the responsibility of `get`
@@ -326,6 +328,7 @@ class Install(Interface):
             # we need to disable error handling in order to have it done at
             # the very top, otherwise we are not able to order a global
             # "ignore-and-keep-going"
+            result_xfm=None,
             on_failure='ignore')
         # make sure logic below is valid, only one dataset result is coming back
         assert(len(res) == 1)
@@ -348,6 +351,7 @@ class Install(Interface):
                     # "ignore-and-keep-going"
                     on_failure='ignore',
                     return_type='generator',
+                    result_xfm=None,
                     **common_kwargs):
                 yield r
         # at this point no futher post-processing should be necessary,
