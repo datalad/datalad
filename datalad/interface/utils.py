@@ -1035,7 +1035,8 @@ def eval_results(func):
                 if result_renderer == 'json':
                     print(json.dumps(
                         {k: v for k, v in res.items()
-                         if k not in ('message', 'logger')}))
+                         if k not in ('message', 'logger')},
+                        sort_keys=True))
                 elif result_renderer == 'simple':
                     # simple output "STATUS: PATH"
                     # where PATH is relative to a reference dataset, if one is reported in the result
