@@ -19,7 +19,6 @@ def _generate_func_api():
     from importlib import import_module
     from inspect import isgenerator
     from collections import namedtuple
-    from collections import OrderedDict
     from functools import wraps
 
     from datalad import cfg
@@ -28,25 +27,14 @@ def _generate_func_api():
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
     from .interface.base import alter_interface_docs_for_api
+    from .interface.base import merge_allargs2kwargs
 
     def _kwargs_to_namespace(call, args, kwargs):
         """
         Given a __call__, args and kwargs passed, prepare a cmdlineargs-like
         thing
         """
-        from inspect import getargspec
-        argspec = getargspec(call)
-        defaults = argspec.defaults
-        nargs = len(argspec.args)
-        assert (nargs >= len(defaults))
-        # map any args to their name
-        argmap = list(zip(argspec.args[:len(args)], args))
-        # map defaults of kwargs to their names (update below)
-        argmap += list(zip(argspec.args[-len(defaults):], defaults))
-        kwargs_ = OrderedDict(argmap)
-        # update with provided kwarg args
-        kwargs_.update(kwargs)
-        assert (nargs == len(kwargs_))
+        kwargs_ = merge_allargs2kwargs(call, args, kwargs)
         # Get all arguments removing those possible ones used internally and
         # which shouldn't be exposed outside anyways
         [kwargs_.pop(k) for k in kwargs_ if k.startswith('_')]
