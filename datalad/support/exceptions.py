@@ -269,6 +269,8 @@ class IncompleteResultsError(RuntimeError):
     # such results have been yielded already at the time this exception is
     # raised, little point in collecting them just for the sake of a possible
     # exception
+    # MIH: AnnexRepo is the last remaining user of this functionality, in a
+    # single context
     def __init__(self, results=None, failed=None, msg=None):
         super(IncompleteResultsError, self).__init__(msg)
         self.results = results
