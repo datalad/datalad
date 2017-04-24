@@ -837,7 +837,8 @@ eval_params = dict(
     return_type=Parameter(
         doc="""return value behavior switch. If 'item-or-list' a single
         value is returned instead of a one-item return value list, or a
-        list in case of multiple return values.""",
+        list in case of multiple return values. `None` is return in case
+        of an empty list.""",
         constraints=EnsureChoice('generator', 'list', 'item-or-list')),
     result_filter=Parameter(
         doc="""if given, each to-be-returned
@@ -1067,8 +1068,8 @@ def eval_results(func):
                     if hasattr(_func_class, 'custom_result_summary_renderer'):
                         _func_class.custom_result_summary_renderer(results)
                 if common_params['return_type'] == 'item-or-list' and \
-                        len(results) == 1:
-                    return results[0]
+                        len(results) < 2:
+                    return results[0] if results else None
                 else:
                     return results
 
