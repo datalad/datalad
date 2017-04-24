@@ -354,7 +354,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
                 all_versions.append(url_versioned)
                 if verify:
                     # it would throw HTTPError exception if not accessible
-                    _ = urlopen(Request(url))
+                    _ = urlopen(Request(url_versioned))
                 was_versioned = True
                 if not return_all:
                     break

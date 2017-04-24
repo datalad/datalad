@@ -57,7 +57,8 @@ def test_version_url():
 def test_version_url_deleted():
     # it existed and then was removed
     fpath = "ds000158/ds158_R1.0.1/compressed/ds000158_R1.0.1_sub001-055.zip"
-    eq_(
-        get_versioned_url("http://openneuro.s3.amazonaws.com/%s" % fpath),
-        "http://openneuro.s3.amazonaws.com/%s?versionId=null" % fpath
-    )
+    url = "http://openneuro.s3.amazonaws.com/%s" % fpath
+    turl = "http://openneuro.s3.amazonaws.com/%s?versionId=null" % fpath
+    eq_(get_versioned_url(url), turl)
+    # too heavy for verification!
+    #eq_(get_versioned_url(url, verify=True), turl)
