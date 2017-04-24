@@ -134,6 +134,9 @@ def _install_subds_from_flexible_source(
                 on_failure='stop',
                 result_renderer='disabled',
                 return_type='item-or-list')
+            # failure will raise an exception, hence if we got here we can
+            # leave the loop and have a successful clone
+            break
         except IncompleteResultsError:
             # details of the failure are logged already by common code
             pass
