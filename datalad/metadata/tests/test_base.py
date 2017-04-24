@@ -118,7 +118,9 @@ def test_basic_metadata(path):
          'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
-    sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
+    sibling = install(
+        opj(path, 'sibling'), source=opj(path, 'origin'),
+        result_xfm='datasets', return_type='item-or-list')
     sibling_meta = get_metadata(sibling)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
@@ -175,7 +177,9 @@ def test_aggregation(path):
     ds.save('with aggregated meta data', all_updated=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
-    clone = install(opj(path, 'clone'), source=ds.path)
+    clone = install(
+        opj(path, 'clone'), source=ds.path,
+        result_xfm='datasets', return_type='item-or-list')
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
@@ -273,7 +277,9 @@ def test_aggregation(path):
     # more tests on returned paths:
     assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
-    clone_sub = clone.install('sub')
+    clone_sub = clone.install(
+        'sub',
+        result_xfm='datasets', return_type='item-or-list')
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
     # Test 'and' for multiple search entries
@@ -321,7 +327,9 @@ def test_aggregate_with_missing_or_duplicate_id(path):
 
     # and let's see now if we wouldn't fail if dataset is duplicate if we
     # install the same dataset twice
-    subds_clone = ds.install(source=subds.path, path="subds2")
+    subds_clone = ds.install(
+        source=subds.path, path="subds2",
+        result_xfm='datasets', return_type='item-or-list')
     with swallow_outputs():
         res2 = list(search_('.', regex=True, dataset=ds))
     # TODO: bring back when meta data RF is complete with aggregate
