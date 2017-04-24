@@ -309,34 +309,13 @@ class Install(Interface):
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
-                # URL doesn't point to a local something
-                # so we have an actual URL in `path`. Since this is valid as a
-                # single positional argument, `source` has to be None at this
-                # point.
-                if is_datalad_compat_ri(path) and source is None:
-                    # TODO delete this branch, reason:
-                    # MIH: I don't think this can ever happen, `source` is tested
-                    # not to be None above, and would lead to an exception if
-                    # it is
-
-                    # we have an actual URL -> this should be the source
-                    lgr.debug(
-                        "Single argument given to install, that doesn't seem to "
-                        "be a local path. "
-                        "Assuming the argument identifies a source location.")
-                    source = path
-                    path = None
-
-                else:
-                    # `path` is neither a valid source nor a local path.
-                    # TODO: The only thing left is a known subdataset with a
-                    # name, that is not a path; Once we correctly distinguish
-                    # between path and name of a submodule, we need to consider
-                    # this.
-                    # For now: Just raise
-                    # TODO this should be the only line in this entire except
-                    # statement, see reasoning above
-                    raise ValueError("Invalid path argument {0}".format(path))
+                # `path` is neither a valid source nor a local path.
+                # TODO: The only thing left is a known subdataset with a
+                # name, that is not a path; Once we correctly distinguish
+                # between path and name of a submodule, we need to consider
+                # this.
+                # For now: Just raise
+                raise ValueError("Invalid path argument {0}".format(path))
         # `path` resolved, if there was any.
 
         # clone dataset, will also take care of adding to superdataset, if one
