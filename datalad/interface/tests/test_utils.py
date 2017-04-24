@@ -424,11 +424,11 @@ def test_result_filter():
     # test more sophisticated filters that actually get to see the
     # API call's kwargs
     def greatfilter(res, **kwargs):
-        assert_in('dataset', kwargs)
+        assert_equal(kwargs.get('dataset', 'bob'), 'awesome')
         return True
     Test_Utils().__call__(4, dataset='awesome', result_filter=greatfilter)
 
     def sadfilter(res, **kwargs):
-        assert_not_in('dataset', kwargs)
+        assert_equal(kwargs.get('dataset', 'bob'), None)
         return True
     Test_Utils().__call__(4, result_filter=sadfilter)

@@ -63,6 +63,7 @@ from datalad.support.param import Parameter
 from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
+from .base import merge_allargs2kwargs
 from .results import get_status_dict
 from .results import known_result_xfms
 
@@ -983,8 +984,12 @@ def eval_results(func):
                     _result_filter = result_filter.__call__
                 if (PY2 and inspect.getargspec(_result_filter).keywords) or \
                         (not PY2 and inspect.getfullargspec(_result_filter).varkw):
+                    # we need to produce a dict with argname/argvalue pairs for all args
+                    # incl. defaults and args given as positionals
+                    fullkwargs_ = merge_allargs2kwargs(wrapped, _args, _kwargs)
+
                     def _result_filter(res):
-                        return result_filter(res, **_kwargs)
+                        return result_filter(res, **fullkwargs_)
             result_renderer = common_params['result_renderer']
             result_xfm = common_params['result_xfm']
             if result_xfm in known_result_xfms:
