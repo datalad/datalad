@@ -36,18 +36,13 @@ from datalad.tests.utils import assert_result_count
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
-    # TODO candidate for install default return value RF test
-    source = install(
-        src_path, source=origin, recursive=True,
-        result_xfm='datasets')[0]
+    source = install(src_path, source=origin, recursive=True)
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
 
     # get a clone to update later on:
-    dest = install(
-        dst_path, source=src_path, recursive=True,
-        result_xfm='datasets')[0]
+    dest = install(dst_path, source=src_path, recursive=True)
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)

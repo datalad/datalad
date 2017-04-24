@@ -372,7 +372,7 @@ def test_get_mixed_hierarchy(src, path):
     # now, install that thing:
     ds, subds = install(
         path, source=src, recursive=True,
-        result_xfm='datasets', return_type='item-or-list')
+        result_xfm='datasets', return_type='item-or-list', result_filter=None)
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:
@@ -434,9 +434,10 @@ def test_recurse_existing(src, path):
 
     # make sure recursion_limit works as expected across a range of depths
     for depth in range(len(origin_ds)):
+        # need to switch off default filter to get full hierarchy of datasets
         datasets = install(
             path, source=src, recursive=True, recursion_limit=depth,
-            result_xfm='datasets', return_type='list')
+            result_xfm='datasets', return_type='list', result_filter=None)
         # we expect one dataset per level
         eq_(len(datasets), depth + 1)
         rmtree(path)
@@ -444,7 +445,7 @@ def test_recurse_existing(src, path):
     # now install all but the last two levels, no data
     root, sub1, sub2 = install(
         path, source=src, recursive=True, recursion_limit=2,
-        result_xfm='datasets')
+        result_xfm='datasets', result_filter=None)
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
     sub3 = Dataset(opj(sub2.path, 'sub3'))
     ok_(not sub3.is_installed())

@@ -320,7 +320,8 @@ def test_install_recursive(src, path_nr, path_r):
         {'subm 1', 'subm 2'})
 
     # now recursively:
-    ds_list = install(path_r, source=src, recursive=True)
+    # don't filter implicit results so we can inspect them
+    ds_list = install(path_r, source=src, recursive=True, result_filter=None)
     # installed a dataset and two subdatasets
     eq_(len(ds_list), 3)
     eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
@@ -353,16 +354,17 @@ def test_install_recursive(src, path_nr, path_r):
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
-    ds_list = install(path, source=src, recursive=True, get_data=True)
-    # installed a dataset and two subdatasets, and two files:
-    # TODO generator (after RF of get only return datasets, waiting for install RF)
-    #eq_(len(ds_list), 5)
-    eq_(len(ds_list), 3)
-    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
+    res = install(path, source=src, recursive=True, get_data=True,
+                  result_filter=None, result_xfm=None)
+    assert_status('ok', res)
+    # installed a dataset and two subdatasets, and one file with content in
+    # each
+    eq_(len(res), 6)
+    assert_result_count(res, 3, type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
-    eq_(ds_list[0].path, path)
-    top_ds = ds_list[0]
+    eq_(res[0]['path'], path)
+    top_ds = YieldDatasets()(res[0])
     ok_(top_ds.is_installed())
     if isinstance(top_ds.repo, AnnexRepo):
         ok_(all(top_ds.repo.file_has_content(top_ds.repo.get_annexed_files())))
@@ -506,7 +508,8 @@ def test_implicit_install(src, dst):
     result = ds.install(path=opj("sub", "subsub"))
     ok_(sub.is_installed())
     ok_(subsub.is_installed())
-    eq_(result, [sub, subsub])
+    # but by default implicit results are not reported
+    eq_(result, subsub)
 
     # fail on obscure non-existing one in subds
     assert_raises(IncompleteResultsError, ds.install, source=opj('sub', 'obscure'))
@@ -709,7 +712,8 @@ def test_install_noautoget_data(src, path):
     top_src.add('.', recursive=True)
 
     # install top level:
-    cdss = install(path, source=src, recursive=True)
+    # don't filter implicitly installed subdataset to check them for content
+    cdss = install(path, source=src, recursive=True, result_filter=None)
     # there should only be datasets in the list of installed items,
     # and none of those should have any data for their annexed files yet
     for ds in cdss:
@@ -770,7 +774,8 @@ def test_install_consistent_state(src, dest, dest2, dest3):
     # whenever possible.
 
     # install entire hierarchy without specifying dataset
-    dest2_ds = install(dest2, source=src, recursive=True)
+    # no filter, we want full report
+    dest2_ds = install(dest2, source=src, recursive=True, result_filter=None)
     check_consistent_installation(dest2_ds[0])  # [1] is the subdataset
 
     # install entire hierarchy by first installing top level ds

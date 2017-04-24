@@ -28,6 +28,7 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import reckless_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.results import YieldDatasets
+from datalad.interface.results import is_result_matching_pathsource_argument
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.support.constraints import EnsureNone
@@ -91,6 +92,10 @@ class Install(Interface):
     # matching what is actually available after command completion (and
     # None for any failed dataset installation)
     result_xfm = 'successdatasets-or-none'
+    # we also want to limit the returned result to explicit input arguments
+    # (paths/source) and not report any implicit action, like intermediate
+    # datasets
+    result_filter = is_result_matching_pathsource_argument
 
     _params_ = dict(
         dataset=Parameter(

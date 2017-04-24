@@ -16,6 +16,7 @@ import logging
 
 from os.path import join as opj
 from os.path import relpath
+from os.path import abspath
 from datalad.utils import assure_list
 from datalad.distribution.dataset import Dataset
 
@@ -207,3 +208,41 @@ def only_matching_paths(res, **kwargs):
     paths = assure_list(kwargs.get('path', []))
     respath = res.get('path', None)
     return respath in paths
+
+
+# needs decorator, as it will otherwise bind to the command classes that use it
+@staticmethod
+def is_result_matching_pathsource_argument(res, **kwargs):
+    # we either have any non-zero number of "paths" (that could be anything), or
+    # we have one path and one source
+    # we don't do any error checking here, done by the command itself
+    source = kwargs.get('source', None)
+    if source is not None:
+        # if there was a source, it needs to be recorded in the result
+        # otherwise this is not what we are looking for
+        return source == res.get('source_url', None)
+    # the only thing left is a potentially heterogeneous list of paths/URLs
+    paths = assure_list(kwargs.get('path', []))
+    # three cases left:
+    # 1. input arg was an absolute path -> must match 'path' property
+    # 2. input arg was relative to a dataset -> must match refds/relpath
+    # 3. something nifti with a relative input path that uses PWD as the
+    #    reference
+    respath = res.get('path', None)
+    if respath in paths:
+        # absolute match, pretty sure we want this
+        return True
+    elif kwargs.get('dataset', None) and YieldRelativePaths()(res) in paths:
+        # command was called with a reference dataset, and a relative
+        # path of a result matches in input argument -- not 100% exhaustive
+        # test, but could be good enough
+        return True
+    elif any(abspath(p) == respath for p in paths):
+        # one absolutified input path matches the result path
+        # I'd say: got for it!
+        return True
+    elif any(p == res.get('source_url', None) for p in paths):
+        # this was installed from a URL that was given, we'll take that too
+        return True
+    else:
+        False

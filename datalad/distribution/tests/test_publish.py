@@ -74,10 +74,7 @@ def test_smth_about_not_supported(p1, p2):
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    # TODO candidate for install default return value RF test
-    source = install(
-        src_path, source=origin, recursive=True,
-        result_xfm='datasets')[0]
+    source = install(src_path, source=origin, recursive=True)
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
@@ -141,10 +138,7 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    # TODO candidate for install default return value RF test
-    source = install(
-        src_path, source=origin, recursive=True,
-        result_xfm='datasets')[0]
+    source = install(src_path, source=origin, recursive=True)
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -265,10 +259,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
-    # TODO candidate for install default return value RF test
-    source = install(
-        src_path, source=origin, recursive=True,
-        result_xfm='datasets')[0]
+    source = install(src_path, source=origin, recursive=True)
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
@@ -358,10 +349,7 @@ def test_publish_depends(
         target2_path,
         target3_path):
     # prepare src
-    # TODO candidate for install default return value RF test
-    source = install(
-        src_path, source=origin, recursive=True,
-        result_xfm='datasets')[0]
+    source = install(src_path, source=origin, recursive=True)
     source.repo.get('test-annex.dat')
     # pollute config
     depvar = 'remote.target2.datalad-publish-depends'
