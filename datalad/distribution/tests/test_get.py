@@ -436,7 +436,7 @@ def test_recurse_existing(src, path):
     for depth in range(len(origin_ds)):
         datasets = install(
             path, source=src, recursive=True, recursion_limit=depth,
-            result_xfm='datasets')
+            result_xfm='datasets', return_type='list')
         # we expect one dataset per level
         eq_(len(datasets), depth + 1)
         rmtree(path)

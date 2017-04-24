@@ -104,11 +104,19 @@ class ResultXFM(object):
 class YieldDatasets(ResultXFM):
     """Result transformer to return a Dataset instance from matching result.
 
-    `None` is return for any other result.
+    If the `success_only` flag is given only dataset with 'ok' or 'notneeded'
+    status are returned'.
+
+    `None` is returned for any other result.
     """
+    def __init__(self, success_only=False):
+        self.success_only = success_only
+
     def __call__(self, res):
         if res.get('type', None) == 'dataset':
-            return Dataset(res['path'])
+            if not self.success_only or \
+                    res.get('status', None) in ('ok', 'notneeded'):
+                return Dataset(res['path'])
         else:
             lgr.debug('rejected by return value configuration: %s', res)
 
@@ -148,6 +156,7 @@ class YieldField(ResultXFM):
 # applied the corresponding callable
 known_result_xfms = {
     'datasets': YieldDatasets(),
+    'successdatasets-or-none': YieldDatasets(success_only=True),
     'paths': YieldField('path'),
     'relpaths': YieldRelativePaths(),
 }
