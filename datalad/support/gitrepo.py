@@ -42,6 +42,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 from datalad.utils import assure_list
@@ -384,6 +385,9 @@ class GitRepo(RepoInterface):
     overridden accidentally by AnnexRepo.
     """
 
+    # We use our sshrun helper
+    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
+
     # Just a non-functional example:
     # must be implemented, since abstract in RepoInterface:
     def sth_like_file_has_content(self):
@@ -601,7 +605,7 @@ class GitRepo(RepoInterface):
             ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = {'GIT_SSH_COMMAND': "datalad sshrun"}
+            env = GitRepo.GIT_SSH_ENV
         else:
             env = None
         ntries = 5  # 3 is not enough for robust workaround
@@ -838,6 +842,8 @@ class GitRepo(RepoInterface):
     def remove(self, files, **kwargs):
         """Remove files.
 
+        Calls git-rm.
+
         Parameters
         ----------
         files: str
@@ -853,27 +859,13 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
 
-        # todo: we are able to remove objects, not necessarily specified by a
-        #       path (see below). We may want to make this available at some
-        #       point.
-        # Multiple types of items are supported which may be be freely mixed.
-        #
-        #     - path string
-        #         Remove the given path at all stages. If it is a directory, you must
-        #         specify the r=True keyword argument to remove all file entries
-        #         below it. If absolute paths are given, they will be converted
-        #         to a path relative to the git repository directory containing
-        #         the working tree
-        #
-        #         The path string may include globs, such as *.c.
-        #
-        #     - Blob Object
-        #         Only the path portion is used in this case.
-        #
-        #     - BaseIndexEntry or compatible type
-        #         The only relevant information here Yis the path. The stage is ignored.
+        stdout, stderr = self._git_custom_command(
+            files, ['git', 'rm'] + to_options(**kwargs))
 
-        return self.repo.index.remove(files, working_tree=True, **kwargs)
+        # output per removed file is expected to be "rm 'PATH'":
+        return [line.strip()[4:-1] for line in stdout.splitlines()]
+
+        #return self.repo.git.rm(files, cached=False, **kwargs)
 
     def precommit(self):
         """Perform pre-commit maintenance tasks
@@ -888,19 +880,27 @@ class GitRepo(RepoInterface):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def commit(self, msg=None, options=None, _datalad_msg=False):
+    def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
+               files=None):
         """Commit changes to git.
 
         Parameters
         ----------
-        msg: str
+        msg: str, optional
           commit-message
-        options: list of str
+        options: list of str, optional
           cmdline options for git-commit
         _datalad_msg: bool, optional
           To signal that commit is automated commit by datalad, so
           it would carry the [DATALAD] prefix
+        careless: bool, optional
+          if False, raise when there's nothing actually committed;
+          if True, don't care
+        files: list of str, optional
+          path(s) to commit
         """
+
+        self.precommit()
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
@@ -909,19 +909,60 @@ class GitRepo(RepoInterface):
             if options:
                 if "--allow-empty-message" not in options:
                         options.append("--allow-empty-message")
-                else:
-                    options = ["--allow-empty-message"]
+            else:
+                options = ["--allow-empty-message"]
 
-        self.precommit()
+        # Note: We used to use a direct call to git only if there were options,
+        # since we can't pass all possible options to gitpython's implementation
+        # of commit.
+        # But there's an additional issue. GitPython implements commit in a way,
+        # that it might create a new commit, when a direct call wouldn't. This
+        # was discovered with a modified (but unstaged) submodule, leading to a
+        # commit, that apparently did nothing - git status still showed the very
+        # same thing afterwards. But a commit was created nevertheless:
+        # diff --git a/sub b/sub
+        # --- a/sub
+        # +++ b/sub
+        # @@ -1 +1 @@
+        # -Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f
+        # +Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f-dirty
+        #
+        # Therefore, for now always use direct call.
+        # TODO: Figure out, what exactly is going on with gitpython here
+
+        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
         if options:
-            # we can't pass all possible options to gitpython's implementation
-            # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
-            lgr.debug("Committing via direct call of git: %s" % cmd)
-            self._git_custom_command([], cmd)
-        else:
-            lgr.debug("Committing with msg=%r" % msg)
-            self.cmd_call_wrapper(self.repo.index.commit, msg)
+            cmd.extend(options)
+        lgr.debug("Committing via direct call of git: %s" % cmd)
+
+        try:
+            self._git_custom_command(files, cmd,
+                                     expect_stderr=True, expect_fail=True)
+        except CommandError as e:
+            if 'nothing to commit' in e.stdout:
+                if careless:
+                    lgr.debug("nothing to commit in {}. "
+                              "Ignored.".format(self))
+                else:
+                    raise
+            elif 'no changes added to commit' in e.stdout or \
+                    'nothing added to commit' in e.stdout:
+                if careless:
+                    lgr.debug("no changes added to commit in {}. "
+                              "Ignored.".format(self))
+                else:
+                    raise
+            elif "did not match any file(s) known to git." in e.stderr:
+                # TODO: Improve FileNotInXXXXError classes to better deal with
+                # multiple files; Also consider PathOutsideRepositoryError
+                raise FileNotInRepositoryError(cmd=e.cmd,
+                                               msg="File(s) unknown to git",
+                                               code=e.code,
+                                               filename=linesep.join(
+                                            [l for l in e.stderr.splitlines()
+                                             if l.startswith("pathspec")]))
+            else:
+                raise
 
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -1396,8 +1437,7 @@ class GitRepo(RepoInterface):
                 ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="datalad sshrun"):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1439,8 +1479,7 @@ class GitRepo(RepoInterface):
             ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            with remote.repo.git.custom_environment(
-                    GIT_SSH_COMMAND="datalad sshrun"):
+            with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                 return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
@@ -1451,8 +1490,8 @@ class GitRepo(RepoInterface):
              **kwargs):
         """Push to remote repository
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         remote: str
           name of the remote to push to
         refspec: str
@@ -1522,8 +1561,7 @@ class GitRepo(RepoInterface):
                 ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="datalad sshrun"):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1659,11 +1697,38 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
+    def is_dirty(self, index=True, working_tree=True, untracked_files=True,
+                 submodules=True, path=None):
+        """Returns true if the repo is considered to be dirty
+
+        Parameters
+        ----------
+        index: bool
+          if True, consider changes to the index
+        working_tree: bool
+          if True, consider changes to the working tree
+        untracked_files: bool
+          if True, consider untracked files
+        submodules: bool
+          if True, consider submodules
+        path: str or list of str
+          path(s) to consider only
+        Returns
+        -------
+          bool
+        """
+
+        return self.repo.is_dirty(index=index, working_tree=working_tree,
+                                  untracked_files=untracked_files,
+                                  submodules=submodules, path=path)
+
     @property
     def dirty(self):
-        """Returns true if there are uncommitted changes or files not known to
-        index"""
-        return self.repo.is_dirty(untracked_files=True)
+        return self.is_dirty()
+
+    @property
+    def untracked_files(self):
+        return self.repo.untracked_files
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
@@ -1684,6 +1749,36 @@ class GitRepo(RepoInterface):
         if sorted_:
             submodules = sorted(submodules, key=lambda x: x.path)
         return submodules
+
+    def is_submodule_modified(self, name, options=[]):
+        """Whether a submodule has new commits
+
+        Note: This is an adhoc method. It parses output of
+        'git submodule summary' and currently is not able to distinguish whether
+        or not this change is staged in `self` and whether this would be
+        reported 'added' or 'modified' by 'git status'.
+        Parsing isn't heavily tested yet.
+
+        Parameters
+        ----------
+        name: str
+          the submodule's name
+        options: list
+          options to pass to 'git submodule summary'
+        Returns
+        -------
+        bool
+          True if there are commits in the submodule, differing from
+          what is registered in `self`
+        --------
+        """
+
+        out, err = self._git_custom_command('',
+                                            ['git', 'submodule', 'summary'] + \
+                                            options + ['--', name])
+        return any([line.split()[1] == name
+                    for line in out.splitlines()
+                    if line and len(line.split()) > 1])
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.

@@ -830,3 +830,18 @@ def test_install_consistent_state(src, dest, dest2, dest3):
     check_consistent_installation(dest3_ds)
 
     # TODO: makes a nice use-case for an update operation
+
+
+from datalad.tests.utils import skip_ssh
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_install_subds_with_space(opath, tpath):
+    ds = create(opath)
+    ds.create('sub ds')
+    # works even now, boring
+    # install(tpath, source=opath, recursive=True)
+    # do via ssh!
+    install(tpath, source="localhost:" + opath, recursive=True)
+    assert Dataset(opj(tpath, 'sub ds')).is_installed()

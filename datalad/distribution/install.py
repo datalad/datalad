@@ -35,6 +35,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI

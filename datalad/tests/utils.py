@@ -62,6 +62,9 @@ _TEMP_PATHS_CLONES = set()
 neq_ = assert_not_equal
 nok_ = assert_false
 
+lgr = logging.getLogger("datalad.tests.utils")
+
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
@@ -143,14 +146,14 @@ from ..utils import chpwd, getpwd
 
 
 def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
-                 untracked=[]):
+                 untracked=[], ignore_submodules=False):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
 
     Note
     ----
-    Parameters head_modified, index_modified and untracked currently work
+    Parameters head_modified and index_modified currently work
     in pure git or indirect mode annex only and are ignored otherwise!
     Implementation is yet to do!
 
@@ -164,6 +167,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
       explicitly set to True or False to indicate, that an annex is (not)
       expected; set to None to autodetect, whether there is an annex.
       Default: None.
+    ignore_submodules: bool
+      if True, submodules are not inspected
     """
     # TODO: See 'Note' in docstring
 
@@ -200,17 +205,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             # 'annex' True
             assert_is(annex, False)
 
+    eq_(sorted(r.untracked_files), sorted(untracked))
+
     if annex and r.is_direct_mode():
-        if head_modified or index_modified or untracked:
-            raise NotImplementedError("TODO - see note in docstring")
-        ok_(not r.dirty)
+        if head_modified or index_modified:
+            lgr.warning("head_modified and index_modified are not quite valid "
+                        "concepts in direct mode! Looking for any change "
+                        "(staged or not) instead.")
+            status = r.get_status(untracked=False, submodules=not ignore_submodules)
+            modified = []
+            for s in status:
+                modified.extend(status[s])
+            eq_(sorted(head_modified + index_modified),
+                sorted(f for f in modified))
+        else:
+            ok_(not r.is_dirty(untracked_files=not untracked,
+                               submodules=not ignore_submodules))
     else:
         repo = r.repo
 
         if repo.index.entries.keys():
             ok_(repo.head.is_valid())
-
-            eq_(sorted(repo.untracked_files), sorted(untracked))
 
             if not head_modified and not index_modified:
                 # get string representations of diffs with index to ease

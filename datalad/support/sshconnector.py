@@ -99,6 +99,7 @@ class SSHConnection(object):
 
         # essential properties of the remote system
         self._remote_props = {}
+        self._opened_by_us = False
 
     def __call__(self, cmd, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -118,18 +119,24 @@ class SSHConnection(object):
           stdout, stderr of the command run.
         """
 
+        # TODO:  do not do all those checks for every invocation!!
+        # TODO: check for annex location once, check for open socket once
+        #       and provide roll back if fails to run and was not explicitly
+        #       checked first
         if not self.is_open():
             if not self.open():
                 raise RuntimeError(
                     'Cannot open SSH connection to {}'.format(
                         self.sshri))
-            # locate annex and set the bundled vs. system Git machinery in motion
+
+        # locate annex and set the bundled vs. system Git machinery in motion
         remote_annex_installdir = self.get_annex_installdir()
         if remote_annex_installdir:
             # make sure to use the bundled git version if any exists
             cmd = '{}; {}'.format(
                 'export "PATH={}:$PATH"'.format(remote_annex_installdir),
                 cmd)
+
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
@@ -138,10 +145,11 @@ class SSHConnection(object):
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
-        if log_output:
-            kwargs = dict(log_stdout=True, log_stderr=True, log_online=False)
-        else:
-            kwargs = dict(log_stdout=False, log_stderr=False, log_online=True)
+        kwargs = dict(
+            log_stdout=log_output, log_stderr=log_output,
+            log_online=not log_output
+        )
+
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(
@@ -159,13 +167,17 @@ class SSHConnection(object):
 
     def is_open(self):
         if not exists(self.ctrl_path):
-            lgr.log(5, "Not opening %s since %s exists" % (self, self.ctrl_path))
+            lgr.log(
+                5,
+                "Not opening %s for checking since %s does not exist",
+                self, self.ctrl_path
+            )
             return False
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         try:
-            out, err = self.runner.run(cmd)
+            out, err = self.runner.run(cmd, stdin=open('/dev/null'))
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -188,7 +200,6 @@ class SSHConnection(object):
         bool
           Whether SSH reports success opening the connection
         """
-
         if self.is_open():
             return
 
@@ -214,19 +225,25 @@ class SSHConnection(object):
                 "Failed to run cmd %s. Exit code=%s\nstdout: %s\nstderr: %s",
                 cmd, exit_code, stdout, stderr
             )
+        else:
+            self._opened_by_us = True
         return ret
 
     def close(self):
         """Closes the connection.
         """
-
+        if not self._opened_by_us:
+            lgr.debug("Not closing %s since was not opened by itself", self)
+            return
         # stop controlmaster:
         cmd = ["ssh", "-O", "stop"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
+            lgr.debug("Failed to run close command")
             if exists(self.ctrl_path):
+                lgr.debug("Removing existing control path %s", self.ctrl_path)
                 # socket need to go in any case
                 remove(self.ctrl_path)
             if e.code != 255:
@@ -273,7 +290,9 @@ class SSHConnection(object):
         try:
             annex_install_dir = self(
                 # use sh -e to be able to fail at each stage of the process
-                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
+                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
+                , stdin=open('/dev/null')
+            )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
                       exc_str(e))
@@ -332,6 +351,9 @@ class SSHManager(object):
         self._prev_connections = [opj(self.socket_dir, p)
                                   for p in listdir(self.socket_dir)
                                   if not isdir(opj(self.socket_dir, p))]
+        lgr.log(5,
+                "Found %d previous connections",
+                len(self._prev_connections))
 
     @property
     def socket_dir(self):
