@@ -104,7 +104,8 @@ requires.update({
     ],
     'devel-utils': [
         'nose-timer',
-        'line-profiler',
+        # disable for now, as it pulls in ipython 6, which is PY3 only
+        #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
         # keyring)  but not installable on travis, IIRC since it needs connectivity
         # to the dbus whenever installed or smth like that, thus disabled here
