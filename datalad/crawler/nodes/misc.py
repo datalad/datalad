@@ -392,17 +392,28 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
                 yield data
 
     in_args = list(_string_as_list(data_args)) + list(_string_as_list(data_kwargs))
-    func_node.__doc__ = """Function %s wrapped into a node.
+    str_args = (
+        func.__name__ if hasattr(func, '__name__') else '',
+        id(func),
+        ', '.join(in_args) if in_args else "no",
+        ', '.join(_string_as_list(outputs)) if outputs else "no"
+    )
+    func_node.__doc__ = """Function %s#0x%x wrapped into a node.
 
-It expects %s keys to be provided in the data and output will be assigned to %s
+It expects %r keys to be provided in the data and output will be assigned to %r
 keys in the output %s
 """ % (
-        func.__name__ if hasattr(func, '__name__') else '',
-        ', '.join(in_args) if in_args else "no",
-        ', '.join(_string_as_list(outputs)) if outputs else "no",
-        (' Additional keyword arguments: %s' % kwargs) if kwargs else ""
+        str_args + (
+        (' Additional keyword arguments: %s' % kwargs) if kwargs else "",
+        )
     )
 
+    # unfortunately overloading __str__ doesn't work
+    _str = "<node:%s#0x%x in_args: %r outputs: %r" % str_args
+    if kwargs:
+        _str += " kwargs: %s" % ', '.join("%s=%r" % i for i in kwargs.items())
+    _str += '>'
+    func_node._custom_str = _str
     return func_node
 
 
