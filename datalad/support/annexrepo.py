@@ -1222,6 +1222,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
         git_options = []
         kwargs = dict(backend=backend)
+        if lexists(opj(self.path, file_)) and not self.is_under_annex(file_):
+            # already under git, we can't addurl for under annex
+            lgr.warning(
+                "File %s:%s is already under git, removing so it could possibly"
+                " be added under annex", self, file_
+            )
+            os.unlink(opj(self.path, file_))
         if not batch:
             self._run_annex_command('addurl',
                                     annex_options=options + ['--file=%s' % file_] + [url],

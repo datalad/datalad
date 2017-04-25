@@ -459,3 +459,14 @@ class TestAddArchiveOptions():
             list(find_files('\.datalad..*', self.annex.path, dirs=True)),
             []
         )
+
+    def test_override_existing_under_git(self):
+        create_tree(self.annex.path, {'1.dat': 'load2'})
+        self.annex.add('1.dat', git=True)
+        self.annex.commit('added to git')
+        add_archive_content(
+            '1.tar', annex=self.annex, strip_leading_dirs=True, delete=True
+        )
+        # and we added it under annex now... in real life if .gitattributes
+        # instruct it to be added under git -- would got there
+        ok_file_under_git(self.annex.path, '1.dat', annexed=True)
