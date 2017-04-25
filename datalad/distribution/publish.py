@@ -57,7 +57,7 @@ def _log_push_info(pi_list, log_nothing=True):
     return error
 
 
-def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
+def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
@@ -75,30 +75,40 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
     # in case there is no.
     # no tracking refspec yet?
 
+    if force:
+        # if forced -- we push regardless if there are differences or not
+        diff = True
     # check if there are any differences wrt the to-be-published paths,
     # and if not skip this dataset
-    if refspec:
-        lgr.debug("Testing for changes with respect to '%s'", refspec)
-        # we have a matching branch on the other side
-        diff = ds.repo.repo.commit().diff(
-            refspec.replace(
-                'refs/heads/',
-                'refs/remotes/{}/'.format(remote)),
-            paths=paths)
     else:
-        # there was no tracking branch, check the push target
-        active_branch = ds.repo.get_active_branch()
-        refspec = active_branch
-        if active_branch in ds.repo.repo.remotes[remote].refs:
-            # we know some remote state -> diff
-            lgr.debug("Testing matching branch to '%s' at '%s' for differences",
-                      active_branch, remote)
-            diff = ds.repo.repo.commit().diff(
-                ds.repo.repo.remotes[remote].refs[active_branch],
-                paths=paths)
+        remote_branch_name = None
+        if refspec:
+            remote_branch_name = refspec[11:] \
+                if refspec.startswith('refs/heads/') \
+                else refspec
         else:
-            lgr.debug("No matching branch to '%s' at '%s'",
-                      active_branch, remote)
+            # there was no tracking branch, check the push target
+            remote_branch_name = ds.repo.get_active_branch()
+
+        if remote_branch_name in ds.repo.repo.remotes[remote].refs:
+            lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
+                      remote_branch_name, remote)
+            current_commit = ds.repo.repo.commit()
+            remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
+            if paths:
+                # if there were custom paths, we will look at the diff
+                lgr.debug("Since paths provided, looking at diff")
+                diff = current_commit.diff(
+                    remote_ref,
+                    paths=paths
+                )
+            else:
+                # if commits differ at all
+                lgr.debug("Since no paths provided, comparing commits")
+                diff = current_commit != remote_ref.commit
+        else:
+            lgr.debug("Remote '%s' has no branch matching %r. Will publish",
+                      remote, remote_branch_name)
             # we don't have any remote state, need to push for sure
             diff = True
 
@@ -120,7 +130,8 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options):
                 d,
                 None,
                 paths,
-                annex_copy_options)
+                annex_copy_options,
+                force=force)
             published.extend(pblsh)
             skipped.extend(skp)
 
@@ -307,6 +318,11 @@ class Publish(Interface):
                 "to subdatasets in case `recursive` is also given.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
+        force=Parameter(
+            args=("-f", "--force",),
+            doc="""enforce doing publish activities (git push etc) regardless of
+            the analysis if they seemed needed""",
+            action='store_true'),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         git_opts=git_opts,
@@ -322,11 +338,13 @@ class Publish(Interface):
             to=None,
             since=None,
             missing='fail',
+            force=False,
             recursive=False,
             recursion_limit=None,
             git_opts=None,
             annex_opts=None,
-            annex_copy_opts=None):
+            annex_copy_opts=None,
+    ):
 
         # if ever we get a mode, for "with-data" we would need this
         #if dataset and not path:
@@ -456,7 +474,9 @@ class Publish(Interface):
                 remote=remote_info['remote'],
                 refspec=remote_info.get('refspec', None),
                 paths=content_by_ds[ds_path],
-                annex_copy_options=annex_copy_opts)
+                annex_copy_options=annex_copy_opts,
+                force=force
+            )
             published.extend(pblsh)
             skipped.extend(skp)
         return published, skipped
