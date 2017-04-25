@@ -161,11 +161,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # we don't have any remote state, need to push for sure
             diff = True
 
-    try:
-        ds.repo.get_wanted(remote)  # could be just checking config.remote.uuid
-        knew_remote_uuid = True
-    except CommandError:
-        knew_remote_uuid = False
+    knew_remote_uuid = None
+    if isinstance(ds.repo, AnnexRepo):
+        try:
+            ds.repo.get_wanted(remote)  # could be just checking config.remote.uuid
+            knew_remote_uuid = True
+        except CommandError:
+            knew_remote_uuid = False
     if knew_remote_uuid:
         # we can try publishing right away
         published += _publish_data()
@@ -256,8 +258,8 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
         published.append(ds)
 
-    if not knew_remote_uuid:
-        # publish only after we tried to sync/push
+    if knew_remote_uuid is False:
+        # publish only after we tried to sync/push and if it was annex repo
         published += _publish_data()
     return published, skipped
 
