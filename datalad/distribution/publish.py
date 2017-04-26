@@ -12,6 +12,7 @@
 
 import logging
 import re
+from collections import OrderedDict
 from os.path import curdir
 from os.path import sep as dirsep
 
@@ -408,7 +409,17 @@ class Publish(Interface):
         lgr.debug(
             "Evaluating %i dataset publication candidate(s)",
             len(content_by_ds))
-        for ds_path in content_by_ds:
+        # TODO: fancier sorting, so we still follow somewhat the hierarchy
+        #       in sorted order, e.g.
+        #  d1/sub1/sub1
+        #  d1/sub1
+        #  d1
+        #  d2/sub1
+        #  d2
+        content_by_ds = OrderedDict(
+            (d, content_by_ds[d]) for d in sorted(content_by_ds, reverse=True)
+        )
+        for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             if to is None:
                 # we need an upstream remote, if there's none given. We could
