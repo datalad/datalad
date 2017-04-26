@@ -55,6 +55,8 @@ def test_version_url():
 
 @use_cassette('s3_test_version_url_deleted')
 def test_version_url_deleted():
+    get_test_providers('s3://openneuro/')  # to verify having credentials to access
+    # openfmri via S3
     # it existed and then was removed
     fpath = "ds000158/ds158_R1.0.1/compressed/ds000158_R1.0.1_sub001-055.zip"
     url = "http://openneuro.s3.amazonaws.com/%s" % fpath
