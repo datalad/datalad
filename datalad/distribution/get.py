@@ -120,6 +120,12 @@ def _install_subds_from_flexible_source(
     subds = None
     dest_path = opj(ds.path, sm_path)
     for src in clone_urls:
+        if src == dest_path:
+            # prevent inevitable exception from `clone`
+            lgr.warn(
+                "Candidate subdataset source URL is identical to the installation target path [%s]. Skipping.",
+                src)
+            continue
         try:
             subds = Clone.__call__(
                 src,
@@ -142,8 +148,9 @@ def _install_subds_from_flexible_source(
             pass
     if subds is None:
         raise InstallFailedError(
-            msg="Failed to install {} from any of: {}".format(
-                subds, clone_urls))
+            msg="Failed to install dataset from{}: {}".format(
+                ' any of' if len(clone_urls) > 1 else '',
+                clone_urls))
 
     assert(subds.is_installed())
     _fixup_submodule_dotgit_setup(ds, sm_path)
