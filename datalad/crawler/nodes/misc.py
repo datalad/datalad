@@ -400,7 +400,7 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
     )
     func_node.__doc__ = """Function %s#0x%x wrapped into a node.
 
-It expects %r keys to be provided in the data and output will be assigned to %r
+It expects %r keys to be provided in the data and output will be assigned to %s
 keys in the output %s
 """ % (
         str_args + (
