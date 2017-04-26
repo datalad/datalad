@@ -31,14 +31,6 @@ from .dataset import Dataset
 lgr = logging.getLogger('datalad.distribution.utils')
 
 
-def _install_subds_inplace(ds, path, relativepath, name=None):
-    """Register an existing repository in the repo tree as a submodule"""
-    ds.repo.add_submodule(relativepath, url=None, name=name)
-    _fixup_submodule_dotgit_setup(ds, relativepath)
-    # return newly added submodule as a dataset
-    return Dataset(path)
-
-
 def _fixup_submodule_dotgit_setup(ds, relativepath):
     """Implementation of our current of .git in a subdataset
 
