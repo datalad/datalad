@@ -199,17 +199,17 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # But that other one carries updated file, so should fail due to overwrite
     with assert_raises(RuntimeError) as cme:
-        add_archive_content(opj('1u', '1.tar.gz'))
+        add_archive_content(opj('1u', '1.tar.gz'), use_current_dir=True)
 
     # TODO: somewhat not precise since we have two possible "already exists"
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
     add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite', use_current_dir=True)
-    d1_basic_checks()
     add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
     add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
     add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+
     # rudimentary test
     assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
                  ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
@@ -378,7 +378,12 @@ class TestAddArchiveOptions():
         self.annex.remove('1.tar', force=True)
         self.annex.add(f123)
         self.annex.commit(msg="renamed")
-        add_archive_content(f123, annex=self.annex, add_archive_leading_dir=True, strip_leading_dirs=True)
+        add_archive_content(
+            f123,
+            annex=self.annex,
+            add_archive_leading_dir=True,
+            strip_leading_dirs=True
+        )
         ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
     def test_add_delete_after_and_drop(self):
@@ -465,8 +470,15 @@ class TestAddArchiveOptions():
         self.annex.add('1.dat', git=True)
         self.annex.commit('added to git')
         add_archive_content(
-            '1.tar', annex=self.annex, strip_leading_dirs=True, delete=True
+            '1.tar', annex=self.annex, strip_leading_dirs=True,
         )
-        # and we added it under annex now... in real life if .gitattributes
-        # instruct it to be added under git -- would got there
+        # and we did not bother adding it to annex (for now) -- just skipped
+        # since we have it and it is the same
+        ok_file_under_git(self.annex.path, '1.dat', annexed=False)
+
+        # but if we say 'overwrite' -- we would remove and replace
+        add_archive_content(
+            '1.tar', annex=self.annex, strip_leading_dirs=True, delete=True
+            , existing='overwrite'
+        )
         ok_file_under_git(self.annex.path, '1.dat', annexed=True)
