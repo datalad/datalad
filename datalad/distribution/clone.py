@@ -132,8 +132,8 @@ class Clone(Interface):
             # "it appears to be already installed", so we just catch an
             # obviously pointless input combination
             raise ValueError(
-                "clone `source` and destination `path` are identical. "
-                "If you are trying to add a subdataset simply use `add` %s".format(
+                "clone `source` and destination `path` are identical [{}]. "
+                "If you are trying to add a subdataset simply use `add`".format(
                     path))
 
         if path is not None:
