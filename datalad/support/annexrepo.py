@@ -1186,7 +1186,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
-                        batch=False, git_options=None, annex_options=None):
+                        batch=False, git_options=None, annex_options=None,
+                        unlink_existing=False):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -1206,6 +1207,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             initiate or continue with a batched run of annex addurl, instead of just
             calling a single git annex addurl command
 
+        unlink_existing: bool, optional
+            by default crashes if file already exists and is under git.
+            With this flag set to True would first remove it.
+
         Returns
         -------
         dict
@@ -1222,7 +1227,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
         git_options = []
         kwargs = dict(backend=backend)
-        if lexists(opj(self.path, file_)) and not self.is_under_annex(file_):
+        if lexists(opj(self.path, file_)) and \
+                unlink_existing and \
+                not self.is_under_annex(file_):
             # already under git, we can't addurl for under annex
             lgr.warning(
                 "File %s:%s is already under git, removing so it could possibly"
