@@ -1574,11 +1574,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         if batch:
             lgr.warning("TODO: --batch mode for whereis.  Operating serially")
 
+        OUTPUTS = {'descriptions', 'uuids', 'full'}
+        if output not in OUTPUTS:
+            raise ValueError(
+                "Unknown value output=%r. Known are %s"
+                % (output, ', '.join(map(repr, OUTPUTS)))
+            )
+
         options = assure_list(options, copy=True)
         options += ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
-
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
@@ -1590,8 +1596,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             return {j['key' if (key or '--all' in options) else 'file']:
                         self._whereis_json_to_dict(j)
                     for j in json_objects}
-        else:
-            raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
 
     # TODO:
     # I think we should make interface cleaner and less ambigious for those annex
