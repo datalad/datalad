@@ -1055,7 +1055,7 @@ class GitRepo(RepoInterface):
         except TypeError as e:
             if "HEAD is a detached symbolic reference" in str(e):
                 lgr.debug("detached HEAD in {0}".format(self))
-                return None, None
+                return None
             else:
                 raise
         return branch
