@@ -47,11 +47,9 @@ def test_clean(d):
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus2'))
     with chpwd(d), swallow_outputs() as cmo:
         res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok',
-                    result_renderer='simple')
+                    result_filter=lambda x: x['status'] == 'ok')
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed 2 temporary archive directories: somebogus, somebogus2")
-        assert_equal(ARCHIVES_TEMP_DIR, cmo.out.split()[-1])
 
     # and what about git annex temporary files?
     makedirs(opj(d, ANNEX_TEMP_DIR))
