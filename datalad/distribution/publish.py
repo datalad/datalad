@@ -12,6 +12,7 @@
 
 import logging
 import re
+from collections import OrderedDict
 from os.path import curdir
 from os.path import sep as dirsep
 
@@ -71,7 +72,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                   'remote.{}'.format(remote),
                   'annex-ignore',
                   False):
-            lgr.info("Publishing data of dataset {0} ...".format(ds))
+            lgr.info("Publishing {0} data to {1}".format(ds, remote))
             # overwrite URL with pushurl if any, reason:
             # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
             # Note: This shouldn't happen anymore with newly added siblings.
@@ -161,6 +162,12 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # we don't have any remote state, need to push for sure
             diff = True
 
+    # # remote might be set to be ignored by annex, or we might not even know yet its uuid
+    # annex_ignore = ds.config.getbool('remote.{}.annex-ignore'.format(remote), None)
+    # annex_uuid = ds.config.get('remote.{}.annex-uuid'.format(remote), None)
+    # if not annex_ignore:
+    #     if annex_uuid is None:
+    #         # most probably not yet 'known' and might require some annex
     knew_remote_uuid = None
     if isinstance(ds.repo, AnnexRepo):
         try:
@@ -415,7 +422,10 @@ class Publish(Interface):
         #  d1
         #  d2/sub1
         #  d2
-        for ds_path in sorted(content_by_ds, reverse=True):
+        content_by_ds = OrderedDict(
+            (d, content_by_ds[d]) for d in sorted(content_by_ds, reverse=True)
+        )
+        for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             if to is None:
                 # we need an upstream remote, if there's none given. We could
