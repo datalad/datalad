@@ -861,7 +861,7 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('json', 'simple', 'tailored') | EnsureNone()),
+        constraints=EnsureChoice('default', 'json', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an
@@ -899,8 +899,9 @@ def eval_results(func):
     Result rendering/output can be triggered via the
     `datalad.api.result-renderer` configuration variable, or the
     `result_renderer` keyword argument of each decorated command. Supported
-    modes are: 'json' (one object per result, like git-annex), 'simple'
-    (status: path), 'tailored' custom output formatting provided by each command
+    modes are: 'default' (one line per result with action, status, path,
+    and an optional message); 'json' (one object per result, like git-annex),
+    'tailored' custom output formatting provided by each command
     class (if any).
 
     Error detection works by inspecting the `status` item of all result
@@ -1032,17 +1033,22 @@ def eval_results(func):
                         lgr.debug('not reporting result (%s)', exc_str(e))
                         continue
                 ## output rendering
-                if result_renderer == 'json':
+                if result_renderer == 'default':
+                    # TODO have a helper that can expand a result message
+                    print('{action}({status}): {path}{msg}'.format(
+                        action=res['action'],
+                        status=res['status'],
+                        path=relpath(res['path'],
+                                     res['refds']) if res.get('refds', None) else res['path'],
+                        msg=' [{}]'.format(
+                            res['message'][0] % res['message'][1:]
+                            if isinstance(res['message'], tuple) else res['message'])
+                        if 'message' in res else ''))
+                elif result_renderer == 'json':
                     print(json.dumps(
                         {k: v for k, v in res.items()
                          if k not in ('message', 'logger')},
                         sort_keys=True))
-                elif result_renderer == 'simple':
-                    # simple output "STATUS: PATH"
-                    # where PATH is relative to a reference dataset, if one is reported in the result
-                    print('{status}: {path}'.format(
-                        status=res['status'],
-                        path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
                 elif result_renderer == 'tailored':
                     if hasattr(_func_class, 'custom_result_renderer'):
                         _func_class.custom_result_renderer(res, **_kwargs)
