@@ -165,7 +165,7 @@ class Clone(Interface):
         dest_path = path
 
         status_kwargs = dict(
-            action='clone', ds=destination_dataset, logger=lgr,
+            action='install', ds=destination_dataset, logger=lgr,
             refds=refds_path, source_url=source_url)
 
         # important test! based on this `rmtree` will happen below after failed clone
