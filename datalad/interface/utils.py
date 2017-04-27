@@ -999,16 +999,15 @@ def eval_results(func):
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
             for res in results:
-                ## log message
-                # use provided logger is possible, or ours if necessary
+                ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
                 # pollutes the output
-                res_lgr = res.pop('logger', lgr)
+                res_lgr = res.pop('logger', None)
                 if isinstance(res_lgr, logging.Logger):
                     # didn't get a particular log function, go with default
                     res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-                if 'message' in res:
+                if res_lgr and 'message' in res:
                     msg = res['message']
                     if isinstance(msg, tuple):
                         # support string expansion of logging to avoid runtime cost
