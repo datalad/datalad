@@ -91,6 +91,7 @@ class Install(Interface):
     # as discussed in #1409 and #1470, we want to return dataset instances
     # matching what is actually available after command completion (and
     # None for any failed dataset installation)
+    # TODO actually need success(containing)dataset-or-none
     result_xfm = 'successdatasets-or-none'
     # we also want to limit the returned result to explicit input arguments
     # (paths/source) and not report any implicit action, like intermediate
@@ -297,7 +298,7 @@ class Install(Interface):
                 'install', path=path, status='impossible', logger=lgr,
                 source_url=source, refds=refds_path,
                 message="installation `source` and destination `path` are identical. "
-                "If you are trying to add a subdataset simply the `add` command")
+                "If you are trying to add a subdataset simply use the `add` command")
             return
 
         # resolve the target location (if local) against the provided dataset
