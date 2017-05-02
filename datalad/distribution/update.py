@@ -184,7 +184,7 @@ def _update_repo(ds, remote, reobtain_data):
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
-        if active_branch == (None, None):
+        if active_branch is None:
             # I guess we need to fetch, and then let super-dataset to update
             # into the state it points to for this submodule, but for now let's
             # just blow I guess :-/

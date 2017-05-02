@@ -165,7 +165,7 @@ def _install_subds_from_flexible_source(
     branch_hexsha = subrepo.get_hexsha(branch)
     ds.repo.update_submodule(sm_path, init=True)
     updated_branch = subrepo.get_active_branch()
-    if branch and (not updated_branch or updated_branch == (None, None)):
+    if branch and not updated_branch:
         # got into 'detached' mode
         # trace if current state is a predecessor of the branch_hexsha
         lgr.debug(
