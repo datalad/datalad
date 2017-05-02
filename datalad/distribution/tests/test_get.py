@@ -112,8 +112,7 @@ def test_get_invalid_call(path, file_outside):
     AnnexRepo(path, init=True, create=True)
     # call get again on a file in git:
     result = ds.get("some.txt")
-    # skipped silently, but no result for this file:
-    eq_(len(result), 0)
+    assert_status('notneeded', result)
 
     # invalid source:
     # yoh:  but now we would need to add it to annex since clever code first
@@ -178,7 +177,7 @@ def test_get_multiple_files(path, url, ds_dir):
     result = ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'],
                     on_failure='ignore')
     assert_status('impossible', [result[0]])
-    assert_status('ok', result[1:])
+    assert_status(['ok', 'notneeded'], result[1:])
     # explicitly given not existing file was skipped:
     # (see test_get_invalid_call)
     eq_(set([basename(item.get('path')) for item in result[1:]]),
@@ -188,7 +187,7 @@ def test_get_multiple_files(path, url, ds_dir):
     # get all of them:
     result = ds.get(curdir)
     # there were two files left to get:
-    eq_(set([basename(item.get('path')) for item in result]),
+    eq_(set([basename(item.get('path')) for item in result if item['type'] == 'file']),
         {'file3.txt', 'file4.txt'})
     ok_(all(ds.repo.file_has_content(file_list)))
 
@@ -223,9 +222,11 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # check result:
     assert_status('ok', result)
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result]),
+    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file']),
         set(files_in_sub))
-    eq_(len(result), len(files_in_sub))
+    # we also get one report on the subdir
+    eq_(len(result) - 1, len(files_in_sub))
 
     # got all files beneath subdir:
     ok_(all(ds.repo.file_has_content(files_in_sub)))
@@ -285,7 +286,9 @@ def test_get_recurse_subdatasets(src, path):
     result = ds.get(recursive=True, result_filter=lambda x: x.get('type') != 'dataset')
     assert_status('ok', result)
 
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result]), annexed_files)
+    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file']),
+        annexed_files)
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
@@ -301,8 +304,10 @@ def test_get_recurse_subdatasets(src, path):
     # now, the very same call, but without recursive:
     result = ds.get('.', recursive=False)
     assert_status('ok', result)
-    eq_(len(result), 1)
-    eq_(result[0]['path'][len(ds.path) + 1:], 'test-annex.dat')
+    # one report is on the requested dir
+    eq_(len(result) - 1, 1)
+    assert_result_count(
+        result, 1, path=opj(ds.path, 'test-annex.dat'), status='ok')
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
@@ -378,9 +383,9 @@ def test_get_mixed_hierarchy(src, path):
     # and get:
     result = ds.get(curdir, recursive=True)
     # git repo and subds
-    assert_status('notneeded', result[:-1])
-    assert_status('ok', [result[-1]])
-    eq_(result[-1]['path'], opj(subds.path, "file_in_annex.txt"))
+    assert_status(['ok', 'notneeded'], result)
+    assert_result_count(
+        result, 1, path=opj(subds.path, "file_in_annex.txt"), status='ok')
     ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
 
 
@@ -463,7 +468,7 @@ def test_recurse_existing(src, path):
     ok_(sub4.is_installed())
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
     # aaannd all data
-    files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok')
+    files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok' and x['type'] == 'file')
     eq_(len(files), 1)
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
 

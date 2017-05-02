@@ -358,8 +358,8 @@ def test_install_recursive_with_data(src, path):
                   result_filter=None, result_xfm=None)
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
-    # each
-    eq_(len(res), 6)
+    # each, plus the report that we got all content in each dataset's root dir
+    eq_(len(res), 9)
     assert_result_count(res, 3, type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
@@ -681,7 +681,8 @@ def test_install_skip_failed_recursive(src, path):
             os.curdir, recursive=True,
             on_failure='ignore', result_xfm=None)
         # toplevel dataset was in the house already
-        assert_not_in_results(result, path=ds.path)
+        assert_result_count(
+            result, 0, path=ds.path, type='dataset')
         assert_status('error', [result[0]])
         assert_in_results(result, status='ok', path=sub2.path)
 

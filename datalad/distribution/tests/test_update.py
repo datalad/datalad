@@ -28,6 +28,7 @@ from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_in_results
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -300,7 +301,9 @@ def test_reobtain_data(originpath, destpath):
     create_tree(origin.path, {'novel': 'but boring'})
     origin.add('.')
     # update must not bring in data for new file
-    assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
+    result = ds.update(merge=True, reobtain_data=True)
+    assert_in_results(result, action='get', status='notneeded')
+
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
     assert_in('novel', ds.repo.get_annexed_files())
     assert_false(ds.repo.file_has_content('novel'))
