@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+# ORDER MATTERS FOLKS!
 
 # the following should be series of import definitions for interface implementations
 # that shall be exposed in the Python API and the cmdline interface
@@ -66,7 +67,12 @@ _group_misc = (
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
-        # very optional ones
+    ])
+
+_group_plumbing = (
+    'Plumbing commands',
+    [
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
     ])

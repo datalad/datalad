@@ -16,13 +16,15 @@ from os.path import commonprefix
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
-from os.path import normpath
+from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from os.path import sep
+from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
+from six import add_metaclass
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -34,10 +36,14 @@ from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.repo import Flyweight
+from datalad.support.network import RI
+
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
+from datalad.utils import get_dataset_root
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -71,10 +77,31 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
+@add_metaclass(Flyweight)
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id', '_cfg']
 
-    def __init__(self, path):
+    # Begin Flyweight
+    _unique_instances = WeakValueDictionary()
+
+    @classmethod
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            raise AttributeError
+
         # Custom handling for few special abbreviations
         path_ = path
         if path == '^':
@@ -87,7 +114,24 @@ class Dataset(object):
             path_ = LOCAL_CENTRAL_PATH
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
-        self._path = abspath(path_)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path_ = RI(path_).localpath
+
+        # we want an absolute path, but no resolved symlinks
+        if not isabs(path_):
+            path_ = opj(getpwd(), path_)
+
+        # use canonical paths only:
+        path_ = normpath(path_)
+        kwargs['path'] = path_
+        return path_, args, kwargs
+    # End Flyweight
+
+    def __init__(self, path):
+        self._path = path
         self._repo = None
         self._id = None
         self._cfg = None
@@ -99,6 +143,15 @@ class Dataset(object):
         if not hasattr(other, 'path'):
             return False
         return realpath(self.path) == realpath(other.path)
+
+    def close(self):
+        """Perform operations which would close any possible process using this Dataset
+        """
+        repo = self._repo
+        self._repo = None
+        if repo:
+            # might take care about lingering batched processes etc
+            del repo
 
     @property
     def path(self):
@@ -117,35 +170,37 @@ class Dataset(object):
         -------
         GitRepo
         """
-        if self._repo is None:
-            with swallow_logs():
-                for cls, ckw, kw in (
-                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                        (GitRepo, {}, {})
-                ):
-                    if cls.is_valid_repo(self._path, **ckw):
-                        try:
-                            lgr.debug("Detected %s at %s", cls, self._path)
-                            self._repo = cls(self._path, create=False, **kw)
-                            break
-                        except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                            lgr.debug(
-                                "Oops -- guess on repo type was wrong?: %s",
-                                exc_str(exc))
-                            pass
-                        # version problems come as RuntimeError: DO NOT CATCH!
-            if self._repo is None:
-                # Often .repo is requested to 'sense' if anything is installed
-                # under, and if so -- to proceed forward. Thus log here only
-                # at DEBUG level and if necessary "complaint upstairs"
-                lgr.debug("Failed to detect a valid repo at %s" % self.path)
 
-        elif not isinstance(self._repo, AnnexRepo):
-            # repo was initially set to be self._repo but might become AnnexRepo
-            # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.get_branches():
-                # we acquired git-annex branch
-                self._repo = AnnexRepo(self._repo.path, create=False)
+        # Note: lazy loading was disabled, since this is provided by the
+        # flyweight pattern already and a possible invalidation of an existing
+        # instance has to be done therein.
+        # TODO: Still this is somewhat problematic. We can't invalidate strong
+        # references
+
+        with swallow_logs():
+            for cls, ckw, kw in (
+                    # TODO: Do we really want allow_noninitialized=True here?
+                    # And if so, leave a proper comment!
+                    (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                    (GitRepo, {}, {})
+            ):
+                if cls.is_valid_repo(self._path, **ckw):
+                    try:
+                        lgr.debug("Detected %s at %s", cls, self._path)
+                        self._repo = cls(self._path, create=False, **kw)
+                        break
+                    except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                        lgr.debug(
+                            "Oops -- guess on repo type was wrong?: %s",
+                            exc_str(exc))
+                        pass
+                    # version problems come as RuntimeError: DO NOT CATCH!
+        if self._repo is None:
+            # Often .repo is requested to 'sense' if anything is installed
+            # under, and if so -- to proceed forward. Thus log here only
+            # at DEBUG level and if necessary "complaint upstairs"
+            lgr.debug("Failed to detect a valid repo at %s" % self.path)
+
         return self._repo
 
     @property
@@ -163,6 +218,7 @@ class Dataset(object):
         """
         if self._id is None:
             # if we have one on record, stick to it!
+            self.config.reload()
             self._id = self.config.get('datalad.dataset.id', None)
         return self._id
 
@@ -175,48 +231,12 @@ class Dataset(object):
         ConfigManager
         """
         if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            if self.repo is None:
+                # associate with this dataset and read the entire config hierarchy
+                self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            else:
+                self._cfg = self.repo.config
         return self._cfg
-
-    def register_sibling(self, name, url, publish_url=None, verify=None):
-        """Register the location of a sibling dataset under a given name.
-
-        Optionally, different URLs can be given for retrieving information from
-        the sibling and for publishing information to it.
-        This is a cheap operation that does not confirm that at the given
-        location an actual sibling dataset is available, unless verify is set.
-        The value "dataset" verifies, that at the given URL an accessible
-        dataset is available and the value "sibling" furthermore verifies, that
-        this dataset shares at least one commit with self.
-
-        Parameters
-        ----------
-        name
-        url
-        publish_url
-        verify
-          None | "dataset" | "sibling"
-        """
-        repo = self.repo
-
-        if verify is not None:
-            raise NotImplementedError("TODO: verify not implemented yet")
-
-        if name not in repo.get_remotes():
-            # Add remote
-            repo.add_remote(name, url)
-            if publish_url is not None:
-                # set push url:
-                repo._git_custom_command('', ["git", "remote",
-                                              "set-url",
-                                              "--push", name,
-                                              publish_url])
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-                     (name, url, publish_url if publish_url else url))
-        else:
-            lgr.warning("Remote '%s' already exists. Ignore.")
-            raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
     # weakref
@@ -250,7 +270,7 @@ class Dataset(object):
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
-
+        # OPT TODO: make it a generator for a possible early termination?
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return []
 
@@ -311,25 +331,6 @@ class Dataset(object):
                 return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
-
-#    def get_file_handles(self, pattern=None, fulfilled=None):
-#        """Get paths to all known file_handles, optionally matching a specific
-#        name pattern.
-#
-#        If fulfilled is True, only paths to fullfiled handles are returned,
-#        if False, only paths to unfulfilled handles are returned.
-#
-#        Parameters
-#        ----------
-#        pattern: str
-#        fulfilled: bool
-#
-#        Returns
-#        -------
-#        list of str
-#          (paths)
-#        """
-#        raise NotImplementedError("TODO")
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
@@ -393,7 +394,7 @@ class Dataset(object):
             # normalize the path after adding .. so we guaranteed to not
             # follow into original directory if path itself is a symlink
             par_path = normpath(opj(path, pardir))
-            sds_path_ = GitRepo.get_toppath(par_path)
+            sds_path_ = get_dataset_root(par_path)
             if sds_path_ is None:
                 # no more parents, use previous found
                 break
@@ -574,7 +575,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        dspath = GitRepo.get_toppath(getpwd())
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)

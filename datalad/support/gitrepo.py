@@ -23,14 +23,16 @@ from os.path import isabs
 from os.path import commonprefix
 from os.path import relpath
 from os.path import realpath
-from os.path import abspath
 from os.path import dirname
 from os.path import basename
 from os.path import curdir
 from os.path import pardir
 from os.path import sep
+from weakref import WeakValueDictionary
+
 
 from six import string_types
+from six import add_metaclass
 from functools import wraps
 import git as gitpy
 from git.exc import GitCommandError
@@ -40,7 +42,9 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
+from datalad.config import ConfigManager
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -51,10 +55,13 @@ from datalad.utils import updated
 # imports from same module:
 from .external_versions import external_versions
 from .exceptions import CommandError
+from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
 from .network import RI
 from .network import is_ssh
+from .repo import Flyweight
+from .repo import RepoInterface
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -369,22 +376,81 @@ def split_remote_branch(branch):
     return branch.split('/', 1)
 
 
-class GitRepo(object):
+@add_metaclass(Flyweight)
+class GitRepo(RepoInterface):
     """Representation of a git repository
 
     Not sure if needed yet, since there is GitPython. By now, wrap it to have
     control. Convention: method's names starting with 'git_' to not be
     overridden accidentally by AnnexRepo.
-
     """
 
-    __slots__ = ['path', 'repo', 'cmd_call_wrapper', '_GIT_COMMON_OPTIONS']
+    # We use our sshrun helper
+    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
+
+    # Just a non-functional example:
+    # must be implemented, since abstract in RepoInterface:
+    def sth_like_file_has_content(self):
+        return "Yes, if it's in the index"
+
+    # Begin Flyweight:
+
+    _unique_instances = WeakValueDictionary()
+
+    @classmethod
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            raise AttributeError
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path = RI(path).localpath
+        # resolve symlinks to make sure we have exactly one instance per
+        # physical repository at a time
+        path = realpath(path)
+        kwargs['path'] = path
+        return path, args, kwargs
+
+    @classmethod
+    def _flyweight_invalid(cls, id_):
+        return not cls.is_valid_repo(id_)
+
+    @classmethod
+    def _flyweight_reject(cls, id_, *args, **kwargs):
+        # TODO:
+        # This is a temporary approach. See PR # ...
+        # create = kwargs.pop('create', None)
+        # kwargs.pop('path', None)
+        # if create and kwargs:
+        #     # we have `create` plus options other than `path`
+        #     return "Call to {0}() with args {1} and kwargs {2} conflicts " \
+        #            "with existing instance {3}." \
+        #            "This is likely to be caused by inconsistent logic in " \
+        #            "your code." \
+        #            "".format(cls, args, kwargs, cls._unique_instances[id_])
+        pass
+
+    # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, **kwargs):
+                 git_opts=None, repo=None, **kwargs):
         """Creates representation of git repository at `path`.
 
-        If `url` is given, a clone is created at `path`.
         Can also be used to create a git repository at `path`.
 
         Parameters
@@ -392,15 +458,18 @@ class GitRepo(object):
         path: str
           path to the git repository; In case it's not an absolute path,
           it's relative to PWD
-        url: str
+        url: str, optional
+          DEPRECATED -- use .clone() class method
           url to the to-be-cloned repository. Requires a valid git url
           according to:
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-        create: bool
+        create: bool, optional
           if true, creates a git repository at `path` if there is none. Also
           creates `path`, if it doesn't exist.
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
+        repo: git.Repo, optional
+          GitPython's Repo instance to (re)use if provided
         kwargs:
           keyword arguments serving as additional options to the git-init
           command. Therefore, it makes sense only if called with `create`.
@@ -421,6 +490,17 @@ class GitRepo(object):
 
         """
 
+        if url is not None:
+            raise DeprecatedError(
+                new=".clone() class method",
+                version="0.5.0",
+                msg="RF: url passed to init()"
+            )
+
+        self.realpath = realpath(path)
+        # note: we may also want to distinguish between a path to the worktree
+        # and the actual repository
+
         # Disable automatic garbage and autopacking
         self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         # actually no need with default GitPython db backend not in memory
@@ -432,42 +512,16 @@ class GitRepo(object):
         if kwargs:
             git_opts.update(kwargs)
 
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-
-        # try to get a local path from `url`:
-        if url is not None:
-            try:
-                if not isinstance(url, RI):
-                    url = RI(url).localpath
-                else:
-                    url = url.localpath
-            except ValueError:
-                pass
-
-        self.path = abspath(normpath(path))
+        self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        # TODO: Concept of when to set to "dry".
-        #       Includes: What to do in gitrepo class?
-        #       Now: setting "dry" means to give a dry-runner to constructor.
-        #       => Do it similar in gitrepo/dataset.
-        #       Still we need a concept of when to set it and whether this
-        #       should be a single instance collecting everything or more
-        #       fine grained.
-
-        # TODO: somehow do more extensive checks that url and path don't point
-        #       to the same location
-
-        self.repo = None
-        if url is not None and not (url == path):
-            # TODO: What to do, in case url is given, but path exists already?
-            # Just rely on whatever clone_from() does, independently on value
-            # of create argument?
-            self.clone(url, path)
+        self.repo = repo
+        self._cfg = None
 
         if create and not GitRepo.is_valid_repo(path):
+            if repo is not None:
+                # `repo` passed with `create`, which doesn't make sense
+                raise TypeError("argument 'repo' must not be used with 'create'")
+
             try:
                 lgr.debug(
                     "Initialize empty Git repository at '%s'%s",
@@ -497,7 +551,8 @@ class GitRepo(object):
         if self.repo is not None:
             self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
-    def clone(self, url, path):
+    @classmethod
+    def clone(cls, url, path, *args, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -509,26 +564,57 @@ class GitRepo(object):
         path : str
         """
 
+        if 'repo' in kwargs:
+            raise TypeError("argument 'repo' conflicts with cloning")
+            # TODO: what about 'create'?
+
+        # fail early on non-empty target:
+        from os import listdir
+        if exists(path) and listdir(path):
+            # simulate actual GitCommandError:
+            lgr.warning("destination path '%s' already exists and is not an "
+                        "empty directory." % path)
+            raise GitCommandError(
+                ['git', 'clone', '-v', url, path],
+                128,
+                "fatal: destination path '%s' already exists and is not an "
+                "empty directory." % path)
+        else:
+            # protect against cloning into existing and obviously dangling
+            # instance for that location
+            try:
+                del cls._unique_instances[path]
+            except KeyError:
+                # didn't exist - all fine
+                pass
+
+        # try to get a local path from `url`:
+        try:
+            if not isinstance(url, RI):
+                url = RI(url).localpath
+            else:
+                url = url.localpath
+        except ValueError:
+            pass
+
         if is_ssh(url):
-            cnct = ssh_manager.get_connection(url)
-            cnct.open()
+            ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = {'GIT_SSH_COMMAND': "ssh -S %s" % cnct.ctrl_path}
+            env = GitRepo.GIT_SSH_ENV
         else:
             env = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.clone_from,
-                                                  url,
-                                                  path,
-                                                  env=env,
-                                                  odbt=default_git_odbt)
+                repo = gitpy.Repo.clone_from(url, path, env=env,
+                                             odbt=default_git_odbt)
+                # Note/TODO: signature for clone from:
+                # (url, to_path, progress=None, env=None, **kwargs)
+
                 lgr.debug("Git clone completed")
                 break
-                # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
                 e_str = exc_str(e)
@@ -554,6 +640,23 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
+        gr = cls(path, *args, repo=repo, **kwargs)
+        return gr
+
+    def __del__(self):
+        # unbind possibly bound ConfigManager, to prevent all kinds of weird
+        # stalls etc
+        self._cfg = None
+        # Make sure to flush pending changes, especially close batch processes
+        # (internal `git cat-file --batch` by GitPython)
+        if hasattr(self, 'repo') and self.repo is not None \
+                and exists(self.path):  # gc might be late, so the (temporary)
+                                        # repo doesn't exist on FS anymore
+
+            self.repo.git.clear_cache()
+            if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                self.repo.index.write()
+
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
 
@@ -562,12 +665,29 @@ class GitRepo(object):
 
         This is done by comparing the base repository path.
         """
-        return self.path == obj.path
+        return self.realpath == obj.realpath
 
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git', 'objects'))
+
+    @property
+    def config(self):
+        """Get an instance of the parser for the persistent repository
+        configuration.
+
+        Note: This allows to also read/write .datalad/config,
+        not just .git/config
+
+        Returns
+        -------
+        ConfigManager
+        """
+        if self._cfg is None:
+            # associate with this dataset and read the entire config hierarchy
+            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+        return self._cfg
 
     def is_with_annex(self, only_remote=False):
         """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
@@ -581,7 +701,7 @@ class GitRepo(object):
             ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
-    def get_toppath(cls, path, follow_up=True):
+    def get_toppath(cls, path, follow_up=True, git_options=None):
         """Return top-level of a repository given the path.
 
         Parameters
@@ -590,13 +710,19 @@ class GitRepo(object):
           If path has symlinks -- they get resolved by git.  If follow_up is
           True, we will follow original path up until we hit the same resolved
           path.  If no such path found, resolved one would be returned.
+        git_options: list of str
+          options to be passed to the git rev-parse call
 
         Return None if no parent directory contains a git repository.
         """
+        cmd = ['git']
+        if git_options:
+            cmd.extend(git_options)
+        cmd += ["rev-parse", "--show-toplevel"]
         try:
             with swallow_logs():
                 toppath, err = Runner().run(
-                    ["git", "rev-parse", "--show-toplevel"],
+                    cmd,
                     cwd=path,
                     log_stdout=True, log_stderr=True,
                     expect_fail=True, expect_stderr=True)
@@ -604,7 +730,8 @@ class GitRepo(object):
         except CommandError:
             return None
         except OSError:
-            toppath = GitRepo.get_toppath(dirname(path))
+            toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
+                                          git_options=git_options)
 
         if follow_up:
             path_ = path
@@ -751,8 +878,10 @@ class GitRepo(object):
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        # flush possibly cached in GitPython changes to index:
-        self.repo.index.write()
+
+        if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
+            # flush possibly cached in GitPython changes to index:
+            self.repo.index.write()
 
     @staticmethod
     def _get_prefixed_commit_msg(msg):
@@ -817,7 +946,10 @@ class GitRepo(object):
         #       Note: repo.tree(treeish).hexsha
         if branch is None:
             try:
-                return self.repo.active_branch.object.hexsha
+                # do not use
+                #self.repo.active_branch.object.hexsha
+                # but HEAD to be able to cope with detached heads
+                return self.repo.head.object.hexsha
             except ValueError as exc:
                 if 'does not exist' in str(exc):
                     return None
@@ -877,7 +1009,15 @@ class GitRepo(object):
         return commit.committed_date
 
     def get_active_branch(self):
-        return self.repo.active_branch.name
+        try:
+            branch = self.repo.active_branch.name
+        except TypeError as e:
+            if "HEAD is a detached symbolic reference" in str(e):
+                lgr.debug("detached HEAD in {0}".format(self))
+                return None, None
+            else:
+                raise
+        return branch
 
     def get_branches(self):
         """Get all branches of the repo.
@@ -919,8 +1059,8 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self, with_refs_only=False):
-        """
+    def get_remotes(self, with_refs_only=False, with_urls_only=False):
+        """Get known remotes of the repository
 
         Parameters
         ----------
@@ -945,9 +1085,14 @@ class GitRepo(object):
                     if "not have any references" not in str(exc):
                         # was some other reason
                         raise
-            return remotes
         else:
-            return [remote.name for remote in self.repo.remotes]
+            remotes = [remote.name for remote in self.repo.remotes]
+        if with_urls_only:
+            remotes = [
+                r for r in remotes
+                if self.config.get('remote.%s.url' % r)
+            ]
+        return remotes
 
     def get_files(self, branch=None):
         """Get a list of files in git.
@@ -1150,7 +1295,9 @@ class GitRepo(object):
             cmd += options
         cmd += [name, url]
 
-        return self._git_custom_command('', cmd)
+        result = self._git_custom_command('', cmd)
+        self.config.reload()
+        return result
 
     def remove_remote(self, name):
         """Remove existing remote
@@ -1221,13 +1368,15 @@ class GitRepo(object):
                 raise ValueError("refspec specified without a remote. (%s)" %
                                  refspec)
             if all_:
-                remotes_to_fetch = self.repo.remotes
+                remotes_to_fetch = [
+                    self.repo.remote(r)
+                    for r in self.get_remotes(with_urls_only=True)
+                ]
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
-                tb = self.repo.active_branch.tracking_branch().name
-                if tb:
-                    tb_remote, refspec = split_remote_branch(tb)
+                tb_remote, refspec = self.get_tracking_branch()
+                if tb_remote is not None:
                     remotes_to_fetch = [self.repo.remote(tb_remote)]
                 else:
                     # No remote, no tracking branch
@@ -1244,12 +1393,10 @@ class GitRepo(object):
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
             if is_ssh(fetch_url):
-                cnct = ssh_manager.get_connection(fetch_url)
-                cnct.open()
+                ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1271,15 +1418,15 @@ class GitRepo(object):
                                  refspec)
             # No explicit remote to pull from.
             # => get tracking branch:
-            tb = self.repo.active_branch.tracking_branch().name
-            if tb:
-                tb_remote, refspec = split_remote_branch(tb)
+            tb_remote, refspec = self.get_tracking_branch()
+            if tb_remote is not None:
                 remote = self.repo.remote(tb_remote)
             else:
                 # No remote, no tracking branch
                 # => fail
-                raise ValueError("No remote specified to fetch from nor a "
+                raise ValueError("No remote specified to pull from nor a "
                                  "tracking branch is set up.")
+
         else:
             remote = self.repo.remote(remote)
 
@@ -1288,12 +1435,10 @@ class GitRepo(object):
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
         if is_ssh(fetch_url):
-            cnct = ssh_manager.get_connection(fetch_url)
-            cnct.open()
+            ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            with remote.repo.git.custom_environment(
-                    GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+            with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                 return remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
@@ -1350,13 +1495,14 @@ class GitRepo(object):
                 #    if config is missing
                 # 2. remote.*.push or push.default
 
-                # get the remote to push to:
-                # TODO: Use ConfigManager when RF'ing GitRepo
-                tb_remote, tb_branch = self.get_tracking_branch()
+                # TODO: check out "same procedure" for fetch/pull
+
+                tb_remote, refspec = self.get_tracking_branch()
                 if tb_remote is None:
                     tb_remote = 'origin'
                 remotes_to_push = [self.repo.remote(tb_remote)]
-                # no refspec, let git find remote.*.push/push.default on its own
+                # use no refspec; let git find remote.*.push or push.default on
+                # its own
 
         else:
             if all_remotes:
@@ -1371,12 +1517,10 @@ class GitRepo(object):
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
             if is_ssh(push_url):
-                cnct = ssh_manager.get_connection(push_url)
-                cnct.open()
+                ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(
-                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
                     pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
@@ -1397,17 +1541,9 @@ class GitRepo(object):
         push: bool
           if True, get the pushurl instead of the fetch url.
         """
-        cfg_reader = self.repo.remote(name).config_reader
-        if push:
-            if cfg_reader.has_option('pushurl'):
-                return cfg_reader.get('pushurl')
-            else:
-                return None
-        else:
-            if cfg_reader.has_option('url'):
-                return cfg_reader.get('url')
-            else:
-                return None
+
+        var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
+        return self.config.get(var, None)
 
     def set_remote_url(self, name, url, push=False):
         """Set the URL a remote is pointing to
@@ -1423,13 +1559,10 @@ class GitRepo(object):
           if True, set the push URL, otherwise the fetch URL
         """
 
-        cmd = ["git", "remote", "set-url"]
-        if push:
-            cmd.append("--push")
-        cmd += [name, url]
-        return self._git_custom_command('', cmd)
+        var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
+        self.config.set(var, url, where='local', reload=True)
 
-    def get_branch_commits(self, branch, limit=None, stop=None, value=None):
+    def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
         Pretty much similar to what 'git log <branch>' does.
@@ -1437,7 +1570,8 @@ class GitRepo(object):
 
         Parameters
         ----------
-        branch: str
+        branch: str, optional
+          If not provided, assumes current branch
         limit: None | 'left-only', optional
           Limit which commits to report.  If None -- all commits (merged or not),
           if 'left-only' -- only the commits from the left side of the tree upon
@@ -1449,6 +1583,9 @@ class GitRepo(object):
           What to yield.  If None - entire commit object is yielded, if 'hexsha'
           only its hexsha
         """
+
+        if not branch:
+            branch = self.get_active_branch()
 
         try:
             _branch = self.repo.branches[branch]
@@ -1633,13 +1770,49 @@ class GitRepo(object):
         init : bool
           If True, initialize all submodules for which "git submodule init" has
           not been called so far before updating.
+          Primarily provided for internal purposes and should not be used directly
+          since would result in not so annex-friendly .git symlinks/references
+          instead of full featured .git/ directories in the submodules
         """
         cmd = ['git', 'submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
+            subgitpath = opj(self.path, path, '.git')
+            if not exists(subgitpath):
+                # TODO:  wouldn't with --init we get all those symlink'ed .git/?
+                # At least let's warn
+                lgr.warning(
+                    "Do not use update_submodule with init=True to avoid git creating "
+                    "symlinked .git/ directories in submodules"
+                )
+            #  yoh: I thought I saw one recently but thought it was some kind of
+            #  an artifact from running submodule update --init manually at
+            #  some point, but looking at this code now I worry that it was not
         cmd += ['--', path]
         self._git_custom_command('', cmd)
         # TODO: return value
+
+    def update_ref(self, ref, value, symbolic=False):
+        """Update the object name stored in a ref "safely".
+
+        Just a shim for `git update-ref` call if not symbolic, and
+        `git symbolic-ref` if symbolic
+
+        Parameters
+        ----------
+        ref : str
+          Reference, such as `ref/heads/BRANCHNAME` or HEAD.
+        value : str
+          Value to update to, e.g. hexsha of a commit when updating for a
+          branch ref, or branch ref if updating HEAD
+        symbolic : None
+          To instruct if ref is symbolic, e.g. should be used in case of
+          ref=HEAD
+        """
+        self._git_custom_command(
+            '',
+            ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
+        )
 
     def tag(self, tag):
         """Assign a tag to current commit
@@ -1668,30 +1841,12 @@ class GitRepo(object):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            try:
-                branch = self.get_active_branch()
-            except TypeError as e:
-                if "HEAD is a detached symbolic reference" in str(e):
-                    lgr.debug("detached HEAD in {0}".format(self))
-                    return None, None
-                else:
-                    raise 
+            branch = self.get_active_branch()
+            if branch is None:
+                return None, None
 
-        cfg_reader = self.repo.config_reader()
-        sct = "branch \"{0}\"".format(branch)
-        track_remote = cfg_reader.get_value(section=sct,
-                                            option="remote",
-                                            default="DATALAD_DEFAULT")
-        if track_remote == "DATALAD_DEFAULT":
-            # we have no "tracking remote"
-            track_remote = None
-        track_branch = cfg_reader.get_value(section=sct,
-                                            option="merge",
-                                            default="DATALAD_DEFAULT")
-        if track_branch == "DATALAD_DEFAULT":
-            # we have no tracking branch
-            track_branch = None
-
+        track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
+        track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
         return track_remote, track_branch
 
     @property

@@ -56,6 +56,7 @@ from os import makedirs
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
+from ..utils import get_dataset_root
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
 from ..support.network import parse_url_opts
@@ -255,7 +256,11 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         # since it is done below at the node level
     else:  # it is a "node" which should generate (or return) us an iterable to feed
         # its elements into the rest of the pipeline
-        lgr.debug("Node: %s" % node)
+        try:
+            node_str = node._custom_str
+        except AttributeError:
+            node_str = str(node)
+        lgr.debug("Node: %s", node_str)
         prev_stats = data.get('datalad_stats', None)  # so we could check if the node doesn't dump it
         data_in_to_loop = node(data)
 
@@ -412,7 +417,7 @@ def _find_pipeline(name):
             name += '.py'
 
         # first -- current directory
-        repo_path = GitRepo.get_toppath(curdir)
+        repo_path = get_dataset_root(curdir)
         if repo_path:
             yield opj(repo_path, CRAWLER_META_DIR, 'pipelines', name)
 
@@ -530,7 +535,7 @@ def get_repo_pipeline_config_path(repo_path=curdir):
     """Given a path within a repo, return path to the crawl.cfg"""
     if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
-        repo_path = GitRepo.get_toppath(repo_path)
+        repo_path = get_dataset_root(repo_path)
         if not repo_path:
             return None
     return opj(repo_path, CRAWLER_META_CONFIG_PATH)
@@ -542,7 +547,7 @@ def get_repo_pipeline_script_path(repo_path=curdir):
     # tracked or smth like that
     if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
-        repo_path = GitRepo.get_toppath(repo_path)
+        repo_path = get_dataset_root(repo_path)
         if not repo_path:
             return None
     pipelines = glob(opj(repo_path, CRAWLER_META_DIR, 'pipelines', '*.py'))

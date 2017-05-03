@@ -46,6 +46,7 @@ from ..utils import on_windows
 from ..utils import _path_
 from ..utils import get_timestamp_suffix
 from ..utils import get_trace
+from ..utils import get_dataset_root
 
 from ..support.annexrepo import AnnexRepo
 
@@ -56,6 +57,8 @@ from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
+from .utils import assure_bool
+from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
@@ -300,6 +303,12 @@ def test_auto_repr():
     assert_equal(buga().some(), "some")
 
 
+def test_assure_list_copy():
+    l = [1]
+    assert assure_list(l) is l
+    assert assure_list(l, copy=True) is not l
+
+
 def test_assure_list_from_str():
     assert_equal(assure_list_from_str(''), None)
     assert_equal(assure_list_from_str([]), None)
@@ -318,6 +327,16 @@ def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(
         dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_assure_bool():
+    for values, t in [
+        (['True', 1, '1', 'yes', 'on'], True),
+        (['False', 0, '0', 'no', 'off'], False)
+    ]:
+        for v in values:
+            eq_(assure_bool(v), t)
+    assert_raises(ValueError, assure_bool, "unknown")
 
 
 def test_any_re_search():
@@ -437,7 +456,7 @@ def test_knows_annex(here, there):
     assert_false(knows_annex(here))
     AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    GitRepo(path=there, url=here, create=True)
+    GitRepo.clone(path=there, url=here, create=True)
     assert_true(knows_annex(there))
 
 
@@ -560,3 +579,24 @@ def test_get_trace():
         ('C', 'D'),
         ('D', 'E'),
         ], 'A', 'E'), ['B', 'C', 'D'])
+
+
+@with_tempfile(mkdir=True)
+def test_get_dataset_root(path):
+    eq_(get_dataset_root('/nonexistent'), None)
+    with chpwd(path):
+        repo = AnnexRepo(os.curdir, create=True)
+        subdir = opj('some', 'deep')
+        fname = opj(subdir, 'dummy')
+        os.makedirs(subdir)
+        with open(fname, 'w') as f:
+            f.write('some')
+        repo.add(fname)
+        # we can find this repo
+        eq_(get_dataset_root(os.curdir), os.curdir)
+        # and we get the type of path that we fed in
+        eq_(get_dataset_root(abspath(os.curdir)), abspath(os.curdir))
+        # subdirs are no issue
+        eq_(get_dataset_root(subdir), os.curdir)
+        # non-dir paths are no issue
+        eq_(get_dataset_root(fname), os.curdir)

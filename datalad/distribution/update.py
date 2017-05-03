@@ -14,19 +14,21 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import join as opj
+from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import require_dataset
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .dataset import require_dataset
 
 lgr = logging.getLogger('datalad.distribution.update')
 
@@ -35,35 +37,37 @@ class Update(Interface):
     """Update a dataset from a sibling.
 
     """
+    # TODO: adjust docs to say:
+    # - update from just one sibling at a time
 
     _params_ = dict(
-        name=Parameter(
-            args=("name",),
+        path=Parameter(
+            args=("path",),
+            metavar="PATH",
+            doc="path to be updated",
+            nargs="*",
+            constraints=EnsureStr() | EnsureNone()),
+        sibling=Parameter(
+            args=("-s", "--sibling",),
             doc="""name of the sibling to update from""",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory""",
+            based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="merge changes from sibling `name` or the remote branch, "
-                "configured to be the tracking branch if no sibling was "
-                "given", ),
-        # TODO: How to document it without using the term 'tracking branch'?
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="""if set this updates all possibly existing subdatasets,
-             too"""),
+            doc="""merge obtained changes from the given or the
+            default sibling""", ),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
-            doc="fetch updates from all siblings", ),
+            doc="fetch updates from all known siblings", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
@@ -71,113 +75,108 @@ class Update(Interface):
 
     @staticmethod
     @datasetmethod(name='update')
-    def __call__(name=None, dataset=None,
-                 merge=False, recursive=False, fetch_all=False,
-                 reobtain_data=False):
+    def __call__(
+            path=None,
+            sibling=None,
+            merge=False,
+            dataset=None,
+            recursive=False,
+            recursion_limit=None,
+            fetch_all=False,
+            reobtain_data=False):
         """
         """
-        # TODO: Is there an 'update filehandle' similar to install and publish?
-        # What does it mean?
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if not dataset and not path:
+            # try to find a dataset in PWD
+            dataset = require_dataset(
+                None, check_installed=True, purpose='updating')
+        content_by_ds, unavailable_paths = Interface._prep(
+            path=path,
+            dataset=dataset,
+            recursive=recursive,
+            recursion_limit=recursion_limit)
 
-        if reobtain_data:
-            # TODO: properly define, what to do
-            raise NotImplementedError("TODO: Option '--reobtain-data' not "
-                                      "implemented yet.")
+        # TODO: check parsed inputs if any paths within a dataset were given
+        # and issue a message that we will update the associate dataset as a whole
+        # or fail -- see #1185 for a potential discussion
+        results = []
 
-        # shortcut
-        ds = require_dataset(dataset, check_installed=True, purpose='updating')
-        assert (ds.repo is not None)
-
-        repos_to_update = [ds.repo]
-        if recursive:
-            repos_to_update += [GitRepo(opj(ds.path, sub_path), create=False)
-                                for sub_path in
-                                ds.get_subdatasets(recursive=True, fulfilled=True)]
-        # only work on those which are installed
-
-
-        # TODO: current implementation disregards submodules organization,
-        #  it just updates/merge each one individually whenever in the simplest
-        #  case we just need  a call to
-        # git submodule update --recursive
-        #  if name was not provided, and there is no --merge
-        # If we do --merge we should at the end call save
-        for repo in repos_to_update:
+        for ds_path in content_by_ds:
+            ds = Dataset(ds_path)
+            repo = ds.repo
             # get all remotes which have references (would exclude
             # special remotes)
-            remotes = repo.get_remotes(with_refs_only=True)
+            remotes = repo.get_remotes(
+                **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
             if not remotes:
                 lgr.debug("No siblings known to dataset at %s\nSkipping",
                           repo.path)
                 continue
-            if name and name not in remotes:
+            if not sibling:
+                # nothing given, look for tracking branch
+                sibling_ = repo.get_tracking_branch()[0]
+            else:
+                sibling_ = sibling
+            if sibling_ and sibling_ not in remotes:
                 lgr.warning("'%s' not known to dataset %s\nSkipping",
-                            name, repo.path)
+                            sibling_, repo.path)
                 continue
-
-            # Currently '--merge' works for single remote only:
-            # TODO: - condition still incomplete
-            #       - We can merge if a remote was given or there is a
-            #         tracking branch
-            #       - we also can fetch all remotes independently on whether or
-            #         not we merge a certain remote
-            if not name and len(remotes) > 1 and merge:
-                lgr.debug("Found multiple remotes:\n%s" % remotes)
-                raise NotImplementedError("No merge strategy for multiple "
-                                          "remotes implemented yet.")
+            if not sibling_ and len(remotes) == 1:
+                # there is only one remote, must be this one
+                sibling_ = remotes[0]
+            if not sibling_ and len(remotes) > 1 and merge:
+                lgr.debug("Found multiple siblings:\n%s" % remotes)
+                raise NotImplementedError(
+                    "Multiple siblings, please specify from which to update.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
+            _update_repo(ds, sibling_, merge, fetch_all, reobtain_data)
 
-            # fetch remote(s):
-            repo.fetch(remote=name, all_=fetch_all)
 
-            # if `repo` is an annex and we didn't fetch the entire remote
-            # anyway, explicitly fetch git-annex branch:
+def _update_repo(ds, remote, merge, fetch_all, reobtain_data):
+    repo = ds.repo
+    # fetch remote
+    repo.fetch(
+        remote=None if fetch_all else remote,
+        all_=fetch_all,
+        prune=True)  # prune to not accumulate a mess over time
 
-            # TODO: This isn't correct. `fetch_all` fetches all remotes.
-            # Apparently, we currently fetch an entire remote anyway. Is this
-            # what we want? Do we want to specify a refspec instead?
-            # yoh: we should leave it to git and its configuration.
-            # So imho we should just extract to fetch everything git would fetch
-            if knows_annex(repo.path) and not fetch_all:
-                if name:
-                    # we are updating from a certain remote, so git-annex branch
-                    # should be updated from there as well:
-                    repo.fetch(remote=name)
-                    # TODO: what does failing here look like?
-                else:
-                    # we have no remote given, therefore
-                    # check for tracking branch's remote:
+    if not merge:
+        return
 
-                    track_remote, track_branch = repo.get_tracking_branch()
-                    if track_remote:
-                        # we have a "tracking remote"
-                        repo.fetch(remote=track_remote)
+    # reevaluate repo instance, for it might be an annex now:
+    repo = ds.repo
 
-            # merge:
-            if merge:
-                lgr.info("Applying changes from tracking branch...")
-                # TODO: Adapt.
-                # TODO: Rethink default remote/tracking branch. See above.
-                # We need a "tracking remote" but custom refspec to fetch from
-                # that remote
-                cmd_list = ["git", "pull"]
-                if name:
-                    cmd_list.append(name)
-                    # branch needed, if not default remote
-                    # => TODO: use default remote/tracking branch to compare
-                    #          (see above, where git-annex is fetched)
-                    # => TODO: allow for passing a branch
-                    # (or more general refspec?)
-                    # For now, just use the same name
-                    cmd_list.append(repo.get_active_branch())
-
-                std_out, std_err = repo._git_custom_command('', cmd_list)
-                lgr.info(std_out)
-                if knows_annex(repo.path):
-                    # annex-apply:
-                    lgr.info("Updating annex ...")
-                    std_out, std_err = repo._git_custom_command(
-                        '', ["git", "annex", "merge"])
-                    lgr.info(std_out)
-
-                    # TODO: return value?
+    lgr.info("Merging updates...")
+    if isinstance(repo, AnnexRepo):
+        if reobtain_data:
+            # get all annexed files that have data present
+            lgr.info('Recording file content availability to re-obtain update files later on')
+            reobtain_data = repo.get_annexed_files(with_content_only=True)
+        # this runs 'annex sync' and should deal with anything
+        repo.sync(remotes=remote, push=False, pull=True, commit=False)
+        if reobtain_data:
+            reobtain_data = [p for p in reobtain_data if lexists(opj(ds.path, p))]
+        if reobtain_data:
+            lgr.info('Ensure content availability for %i previously available files', len(reobtain_data))
+            ds.get(reobtain_data, recursive=False)
+    else:
+        # handle merge in plain git
+        active_branch = repo.get_active_branch()
+        if active_branch == (None, None):
+            # I guess we need to fetch, and then let super-dataset to update
+            # into the state it points to for this submodule, but for now let's
+            # just blow I guess :-/
+            lgr.warning(
+                "No active branch in %s - we just fetched and not changing state",
+                repo
+            )
+        else:
+            if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
+                # the branch love this remote already, let git pull do its thing
+                repo.pull(remote=remote)
+            else:
+                # no marriage yet, be specific
+                repo.pull(remote=remote, refspec=active_branch)

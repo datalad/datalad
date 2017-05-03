@@ -459,7 +459,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
 
     # adjust path strings
     for ds_model in dsms:
-        path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        #path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        path = relpath(ds_model.path, topdir) if topdir else ds_model.path
         if not path:
             path = '.'
         ds_model.path = path
@@ -541,13 +542,18 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     """
 
     # use implicit paths unless paths explicitly specified
-    ds_path = ds_path or fs_metadata['repo']
+    # Note: usage of ds_path as if it was the Repo's path. Therefore use
+    # realpath, since we switched to have symlinks resolved in repos but not in
+    # datasets
+    ds_path = realpath(ds_path) if ds_path else fs_metadata['repo']
     path = path or fs_metadata['path']
     metadata_path = metadata_path or '.git/datalad/metadata'
     # directory metadata directory tree location
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
-    dir_path = '/' if path == '.' else path
+    # Was following in debanjum's fixes to webui branch
+    # dir_path = '/' if path in ('.', None, '') else path
+    dir_path = realpath(path).split(ds_path)[1][1:] or '/'
     # create md5 hash of current directory's relative path
     metadata_hash = hashlib.md5(dir_path.encode('utf-8')).hexdigest()
     # construct final path to metadata file
@@ -652,7 +658,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                 # if recursive, create info dictionary of each child node too
                 if recursive:
                     subdir = fs_traverse(nodepath, repo,
-                                         parent=None, # children[0],
+                                         parent=None,  # children[0],
                                          recursive=recursive, json=json, basepath=basepath or path)
                 else:
                     # read child metadata from its metadata file if it exists

@@ -106,13 +106,20 @@ def test_custom_versions():
     ev = ExternalVersions()
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
-    assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
+    # some older git version don't support files to be passed to
+    # `commit` call under some conditions and this will lead to diverse
+    # errors
+    assert(ev['cmd:git'] > '2.0')  # git must be present and recentish
     assert(isinstance(ev['cmd:git'], LooseVersion))
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
+    # and there is also a version of system-wide installed git, which might
+    # differ from cmd:git but should be at least good old 1.7
+    assert(ev['cmd:system-git'] > '1.7')
+
     ev.CUSTOM = {'bogus': lambda: 1 / 0}
     assert_equal(ev['bogus'], None)
-    assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
+    assert_equal(set(ev.versions), {'cmd:annex', 'cmd:git', 'cmd:system-git'})
 
 
 def test_ancient_annex():
@@ -176,3 +183,19 @@ def test_list_tuple():
 
     for v in thing_with_list_version, thing_with_tuple_version, '0.1', (0, 1), [0, 1]:
         yield _test_list_tuple, v
+
+
+def test_system_ssh_version():
+    ev = ExternalVersions()
+    assert ev['cmd:system-ssh']  # usually we have some available at boxes we test
+
+    for s, v in [
+        ('OpenSSH_7.4p1 Debian-6, OpenSSL 1.0.2k  26 Jan 2017', '7.4p1'),
+    ]:
+        ev = ExternalVersions()
+        # TODO: figure out leaner way
+        class _runner(object):
+            def run(self, cmd):
+                return "", s
+        with patch('datalad.support.external_versions._runner', _runner()):
+            assert_equal(ev['cmd:system-ssh'], v)

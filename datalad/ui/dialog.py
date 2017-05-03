@@ -104,6 +104,15 @@ class ConsoleLog(object):
         return isinstance(self, InteractiveUI)
 
 
+@auto_repr
+class SilentConsoleLog(ConsoleLog):
+    """A ConsoleLog with a SilentProgressbar"""
+
+    def get_progressbar(self, *args, **kwargs):
+        from .progressbars import SilentProgressBar
+        return SilentProgressBar(*args, out=self.out, **kwargs)
+
+
 def getpass_echo(prompt='Password: ', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
     """

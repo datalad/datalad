@@ -50,6 +50,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import put_file_under_git
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -254,7 +255,7 @@ def test_install_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -271,7 +272,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -382,12 +383,12 @@ def test_install_into_dataset(source, top_path):
     ok_(subds.is_installed())
     assert_in('sub', ds.get_subdatasets())
     # sub is clean:
-    ok_clean_git(subds.path, annex=False)
+    ok_clean_git(subds.path, annex=None)
     # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
+    assert_raises(AssertionError, ok_clean_git, ds.path, annex=None)
     ds.save('addsub')
     # now it is:
-    ok_clean_git(ds.path, annex=False)
+    ok_clean_git(ds.path, annex=None)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -399,10 +400,10 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
     # and we should achieve the same behavior if we create a dataset
-    # and then decide to "add" it
-    create(_path_(top_path, 'sub3'), if_dirty='ignore')
+    # and then decide to add it
+    create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
-    ds.install('sub3', if_dirty='ignore')
+    ds.add('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
@@ -414,13 +415,16 @@ def test_failed_install_multiple(top_path):
 
     create(_path_(top_path, 'ds1'))
     create(_path_(top_path, 'ds3'))
-    ok_clean_git(ds.path, annex=False, untracked=['ds1/', 'ds3/'])
+    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
 
     # specify install with multiple paths and one non-existing
     with assert_raises(IncompleteResultsError) as cme:
         ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
 
-    ok_clean_git(ds.path, annex=False)
+    # install doesn't add existing submodules -- add does that
+    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
+    ds.add(['ds1', 'ds3'])
+    ok_clean_git(ds.path, annex=None)
     # those which succeeded should be saved now
     eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
@@ -484,7 +488,7 @@ def test_implicit_install(src, dst):
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
     origin_subsub.add("file3.txt")
-    origin_top.save(auto_add_changes=True)
+    origin_top.save(recursive=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -522,7 +526,9 @@ def test_implicit_install(src, dst):
     # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
     with chpwd(dst):
-        result = get(path=opj("sub", "subsub"))
+        # don't ask for the file content to make return value comparison
+        # simpler
+        result = get(path=opj("sub", "subsub"), get_data=False)
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
         eq_(result, [subsub])
@@ -588,7 +594,8 @@ def test_install_recursive_repeat(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
+    ok_clean_git(top_src.path)
 
     # install top level:
     top_ds = install(path, source=src)
@@ -691,7 +698,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.save(auto_add_changes=True, recursive=True)
+    top_src.add('.', recursive=True)
 
     # install top level:
     cdss = install(path, source=src, recursive=True)
@@ -708,3 +715,76 @@ def test_install_source_relpath(src, dest):
     src_ = basename(src)
     with chpwd(dirname(src)):
         ds2 = install(dest, source=src_)
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_install_consistent_state(src, dest, dest2, dest3):
+    # if we install a dataset, where sub-dataset "went ahead" in that branch,
+    # while super-dataset was not yet updated (e.g. we installed super before)
+    # then it is desired to get that default installed branch to get to the
+    # position where previous location was pointing to.
+    # It is indeed a mere heuristic which might not hold the assumption in some
+    # cases, but it would work for most simple and thus mostly used ones
+    ds1 = create(src)
+    sub1 = ds1.create('sub1')
+
+    def check_consistent_installation(ds):
+        datasets = [ds] + list(
+            map(Dataset, ds.get_subdatasets(recursive=True, absolute=True, fulfilled=True)))
+        assert len(datasets) == 2  # in this test
+        for ds in datasets:
+            # all of them should be in master branch
+            eq_(ds.repo.get_active_branch(), "master")
+            # all of them should be clean, so sub should be installed in a "version"
+            # as pointed by the super
+            ok_(not ds.repo.dirty)
+
+    dest_ds = install(dest, source=src)
+    # now we progress sub1 by adding sub2
+    subsub2 = sub1.create('sub2')
+
+    # and progress subsub2 forward to stay really thorough
+    put_file_under_git(subsub2.path, 'file.dat', content="data")
+    subsub2.save("added a file")  # above function does not commit
+
+    # just installing a submodule -- apparently different code/logic
+    # but also the same story should hold - we should install the version pointed
+    # by the super, and stay all clean
+    dest_sub1 = dest_ds.install('sub1')
+    check_consistent_installation(dest_ds)
+
+    # So now we have source super-dataset "dirty" with sub1 progressed forward
+    # Our install should try to "retain" consistency of the installation
+    # whenever possible.
+
+    # install entire hierarchy without specifying dataset
+    dest2_ds = install(dest2, source=src, recursive=True)
+    check_consistent_installation(dest2_ds[0])  # [1] is the subdataset
+
+    # install entire hierarchy by first installing top level ds
+    # and then specifying sub-dataset
+    dest3_ds = install(dest3, source=src, recursive=False)
+    # and then install both submodules recursively while pointing
+    # to it based on dest3_ds
+    dest3_ds.install('sub1', recursive=True)
+    check_consistent_installation(dest3_ds)
+
+    # TODO: makes a nice use-case for an update operation
+
+
+from datalad.tests.utils import skip_ssh
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_install_subds_with_space(opath, tpath):
+    ds = create(opath)
+    ds.create('sub ds')
+    # works even now, boring
+    # install(tpath, source=opath, recursive=True)
+    # do via ssh!
+    install(tpath, source="localhost:" + opath, recursive=True)
+    assert Dataset(opj(tpath, 'sub ds')).is_installed()

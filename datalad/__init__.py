@@ -12,6 +12,15 @@ distribution with the convenience of git-annex repositories as a backend."""
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
+
+# If there is a bundled git, make sure GitPython uses it too:
+from datalad.cmd import GitRunner
+GitRunner._check_git_path()
+if GitRunner._GIT_PATH:
+    import os
+    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
+        os.path.join(GitRunner._GIT_PATH, 'git')
+
 from .config import ConfigManager
 cfg = ConfigManager()
 
@@ -86,7 +95,8 @@ def setup_package():
     # Set to non-interactive UI
     from datalad.ui import ui
     _test_states['ui_backend'] = ui.backend
-    ui.set_backend('tests-noninteractive')
+    # obtain() since that one consults for the default value
+    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
 
 def teardown_package():
@@ -111,5 +121,15 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
+
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    # request versioning for few others which we do not check at runtime
+    for m in ('git', 'system-ssh'):
+        try:  # Let's make sure to not blow up when we are almost done
+            ev[m]
+        except Exception:
+            pass
+    print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")

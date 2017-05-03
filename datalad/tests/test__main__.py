@@ -40,4 +40,3 @@ def test_main_run_a_script(stdout, mock_activate):
     assert_equal(stdout.getvalue().rstrip(), "Running the script")
     # And we have "activated"
     mock_activate.assert_called_once_with()
-

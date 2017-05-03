@@ -140,6 +140,7 @@ class ColorFormatter(logging.Formatter):
             return record.msg
 
         levelname = record.levelname
+
         if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
             fore_color = colors.LOG_LEVEL_COLORS[levelname]
             levelname_color = (colors.COLOR_SEQ % fore_color) + \
@@ -169,8 +170,9 @@ class LoggerHelper(object):
         self.logtarget = logtarget
         self.lgr = logging.getLogger(logtarget if logtarget is not None else name)
 
-    def _get_environ(self, var, default=None):
-        return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)
+    def _get_config(self, var, default=None):
+        from datalad import cfg
+        return cfg.get(self.name.lower() + '.log.' + var, default)
 
     def set_level(self, level=None, default='INFO'):
         """Helper to set loglevel for an arbitrary logger
@@ -180,7 +182,7 @@ class LoggerHelper(object):
         """
         if level is None:
             # see if nothing in the environment
-            level = self._get_environ('LOG_LEVEL')
+            level = self._get_config('level')
         if level is None:
             level = default
 
@@ -216,7 +218,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_environ('LOG_TARGET', logtarget or 'stderr')
+        logtarget = self._get_config('target', logtarget or 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
@@ -235,12 +237,33 @@ class LoggerHelper(object):
             use_color = False
             # I had decided not to guard this call and just raise exception to go
             # out happen that specified file location is not writable etc.
+
+        for names_filter in 'names', 'namesre':
+            names = self._get_config(names_filter, '')
+            if names:
+                import re
+                # add a filter which would catch those
+                class LogFilter(object):
+                    """A log filter to filter based on the log target name(s)"""
+                    def __init__(self, names):
+                        self.target_names = set(n for n in names.split(',')) \
+                            if names_filter == 'names' \
+                            else re.compile(names)
+                    if names_filter == 'names':
+                        def filter(self, record):
+                            return record.name in self.target_names
+                    else:
+                        def filter(self, record):
+                            return self.target_names.match(record.name)
+
+                loghandler.addFilter(LogFilter(names))
+
         # But now improve with colors and useful information such as time
         loghandler.setFormatter(
             ColorFormatter(use_color=use_color,
                            # TODO: config log.name, pid
-                           log_name=self._get_environ("LOG_NAME", False),
-                           log_pid=self._get_environ("LOG_PID", False),
+                           log_name=self._get_config("name", False),
+                           log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)

@@ -22,3 +22,4 @@ tmp
 .rej
 .*.swp
 .travis.yml.evil-bd
+.asv
