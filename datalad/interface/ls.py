@@ -81,14 +81,16 @@ class Ls(Interface):
             action="store_true",
             doc="only perform fast operations.  Would be overridden by --all",
         ),
-        all=Parameter(
+        all_=Parameter(
             args=("-a", "--all"),
+            dest='all_',
             action="store_true",
             doc="list all (versions of) entries, not e.g. only latest entries "
                 "in case of S3",
         ),
-        long=Parameter(
+        long_=Parameter(
             args=("-L", "--long"),
+            dest='long_',
             action="store_true",
             doc="list more information on entries (e.g. acl, urls in s3, annex "
                 "sizes etc)",
@@ -116,13 +118,13 @@ class Ls(Interface):
     )
 
     @staticmethod
-    def __call__(loc, recursive=False, fast=False, all=False, long=False,
+    def __call__(loc, recursive=False, fast=False, all_=False, long_=False,
                  config_file=None, list_content=False, json=None):
         if isinstance(loc, list) and not len(loc):
             # nothing given, CWD assumed -- just like regular ls
             loc = '.'
 
-        kw = dict(fast=fast, recursive=recursive, all=all, long=long)
+        kw = dict(fast=fast, recursive=recursive, all_=all_, long_=long_)
         if isinstance(loc, list):
             return [Ls.__call__(loc_, config_file=config_file,
                                 list_content=list_content, json=json, **kw)
@@ -133,9 +135,8 @@ class Ls(Interface):
         # warning if some custom value/option was specified which doesn't apply to the
         # given url
 
-        # rename to not angry Python gods who took all good words
-        kw['all_'] = kw.pop('all')
-        kw['long_'] = kw.pop('long')
+        # rename to not angry Python gods who took all_ good words
+        kw['long_'] = kw.pop('long_')
 
         loc_type = "unknown"
         if loc.startswith('s3://'):
@@ -167,7 +168,7 @@ class Ls(Interface):
 
         if loc_type:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
-            # TODO: unify all the output here -- _ls functions should just return something
+            # TODO: unify all_ the output here -- _ls functions should just return something
             # to be displayed
             ui.message(
                 "{}  {}".format(
@@ -732,7 +733,6 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     list of dict
       extracts and returns a (recursive) list of dataset(s) info at path
     """
-
     # extract parent info to pass to traverser
     fsparent = fs_extract(parent.path, parent.repo, basepath=rootds.path) if parent else None
 
