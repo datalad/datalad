@@ -107,34 +107,65 @@ function bread2crumbs(jQuery, md5) {
   return crumbs;
 }
 
+/*
+Helper to check if cache has the item and the key for it set, get and set them
+*/
+function has_cached(item, key) {
+    return (item in ntCache) && (key in ntCache[item]);
+}
+function get_cached(item, key) {
+    return ntCache[item][key];
+}
+function set_cached(item, key, value) {
+    var cache_rec = (item in ntCache) ? ntCache[item] : {};
+    cache_rec[key] = value;
+    ntCache[item] = cache_rec;
+    return value;
+}
+
 /**
  * Create installation RI
  * @return {string} RI to install current dataset from
  */
 function uri2installri() {
   // TODO -- RF to centralize common logic with bread2crumbs
-  var rawCrumbs = loc().href.split('/');
+  var href = loc().href;
+  var rawCrumbs = href.split('/');
   var ri_ = '';
-  // poor Yarik knows no JS
-  // TODO:  now check for the last dataset is crippled, we would need
-  // meld logic with breadcrumbs I guess, whenever they would get idea
-  // of where dataset boundary is
-  var ri = null;
-  for (var index = 0; index < rawCrumbs.length; index++) {
-    if (rawCrumbs[index] === '?dir=')
-      continue;
-    if (ri_)
-      ri_ += '/';
-    ri_ += rawCrumbs[index];
-    if (urlExists(ri_ + '/' + metadataDir)) {
-      ri = ri_;
-    }
+
+  var dir = getParameterByName('dir', href);
+  var topurl = href.replace(/\?.*/, '').replace(/\/$/, '')
+
+  if (has_cached(dir, "install_url")) return get_cached(dir, "install_url");
+
+  if (has_cached(dir, "type")
+      && ((ntCache[dir].type == 'git') || (ntCache[dir].type == 'annex'))) {
+    ri = topurl + dir
+  }
+  else {
+      // poor Yarik knows no JS
+      // TODO:  now check for the last dataset is crippled, we would need
+      // meld logic with breadcrumbs I guess, whenever they would get idea
+      // of where dataset boundary is
+      var ri = null;
+      for (var index = 0; index < rawCrumbs.length; index++) {
+        if (rawCrumbs[index] === '?dir=')
+          continue;
+        if (ri_)
+          ri_ += '/';
+        ri_ += rawCrumbs[index];
+        // TODO: avoid direct query for urlExists and make use of the ntCache
+        if (urlExists(ri_ + '/' + metadataDir)) {
+          ri = ri_;
+        }
+      }
   }
   // possible shortcuts
   if (ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
   }
+  set_cached(dir, "install_url", ri);
   return ri;
 }
 
@@ -193,37 +224,45 @@ function clickHandler(data, url) {
 function metadataLocator(md5, parent, nodeurl) {
   // if path argument set, find metadata file wrt node at path directory
   var nodepath = typeof nodeurl !== 'undefined' ? nodeurl : loc().href;
-  var startLoc = absoluteUrl(getParameterByName('dir', nodepath)).replace(/\/*$/, '/');
+  var startLoc = absoluteUrl(getParameterByName('dir', nodepath))
+                    .replace(/\/+$/, '/');
 
   if (startLoc === '/' && parent) return "";
 
   // if parent argument set, find metadata file of parent directory instead
   var findParentDs = typeof parent !== 'undefined' ? parent : false;
-  startLoc = findParentDs ? parentUrl(startLoc).replace(/\/*$/, '/') : startLoc;
+  startLoc = findParentDs ? parentUrl(startLoc) : startLoc;
+  startLoc = startLoc.replace(/\/+$/, '');
   var currentDs = startLoc;
 
+  if (has_cached(currentDs, "metadata_path")) return get_cached(currentDs, "metadata_path");
   // traverse up directory tree till a dataset directory found
   // check by testing if current directory has a metadata directory
-  while (!urlExists(currentDs + metadataDir)) {
+  while (!urlExists(currentDs + "/" + metadataDir)) {
     // return error code, if no dataset found till root dataset
     if (currentDs.length <= loc().pathname.length)
       return '';
     // go to parent of current directory
-    currentDs = parentUrl(currentDs).replace(/^\/*/, '/').replace(/\/*$/, '/');
+    currentDs = parentUrl(currentDs).replace(/^\/+/, '/').replace(/\/+$/, '');
   }
 
   // if locating parent dataset or current_loc is a dataset, metadata filename = md5 of '/'
-  if (startLoc === currentDs)
-    return currentDs + metadataDir + md5('/');
-
-  // else compute name of current nodes metadata hash
-  var metadataPath = getParameterByName('dir')
+  if (startLoc === currentDs) {
+    var metadataPath = currentDs + '/' + metadataDir + md5('/');
+  }
+  else {
+    // else compute name of current nodes metadata hash
+    var metadataPath = getParameterByName('dir')
         .replace(currentDs
                  .replace(/\/$/, '')                // remove ending / from currentDs
                  .replace(loc().pathname, ''), '')  // remove basepath to dir
-        .replace(/^\/*/, '')                        // replace beginning /'s
-        .replace(/\/*$/, '');                       // replace ending /'s with /
-  return currentDs + metadataDir + md5(metadataPath);
+        .replace(/^\/+/, '')                        // replace beginning /'s
+        .replace(/\/+$/, '');                       // replace ending /'s with /
+    metadataPath = currentDs + "/" + metadataDir + md5(metadataPath);
+  }
+  // TODO: add caching of information as well -- otherwise we are redoing
+  //       the same discovery over again
+  return set_cached(currentDs, "metadata_path", metadataPath);
 }
 
 /**
@@ -323,7 +362,7 @@ function getNodeType(jQuery, md5, url) {
     return 'dir';
 
   // if key of url in current path, return cached node's type
-  if (relUrl in ntCache)
+  if (has_cached(relUrl, "type"))
     return ntCache[relUrl].type;
 
   // else get metadata json of node if no json object explicitly passed
@@ -351,7 +390,7 @@ function getNodeType(jQuery, md5, url) {
       var childRelUrl = child.path !== '.' ? (dsLoc + '/' + child.path).replace(/\/\//, '/') : dsLoc;
       if (!(childRelUrl in ntCache))
         childRelUrl = childRelUrl.replace(/\/+$/, "");  // strip trailing /
-        ntCache[childRelUrl] = {type: child.type};
+        set_cached(childRelUrl, "type", child.type);
     });
   }
   if ("type" in metaJson) return metaJson.type;
@@ -366,6 +405,8 @@ function getNodeType(jQuery, md5, url) {
  */
 function directory(jQuery, md5) {
   var parent = false;
+  var stored = localStorage['ntCache'];
+  if (stored) ntCache = JSON.parse(stored);
   var md5Url = metadataLocator(md5);
 
   if (md5Url === "") {
@@ -479,5 +520,6 @@ function directory(jQuery, md5) {
                                           '</span>');
     }
   });
+  localStorage['ntCache'] = JSON.stringify(ntCache);
   return table;
 }
