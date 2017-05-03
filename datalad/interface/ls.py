@@ -551,9 +551,10 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     # directory metadata directory tree location
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
-    # Was following in debanjum's fixes to webui branch
-    # dir_path = '/' if path in ('.', None, '') else path
-    dir_path = realpath(path).split(ds_path)[1][1:] or '/'
+    dir_path = relpath(path, ds_path) if isabs(path) else path
+    # normalize to /
+    if dir_path in ('.', None, ''):
+        dir_path = '/'
     # create md5 hash of current directory's relative path
     metadata_hash = hashlib.md5(dir_path.encode('utf-8')).hexdigest()
     # construct final path to metadata file
