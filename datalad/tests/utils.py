@@ -84,6 +84,19 @@ def skip_if_scrapy_without_selector():
             % getattr(scrapy, '__version__'))
 
 
+def skip_if_url_is_not_available(url, regex=None):
+    # verify that dataset is available
+    from datalad.downloaders.providers import Providers
+    from datalad.downloaders.base import DownloadError
+    providers = Providers.from_config_files()
+    try:
+        content = providers.fetch(url)
+        if regex and re.search(regex, content):
+            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+    except DownloadError:
+        raise SkipTest("%s failed to download" % url)
+
+
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """

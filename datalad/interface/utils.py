@@ -763,6 +763,8 @@ def filter_unmodified(content_by_ds, refds, since):
         # TODO use GitRepo.diff() when available (gh-1217)
         repo = repo.repo
 
+    dict_class = content_by_ds.__class__    # could be ordered dict
+
     # life is simple: we diff the base dataset, and kill anything that
     # does not start with something that is in the diff
     # we cannot really limit the diff paths easily because we might get
@@ -798,23 +800,27 @@ def filter_unmodified(content_by_ds, refds, since):
                     for d in diff)
     if not modified:
         # nothing modified nothing to report
-        return {}
+        return dict_class()
     # determine the subset that is a directory and hence is relevant for possible
     # subdatasets
     modified_dirs = {_with_sep(d) for d in modified if isdir(d)}
     # find the subdatasets matching modified paths, this will also kick out
     # any paths that are not in the dataset sub-hierarchy
-    mod_subs = {candds: paths
-                for candds, paths in content_by_ds.items()
-                if candds != refds_path and
-                any(_with_sep(candds).startswith(md) for md in modified_dirs)}
+    mod_subs = dict_class(
+        (candds, paths)
+        for candds, paths in content_by_ds.items()
+        if candds != refds_path and
+           any(_with_sep(candds).startswith(md) for md in modified_dirs)
+    )
     # now query the next level down
     keep_subs = \
         [filter_unmodified(mod_subs, subds_path, modified[subds_path])
          for subds_path in mod_subs
          if subds_path in modified]
     # merge result list into a single dict
-    keep = {k: v for d in keep_subs for k, v in d.items()}
+    keep = dict_class(
+        (k, v) for d in keep_subs for k, v in d.items()
+    )
 
     paths_refds = content_by_ds[refds_path]
     keep[refds_path] = [m for m in modified

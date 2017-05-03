@@ -12,6 +12,7 @@
 
 import os
 import logging
+from collections import OrderedDict
 from os.path import join as opj
 from os.path import relpath
 from nose.tools import assert_raises, assert_equal
@@ -282,6 +283,11 @@ def test_filter_unmodified(path):
     orig_base_commit = ds.repo.repo.commit()
     # nothing was modified compared to the status quo, output must be empty
     assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
+    # and if we pass OrderedDict we should get OrderedDict out
+    spec_o = OrderedDict(spec)
+    res_spec_o = filter_unmodified(spec_o, ds, orig_base_commit)
+    assert_equal({}, res_spec_o)
+    assert isinstance(res_spec_o, OrderedDict)
 
     # modify one subdataset
     added_path = opj(subb.path, 'added')
@@ -299,12 +305,15 @@ def test_filter_unmodified(path):
     assert_equal(spec, modspec)
 
     # only the actually modified components per dataset are kept
+    res = filter_unmodified(spec_o, ds, orig_base_commit)
     assert_equal(
         {
             ds.path: [subb.path],
             subb.path: [added_path]
         },
-        filter_unmodified(spec, ds, orig_base_commit))
+        res
+    )
+    assert isinstance(res_spec_o, OrderedDict)
 
     # deal with removal (force insufiicient copies error)
     ds.remove(opj(subsub.path, 'file_bbaa'), check=False)

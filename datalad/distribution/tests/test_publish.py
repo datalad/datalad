@@ -284,7 +284,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     # Is there an option for push, that prevents GitPython from failing?
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
-    eq_(res, ([source, 'test-annex.dat'], []))
+    # first it would publish data and then push
+    eq_(res, (['test-annex.dat', source], []))
     # XXX master was not checked out in dst!
 
     eq_(list(target.get_branch_commits("master")),
