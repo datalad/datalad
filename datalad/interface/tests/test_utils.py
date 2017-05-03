@@ -349,7 +349,7 @@ class Test_Utils(Interface):
         for i in range(number):
             # this dict will need to have the minimum info required by
             # eval_results
-            yield {'path': 'some', 'status': 'ok', 'somekey': i}
+            yield {'path': 'some', 'status': 'ok', 'somekey': i, 'action': 'off'}
 
 
 def test_eval_results_plus_build_doc():
@@ -419,7 +419,7 @@ def test_result_filter():
             Test_Utils().__call__(
                 4,
                 result_filter=filt)[-1],
-            {'path': 'some', 'status': 'ok', 'somekey': 2})
+            {'action': 'off', 'path': 'some', 'status': 'ok', 'somekey': 2})
 
     # test more sophisticated filters that actually get to see the
     # API call's kwargs

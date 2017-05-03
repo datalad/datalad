@@ -998,7 +998,12 @@ def eval_results(func):
             on_failure = common_params['on_failure']
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
+            # track what actions were performed how many times
+            action_summary = {}
             for res in results:
+                actsum = action_summary.get(res['action'], {})
+                actsum[res['status']] = actsum.get(res['status'], 0) + 1
+                action_summary[res['action']] = actsum
                 ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
@@ -1058,6 +1063,14 @@ def eval_results(func):
                     if res is None:
                         continue
                 yield res
+
+            if result_renderer == 'default' and action_summary:
+                print("Action summary:\n  {}".format(
+                    '\n  '.join('{} ({})'.format(
+                        act,
+                        ', '.join('{}: {}'.format(status, action_summary[act][status])
+                                  for status in sorted(action_summary[act])))
+                                for act in sorted(action_summary))))
 
             if incomplete_results:
                 # stupid catch all message <- tailor TODO
