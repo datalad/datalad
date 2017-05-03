@@ -39,6 +39,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -144,6 +145,7 @@ def test_clone_simple_local(src, path):
 
     # installing it again, shouldn't matter:
     res = clone(src, path)
+    assert_result_values_equal(res, 'source_url', [src])
     assert_status('notneeded', res)
     assert_message("dataset %s was already cloned from '%s'", res)
     ok_(ds.is_installed())

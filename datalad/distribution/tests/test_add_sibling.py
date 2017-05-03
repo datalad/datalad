@@ -36,7 +36,7 @@ def test_add_sibling(origin, repo_path):
                       add_sibling, url=httpurl1)
 
     # prepare src
-    source = install(repo_path, source=origin, recursive=True)[0]
+    source = install(repo_path, source=origin, recursive=True)
     # pollute config
     depvar = 'remote.test-remote.datalad-publish-depends'
     source.config.add(depvar, 'stupid', where='local')

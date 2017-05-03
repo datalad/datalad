@@ -39,7 +39,9 @@ def test_invalid_call(path):
 def test_dont_trip_over_missing_subds(path):
     ds1 = Dataset(opj(path, 'ds1')).create()
     ds2 = Dataset(opj(path, 'ds2')).create()
-    subds2 = ds1.install(source=ds2.path, path='subds2')
+    subds2 = ds1.install(
+        source=ds2.path, path='subds2',
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subds2.is_installed())
     assert_in('subds2', ds1.get_subdatasets())
     subds2.uninstall()

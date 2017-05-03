@@ -53,6 +53,7 @@ from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
+from datalad.support.constraints import Constraint
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
@@ -62,6 +63,7 @@ from datalad.support.param import Parameter
 from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
+from .base import merge_allargs2kwargs
 from .results import get_status_dict
 from .results import known_result_xfms
 
@@ -836,13 +838,16 @@ eval_params = dict(
     return_type=Parameter(
         doc="""return value behavior switch. If 'item-or-list' a single
         value is returned instead of a one-item return value list, or a
-        list in case of multiple return values.""",
+        list in case of multiple return values. `None` is return in case
+        of an empty list.""",
         constraints=EnsureChoice('generator', 'list', 'item-or-list')),
     result_filter=Parameter(
         doc="""if given, each to-be-returned
         status dictionary is passed to this callable, and is only
         returned if the callable's return value does not
-        evaluate to False or a ValueError exception is raised.""",
+        evaluate to False or a ValueError exception is raised. If the given
+        callable supports `**kwargs` it will additionally be passed the
+        keyword arguments of the original API call.""",
         constraints=EnsureCallable()),
     result_xfm=Parameter(
         doc="""if given, each to-be-returned result
@@ -856,7 +861,7 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('json', 'simple', 'tailored') | EnsureNone()),
+        constraints=EnsureChoice('default', 'json', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an
@@ -894,8 +899,9 @@ def eval_results(func):
     Result rendering/output can be triggered via the
     `datalad.api.result-renderer` configuration variable, or the
     `result_renderer` keyword argument of each decorated command. Supported
-    modes are: 'json' (one object per result, like git-annex), 'simple'
-    (status: path), 'tailored' custom output formatting provided by each command
+    modes are: 'default' (one line per result with action, status, path,
+    and an optional message); 'json' (one object per result, like git-annex),
+    'tailored' custom output formatting provided by each command
     class (if any).
 
     Error detection works by inspecting the `status` item of all result
@@ -969,6 +975,22 @@ def eval_results(func):
             incomplete_results = []
             # inspect and render
             result_filter = common_params['result_filter']
+            # wrap the filter into a helper to be able to pass additional arguments
+            # if the filter supports it, but at the same time keep the required interface
+            # as minimal as possible. Also do this here, in order to avoid this test
+            # to be performed for each return value
+            _result_filter = result_filter
+            if result_filter:
+                if isinstance(result_filter, Constraint):
+                    _result_filter = result_filter.__call__
+                if (PY2 and inspect.getargspec(_result_filter).keywords) or \
+                        (not PY2 and inspect.getfullargspec(_result_filter).varkw):
+                    # we need to produce a dict with argname/argvalue pairs for all args
+                    # incl. defaults and args given as positionals
+                    fullkwargs_ = merge_allargs2kwargs(wrapped, _args, _kwargs)
+
+                    def _result_filter(res):
+                        return result_filter(res, **fullkwargs_)
             result_renderer = common_params['result_renderer']
             result_xfm = common_params['result_xfm']
             if result_xfm in known_result_xfms:
@@ -977,16 +999,15 @@ def eval_results(func):
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
             for res in results:
-                ## log message
-                # use provided logger is possible, or ours if necessary
+                ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
                 # pollutes the output
-                res_lgr = res.pop('logger', lgr)
+                res_lgr = res.pop('logger', None)
                 if isinstance(res_lgr, logging.Logger):
                     # didn't get a particular log function, go with default
                     res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-                if 'message' in res:
+                if res_lgr and 'message' in res:
                     msg = res['message']
                     if isinstance(msg, tuple):
                         # support string expansion of logging to avoid runtime cost
@@ -1003,24 +1024,30 @@ def eval_results(func):
                         # first fail -> that's it
                         # raise will happen after the loop
                         break
-                if result_filter:
+                if _result_filter:
                     try:
-                        if not result_filter(res):
+                        if not _result_filter(res):
                             raise ValueError('excluded by filter')
                     except ValueError as e:
                         lgr.debug('not reporting result (%s)', exc_str(e))
                         continue
                 ## output rendering
-                if result_renderer == 'json':
+                if result_renderer == 'default':
+                    # TODO have a helper that can expand a result message
+                    print('{action}({status}): {path}{msg}'.format(
+                        action=res['action'],
+                        status=res['status'],
+                        path=relpath(res['path'],
+                                     res['refds']) if res.get('refds', None) else res['path'],
+                        msg=' [{}]'.format(
+                            res['message'][0] % res['message'][1:]
+                            if isinstance(res['message'], tuple) else res['message'])
+                        if 'message' in res else ''))
+                elif result_renderer == 'json':
                     print(json.dumps(
                         {k: v for k, v in res.items()
-                         if k not in ('message', 'logger')}))
-                elif result_renderer == 'simple':
-                    # simple output "STATUS: PATH"
-                    # where PATH is relative to a reference dataset, if one is reported in the result
-                    print('{status}: {path}'.format(
-                        status=res['status'],
-                        path=relpath(res['path'], res['refds']) if res.get('refds', None) else res['path']))
+                         if k not in ('message', 'logger')},
+                        sort_keys=True))
                 elif result_renderer == 'tailored':
                     if hasattr(_func_class, 'custom_result_renderer'):
                         _func_class.custom_result_renderer(res, **_kwargs)
@@ -1052,8 +1079,8 @@ def eval_results(func):
                     if hasattr(_func_class, 'custom_result_summary_renderer'):
                         _func_class.custom_result_summary_renderer(results)
                 if common_params['return_type'] == 'item-or-list' and \
-                        len(results) == 1:
-                    return results[0]
+                        len(results) < 2:
+                    return results[0] if results else None
                 else:
                     return results
 

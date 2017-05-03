@@ -27,7 +27,7 @@ from datalad.utils import swallow_logs
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.utils import _install_subds_inplace
+from datalad.distribution.add import _install_subds_inplace
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -420,3 +420,15 @@ def test_result_filter():
                 4,
                 result_filter=filt)[-1],
             {'path': 'some', 'status': 'ok', 'somekey': 2})
+
+    # test more sophisticated filters that actually get to see the
+    # API call's kwargs
+    def greatfilter(res, **kwargs):
+        assert_equal(kwargs.get('dataset', 'bob'), 'awesome')
+        return True
+    Test_Utils().__call__(4, dataset='awesome', result_filter=greatfilter)
+
+    def sadfilter(res, **kwargs):
+        assert_equal(kwargs.get('dataset', 'bob'), None)
+        return True
+    Test_Utils().__call__(4, result_filter=sadfilter)

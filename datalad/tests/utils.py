@@ -1065,7 +1065,10 @@ def dump_graph(graph, flatten=False):
     if flatten:
         from datalad.metadata import flatten_metadata_graph
         graph = flatten_metadata_graph(graph)
-    return dumps(graph, indent=1)
+    return dumps(
+        graph,
+        indent=1,
+        default=lambda x: 'non-serializable object skipped')
 
 
 # List of most obscure filenames which might or not be supported by different

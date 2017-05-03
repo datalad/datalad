@@ -14,8 +14,11 @@ from os import curdir
 from os.path import join as opj, basename
 from glob import glob
 
+from datalad.api import create
 from datalad.api import get
 from datalad.api import install
+from datalad.interface.results import only_matching_paths
+from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import RemoteNotAvailableError
@@ -55,6 +58,38 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
+@with_tempfile
+@with_tempfile
+def test_get_flexible_source_candidates_for_submodule(t, t2):
+    f = _get_flexible_source_candidates_for_submodule
+    # for now without mocking -- let's just really build a dataset
+    ds = create(t)
+    clone = install(
+        t2, source=t,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # first one could just know about itself or explicit url provided
+    sshurl = 'ssh://e.c'
+    httpurl = 'http://e.c'
+    # Expansion with '/.git' no longer done in this helper
+    #sm_httpurls = [httpurl, httpurl + '/.git']
+    sm_httpurls = [httpurl]
+    eq_(f(ds, 'sub'), [])
+    eq_(f(ds, 'sub', sshurl), [sshurl])
+    eq_(f(ds, 'sub', httpurl), sm_httpurls)
+    eq_(f(ds, 'sub', None), [])  # otherwise really we have no clue were to get from
+
+    # but if we work on dsclone then it should also add urls deduced from its
+    # own location default remote for current branch
+    eq_(f(clone, 'sub'), [t + '/sub'])
+    eq_(f(clone, 'sub', sshurl), [t + '/sub', sshurl])
+    eq_(f(clone, 'sub', httpurl), [t + '/sub'] + sm_httpurls)
+    eq_(f(clone, 'sub'), [t + '/sub'])  # otherwise really we have no clue were to get from
+    # TODO: check that http:// urls for the dataset itself get resolved
+
+    # TODO: many more!!
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
 def test_get_invalid_call(path, file_outside):
@@ -77,8 +112,7 @@ def test_get_invalid_call(path, file_outside):
     AnnexRepo(path, init=True, create=True)
     # call get again on a file in git:
     result = ds.get("some.txt")
-    # skipped silently, but no result for this file:
-    eq_(len(result), 0)
+    assert_status('notneeded', result)
 
     # invalid source:
     # yoh:  but now we would need to add it to annex since clever code first
@@ -132,7 +166,9 @@ def test_get_multiple_files(path, url, ds_dir):
     origin.add(file_list)
     origin.save("initial")
 
-    ds = install(ds_dir, source=path)
+    ds = install(
+        ds_dir, source=path,
+        result_xfm='datasets', return_type='item-or-list')
 
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))
@@ -141,7 +177,7 @@ def test_get_multiple_files(path, url, ds_dir):
     result = ds.get(['file1.txt', 'file2.txt', 'not_existing.txt'],
                     on_failure='ignore')
     assert_status('impossible', [result[0]])
-    assert_status('ok', result[1:])
+    assert_status(['ok', 'notneeded'], result[1:])
     # explicitly given not existing file was skipped:
     # (see test_get_invalid_call)
     eq_(set([basename(item.get('path')) for item in result[1:]]),
@@ -151,7 +187,7 @@ def test_get_multiple_files(path, url, ds_dir):
     # get all of them:
     result = ds.get(curdir)
     # there were two files left to get:
-    eq_(set([basename(item.get('path')) for item in result]),
+    eq_(set([basename(item.get('path')) for item in result if item['type'] == 'file']),
         {'file3.txt', 'file4.txt'})
     ok_(all(ds.repo.file_has_content(file_list)))
 
@@ -169,7 +205,9 @@ def test_get_recurse_dirs(o_path, c_path):
     origin = Dataset(o_path).create(force=True)
     origin.save("Initial", all_updated=True)
 
-    ds = install(c_path, source=o_path)
+    ds = install(
+        c_path, source=o_path,
+        result_xfm='datasets', return_type='item-or-list')
 
     file_list = ['file1.txt',
                  opj('subdir', 'file2.txt'),
@@ -184,9 +222,11 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # check result:
     assert_status('ok', result)
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result]),
+    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file']),
         set(files_in_sub))
-    eq_(len(result), len(files_in_sub))
+    # we also get one report on the subdir
+    eq_(len(result) - 1, len(files_in_sub))
 
     # got all files beneath subdir:
     ok_(all(ds.repo.file_has_content(files_in_sub)))
@@ -200,7 +240,9 @@ def test_get_recurse_dirs(o_path, c_path):
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src, path):
 
-    ds = install(path, source=src)
+    ds = install(
+        path, source=src,
+        result_xfm='datasets', return_type='item-or-list')
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
@@ -244,7 +286,9 @@ def test_get_recurse_subdatasets(src, path):
     result = ds.get(recursive=True, result_filter=lambda x: x.get('type') != 'dataset')
     assert_status('ok', result)
 
-    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result]), annexed_files)
+    eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
+             if item['type'] == 'file']),
+        annexed_files)
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
@@ -260,8 +304,10 @@ def test_get_recurse_subdatasets(src, path):
     # now, the very same call, but without recursive:
     result = ds.get('.', recursive=False)
     assert_status('ok', result)
-    eq_(len(result), 1)
-    eq_(result[0]['path'][len(ds.path) + 1:], 'test-annex.dat')
+    # one report is on the requested dir
+    eq_(len(result) - 1, 1)
+    assert_result_count(
+        result, 1, path=opj(ds.path, 'test-annex.dat'), status='ok')
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
@@ -271,7 +317,9 @@ def test_get_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_greedy_recurse_subdatasets(src, path):
 
-    ds = install(path, source=src)
+    ds = install(
+        path, source=src,
+        result_xfm='datasets', return_type='item-or-list')
 
     # GIMME EVERYTHING
     ds.get(['subm 1', 'subm 2'])
@@ -287,7 +335,9 @@ def test_get_greedy_recurse_subdatasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_install_missing_subdataset(src, path):
 
-    ds = install(path=path, source=src)
+    ds = install(
+        path=path, source=src,
+        result_xfm='datasets', return_type='item-or-list')
     ds.create(force=True)  # force, to cause dataset initialization
     subs = ds.subdatasets(result_xfm='datasets')
     ok_(all([not sub.is_installed() for sub in subs]))
@@ -325,15 +375,17 @@ def test_get_mixed_hierarchy(src, path):
     origin.save(all_updated=True)
 
     # now, install that thing:
-    ds, subds = install(path, source=src, recursive=True)
+    ds, subds = install(
+        path, source=src, recursive=True,
+        result_xfm='datasets', return_type='item-or-list', result_filter=None)
     ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
 
     # and get:
     result = ds.get(curdir, recursive=True)
     # git repo and subds
-    assert_status('notneeded', result[:-1])
-    assert_status('ok', [result[-1]])
-    eq_(result[-1]['path'], opj(subds.path, "file_in_annex.txt"))
+    assert_status(['ok', 'notneeded'], result)
+    assert_result_count(
+        result, 1, path=opj(subds.path, "file_in_annex.txt"), status='ok')
     ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
 
 
@@ -341,8 +393,12 @@ def test_get_mixed_hierarchy(src, path):
 @with_tempfile(mkdir=True)
 def test_autoresolve_multiple_datasets(src, path):
     with chpwd(path):
-        ds1 = install('ds1', source=src)
-        ds2 = install('ds2', source=src)
+        ds1 = install(
+            'ds1', source=src,
+            result_xfm='datasets', return_type='item-or-list')
+        ds2 = install(
+            'ds2', source=src,
+            result_xfm='datasets', return_type='item-or-list')
         results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
         # each ds has one file
         assert_result_count(results, 2, type='file', action='get', status='ok')
@@ -361,7 +417,9 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
         f.write('content')
     origin.save(recursive=True, all_updated=True)
 
-    ds = install(path, source=src)
+    ds = install(
+        path, source=src,
+        result_xfm='datasets', return_type='item-or-list')
     eq_(len(ds.subdatasets(fulfilled=True)), 0)
 
     results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
@@ -381,14 +439,18 @@ def test_recurse_existing(src, path):
 
     # make sure recursion_limit works as expected across a range of depths
     for depth in range(len(origin_ds)):
-        datasets = assure_list(
-            install(path, source=src, recursive=True, recursion_limit=depth))
+        # need to switch off default filter to get full hierarchy of datasets
+        datasets = install(
+            path, source=src, recursive=True, recursion_limit=depth,
+            result_xfm='datasets', return_type='list', result_filter=None)
         # we expect one dataset per level
         eq_(len(datasets), depth + 1)
         rmtree(path)
 
     # now install all but the last two levels, no data
-    root, sub1, sub2 = install(path, source=src, recursive=True, recursion_limit=2)
+    root, sub1, sub2 = install(
+        path, source=src, recursive=True, recursion_limit=2,
+        result_xfm='datasets', result_filter=None)
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
     sub3 = Dataset(opj(sub2.path, 'sub3'))
     ok_(not sub3.is_installed())
@@ -406,7 +468,7 @@ def test_recurse_existing(src, path):
     ok_(sub4.is_installed())
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
     # aaannd all data
-    files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok')
+    files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok' and x['type'] == 'file')
     eq_(len(files), 1)
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
 
@@ -415,10 +477,19 @@ def test_recurse_existing(src, path):
 @with_tempfile(mkdir=True)
 def test_get_in_unavailable_subdataset(src, path):
     _make_dataset_hierarchy(src)
-    root = install(path, source=src)
+    root = install(
+        path, source=src,
+        result_xfm='datasets', return_type='item-or-list')
     targetpath = opj('sub1', 'sub2')
     targetabspath = opj(root.path, targetpath)
-    get(targetabspath)
+    res = get(targetabspath)
+    assert_result_count(res, 2, status='ok', action='install', type='dataset')
+    # dry-fit result filter that only returns the result that matched the requested
+    # path
+    filtered = [r for r in res if only_matching_paths(r, path=targetabspath)]
+    assert_result_count(
+        filtered, 1, status='ok', action='install', type='dataset',
+        path=targetabspath)
     # we got the dataset, and its immediate content, but nothing below
     sub2 = Dataset(targetabspath)
     ok_(sub2.is_installed())

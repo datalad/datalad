@@ -20,6 +20,7 @@ import re
 import textwrap
 from os.path import curdir
 import inspect
+from collections import OrderedDict
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -313,7 +314,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Get', 'Clone', 'Subdatasets'):
+        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Get', 'Clone', 'Subdatasets', 'Install'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -471,3 +472,23 @@ def report_result_objects(cls, res, args, passive):
         else:
             msg += "File: %s\n" % item
     ui.message(msg)
+
+
+def merge_allargs2kwargs(call, args, kwargs):
+    """Generate a kwargs dict from a call signature and *args, **kwargs"""
+    from inspect import getargspec
+    argspec = getargspec(call)
+    defaults = argspec.defaults
+    nargs = len(argspec.args)
+    assert (nargs >= len(defaults))
+    # map any args to their name
+    argmap = list(zip(argspec.args[:len(args)], args))
+    kwargs_ = OrderedDict(argmap)
+    # map defaults of kwargs to their names (update below)
+    for k, v in zip(argspec.args[-len(defaults):], defaults):
+        if k not in kwargs_:
+            kwargs_[k] = v
+    # update with provided kwarg args
+    kwargs_.update(kwargs)
+    assert (nargs == len(kwargs_))
+    return kwargs_

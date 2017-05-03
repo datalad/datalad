@@ -165,7 +165,7 @@ def test_uninstall_git_file(path):
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
 
-    ds = install(dst, source=src, recursive=True)[0]
+    ds = install(dst, source=src, recursive=True)
     ok_(ds.is_installed())
     known_subdss = ds.get_subdatasets()
     for subds_path in ds.get_subdatasets():
