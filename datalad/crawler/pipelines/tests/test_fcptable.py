@@ -79,6 +79,8 @@ def _test_dataset(dataset, error, create, skip, tmpdir):
 
 
 def test_dataset():
+    raise SkipTest('Bring back when NITRC is back (gh-1472)')
+
     skip_if_url_is_not_available(TOPURL, regex='service provider outage')
     yield _test_dataset, 'Baltimore', None, False, False
     yield _test_dataset, 'AnnArbor_b', None, False, False
