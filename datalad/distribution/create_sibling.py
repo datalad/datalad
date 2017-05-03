@@ -665,14 +665,22 @@ class CreateSibling(Interface):
 
 git update-server-info
 
-# (Re)generate meta-data for DataLad Web UI
+#
+# DataLad
+#
+# (Re)generate meta-data for DataLad Web UI and possibly init new submodules
 dsdir={path}
+logfile=$dsdir/{WEB_META_LOG}/{log_filename}
+
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
   && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file "$dsdir"; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
-) &> "$dsdir/{WEB_META_LOG}/{log_filename}"
+) &> "$logfile"
+
+# Some submodules might have been added and thus we better init them
+( cd ..; git submodule update --init >> "$logfile" 2>&1 || : ; )
 '''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:
