@@ -1,6 +1,8 @@
 /* global window XMLHttpRequest */
 var metadataDir = '.git/datalad/metadata/';
 var ntCache = {};   // node_path: type cache[dictionary]
+var stored = localStorage['ntCache'];
+if (stored) ntCache = JSON.parse(stored);
 
 /**
  * check if url exists
@@ -10,6 +12,7 @@ var ntCache = {};   // node_path: type cache[dictionary]
 function urlExists(url) {
   var http = new XMLHttpRequest();
   try {
+    // TODO: sync open seems to be deprecated.
     http.open('HEAD', url, false);
     http.send();
   } catch (err) {
@@ -140,7 +143,7 @@ function uri2installri() {
 
   if (has_cached(dir, "type")
       && ((ntCache[dir].type == 'git') || (ntCache[dir].type == 'annex'))) {
-    ri = topurl + dir
+      ri = topurl + dir
   }
   else {
       // poor Yarik knows no JS
@@ -224,7 +227,8 @@ function clickHandler(data, url) {
 function metadataLocator(md5, parent, nodeurl) {
   // if path argument set, find metadata file wrt node at path directory
   var nodepath = typeof nodeurl !== 'undefined' ? nodeurl : loc().href;
-  var startLoc = absoluteUrl(getParameterByName('dir', nodepath))
+  var startLoc = absoluteUrl(
+                        getParameterByName('dir', nodepath))
                     .replace(/\/+$/, '/');
 
   if (startLoc === '/' && parent) return "";
@@ -235,7 +239,7 @@ function metadataLocator(md5, parent, nodeurl) {
   startLoc = startLoc.replace(/\/+$/, '');
   var currentDs = startLoc;
 
-  if (has_cached(currentDs, "metadata_path")) return get_cached(currentDs, "metadata_path");
+  if (has_cached(startLoc, "metadata_path")) return get_cached(currentDs, "metadata_path");
   // traverse up directory tree till a dataset directory found
   // check by testing if current directory has a metadata directory
   while (!urlExists(currentDs + "/" + metadataDir)) {
@@ -262,7 +266,7 @@ function metadataLocator(md5, parent, nodeurl) {
   }
   // TODO: add caching of information as well -- otherwise we are redoing
   //       the same discovery over again
-  return set_cached(currentDs, "metadata_path", metadataPath);
+  return set_cached(startLoc, "metadata_path", metadataPath);
 }
 
 /**
@@ -296,7 +300,8 @@ function nodeJson(jQuery, md5, parent, top, nodeurl) {
                          path: data.path || '-',
                          type: data.type || 'dir',
                          description: data.description || '',
-                         size: sizeRenderer(data.size || null)} : data;
+                         size: sizeRenderer(data.size || null)}
+                      : data;
     }
   });
 
@@ -405,8 +410,6 @@ function getNodeType(jQuery, md5, url) {
  */
 function directory(jQuery, md5) {
   var parent = false;
-  var stored = localStorage['ntCache'];
-  if (stored) ntCache = JSON.parse(stored);
   var md5Url = metadataLocator(md5);
 
   if (md5Url === "") {
@@ -523,3 +526,14 @@ function directory(jQuery, md5) {
   localStorage['ntCache'] = JSON.stringify(ntCache);
   return table;
 }
+
+/* triggers also when just opening a page... wanted to clear it upon forced
+   refresh only
+
+function clearCache() {
+    localStorage['ntCache'] = '';
+    urlExists('http://localhost:8081/CLEARED')
+}
+
+window.addEventListener('beforeunload', clearCache, false);
+*/
