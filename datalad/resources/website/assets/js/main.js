@@ -229,17 +229,18 @@ function metadataLocator(md5, parent, nodeurl) {
   var nodepath = typeof nodeurl !== 'undefined' ? nodeurl : loc().href;
   var startLoc = absoluteUrl(
                         getParameterByName('dir', nodepath))
-                    .replace(/\/+$/, '/');
+                    .replace(/\/+$/, '');
 
-  if (startLoc === '/' && parent) return "";
+  if (startLoc === '' && parent) return "";
 
   // if parent argument set, find metadata file of parent directory instead
   var findParentDs = typeof parent !== 'undefined' ? parent : false;
   startLoc = findParentDs ? parentUrl(startLoc) : startLoc;
   startLoc = startLoc.replace(/\/+$/, '');
   var currentDs = startLoc;
-
-  if (has_cached(startLoc, "metadata_path")) return get_cached(currentDs, "metadata_path");
+  var cacheKey = (findParentDs ? "PARENT" : "") + startLoc;
+  // urlExists("http://localhost:8081/CHECK" + cacheKey)
+  if (has_cached(cacheKey, "metadata_path")) return get_cached(cacheKey, "metadata_path");
   // traverse up directory tree till a dataset directory found
   // check by testing if current directory has a metadata directory
   while (!urlExists(currentDs + "/" + metadataDir)) {
@@ -264,9 +265,7 @@ function metadataLocator(md5, parent, nodeurl) {
         .replace(/\/+$/, '');                       // replace ending /'s with /
     metadataPath = currentDs + "/" + metadataDir + md5(metadataPath);
   }
-  // TODO: add caching of information as well -- otherwise we are redoing
-  //       the same discovery over again
-  return set_cached(startLoc, "metadata_path", metadataPath);
+  return set_cached(cacheKey, "metadata_path", metadataPath);
 }
 
 /**
