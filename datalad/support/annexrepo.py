@@ -1186,7 +1186,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
-                        batch=False, git_options=None, annex_options=None):
+                        batch=False, git_options=None, annex_options=None,
+                        unlink_existing=False):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -1206,6 +1207,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             initiate or continue with a batched run of annex addurl, instead of just
             calling a single git annex addurl command
 
+        unlink_existing: bool, optional
+            by default crashes if file already exists and is under git.
+            With this flag set to True would first remove it.
+
         Returns
         -------
         dict
@@ -1222,6 +1227,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
         git_options = []
         kwargs = dict(backend=backend)
+        if lexists(opj(self.path, file_)) and \
+                unlink_existing and \
+                not self.is_under_annex(file_):
+            # already under git, we can't addurl for under annex
+            lgr.warning(
+                "File %s:%s is already under git, removing so it could possibly"
+                " be added under annex", self, file_
+            )
+            os.unlink(opj(self.path, file_))
         if not batch:
             self._run_annex_command('addurl',
                                     annex_options=options + ['--file=%s' % file_] + [url],
@@ -1560,11 +1574,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         if batch:
             lgr.warning("TODO: --batch mode for whereis.  Operating serially")
 
+        OUTPUTS = {'descriptions', 'uuids', 'full'}
+        if output not in OUTPUTS:
+            raise ValueError(
+                "Unknown value output=%r. Known are %s"
+                % (output, ', '.join(map(repr, OUTPUTS)))
+            )
+
         options = assure_list(options, copy=True)
         options += ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
-
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
@@ -1575,9 +1595,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             # same so we could just reuse them instead of brewing copies
             return {j['key' if (key or '--all' in options) else 'file']:
                         self._whereis_json_to_dict(j)
-                    for j in json_objects}
-        else:
-            raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
+                    for j in json_objects
+                    if not j.get('key').endswith('.this-is-a-test-key')}
 
     # TODO:
     # I think we should make interface cleaner and less ambigious for those annex
