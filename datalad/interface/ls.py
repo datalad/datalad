@@ -658,7 +658,6 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
       does not traverse into annex, git or hidden directories
     """
     fs = fs_extract(path, repo, basepath=basepath or path)
-
     if isdir(path):                     # if node is a directory
         children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
         # ATM seems some pieces still rely on having this duplication, so left as is
@@ -779,7 +778,8 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
             if exists(subds_json):
                 with open(subds_json) as data_file:
                     subfs = js.load(data_file)
-                    subfs.pop('nodes', None)
+                    subfs.pop('nodes', None)    # remove children
+                    subfs['path'] = subds_rpath # reassign the path
                     size_list.append(subfs['size'])
             else:
                 # the same drill as if not installed

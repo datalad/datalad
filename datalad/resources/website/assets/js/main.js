@@ -326,7 +326,7 @@ function getNodeType(jQuery, md5, url) {
   if (relUrl in ntCache)
     return ntCache[relUrl].type;
 
-  // else get metadata json of node if no json object explictly passed
+  // else get metadata json of node if no json object explicitly passed
   var temp = nodeJson(jQuery, md5, false, false, url);
   var metaJson = temp.js;
   var dsLoc = temp.ds;
@@ -350,9 +350,11 @@ function getNodeType(jQuery, md5, url) {
     metaJson.nodes.forEach(function(child) {
       var childRelUrl = child.path !== '.' ? (dsLoc + '/' + child.path).replace(/\/\//, '/') : dsLoc;
       if (!(childRelUrl in ntCache))
+        childRelUrl = childRelUrl.replace(/\/+$/, "");  // strip trailing /
         ntCache[childRelUrl] = {type: child.type};
     });
   }
+  if ("type" in metaJson) return metaJson.type;
   return (relUrl in ntCache) ? ntCache[relUrl].type : "dir";
 }
 
