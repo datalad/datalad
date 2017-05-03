@@ -512,7 +512,8 @@ function directory(jQuery, md5) {
       api.$('tr').click(function() {
         var traverse = clickHandler(api.row(this).data());
         if (traverse.type === 'assign')
-          window.location.assign(traverse.next);
+          // window.location.assign(traverse.next);
+          window.location.href = traverse.next;
         else if (traverse.type === 'search')
           window.location.search = traverse.next;
       });
