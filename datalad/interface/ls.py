@@ -552,7 +552,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
     dir_path = relpath(path, ds_path) if isabs(path) else path
-    # normalize to /
+    # normalize to / -- TODO, switch to '.' which is now actually the name since path is relative in web meta?
     if dir_path in ('.', None, ''):
         dir_path = '/'
     # create md5 hash of current directory's relative path
@@ -587,7 +587,19 @@ def fs_extract(nodepath, repo, basepath='/'):
     # we include it
     metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
     if exists(metadata_path):
-        rec["metadata"] = js.load(open(metadata_path))
+        # might need flattening!  TODO: flatten when aggregating?  why wasn't done?
+        metadata = js.load(open(metadata_path))
+        # might be too heavy to carry around, so will do basic flattening manually
+        # and in a basic fashion
+        # import jsonld
+        metadata_reduced = metadata[0]
+        for m in metadata[1:]:
+            metadata_reduced.update(m)
+        # but verify that they all had the same id
+        if metadata:
+            metaid = metadata[0]['@id']
+            assert all(m['@id'] == metaid for m in metadata)
+        rec["metadata"] = metadata_reduced
     return rec
 
 
@@ -658,9 +670,12 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
             if not ignored(nodepath):
                 # if recursive, create info dictionary of each child node too
                 if recursive:
-                    subdir = fs_traverse(nodepath, repo,
+                    subdir = fs_traverse(nodepath,
+                                         repo,
                                          parent=None,  # children[0],
-                                         recursive=recursive, json=json, basepath=basepath or path)
+                                         recursive=recursive,
+                                         json=json,
+                                         basepath=basepath or path)
                 else:
                     # read child metadata from its metadata file if it exists
                     subdir_json = metadata_locator(path=node, ds_path=basepath or path)
@@ -729,11 +744,11 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
     # (recursively) traverse each subdataset
     children = []
-    for subds_path in rootds.get_subdatasets():
+    for subds_rpath in rootds.get_subdatasets():
 
-        subds_path = opj(rootds.path, subds_path)
+        subds_path = opj(rootds.path, subds_rpath)
         subds = Dataset(subds_path)
-        subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+        subds_json = metadata_locator(path='.', ds_path=subds_path)
 
         def handle_not_installed():
             # for now just traverse as fs
@@ -745,7 +760,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
             # TODO:  this is inefficient and cruel -- "ignored" should be made
             # smarted to ignore submodules for the repo
             if fs['nodes']:
-                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_path]
+                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_rpath]
             return subfs
 
         if not subds.is_installed():

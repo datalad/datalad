@@ -416,7 +416,8 @@ function directory(jQuery, md5) {
        render: function(data) {
          var meta = data.metadata;
          if (!meta) return '';
-         var desc = meta[0].name;
+         var desc = meta.title;
+         if (!desc) desc = meta.name;
          return desc ? desc : '';
        }},
       {data: "type", title: "Type", className: "dt-center", visible: false},
