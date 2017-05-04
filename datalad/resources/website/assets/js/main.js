@@ -238,7 +238,7 @@ function metadataLocator(md5, parent, nodeurl) {
   startLoc = findParentDs ? parentUrl(startLoc) : startLoc;
   startLoc = startLoc.replace(/\/+$/, '');
   var currentDs = startLoc;
-  var cacheKey = (findParentDs ? "PARENT" : "") + startLoc;
+  var cacheKey = (findParentDs ? "%PARENT%" : "") + startLoc;
   // urlExists("http://localhost:8081/CHECK" + cacheKey)
   if (has_cached(cacheKey, "metadata_path")) return get_cached(cacheKey, "metadata_path");
   // traverse up directory tree till a dataset directory found
@@ -392,8 +392,8 @@ function getNodeType(jQuery, md5, url) {
   if ("nodes" in metaJson) {
     metaJson.nodes.forEach(function(child) {
       var childRelUrl = child.path !== '.' ? (dsLoc + '/' + child.path).replace(/\/\//, '/') : dsLoc;
+      childRelUrl = childRelUrl.replace(/\/+$/, "");  // strip trailing /
       if (!(childRelUrl in ntCache))
-        childRelUrl = childRelUrl.replace(/\/+$/, "");  // strip trailing /
         set_cached(childRelUrl, "type", child.type);
     });
   }
