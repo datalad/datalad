@@ -668,7 +668,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
             # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
             if not ignored(nodepath):
-                # if recursive, create info dictionary of each child node too
+                # if recursive, create info dictionary (within) each child node too
                 if recursive:
                     subdir = fs_traverse(nodepath,
                                          repo,
@@ -676,6 +676,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                                          recursive=recursive,
                                          json=json,
                                          basepath=basepath or path)
+                    subdir.pop('nodes', None)
                 else:
                     # read child metadata from its metadata file if it exists
                     subdir_json = metadata_locator(path=node, ds_path=basepath or path)
@@ -685,7 +686,10 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                             subdir.pop('nodes', None)
                     # else extract whatever information you can about the child
                     else:
-                        subdir = fs_extract(nodepath, repo, basepath=basepath or path)
+                        # Yarik: this one is way too lean...
+                        subdir = fs_extract(nodepath,
+                                            repo,
+                                            basepath=basepath or path)
                 # append child metadata to list
                 children.extend([subdir])
 
@@ -694,6 +698,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
         for node in children[1:]:
             for size_type, child_size in node['size'].items():
                 children_size[size_type] = children_size.get(size_type, 0) + machinesize(child_size)
+
         # update current node sizes to the humanized aggregate children size
         fs['size'] = children[0]['size'] = \
             {size_type: humanize.naturalsize(child_size)
