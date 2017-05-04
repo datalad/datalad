@@ -29,6 +29,8 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import SkipTest
@@ -45,14 +47,20 @@ def test_add_insufficient_args(path):
     # no `path`, no `source`:
     assert_raises(InsufficientArgumentsError, add, dataset=path)
     with chpwd(path):
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            assert_raises(InsufficientArgumentsError, add, path="some")
-            assert_in('ignoring non-existent', cml.out)
-
-    ds = Dataset(path)
+        res = add(path="some", on_failure='ignore')
+        assert_status('impossible', res)
+    ds = Dataset(opj(path, 'ds'))
     ds.create()
-    assert_raises(InsufficientArgumentsError, ds.add,
-                  opj(pardir, 'path', 'outside'))
+    # non-existing path outside
+    assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
+    # existing path outside
+    with open(opj(path, 'outside'), 'w') as f:
+        f.write('doesnt matter')
+    # should be
+    #assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
+    # but actually is
+    # RF Interface._prep() in some way, not sure how yet
+    assert_raises(ValueError, ds.add, opj(path, 'outside'), on_failure='ignore')
 
 
 tree_arg = dict(tree={'test.txt': 'some',
@@ -129,16 +137,20 @@ def test_add_recursive(path):
     # for that effect ATM)
     added1 = ds.add(opj('dir', 'testindir'), jobs=2)
     # added to annex, so annex output record
-    eq_(added1, [{'file': opj(ds.path, 'dir', 'testindir'), 'command': 'add',
-                  'key': 'MD5E-s9--3f0f870d18d6ba60a79d9463ff3827ea',
-                  'success': True}])
+    assert_result_count(
+        added1, 1,
+        path=opj(ds.path, 'dir', 'testindir'), action='add',
+        annexkey='MD5E-s9--3f0f870d18d6ba60a79d9463ff3827ea',
+        status='ok')
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
 
     added2 = ds.add('dir', to_git=True)
     # added to git, so parsed git output record
-    eq_(added2, [{'file': opj(ds.path, 'dir', 'testindir2'), 'command': u'add',
-                  'note': u'non-large file; adding content to git repository',
-                  'success': True}])
+    assert_result_count(
+        added2, 1,
+        path=opj(ds.path, 'dir', 'testindir2'), action='add',
+        message='non-large file; adding content to git repository',
+        status='ok')
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
 
     # We used to fail to add to pure git repository, but now it should all be
@@ -147,14 +159,21 @@ def test_add_recursive(path):
     with open(opj(subds.path, 'somefile.txt'), "w") as f:
         f.write("bla bla")
     result = ds.add(opj('git-sub', 'somefile.txt'), to_git=False)
-    eq_(result, [{'file': opj(subds.path, 'somefile.txt'), 'success': True}])
+    # adds the file
+    assert_result_count(
+        result, 1,
+        action='add', path=opj(subds.path, 'somefile.txt'), status='ok')
+    # but also saves both datasets
+    assert_result_count(
+        result, 2,
+        action='save', status='ok', type='dataset')
 
 
 @with_tree(**tree_arg)
 def test_relpath_add(path):
     ds = Dataset(path).create(force=True)
     with chpwd(opj(path, 'dir')):
-        eq_(add('testindir')[0]['file'],
+        eq_(add('testindir')[0]['path'],
             opj(ds.path, 'dir', 'testindir'))
         # and now add all
         add('..')

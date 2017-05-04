@@ -26,8 +26,13 @@ from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
+from datalad.interface.results import annexjson2result
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import _discover_trace_to_known
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
 from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -35,6 +40,7 @@ from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import CommandError
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
@@ -44,14 +50,6 @@ from .dataset import Dataset
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.add')
-
-
-def _install_subds_inplace(ds, path, relativepath, name=None, url=None):
-    """Register an existing repository in the repo tree as a submodule"""
-    ds.repo.add_submodule(relativepath, url=url, name=name)
-    _fixup_submodule_dotgit_setup(ds, relativepath)
-    # return newly added submodule as a dataset
-    return Dataset(path)
 
 
 def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
@@ -78,6 +76,7 @@ def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
         _discover_subdatasets_recursively(path, trace, spec, recursion_limit)
 
 
+@build_doc
 class Add(Interface):
     """Add files/directories to an existing dataset.
 
@@ -148,6 +147,7 @@ class Add(Interface):
 
     @staticmethod
     @datasetmethod(name='add')
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -172,9 +172,15 @@ class Add(Interface):
             path=path,
             dataset=dataset,
             recursive=False)
-        if unavailable_paths:
-            lgr.warning("ignoring non-existent path(s): %s",
-                        unavailable_paths)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        common_report = dict(action='add', logger=lgr, refds=refds_path)
+        # we cannot possibly `add` these
+        for r in results_from_paths(
+                unavailable_paths, status='impossible',
+                message="path does not exist: %s",
+                **common_report):
+            yield r
+
         if recursive:
             # with --recursive for each input path traverse the directory
             # tree, when we find a dataset, add it to the spec, AND add it as
@@ -182,6 +188,7 @@ class Add(Interface):
             # MIH: wrap in list() to avoid exception, because dict size might
             # change, but we want to loop over all that are in at the start
             # only
+            # NOTE no results are generated in this loop, just discovery
             for d in list(content_by_ds.keys()):
                 for p in content_by_ds[d]:
                     _discover_subdatasets_recursively(
@@ -191,8 +198,9 @@ class Add(Interface):
                         recursion_limit)
 
         if not content_by_ds:
-            raise InsufficientArgumentsError(
-                "non-existing paths given to add")
+            # we should have complained about any inappropriate path argument
+            # above, so if nothing is left, we can simply exit
+            return
 
         if dataset:
             # remeber the datasets associated with actual inputs
@@ -209,7 +217,7 @@ class Add(Interface):
                 # saving any staged content in the final step
                 content_by_ds = {d: v for d, v in content_by_ds.items() if v}
 
-        results = []
+        save_needed = False
         # simple loop over datasets -- save happens later
         # start deep down
         for ds_path in sorted(content_by_ds, reverse=True):
@@ -228,24 +236,30 @@ class Add(Interface):
                 # to operate on it otherwise, or we would get a bastard
                 # submodule that cripples git operations
                 if not subds.repo.get_hexsha():
-                    # TODO generator: tuen into 'impossible' result
-                    lgr.warn('Ignoring subdataset %s with no commits', subds)
+                    yield get_status_dict(
+                        ds=subds, status='impossible',
+                        message='cannot add subdataset with no commits',
+                        **common_report)
                     continue
+                subds_relpath = relpath(subds_path, ds_path)
                 # make an attempt to configure a submodule source URL based on the
                 # discovered remote configuration
                 remote, branch = subds.repo.get_tracking_branch()
                 subds_url = subds.repo.get_remote_url(remote) if remote else None
-                _install_subds_inplace(
-                    ds=ds,
-                    path=subds_path,
-                    relativepath=relpath(subds_path, ds_path),
-                    url=subds_url)
+                # Register the repository in the repo tree as a submodule
+                try:
+                    ds.repo.add_submodule(subds_relpath, url=subds_url, name=None)
+                except CommandError as e:
+                    yield get_status_dict(
+                        ds=subds, status='error', message=e.stderr,
+                        **common_report)
+                    continue
+                _fixup_submodule_dotgit_setup(ds, subds_relpath)
+                # report added subdatasets -- `annex add` below won't do it
+                yield get_status_dict(ds=subds, status='ok', **common_report)
                 # make sure that .gitmodules is added to the list of files
                 toadd.append(opj(ds.path, '.gitmodules'))
-                # report added subdatasets -- add below won't do it
-                results.append({
-                    'success': True,
-                    'file': Dataset(subds_path)})
+                save_needed = save
             # make sure any last minute additions make it to the saving stage
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
@@ -255,40 +269,19 @@ class Add(Interface):
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
                 commit=False)
             for a in added:
-                a['file'] = opj(ds_path, a['file'])
-            results.extend(added)
+                if a['file'] == '.gitmodules':
+                    # filter out .gitmodules, because this is only included for
+                    # technical reasons and has nothing to do with the actual content
+                    continue
+                yield annexjson2result(a, ds, type_='file', **common_report)
+                save_needed = save
 
-        if results and save:
-            # TODO GENERATOR
+        if save_needed:
             # new returns a generator and yields status dicts
             # pass through as embedded results
             # OPT: tries to save even unrelated stuff
-            list(save_dataset_hierarchy(
-                content_by_ds,
-                base=dataset.path if dataset and dataset.is_installed() else None,
-                message=message if message else '[DATALAD] added content'))
-
-        return results
-
-    @staticmethod
-    def result_renderer_cmdline(res, args):
-        from datalad.ui import ui
-        from os import linesep
-        if res is None:
-            res = []
-        if not isinstance(res, list):
-            res = [res]
-        if not len(res):
-            ui.message("Nothing was added{}".format(
-                       '' if args.recursive else
-                       " (consider --recursive if that is unexpected)"))
-            return
-
-        msg = linesep.join([
-            "{suc} {path}".format(
-                suc="Added" if item.get('success', False)
-                    else "Failed to add. (%s)" % item.get('note',
-                                                          'unknown reason'),
-                path=item.get('file'))
-            for item in res])
-        ui.message(msg)
+            for res in save_dataset_hierarchy(
+                    content_by_ds,
+                    base=dataset.path if dataset and dataset.is_installed() else None,
+                    message=message if message else '[DATALAD] added content'):
+                yield res

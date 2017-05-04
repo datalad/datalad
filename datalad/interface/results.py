@@ -194,6 +194,8 @@ def annexjson2result(d, ds, **kwargs):
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
+    if 'note' in d:
+        res['message'] = d['note']
     return res
 
 

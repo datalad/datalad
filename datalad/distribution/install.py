@@ -44,6 +44,7 @@ from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
+from datalad.tests.utils import assert_result_count
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -343,14 +344,20 @@ class Install(Interface):
             # the very top, otherwise we are not able to order a global
             # "ignore-and-keep-going"
             result_xfm=None,
+            return_type='generator',
+            result_filter=None,
             on_failure='ignore')
-        # make sure logic below is valid, only one dataset result is coming back
-        assert(len(res) == 1)
-        yield res[0]
-
         # helper
         as_ds = YieldDatasets()
-        destination_dataset = as_ds(res[0])
+        destination_dataset = None
+        for r in res:
+            if r['action'] == 'install' and r['type'] == 'dataset':
+                # make sure logic below is valid, only one dataset result is
+                # coming back
+                assert(destination_dataset is None)
+                destination_dataset = as_ds(r)
+            yield r
+        assert(destination_dataset)
 
         # Now, recursive calls:
         if recursive or get_data:

@@ -27,7 +27,6 @@ from datalad.utils import swallow_logs
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.add import _install_subds_inplace
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone

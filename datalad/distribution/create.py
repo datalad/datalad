@@ -290,7 +290,13 @@ class Create(Interface):
         if save and dataset is not None and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            dataset.add(tbds.path, save=save, ds2super=True)
+            for r in dataset.add(
+                    tbds.path, save=save, ds2super=True,
+                    return_type='generator',
+                    result_filter=None,
+                    result_xfm=None,
+                    on_failure='ignore'):
+                yield r
 
         yield get_status_dict(
             action='create',

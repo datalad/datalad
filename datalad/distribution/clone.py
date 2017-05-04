@@ -29,6 +29,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureKeyChoice
 from datalad.support.param import Parameter
 from datalad.support.network import get_local_file_url
 from datalad.dochelpers import exc_str
@@ -69,6 +70,9 @@ class Clone(Interface):
     alternative access URL for common cases (such as appending '.git' to the
     URL in case the accessing the base URL failed).
     """
+    # by default ignore everything but install results
+    # i.e. no "add to super dataset"
+    result_filter = EnsureKeyChoice('action', ('install',))
 
     _params_ = dict(
         dataset=Parameter(
@@ -230,8 +234,13 @@ class Clone(Interface):
         if dataset is not None:
             # we created a dataset in another dataset
             # -> make submodule
-            # TODO generator: yield when `add` is converted
-            dataset.add(dest_path, save=True, ds2super=True)
+            for r in dataset.add(
+                    dest_path, save=True, ds2super=True,
+                    return_type='generator',
+                    result_filter=None,
+                    result_xfm=None,
+                    on_failure='ignore'):
+                yield r
 
         _handle_possible_annex_dataset(
             destination_dataset,
