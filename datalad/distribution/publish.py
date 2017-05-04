@@ -100,17 +100,16 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                 remote=remote,
                 options=annex_copy_options_
             )
-            if ds.submodules:
-                # NOTE: we might need to init them on the remote, but needs to
-                #  be done only if remote is sshurl and it is not bare there
-                #  (which I think we do not even support ATM)...
-                #  or we could do that in the hook, as it is done for now
-                #  (see create_sibling.py)
-                #
-                pass
+            # if ds.submodules:
+            #     # NOTE: we might need to init them on the remote, but needs to
+            #     #  be done only if remote is sshurl and it is not bare there
+            #     #  (which I think we do not even support ATM)...
+            #     #  or we could do that in the hook, as it is done for now
+            #     #  (see create_sibling.py)
+            #     #
+            #     pass
 
             # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
-            #     print "HERE"
             #     # there were changes which should be pushed
             #     lgr.debug(
             #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
