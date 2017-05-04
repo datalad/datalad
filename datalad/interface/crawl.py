@@ -147,6 +147,8 @@ class Crawl(Interface):
                 # into the subdatasets' crawl.  We will collect all of them here so we might later
                 # also introduce automatic commits when super-dataset got successfully updated
                 subdatasets = Dataset(os.curdir).get_subdatasets(recursive=recursive)
+                if len(subdatasets):
+                    assert Dataset(os.curdir).is_installed()
 
                 lgr.info("Crawling %d subdatasets", len(subdatasets))
                 output = [output]
