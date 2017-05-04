@@ -715,7 +715,7 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
             with open(js_file) as asset:
                 try:
                     from jsmin import jsmin
-                    jsmin = lambda x: x   # no minimization
+                    # jsmin = lambda x: x   # no minimization
                     minified = jsmin(asset.read())                      # minify asset
                 except ImportError:
                     lgr.warning(
