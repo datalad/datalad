@@ -299,8 +299,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
     **kwargs
       Any further kwargs are included in the yielded result dictionary.
     """
-    while requested_paths:
-        p = requested_paths.pop()
+    for p in requested_paths:
         # any relpath is relative to the currently processed dataset
         # not the global reference dataset
         p = p if isabs(p) else normpath(opj(ds.path, p))
