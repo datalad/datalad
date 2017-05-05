@@ -756,7 +756,9 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
+    def add(self, files, commit=False, msg=None, git=True,
+            updates=False,
+            git_options=None, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -778,13 +780,16 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
         out = []
+        git_options = assure_list(git_options)
+        if updates:
+            git_options += ['--update']
 
-        if files:
+        if files or updates:
             try:
                 # without --verbose git 2.9.3  add does not return anything
                 add_out = self._git_custom_command(
                     files,
-                    ['git', 'add'] + assure_list(git_options) + ['--verbose']
+                    ['git', 'add'] + git_options + ['--verbose']
                 )
                 # get all the entries
                 out = self._process_git_get_output(*add_out)
@@ -811,7 +816,7 @@ class GitRepo(RepoInterface):
                 raise
 
         else:
-            lgr.warning("add was called with empty file list.")
+            lgr.warning("add was called with empty file list and no updates.")
 
         if commit:
             if msg is None:

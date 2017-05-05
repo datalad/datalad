@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 from os.path import join as opj
 from datalad.utils import chpwd
 
@@ -112,7 +113,10 @@ def test_recursive_save(path):
     with open(newfile_name, 'w') as f:
         f.write('some')
     # saves the status change of the subdataset due to the subsubdataset addition
-    assert_equal(ds.save(all_updated=True), [ds])
+
+    res = ds.save(all_updated=True)
+    assert ds.repo.dirty
+    #assert_equal(res, [ds])
 
     # make the new file known to its dataset
     # with #1141 this would be
@@ -125,7 +129,8 @@ def test_recursive_save(path):
     assert_equal(ds.save(all_updated=True), [])
     assert ds.repo.dirty
     # with recursive pick up the change in subsubds
-    assert_equal(ds.save(all_updated=True, recursive=True), [subsubds, subds, ds])
+    res = ds.save(all_updated=True, recursive=True)
+    assert_equal(res, [subsubds, subds, ds])
     # modify content in subsub and try saving
     testfname = newfile_name
     subsubds.unlock(testfname)
@@ -142,32 +147,54 @@ def test_recursive_save(path):
     assert_equal(ds.save(recursive=True), [subds, ds])
     # there is nothing else to save
     assert_false(ds.save(all_updated=True, recursive=True))
-    # one more time and check that all datasets in the hierarchy get updated
+
+    # one more time and check that nothing is saved/updated if we
+    # just added a file underneath somewhere
     states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     testfname = opj('sub', 'subsub', 'saveme2')
     with open(opj(ds.path, testfname), 'w') as f:
         f.write('I am in here!')
-    assert_true(ds.save(all_updated=True, recursive=True))
+    res = ds.save(all_updated=True, recursive=True)
+    assert_false(res)  # nothing should be saved
     newstates = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
-    for old, new in zip(states, newstates):
-        assert_not_equal(old, new)
-    # now let's check saving "upwards"
+    assert_equal(states, newstates)
+
+    os.unlink(opj(ds.path, testfname))
     assert not subds.repo.dirty
+
+    # now let's check saving "upwards"
     create_tree(subds.path, {"testnew": 'smth', "testadded": "added"})
     subds.repo.add("testadded")
     indexed_files = subds.repo.get_indexed_files()
     assert subds.repo.dirty
     assert ds.repo.dirty
 
-    assert not subsubds.repo.dirty
+    ok_clean_git(subsubds.repo)
     create_tree(subsubds.path, {"testnew2": 'smth'})
     assert subsubds.repo.dirty
     # and indexed files didn't change
     assert_equal(indexed_files, subds.repo.get_indexed_files())
-    ok_clean_git(subds.repo, untracked=['testnew'],
-                 index_modified=['subsub'], head_modified=['testadded'])
+    ok_clean_git(subds.repo,
+                 untracked=['testnew'],
+                 index_modified=['subsub'],
+                 head_modified=['testadded'])
+
+    # since we didn't add that testnew2 file -- nothing to be saved even
+    # with all_updated
+    assert not subsubds.save(message="savingtestmessage", super_datasets=True,
+                  all_updated=True)
+    assert subsubds.repo.dirty  # still dirty
+
+    # TODO:  yet another option of automagically saving 'add' which should be
+    #        passed to save is super_datasets, so doing without commit
+    subsubds.add('testnew2', save=False)
+    # and for a good measure let's modify existing 'test' since that is the
+    # one which will be just updated then
+    subsubds.unlock('test')
+    create_tree(subsubds.path, {"test": 'smthnew'})
     subsubds.save(message="savingtestmessage", super_datasets=True,
                   all_updated=True)
+
     ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
     # not the file we created

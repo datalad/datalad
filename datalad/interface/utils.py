@@ -344,13 +344,31 @@ def save_dataset(
         if isinstance(ds.repo, AnnexRepo):
             # to make this work without calling `git add` in addition,
             # this needs git-annex v6.20161210 (see #1027)
-            ds.repo.add(tostage, commit=False)
+
+            # !!! We must not call it with the entire path to the dataset
+            # since that would also add (annex) untracked files. IMHO operating
+            # slowly is still better than operating incorrectly (re above
+            # comment states that acting upon untracked is expensive). I see no
+            # other way imho (yoh) until something like 'annex add --update' exists
+            # (dropped joey a question via email).  Note that those which were
+            # already staged not needed to be added
+            # First we need to fish out from tostage the path of ds itself
+            # and get its updates
+            if ds.path in tostage:
+                tostage.pop(tostage.index(ds.path))
+                updated_listing = ds.repo.add(tostage, updates=True, dry_run=True, commit=False)
+                tostage.extend([x['file'] for x in updated_listing])
+                tostage = unique(tostage)  # remove duplicates if any
+            if tostage:
+                ds.repo.add(tostage, commit=False)
+            else:
+                lgr.log(3, "Not calling annex add since no files found to be modified")
         else:
             # --update will ignore any untracked files, sadly git-annex add
-            # above does not
+            # above does not "natively"
             # will complain about vanished files though, filter them here, but
             # keep them for a later commit call
-            ds.repo.add(tostage, git_options=['--update'], commit=False)
+            ds.repo.add(tostage, updates=True, commit=False)
 
     _datalad_msg = False
     if not message:
