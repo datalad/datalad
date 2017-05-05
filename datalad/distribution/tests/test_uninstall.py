@@ -279,10 +279,10 @@ def test_remove_file_handle_only(path):
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
-    # we add one file
-    assert_result_count(
-        subds.add('.'), 1,
-        action='add', status='ok')
+    # we add one file, but we get a response for the requested
+    # directory too
+    assert_result_count(subds.add('.'), 2,
+                        action='add', status='ok')
     # save all -> all clean
     ds.save(all_updated=True, recursive=True)
     ok_clean_git(subds.path)

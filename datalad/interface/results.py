@@ -263,7 +263,8 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         False
 
 
-def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg, noinfo_file_msg, **kwargs):
+def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
+                              noinfo_dir_msg, noinfo_file_msg, **kwargs):
     """Helper to yield results based on what information git annex did no give us.
 
     The helper assumes that the annex command returned without an error code,
@@ -286,6 +287,10 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
       a failure was reported for some of its content. The template contains two
       string placeholders that will be expanded with 1) the path of the
       directory, and 2) the content failure paths for that directory
+    noinfo_dir_msg : str
+      Message template to inject into the result for a requested directory that
+      `git annex` was silent about (incl. any content). There must be one string
+      placeholder that is expanded with the path of that directory.
     noinfo_file_msg : str
       Message template to inject into the result for a requested file that `git
       annex` was silent about. There must be one string placeholder that is
@@ -298,9 +303,12 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
         # any relpath is relative to the currently processed dataset
         # not the global reference dataset
         p = p if isabs(p) else normpath(opj(ds.path, p))
+        if any(p in ps for ps in respath_by_status.values()):
+            # we have a report for this path already
+            continue
         common_report = dict(path=p, **kwargs)
         if isdir(p):
-            # `annex` will never report on directories, but if a
+            # `annex` itself will not report on directories, but if a
             # directory was requested, we want to say something about
             # it in the results.  we are inside a single, existing
             # repo, hence all directories are already present, if not
@@ -325,9 +333,10 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                     if fp.startswith(_with_sep(p))]
                 yield get_status_dict(
                     status='ok' if success_results else 'notneeded',
+                    message=None if success_results else (noinfo_dir_msg, p),
                     type_='directory', **common_report)
             continue
-        elif not any(p in ps for ps in respath_by_status.values()):
+        else:
             # not a directory, and we have had no word from `git annex`,
             # yet no exception, hence the file was most probably
             # already in the desired state
@@ -335,7 +344,3 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 status='notneeded', type_='file',
                 message=(noinfo_file_msg, p),
                 **common_report)
-        else:
-            # not a case we want to report beyond what we got from
-            # `git annex`
-            pass

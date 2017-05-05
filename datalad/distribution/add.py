@@ -29,6 +29,8 @@ from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.results import results_from_paths
 from datalad.interface.results import annexjson2result
+from datalad.interface.results import success_status_map
+from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import _discover_trace_to_known
 from datalad.interface.utils import eval_results
@@ -203,7 +205,7 @@ class Add(Interface):
             return
 
         if dataset:
-            # remeber the datasets associated with actual inputs
+            # remember the datasets associated with actual inputs
             input_ds = list(content_by_ds.keys())
             # forge chain from base dataset to any leaf dataset
             _discover_trace_to_known(dataset.path, [], content_by_ds)
@@ -223,14 +225,27 @@ class Add(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             toadd = list(set(content_by_ds[ds_path]))
+            known_subds = ds.subdatasets(
+                recursive=False,
+                fulfilled=True,
+                result_xfm='paths')
+            respath_by_status = {}
             # handle anything that looks like a wannabe subdataset
             for subds_path in [d for d in toadd
                                if GitRepo.is_valid_repo(d) and
-                               d != ds_path and
-                               d not in ds.subdatasets(
-                                   recursive=False,
-                                   fulfilled=True,
-                                   result_xfm='paths')]:
+                               d != ds_path]:
+                if subds_path in known_subds:
+                    # subdataset that might be in this list because of the
+                    # need to save all the way up to a super dataset
+                    respath_by_status['success'] = \
+                        respath_by_status.get('success', []) + [subds_path]
+                    yield get_status_dict(
+                        path=subds_path,
+                        status='notneeded',
+                        type_='dataset',
+                        message=("already known subdataset: %s", subds_path),
+                        **common_report)
+                    continue
                 subds = Dataset(subds_path)
                 # check that the subds has a commit, and refuse
                 # to operate on it otherwise, or we would get a bastard
@@ -263,7 +278,9 @@ class Add(Interface):
             # make sure any last minute additions make it to the saving stage
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
-            content_by_ds[ds_path] = toadd
+            # MIH: not sure WTF is going on, but if I don't create a new list
+            # the content of `toadd` vanishes from the dict
+            content_by_ds[ds_path] = [a for a in toadd]
             added = ds.repo.add(
                 toadd,
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
@@ -273,8 +290,31 @@ class Add(Interface):
                     # filter out .gitmodules, because this is only included for
                     # technical reasons and has nothing to do with the actual content
                     continue
-                yield annexjson2result(a, ds, type_='file', **common_report)
+                res = annexjson2result(a, ds, type_='file', **common_report)
+                if GitRepo.is_valid_repo(res['path']):
+                    # more accurate report in case of an added submodule
+                    # mountpoint.
+                    # XXX Actually not sure if this can really happen
+                    # (depends on what our low-level code would do)
+                    # but worst case is that we loose a little bit of
+                    # coverage...
+                    res['type'] = 'dataset'
+                    res['message'] = 'added new state as submodule'
+                success = success_status_map[res['status']]
+                respath_by_status[success] = \
+                    respath_by_status.get(success, []) + [res['path']]
+                yield res
                 save_needed = save
+
+            for r in results_from_annex_noinfo(
+                    ds, toadd, respath_by_status,
+                    dir_fail_msg='could not add some content in %s %s',
+                    noinfo_dir_msg='nothing to add from %s',
+                    noinfo_file_msg='%s is already included in the dataset',
+                    action='add',
+                    logger=lgr,
+                    refds=refds_path):
+                yield r
 
         if save_needed:
             # new returns a generator and yields status dicts

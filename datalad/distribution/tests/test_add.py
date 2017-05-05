@@ -123,7 +123,6 @@ def test_add_recursive(path):
     ds = Dataset(path)
     ds.create(force=True, save=False)
     subds = ds.create('dir', force=True)
-    ds.save("Submodule added.")
     ok_(subds.repo.dirty)
 
     # no subds without recursive:
@@ -143,6 +142,7 @@ def test_add_recursive(path):
         annexkey='MD5E-s9--3f0f870d18d6ba60a79d9463ff3827ea',
         status='ok')
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
+    ok_(subds.repo.dirty)
 
     added2 = ds.add('dir', to_git=True)
     # added to git, so parsed git output record
@@ -152,6 +152,7 @@ def test_add_recursive(path):
         message='non-large file; adding content to git repository',
         status='ok')
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+    ok_clean_git(ds.path)
 
     # We used to fail to add to pure git repository, but now it should all be
     # just fine
