@@ -70,9 +70,14 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
     for path in not_paths:
         assert_false(exists(opj(target_path, path)))
 
-    # correct ls_json command in hook content (path wrapped in quotes)
-    ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -a --json file \'%s\'.*' % target_path,
+    hook_path = _path_(target_path, '.git/hooks/post-update')
+    ok_file_has_content(hook_path,
+                        '.*\ndsdir=%s\n.*' % target_path,
+                        re_=True,
+                        flags=re.DOTALL)
+    # correct ls_json command in hook content (path wrapped in "quotes)
+    ok_file_has_content(hook_path,
+                        '.*datalad ls -a --json file "\$dsdir".*',
                         re_=True,
                         flags=re.DOTALL)
 

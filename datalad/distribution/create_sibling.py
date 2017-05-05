@@ -658,25 +658,30 @@ class CreateSibling(Interface):
         # make sure hooks directory exists (see #1251)
         ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
-        # post-update hook should create its log directory if doesn't exist
-        logs_remote_dir = opj(path, WEB_META_LOG)
-
-        make_log_dir = 'mkdir -p "{}"'.format(logs_remote_dir)
 
         # create json command for current dataset
-        json_command = r'''
-        mkdir -p {};
-        ( which datalad > /dev/null \
-        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file '{}'; ) \
-        || echo "no datalad found - skipping generation of indexes for web frontend"; \
-        ) &> "{}/{}"
-        '''.format(logs_remote_dir,
-                   str(path),
-                   logs_remote_dir,
-                   'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT)
+        log_filename = 'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
+        hook_content = r'''#!/bin/bash
 
-        # collate content for post_update hook
-        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
+git update-server-info
+
+#
+# DataLad
+#
+# (Re)generate meta-data for DataLad Web UI and possibly init new submodules
+dsdir={path}
+logfile=$dsdir/{WEB_META_LOG}/{log_filename}
+
+mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
+
+( which datalad > /dev/null \
+  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file "$dsdir"; ) \
+  || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
+) &> "$logfile"
+
+# Some submodules might have been added and thus we better init them
+( cd ..; git submodule update --init >> "$logfile" 2>&1 || : ; )
+'''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:
             # create post_update hook script
@@ -710,6 +715,7 @@ class CreateSibling(Interface):
             with open(js_file) as asset:
                 try:
                     from jsmin import jsmin
+                    # jsmin = lambda x: x   # no minimization
                     minified = jsmin(asset.read())                      # minify asset
                 except ImportError:
                     lgr.warning(
