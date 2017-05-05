@@ -219,7 +219,6 @@ class Add(Interface):
                 # saving any staged content in the final step
                 content_by_ds = {d: v for d, v in content_by_ds.items() if v}
 
-        save_needed = False
         # simple loop over datasets -- save happens later
         # start deep down
         for ds_path in sorted(content_by_ds, reverse=True):
@@ -274,13 +273,13 @@ class Add(Interface):
                 yield get_status_dict(ds=subds, status='ok', **common_report)
                 # make sure that .gitmodules is added to the list of files
                 toadd.append(opj(ds.path, '.gitmodules'))
-                save_needed = save
             # make sure any last minute additions make it to the saving stage
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
             # MIH: not sure WTF is going on, but if I don't create a new list
             # the content of `toadd` vanishes from the dict
             content_by_ds[ds_path] = [a for a in toadd]
+            lgr.debug('Adding content to repo %s: %s', ds.repo, toadd)
             added = ds.repo.add(
                 toadd,
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
@@ -304,7 +303,6 @@ class Add(Interface):
                 respath_by_status[success] = \
                     respath_by_status.get(success, []) + [res['path']]
                 yield res
-                save_needed = save
 
             for r in results_from_annex_noinfo(
                     ds, toadd, respath_by_status,
@@ -316,12 +314,14 @@ class Add(Interface):
                     refds=refds_path):
                 yield r
 
-        if save_needed:
-            # new returns a generator and yields status dicts
-            # pass through as embedded results
-            # OPT: tries to save even unrelated stuff
-            for res in save_dataset_hierarchy(
-                    content_by_ds,
-                    base=dataset.path if dataset and dataset.is_installed() else None,
-                    message=message if message else '[DATALAD] added content'):
-                yield res
+        if not save:
+            lgr.debug('Not calling `save` as instructed')
+            return
+
+        # OPT: tries to save even unrelated stuff
+        # MIH: issue reference would help to evaluate this comment!
+        for res in save_dataset_hierarchy(
+                content_by_ds,
+                base=dataset.path if dataset and dataset.is_installed() else None,
+                message=message if message else '[DATALAD] added content'):
+            yield res
