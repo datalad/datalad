@@ -109,8 +109,8 @@ def test_recursive_save(path):
     ok_clean_git(ds.path)
     subsubds = subds.create('subsub')
     assert_equal(
-        ds.get_subdatasets(recursive=True, absolute=True, fulfilled=True),
-        [subsubds.path, subds.path])
+        ds.subdatasets(recursive=True, fulfilled=True, result_xfm='paths'),
+        [subds.path, subsubds.path])
     newfile_name = opj(subsubds.path, 'test')
     with open(newfile_name, 'w') as f:
         f.write('some')
