@@ -1039,11 +1039,12 @@ def eval_results(func):
                 ## output rendering
                 if result_renderer == 'default':
                     # TODO have a helper that can expand a result message
-                    print('{action}({status}): {path}{msg}'.format(
+                    print('{action}({status}): {path}{type}{msg}'.format(
                         action=res['action'],
                         status=res['status'],
                         path=relpath(res['path'],
                                      res['refds']) if res.get('refds', None) else res['path'],
+                        type=' ({})'.format(res['type']) if 'type' in res else '',
                         msg=' [{}]'.format(
                             res['message'][0] % res['message'][1:]
                             if isinstance(res['message'], tuple) else res['message'])
