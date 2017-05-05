@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from six import text_type
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
@@ -143,7 +144,17 @@ def _create_dataset_sibling(
                 path_exists = False
             except CommandError as e:
                 # If fails to rmdir -- either contains stuff no permissions
-                _msg += " And it fails to rmdir (%s)." % (e.stderr.strip(), )
+                # TODO: fixup encode/decode dance again :-/ we should have got
+                # unicode/str here by now.  I guess it is the same as
+                # https://github.com/ReproNim/niceman/issues/83
+                # where I have reused this Runner thing
+                try:
+                    # ds_name is unicode which makes _msg unicode so we must be
+                    # unicode-ready
+                    err_str = text_type(e.stderr)
+                except UnicodeDecodeError:
+                    err_str = e.stderr.decode(errors='replace')
+                _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
 
         if path_exists:
             if existing == 'error':
