@@ -60,3 +60,4 @@ if __name__ == '__main__':
             )
     # to cause annex to commit all the changes
     annex._annex_custom_command([], ["git", "annex", "merge"])
+    annex.gc(allow_background=False)
