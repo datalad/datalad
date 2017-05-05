@@ -39,8 +39,6 @@ from datalad.utils import assure_list
 from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
-from datalad.utils import swallow_logs
-from datalad.utils import better_wraps
 from datalad.utils import unique
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
@@ -54,7 +52,6 @@ from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
 from datalad.support.constraints import Constraint
-from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureCallable

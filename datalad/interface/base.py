@@ -18,7 +18,6 @@ lgr = logging.getLogger('datalad.interface.base')
 import sys
 import re
 import textwrap
-from os.path import curdir
 import inspect
 from collections import OrderedDict
 

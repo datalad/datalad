@@ -36,6 +36,7 @@ success_status_map = {
     'error': 'failure',
 }
 
+
 def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
                     refds=None, status=None, message=None, **kwargs):
     """Helper to create a result dictionary.
