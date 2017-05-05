@@ -60,6 +60,8 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureCallable
 from datalad.support.param import Parameter
 
+from datalad.ui import ui
+
 from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
@@ -1039,7 +1041,7 @@ def eval_results(func):
                 ## output rendering
                 if result_renderer == 'default':
                     # TODO have a helper that can expand a result message
-                    print('{action}({status}): {path}{type}{msg}'.format(
+                    ui.message('{action}({status}): {path}{type}{msg}'.format(
                         action=res['action'],
                         status=res['status'],
                         path=relpath(res['path'],
@@ -1050,7 +1052,7 @@ def eval_results(func):
                             if isinstance(res['message'], tuple) else res['message'])
                         if 'message' in res else ''))
                 elif result_renderer == 'json':
-                    print(json.dumps(
+                    ui.message(json.dumps(
                         {k: v for k, v in res.items()
                          if k not in ('message', 'logger')},
                         sort_keys=True))
@@ -1069,7 +1071,7 @@ def eval_results(func):
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
-                print("Action summary:\n  {}".format(
+                ui.message("action summary:\n  {}".format(
                     '\n  '.join('{} ({})'.format(
                         act,
                         ', '.join('{}: {}'.format(status, action_summary[act][status])
