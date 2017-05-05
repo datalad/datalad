@@ -382,7 +382,7 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_list(s, copy=False):
+def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -390,13 +390,16 @@ def assure_list(s, copy=False):
     s: list or anything
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
     """
 
     if isinstance(s, list):
         return s if not copy else s[:]
     elif isinstance(s, text_type):
         return [s]
-    elif hasattr(s, '__iter__'):
+    elif iterate and hasattr(s, '__iter__'):
         return list(s)
     elif s is None:
         return []
