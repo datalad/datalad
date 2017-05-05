@@ -1065,7 +1065,10 @@ def eval_results(func):
                         continue
                 yield res
 
-            if result_renderer == 'default' and action_summary:
+            if result_renderer == 'default' and action_summary and \
+                    sum(sum(s.values()) for s in action_summary.values()) > 1:
+                # give a summary in default mode, when there was more than one
+                # action performed
                 print("Action summary:\n  {}".format(
                     '\n  '.join('{} ({})'.format(
                         act,
