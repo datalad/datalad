@@ -583,9 +583,11 @@ class CreateSibling(Interface):
                               "datalad repository.\nError: %s" % exc_str(e))
 
         # in reverse order would be depth first
-        lgr.debug("Running post-update hooks in all created siblings")
+        lgr.info("Running post-update hooks in all created siblings")
+        # TODO: add progressbar
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
+            lgr.debug("Running hook for %s", path)
             try:
                 ssh("cd {} && hooks/post-update".format(
                     sh_quote(_path_(path, ".git")))
