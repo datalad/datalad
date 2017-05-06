@@ -27,6 +27,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tree
 
@@ -190,7 +191,7 @@ def test_nested_create(path):
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself
-    ok_(not ds.save())
+    assert_status('notneeded', ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_raises(ValueError, ds.create, lvl2relpath)

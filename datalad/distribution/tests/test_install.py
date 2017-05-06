@@ -26,6 +26,8 @@ from datalad.api import install
 from datalad.api import get
 from datalad.consts import DATASETS_TOPURL
 from datalad.utils import chpwd
+from datalad.interface.results import YieldDatasets
+from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
@@ -44,6 +46,10 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -55,8 +61,8 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..install import _get_installationpath_from_url
-from ..install import _get_git_url_from_source
+from ..utils import _get_installationpath_from_url
+from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
@@ -106,7 +112,7 @@ def _test_guess_dot_git(annex, path, url, tdir):
 
     # we need to prepare to be served via http, otherwise it must fail
     with swallow_logs() as cml:
-        assert_raises(GitCommandError, install, path=tdir, source=url)
+        assert_raises(IncompleteResultsError, install, path=tdir, source=url)
     ok_(not exists(tdir))
 
     Runner(cwd=path)(['git', 'update-server-info'])
@@ -137,48 +143,53 @@ def test_insufficient_args():
 
 @with_tempfile(mkdir=True)
 def test_invalid_args(path):
-    assert_raises(ValueError, install, 'Zoidberg', source='Zoidberg')
+    assert_raises(IncompleteResultsError, install, 'Zoidberg', source='Zoidberg')
     # install to an invalid URL
     assert_raises(ValueError, install, 'ssh://mars:Zoidberg', source='Zoidberg')
     # install to a remote location
     assert_raises(ValueError, install, 'ssh://mars/Zoidberg', source='Zoidberg')
     # make fake dataset
     ds = create(path)
-    assert_raises(ValueError, install, '/higherup.', 'Zoidberg', dataset=ds)
+    assert_raises(IncompleteResultsError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
-@skip_if_no_network
-@use_cassette('test_install_crcns')
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_install_crcns(tdir, ds_path):
-    with chpwd(tdir):
-        with swallow_logs(new_level=logging.INFO) as cml:
-            install("all-nonrecursive", source='///')
-            # since we didn't log decorations such as log level atm while
-            # swallowing so lets check if exit code is returned or not
-            # I will test both
-            assert_not_in('ERROR', cml.out)
-            # below one must not fail alone! ;)
-            assert_not_in('with exit code', cml.out)
-
-        # should not hang in infinite recursion
-        with chpwd('all-nonrecursive'):
-            get("crcns")
-        ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
-        # and we could repeat installation and get the same result
-        ds1 = install(_path_("all-nonrecursive/crcns"))
-        ds2 = Dataset('all-nonrecursive').install('crcns')
-        ok_(ds1.is_installed())
-        eq_(ds1, ds2)
-        eq_(ds1.path, ds2.path)  # to make sure they are a single dataset
-
-    # again, but into existing dataset:
-    ds = create(ds_path)
-    crcns = ds.install("///crcns")
-    ok_(crcns.is_installed())
-    eq_(crcns.path, opj(ds_path, "crcns"))
-    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
+# This test caused a mysterious segvault in gh-1350. I reimplementation of
+# the same test functionality in test_clone.py:test_clone_crcns that uses
+# `clone` instead of `install` passes without showing this behavior
+# This test is disabled until some insight into the cause of the issue
+# materializes.
+#@skip_if_no_network
+#@use_cassette('test_install_crcns')
+#@with_tempfile(mkdir=True)
+#@with_tempfile(mkdir=True)
+#def test_install_crcns(tdir, ds_path):
+#    with chpwd(tdir):
+#        with swallow_logs(new_level=logging.INFO) as cml:
+#            install("all-nonrecursive", source='///')
+#            # since we didn't log decorations such as log level atm while
+#            # swallowing so lets check if exit code is returned or not
+#            # I will test both
+#            assert_not_in('ERROR', cml.out)
+#            # below one must not fail alone! ;)
+#            assert_not_in('with exit code', cml.out)
+#
+#        # should not hang in infinite recursion
+#        with chpwd('all-nonrecursive'):
+#            get("crcns")
+#        ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
+#        # and we could repeat installation and get the same result
+#        ds1 = install(_path_("all-nonrecursive/crcns"))
+#        ok_(ds1.is_installed())
+#        ds2 = Dataset('all-nonrecursive').install('crcns')
+#        eq_(ds1, ds2)
+#        eq_(ds1.path, ds2.path)  # to make sure they are a single dataset
+#
+#    # again, but into existing dataset:
+#    ds = create(ds_path)
+#    crcns = ds.install("///crcns")
+#    ok_(crcns.is_installed())
+#    eq_(crcns.path, opj(ds_path, "crcns"))
+#    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
 @skip_if_no_network
@@ -191,19 +202,17 @@ def test_install_datasets_root(tdir):
         eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
 
         # do it a second time:
-        with swallow_logs(new_level=logging.INFO) as cml:
-            result = install("///")
-            assert_in("was already installed from", cml.out)
-            eq_(result, ds)
+        result = install("///", result_xfm=None, return_type='list')
+        assert_status('notneeded', result)
+        eq_(YieldDatasets()(result[0]), ds)
 
         # and a third time into an existing something, that is not a dataset:
         with open(opj(tdir, 'sub', 'a_file.txt'), 'w') as f:
             f.write("something")
 
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            result = install("sub", source='///')
-            assert_in("already exists and is not an installed dataset", cml.out)
-            ok_(result is None)
+        with assert_raises(IncompleteResultsError) as cme:
+            install("sub", source='///')
+            assert_in("already exists and not empty", str(cme))
 
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
@@ -212,7 +221,7 @@ def test_install_simple_local(src, path):
     origin = Dataset(path)
 
     # now install it somewhere else
-    ds = install(path, source=src)
+    ds = install(path, source=src, description='mydummy')
     eq_(ds.path, path)
     ok_(ds.is_installed())
     if not isinstance(origin.repo, AnnexRepo):
@@ -235,15 +244,14 @@ def test_install_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
-    with swallow_logs(new_level=logging.INFO) as cml:
-        ds = install(path, source=src)
-        cml.assert_logged(msg="{0} was already installed from".format(ds),
-                          regex=False, level="INFO")
-        ok_(ds.is_installed())
-        if isinstance(origin.repo, AnnexRepo):
-            eq_(uuid_before, ds.repo.uuid)
+    res = install(path, source=src, result_xfm=None, return_type='list')
+    assert_status('notneeded', res)
+    ok_(ds.is_installed())
+    if isinstance(origin.repo, AnnexRepo):
+        eq_(uuid_before, ds.repo.uuid)
 
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
@@ -290,7 +298,7 @@ def test_install_dataladri(src, topurl, path):
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.support.network.DATASETS_TOPURL', topurl), \
-        swallow_logs():
+            swallow_logs():
         ds = install(path, source='///ds')
     eq_(ds.path, path)
     ok_clean_git(path, annex=False)
@@ -304,15 +312,16 @@ def test_install_recursive(src, path_nr, path_r):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
     ok_(ds.is_installed())
-    for sub in ds.get_subdatasets(recursive=True):
-        ok_(not Dataset(opj(path_nr, sub)).is_installed(),
-            "Unintentionally installed: %s" % opj(path_nr, sub))
+    for sub in ds.subdatasets(recursive=True, result_xfm='datasets'):
+        ok_(not sub.is_installed(),
+            "Unintentionally installed: %s" % (sub,))
     # this also means, subdatasets to be listed as not fulfilled:
-    eq_(set(ds.get_subdatasets(recursive=True, fulfilled=False)),
+    eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
         {'subm 1', 'subm 2'})
 
     # now recursively:
-    ds_list = install(path_r, source=src, recursive=True)
+    # don't filter implicit results so we can inspect them
+    ds_list = install(path_r, source=src, recursive=True, result_filter=None)
     # installed a dataset and two subdatasets
     eq_(len(ds_list), 3)
     eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
@@ -328,17 +337,16 @@ def test_install_recursive(src, path_nr, path_r):
     assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
     assert_in(opj(top_ds.path, 'subm 2'), [i.path for i in ds_list])
 
-    eq_(len(top_ds.get_subdatasets(recursive=True)), 2)
+    eq_(len(top_ds.subdatasets(recursive=True)), 2)
 
-    for sub in top_ds.get_subdatasets(recursive=True):
-        subds = Dataset(opj(path_r, sub))
+    for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subds.is_installed(),
-            "Not installed: %s" % opj(path_r, sub))
+            "Not installed: %s" % (subds,))
         # no content was installed:
         ok_(not any(subds.repo.file_has_content(
             subds.repo.get_annexed_files())))
     # no unfulfilled subdatasets:
-    ok_(top_ds.get_subdatasets(recursive=True, fulfilled=False) == [])
+    ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -346,20 +354,22 @@ def test_install_recursive(src, path_nr, path_r):
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
-    ds_list = install(path, source=src, recursive=True, get_data=True)
-    # installed a dataset and two subdatasets, and two files:
-    eq_(len(ds_list), 5)
-    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
+    res = install(path, source=src, recursive=True, get_data=True,
+                  result_filter=None, result_xfm=None)
+    assert_status('ok', res)
+    # installed a dataset and two subdatasets, and one file with content in
+    # each, plus the report that we got all content in each dataset's root dir
+    eq_(len(res), 9)
+    assert_result_count(res, 3, type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
-    eq_(ds_list[0].path, path)
-    top_ds = ds_list[0]
+    eq_(res[0]['path'], path)
+    top_ds = YieldDatasets()(res[0])
     ok_(top_ds.is_installed())
     if isinstance(top_ds.repo, AnnexRepo):
         ok_(all(top_ds.repo.file_has_content(top_ds.repo.get_annexed_files())))
-    for sub in top_ds.get_subdatasets(recursive=True):
-        subds = Dataset(opj(path, sub))
-        ok_(subds.is_installed(), "Not installed: %s" % opj(path, sub))
+    for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
+        ok_(subds.is_installed(), "Not installed: %s" % (subds,))
         if isinstance(subds.repo, AnnexRepo):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
@@ -381,11 +391,11 @@ def test_install_into_dataset(source, top_path):
     else:
         ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
-    assert_in('sub', ds.get_subdatasets())
+    assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
     # sub is clean:
     ok_clean_git(subds.path, annex=None)
-    # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=None)
+    # top is too:
+    ok_clean_git(ds.path, annex=None)
     ds.save('addsub')
     # now it is:
     ok_clean_git(ds.path, annex=None)
@@ -395,7 +405,7 @@ def test_install_into_dataset(source, top_path):
     # Create a dummy change
     create_tree(ds.path, {'dummy.txt': 'buga'})
     ok_clean_git(ds.path, untracked=['dummy.txt'])
-    subds_ = ds.install("sub2", source=source, if_dirty='ignore')
+    subds_ = ds.install("sub2", source=source)
     eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
@@ -419,24 +429,18 @@ def test_failed_install_multiple(top_path):
 
     # specify install with multiple paths and one non-existing
     with assert_raises(IncompleteResultsError) as cme:
-        ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'])
+        ds.install(['ds1', 'ds2', '///crcns', '///nonexisting', 'ds3'],
+                   on_failure='continue')
 
     # install doesn't add existing submodules -- add does that
     ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
     ds.add(['ds1', 'ds3'])
     ok_clean_git(ds.path, annex=None)
     # those which succeeded should be saved now
-    eq_(ds.get_subdatasets(), ['crcns', 'ds1', 'ds3'])
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
-    eq_(set(cme.exception.failed), {'///nonexisting', _path_(top_path, 'ds2')})
-
-    # but if there was only a single installation requested -- it will be
-    # InstallFailedError to stay consistent with single install behavior
-    # TODO: unify at some point
-    with assert_raises(InstallFailedError) as cme:
-        ds.install('ds2')
-    with assert_raises(InstallFailedError) as cme:
-        ds.install('///nonexisting')
+    eq_(set(r.get('source_url', r['path']) for r in cme.exception.failed),
+        {'///nonexisting', _path_(top_path, 'ds2')})
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
@@ -445,12 +449,11 @@ def test_install_known_subdataset(src, path):
 
     # get the superdataset:
     ds = install(path, source=src)
-
     # subdataset not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    assert_in('subm 1', ds.get_subdatasets(fulfilled=False))
-    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=True))
+    assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # install it:
     ds.install('subm 1')
     ok_(subds.is_installed())
@@ -459,15 +462,14 @@ def test_install_known_subdataset(src, path):
     # new repository initiated
     eq_(set(subds.repo.get_indexed_files()),
         {'test.dat', 'INFO.txt', 'test-annex.dat'})
-    assert_not_in('subm 1', ds.get_subdatasets(fulfilled=False))
-    assert_in('subm 1', ds.get_subdatasets(fulfilled=True))
+    assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
     # now, get the data by reinstalling with -g:
     ok_(subds.repo.file_has_content('test-annex.dat') is False)
     with chpwd(ds.path):
         result = get(path='subm 1', dataset=os.curdir)
-        eq_(len(result), 1)
-        eq_(result[0]['file'], opj('subm 1', 'test-annex.dat'))
+        assert_in_results(result, path=opj(subds.path, 'test-annex.dat'))
         ok_(subds.repo.file_has_content('test-annex.dat') is True)
         ok_(subds.is_installed())
 
@@ -500,18 +502,19 @@ def test_implicit_install(src, dst):
     ok_(not subsub.is_installed())
 
     # fail on obscure non-existing one
-    assert_raises(InstallFailedError, ds.install, source='obscure')
+    assert_raises(IncompleteResultsError, ds.install, source='obscure')
 
     # install 3rd level and therefore implicitly the 2nd:
     result = ds.install(path=opj("sub", "subsub"))
     ok_(sub.is_installed())
     ok_(subsub.is_installed())
+    # but by default implicit results are not reported
     eq_(result, subsub)
 
     # fail on obscure non-existing one in subds
-    assert_raises(InstallFailedError, ds.install, source=opj('sub', 'obscure'))
+    assert_raises(IncompleteResultsError, ds.install, source=opj('sub', 'obscure'))
 
-    # clean up:
+    # clean up, the nasty way
     rmtree(dst, chmod_files=True)
     ok_(not exists(dst))
 
@@ -528,16 +531,16 @@ def test_implicit_install(src, dst):
     with chpwd(dst):
         # don't ask for the file content to make return value comparison
         # simpler
-        result = get(path=opj("sub", "subsub"), get_data=False)
+        result = get(path=opj("sub", "subsub"), get_data=False, result_xfm='datasets')
         ok_(sub.is_installed())
         ok_(subsub.is_installed())
-        eq_(result, [subsub])
+        eq_(result, [sub, subsub])
 
 
 @with_tempfile(mkdir=True)
 def test_failed_install(dspath):
     ds = create(dspath)
-    assert_raises(InstallFailedError,
+    assert_raises(IncompleteResultsError,
                   ds.install,
                   "sub",
                   source="http://nonexistingreallyanything.somewhere/bla")
@@ -563,13 +566,13 @@ def test_install_list(path, top_path):
                   source='something')
 
     # now should work:
-    result = ds.install(path=['subm 1', 'subm 2'])
+    result = ds.install(path=['subm 1', 'subm 2'], result_xfm='paths')
     ok_(sub1.is_installed())
     ok_(sub2.is_installed())
-    eq_(set([i.path for i in result]), {sub1.path, sub2.path})
+    eq_(set(result), {sub1.path, sub2.path})
     # and if we request it again via get, result should be empty
     get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
-    eq_(get_result, [])
+    assert_status('notneeded', get_result)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -608,7 +611,8 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1)
+    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1,
+                 result_xfm='datasets')
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
     assert_in(sub1, result)
@@ -632,33 +636,32 @@ def test_install_skip_list_arguments(src, path, path_outside):
     ok_(ds.is_installed())
 
     # install a list with valid and invalid items:
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        with assert_raises(IncompleteResultsError) as cme:
-            ds.install(
-                path=['subm 1', 'not_existing', path_outside, 'subm 2'],
-                get_data=False)
-        result = cme.exception.results
-        for skipped in [opj(ds.path, 'not_existing'), path_outside]:
-            cml.assert_logged(msg="ignored non-existing paths: {}\n".format(
-                              [opj(ds.path, 'not_existing'), path_outside]),
-                              regex=False, level='WARNING')
-            pass
-        ok_(isinstance(result, list))
-        eq_(len(result), 2)
-        for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
-            assert_in(sub, result)
-            ok_(sub.is_installed())
+    result = ds.install(
+        path=['subm 1', 'not_existing', path_outside, 'subm 2'],
+        get_data=False,
+        on_failure='ignore', result_xfm=None, return_type='list')
+    # good and bad results together
+    ok_(isinstance(result, list))
+    eq_(len(result), 4)
+    # check that we have an 'impossible' status for both invalid args
+    # but all the other tasks have been accomplished
+    for skipped in [opj(ds.path, 'not_existing'), path_outside]:
+        assert_result_count(
+            result, 1, status='impossible',
+            message=('path does not exist: %s', skipped))
+    for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
+        assert_result_count(
+            result, 1, status='ok',
+            message=('Installed subdataset %s%s', sub, ''))
+        ok_(sub.is_installed())
 
-    # return of get is always a list, even if just one thing was gotten
+    # return of get is always a list, by default, even if just one thing was gotten
     # in this case 'subm1' was already obtained above, so this will get this
     # content of the subdataset
     with assert_raises(IncompleteResultsError) as cme:
         ds.install(path=['subm 1', 'not_existing'])
     with assert_raises(IncompleteResultsError) as cme:
         ds.get(path=['subm 1', 'not_existing'])
-    result = cme.exception.results
-    eq_(len(result), 1)
-    eq_(result[0]['file'], 'subm 1/test-annex.dat')
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -674,14 +677,23 @@ def test_install_skip_failed_recursive(src, path):
         f.write("sdfdsf")
 
     with swallow_logs(new_level=logging.WARNING) as cml:
-        result = ds.get(os.curdir, recursive=True)
+        result = ds.get(
+            os.curdir, recursive=True,
+            on_failure='ignore', result_xfm=None)
         # toplevel dataset was in the house already
-        assert_not_in(ds, result)
-        assert_in(sub2, result)
-        assert_not_in(sub1, result)
+        assert_result_count(
+            result, 0, path=ds.path, type='dataset')
+        assert_status('error', [result[0]])
+        assert_in_results(result, status='ok', path=sub2.path)
+
         cml.assert_logged(
-            msg="Target {} already exists and is not an installed dataset. Skipped.".format(sub1.path),
-            regex=False, level='WARNING')
+            msg="target path already exists and not empty".format(sub1.path),
+            regex=False, level='ERROR')
+    # this is not in effect that this message is not propagated up
+    # assert_in(
+    #     "destination path '{}' already exists and is not an empty directory".format(
+    #         sub1.path),
+    #     result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',
@@ -701,7 +713,8 @@ def test_install_noautoget_data(src, path):
     top_src.add('.', recursive=True)
 
     # install top level:
-    cdss = install(path, source=src, recursive=True)
+    # don't filter implicitly installed subdataset to check them for content
+    cdss = install(path, source=src, recursive=True, result_filter=None)
     # there should only be datasets in the list of installed items,
     # and none of those should have any data for their annexed files yet
     for ds in cdss:
@@ -733,7 +746,8 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     def check_consistent_installation(ds):
         datasets = [ds] + list(
-            map(Dataset, ds.get_subdatasets(recursive=True, absolute=True, fulfilled=True)))
+            map(Dataset, ds.subdatasets(recursive=True, fulfilled=True,
+                                        result_xfm='paths')))
         assert len(datasets) == 2  # in this test
         for ds in datasets:
             # all of them should be in master branch
@@ -761,7 +775,8 @@ def test_install_consistent_state(src, dest, dest2, dest3):
     # whenever possible.
 
     # install entire hierarchy without specifying dataset
-    dest2_ds = install(dest2, source=src, recursive=True)
+    # no filter, we want full report
+    dest2_ds = install(dest2, source=src, recursive=True, result_filter=None)
     check_consistent_installation(dest2_ds[0])  # [1] is the subdataset
 
     # install entire hierarchy by first installing top level ds

@@ -23,16 +23,19 @@ from datalad.api import remove
 from datalad.api import install
 from datalad.api import create
 from datalad.support.exceptions import InsufficientArgumentsError, CommandError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import create_tree
 from datalad.utils import chpwd
 from datalad.support.external_versions import external_versions
 from datalad.utils import swallow_logs
@@ -56,9 +59,9 @@ def test_uninstall_uninstalled(path):
     # goal oriented error reporting. here:
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
-    eq_(ds.uninstall(), [])
-    eq_(ds.drop(), [])
-    eq_(ds.remove(), [])
+    assert_status('notneeded', ds.drop())
+    assert_status('notneeded', ds.uninstall())
+    assert_status('notneeded', ds.remove())
 
 
 @with_tempfile()
@@ -69,8 +72,10 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
-    res = ds.remove('one')
-    eq_(res, [subds1])
+    res = ds.remove(
+        'one', result_xfm='datasets')
+    # subds1 got uninstalled, and ds got the removal of subds1 saved
+    eq_(res, [subds1, ds])
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
@@ -86,9 +91,10 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
     ok_(not subds2.is_installed())
     assert(exists(subds2.path))
-    res = ds.remove('two')
+    res = ds.remove('two', result_xfm='datasets')
     ok_clean_git(ds.path)
-    eq_(res, [subds2])
+    # subds1 got uninstalled, and ds got the removal of subds1 saved
+    eq_(res, [subds2, ds])
     eq_(ds.get_subdatasets(), ['three'])
     #import pdb; pdb.set_trace()
     assert(not exists(subds2.path))
@@ -102,7 +108,7 @@ def test_uninstall_invalid(path):
         # refuse to touch stuff outside the dataset
         assert_raises(ValueError, method, dataset=ds, path='..')
         # but it is only an error when there is actually something there
-        eq_(method(dataset=ds, path='../madeupnonexist'), [])
+        assert_status('notneeded', method(dataset=ds, path='../madeupnonexist'))
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -114,7 +120,7 @@ def test_uninstall_annex_file(path):
     ok_(ds.repo.file_has_content('test-annex.dat'))
 
     # remove file's content:
-    res = ds.drop(path='test-annex.dat')
+    res = ds.drop(path='test-annex.dat', result_xfm='paths')
     # test it happened:
     ok_(not ds.repo.file_has_content('test-annex.dat'))
     ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
@@ -141,14 +147,15 @@ def test_uninstall_git_file(path):
 
     if not hasattr(ds.repo, 'drop'):
         # nothing can be dropped in a plain GitRepo
-        eq_([], ds.drop(path='INFO.txt'))
+        assert_status('impossible', ds.drop(path='INFO.txt', on_failure='ignore'))
 
-    with swallow_logs(new_level=logging.ERROR) as cml:
-        assert_raises(ValueError, ds.uninstall, path="INFO.txt")
-        assert_in("will not act on files", cml.out)
+    res = ds.uninstall(path="INFO.txt", on_failure='ignore')
+    assert_status('error', res)
+    assert_in("will not act on files", res[0]['message'][0])
 
     # uninstall removes the file:
-    res = ds.remove(path='INFO.txt')
+    res = ds.remove(path='INFO.txt', result_xfm='paths',
+                    result_filter=lambda x: x['action'] == 'remove')
     assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
     ok_(not exists(opj(path, 'INFO.txt')))
     eq_(res, ['INFO.txt'])
@@ -158,7 +165,7 @@ def test_uninstall_git_file(path):
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
 
-    ds = install(dst, source=src, recursive=True)[0]
+    ds = install(dst, source=src, recursive=True)
     ok_(ds.is_installed())
     known_subdss = ds.get_subdatasets()
     for subds_path in ds.get_subdatasets():
@@ -169,7 +176,7 @@ def test_uninstall_subdataset(src, dst):
         subds.repo.get(annexed_files)
 
         # drop data of subds:
-        res = ds.drop(path=subds_path)
+        res = ds.drop(path=subds_path, result_xfm='paths')
 
         ok_(all([opj(subds.path, f) in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
@@ -185,7 +192,7 @@ def test_uninstall_subdataset(src, dst):
             raise SkipTest(
                 "Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds_path)
+        res = ds.uninstall(path=subds_path, result_xfm='datasets')
         subds = Dataset(opj(ds.path, subds_path))
         eq_(res[0], subds)
         ok_(not subds.is_installed())
@@ -239,7 +246,7 @@ def test_uninstall_dataset(path):
     ok_clean_git(ds.path)
     # removing entire dataset, uninstall will refuse to act on top-level
     # datasets
-    assert_raises(ValueError, ds.uninstall)
+    assert_raises(IncompleteResultsError, ds.uninstall)
     ds.remove()
     # completely gone
     ok_(not ds.is_installed())
@@ -307,7 +314,7 @@ def test_remove_dataset_hierarchy(path):
     ds.save(all_updated=True)
     ok_clean_git(ds.path)
     # fail on missing --recursive because subdataset is present
-    assert_raises(ValueError, ds.remove)
+    assert_raises(IncompleteResultsError, ds.remove)
     ok_clean_git(ds.path)
     ds.remove(recursive=True)
     # completely gone
@@ -346,7 +353,8 @@ def test_kill(path):
 
     # and we fail to remove since content can't be dropped
     assert_raises(CommandError, ds.remove)
-    eq_(ds.remove(recursive=True, check=False), [subds, ds])
+    eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
+        [subds, ds])
     ok_(not exists(path))
 
 
@@ -362,3 +370,16 @@ def test_remove_recreation(path):
     ds = create(path)
     ok_clean_git(ds.path)
     ok_(ds.is_installed())
+
+
+@with_tempfile()
+def test_no_interaction_with_untracked_content(path):
+    # extracted from what was a metadata test originally
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    create_tree(ds.path, {'sub': {'subsub': {'dat': 'lots of data'}}})
+    subds = ds.create('sub', force=True)
+    subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
+    ok_(not exists(opj(subds.path, '.datalad', 'config')))
+    # this will only work, if `remove` didn't do anything stupid and
+    # caused all content to be saved
+    subds.create('subsub', force=True)

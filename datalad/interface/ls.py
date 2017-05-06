@@ -157,7 +157,7 @@ class Ls(Interface):
                             subdatasets = Ls._cached_subdatasets[superds.path]
                         except KeyError:
                             subdatasets = Ls._cached_subdatasets[superds.path] \
-                                = superds.get_subdatasets()
+                                = superds.subdatasets(result_xfm='relpaths')
                         if relpath(ds.path, superds.path) in subdatasets:
                             loc_type = "not installed"
             else:
@@ -442,7 +442,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_subdatasets(recursive=recursive)]
+         for sm in topds.subdatasets(recursive=recursive, result_xfm='relpaths')]
         if recursive else [])
 
     dsms = []
@@ -748,7 +748,10 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
 
     # (recursively) traverse each subdataset
     children = []
-    for subds_rpath in rootds.get_subdatasets():
+    # yoh: was in return results branch returning full datasets:
+    # for subds in rootds.subdatasets(result_xfm='datasets'):
+    # but since rpath is needed/used, decided to return relpaths
+    for subds_rpath in rootds.subdatasets(result_xfm='relpaths'):
 
         subds_path = opj(rootds.path, subds_rpath)
         subds = Dataset(subds_path)
@@ -779,7 +782,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
             size_list.append(subfs['size'])
         # else just pick the data from metadata_file of each subdataset
         else:
-            lgr.info(subds_path)
+            lgr.info(subds.path)
             if exists(subds_json):
                 with open(subds_json) as data_file:
                     subfs = js.load(data_file)

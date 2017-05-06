@@ -125,7 +125,9 @@ def _check_mocked_install(central_dspath, mock_install):
 def test_our_metadataset_search(tdir):
     # smoke test for basic search operations on our super-megadataset
     # expensive operation but ok
-    ds = install(path=tdir, source="///")
+    ds = install(
+        path=tdir, source="///",
+        result_xfm='datasets', return_type='item-or-list')
     assert list(ds.search('.', report='*', regex=True))
     assert list(ds.search('.', report='*'))
     assert list(ds.search('.', report_matched=True))

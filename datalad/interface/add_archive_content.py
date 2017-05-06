@@ -495,7 +495,7 @@ class AddArchiveContent(Interface):
                 commit_stats = outside_stats if outside_stats else stats
                 annex.precommit()  # so batched ones close and files become annex symlinks etc
                 precommitted = True
-                if annex.repo.is_dirty(untracked_files=False):
+                if annex.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive, commit_stats.as_str(mode='full')),

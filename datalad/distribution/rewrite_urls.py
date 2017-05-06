@@ -81,9 +81,9 @@ class RewriteURLs(Interface):
 
         repos_to_update = [ds.repo]
         if recursive:
-            repos_to_update += [GitRepo(opj(ds.path, sub_path))
-                                for sub_path in
-                                ds.get_subdatasets(recursive=True)]
+            repos_to_update += \
+                [d.repo
+                 for d in ds.subdatasets(recursive=True, result_xfm='datasets')]
 
         for dataset_repo in repos_to_update:
             parser = get_module_parser(dataset_repo)

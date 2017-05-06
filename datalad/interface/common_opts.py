@@ -20,8 +20,10 @@ from datalad.support.constraints import EnsureChoice
 dataset_description = Parameter(
     args=("-D", "--description",),
     constraints=EnsureStr() | EnsureNone(),
-    doc="""short description of this dataset instance that humans can use to
-    identify the repository/location, e.g. "Precious data on my laptop.""")
+    doc="""short description of newly installed dataset instances. Its primary
+    purpose is to help humans to identify a dataset copy (e.g., "mike's dataset
+    on lab server"). Note that when a dataset is published, this information
+    becomes available on the remote side.""")
 
 recursion_flag = Parameter(
     args=("-r", "--recursive",),

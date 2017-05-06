@@ -28,7 +28,7 @@ from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import _discover_trace_to_known
-from datalad.distribution.utils import _install_subds_inplace
+from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
@@ -44,6 +44,14 @@ from .dataset import Dataset
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.add')
+
+
+def _install_subds_inplace(ds, path, relativepath, name=None, url=None):
+    """Register an existing repository in the repo tree as a submodule"""
+    ds.repo.add_submodule(relativepath, url=url, name=name)
+    _fixup_submodule_dotgit_setup(ds, relativepath)
+    # return newly added submodule as a dataset
+    return Dataset(path)
 
 
 def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
@@ -211,17 +219,27 @@ class Add(Interface):
             for subds_path in [d for d in toadd
                                if GitRepo.is_valid_repo(d) and
                                d != ds_path and
-                               d not in ds.get_subdatasets(
+                               d not in ds.subdatasets(
                                    recursive=False,
-                                   absolute=True,
-                                   fulfilled=True)]:
-                # TODO add check that the subds has a commit, and refuse
+                                   fulfilled=True,
+                                   result_xfm='paths')]:
+                subds = Dataset(subds_path)
+                # check that the subds has a commit, and refuse
                 # to operate on it otherwise, or we would get a bastard
                 # submodule that cripples git operations
+                if not subds.repo.get_hexsha():
+                    # TODO generator: tuen into 'impossible' result
+                    lgr.warn('Ignoring subdataset %s with no commits', subds)
+                    continue
+                # make an attempt to configure a submodule source URL based on the
+                # discovered remote configuration
+                remote, branch = subds.repo.get_tracking_branch()
+                subds_url = subds.repo.get_remote_url(remote) if remote else None
                 _install_subds_inplace(
                     ds=ds,
                     path=subds_path,
-                    relativepath=relpath(subds_path, ds_path))
+                    relativepath=relpath(subds_path, ds_path),
+                    url=subds_url)
                 # make sure that .gitmodules is added to the list of files
                 toadd.append(opj(ds.path, '.gitmodules'))
                 # report added subdatasets -- add below won't do it
@@ -241,11 +259,14 @@ class Add(Interface):
             results.extend(added)
 
         if results and save:
+            # TODO GENERATOR
+            # new returns a generator and yields status dicts
+            # pass through as embedded results
             # OPT: tries to save even unrelated stuff
-            save_dataset_hierarchy(
+            list(save_dataset_hierarchy(
                 content_by_ds,
                 base=dataset.path if dataset and dataset.is_installed() else None,
-                message=message if message else '[DATALAD] added content')
+                message=message if message else '[DATALAD] added content'))
 
         return results
 

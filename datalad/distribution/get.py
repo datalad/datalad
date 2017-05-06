@@ -12,19 +12,29 @@
 
 import logging
 
-from itertools import chain
 from os import curdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
+from os.path import normpath
+from os.path import isabs
+
+from six.moves.urllib.parse import quote as urlquote
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import get_paths_by_dataset
-from datalad.interface.utils import get_normalized_path_arguments
+from datalad.interface.utils import eval_results
+from datalad.interface.utils import build_doc
+from datalad.interface.results import get_status_dict
+from datalad.interface.results import results_from_paths
+from datalad.interface.results import YieldDatasets
+from datalad.interface.results import annexjson2result
+from datalad.interface.results import count_results
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import git_opts
-from datalad.interface.common_opts import annex_opts
-from datalad.interface.common_opts import annex_get_opts
+# from datalad.interface.common_opts import git_opts
+# from datalad.interface.common_opts import annex_opts
+# from datalad.interface.common_opts import annex_get_opts
+from datalad.interface.common_opts import dataset_description
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
@@ -35,66 +45,288 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.network import URL
+from datalad.support.network import RI
+from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
+from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import unique
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
-from .utils import install_necessary_subdatasets
-from .utils import _recursive_install_subds_underneath
+from .clone import Clone
+from .utils import _get_flexible_source_candidates
+from .utils import _get_tracking_source
+from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _get(content_by_ds, refpath=None, source=None, jobs=None,
-         get_data=True):
-    """Loops through datasets and calls git-annex call where appropriate
+def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
+    """Retrieve candidates from where to install the submodule
+
+    Even if url for submodule is provided explicitly -- first tries urls under
+    parent's module tracking branch remote.
     """
-    for ds_path in sorted(content_by_ds.keys()):
-        cur_ds = Dataset(ds_path)
-        content = content_by_ds[ds_path]
-        results = []
-        if len(content) >= 1 and content[0] == curdir:
-            # we hit a subdataset that just got installed few lines above, and was
-            # requested specifically, as opposed to some of its content.
-            results.append(cur_ds)
+    clone_urls = []
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+    remote_name, remote_url = _get_tracking_source(ds)
 
-        if not get_data:
-            lgr.debug(
-                "Will not get any content in %s, as instructed.",
-                cur_ds)
-            yield results
+    # Directly on parent's ds url
+    if remote_url:
+        # attempt: submodule checkout at parent remote URL
+        # We might need to quote sm_path portion, e.g. for spaces etc
+        if isinstance(RI(remote_url), URL):
+            sm_path_url = urlquote(sm_path)
+        else:
+            sm_path_url = sm_path
+
+        clone_urls.extend(
+            _get_flexible_source_candidates(
+                # alternate suffixes are tested by `clone` anyways
+                sm_path_url, remote_url, alternate_suffix=False))
+
+    # attempt: provided (configured?) submodule URL
+    # TODO: consider supporting DataLadRI here?  or would confuse
+    #  git and we wouldn't want that (i.e. not allow pure git clone
+    #  --recursive)
+    if sm_url:
+        clone_urls += _get_flexible_source_candidates(
+            sm_url,
+            remote_url if remote_url else ds.path,
+            alternate_suffix=False)
+
+    return unique(clone_urls)
+
+
+def _install_subds_from_flexible_source(
+        ds, sm_path, sm_url, reckless, description=None):
+    """Tries to obtain a given subdataset from several meaningful locations"""
+    # TODO remove this assertion eventually, for now it assures intented
+    # usage of this helper function
+    assert(sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'))
+
+    # compose a list of candidate clone URLs
+    clone_urls = _get_flexible_source_candidates_for_submodule(
+        ds, sm_path, sm_url)
+
+    # now loop over all candidates and try to clone
+    subds = None
+    dest_path = opj(ds.path, sm_path)
+    for src in clone_urls:
+        if src == dest_path:
+            # prevent inevitable exception from `clone`
+            lgr.warn(
+                "Candidate subdataset source URL is identical to the installation target path [%s]. Skipping.",
+                src)
             continue
+        try:
+            subds = Clone.__call__(
+                src,
+                path=dest_path,
+                # pretend no parent -- we don't want clone to add to ds
+                # because this is a submodule already!
+                dataset=None,
+                reckless=reckless,
+                description=description,
+                result_xfm='datasets',
+                # not really need, but should protect against future RF
+                on_failure='stop',
+                result_renderer='disabled',
+                return_type='item-or-list')
+            # failure will raise an exception, hence if we got here we can
+            # leave the loop and have a successful clone
+            break
+        except IncompleteResultsError:
+            # details of the failure are logged already by common code
+            pass
+    if subds is None:
+        raise InstallFailedError(
+            msg="Failed to install dataset from{}: {}".format(
+                ' any of' if len(clone_urls) > 1 else '',
+                clone_urls))
 
-        # needs to be an annex:
-        found_an_annex = isinstance(cur_ds.repo, AnnexRepo)
-        if not found_an_annex:
-            lgr.debug("Found no annex at %s. Skipped.", cur_ds)
-            if results:
-                yield results
+    assert(subds.is_installed())
+    _fixup_submodule_dotgit_setup(ds, sm_path)
+
+    # do fancy update
+    lgr.debug("Update cloned subdataset {0} in parent".format(subds))
+    # TODO: move all of that into update_submodule ??
+    # TODO: direct mode ramifications?
+    # track branch originally cloned
+    subrepo = subds.repo
+    branch = subrepo.get_active_branch()
+    branch_hexsha = subrepo.get_hexsha(branch)
+    ds.repo.update_submodule(sm_path, init=True)
+    updated_branch = subrepo.get_active_branch()
+    if branch and not updated_branch:
+        # got into 'detached' mode
+        # trace if current state is a predecessor of the branch_hexsha
+        lgr.debug(
+            "Detected detached HEAD after updating submodule %s which was "
+            "in %s branch before", subds.path, branch)
+        detached_hexsha = subrepo.get_hexsha()
+        if subrepo.get_merge_base(
+                [branch_hexsha, detached_hexsha]) == detached_hexsha:
+            # TODO: config option?
+            # in all likely event it is of the same branch since
+            # it is an ancestor -- so we could update that original branch
+            # to point to the state desired by the submodule, and update
+            # HEAD to point to that location
+            lgr.info(
+                "Submodule HEAD got detached. Resetting branch %s to point "
+                "to %s. Original location was %s",
+                branch, detached_hexsha[:8], branch_hexsha[:8]
+            )
+            branch_ref = 'refs/heads/%s' % branch
+            subrepo.update_ref(branch_ref, detached_hexsha)
+            assert(subrepo.get_hexsha(branch) == detached_hexsha)
+            subrepo.update_ref('HEAD', branch_ref, symbolic=True)
+            assert(subrepo.get_active_branch() == branch)
+        else:
+            lgr.warning(
+                "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
+                subrepo.path, branch, detached_hexsha[:8]
+            )
+    return subds
+
+
+def _install_necessary_subdatasets(
+        ds, path, reckless, refds_path, description=None):
+    """Installs subdatasets of `ds`, that are necessary to obtain in order
+    to have access to `path`.
+
+    Gets the subdataset containing `path` regardless of whether or not it was
+    already installed. While doing so, installs everything necessary in between
+    the uppermost installed one and `path`.
+
+    Note: `ds` itself has to be installed.
+
+    Parameters
+    ----------
+    ds: Dataset
+    path: str
+    reckless: bool
+    """
+    assert ds.is_installed()
+
+    # figuring out what dataset to start with:
+    start_ds = ds.get_containing_subdataset(path, recursion_limit=None)
+    if start_ds.is_installed():
+        if not start_ds.path == refds_path:
+            # we don't want to report the base dataset as notneeded
+            # when `get` was called as a method of that dataset
+            yield get_status_dict(
+                'install', ds=start_ds, status='notneeded', logger=lgr,
+                refds=refds_path, message=('%s is already installed', start_ds))
+        return
+
+    # we try to install subdatasets as long as there is anything to
+    # install in between the last one installed and the actual thing
+    # to get (which is `path`):
+    cur_subds = start_ds
+
+    # Note, this is not necessarily `ds`:
+    # MIH: would be good to know why?
+    cur_par_ds = cur_subds.get_superdataset()
+    assert cur_par_ds is not None
+
+    while not cur_subds.is_installed():
+        # get subdataset info
+        subdatasets = cur_par_ds.subdatasets()
+        subdataset = [sm for sm in subdatasets
+                      if sm['path'] == cur_subds.path][0]
+        # install using helper that give some flexibility regarding where to
+        # get the module from
+        try:
+            sd = _install_subds_from_flexible_source(
+                cur_par_ds,
+                relpath(subdataset['path'], start=cur_par_ds.path),
+                subdataset['url'],
+                reckless,
+                description=description)
+        except Exception as e:
+            # skip all of downstairs, if we didn't manage to install subdataset
+            yield get_status_dict(
+                'install', path=subdataset['path'], type_='dataset',
+                status='error', logger=lgr, refds=refds_path,
+                message=("Installation of subdatasets %s failed with exception: %s",
+                         subdataset['path'], exc_str(e)))
+
+        cur_par_ds = cur_subds
+
+        # Note: PathOutsideRepositoryError should not happen here.
+        # If so, there went something fundamentally wrong, so raise something
+        # different, to not let the caller mix it up with a "regular"
+        # PathOutsideRepositoryError from above. (Although it could be
+        # detected via its `repo` attribute)
+        try:
+            cur_subds = \
+                cur_subds.get_containing_subdataset(path, recursion_limit=None)
+        except PathOutsideRepositoryError as e:
+            raise RuntimeError("Unexpected failure: {0}".format(exc_str(e)))
+
+        yield get_status_dict(
+            'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
+            message=(
+                "Installed subdataset %s%s",
+                cur_subds,
+                ' in order to get %s' % path if cur_subds.path != path else ''))
+
+
+def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
+                                        refds_path=None, description=None):
+    if isinstance(recursion_limit, int) and recursion_limit <= 0:
+        return
+    # install using helper that give some flexibility regarding where to
+    # get the module from
+    for sub in ds.subdatasets(
+            return_type='generator', result_renderer='disabled'):
+        subds = Dataset(sub['path'])
+        if start is not None and not subds.path.startswith(_with_sep(start)):
+            # this one we can ignore, not underneath the start path
             continue
-        lgr.info("Getting %i items of dataset %s ...",
-                 len(content), cur_ds)
+        if sub['state'] != 'absent':
+            yield get_status_dict(
+                'install', ds=subds, status='notneeded', logger=lgr,
+                refds=refds_path)
+            continue
+        try:
+            subds = _install_subds_from_flexible_source(
+                ds,
+                relpath(sub['path'], start=ds.path),
+                sub['url'],
+                reckless,
+                description=description)
+            yield get_status_dict(
+                'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
+                message=("Installed subdataset %s", subds))
+        except Exception as e:
+            # skip all of downstairs, if we didn't manage to install subdataset
+            yield get_status_dict(
+                'install', ds=subds, status='error', logger=lgr, refds=refds_path,
+                message=("Installation of subdatasets %s failed with exception: %s",
+                         subds, exc_str(e)))
+            continue
+        # otherwise recurse
+        # we can skip the start expression, we know we are within
+        for res in _recursive_install_subds_underneath(
+                subds,
+                recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
+                reckless=reckless,
+                refds_path=refds_path):
+            yield res
 
-        results.extend(cur_ds.repo.get(
-            content,
-            options=['--from=%s' % source] if source else [],
-            jobs=jobs))
 
-        if refpath:
-            # adapt relative paths reported by annex to be relative some
-            # reference
-            if ds_path != refpath:
-                for lr in results:
-                    if isinstance(lr, dict):
-                        lr['file'] = relpath(opj(ds_path, lr['file']), refpath)
-        yield results
-
-
+@build_doc
 class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
@@ -157,10 +389,11 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
+        description=dataset_description,
         reckless=reckless_opt,
-        git_opts=git_opts,
-        annex_opts=annex_opts,
-        annex_get_opts=annex_get_opts,
+        # git_opts=git_opts,
+        # annex_opts=annex_opts,
+        # annex_get_opts=annex_get_opts,
         jobs=jobs_opt,
         verbose=verbose)
 
@@ -170,6 +403,7 @@ class Get(Interface):
 
     @staticmethod
     @datasetmethod(name='get')
+    @eval_results
     def __call__(
             path=None,
             source=None,
@@ -177,19 +411,16 @@ class Get(Interface):
             recursive=False,
             recursion_limit=None,
             get_data=True,
+            description=None,
             reckless=False,
-            git_opts=None,
-            annex_opts=None,
-            annex_get_opts=None,
+            #git_opts=None,
+            #annex_opts=None,
+            #annex_get_opts=None,
             jobs=None,
             verbose=False,
-            # internal -- instead of returning 'get'ed items, return final
-            # content_by_ds, unavailable_paths.  To be used by the call from
-            # Install.__call__ and done so to avoid creating another reusable
-            # function which would need to duplicate all this heavy list of
-            # kwargs
-            _return_datasets=False
     ):
+        # helper
+        as_ds = YieldDatasets()
         # IMPLEMENTATION CONCEPT:
         #
         # 1. Sort the world into existing handles and the rest
@@ -214,6 +445,25 @@ class Get(Interface):
             recursive=recursive,
             recursion_limit=recursion_limit,
             dir_lookup=dir_lookup)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        # NOTE: Do not act upon unavailable paths yet! Done below after testing
+        # which ones could be obtained
+
+        # remember which results we already reported, to avoid duplicates
+        not_needed_ds = []
+
+        # report dataset we already have and don't need to get
+        for dspath in content_by_ds:
+            d = Dataset(dspath)
+            if not d.is_installed() or (dspath == refds_path):
+                # do not report what hasn't arived yet
+                # also do not report the base dataset that is already
+                # present -- no surprise
+                continue
+            yield get_status_dict(
+                'install', ds=d, status='notneeded', logger=lgr,
+                refds=refds_path, message=('%s is already installed', d))
+            not_needed_ds.append(d.path)
 
         # explore the unknown
         for path in sorted(unavailable_paths):
@@ -223,22 +473,32 @@ class Get(Interface):
                 # nothing we can do for this path
                 continue
             ds = Dataset(dspath)
-            # must always yield a dataset -- we sorted out the ones outside
-            # any dataset at the very top
-            assert ds.is_installed()
             # now actually obtain whatever is necessary to get to this path
-            containing_ds = install_necessary_subdatasets(ds, path, reckless)
+            containing_ds = ds
+            for res in _install_necessary_subdatasets(
+                    ds, path, reckless, refds_path, description=description):
+                # yield immediately so errors could be acted upon outside, before
+                # we continue
+                if not (res['type'] == 'dataset' and res['path'] in not_needed_ds):
+                    # unless we reported on this dataset before
+                    yield res
+                # update to the current innermost dataset
+                containing_ds = as_ds(res)
+
+            # important to only do the next for the innermost subdataset
+            # as the `recursive` logic below relies on that!
             if containing_ds.path != ds.path:
-                lgr.debug("Installed %s to fulfill request for content for "
-                          "path %s", containing_ds, path)
                 # mark resulting dataset as auto-installed
+                # TODO generator
+                # check where this "markup" is needed and see if/how it could be
+                # read from a result dict
                 if containing_ds.path == path:
                     # we had to get the entire dataset, not something within
                     # mark that it just appeared
-                    content_by_ds[path] = [curdir]
+                    content_by_ds[containing_ds.path] = [curdir]
                 else:
                     # we need to get content within
-                    content_by_ds[path] = [path]
+                    content_by_ds[containing_ds.path] = [path]
 
         if recursive and not recursion_limit == 'existing':
             # obtain any subdatasets underneath the paths given inside the
@@ -251,27 +511,39 @@ class Get(Interface):
                         continue
                     subds = Dataset(subdspath)
                     lgr.info(
-                        "Obtaining %s %s recursively",
+                        "Installing %s%s recursively",
                         subds,
-                        ("underneath %s" % content_path
+                        (" underneath %s" % content_path
                          if subds.path != content_path
                          else ""))
-                    cbysubds = _recursive_install_subds_underneath(
-                        subds,
-                        # `content_path` was explicitly given as input
-                        # we count recursions from the input, hence we
-                        # can start with the full number
-                        recursion_limit,
-                        reckless,
-                        # protect against magic marker misinterpretation
-                        # only relevant for _get, hence replace here
-                        start=content_path if content_path != curdir else None)
-                    # gets file content for all freshly installed subdatasets
-                    content_by_ds.update(cbysubds)
+                    for res in _recursive_install_subds_underneath(
+                            subds,
+                            # `content_path` was explicitly given as input
+                            # we count recursions from the input, hence we
+                            # can start with the full number
+                            recursion_limit,
+                            reckless,
+                            # protect against magic marker misinterpretation
+                            # only relevant for _get, hence replace here
+                            start=content_path if content_path != curdir else None,
+                            refds_path=refds_path,
+                            description=description):
+                        # yield immediately so errors could be acted upon
+                        # outside, before we continue
+                        yield res
+                        if not (res['status'] == 'ok' and res['type'] == 'dataset'):
+                            # nothing that we could act upon, we just reported it
+                            # upstairs
+                            continue
+                        sd = as_ds(res)
+                        # paranoia, so popular these days...
+                        assert sd.is_installed()
+                        # TODO: again the magic marker (like above) figure out if needed
+                        content_by_ds[sd.path] = [curdir]
 
-        ## we have now done everything we could to obtain whatever subdataset
-        ## to get something on the file system for previously unavailable paths
-        ## check and sort one last
+        # we have now done everything we could to obtain whatever subdataset
+        # to get something on the file system for previously unavailable paths
+        # check and sort one last
         content_by_ds, unavailable_paths, nondataset_paths = \
             get_paths_by_dataset(
                 unavailable_paths,
@@ -280,59 +552,121 @@ class Get(Interface):
                 out=content_by_ds,
                 dir_lookup=dir_lookup)
 
-        if nondataset_paths:
-            # XXX likely can never get here
-            lgr.warning(
-                "ignored paths that do not belong to any dataset: %s",
-                nondataset_paths)
+        assert not nondataset_paths, "Somehow broken implementation logic"
 
-        if unavailable_paths:
-            lgr.warning('ignored non-existing paths: %s', unavailable_paths)
+        for r in results_from_paths(
+                unavailable_paths, status='impossible',
+                message="path does not exist: %s",
+                action='get', logger=lgr,
+                refds=refds_path):
+            yield r
 
-        # hand over to git-annex
-        results = list(chain.from_iterable(
-            _get(content_by_ds, refpath=dataset_path, source=source, jobs=jobs,
-                 get_data=get_data)))
-        # ??? should we in _return_datasets case just return both content_by_ds
-        # and unavailable_paths may be so we provide consistent across runs output
-        # and then issue outside similar IncompleteResultsError?
-        if unavailable_paths:  # and likely other error flags
-            if _return_datasets:
-                results = sorted(set(content_by_ds).difference(unavailable_paths))
-            raise IncompleteResultsError(results, failed=unavailable_paths)
-        else:
-            return sorted(content_by_ds) if _return_datasets else results
+        if not get_data:
+            # done already
+            return
+
+        status_map = {
+            'ok': 'success',
+            'notneeded': 'success',
+            'impossible': 'failure',
+            'error': 'failure',
+        }
+        # hand over to git-annex, get files content,
+        # repo files in git as 'notneeded' to get
+        for ds_path in sorted(content_by_ds.keys()):
+            ds = Dataset(ds_path)
+            content = content_by_ds[ds_path]
+            # needs to be an annex to get content
+            if not isinstance(ds.repo, AnnexRepo):
+                for r in results_from_paths(
+                        content, status='notneeded',
+                        message="no dataset annex, content already present: %s",
+                        action='get', logger=lgr,
+                        refds=refds_path):
+                    yield r
+                continue
+            respath_by_status = {}
+            for res in ds.repo.get(
+                    content,
+                    options=['--from=%s' % source] if source else [],
+                    jobs=jobs):
+                res = annexjson2result(res, ds, type_='file', logger=lgr,
+                                       refds=refds_path)
+                respath_by_status[status_map[res['status']]] = res['path']
+                yield res
+            # the following result reporting assume that low-level
+            # code causes some form of error (exception or result)
+            # to surface in case anything goes wrong in `annex get`
+            while content:
+                p = content.pop()
+                common_report = dict(
+                    action='get',
+                    # any relpath is relative to the currently processed dataset
+                    # not the global reference dataset
+                    path=p if isabs(p) else normpath(opj(ds.path, p)),
+                    logger=lgr,
+                    refds=refds_path)
+                if isdir(p):
+                    # `annex get` will never report on directories, but if a
+                    # directory was requested, we want to say something about
+                    # it in the results.  we are inside a single, existing
+                    # repo, hence all directories are already present, if not
+                    # we had an error
+                    # do we have any failures in a subdir of the requested dir?
+                    failure_results = [
+                        fp for fp in respath_by_status.get('failure', [])
+                        if fp.startswith(_with_sep(p))]
+                    if failure_results:
+                        # we were not able to obtain all content, let's label
+                        # this 'impossible' to get a warning-type report
+                        # after all we have the directory itself, but not
+                        # (some) of its content
+                        yield get_status_dict(
+                            status='impossible', type_='directory',
+                            message=('could not get some content in %s %s',
+                                     p, failure_results), **common_report)
+                    else:
+                        # otherwise cool
+                        yield get_status_dict(
+                            status='ok', type_='directory', **common_report)
+                    continue
+                elif not any(p in ps for ps in respath_by_status.values()):
+                    # not a directory, and we have had no word from `git annex`,
+                    # yet no exception, hence the file was most probably
+                    # already present, or is in Git -> not needed
+                    yield get_status_dict(
+                        status='notneeded', type_='file',
+                        message=('%s is already present', p), **common_report)
+                else:
+                    # not a case we want to report beyond what we got from
+                    # `git annex`
+                    pass
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_summary_renderer(res):
         from datalad.ui import ui
         from os import linesep
-        if res is None:
-            res = []
-        if not isinstance(res, list):
-            res = [res]
         if not len(res):
             ui.message("Got nothing new")
             return
 
-        # provide summary
-        nsuccess = sum(item.get('success', False) if isinstance(item, dict) else True
-                       for item in res)
-        nfailure = len(res) - nsuccess
-        msg = "Tried to get %d %s." % (
-            len(res), single_or_plural("file", "files", len(res)))
-        if nsuccess:
-            msg += " Got %d. " % nsuccess
+        nfiles = count_results(res, type='file')
+        nsuccess_file = count_results(res, type='file', status='ok')
+        nfailure = nfiles - nsuccess_file
+        msg = "Tried to get %d %s that had no content yet." % (
+            nfiles, single_or_plural("file", "files", nfiles))
+        if nsuccess_file:
+            msg += " Successfully obtained %d. " % nsuccess_file
         if nfailure:
-            msg += " Failed to get %d." % (nfailure,)
+            msg += " %d (failed)." % (nfailure,)
         ui.message(msg)
 
         # if just a few or less than initially explicitly requested
-        if len(res) < 10 or args.verbose:
+        if len(res) < 10:
             msg = linesep.join([
-                "{path} ... {suc}".format(
-                    suc="ok." if isinstance(item, Dataset) or item.get('success', False)
-                        else "failed. (%s)" % item.get('note', 'unknown reason'),
-                    path=item.get('file') if isinstance(item, dict) else item.path)
+                "{path}{type} ... {suc}".format(
+                    suc=item.get('status'),
+                    path=item.get('path'),
+                    type=' [{}]'.format(item['type']) if 'type' in item else '')
                 for item in res])
             ui.message(msg)

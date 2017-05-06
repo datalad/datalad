@@ -15,6 +15,7 @@ from os.path import join as opj
 
 from datalad.api import create
 from datalad.api import add
+from datalad.api import install
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import CommandError
@@ -251,21 +252,35 @@ def test_add_source(path, url, ds_dir):
 
 
 @with_tree(**tree_arg)
-def test_add_subdataset(path):
+@with_tempfile(mkdir=True)
+def test_add_subdataset(path, other):
     subds = create(opj(path, 'dir'), force=True)
     ds = create(path, force=True)
     ok_(subds.repo.dirty)
     ok_(ds.repo.dirty)
-    assert_not_in('dir', ds.get_subdatasets())
+    assert_not_in('dir', ds.subdatasets(result_xfm='relpaths'))
     # without a base dataset the next is interpreted as "add everything
     # in subds to subds"
     add(subds.path)
     ok_clean_git(subds.path)
-    assert_not_in('dir', ds.get_subdatasets())
+    assert_not_in('dir', ds.subdatasets(result_xfm='relpaths'))
     # but with a base directory we add the dataset subds as a subdataset
     # to ds
     ds.add(subds.path)
-    assert_in('dir', ds.get_subdatasets())
+    assert_in('dir', ds.subdatasets(result_xfm='relpaths'))
+    #  create another one
+    other = create(other)
+    # install into superdataset, but don't add
+    other_clone = install(source=other.path, path=opj(ds.path, 'other'))
+    ok_(other_clone.is_installed)
+    assert_not_in('other', ds.subdatasets(result_xfm='relpaths'))
+    # now add, it should pick up the source URL
+    ds.add('other')
+    # and that is why, we can reobtain it from origin
+    ds.uninstall('other')
+    ok_(other_clone.is_installed)
+    ds.get('other')
+    ok_(other_clone.is_installed)
 
 
 @with_tree(tree={
