@@ -14,14 +14,27 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from os.path import isdir
+from os.path import isabs
 from os.path import join as opj
 from os.path import relpath
 from os.path import abspath
+from os.path import normpath
 from datalad.utils import assure_list
+from datalad.utils import with_pathsep as _with_sep
 from datalad.distribution.dataset import Dataset
 
 
 lgr = logging.getLogger('datalad.interface.results')
+
+
+# which status is a success , which is failure
+success_status_map = {
+    'ok': 'success',
+    'notneeded': 'success',
+    'impossible': 'failure',
+    'error': 'failure',
+}
 
 
 def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
@@ -194,6 +207,9 @@ def annexjson2result(d, ds, **kwargs):
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
+    # avoid meaningless standard message
+    if 'note' in d and d['note'] != 'checksum...':
+        res['message'] = d['note']
     return res
 
 
@@ -246,3 +262,85 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         return True
     else:
         False
+
+
+def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
+                              noinfo_dir_msg, noinfo_file_msg, **kwargs):
+    """Helper to yield results based on what information git annex did no give us.
+
+    The helper assumes that the annex command returned without an error code,
+    and interprets which of the requested paths we have heard nothing about,
+    and assumes that git annex was happy with their current state.
+
+    Parameters
+    ==========
+    ds : Dataset
+      All results have to be concerning this single dataset (used to resolve
+      relpaths).
+    requested_paths : list
+      List of path arguments sent to `git annex`
+    respath_by_status : dict
+      Mapping of 'success' or 'failure' labels to lists of result paths
+      reported by `git annex`. Everything that is not in here, we assume
+      that `git annex` was happy about.
+    dir_fail_msg : str
+      Message template to inject into the result for a requested directory where
+      a failure was reported for some of its content. The template contains two
+      string placeholders that will be expanded with 1) the path of the
+      directory, and 2) the content failure paths for that directory
+    noinfo_dir_msg : str
+      Message template to inject into the result for a requested directory that
+      `git annex` was silent about (incl. any content). There must be one string
+      placeholder that is expanded with the path of that directory.
+    noinfo_file_msg : str
+      Message template to inject into the result for a requested file that `git
+      annex` was silent about. There must be one string placeholder that is
+      expanded with the path of that file.
+    **kwargs
+      Any further kwargs are included in the yielded result dictionary.
+    """
+    for p in requested_paths:
+        # any relpath is relative to the currently processed dataset
+        # not the global reference dataset
+        p = p if isabs(p) else normpath(opj(ds.path, p))
+        if any(p in ps for ps in respath_by_status.values()):
+            # we have a report for this path already
+            continue
+        common_report = dict(path=p, **kwargs)
+        if isdir(p):
+            # `annex` itself will not report on directories, but if a
+            # directory was requested, we want to say something about
+            # it in the results.  we are inside a single, existing
+            # repo, hence all directories are already present, if not
+            # we had an error
+            # do we have any failures in a subdir of the requested dir?
+            failure_results = [
+                fp for fp in respath_by_status.get('failure', [])
+                if fp.startswith(_with_sep(p))]
+            if failure_results:
+                # we were not able to process all requested_paths, let's label
+                # this 'impossible' to get a warning-type report
+                # after all we have the directory itself, but not
+                # (some) of its requested_paths
+                yield get_status_dict(
+                    status='impossible', type_='directory',
+                    message=(dir_fail_msg, p, failure_results),
+                    **common_report)
+            else:
+                # otherwise cool, but how cool?
+                success_results = [
+                    fp for fp in respath_by_status.get('success', [])
+                    if fp.startswith(_with_sep(p))]
+                yield get_status_dict(
+                    status='ok' if success_results else 'notneeded',
+                    message=None if success_results else (noinfo_dir_msg, p),
+                    type_='directory', **common_report)
+            continue
+        else:
+            # not a directory, and we have had no word from `git annex`,
+            # yet no exception, hence the file was most probably
+            # already in the desired state
+            yield get_status_dict(
+                status='notneeded', type_='file',
+                message=(noinfo_file_msg, p),
+                **common_report)

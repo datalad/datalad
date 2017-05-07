@@ -16,8 +16,6 @@ from os import curdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
-from os.path import normpath
-from os.path import isabs
 
 from six.moves.urllib.parse import quote as urlquote
 
@@ -30,6 +28,8 @@ from datalad.interface.results import results_from_paths
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import annexjson2result
 from datalad.interface.results import count_results
+from datalad.interface.results import success_status_map
+from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.common_opts import recursion_flag
 # from datalad.interface.common_opts import git_opts
 # from datalad.interface.common_opts import annex_opts
@@ -467,11 +467,13 @@ class Get(Interface):
 
         # explore the unknown
         for path in sorted(unavailable_paths):
+            lgr.debug("Investigate non-existing path %s", path)
             # how close can we get?
             dspath = get_dataset_root(path)
             if dspath is None:
                 # nothing we can do for this path
                 continue
+            lgr.debug("Found containing dataset %s for path %s", dspath, path)
             ds = Dataset(dspath)
             # now actually obtain whatever is necessary to get to this path
             containing_ds = ds
@@ -565,12 +567,6 @@ class Get(Interface):
             # done already
             return
 
-        status_map = {
-            'ok': 'success',
-            'notneeded': 'success',
-            'impossible': 'failure',
-            'error': 'failure',
-        }
         # hand over to git-annex, get files content,
         # repo files in git as 'notneeded' to get
         for ds_path in sorted(content_by_ds.keys()):
@@ -592,55 +588,20 @@ class Get(Interface):
                     jobs=jobs):
                 res = annexjson2result(res, ds, type_='file', logger=lgr,
                                        refds=refds_path)
-                respath_by_status[status_map[res['status']]] = res['path']
+                success = success_status_map[res['status']]
+                respath_by_status[success] = \
+                    respath_by_status.get(success, []) + [res['path']]
                 yield res
-            # the following result reporting assume that low-level
-            # code causes some form of error (exception or result)
-            # to surface in case anything goes wrong in `annex get`
-            while content:
-                p = content.pop()
-                common_report = dict(
+
+            for r in results_from_annex_noinfo(
+                    ds, content, respath_by_status,
+                    dir_fail_msg='could not get some content in %s %s',
+                    noinfo_dir_msg='nothing to get from %s',
+                    noinfo_file_msg='%s is already present',
                     action='get',
-                    # any relpath is relative to the currently processed dataset
-                    # not the global reference dataset
-                    path=p if isabs(p) else normpath(opj(ds.path, p)),
                     logger=lgr,
-                    refds=refds_path)
-                if isdir(p):
-                    # `annex get` will never report on directories, but if a
-                    # directory was requested, we want to say something about
-                    # it in the results.  we are inside a single, existing
-                    # repo, hence all directories are already present, if not
-                    # we had an error
-                    # do we have any failures in a subdir of the requested dir?
-                    failure_results = [
-                        fp for fp in respath_by_status.get('failure', [])
-                        if fp.startswith(_with_sep(p))]
-                    if failure_results:
-                        # we were not able to obtain all content, let's label
-                        # this 'impossible' to get a warning-type report
-                        # after all we have the directory itself, but not
-                        # (some) of its content
-                        yield get_status_dict(
-                            status='impossible', type_='directory',
-                            message=('could not get some content in %s %s',
-                                     p, failure_results), **common_report)
-                    else:
-                        # otherwise cool
-                        yield get_status_dict(
-                            status='ok', type_='directory', **common_report)
-                    continue
-                elif not any(p in ps for ps in respath_by_status.values()):
-                    # not a directory, and we have had no word from `git annex`,
-                    # yet no exception, hence the file was most probably
-                    # already present, or is in Git -> not needed
-                    yield get_status_dict(
-                        status='notneeded', type_='file',
-                        message=('%s is already present', p), **common_report)
-                else:
-                    # not a case we want to report beyond what we got from
-                    # `git annex`
-                    pass
+                    refds=refds_path):
+                yield r
 
     @staticmethod
     def custom_result_summary_renderer(res):

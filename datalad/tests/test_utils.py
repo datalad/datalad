@@ -633,5 +633,7 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(abspath(os.curdir)), abspath(os.curdir))
         # subdirs are no issue
         eq_(get_dataset_root(subdir), os.curdir)
+        # even more subdirs are no issue
+        eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
         # non-dir paths are no issue
         eq_(get_dataset_root(fname), os.curdir)

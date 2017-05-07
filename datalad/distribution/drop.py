@@ -15,12 +15,14 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os.path import join as opj
+from os.path import isabs
+from os.path import normpath
+
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod
 from datalad.interface.base import Interface
-from datalad.interface.base import report_result_objects
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -53,12 +55,14 @@ check_argument = Parameter(
 res_kwargs = dict(action='drop', logger=lgr)
 
 
-def _drop_files(ds, files, check):
+def _drop_files(ds, files, check, noannex_iserror=True):
     if not hasattr(ds.repo, 'drop'):
         msg = 'no annex in dataset'
         for f in files:
             yield get_status_dict(
-                status='impossible', path=f, message=msg, **res_kwargs)
+                status='impossible' if noannex_iserror else 'notneeded',
+                path=f if isabs(f) else normpath(opj(ds.path, f)),
+                message=msg, **res_kwargs)
         return
 
     opts = ['--force'] if not check else []

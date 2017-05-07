@@ -14,11 +14,8 @@ from os.path import join as opj
 
 from ..dataset import Dataset
 from datalad.api import create
-from datalad.api import uninstall
 from datalad.utils import chpwd
-from datalad.utils import rmtree
 from datalad.cmd import Runner
-from datalad.support.exceptions import CommandError
 
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import eq_
@@ -28,6 +25,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tree
 
@@ -187,7 +185,11 @@ def test_nested_create(path):
     assert_raises(ValueError, ds.create, lvl2relpath)
     # even with force, as to do this properly complicated surgery would need to
     # take place
-    assert_raises(CommandError, ds.create, lvl2relpath, force=True)
+    assert_in_results(
+        ds.create(lvl2relpath, force=True,
+                  on_failure='ignore', result_xfm=None, result_filter=None,
+                  return_type='generator'),
+        status='error', action='add')
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself

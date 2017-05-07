@@ -36,6 +36,7 @@ from os.path import isdir
 from os.path import relpath
 from os.path import stat
 from os.path import dirname
+from os.path import split as psplit
 
 
 from six import text_type, binary_type, string_types
@@ -1190,11 +1191,16 @@ def get_dataset_root(path):
     suffix = os.sep + opj('.git', 'objects')
     if not isdir(path):
         path = dirname(path)
-    while not exists(path + suffix):
-        path = opj(path, os.pardir)
-        if not exists(path):
-            return None
-    return normpath(path)
+    apath = abspath(path)
+    # while we can still go up
+    while psplit(apath)[1]:
+        if exists(path + suffix):
+            return path
+        # new test path in the format we got it
+        path = normpath(opj(path, os.pardir))
+        # no luck, next round
+        apath = abspath(path)
+    return None
 
 
 lgr.log(5, "Done importing datalad.utils")
