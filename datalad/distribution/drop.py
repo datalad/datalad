@@ -55,12 +55,12 @@ check_argument = Parameter(
 res_kwargs = dict(action='drop', logger=lgr)
 
 
-def _drop_files(ds, files, check):
+def _drop_files(ds, files, check, noannex_iserror=True):
     if not hasattr(ds.repo, 'drop'):
         msg = 'no annex in dataset'
         for f in files:
             yield get_status_dict(
-                status='impossible',
+                status='impossible' if noannex_iserror else 'notneeded',
                 path=f if isabs(f) else normpath(opj(ds.path, f)),
                 message=msg, **res_kwargs)
         return
