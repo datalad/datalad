@@ -467,11 +467,13 @@ class Get(Interface):
 
         # explore the unknown
         for path in sorted(unavailable_paths):
+            lgr.debug("Investigate non-existing path %s", path)
             # how close can we get?
             dspath = get_dataset_root(path)
             if dspath is None:
                 # nothing we can do for this path
                 continue
+            lgr.debug("Found containing dataset %s for path %s", dspath, path)
             ds = Dataset(dspath)
             # now actually obtain whatever is necessary to get to this path
             containing_ds = ds
