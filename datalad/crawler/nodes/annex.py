@@ -168,12 +168,8 @@ class initiate_dataset(object):
             # place hack from 'add-to-super' times here
             sds = ds.get_superdataset()
             if sds is not None:
-                # TODO this should use the `add` command and not this helper
-                from datalad.distribution.add import _install_subds_inplace
-                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
-                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
-                _install_subds_inplace(ds=sds, path=ds.path,
-                                       relativepath=subdsrelpath)
+                lgr.debug("Adding %s as a subdataset to %s", ds, sds)
+                sds.add(ds.path, save=False)
                 # this leaves the subdataset staged in the parent
             elif str(self.add_to_super) != 'auto':
                 raise ValueError(

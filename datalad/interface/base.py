@@ -18,7 +18,6 @@ lgr = logging.getLogger('datalad.interface.base')
 import sys
 import re
 import textwrap
-from os.path import curdir
 import inspect
 from collections import OrderedDict
 
@@ -314,12 +313,16 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Get', 'Clone', 'Subdatasets', 'Install'):
+        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Remove', 'Get', 'Clone', 'Subdatasets', 'Install', 'Add'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
             kwargs['result_renderer'] = args.common_output_format
+            if '{' in args.common_output_format:
+                # stupid hack, could and should become more powerful
+                kwargs['result_renderer'] = \
+                    lambda x, **kwargs: ui.message(args.common_output_format.format(**x))
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options

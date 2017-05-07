@@ -42,7 +42,7 @@ res_kwargs = dict(action='uninstall', logger=lgr)
 
 def _uninstall_dataset(ds, check, has_super):
     if check and ds.is_installed():
-        for r in _drop_files(ds, curdir, check=True):
+        for r in _drop_files(ds, curdir, check=True, noannex_iserror=False):
             yield r
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and

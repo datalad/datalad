@@ -22,11 +22,9 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
-from datalad.support.network import SSHRI
 from datalad.support.network import PathRI
 from datalad.utils import knows_annex
 
-from .dataset import Dataset
 
 lgr = logging.getLogger('datalad.distribution.utils')
 
