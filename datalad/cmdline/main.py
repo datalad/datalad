@@ -339,9 +339,13 @@ def main(args=None):
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
                 if exc.stdout:
-                    os.write(1, exc.stdout)
+                    os.write(1, exc.stdout.encode()) \
+                        if hasattr(exc.stdout, 'encode')  \
+                        else os.write(1, exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr)
+                    os.write(2, exc.stderr.encode()) \
+                        if hasattr(exc.stderr, 'encode')  \
+                        else os.write(2, exc.stderr)
                 sys.exit(exc.code)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
