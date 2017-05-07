@@ -108,13 +108,16 @@ def setup_parser(
         variables in the process environment.""")
     parser.add_argument(
         '--output-format', dest='common_output_format',
-        choices=['default', 'json', 'tailored'],
         default='default',
+        metavar="{default,json,tailored,'<template>'",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
         'json' renders a JSON object with all properties for each result (one per 
         line); 'tailored' enables a command-specific rendering style that is typically
-        tailored to human consumption (no result output otherwise).""")
+        tailored to human consumption (no result output otherwise),
+        '<template>' reports any value(s) of any result properties in any format
+        indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices).""")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],

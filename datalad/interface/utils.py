@@ -39,8 +39,6 @@ from datalad.utils import assure_list
 from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
-from datalad.utils import swallow_logs
-from datalad.utils import better_wraps
 from datalad.utils import unique
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
@@ -54,11 +52,12 @@ from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
 from datalad.support.constraints import Constraint
-from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureCallable
 from datalad.support.param import Parameter
+
+from datalad.ui import ui
 
 from .base import Interface
 from .base import update_docstring_with_parameters
@@ -1004,7 +1003,12 @@ def eval_results(func):
             on_failure = common_params['on_failure']
             if not result_renderer:
                 result_renderer = dlcfg.get('datalad.api.result-renderer', None)
+            # track what actions were performed how many times
+            action_summary = {}
             for res in results:
+                actsum = action_summary.get(res['action'], {})
+                actsum[res['status']] = actsum.get(res['status'], 0) + 1
+                action_summary[res['action']] = actsum
                 ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
@@ -1040,17 +1044,18 @@ def eval_results(func):
                 ## output rendering
                 if result_renderer == 'default':
                     # TODO have a helper that can expand a result message
-                    print('{action}({status}): {path}{msg}'.format(
+                    ui.message('{action}({status}): {path}{type}{msg}'.format(
                         action=res['action'],
                         status=res['status'],
                         path=relpath(res['path'],
                                      res['refds']) if res.get('refds', None) else res['path'],
+                        type=' ({})'.format(res['type']) if 'type' in res else '',
                         msg=' [{}]'.format(
                             res['message'][0] % res['message'][1:]
                             if isinstance(res['message'], tuple) else res['message'])
                         if 'message' in res else ''))
                 elif result_renderer == 'json':
-                    print(json.dumps(
+                    ui.message(json.dumps(
                         {k: v for k, v in res.items()
                          if k not in ('message', 'logger')},
                         sort_keys=True))
@@ -1064,6 +1069,17 @@ def eval_results(func):
                     if res is None:
                         continue
                 yield res
+
+            if result_renderer == 'default' and action_summary and \
+                    sum(sum(s.values()) for s in action_summary.values()) > 1:
+                # give a summary in default mode, when there was more than one
+                # action performed
+                ui.message("action summary:\n  {}".format(
+                    '\n  '.join('{} ({})'.format(
+                        act,
+                        ', '.join('{}: {}'.format(status, action_summary[act][status])
+                                  for status in sorted(action_summary[act])))
+                                for act in sorted(action_summary))))
 
             if incomplete_results:
                 # stupid catch all message <- tailor TODO
