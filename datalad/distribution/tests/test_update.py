@@ -246,17 +246,17 @@ def test_update_volatile_subds(originpath, destpath):
     osm1 = origin.create(sname)
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     # nothing without a merge, no inappropriate magic
-    assert_not_in(sname, ds.get_subdatasets())
+    assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
     # known, and placeholder exists
-    assert_in(sname, ds.get_subdatasets())
+    assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_(exists(opj(ds.path, sname)))
 
     # remove from origin
     origin.remove(sname)
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
     # gone locally, wasn't checked out
-    assert_not_in(sname, ds.get_subdatasets())
+    assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     assert_false(exists(opj(ds.path, sname)))
 
     # re-introduce at origin
@@ -270,12 +270,12 @@ def test_update_volatile_subds(originpath, destpath):
 
     # now remove just-installed subdataset from origin again
     origin.remove(sname, check=False)
-    assert_not_in(sname, origin.get_subdatasets())
-    assert_in(sname, ds.get_subdatasets())
+    assert_not_in(sname, origin.subdatasets(result_xfm='relpaths'))
+    assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
     assert_result_count(ds.update(merge=True), 1, type='dataset')
-    assert_not_in(sname, ds.get_subdatasets())
+    assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
 

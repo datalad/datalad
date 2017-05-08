@@ -341,10 +341,10 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    eq_(len(source.get_subdatasets()), 2)
+    eq_(len(source.subdatasets()), 2)
     # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
-    eq_(len(source.get_subdatasets()), 3)
+    eq_(len(source.subdatasets()), 3)
     ok_clean_git(source.path)
 
     # and now we create a sibling for the new subdataset only

@@ -392,6 +392,6 @@ def test_ignore_nondatasets(path):
         assert_equal(meta, _kill_time(get_metadata(ds)))
         # making it a submodule has no effect either
         ds.add(subpath)
-        assert_equal(len(ds.get_subdatasets()), n_subm + 1)
+        assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
