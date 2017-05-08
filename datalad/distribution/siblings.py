@@ -170,9 +170,6 @@ class Siblings(Interface):
 
         res_kwargs = dict(refds=refds_path)
 
-        # do we have instructions to register siblings with some alternative
-        # layout?
-        replicate_local_structure = "%NAME" not in url
         ds_name = basename(dataset.path)
 
         # do not form single list of datasets (with recursion results) to
@@ -193,6 +190,10 @@ class Siblings(Interface):
             yield r
         if not recursive:
             return
+
+        # do we have instructions to register siblings with some alternative
+        # layout?
+        replicate_local_structure = url and "%NAME" not in url
 
         for subds in dataset.subdatasets(
                 fulfilled=True,
