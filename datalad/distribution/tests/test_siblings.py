@@ -26,7 +26,7 @@ from nose.tools import eq_, ok_
 # work on cloned repos to be safer
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
-def test_add_sibling(origin, repo_path):
+def test_siblings(origin, repo_path):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"

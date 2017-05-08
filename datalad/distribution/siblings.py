@@ -115,9 +115,10 @@ class Siblings(Interface):
         # --template/cfgfrom gh-1462 (maybe also for a one-time inherit)
         # --wanted gh-925 (also see below for add_sibling approach)
 
-        ## same as add_sibling
-        # --fetch
-
+        fetch=Parameter(
+            args=("--fetch",),
+            action="store_true",
+            doc="""fetch the sibling after configuration"""),
         as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
@@ -138,6 +139,8 @@ class Siblings(Interface):
             name=None,
             url=None,
             pushurl=None,
+            # TODO consider true, for now like add_sibling
+            fetch=False,
             as_common_datasrc=None,
             publish_depends=None,
             publish_by_default=None,
@@ -182,6 +185,7 @@ class Siblings(Interface):
                 # for top-level dataset there is no layout questions
                 _mangle_urls(url, ds_name),
                 _mangle_urls(pushurl, ds_name),
+                fetch,
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_group, annex_groupwanted,
                 inherit,
@@ -208,6 +212,7 @@ class Siblings(Interface):
                     subds, name,
                     subds_url,
                     subds_pushurl,
+                    fetch,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_group, annex_groupwanted,
                     inherit,
@@ -217,7 +222,7 @@ class Siblings(Interface):
 
 # always copy signature from above to avoid bugs
 def _add_remote(
-        ds, name, url, pushurl,
+        ds, name, url, pushurl, fetch,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -253,7 +258,7 @@ def _add_remote(
         return
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, url, pushurl,
+            ds, name, url, pushurl, fetch,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_group, annex_groupwanted,
             inherit,
@@ -265,7 +270,7 @@ def _add_remote(
 
 # always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, url, pushurl,
+        ds, name, url, pushurl, fetch,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -306,6 +311,11 @@ def _configure_remote(
             **result_props)
         return
 
+    if fetch:
+        # fetch the remote so we are up to date
+        lgr.debug("Fetching sibling %s of %s", name, ds)
+        # TODO better use `ds.update`
+        ds.repo.fetch(name)
     # report all we know at once
     info = list(_query_remotes(ds, name))[0]
     info.update(dict(status='ok', **result_props))
@@ -314,7 +324,7 @@ def _configure_remote(
 
 # always copy signature from above to avoid bugs
 def _query_remotes(
-        ds, name, url=None, pushurl=None,
+        ds, name, url=None, pushurl=None, fetch=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
@@ -338,7 +348,11 @@ def _query_remotes(
 
 
 def _remove_remote(
-        ds, name, **res_kwargs):
+        ds, name, url, pushurl, fetch,
+        as_common_datasrc, publish_depends, publish_by_default,
+        annex_wanted, annex_group, annex_groupwanted,
+        inherit,
+        **res_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
         raise InsufficientArgumentsError("no sibling name given")

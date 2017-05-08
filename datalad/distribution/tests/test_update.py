@@ -125,8 +125,8 @@ def test_update_fetch_all(src, remote_1, remote_2):
     rmt2 = AnnexRepo.clone(src, remote_2)
 
     ds = Dataset(src)
-    ds.add_sibling(name="sibling_1", url=remote_1)
-    ds.add_sibling(name="sibling_2", url=remote_2)
+    ds.siblings('add', name="sibling_1", url=remote_1)
+    ds.siblings('add', name="sibling_2", url=remote_2)
 
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
