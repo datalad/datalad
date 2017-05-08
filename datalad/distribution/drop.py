@@ -30,6 +30,8 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
 from datalad.interface.results import results_from_paths
 from datalad.interface.results import annexjson2result
+from datalad.interface.results import success_status_map
+from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -55,6 +57,8 @@ check_argument = Parameter(
 
 
 def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
+    if 'action' not in kwargs:
+        kwargs['action'] = 'drop'
     # always need to make sure that we pass a list
     # `normalize_paths` decorator will otherwise screw all logic below
     files = assure_list(files)
@@ -68,10 +72,23 @@ def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
         return
 
     opts = ['--force'] if not check else []
+    respath_by_status = {}
     for res in ds.repo.drop(files, options=opts):
-        yield annexjson2result(
+        res = annexjson2result(
             # annex reports are always about files
             res, ds, type_='file', **kwargs)
+        success = success_status_map[res['status']]
+        respath_by_status[success] = \
+            respath_by_status.get(success, []) + [res['path']]
+        yield res
+    # report on things requested that annex was silent about
+    for r in results_from_annex_noinfo(
+            ds, files, respath_by_status,
+            dir_fail_msg='could not drop some content in %s %s',
+            noinfo_dir_msg='nothing to drop from %s',
+            noinfo_file_msg="%s has no annex'ed content",
+            **kwargs):
+        yield r
 
 
 @build_doc

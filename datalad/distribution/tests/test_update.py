@@ -80,7 +80,9 @@ def test_update_simple(origin, src_path, dst_path):
     # smoke-test if recursive update doesn't fail if submodule is removed
     # and that we can run it from within a dataset without providing it
     # explicitly
-    assert_status('ok', dest.remove('subm 1'))
+    assert_result_count(
+        dest.remove('subm 1'), 1,
+        status='ok', action='remove', path=opj(dest.path, 'subm 1'))
     with chpwd(dest.path):
         assert_result_count(
             update(recursive=True), 2,
