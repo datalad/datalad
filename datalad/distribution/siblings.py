@@ -56,6 +56,31 @@ class Siblings(Interface):
             metavar='NAME',
             doc="""name of the sibling""",
             constraints=EnsureStr() | EnsureNone()),
+        ## actions
+        # --add gh-1235
+        # --remove gh-1483
+        # --query (implied)
+        # --reconfigure gh-1235
+
+        ## info options
+        # --description gh-1484
+        # --template/cfgfrom gh-1462 (maybe also for a one-time inherit)
+        # --wanted gh-925 (also see below for add_sibling approach)
+
+        ## same as add_sibling
+        # --url
+        # --pushurl
+        # --fetch
+        # --force
+
+        #as_common_datasrc=as_common_datasrc,
+        #publish_depends=publish_depends,
+        #publish_by_default=publish_by_default,
+        #annex_wanted=annex_wanted_opt,
+        #annex_group=annex_group_opt,
+        #annex_groupwanted=annex_groupwanted_opt,
+        #inherit=inherit_opt
+
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
 
@@ -73,7 +98,10 @@ class Siblings(Interface):
 
         res_kwargs = dict(refds=refds_path)
 
-        for r in _query_remotes(dataset, name, **res_kwargs):
+        # imaging switching layer here that decides what function to call
+        worker = _query_remotes
+
+        for r in worker(dataset, name, **res_kwargs):
             yield r
         if not recursive:
             return
@@ -82,7 +110,7 @@ class Siblings(Interface):
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
-            for r in _query_remotes(ds, name, **res_kwargs):
+            for r in worker(ds, name, **res_kwargs):
                 yield r
 
 
