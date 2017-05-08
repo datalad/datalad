@@ -695,15 +695,17 @@ def _discover_trace_to_known(path, trace, spec):
                 spec[p] = list(set(spec.get(p, []) + [trace[i + 1]]))
             # this edge is not done, we need to try to reach any downstream
             # dataset
-    # OPT TODO? listdir might be large and we could have only few items
-    #  in spec -- so why not to traverse only those in spec which have
-    #  leading dir path???
     for p in listdir(path):
         if valid_repo and p == '.git':
             # ignore gitdir to speed things up
             continue
         p = opj(path, p)
         if not isdir(p):
+            continue
+        if all(t != p and not t.startswith(_with_sep(p)) for t in spec):
+            # OPT listdir might be large and we could have only few items
+            # in spec -- so traverse only those in spec which have
+            # leading dir path
             continue
         _discover_trace_to_known(p, trace, spec)
 
