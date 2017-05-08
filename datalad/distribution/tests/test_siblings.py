@@ -10,18 +10,21 @@
 """
 
 from os.path import join as opj, basename
-from datalad.api import install, add_sibling
+from datalad.api import install, siblings
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import with_tempfile, assert_in, with_testrepos
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_result_count
 
 from nose.tools import eq_, ok_
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
+# work on cloned repos to be safer
+@with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_add_sibling(origin, repo_path):
 
@@ -33,7 +36,7 @@ def test_add_sibling(origin, repo_path):
     # we need a dataset to work at
     with chpwd(repo_path):  # not yet there
         assert_raises(InsufficientArgumentsError,
-                      add_sibling, url=httpurl1)
+                      siblings, 'add', url=httpurl1)
 
     # prepare src
     source = install(repo_path, source=origin, recursive=True)
@@ -42,30 +45,36 @@ def test_add_sibling(origin, repo_path):
     source.config.add(depvar, 'stupid', where='local')
 
     # cannot configure unknown remotes as dependencies
-    assert_raises(
-        ValueError,
-        add_sibling,
+    res = siblings(
+        'configure',
         dataset=source,
         name="test-remote",
         url=httpurl1,
         publish_depends=['r1', 'r2'],
-        force=True)
+        on_failure='ignore')
+    assert_status('error', res)
+    assert_in('unknown sibling(s) specified as publication dependency',
+              res[0]['message'])
     # prior config was changed by failed call above
     eq_(source.config.get(depvar, None), 'stupid')
 
-    res = add_sibling(dataset=source, name="test-remote",
-                      url=httpurl1,
-                      force=True)
+    res = siblings('configure',
+                   dataset=source, name="test-remote",
+                   url=httpurl1,
+                   result_xfm='paths')
 
-    eq_(res, [basename(source.path)])
+    eq_(res, [source.path])
     assert_in("test-remote", source.repo.get_remotes())
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
 
-    # doing it again doesn't do anything
-    res = add_sibling(dataset=source, name="test-remote",
-                      url=httpurl1)
-    eq_(res, [])
+    # re-adding doesn't work
+    res = siblings('add', dataset=source, name="test-remote",
+                   url=httpurl1, on_failure='ignore')
+    assert_status('error', res)
+    # reconfiguring doesn't change anything
+    siblings('configure', dataset=source, name="test-remote",
+             url=httpurl1)
     assert_in("test-remote", source.repo.get_remotes())
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
@@ -73,56 +82,60 @@ def test_add_sibling(origin, repo_path):
     # add to another remote automagically taking it from the url
     # and being in the dataset directory
     with chpwd(source.path):
-        res = add_sibling(httpurl2)
-    eq_(res, [basename(source.path)])
+        res = siblings('add', url=httpurl2)
+    assert_result_count(
+        res, 1,
+        name="remote2.example.com", type='sibling')
     assert_in("remote2.example.com", source.repo.get_remotes())
 
-    # fail with conflicting url:
-    with assert_raises(RuntimeError) as cm:
-        add_sibling(dataset=source, name="test-remote",
-                    url=httpurl1 + "/elsewhere")
-    assert_in("""'test-remote' already exists with conflicting settings""",
-              str(cm.exception))
-
     # don't fail with conflicting url, when using force:
-    res = add_sibling(dataset=source, name="test-remote",
-                      url=httpurl1 + "/elsewhere", force=True)
-    eq_(res, [basename(source.path)])
+    res = siblings('configure',
+                    dataset=source, name="test-remote",
+                    url=httpurl1 + "/elsewhere")
+    assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
 
-    # add a push url without force fails, since in a way the fetch url is the
-    # configured push url, too, in that case:
-    with assert_raises(RuntimeError) as cm:
-        add_sibling(dataset=source, name="test-remote",
-                    url=httpurl1 + "/elsewhere",
-                    pushurl=sshurl, force=False)
-    assert_in("""'test-remote' already exists with conflicting settings""",
-              str(cm.exception))
+
+    # no longer a use case, I would need additional convincing that
+    # this is anyhow useful other then tripple checking other peoples
+    # errors. for an actual check use 'query'
+    # maybe it could be turned into a set of warnings when `configure`
+    # alters an existing setting, but then why call configure, if you
+    # want to keep the old values
+    #with assert_raises(RuntimeError) as cm:
+    #    add_sibling(dataset=source, name="test-remote",
+    #                url=httpurl1 + "/elsewhere")
+    #assert_in("""'test-remote' already exists with conflicting settings""",
+    #          str(cm.exception))
+    ## add a push url without force fails, since in a way the fetch url is the
+    ## configured push url, too, in that case:
+    #with assert_raises(RuntimeError) as cm:
+    #    add_sibling(dataset=source, name="test-remote",
+    #                url=httpurl1 + "/elsewhere",
+    #                pushurl=sshurl, force=False)
+    #assert_in("""'test-remote' already exists with conflicting settings""",
+    #          str(cm.exception))
 
     # add push url (force):
-    res = add_sibling(dataset=source, name="test-remote",
-                      url=httpurl1 + "/elsewhere",
-                      pushurl=sshurl, force=True)
-    eq_(res, [basename(source.path)])
+    res = siblings('configure',
+                   dataset=source, name="test-remote",
+                   url=httpurl1 + "/elsewhere",
+                   pushurl=sshurl)
+    assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
     eq_(sshurl,
         source.repo.get_remote_url("test-remote", push=True))
 
     # recursively:
-    res = add_sibling(dataset=source, name="test-remote",
-                      url=httpurl1 + "/%NAME",
-                      pushurl=sshurl + "/%NAME",
-                      recursive=True,
-                      force=True)
-
-    eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "subm 1"),
-                   opj(basename(source.path), "subm 2")})
-    for repo in [source.repo,
-                 GitRepo(opj(source.path, "subm 1")),
-                 GitRepo(opj(source.path, "subm 2"))]:
+    for r in siblings(
+            'configure',
+            dataset=source, name="test-remote",
+            url=httpurl1 + "/%NAME",
+            pushurl=sshurl + "/%NAME",
+            recursive=True):
+        repo = GitRepo(r['path'], create=False)
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
         pushurl = repo.get_remote_url("test-remote", push=True)
@@ -130,20 +143,17 @@ def test_add_sibling(origin, repo_path):
         ok_(url.endswith(basename(repo.path)))
         ok_(pushurl.startswith(sshurl + '/' + basename(source.path)))
         ok_(pushurl.endswith(basename(repo.path)))
+        eq_(url, r['url'])
+        eq_(pushurl, r['pushurl'])
 
     # recursively without template:
-    res = add_sibling(dataset=source, name="test-remote-2",
-                      url=httpurl1,
-                      pushurl=sshurl,
-                      recursive=True,
-                      force=True)
-    eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "subm 1"),
-                   opj(basename(source.path), "subm 2")})
-
-    for repo in [source.repo,
-                 GitRepo(opj(source.path, "subm 1")),
-                 GitRepo(opj(source.path, "subm 2"))]:
+    for r in siblings(
+            'configure',
+            dataset=source, name="test-remote-2",
+            url=httpurl1,
+            pushurl=sshurl,
+            recursive=True):
+        repo = GitRepo(r['path'], create=False)
         assert_in("test-remote-2", repo.get_remotes())
         url = repo.get_remote_url("test-remote-2")
         pushurl = repo.get_remote_url("test-remote-2", push=True)
@@ -152,3 +162,5 @@ def test_add_sibling(origin, repo_path):
         if repo != source.repo:
             ok_(url.endswith('/' + basename(repo.path)))
             ok_(pushurl.endswith(basename(repo.path)))
+        eq_(url, r['url'])
+        eq_(pushurl, r['pushurl'])

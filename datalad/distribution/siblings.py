@@ -13,6 +13,12 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from os.path import basename
+from os.path import relpath
+
+# XXX confusing: we have urljoin, _urljoin, dlurljoin
+from datalad.distribution.add_sibling import _urljoin
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -23,6 +29,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.network import RI
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import as_common_datasrc
@@ -34,11 +41,19 @@ from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import swallow_logs
+from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 
 lgr = logging.getLogger('datalad.distribution.siblings')
+
+
+def _mangle_urls(url, ds_name):
+    if not url:
+        return url
+    return url.replace("%NAME", ds_name.replace("/", "-"))
+
 
 @build_doc
 class Siblings(Interface):
@@ -132,6 +147,7 @@ class Siblings(Interface):
             inherit=False,
             recursive=False,
             recursion_limit=None):
+
         # TODO catch invalid mode specified
         mode_worker_map = {
             'query': _query_remotes,
@@ -139,6 +155,10 @@ class Siblings(Interface):
             'configure': _configure_remote,
             'remove': _remove_remote,
         }
+        # all worker strictly operate on a single dataset
+        # anything that deals with hierarchies and/or dataset
+        # relationships in general should be dealt with in here
+        # at the top-level and vice versa
         worker = mode_worker_map[mode]
 
         dataset = require_dataset(
@@ -147,13 +167,21 @@ class Siblings(Interface):
 
         res_kwargs = dict(refds=refds_path)
 
+        # do we have instructions to register siblings with some alternative
+        # layout?
+        replicate_local_structure = "%NAME" not in url
+        ds_name = basename(dataset.path)
+
         # do not form single list of datasets (with recursion results) to
         # give fastest possible response, for the precise of a long-all
         # function call
         ds = dataset
         for r in worker(
                 # always copy signature to below to avoid bugs!
-                ds, name, url, pushurl,
+                ds, name,
+                # for top-level dataset there is no layout questions
+                _mangle_urls(url, ds_name),
+                _mangle_urls(pushurl, ds_name),
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_group, annex_groupwanted,
                 inherit,
@@ -162,13 +190,24 @@ class Siblings(Interface):
         if not recursive:
             return
 
-        for ds in dataset.subdatasets(
+        for subds in dataset.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
+            subds_name = relpath(subds.path, start=dataset.path)
+            if replicate_local_structure:
+                subds_url = _urljoin(url, subds_name)
+                subds_pushurl = _urljoin(pushurl, subds_name)
+            else:
+                subds_url = \
+                    _mangle_urls(url, '/'.join([ds_name, subds_name]))
+                subds_pushurl = \
+                    _mangle_urls(pushurl, '/'.join([ds_name, subds_name]))
             for r in worker(
                     # always copy signature from above to avoid bugs
-                    ds, name, url, pushurl,
+                    subds, name,
+                    subds_url,
+                    subds_pushurl,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_group, annex_groupwanted,
                     inherit,
@@ -185,6 +224,21 @@ def _add_remote(
         **res_kwargs):
     # it seems that the only difference is that `add` should fail if a remote
     # already exists
+    if (url is None and pushurl is None):
+        raise InsufficientArgumentsError(
+            """insufficient information to add a sibling
+            (needs at least a dataset, and any URL).""")
+    if url is None:
+        url = pushurl
+
+    if not name:
+        urlri = RI(url)
+        # use the hostname as default remote name
+        name = urlri.hostname
+        lgr.debug(
+            "No sibling name given, use URL hostname '%s' as sibling name",
+            name)
+
     if not name:
         raise InsufficientArgumentsError("no sibling name given")
     if name in ds.repo.get_remotes():
@@ -248,7 +302,7 @@ def _configure_remote(
     except Exception as e:
         yield get_status_dict(
             status='error',
-            message=e.msg,
+            message=exc_str(e),
             **result_props)
         return
 
