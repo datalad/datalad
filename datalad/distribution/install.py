@@ -229,6 +229,7 @@ class Install(Interface):
                         on_failure='ignore',
                         return_type='generator',
                         result_xfm=None,
+                        result_filter=None,
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
@@ -258,6 +259,7 @@ class Install(Interface):
                         on_failure='ignore',
                         return_type='generator',
                         result_xfm=None,
+                        result_filter=None,
                         **common_kwargs):
                     # no post-processing of get'ed content on disk should be
                     # necessary here, this is the responsibility of `get`
