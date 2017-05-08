@@ -146,21 +146,15 @@ def test_uninstall_git_file(path):
     ok_(exists(opj(path, 'INFO.txt')))
     ok_file_under_git(ds.repo.path, 'INFO.txt')
 
-    if not hasattr(ds.repo, 'drop'):
-        # nothing can be dropped in a plain GitRepo
-        assert_status('impossible', ds.drop(path='INFO.txt', on_failure='ignore'))
-    else:
-        # drop file in Git in an annex repo
-        # we could argue that it also should be impossible, but we simply
-        # turn the fact that annex said nothing at all into a result
-        # XXX maybe we actually want to make the 'impossible' result above
-        # also into 'notneeded'... it is less about education that about "can we
-        # we get the content back?", and for a file in Git we can
-        res = ds.drop(path='INFO.txt')
-        assert_result_count(
-            res, 1,
-            status='notneeded',
-            message=("%s has no annex'ed content", opj(ds.path, 'INFO.txt')))
+    # drop file in Git in an annex repo
+    # regardless of the type of repo this is 'notneeded'...
+    # it is less about education that about "can we
+    # we get the content back?", and for a file in Git we can
+    assert_result_count(
+        ds.drop(path='INFO.txt'),
+        1,
+        status='notneeded',
+        message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
     assert_status('error', res)

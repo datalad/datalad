@@ -56,24 +56,40 @@ check_argument = Parameter(
     dest='check')
 
 
-def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
+def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
+    """Helper to drop content in datasets.
+
+    Parameters
+    ----------
+    ds : Dataset
+    paths : path or list(path)
+      which content to drop
+    check : bool
+      whether to instruct annex to perform minimum copy availability
+      checks
+    noannex_iserror : bool
+      whether calling this function on a pur Git repo results in an
+      'impossible' or 'notneeded' result.
+    **kwargs
+      additional payload for the result dicts
+    """
     if 'action' not in kwargs:
         kwargs['action'] = 'drop'
     # always need to make sure that we pass a list
     # `normalize_paths` decorator will otherwise screw all logic below
-    files = assure_list(files)
+    paths = assure_list(paths)
     if not hasattr(ds.repo, 'drop'):
-        msg = 'no annex in dataset'
-        for f in files:
+        for p in paths:
             yield get_status_dict(
                 status='impossible' if noannex_iserror else 'notneeded',
-                path=f if isabs(f) else normpath(opj(ds.path, f)),
-                message=msg, **kwargs)
+                path=p if isabs(p) else normpath(opj(ds.path, p)),
+                message="no annex'ed content",
+                **kwargs)
         return
 
     opts = ['--force'] if not check else []
     respath_by_status = {}
-    for res in ds.repo.drop(files, options=opts):
+    for res in ds.repo.drop(paths, options=opts):
         res = annexjson2result(
             # annex reports are always about files
             res, ds, type_='file', **kwargs)
@@ -83,7 +99,7 @@ def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
         yield res
     # report on things requested that annex was silent about
     for r in results_from_annex_noinfo(
-            ds, files, respath_by_status,
+            ds, paths, respath_by_status,
             dir_fail_msg='could not drop some content in %s %s',
             noinfo_dir_msg='nothing to drop from %s',
             noinfo_file_msg="no annex'ed content",
