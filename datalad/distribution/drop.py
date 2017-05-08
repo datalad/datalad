@@ -18,6 +18,7 @@ from os.path import join as opj
 from os.path import isabs
 from os.path import normpath
 
+from datalad.utils import assure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
@@ -28,6 +29,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
 from datalad.interface.results import results_from_paths
+from datalad.interface.results import annexjson2result
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -52,25 +54,24 @@ check_argument = Parameter(
     dest='check')
 
 
-res_kwargs = dict(action='drop', logger=lgr)
-
-
-def _drop_files(ds, files, check, noannex_iserror=True):
+def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
+    # always need to make sure that we pass a list
+    # `normalize_paths` decorator will otherwise screw all logic below
+    files = assure_list(files)
     if not hasattr(ds.repo, 'drop'):
         msg = 'no annex in dataset'
         for f in files:
             yield get_status_dict(
                 status='impossible' if noannex_iserror else 'notneeded',
                 path=f if isabs(f) else normpath(opj(ds.path, f)),
-                message=msg, **res_kwargs)
+                message=msg, **kwargs)
         return
 
     opts = ['--force'] if not check else []
-    # TODO capture for which files it fails and report them properly
-    # not embedded in a command error
-    for f in ds.repo.drop(files, options=opts):
-        yield get_status_dict(
-            status='ok', path=opj(ds.path, f), **res_kwargs)
+    for res in ds.repo.drop(files, options=opts):
+        yield annexjson2result(
+            # annex reports are always about files
+            res, ds, type_='file', **kwargs)
 
 
 @build_doc
@@ -137,6 +138,8 @@ class Drop(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
         for r in results_from_paths(
                 # justification for status:
                 # content need not be drop where there is none
@@ -153,6 +156,6 @@ class Drop(Interface):
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            for r in _drop_files(ds, paths, check=check):
+            for r in _drop_files(ds, paths, check=check, **res_kwargs):
                 yield r
         # there is nothing to save at the end

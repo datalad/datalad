@@ -175,6 +175,11 @@ known_result_xfms = {
     'relpaths': YieldRelativePaths(),
 }
 
+translate_annex_notes = {
+    '(Use --force to override this check, or adjust numcopies.)':
+        'configured minimum number of copies not found',
+}
+
 
 def annexjson2result(d, ds, **kwargs):
     """Helper to convert an annex JSON result to a datalad result dict
@@ -207,9 +212,11 @@ def annexjson2result(d, ds, **kwargs):
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
-    # avoid meaningless standard message
-    if 'note' in d and d['note'] != 'checksum...':
-        res['message'] = d['note']
+    # avoid meaningless standard messages
+    if 'note' in d and (
+            d['note'] != 'checksum...' and
+            not d['note'].startswith('checking file')):
+        res['message'] = translate_annex_notes.get(d['note'], d['note'])
     return res
 
 

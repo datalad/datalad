@@ -1810,6 +1810,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             commandline options for the git annex drop command
         jobs : int, optional
             how many jobs to run in parallel (passed to git-annex call)
+
+        Returns
+        -------
+        list(JSON objects)
+          'success' item in each object indicates failure/success per file
+          path.
         """
 
         # annex drop takes either files or options

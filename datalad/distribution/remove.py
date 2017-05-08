@@ -42,7 +42,6 @@ from datalad.distribution.uninstall import _uninstall_dataset
 
 
 lgr = logging.getLogger('datalad.distribution.remove')
-res_kwargs = dict(action='remove', logger=lgr)
 
 
 @build_doc
@@ -96,6 +95,7 @@ class Remove(Interface):
             recursive=False,
             check=True,
             if_dirty='save-before'):
+        res_kwargs = dict(action='remove', logger=lgr)
         if dataset:
             dataset = require_dataset(
                 dataset, check_installed=False, purpose='removal')
@@ -112,6 +112,8 @@ class Remove(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        res_kwargs['refds'] = refds_path
         if path_is_under(content_by_ds):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
@@ -152,7 +154,8 @@ class Remove(Interface):
                 superds = ds.get_superdataset(
                     datalad_only=False,
                     topmost=False)
-                for r in _uninstall_dataset(ds, check=check, has_super=False):
+                for r in _uninstall_dataset(ds, check=check, has_super=False,
+                                            **res_kwargs):
                     yield r
                 if not superds:
                     continue

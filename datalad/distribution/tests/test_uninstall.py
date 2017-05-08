@@ -154,7 +154,7 @@ def test_uninstall_git_file(path):
     assert_status('error', res)
     assert_in("will not act on files", res[0]['message'][0])
 
-    # uninstall removes the file:
+    # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
                     result_filter=lambda x: x['action'] == 'remove')
     assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
@@ -292,8 +292,10 @@ def test_uninstall_recursive(path):
     # sane starting point
     ok_(exists(opj(ds.path, target_fname)))
     # doesn't have the minimum number of copies for a safe drop
-    # TODO: better exception
-    assert_raises(CommandError, ds.drop, target_fname, recursive=True)
+    res = ds.drop(target_fname, recursive=True, on_failure='ignore')
+    assert_status('error', res)
+    assert_result_count(res, 1,
+                        message='configured minimum number of copies not found')
     # this should do it
     ds.drop(target_fname, check=False, recursive=True)
     # link is dead
@@ -347,7 +349,8 @@ def test_careless_subdataset_uninstall(path):
 def test_kill(path):
     # nested datasets with load
     ds = Dataset(path).create()
-    with open(opj(ds.path, "file.dat"), 'w') as f:
+    testfile = opj(ds.path, "file.dat")
+    with open(testfile, 'w') as f:
         f.write("load")
     ds.add("file.dat")
     subds = ds.create('deep1')
@@ -355,7 +358,11 @@ def test_kill(path):
     ok_clean_git(ds.path)
 
     # and we fail to remove since content can't be dropped
-    assert_raises(CommandError, ds.remove)
+    res = ds.remove(on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error', path=testfile,
+        message='configured minimum number of copies not found')
     eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
         [subds, ds])
     ok_(not exists(path))
