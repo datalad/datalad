@@ -25,6 +25,13 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import as_common_datasrc
+from datalad.interface.common_opts import publish_depends
+from datalad.interface.common_opts import publish_by_default
+from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_group_opt
+from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import swallow_logs
 
@@ -60,17 +67,33 @@ class Siblings(Interface):
             doc="""name of the sibling""",
             constraints=EnsureStr() | EnsureNone()),
         mode=Parameter(
+            ## actions
+            # add gh-1235
+            # remove gh-1483
+            # query (implied)
+            # configure gh-1235
             args=('mode',),
             nargs='?',
             metavar='MODE',
             doc="""mode""",
             constraints=EnsureChoice('query', 'add', 'remove', 'configure') | EnsureNone()),
-
-        ## actions
-        # add gh-1235
-        # remove gh-1483
-        # query (implied)
-        # configure gh-1235
+        url=Parameter(
+            args=('--url',),
+            doc="""the URL of or path to the dataset sibling named by
+                `name`. For recursive operation it is required that
+                a template string for building subdataset sibling URLs
+                is given.\n List of currently available placeholders:\n
+                %%NAME\tthe name of the dataset, where slashes are replaced by
+                dashes.""",
+            constraints=EnsureStr() | EnsureNone(),
+            nargs="?"),
+        pushurl=Parameter(
+            args=('--pushurl',),
+            doc="""in case the `url` cannot be used to publish to the dataset
+                sibling, this option specifies a URL to be used instead.\nIf no
+                `url` is given, `pushurl` serves as `url` as well.""",
+            constraints=EnsureStr() | EnsureNone()),
+ 
 
         ## info options
         # --description gh-1484
@@ -78,17 +101,15 @@ class Siblings(Interface):
         # --wanted gh-925 (also see below for add_sibling approach)
 
         ## same as add_sibling
-        # --url
-        # --pushurl
         # --fetch
 
-        #as_common_datasrc=as_common_datasrc,
-        #publish_depends=publish_depends,
-        #publish_by_default=publish_by_default,
-        #annex_wanted=annex_wanted_opt,
-        #annex_group=annex_group_opt,
-        #annex_groupwanted=annex_groupwanted_opt,
-        #inherit=inherit_opt
+        as_common_datasrc=as_common_datasrc,
+        publish_depends=publish_depends,
+        publish_by_default=publish_by_default,
+        annex_wanted=annex_wanted_opt,
+        annex_group=annex_group_opt,
+        annex_groupwanted=annex_groupwanted_opt,
+        inherit=inherit_opt,
 
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
@@ -100,6 +121,15 @@ class Siblings(Interface):
             mode='query',
             dataset=None,
             name=None,
+            url=None,
+            pushurl=None,
+            as_common_datasrc=None,
+            publish_depends=None,
+            publish_by_default=None,
+            annex_wanted=None,
+            annex_group=None,
+            annex_groupwanted=None,
+            inherit=False,
             recursive=False,
             recursion_limit=None):
         # TODO catch invalid mode specified
@@ -123,7 +153,11 @@ class Siblings(Interface):
         ds = dataset
         for r in worker(
                 # always copy signature to below to avoid bugs!
-                ds, name, **res_kwargs):
+                ds, name, url, pushurl,
+                as_common_datasrc, publish_depends, publish_by_default,
+                annex_wanted, annex_group, annex_groupwanted,
+                inherit,
+                **res_kwargs):
             yield r
         if not recursive:
             return
@@ -134,14 +168,25 @@ class Siblings(Interface):
                 result_xfm='datasets'):
             for r in worker(
                     # always copy signature from above to avoid bugs
-                    ds, name, **res_kwargs):
+                    ds, name, url, pushurl,
+                    as_common_datasrc, publish_depends, publish_by_default,
+                    annex_wanted, annex_group, annex_groupwanted,
+                    inherit,
+                    **res_kwargs):
                 yield r
 
 
+# always copy signature from above to avoid bugs
 def _add_remote(
-        ds, name, **res_kwargs):
+        ds, name, url, pushurl,
+        as_common_datasrc, publish_depends, publish_by_default,
+        annex_wanted, annex_group, annex_groupwanted,
+        inherit,
+        **res_kwargs):
     # it seems that the only difference is that `add` should fail if a remote
     # already exists
+    if not name:
+        raise InsufficientArgumentsError("no sibling name given")
     if name in ds.repo.get_remotes():
         yield get_status_dict(
             action='add-sibling',
@@ -149,35 +194,77 @@ def _add_remote(
             path=ds.path,
             type_='sibling',
             name=name,
-            message=("sibling is already known: %s", name),
+            message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
-    for r in _configure_remote(ds, name, **res_kwargs):
+    # always copy signature from above to avoid bugs
+    for r in _configure_remote(
+            ds, name, url, pushurl,
+            as_common_datasrc, publish_depends, publish_by_default,
+            annex_wanted, annex_group, annex_groupwanted,
+            inherit,
+            **res_kwargs):
+        if r['action'] == 'configure-sibling':
+            r['action'] = 'add-sibling'
         yield r
 
 
+# always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, **res_kwargs):
+        ds, name, url, pushurl,
+        as_common_datasrc, publish_depends, publish_by_default,
+        annex_wanted, annex_group, annex_groupwanted,
+        inherit,
+        **res_kwargs):
+    result_props = dict(
+        action='configure-sibling',
+        path=ds.path,
+        type_='sibling',
+        name=name,
+        **res_kwargs)
     # cheat and pretend it is all new and shiny already
-    from datalad.distribution.add_sibling import AddSibling
-    AddSibling.__call__(
-        dataset=ds, name=None,
-        url=url, pushurl=pushurl,
-        # never recursive, done outside
-        recursive=False,
-        fetch=fetch,
-        force=True,
-        as_common_datasrc=None,
-        publish_depends=None,
-        publish_by_default=None,
-        annex_wanted=None,
-        annex_group=None,
-        annex_groupwanted=None,
-        inherit=False)
+    try:
+        from datalad.distribution.add_sibling import AddSibling
+        added = AddSibling.__call__(
+            dataset=ds,
+            name=name,
+            url=url,
+            pushurl=pushurl,
+            as_common_datasrc=as_common_datasrc,
+            publish_depends=publish_depends,
+            publish_by_default=publish_by_default,
+            annex_wanted=annex_wanted,
+            annex_group=annex_group,
+            annex_groupwanted=annex_groupwanted,
+            inherit=inherit,
+            # never recursive, done outside
+            recursive=False,
+            # we want to do this in our wrapper code
+            fetch=False,
+            # configure is what `force` was used for previously
+            force=True)
+        # just make sure the legacy code doesn't surprise us
+        assert(len(added) == 1)
+    except Exception as e:
+        yield get_status_dict(
+            status='error',
+            message=e.msg,
+            **result_props)
+        return
+
+    # report all we know at once
+    info = list(_query_remotes(ds, name))[0]
+    info.update(dict(status='ok', **result_props))
+    yield info
 
 
+# always copy signature from above to avoid bugs
 def _query_remotes(
-        ds, name, **res_kwargs):
+        ds, name, url=None, pushurl=None,
+        as_common_datasrc=None, publish_depends=None, publish_by_default=None,
+        annex_wanted=None, annex_group=None, annex_groupwanted=None,
+        inherit=None,
+        **res_kwargs):
     remotes = [name] if name else ds.repo.get_remotes()
     for remote in remotes:
         info = get_status_dict(
