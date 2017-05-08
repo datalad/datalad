@@ -260,6 +260,7 @@ def _install_necessary_subdatasets(
                 status='error', logger=lgr, refds=refds_path,
                 message=("Installation of subdatasets %s failed with exception: %s",
                          subdataset['path'], exc_str(e)))
+            return
 
         cur_par_ds = cur_subds
 
