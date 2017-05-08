@@ -597,7 +597,7 @@ class Get(Interface):
                     ds, content, respath_by_status,
                     dir_fail_msg='could not get some content in %s %s',
                     noinfo_dir_msg='nothing to get from %s',
-                    noinfo_file_msg='%s is already present',
+                    noinfo_file_msg='already present',
                     action='get',
                     logger=lgr,
                     refds=refds_path):

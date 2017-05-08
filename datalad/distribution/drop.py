@@ -86,7 +86,7 @@ def _drop_files(ds, files, check, noannex_iserror=True, **kwargs):
             ds, files, respath_by_status,
             dir_fail_msg='could not drop some content in %s %s',
             noinfo_dir_msg='nothing to drop from %s',
-            noinfo_file_msg="%s has no annex'ed content",
+            noinfo_file_msg="no annex'ed content",
             **kwargs):
         yield r
 

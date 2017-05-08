@@ -308,7 +308,7 @@ class Add(Interface):
                     ds, toadd, respath_by_status,
                     dir_fail_msg='could not add some content in %s %s',
                     noinfo_dir_msg='nothing to add from %s',
-                    noinfo_file_msg='%s is already included in the dataset',
+                    noinfo_file_msg='already included in the dataset',
                     action='add',
                     logger=lgr,
                     refds=refds_path):

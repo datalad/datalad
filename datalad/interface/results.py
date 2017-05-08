@@ -300,9 +300,8 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
       `git annex` was silent about (incl. any content). There must be one string
       placeholder that is expanded with the path of that directory.
     noinfo_file_msg : str
-      Message template to inject into the result for a requested file that `git
-      annex` was silent about. There must be one string placeholder that is
-      expanded with the path of that file.
+      Message to inject into the result for a requested file that `git
+      annex` was silent about.
     **kwargs
       Any further kwargs are included in the yielded result dictionary.
     """
@@ -349,5 +348,5 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
             # already in the desired state
             yield get_status_dict(
                 status='notneeded', type_='file',
-                message=(noinfo_file_msg, p),
+                message=noinfo_file_msg,
                 **common_report)
