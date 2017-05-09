@@ -681,7 +681,31 @@ def get_dataset_directories(top, ignore_datalad=True):
 # processed ones and a base
 # let it simmer for a while and RF to use one or the other
 # this one here seems more leightweight and less convoluted
-def _discover_trace_to_known(basepath, targetpaths, current_trace, spec):
+def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
+    """Discover the edges and nodes in a dataset tree to given target paths
+
+    Parameters
+    ----------
+    basepath : path
+      Path to a start or top-level dataset. Really has to be a path to a
+      dataset!
+    targetpaths : list(path)
+      Any non-zero number of path that are termination points for the
+      search algorithm. Can be paths to datasets, directories, or files
+      (and any combination thereof).
+    current_trace : list
+      For a top-level call this should probably always be `[]`
+    spec : dict
+      `content_by_ds`-style dictionary that will receive information about the
+      discovered datasets. Specifically, for each discovered dataset there
+      will be in item with its path under the key (path) of the respective
+      superdataset.
+
+    Returns
+    -------
+    None
+      Function calls itself recursively and populates `spec` in-place.
+    """
     # this beast walks the directory tree from a given `basepath` until
     # it discovers any of the given `targetpaths`
     # if it finds one, it commits any accummulated trace of visited
@@ -711,7 +735,7 @@ def _discover_trace_to_known(basepath, targetpaths, current_trace, spec):
             continue
         # we need to call this even for non-directories, to be able to match
         # file target paths
-        _discover_trace_to_known(p, targetpaths, current_trace, spec)
+        discover_dataset_trace_to_targets(p, targetpaths, current_trace, spec)
 
 
 def filter_unmodified(content_by_ds, refds, since):

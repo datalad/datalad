@@ -32,7 +32,7 @@ from datalad.interface.results import annexjson2result
 from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import _discover_trace_to_known
+from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.distribution.utils import _fixup_submodule_dotgit_setup
@@ -208,7 +208,7 @@ class Add(Interface):
             # remember the datasets associated with actual inputs
             input_ds = list(content_by_ds.keys())
             # forge chain from base dataset to any leaf dataset
-            _discover_trace_to_known(
+            discover_dataset_trace_to_targets(
                 # from here
                 dataset.path,
                 # to any dataset we are aware of

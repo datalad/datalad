@@ -29,7 +29,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import _discover_trace_to_known
+from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
@@ -193,7 +193,7 @@ class Remove(Interface):
         if dataset and dataset.is_installed():
             # forge chain from base dataset to any leaf dataset
             # in order to save state changes all the way up
-            _discover_trace_to_known(
+            discover_dataset_trace_to_targets(
                 # from here
                 dataset.path,
                 # to any of
