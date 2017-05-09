@@ -131,6 +131,12 @@ class Subdatasets(Interface):
     "url"
         URL of the subdataset recorded in the parent
 
+    Performance note: Requesting `bottomup` reporting order, or a particular
+    numerical `recursion_limit` implies an internal switch to an alternative
+    query implementation for recursive query that is more flexible, but also
+    notably slower (performs one call to Git per dataset versus a single call
+    for all combined).
+
     """
     _params_ = dict(
         dataset=Parameter(
