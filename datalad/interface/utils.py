@@ -185,68 +185,62 @@ def get_tree_roots(paths):
     return roots
 
 
-def sort_paths_into_subdatasets(superds_path, target_subs, spec):
-    # XXX forge a chain: whenever some path needs to be pushed down
-    # put the receiving dataset as a components to process into the
-    # respective superdataset -- this will enable further processing
-    # of all datasets in a completely independent fashion
-    # (except for order of processing)
+def sort_paths_into_subdatasets(spec):
+    """Sort a `content_by_ds` dict to have paths match their closest subdataset
 
-    subds = Dataset(superds_path)
+    This function is cheap and performs no Dataset requests (e.g. subdatasets)
+    or any kind of file-system lookups. Consequently, the result is not
+    guaranteed to yield a true path-subdataset assignment. It only works with
+    the dataset paths included in `spec`. Use a helper like
+    `discover_dataset_trace_to_targets()` to prepopulate the `spec` with all
+    relevant datasets to ensure a result that matches the content in the
+    filesystem.
 
-    # get all existing subdataset as candidate nodes of the graph
-    # that needs to be built and checked
-    # OPT TODO:  this is the expensive one!  e.g we might have a big
-    #       hierarchy of datasets and interested in analyzing only a single
-    #       target_subds -- now it gets the entire hierarchy first (EXPENSIVE)
-    #       to look/check just one... bleh... and then even better -- would continue
-    #       out of the loop if that dataset is already known
-    #       Moreover possibly causing entire recursive traversal of sub-datasets
-    #       multiple times if operating from some higher level super and sorted
-    #       target_subds in multiple subs
-    # Delay expensive operation
-    subds_graph = None
-    # so we first get immediate children, delaying even check for being fulfilled
-    subdss = subds.subdatasets(recursive=False, fulfilled=None, result_xfm='paths')
-    if not subdss:
-        # no subdatasets, nothing to sort
-        return
-    for t in target_subs:
-        if t in subdss and GitRepo.is_valid_repo(t):  # fastest possible test for "installed?"
-            # immediate known kiddo
-            continue
-        if subds_graph is None:
-            subds_graph = [(r['parentpath'], r['path'])
-                           for r in Dataset(superds_path).subdatasets(
-                           recursive=True, fulfilled=True)]
+    Paths are sorted to be assigned to the dataset path key that is the
+    closest, but not identical match. Hence, if any path to a dataset
+    it contained in a `spec` value, it will not be re-assigned to its
+    "own" `spec`-key, but is assigned to its superdataset. However, see the
+    note below.
 
-        trace = get_trace(
-            subds_graph,
-            superds_path,
-            t)
-        if not trace:
-            # not connected, or identical
-            continue
-        tosort = [superds_path] + trace + [t]
-        # loop over all but the last one, simplifies logic below
-        for i, d in enumerate(tosort[:-1]):
-            paths = spec.get(d, [])
-            keep_paths = []
-            next_ds = tosort[i + 1]
-            next_dspaths = spec.get(next_ds, [])
-            comp = _with_sep(next_ds)
-            for p in assure_list(paths):
-                if p.startswith(comp):
-                    next_dspaths.append(p)
-                    # remember that we pushed the path into this dataset
-                    keep_paths.append(next_ds)
-                else:
-                    keep_paths.append(p)
-            spec[next_ds] = next_dspaths
-            spec[d] = keep_paths
-    # tidy up -- deduplicate
-    for c in spec:
-        spec[c] = unique(spec[c])
+    Note, no path is ever re-assigned upward in the hierarchy.
+
+    Parameters
+    ----------
+    spec : dict
+      content_by_ds style dict that will be sorted in-place.
+
+    Returns
+    -------
+    None
+    """
+    # paths to all known dataset, bottom-up
+    dspaths = [(p, _with_sep(p)) for p in sorted(spec.keys(), reverse=True)]
+    # loop over all dataset entries, top-down
+    for ds in sorted(spec):
+        # for each unique path recorded for this dataset check if it should
+        # move
+        paths = spec[ds]
+        filtered_paths = []
+        for path in unique(paths):
+            # check all other known dataset in bottom-up fashion
+            # for the first dataset that "contains" this path
+            moveto = None
+            for targetkey, targetpath in dspaths:
+                if targetkey == ds:
+                    # we reached the current dataset on out way up,
+                    # everything beyond here is already sorted
+                    break
+                if path.startswith(targetpath) and path != targetkey:
+                    # move path down
+                    moveto = targetkey
+                    # this was the longest match, done
+                    break
+            if moveto:
+                spec[moveto].append(path)
+            else:
+                filtered_paths.append(path)
+        # reassign what wasn't moved, deduplicated at the same time
+        spec[ds] = filtered_paths
 
 
 def save_dataset_hierarchy(
@@ -295,7 +289,15 @@ def save_dataset_hierarchy(
     # save the superdataset
     for superds_path in superdss:
         target_subs = superdss[superds_path]
-        sort_paths_into_subdatasets(superds_path, target_subs, info)
+        # populate `info` with intermediate datasets
+        discover_dataset_trace_to_targets(
+            # from here
+            superds_path,
+            # to all
+            target_subs,
+            [], info)
+        # and now assign all paths to the corresponding datasets
+        sort_paths_into_subdatasets(info)
     # iterate over all datasets, starting at the bottom
     for dpath in sorted(info.keys(), reverse=True):
         ds = Dataset(dpath)
