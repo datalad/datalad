@@ -681,33 +681,37 @@ def get_dataset_directories(top, ignore_datalad=True):
 # processed ones and a base
 # let it simmer for a while and RF to use one or the other
 # this one here seems more leightweight and less convoluted
-def _discover_trace_to_known(path, trace, spec):
-    # this beast walks the directory tree from a given `path` until
-    # it discovers a known dataset (i.e. recorded in the spec)
+def _discover_trace_to_known(basepath, targetpaths, current_trace, spec):
+    # this beast walks the directory tree from a given `basepath` until
+    # it discovers any of the given `targetpaths`
     # if it finds one, it commits any accummulated trace of visited
     # datasets on this edge to the spec
-    valid_repo = GitRepo.is_valid_repo(path)
+    valid_repo = GitRepo.is_valid_repo(basepath)
     if valid_repo:
-        trace = trace + [path]
-        if path in spec:
-            # found a known repo, commit the trace
-            for i, p in enumerate(trace[:-1]):
-                spec[p] = list(set(spec.get(p, []) + [trace[i + 1]]))
-            # this edge is not done, we need to try to reach any downstream
-            # dataset
-    for p in listdir(path):
+        # we are passing into a new dataset, extend the dataset trace
+        current_trace = current_trace + [basepath]
+    if basepath in targetpaths:
+        # found a targetpath, commit the trace
+        for i, p in enumerate(current_trace[:-1]):
+            spec[p] = list(set(spec.get(p, []) + [current_trace[i + 1]]))
+    if not isdir(basepath):
+        # nothing underneath this one -> done
+        return
+    # this edge is not done, we need to try to reach any downstream
+    # dataset
+    for p in listdir(basepath):
         if valid_repo and p == '.git':
             # ignore gitdir to speed things up
             continue
-        p = opj(path, p)
-        if not isdir(p):
-            continue
-        if all(t != p and not t.startswith(_with_sep(p)) for t in spec):
+        p = opj(basepath, p)
+        if all(t != p and not t.startswith(_with_sep(p)) for t in targetpaths):
             # OPT listdir might be large and we could have only few items
-            # in spec -- so traverse only those in spec which have
-            # leading dir path
+            # in `targetpaths` -- so traverse only those in spec which have
+            # leading dir basepath
             continue
-        _discover_trace_to_known(p, trace, spec)
+        # we need to call this even for non-directories, to be able to match
+        # file target paths
+        _discover_trace_to_known(p, targetpaths, current_trace, spec)
 
 
 def filter_unmodified(content_by_ds, refds, since):

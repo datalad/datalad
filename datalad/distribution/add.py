@@ -208,7 +208,13 @@ class Add(Interface):
             # remember the datasets associated with actual inputs
             input_ds = list(content_by_ds.keys())
             # forge chain from base dataset to any leaf dataset
-            _discover_trace_to_known(dataset.path, [], content_by_ds)
+            _discover_trace_to_known(
+                # from here
+                dataset.path,
+                # to any dataset we are aware of
+                list(content_by_ds.keys()),
+                [],
+                content_by_ds)
             if ds2super:
                 # now check all dataset entries corresponding to the original
                 # input to see if they contain their own paths and remove them
