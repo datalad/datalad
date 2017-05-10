@@ -18,10 +18,14 @@ from subprocess import call
 from datalad.api import add
 from datalad.api import create
 from datalad.api import create_test_dataset
+from datalad.api import Dataset
 from datalad.api import install
 from datalad.api import ls
+from datalad.api import remove
+from datalad.api import uninstall
 
 from datalad.utils import rmtree
+from datalad.utils import getpwd
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -102,15 +106,32 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
 
     def setup_cache(self):
         # creating in CWD so things get removed when ASV is done
-        return create_test_dataset("testds1", spec='2/-3/-2', seed=0)[0]
+        ds_path = create_test_dataset("testds1", spec='2', seed=0)[0]
+        tarfile_path = opj(osp.dirname(ds_path), 'testds1.tar')
+        import tarfile
+        with tarfile.open(tarfile_path, "w") as tar:
+            # F.CK -- Python tarfile can't later extract those because key dirs are
+            # read-only.  For now just a workaround - make it all writeable
+            from datalad.utils import rotree
+            rotree('testds1', ro=False, chmod_files=False)
+            tar.add('testds1', recursive=True)
+        rmtree('testds1')
+
+        return tarfile_path
 
     def setup(self, orig_ds_path):
-        self.ds = install(orig_ds_path + '_clone',
-                          source=orig_ds_path,
-                          recursive=True)
-        # 0.5.x versions return a list of all installed datasets when recursive
-        if isinstance(self.ds, list):
-            self.ds = self.ds[0]
+        # self.ds = install(orig_ds_path + '_clone',
+        #                   source=orig_ds_path,
+        #                   recursive=True)
+        import tarfile
+        tempdir = osp.dirname(orig_ds_path)
+        with tarfile.open(orig_ds_path) as tar:
+            tar.extractall(tempdir)
+        self.ds = Dataset(opj(tempdir, 'testds1'))
+        sys.stderr.write("HERE: %s\n" % self.ds)
+        # # 0.5.x versions return a list of all installed datasets when recursive
+        # if isinstance(self.ds, list):
+        #     self.ds = self.ds[0]
 
     def teardown(self, orig_ds_path):
         rmtree(self.ds.path)
@@ -122,6 +143,10 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
         # somewhat duplicating setup but lazy to do different one for now
         assert install(self.ds.path + '_', source=self.ds.path, recursive=True)
 
+    # def time_installcopy(self, orig_ds_path):
+    #     import shutil
+    #     shutil.copytree(orig_ds_path, self.ds.path + '___')
+
     def time_createadd(self, orig_ds_path):
         assert self.ds.create('newsubds')
 
@@ -131,3 +156,10 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
 
     def time_ls(self, orig_ds_path):
         ls(self.ds.path)
+
+    # TODO: since doesn't really allow to uninstall top level ds... bleh ;)
+    #def time_uninstall(self, orig_ds_path):
+    #    uninstall(self.ds.path, recursive=True)
+
+    def time_remove(self, orig_ds_path):
+        remove(self.ds.path, recursive=True)
