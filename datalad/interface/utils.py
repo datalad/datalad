@@ -512,7 +512,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     # paths that don't exist (yet)
     unavailable_paths = []
     nondataset_paths = []
-    for path in paths:
+    for path in unique(paths):
         if not lexists(path):
             # not there yet, impossible to say which ds it will actually
             # be in, if any
@@ -527,24 +527,53 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
             d = dirname(path)
             if not d:
                 d = curdir
-        # this could be `None` if there is no git repo
-        dspath = dir_lookup.get(d, get_dataset_root(d))
-        dir_lookup[d] = dspath
+
+        dspath = dir_lookup.get(d, None)
+        if dspath:
+            _ds_looked_up = True
+        else:
+            _ds_looked_up = False
+            # this could be `None` if there is no git repo
+            dspath = get_dataset_root(d)
+            dir_lookup[d] = dspath
+
         if not dspath:
             nondataset_paths.append(path)
             continue
+
+        if path in out.get(dspath, []):
+            # we already recorded this path in the output
+            # this can happen, whenever `path` is a subdataset, that was
+            # discovered via recursive processing of another path before
+            continue
+
         if isdir(path):
             ds = Dataset(dspath)
             # we need to doublecheck that this is not a subdataset mount
-            # point, in which case get_toppath() would point to the parent
-            smpath = ds.get_containing_subdataset(
-                path, recursion_limit=1).path
-            if smpath != dspath:
-                # fix entry
-                dir_lookup[d] = smpath
-                # submodule still needs to be obtained
-                unavailable_paths.append(path)
-                continue
+            # point, in which case get_dataset_root() would point to the parent.
+
+            if not _ds_looked_up:
+                # we didn't deal with it before
+
+                smpath = ds.get_containing_subdataset(
+                    path, recursion_limit=1).path
+                if smpath != dspath:
+                    # fix entry
+                    dir_lookup[d] = smpath
+                    # submodule still needs to be obtained
+                    unavailable_paths.append(path)
+                    continue
+            else:
+                # we figured out the dataset previously, so we can spare some
+                # effort by not calling ds.subdatasets or
+                # ds.get_containing_subdataset. Instead we just need
+                # get_dataset_root, which is cheaper
+                if dspath != get_dataset_root(dspath):
+                    # if the looked up path isn't the default value,
+                    # it's a 'fixed' entry for an unavailable dataset (see above)
+                    unavailable_paths.append(path)
+                    continue
+
             if recursive:
                 # make sure we get everything relevant in all _checked out_
                 # subdatasets, obtaining of previously unavailable subdataset
@@ -561,6 +590,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         out[subdspath] = out.get(
                             subdspath,
                             [subdspath] if sub_paths else [])
+
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 
