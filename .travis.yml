@@ -89,6 +89,9 @@ matrix:
     # see  https://github.com/datalad/datalad/issues/878
     env:
     - TMPDIR="/var/tmp/sym link"
+    - TESTS_TO_PERFORM="datalad/distribution/tests/test_create_sibling.py:test_target_ssh_simple"
+    - DATALAD_LOG_LEVEL=DEBUG
+    - DATALAD_LOG_TRACEBACK=10
   - python: 2.7
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
