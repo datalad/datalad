@@ -682,13 +682,13 @@ git update-server-info
 # DataLad
 #
 # (Re)generate meta-data for DataLad Web UI and possibly init new submodules
-dsdir={path}
-logfile=$dsdir/{WEB_META_LOG}/{log_filename}
+dsdir="{path}"
+logfile="$dsdir/{WEB_META_LOG}/{log_filename}"
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file "$dsdir"; ) \
+  && ( cd ..; GIT_DIR="$PWD/.git" datalad ls -a --json file "$dsdir"; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
 
