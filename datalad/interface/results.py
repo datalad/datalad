@@ -57,13 +57,13 @@ def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
     """
 
     d = {}
-    if action:
+    if action is not None:
         d['action'] = action
     if ds:
         d['path'] = ds.path
         d['type'] = 'dataset'
     # now overwrite automatic
-    if path:
+    if path is not None:
         d['path'] = path
     if type_:
         d['type'] = type_
@@ -71,10 +71,10 @@ def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
         d['logger'] = logger
     if refds:
         d['refds'] = refds
-    if status:
+    if status is not None:
         # TODO check for known status label
         d['status'] = status
-    if message:
+    if message is not None:
         d['message'] = message
     if kwargs:
         d.update(kwargs)
