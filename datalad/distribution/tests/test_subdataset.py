@@ -35,7 +35,7 @@ def test_get_subdatasets(path):
     # obtain key subdataset, so all leave subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
     eq_(ds.subdatasets(result_xfm='relpaths'), ['sub dataset1'])
-    eq_([(r['parentpath'], r['path']) for r in ds.subdatasets()],
+    eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
         [(path, opj(path, 'sub dataset1'))])
     eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
         'sub dataset1',
@@ -58,7 +58,7 @@ def test_get_subdatasets(path):
         'sub dataset1',
         'sub dataset1/sub sub dataset1',
     ])
-    eq_([(relpath(r['parentpath'], start=ds.path), relpath(r['path'], start=ds.path))
+    eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
         (os.curdir, 'sub dataset1'),
         ('sub dataset1', 'sub dataset1/sub sub dataset1'),
@@ -84,5 +84,5 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('url', 'state', 'reccommit', 'name'):
+        for prop in ('url', 'state', 'reccommit', 'subds_name'):
             assert_in(prop, r)

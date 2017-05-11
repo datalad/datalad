@@ -62,7 +62,7 @@ def _parse_gitmodules(dspath):
         modprops = {opt: parser.get_value(sec, opt)
                     for opt in parser.options(sec)
                     if not (opt.startswith('__') or opt == 'path')}
-        modprops['name'] = sec[11:-1]
+        modprops['subds_name'] = sec[11:-1]
         mods[modpath] = modprops
     return mods
 
@@ -99,7 +99,7 @@ def _parse_git_submodules(dspath, recursive):
         if props:
             sm['reccommit'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
-            sm['describe'] = props.group(3)
+            sm['reccommit_descr'] = props.group(3)
         else:
             props = submodule_nodescribe_props.match(line[1:])
             sm['reccommit'] = props.group(1)
@@ -114,9 +114,6 @@ class Subdatasets(Interface):
     The following properties are reported (if possible) for each matching
     subdataset record.
 
-    "describe"
-        Output of `git describe` for the subdataset
-
     "name"
         Name of the subdataset in the parent (often identical with the
         relative path in the parent dataset)
@@ -124,7 +121,7 @@ class Subdatasets(Interface):
     "path"
         Absolute path to the subdataset
 
-    "parentpath"
+    "parentds"
         Absolute path to the parent dataset
 
     "reccommit"
@@ -133,6 +130,9 @@ class Subdatasets(Interface):
     "state"
         Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
         as reported by `git submodule`
+
+    "reccommit_descr"
+        Output of `git describe` for the subdataset
 
     "url"
         URL of the subdataset recorded in the parent
@@ -222,7 +222,7 @@ class Subdatasets(Interface):
                     refds=refds_path,
                     logger=lgr)
                 subdsres.update(sm)
-                subdsres['parentpath'] = parent
+                subdsres['parentds'] = parent
                 if (fulfilled is None or
                         GitRepo.is_valid_repo(sm['path']) == fulfilled):
                     yield subdsres
@@ -246,7 +246,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             type_='dataset',
             logger=lgr)
         subdsres.update(sm)
-        subdsres['parentpath'] = dspath
+        subdsres['parentds'] = dspath
         if not bottomup and \
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm['path']) == fulfilled):
