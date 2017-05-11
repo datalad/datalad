@@ -77,6 +77,8 @@ def pipeline(bucket,
       What strategy to use whenever processing "delete" event, See `crawl_s3` node for more information.
     drop : bool, optional
       Drop all the files whenever done crawling
+    **kwargs:
+      passed into simple_with_archives.pipeline
     """
 
     lgr.info("Creating a pipeline for the %s bucket", bucket)
