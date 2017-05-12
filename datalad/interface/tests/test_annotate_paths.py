@@ -10,6 +10,8 @@
 
 """
 
+from copy import deepcopy
+
 from os.path import join as opj
 from os.path import basename
 
@@ -143,4 +145,40 @@ def test_annotate_paths(dspath, nodspath):
     eq_(res, droppedres)
 
     # now try the same on an uninstalled dataset
-    # TODO
+    subdspath = opj('b', 'bb')
+    # before
+    before_res = ds.annotate_paths(subdspath, recursive=True)
+    assert_result_count(before_res, 3, status='', type='dataset')
+    uninstall_res = ds.uninstall(subdspath, recursive=True, check=False)
+    assert_result_count(uninstall_res, 3, status='ok', type='dataset')
+    # after
+    after_res = ds.annotate_paths(subdspath)
+    # uninstall hides all low-level datasets
+    assert_result_count(after_res, 1)
+    # but for the top-most uninstalled one it merely changes the type
+    # to be a directory in the parent.
+    # XXX consider making this look like a subdataset (type=dataset,
+    # parentds=likenow), but add something like state=absent
+    # this way we can use this info in, e.g., `get` right away and
+    # don't have to rediscover the relationship
+    assert_result_count(
+        after_res, 1, type='directory',
+        **{k: before_res[0][k] for k in before_res[0] if k not in ('type',)})
+
+    # feed annotated paths into annotate_paths, it shouldn't change things
+    # upon second run
+    # datasets and file
+    res = ds.annotate_paths(['.', fpath], recursive=True)
+    # make a copy, just to the sure
+    orig_res = deepcopy(res)
+    assert_result_count(res, 7)
+    # and in again, no recursion this time
+    res_again = ds.annotate_paths(res)
+    # doesn't change a thing
+    eq_(orig_res, res_again)
+    # and in again, with recursion this time
+    res_recursion_again = ds.annotate_paths(res, recursive=True)
+    assert_result_count(res_recursion_again, 7)
+    # doesn't change a thing
+    # TODO right now does change some props
+    eq_(orig_res, res_recursion_again)

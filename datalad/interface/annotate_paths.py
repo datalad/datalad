@@ -313,19 +313,19 @@ class AnnotatePaths(Interface):
             if not dspath:
                 # not in any dataset
                 res = get_status_dict(
-                    status=nondataset_path_status,
-                    message='path not associated with any dataset',
                     **dict(res_kwargs, **path_props))
+                res['status'] = nondataset_path_status,
+                res['message'] = 'path not associated with any dataset'
                 reported_paths[path] = res
                 yield res
                 continue
 
             # check that we only got SUBdatasets
             if refds_path and not _with_sep(dspath).startswith(_with_sep(refds_path)):
-                res = get_status_dict(
-                    status=nondataset_path_status,
-                    message=('path not part of the reference dataset at %s', refds_path),
-                    **dict(res_kwargs, **path_props))
+                res = get_status_dict(**dict(res_kwargs, **path_props))
+                res['status'] = nondataset_path_status,
+                res['message'] = \
+                    ('path not part of the reference dataset at %s', refds_path)
                 reported_paths[path] = res
                 yield res
                 continue
@@ -335,18 +335,17 @@ class AnnotatePaths(Interface):
                 message = unavailable_path_msg if unavailable_path_msg else None
                 if message and '%s' in message:
                     message = (message, path)
-                res = get_status_dict(
-                    status=unavailable_path_status,
-                    **dict(res_kwargs, **path_props))
+                res = get_status_dict(**dict(res_kwargs, **path_props))
+                res['status'] = unavailable_path_status,
                 reported_paths[path] = res
                 yield res
                 continue
 
             if path_props.get('type', None) == 'file':
                 # nothing else we can learn about this
-                res = get_status_dict(
-                    status='',
-                    **dict(res_kwargs, **path_props))
+                res = get_status_dict(**dict(res_kwargs, **path_props))
+                if 'status' not in res:
+                    res['status'] = ''
                 reported_paths[path] = res
                 yield res
                 continue
@@ -356,9 +355,9 @@ class AnnotatePaths(Interface):
             # we need to doublecheck that this is not a subdataset mount
             # point, in which case get_dataset_root() would point to the parent.
 
-            res = get_status_dict(
-                status='',
-                **dict(res_kwargs, **path_props))
+            res = get_status_dict(**dict(res_kwargs, **path_props))
+            if 'status' not in res:
+                res['status'] = ''
             reported_paths[path] = res
             yield res
 
