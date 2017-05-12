@@ -140,12 +140,6 @@ class AnnotatePaths(Interface):
     FILLMEIN
     """
     _params_ = dict(
-        dataset=Parameter(
-            args=("-d", "--dataset"),
-            doc="""specify the dataset to configure.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the input and/or the current working directory""",
-            constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar="PATH",
@@ -154,6 +148,12 @@ class AnnotatePaths(Interface):
             dataset use the `add` command""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc="""specify the dataset to configure.  If
+            no dataset is given, an attempt is made to identify the dataset
+            based on the input and/or the current working directory""",
+            constraints=EnsureDataset() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         action=Parameter(
@@ -185,8 +185,8 @@ class AnnotatePaths(Interface):
     @datasetmethod(name='annotate_paths')
     @eval_results
     def __call__(
-            dataset=None,
             path=None,
+            dataset=None,
             recursive=False,
             recursion_limit=None,
             action=None,
@@ -218,7 +218,6 @@ class AnnotatePaths(Interface):
                     status=nondataset_path_status,
                     message='given reference dataset is not a dataset',
                     path=refds_path,
-                    type='dataset',
                     **res_kwargs)
                 return
 
@@ -241,7 +240,7 @@ class AnnotatePaths(Interface):
                 return
             else:
                 # yield the dataset itself
-                yield get_status_dict(ds=refds, **res_kwargs)
+                yield get_status_dict(ds=refds, status='', **res_kwargs)
                 return
 
         # goal: structure in a way that makes most information on any path
@@ -371,6 +370,7 @@ class AnnotatePaths(Interface):
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
                         del r['refds']
+                    reported_paths[r['path']] = r
                     yield r
 
         return
