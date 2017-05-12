@@ -44,7 +44,6 @@ from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
-from datalad.tests.utils import assert_result_count
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -229,6 +228,7 @@ class Install(Interface):
                         on_failure='ignore',
                         return_type='generator',
                         result_xfm=None,
+                        result_filter=None,
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
@@ -258,6 +258,7 @@ class Install(Interface):
                         on_failure='ignore',
                         return_type='generator',
                         result_xfm=None,
+                        result_filter=None,
                         **common_kwargs):
                     # no post-processing of get'ed content on disk should be
                     # necessary here, this is the responsibility of `get`

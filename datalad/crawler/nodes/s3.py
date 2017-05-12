@@ -42,6 +42,8 @@ def get_version_for_key(k, fmt='0.0.%Y%m%d'):
 
     Uses 0.0.YYYYMMDD by default
     """
+    if isinstance(k, Prefix):
+        return None
     t = iso8601_to_epoch(k.last_modified)
     # format it
     return time.strftime(fmt, time.gmtime(t))
@@ -211,7 +213,7 @@ class crawl_s3(object):
                 if staged:
                     if self.versionfx and e_prev is not None:
                         version = self.versionfx(e_prev)
-                        if version not in stats.versions:
+                        if version is not None and version not in stats.versions:
                             stats.versions.append(version)
                     if versions_db:
                         # save current "version" DB so we would know where to pick up from

@@ -32,7 +32,7 @@ from datalad.interface.results import annexjson2result
 from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import _discover_trace_to_known
+from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.distribution.utils import _fixup_submodule_dotgit_setup
@@ -208,7 +208,13 @@ class Add(Interface):
             # remember the datasets associated with actual inputs
             input_ds = list(content_by_ds.keys())
             # forge chain from base dataset to any leaf dataset
-            _discover_trace_to_known(dataset.path, [], content_by_ds)
+            discover_dataset_trace_to_targets(
+                # from here
+                dataset.path,
+                # to any dataset we are aware of
+                list(content_by_ds.keys()),
+                [],
+                content_by_ds)
             if ds2super:
                 # now check all dataset entries corresponding to the original
                 # input to see if they contain their own paths and remove them
@@ -308,7 +314,7 @@ class Add(Interface):
                     ds, toadd, respath_by_status,
                     dir_fail_msg='could not add some content in %s %s',
                     noinfo_dir_msg='nothing to add from %s',
-                    noinfo_file_msg='%s is already included in the dataset',
+                    noinfo_file_msg='already included in the dataset',
                     action='add',
                     logger=lgr,
                     refds=refds_path):

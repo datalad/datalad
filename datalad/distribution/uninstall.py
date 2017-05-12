@@ -37,12 +37,11 @@ from datalad.utils import rmtree
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
-res_kwargs = dict(action='uninstall', logger=lgr)
 
-
-def _uninstall_dataset(ds, check, has_super):
+def _uninstall_dataset(ds, check, has_super, **kwargs):
     if check and ds.is_installed():
-        for r in _drop_files(ds, curdir, check=True, noannex_iserror=False):
+        for r in _drop_files(
+                ds, curdir, check=True, noannex_iserror=False, **kwargs):
             yield r
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
@@ -55,7 +54,7 @@ def _uninstall_dataset(ds, check, has_super):
             message=(
                 'to be uninstalled dataset %s has present subdatasets, forgot --recursive?',
                 ds),
-            **res_kwargs)
+            **kwargs)
         return
     # Close any possibly associated process etc with underlying repo.
     # Otherwise - rmtree could fail to remove e.g. under NFS which would
@@ -69,7 +68,7 @@ def _uninstall_dataset(ds, check, has_super):
         os.makedirs(ds.path)
     # invalidate loaded ConfigManager:
     ds._cfg = None
-    yield get_status_dict(status='ok', ds=ds, **res_kwargs)
+    yield get_status_dict(status='ok', ds=ds, **kwargs)
 
 
 @build_doc
@@ -134,6 +133,9 @@ class Uninstall(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        res_kwargs = dict(action='uninstall', logger=lgr, refds=refds_path)
+
         if path_is_under(content_by_ds.keys()):
             # behave like `rm` and refuse to remove where we are
             raise ValueError(
@@ -186,6 +188,7 @@ class Uninstall(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             # we confirmed the super dataset presence above
-            for r in _uninstall_dataset(ds, check=check, has_super=True):
+            for r in _uninstall_dataset(ds, check=check, has_super=True,
+                                        **res_kwargs):
                 yield r
         # there is nothing to save at the end

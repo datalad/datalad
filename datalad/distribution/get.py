@@ -260,6 +260,7 @@ def _install_necessary_subdatasets(
                 status='error', logger=lgr, refds=refds_path,
                 message=("Installation of subdatasets %s failed with exception: %s",
                          subdataset['path'], exc_str(e)))
+            return
 
         cur_par_ds = cur_subds
 
@@ -597,7 +598,7 @@ class Get(Interface):
                     ds, content, respath_by_status,
                     dir_fail_msg='could not get some content in %s %s',
                     noinfo_dir_msg='nothing to get from %s',
-                    noinfo_file_msg='%s is already present',
+                    noinfo_file_msg='already present',
                     action='get',
                     logger=lgr,
                     refds=refds_path):
