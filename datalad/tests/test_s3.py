@@ -51,3 +51,16 @@ def test_version_url():
     for url in urls:
         # so we didn't grab other files along with the same prefix
         ok_startswith(url, 'http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt?versionId=')
+
+
+@use_cassette('s3_test_version_url_deleted')
+def test_version_url_deleted():
+    get_test_providers('s3://openneuro/')  # to verify having credentials to access
+    # openfmri via S3
+    # it existed and then was removed
+    fpath = "ds000158/ds158_R1.0.1/compressed/ds000158_R1.0.1_sub001-055.zip"
+    url = "http://openneuro.s3.amazonaws.com/%s" % fpath
+    turl = "http://openneuro.s3.amazonaws.com/%s?versionId=null" % fpath
+    eq_(get_versioned_url(url), turl)
+    # too heavy for verification!
+    #eq_(get_versioned_url(url, verify=True), turl)

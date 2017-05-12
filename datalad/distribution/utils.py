@@ -32,6 +32,7 @@ from datalad.support.exceptions import InstallFailedError
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import SSHRI
 from datalad.support.network import PathRI
 from datalad.dochelpers import exc_str
 from datalad.utils import swallow_logs

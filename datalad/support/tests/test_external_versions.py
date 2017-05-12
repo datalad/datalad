@@ -183,3 +183,19 @@ def test_list_tuple():
 
     for v in thing_with_list_version, thing_with_tuple_version, '0.1', (0, 1), [0, 1]:
         yield _test_list_tuple, v
+
+
+def test_system_ssh_version():
+    ev = ExternalVersions()
+    assert ev['cmd:system-ssh']  # usually we have some available at boxes we test
+
+    for s, v in [
+        ('OpenSSH_7.4p1 Debian-6, OpenSSL 1.0.2k  26 Jan 2017', '7.4p1'),
+    ]:
+        ev = ExternalVersions()
+        # TODO: figure out leaner way
+        class _runner(object):
+            def run(self, cmd):
+                return "", s
+        with patch('datalad.support.external_versions._runner', _runner()):
+            assert_equal(ev['cmd:system-ssh'], v)

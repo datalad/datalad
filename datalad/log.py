@@ -140,6 +140,7 @@ class ColorFormatter(logging.Formatter):
             return record.msg
 
         levelname = record.levelname
+
         if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
             fore_color = colors.LOG_LEVEL_COLORS[levelname]
             levelname_color = (colors.COLOR_SEQ % fore_color) + \

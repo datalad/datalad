@@ -357,11 +357,23 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_OUTPUTS*: 
+- *DATALAD_LOG_CMD_OUTPUTS*:
   Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
+- *DATALAD_LOG_CMD_ENV*:
+  If contains a digit (e.g. 1), would log entire environment passed into
+  the Runner.run's popen call.  Otherwise could be a comma separated list
+  of environment variables to log
+- *DATALAD_LOG_CMD_STDIN*:
+  Either to log stdin for the command
+- *DATALAD_LOG_CMD_CWD*:
+  Either to log cwd where command to be executed
+- *DATALAD_LOG_PID*
+  To instruct datalad to log PID of the process
+- *DATALAD_LOG_TARGET*
+  Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
   Used to add timestamp to datalad logs
-- *DATALAD_LOG_TRACEBACK*: 
+- *DATALAD_LOG_TRACEBACK*:
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_EXC_STR_TBLIMIT*: 
