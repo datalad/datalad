@@ -1081,6 +1081,9 @@ def eval_results(func):
                     res_lgr = getattr(res_lgr, default_logchannels[res['status']])
                 if res_lgr and 'message' in res:
                     msg = res['message']
+                    if 'path' in res:
+                        msg = '{} [{}({})]'.format(
+                            msg, res['action'], res['path'])
                     if isinstance(msg, tuple):
                         # support string expansion of logging to avoid runtime cost
                         res_lgr(*msg)
