@@ -92,7 +92,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
     for res in ds.repo.drop(paths, options=opts):
         res = annexjson2result(
             # annex reports are always about files
-            res, ds, type_='file', **kwargs)
+            res, ds, type='file', **kwargs)
         success = success_status_map[res['status']]
         respath_by_status[success] = \
             respath_by_status.get(success, []) + [res['path']]

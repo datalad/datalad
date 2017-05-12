@@ -256,7 +256,7 @@ def _install_necessary_subdatasets(
         except Exception as e:
             # skip all of downstairs, if we didn't manage to install subdataset
             yield get_status_dict(
-                'install', path=subdataset['path'], type_='dataset',
+                'install', path=subdataset['path'], type='dataset',
                 status='error', logger=lgr, refds=refds_path,
                 message=("Installation of subdatasets %s failed with exception: %s",
                          subdataset['path'], exc_str(e)))
@@ -587,7 +587,7 @@ class Get(Interface):
                     content,
                     options=['--from=%s' % source] if source else [],
                     jobs=jobs):
-                res = annexjson2result(res, ds, type_='file', logger=lgr,
+                res = annexjson2result(res, ds, type='file', logger=lgr,
                                        refds=refds_path)
                 success = success_status_map[res['status']]
                 respath_by_status[success] = \

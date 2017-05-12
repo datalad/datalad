@@ -218,7 +218,7 @@ class Subdatasets(Interface):
                 subdsres = get_status_dict(
                     'subdataset',
                     status='ok',
-                    type_='dataset',
+                    type='dataset',
                     refds=refds_path,
                     logger=lgr)
                 subdsres.update(sm)
@@ -243,7 +243,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
         subdsres = get_status_dict(
             'subdataset',
             status='ok',
-            type_='dataset',
+            type='dataset',
             logger=lgr)
         subdsres.update(sm)
         subdsres['parentds'] = dspath

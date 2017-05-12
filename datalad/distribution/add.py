@@ -247,7 +247,7 @@ class Add(Interface):
                     yield get_status_dict(
                         path=subds_path,
                         status='notneeded',
-                        type_='dataset',
+                        type='dataset',
                         message=("already known subdataset: %s", subds_path),
                         **common_report)
                     continue
@@ -295,7 +295,7 @@ class Add(Interface):
                     # filter out .gitmodules, because this is only included for
                     # technical reasons and has nothing to do with the actual content
                     continue
-                res = annexjson2result(a, ds, type_='file', **common_report)
+                res = annexjson2result(a, ds, type='file', **common_report)
                 if GitRepo.is_valid_repo(res['path']):
                     # more accurate report in case of an added submodule
                     # mountpoint.
