@@ -15,6 +15,7 @@ import logging
 import re
 from os.path import join as opj
 from os.path import normpath
+from os.path import exists
 
 from git import GitConfigParser
 
@@ -68,6 +69,11 @@ def _parse_gitmodules(dspath):
 
 def _parse_git_submodules(dspath, recursive):
     """All known ones with some properties"""
+    if not exists(opj(dspath, ".gitmodules")):
+        # easy way out. if there is no .gitmodules file
+        # we cannot have (functional) subdatasets
+        return
+
     # this will not work in direct mode, need better way #1422
     cmd = ['git', '--work-tree=.', 'submodule', 'status']
     if recursive:
