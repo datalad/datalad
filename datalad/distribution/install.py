@@ -44,6 +44,7 @@ from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
+from datalad.tests.utils import assert_result_count
 
 from .dataset import Dataset
 from .dataset import datasetmethod
