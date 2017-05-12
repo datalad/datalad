@@ -43,9 +43,9 @@ def test_dont_trip_over_missing_subds(path):
         source=ds2.path, path='subds2',
         result_xfm='datasets', return_type='item-or-list')
     assert_true(subds2.is_installed())
-    assert_in('subds2', ds1.get_subdatasets())
+    assert_in('subds2', ds1.subdatasets(result_xfm='relpaths'))
     subds2.uninstall()
-    assert_in('subds2', ds1.get_subdatasets())
+    assert_in('subds2', ds1.subdatasets(result_xfm='relpaths'))
     assert_false(subds2.is_installed())
     # see if it wants to talk to github (and fail), or if it trips over something
     # before

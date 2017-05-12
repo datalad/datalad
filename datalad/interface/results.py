@@ -175,6 +175,11 @@ known_result_xfms = {
     'relpaths': YieldRelativePaths(),
 }
 
+translate_annex_notes = {
+    '(Use --force to override this check, or adjust numcopies.)':
+        'configured minimum number of copies not found',
+}
+
 
 def annexjson2result(d, ds, **kwargs):
     """Helper to convert an annex JSON result to a datalad result dict
@@ -207,9 +212,11 @@ def annexjson2result(d, ds, **kwargs):
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
-    # avoid meaningless standard message
-    if 'note' in d and d['note'] != 'checksum...':
-        res['message'] = d['note']
+    # avoid meaningless standard messages
+    if 'note' in d and (
+            d['note'] != 'checksum...' and
+            not d['note'].startswith('checking file')):
+        res['message'] = translate_annex_notes.get(d['note'], d['note'])
     return res
 
 
@@ -293,9 +300,8 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
       `git annex` was silent about (incl. any content). There must be one string
       placeholder that is expanded with the path of that directory.
     noinfo_file_msg : str
-      Message template to inject into the result for a requested file that `git
-      annex` was silent about. There must be one string placeholder that is
-      expanded with the path of that file.
+      Message to inject into the result for a requested file that `git
+      annex` was silent about.
     **kwargs
       Any further kwargs are included in the yielded result dictionary.
     """
@@ -342,5 +348,5 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
             # already in the desired state
             yield get_status_dict(
                 status='notneeded', type_='file',
-                message=(noinfo_file_msg, p),
+                message=noinfo_file_msg,
                 **common_report)
