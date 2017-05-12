@@ -70,7 +70,7 @@ def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
     subds2 = ds.create('two')
-    eq_(sorted(ds.get_subdatasets()), ['one', 'two'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
     res = ds.remove(
@@ -80,23 +80,23 @@ def test_clean_subds_removal(path):
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
-    eq_(ds.get_subdatasets(), ['two'])
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['two'])
     # one is gone
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
     ds.save(all_updated=True)
-    eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
-    eq_(sorted(ds.get_subdatasets()), ['three', 'two'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ok_(not subds2.is_installed())
     assert(exists(subds2.path))
     res = ds.remove('two', result_xfm='datasets')
     ok_clean_git(ds.path)
     # subds1 got uninstalled, and ds got the removal of subds1 saved
     eq_(res, [subds2, ds])
-    eq_(ds.get_subdatasets(), ['three'])
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
     #import pdb; pdb.set_trace()
     assert(not exists(subds2.path))
 
@@ -146,15 +146,21 @@ def test_uninstall_git_file(path):
     ok_(exists(opj(path, 'INFO.txt')))
     ok_file_under_git(ds.repo.path, 'INFO.txt')
 
-    if not hasattr(ds.repo, 'drop'):
-        # nothing can be dropped in a plain GitRepo
-        assert_status('impossible', ds.drop(path='INFO.txt', on_failure='ignore'))
+    # drop file in Git in an annex repo
+    # regardless of the type of repo this is 'notneeded'...
+    # it is less about education that about "can we
+    # we get the content back?", and for a file in Git we can
+    assert_result_count(
+        ds.drop(path='INFO.txt'),
+        1,
+        status='notneeded',
+        message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
     assert_status('error', res)
     assert_in("will not act on files", res[0]['message'][0])
 
-    # uninstall removes the file:
+    # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
                     result_filter=lambda x: x['action'] == 'remove')
     assert_raises(AssertionError, ok_file_under_git, ds.repo.path, 'INFO.txt')
@@ -168,37 +174,35 @@ def test_uninstall_subdataset(src, dst):
 
     ds = install(dst, source=src, recursive=True)
     ok_(ds.is_installed())
-    known_subdss = ds.get_subdatasets()
-    for subds_path in ds.get_subdatasets():
-        subds = Dataset(opj(ds.path, subds_path))
+    known_subdss = ds.subdatasets(result_xfm='datasets')
+    for subds in ds.subdatasets(result_xfm='datasets'):
         ok_(subds.is_installed())
 
         annexed_files = subds.repo.get_annexed_files()
         subds.repo.get(annexed_files)
 
         # drop data of subds:
-        res = ds.drop(path=subds_path, result_xfm='paths')
+        res = ds.drop(path=subds.path, result_xfm='paths')
 
         ok_(all([opj(subds.path, f) in res for f in annexed_files]))
         ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
         # subdataset is still known
-        assert_in(subds_path, ds.get_subdatasets())
+        assert_in(subds.path, ds.subdatasets(result_xfm='paths'))
 
-    eq_(ds.get_subdatasets(), known_subdss)
+    eq_(ds.subdatasets(result_xfm='datasets'), known_subdss)
 
-    for subds_path in ds.get_subdatasets():
+    for subds in ds.subdatasets(result_xfm='datasets'):
         # uninstall subds itself:
         if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
                 and external_versions['git'] < '2.0.9':
             raise SkipTest(
                 "Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds_path, result_xfm='datasets')
-        subds = Dataset(opj(ds.path, subds_path))
+        res = ds.uninstall(path=subds.path, result_xfm='datasets')
         eq_(res[0], subds)
         ok_(not subds.is_installed())
         # just a deinit must not remove the subdataset registration
-        eq_(ds.get_subdatasets(), known_subdss)
+        eq_(ds.subdatasets(result_xfm='datasets'), known_subdss)
         # mountpoint of subdataset should still be there
         ok_(exists(subds.path))
 
@@ -292,8 +296,10 @@ def test_uninstall_recursive(path):
     # sane starting point
     ok_(exists(opj(ds.path, target_fname)))
     # doesn't have the minimum number of copies for a safe drop
-    # TODO: better exception
-    assert_raises(CommandError, ds.drop, target_fname, recursive=True)
+    res = ds.drop(target_fname, recursive=True, on_failure='ignore')
+    assert_status('error', res)
+    assert_result_count(res, 1,
+                        message='configured minimum number of copies not found')
     # this should do it
     ds.drop(target_fname, check=False, recursive=True)
     # link is dead
@@ -331,7 +337,7 @@ def test_careless_subdataset_uninstall(path):
     ds = Dataset(path).create()
     subds1 = ds.create('deep1')
     ds.create('deep2')
-    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
     ok_clean_git(ds.path)
     # now we kill the sub without the parent knowing
     subds1.uninstall()
@@ -340,22 +346,27 @@ def test_careless_subdataset_uninstall(path):
     ok_(exists(subds1.path))
     ok_clean_git(ds.path)
     # parent still knows the sub
-    eq_(sorted(ds.get_subdatasets()), ['deep1', 'deep2'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
 
 
 @with_tempfile()
 def test_kill(path):
     # nested datasets with load
     ds = Dataset(path).create()
-    with open(opj(ds.path, "file.dat"), 'w') as f:
+    testfile = opj(ds.path, "file.dat")
+    with open(testfile, 'w') as f:
         f.write("load")
     ds.add("file.dat")
     subds = ds.create('deep1')
-    eq_(sorted(ds.get_subdatasets()), ['deep1'])
+    eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
     ok_clean_git(ds.path)
 
     # and we fail to remove since content can't be dropped
-    assert_raises(CommandError, ds.remove)
+    res = ds.remove(on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error', path=testfile,
+        message='configured minimum number of copies not found')
     eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
         [subds, ds])
     ok_(not exists(path))

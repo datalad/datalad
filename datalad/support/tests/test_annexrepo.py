@@ -405,18 +405,10 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    try:
-        with swallow_logs() as cml:
-            ar.drop(testfile)
-            assert_in('ERROR', cml.out)
-            assert_in('drop: 1 failed', cml.out)
-    except CommandError as e:
-        eq_(e.code, 1)
-        assert_in('Could only verify the '
-                  'existence of 0 out of 1 necessary copies', e.stdout)
-        failed = True
-
-    ok_(failed)
+    res = ar.drop(testfile)
+    eq_(res['command'], 'drop')
+    eq_(res['success'], False)
+    assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
@@ -1219,8 +1211,10 @@ def test_annex_drop(src, dst):
     result = ar.drop([testfile])
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
-    eq_(result[0], testfile)
     eq_(len(result), 1)
+    eq_(result[0]['command'], 'drop')
+    eq_(result[0]['success'], True)
+    eq_(result[0]['file'], testfile)
 
     ar.get(testfile)
 
@@ -1229,8 +1223,10 @@ def test_annex_drop(src, dst):
     result = ar.drop([testkey], key=True)
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
-    eq_(result[0], testkey)
     eq_(len(result), 1)
+    eq_(result[0]['command'], 'drop')
+    eq_(result[0]['success'], True)
+    eq_(result[0]['key'], testkey)
 
     # insufficient arguments:
     assert_raises(TypeError, ar.drop)

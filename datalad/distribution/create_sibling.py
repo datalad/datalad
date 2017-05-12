@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from six import text_type
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
@@ -143,7 +144,17 @@ def _create_dataset_sibling(
                 path_exists = False
             except CommandError as e:
                 # If fails to rmdir -- either contains stuff no permissions
-                _msg += " And it fails to rmdir (%s)." % (e.stderr.strip(), )
+                # TODO: fixup encode/decode dance again :-/ we should have got
+                # unicode/str here by now.  I guess it is the same as
+                # https://github.com/ReproNim/niceman/issues/83
+                # where I have reused this Runner thing
+                try:
+                    # ds_name is unicode which makes _msg unicode so we must be
+                    # unicode-ready
+                    err_str = text_type(e.stderr)
+                except UnicodeDecodeError:
+                    err_str = e.stderr.decode(errors='replace')
+                _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
 
         if path_exists:
             if existing == 'error':
@@ -573,9 +584,11 @@ class CreateSibling(Interface):
                               "datalad repository.\nError: %s" % exc_str(e))
 
         # in reverse order would be depth first
-        lgr.debug("Running post-update hooks in all created siblings")
+        lgr.info("Running post-update hooks in all created siblings")
+        # TODO: add progressbar
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
+            lgr.debug("Running hook for %s", path)
             try:
                 ssh("cd {} && hooks/post-update".format(
                     sh_quote(_path_(path, ".git")))
@@ -670,13 +683,13 @@ git update-server-info
 # DataLad
 #
 # (Re)generate meta-data for DataLad Web UI and possibly init new submodules
-dsdir={path}
-logfile=$dsdir/{WEB_META_LOG}/{log_filename}
+dsdir="{path}"
+logfile="$dsdir/{WEB_META_LOG}/{log_filename}"
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file "$dsdir"; ) \
+  && ( cd ..; GIT_DIR="$PWD/.git" datalad ls -a --json file "$dsdir"; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
 

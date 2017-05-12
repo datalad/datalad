@@ -285,10 +285,10 @@ def test_add_archive_content(path_orig, url, repo_path):
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, options=['--key'])
     unlink(opj(path_orig, '1.tar.gz'))
-    with swallow_logs(new_level=logging.ERROR) as cml:
-        assert_raises(CommandError, repo.drop, key_1tar, options=['--key'])
-        assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
-        assert_in('Could only verify the existence of 0 out of 1 necessary copies', cml.out)
+    res = repo.drop(key_1tar, options=['--key'])
+    assert_equal(res['success'], False)
+    assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
+    assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
