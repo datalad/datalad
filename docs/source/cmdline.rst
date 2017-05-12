@@ -72,3 +72,4 @@ Plumbing commands
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
    generated/man/datalad-subdatasets
+   generated/man/datalad-validate-paths

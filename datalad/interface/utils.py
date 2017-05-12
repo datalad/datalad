@@ -990,6 +990,7 @@ def eval_results(func):
     """
 
     default_logchannels = {
+        '': 'debug',
         'ok': 'debug',
         'notneeded': 'debug',
         'impossible': 'warning',

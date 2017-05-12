@@ -56,11 +56,7 @@ def test_add_insufficient_args(path):
     # existing path outside
     with open(opj(path, 'outside'), 'w') as f:
         f.write('doesnt matter')
-    # should be
-    #assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
-    # but actually is
-    # RF Interface._prep() in some way, not sure how yet
-    assert_raises(ValueError, ds.add, opj(path, 'outside'), on_failure='ignore')
+    assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
 
 
 tree_arg = dict(tree={'test.txt': 'some',
@@ -144,7 +140,9 @@ def test_add_recursive(path):
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
     ok_(subds.repo.dirty)
 
-    added2 = ds.add('dir', to_git=True)
+    # this tests wants to add the content to subdir before updating the
+    # parent, no we can finally say that explicitly
+    added2 = ds.add('dir/.', to_git=True)
     # added to git, so parsed git output record
     assert_result_count(
         added2, 1,

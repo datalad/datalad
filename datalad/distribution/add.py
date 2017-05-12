@@ -18,6 +18,8 @@ from os.path import join as opj
 from os.path import relpath
 
 from datalad.interface.base import Interface
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import nosave_opt
@@ -27,7 +29,6 @@ from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
 from datalad.interface.results import annexjson2result
 from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
@@ -170,18 +171,24 @@ class Add(Interface):
                 "insufficient information for adding: requires at least a path")
         # never recursion, need to handle manually below to be able to
         # discover untracked content
-        content_by_ds, unavailable_paths = Interface._prep(
+        annotated_paths = AnnotatePaths.__call__(
             path=path,
             dataset=dataset,
-            recursive=False)
+            recursive=False,
+            action='add',
+            unavailable_path_status='impossible',
+            unavailable_path_msg="path does not exist: %s",
+            nondataset_path_status='impossible',
+            on_failure='ignore')
+        content_by_ds, completed, nondataset_paths = \
+            annotated2content_by_ds(
+                annotated_paths,
+                # TODO RF to use full info and avoid rediscovery of props
+                path_only=True)
+        for r in completed:
+            yield r
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         common_report = dict(action='add', logger=lgr, refds=refds_path)
-        # we cannot possibly `add` these
-        for r in results_from_paths(
-                unavailable_paths, status='impossible',
-                message="path does not exist: %s",
-                **common_report):
-            yield r
 
         if recursive:
             # with --recursive for each input path traverse the directory
