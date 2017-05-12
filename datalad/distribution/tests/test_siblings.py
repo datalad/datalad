@@ -15,7 +15,9 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.tests.utils import chpwd
-from datalad.tests.utils import with_tempfile, assert_in, with_testrepos
+from datalad.tests.utils import with_tempfile, with_testrepos
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
@@ -68,16 +70,23 @@ def test_siblings(origin, repo_path):
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
 
-    # re-adding doesn't work
-    res = siblings('add', dataset=source, name="test-remote",
-                   url=httpurl1, on_failure='ignore')
-    assert_status('error', res)
     # reconfiguring doesn't change anything
     siblings('configure', dataset=source, name="test-remote",
              url=httpurl1)
     assert_in("test-remote", source.repo.get_remotes())
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
+    # re-adding doesn't work
+    res = siblings('add', dataset=source, name="test-remote",
+                   url=httpurl1, on_failure='ignore')
+    assert_status('error', res)
+    # only after removal
+    res = siblings('remove', dataset=source, name="test-remote")
+    assert_status('ok', res)
+    assert_not_in("test-remote", source.repo.get_remotes())
+    res = siblings('add', dataset=source, name="test-remote",
+                   url=httpurl1, on_failure='ignore')
+    assert_status('ok', res)
 
     # add to another remote automagically taking it from the url
     # and being in the dataset directory
