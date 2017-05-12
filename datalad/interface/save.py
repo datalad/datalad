@@ -131,6 +131,10 @@ class Save(Interface):
         if all_updated:
             # and we do this by replacing any given paths with the respective
             # datasets' base path
+            # MIH: this is wrong, it makes the desired use case indistinguishable
+            # from an explicit "save everything underneath the dataset root"
+            # remember that we have to call `git add` inside the technical reasons
+            # and here we need to avoid that somehow -- yet not like this (see #1419)
             for ds in content_by_ds:
                 content_by_ds[ds] = [ds]
 

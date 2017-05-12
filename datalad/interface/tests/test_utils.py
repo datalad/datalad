@@ -100,7 +100,7 @@ def test_dirty(path):
     _check_all_clean(subds, subds.repo.get_hexsha())
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
-    assert_equal(ds.get_subdatasets(), ['subds'])
+    assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
 
 
 @with_tempfile(mkdir=True)

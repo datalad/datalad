@@ -117,7 +117,7 @@ def test_create_sub(path):
     ok_clean_git(subds.path, annex=True)
 
     # subdataset is known to superdataset:
-    assert_in("some/what/deeper", ds.get_subdatasets())
+    assert_in("some/what/deeper", ds.subdatasets(result_xfm='relpaths'))
     # and was committed:
     ok_clean_git(ds.path)
 
@@ -131,14 +131,14 @@ def test_create_sub(path):
     ok_clean_git(subds2.path, annex=True)
 
     # unknown to superdataset:
-    assert_not_in("someother", ds.get_subdatasets())
+    assert_not_in("someother", ds.subdatasets(result_xfm='relpaths'))
 
     # 3. create sub via super:
     subds3 = ds.create("third", no_annex=True)
     ok_(isinstance(subds3, Dataset))
     ok_(subds3.is_installed())
     ok_clean_git(subds3.path, annex=False)
-    assert_in("third", ds.get_subdatasets())
+    assert_in("third", ds.subdatasets(result_xfm='relpaths'))
 
 
 @with_tree(tree=_dataset_hierarchy_template)
@@ -176,7 +176,7 @@ def test_nested_create(path):
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)
-    eq_(ds.get_subdatasets(), [opj('lvl1', 'subds')])
+    eq_(ds.subdatasets(result_xfm='relpaths'), [opj('lvl1', 'subds')])
     # later create subdataset in an existing empty dir
     subds2 = ds.create(opj('lvl1', 'empty'))
     ok_clean_git(ds.path)
@@ -200,7 +200,7 @@ def test_nested_create(path):
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)
-    assert_in(lvl2relpath, ds.get_subdatasets())
+    assert_in(lvl2relpath, ds.subdatasets(result_xfm='relpaths'))
 
 
 # Imported from #1016
@@ -220,4 +220,4 @@ def test_saving_prior(topdir):
     # ds1, and then the whole procedure actually crashes since because ds2/file1.txt
     # is committed -- ds2 is already known to git and it just pukes with a bit
     # confusing    'ds2' already exists in the index
-    assert_in('ds2', ds1.get_subdatasets())
+    assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))

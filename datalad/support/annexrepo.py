@@ -1810,7 +1810,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
 
     @normalize_paths
-    def drop(self, files, options=None, key=False):
+    def drop(self, files, options=None, key=False, jobs=None):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -1819,6 +1819,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         Parameters
         ----------
         files: list of str
+            paths to drop
+        options : list of str, optional
+            commandline options for the git annex drop command
+        jobs : int, optional
+            how many jobs to run in parallel (passed to git-annex call)
+
+        Returns
+        -------
+        list(JSON objects)
+          'success' item in each object indicates failure/success per file
+          path.
         """
 
         # annex drop takes either files or options
@@ -1832,25 +1843,28 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise InsufficientArgumentsError("drop() requires at least to "
                                              "specify 'files' or 'options'")
 
-        options = options[:] if options else []
-        files = files[:] if files else []
+        options = assure_list(options)
+        files = assure_list(files)
 
-        output_lines = []
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
             options = options + ['--key']
-            for k in files:
-                std_out, std_err = \
-                    self._run_annex_command('drop', annex_options=options + [k])
-                output_lines.extend(std_out.splitlines())
+            res = [self._run_annex_command_json(
+                'drop',
+                args=options + [k],
+                jobs=jobs)
+                for k in files]
+            # `normalize_paths` ... magic, useful?
+            if len(files) == 1:
+                return res[0]
+            else:
+                return res
         else:
-            std_out, std_err = \
-                self._run_annex_command('drop', annex_options=options + files)
-            output_lines.extend(std_out.splitlines())
-
-        return [line.split()[1] for line in output_lines
-                if line.startswith('drop') and line.endswith('ok')]
+            return self._run_annex_command_json(
+                'drop',
+                args=options + files,
+                jobs=jobs)
 
     def drop_key(self, keys, options=None, batch=False):
         """Drops the content of annexed files from this repository referenced by keys
