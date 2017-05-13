@@ -38,11 +38,12 @@ _dataset_hierarchy_template = {
             'subsub': {
                 'file3': 'file3'}}}}
 
+raw = dict(return_type='list', result_filter=None, result_xfm=None, on_failure='ignore')
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_create_raises(path, outside_path):
-
     ds = Dataset(path)
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, no_annex=True, description='some')
@@ -52,16 +53,34 @@ def test_create_raises(path, outside_path):
     with open(opj(path, "somefile.tst"), 'w') as f:
         f.write("some")
     # non-empty without `force`:
-    assert_raises(ValueError, ds.create, force=False)
+    assert_in_results(
+        ds.create(force=False, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
-    assert_raises(ValueError, ds.create, outside_path)
+    assert_in_results(
+        ds.create(outside_path, **raw),
+        status='error',
+        message='path not associated with any dataset')
 
     # create a sub:
     ds.create('sub')
-    # fail when doing it again without `force`:
-    assert_raises(ValueError, ds.create, 'sub')
+    # fail when doing it again
+    assert_in_results(
+        ds.create('sub', **raw),
+        status='error',
+        message=('collision with known subdataset in dataset %s', ds.path))
+
+    # now deinstall the sub and fail trying to create a new one at the
+    # same location
+    ds.uninstall('sub', check=False)
+    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in_results(
+        ds.create('sub', **raw),
+        status='error',
+        message=('collision with known subdataset in dataset %s', ds.path))
 
 
 @with_tempfile
@@ -182,7 +201,10 @@ def test_nested_create(path):
     ok_clean_git(ds.path)
     # later try to wrap existing content into a new subdataset
     # but that won't work
-    assert_raises(ValueError, ds.create, lvl2relpath)
+    assert_in_results(
+        ds.create(lvl2relpath, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # even with force, as to do this properly complicated surgery would need to
     # take place
     assert_in_results(
@@ -196,7 +218,10 @@ def test_nested_create(path):
     assert_status('notneeded', ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
-    assert_raises(ValueError, ds.create, lvl2relpath)
+    assert_in_results(
+        ds.create(lvl2relpath, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)

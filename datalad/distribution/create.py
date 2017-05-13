@@ -17,6 +17,7 @@ from os import listdir
 from os.path import isdir, realpath, relpath, join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.utils import save_dataset
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -41,6 +42,7 @@ from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
 from .dataset import resolve_path
+from .subdatasets import Subdatasets
 
 
 __docformat__ = 'restructuredtext'
@@ -194,21 +196,56 @@ class Create(Interface):
 
         if not isinstance(force, bool):
             raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
+        annotated_paths = AnnotatePaths.__call__(
+            # nothing given explicitly, assume create fresh right here
+            path=path if path else getpwd() if dataset is None else None,
+            dataset=dataset,
+            recursive=False,
+            action='create',
+            # we need to know whether we have to check for potential
+            # subdataset collision
+            force_parentds_discovery=True,
+            # it is absolutely OK to have something that does not exist
+            unavailable_path_status='',
+            unavailable_path_msg=None,
+            # if we have a dataset given that actually exists, we want to
+            # fail if the requested path is not in it
+            nondataset_path_status='error' if dataset and dataset.is_installed() else '',
+            on_failure='ignore')
+        path = None
+        for r in annotated_paths:
+            if r['status']:
+                # this is dealt with already
+                yield r
+                continue
+            if path is not None:
+                raise ValueError("`create` can only handle single target path or dataset")
+            path = r
 
-        # straight from input arg, no messing around before this
-        if path is None:
-            if dataset is None:
-                # nothing given explicitly, assume create fresh right here
-                path = getpwd()
-            else:
-                # no path, but dataset -> create that dataset
-                path = dataset.path
-        else:
-            # resolve the path against a potential dataset
-            path = resolve_path(path, ds=dataset)
+        if len(annotated_paths) and path is None:
+            # we got something, we complained already, done
+            return
 
         # we know that we need to create a dataset at `path`
         assert(path is not None)
+
+        # prep for yield
+        path.update({'logger': lgr, 'type': 'dataset'})
+        # just discard, we have a new story to tell
+        path.pop('message', None)
+
+        if 'parentds' in path and path['path'] in Subdatasets.__call__(
+                dataset=path['parentds'],
+                # any known
+                fulfilled=None,
+                recursive=False,
+                result_xfm='paths'):
+            path.update({
+                'status': 'error',
+                'message': ('collision with known subdataset in dataset %s',
+                            path['parentds'])})
+            yield path
+            return
 
         if git_opts is None:
             git_opts = {}
@@ -216,25 +253,20 @@ class Create(Interface):
             # configure `git --shared` value
             git_opts['shared'] = shared_access
 
-        # check for sane subdataset path
-        real_targetpath = with_pathsep(realpath(path))  # realpath OK
-        if dataset is not None:
-            # make sure we get to an expected state
-            if not real_targetpath.startswith(  # realpath OK
-                    with_pathsep(realpath(dataset.path))):  # realpath OK
-                raise ValueError("path {} outside {}".format(path, dataset))
-
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
-        tbds = dataset if dataset is not None and dataset.path == path else Dataset(path)
+        tbds = dataset if dataset is not None and dataset.path == path['path'] \
+            else Dataset(path['path'])
 
         # don't create in non-empty directory without `force`:
         if isdir(tbds.path) and listdir(tbds.path) != [] and not force:
-            raise ValueError("Cannot create dataset in directory %s "
-                             "(not empty). Use option 'force' in order to "
-                             "ignore this and enforce creation." % tbds.path)
+            path.update({
+                'status': 'error',
+                'message':
+                    'will not create a dataset in a non-empty directory, use '
+                    '`force` option to ignore'})
+            yield path
+            return
 
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
@@ -298,12 +330,8 @@ class Create(Interface):
                     on_failure='ignore'):
                 yield r
 
-        yield get_status_dict(
-            action='create',
-            ds=tbds,
-            logger=lgr,
-            refds=refds_path,
-            status='ok')
+        path.update({'status': 'ok'})
+        yield path
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
