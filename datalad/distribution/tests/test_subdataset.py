@@ -45,6 +45,7 @@ def test_get_subdatasets(path):
         'sub dataset1/subm 1',
         'sub dataset1/subm 2',
     ])
+    # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
         'sub dataset1/sub sub dataset1/subm 1',
         'sub dataset1/sub sub dataset1/subm 2',
@@ -66,10 +67,13 @@ def test_get_subdatasets(path):
         ('sub dataset1', 'sub dataset1/subm 1'),
         ('sub dataset1', 'sub dataset1/subm 2'),
     ])
+    # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, recursion_limit=0),
         [])
+    # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=1, result_xfm='relpaths'),
         ['sub dataset1'])
+    # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
         'sub dataset1',
