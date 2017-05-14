@@ -57,7 +57,7 @@ def test_siblings(origin, repo_path):
     assert_status('error', res)
     assert_in('unknown sibling(s) specified as publication dependency',
               res[0]['message'])
-    # prior config was changed by failed call above
+    # prior config was not changed by failed call above
     eq_(source.config.get(depvar, None), 'stupid')
 
     res = siblings('configure',

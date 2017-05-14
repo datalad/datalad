@@ -57,10 +57,19 @@ def _mangle_urls(url, ds_name):
 
 @build_doc
 class Siblings(Interface):
-    """
+    """Manage sibling configuration
 
-    The following properties are reported (if possible) for each matching
-    subdataset record.
+    This command offers four different modes: 'query', 'add', 'remove',
+    'configure'. 'query' is the default mode and can be used to obtain
+    information about (all) known siblings. `add` and `configure` are highly
+    similar modes, the only difference being that adding a sibling
+    with a name that is already registered will fail, whereas
+    re-configuring a (different) sibling under a known name will not
+    be considered an error. Lastly, the `remove` mode allows for the
+    removal (or de-configuration) of a registered sibling.
+
+    For each sibling (added, configured, or queried) all known sibling
+    properties are reported. This includes:
 
     "name"
         Name of the sibling
@@ -68,6 +77,11 @@ class Siblings(Interface):
     "path"
         Absolute path of the dataset
 
+    "url"
+        At minimum a "fetch" URL, possibly also a "pushurl"
+
+    Additionally, any further configuration will also be reported using
+    a key that matches that in the Git configuration.
     """
     _params_ = dict(
         dataset=Parameter(
@@ -79,7 +93,10 @@ class Siblings(Interface):
         name=Parameter(
             args=('-s', '--name',),
             metavar='NAME',
-            doc="""name of the sibling""",
+            doc="""name of the sibling. For sibling removal this option is
+            mandatory, otherwise the hostname part of a given URL is used as a
+            default. This option can be used to limit 'query' to a specific
+            sibling.""",
             constraints=EnsureStr() | EnsureNone()),
         mode=Parameter(
             ## actions
@@ -108,7 +125,6 @@ class Siblings(Interface):
                 sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.""",
             constraints=EnsureStr() | EnsureNone()),
- 
 
         ## info options
         # --description gh-1484
