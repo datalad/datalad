@@ -31,7 +31,7 @@ from datalad.support.exceptions import MissingExternalDependency
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
     require_dataset, Dataset
-from .add_sibling import AddSibling
+from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
@@ -349,13 +349,13 @@ class CreateSiblingGithub(Interface):
                 ignore_var = 'remote.{}.annex-ignore'.format(name)
                 if not ignore_var in d.config:
                     d.config.add(ignore_var, 'true', where='local')
-                AddSibling()(
+                Siblings()(
+                    'configure',
                     dataset=d,
                     name=name,
                     url=url,
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
-                    force=existing in {'reconfigure'},
                     publish_depends=publish_depends)
 
         # TODO let submodule URLs point to Github (optional)
