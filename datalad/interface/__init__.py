@@ -75,7 +75,7 @@ _group_plumbing = (
         ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
         ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
-        ('datalad.distribution.siblings', 'Siblings', 'siblings'),
     ])
