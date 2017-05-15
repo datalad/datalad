@@ -61,16 +61,18 @@ def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
     # of whether they are already subdatasets or not
     # for all found datasets it puts an entry into the SPEC and also
     # and entry with the path in the SPEC of the parent dataset
+    # `trace` must be a list that has at least one element (the base
+    # dataset)
     if recursion_limit is not None and len(trace) > recursion_limit:
         return
     if not isdir(top):
         return
     if GitRepo.is_valid_repo(top):
+        # TODO RF prepare a proper annotated path dict with
         # found a repo, add the entire thing
         spec[top] = spec.get(top, []) + [top]
         # and to the parent
-        if trace:
-            spec[trace[-1]] = spec.get(trace[-1], []) + [top]
+        spec[trace[-1]] = spec.get(trace[-1], []) + [top]
         trace = trace + [top]
     for path in listdir(top):
         path = opj(top, path)
@@ -202,7 +204,8 @@ class Add(Interface):
             for d in list(content_by_ds.keys()):
                 for p in content_by_ds[d]:
                     _discover_subdatasets_recursively(
-                        p,
+                        # TODO RF to use annotated paths natively
+                        p['path'] if isinstance(p, dict) else p,
                         [d],
                         content_by_ds,
                         recursion_limit)
@@ -214,6 +217,8 @@ class Add(Interface):
 
         if dataset:
             # remember the datasets associated with actual inputs
+            # TODO this is each annotated path that is requested=True
+            # and either the 'parentds' or 'path' in case of a dataset
             input_ds = list(content_by_ds.keys())
             # forge chain from base dataset to any leaf dataset
             discover_dataset_trace_to_targets(
@@ -223,6 +228,8 @@ class Add(Interface):
                 list(content_by_ds.keys()),
                 [],
                 content_by_ds)
+            # TODO make this flag go away, path annotation should have this sorted
+            # out before
             if ds2super:
                 # now check all dataset entries corresponding to the original
                 # input to see if they contain their own paths and remove them
@@ -336,7 +343,11 @@ class Add(Interface):
         # OPT: tries to save even unrelated stuff
         # MIH: issue reference would help to evaluate this comment!
         for res in save_dataset_hierarchy(
-                content_by_ds,
+                # TODO RF pass annotated paths when receiver is ready
+                #content_by_ds,
+                {dspath: [p['path'] if isinstance(p, dict) else p
+                          for p in content_by_ds[dspath]]
+                 for dspath in content_by_ds},
                 base=dataset.path if dataset and dataset.is_installed() else None,
                 message=message if message else '[DATALAD] added content'):
             yield res

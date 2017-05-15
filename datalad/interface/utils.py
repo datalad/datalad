@@ -749,6 +749,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
     if basepath in targetpaths:
         # found a targetpath, commit the trace
         for i, p in enumerate(current_trace[:-1]):
+            # TODO RF prepare proper annotated path dicts
             spec[p] = list(set(spec.get(p, []) + [current_trace[i + 1]]))
     if not isdir(basepath):
         # nothing underneath this one -> done
