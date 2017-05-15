@@ -20,6 +20,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_raises
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import annotate_paths
@@ -153,15 +154,23 @@ def test_annotate_paths(dspath, nodspath):
     after_res = ds.annotate_paths(subdspath)
     # uninstall hides all low-level datasets
     assert_result_count(after_res, 1)
-    # but for the top-most uninstalled one it merely changes the type
-    # to be a directory in the parent.
-    # XXX consider making this look like a subdataset (type=dataset,
-    # parentds=likenow), but add something like state=absent
-    # this way we can use this info in, e.g., `get` right away and
-    # don't have to rediscover the relationship
+    # but for the top-most uninstalled one it merely reports absent state now
+    assert_result_count(
+        after_res, 1, state='absent',
+        **{k: before_res[0][k] for k in before_res[0] if k not in ('state',)})
+    # however, this beauty doesn't come for free, so it can be disabled
+    # which will make the uninstalled subdataset like a directory in the
+    # parent (or even just a non-existing path, if the mountpoint dir isn't
+    # present
+    after_res = ds.annotate_paths(subdspath, force_subds_discovery=False)
     assert_result_count(
         after_res, 1, type='directory',
         **{k: before_res[0][k] for k in before_res[0] if k not in ('type',)})
+    # which BTW has inter-option dependencies
+    assert_raises(
+        ValueError,
+        ds.annotate_paths, subdspath,
+        force_subds_discovery=True, force_parentds_discovery=False)
 
     # feed annotated paths into annotate_paths, it shouldn't change things
     # upon second run

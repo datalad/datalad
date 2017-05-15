@@ -177,9 +177,20 @@ class AnnotatePaths(Interface):
             doc="""""",
             constraints=EnsureStr() | EnsureNone()),
         force_parentds_discovery=Parameter(
-            args=("--force-parentds-discovery",),
-            doc="""""",
-            constraints=EnsureBool()))
+            args=("--no-parentds-discovery",),
+            dest='force_parentds_discovery',
+            action='store_false',
+            doc="""Flag to disable reports of parent dataset information for any
+            path, in particular dataset root paths. Disabling saves on command
+            run time, if this information is not needed."""),
+        force_subds_discovery=Parameter(
+            args=("--no-subds-discovery",),
+            action='store_false',
+            dest='force_subds_discovery',
+            doc="""Flag to disable reporting type='dataset' for subdatasets, even
+            when they are not installed, or their mount point directory doesn't
+            exist. Disabling saves on command run time, if this information is
+            not needed."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
@@ -193,10 +204,15 @@ class AnnotatePaths(Interface):
             unavailable_path_status='',
             unavailable_path_msg=None,
             nondataset_path_status='error',
-            force_parentds_discovery=False):
+            force_parentds_discovery=True,
+            force_subds_discovery=True):
         # upfront check for the fastest possible response
         if path is None and dataset is None:
             return
+
+        if force_subds_discovery and not force_parentds_discovery:
+            raise ValueError(
+                'subdataset discovery requires parent dataset discovery')
 
         # CONCEPT: yield with no status to indicate further processing
 
@@ -335,6 +351,31 @@ class AnnotatePaths(Interface):
                 yield res
                 continue
 
+            if path_props.get('type', None) == 'file':
+                # nothing else we can learn about this
+                res = get_status_dict(**dict(res_kwargs, **path_props))
+                if 'status' not in res:
+                    res['status'] = ''
+                reported_paths[path] = res
+                yield res
+                continue
+
+            containing_ds = None
+            if dspath and force_subds_discovery and (
+                    path_props.get('type', None) == 'directory' or
+                    lexists(path)):
+                # if the path doesn't exist, or is labeled a directory, make sure that
+                # it isn't actually a subdataset
+                containing_ds = Dataset(dspath)
+                # XXX cache!
+                subdss = containing_ds.subdatasets(
+                    fulfilled=None, recursive=False,
+                    result_xfm=None, result_filter=None, return_type='list')
+                if path in [s['path'] for s in subdss]:
+                    # this must be a directory, and it is not installed
+                    path_props['type'] = 'dataset'
+                    path_props['state'] = 'absent'
+
             if not lexists(path):
                 # not there (yet)
                 message = unavailable_path_msg if unavailable_path_msg else None
@@ -346,20 +387,7 @@ class AnnotatePaths(Interface):
                 yield res
                 continue
 
-            if path_props.get('type', None) == 'file':
-                # nothing else we can learn about this
-                res = get_status_dict(**dict(res_kwargs, **path_props))
-                if 'status' not in res:
-                    res['status'] = ''
-                reported_paths[path] = res
-                yield res
-                continue
-
-            # from here it is only about directories/datasets
-            containing_ds = Dataset(dspath)
-            # we need to doublecheck that this is not a subdataset mount
-            # point, in which case get_dataset_root() would point to the parent.
-
+            # we know everything we can, report
             res = get_status_dict(**dict(res_kwargs, **path_props))
             if 'status' not in res:
                 res['status'] = ''
@@ -367,6 +395,7 @@ class AnnotatePaths(Interface):
             yield res
 
             if recursive:
+                containing_ds = Dataset(dspath) if containing_ds is None else containing_ds
                 # XXX cache!
                 for r in yield_recursive(containing_ds, path, action, recursion_limit, cache=None):
                     # capture reported paths
