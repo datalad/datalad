@@ -87,6 +87,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
             # "itself" (e.g. '.'), and its parent ds. At present it is either
             # one XOR the other
             if parentds is None or refds_path is None or (pristine_path and (
+                    pristine_path == curdir or
                     pristine_path.endswith(dirsep) or
                     pristine_path.endswith('{}{}'.format(dirsep, curdir)))):
                 # a dataset that floats by on its own OR
