@@ -46,7 +46,7 @@ from datalad.utils import assure_list
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
-def annotated2content_by_ds(annotated, path_only=False):
+def annotated2content_by_ds(annotated, refds_path, path_only=False):
     """Helper to convert annotated paths into an old-style content_by_ds dict
 
     Only items with an `status` property value not equal to 'ok', 'notneeded',
@@ -57,6 +57,8 @@ def annotated2content_by_ds(annotated, path_only=False):
     ----------
     annotated : list or generator
       Dicts with annotated path information.
+    refds_path : str
+      Path to the reference dataset the original path annotation was based on.
     path_only: bool
       Whether returned dict values are sequences of just paths for each
       dataset, or whether the full info dicts are reported as items.
@@ -81,7 +83,10 @@ def annotated2content_by_ds(annotated, path_only=False):
         if r.get('type', None) == 'dataset':
             # to dataset handling first, it is the more complex beast
             pristine_path = r.get('pristine_path', None)
-            if parentds is None or (pristine_path and (
+            # XXX might need RF to sort a single subdataset entry into
+            # "itself" (e.g. '.'), and its parent ds. At present it is either
+            # one XOR the other
+            if parentds is None or refds_path is None or (pristine_path and (
                     pristine_path.endswith(dirsep) or
                     pristine_path.endswith('{}{}'.format(dirsep, curdir)))):
                 # a dataset that floats by on its own OR
@@ -138,6 +143,11 @@ class AnnotatePaths(Interface):
     subdataset record.
 
     FILLMEIN
+
+    parentds -- not necessarily as superds! I.e. there might be a dataset
+    upstairs, but it may not recognize a dataset underneath as a registered
+    subdataset (yet).
+
     """
     _params_ = dict(
         path=Parameter(

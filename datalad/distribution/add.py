@@ -169,6 +169,7 @@ class Add(Interface):
         if not path:
             raise InsufficientArgumentsError(
                 "insufficient information for adding: requires at least a path")
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         # never recursion, need to handle manually below to be able to
         # discover untracked content
         annotated_paths = AnnotatePaths.__call__(
@@ -183,11 +184,11 @@ class Add(Interface):
         content_by_ds, completed, nondataset_paths = \
             annotated2content_by_ds(
                 annotated_paths,
+                refds_path=refds_path,
                 # TODO RF to use full info and avoid rediscovery of props
                 path_only=True)
         for r in completed:
             yield r
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
         common_report = dict(action='add', logger=lgr, refds=refds_path)
 
         if recursive:
@@ -237,6 +238,7 @@ class Add(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             toadd = list(set(content_by_ds[ds_path]))
+            # TODO generator: duplicate! those were found by annotate_paths already!
             known_subds = ds.subdatasets(
                 recursive=False,
                 fulfilled=True,
