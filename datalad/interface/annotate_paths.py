@@ -277,8 +277,13 @@ class AnnotatePaths(Interface):
                 continue
             # the path exists in some shape or form
             if isdir(path):
+                # keep any existing type info, previously a more expensive run
+                # could have discovered an uninstalled 'dataset', and we don't
+                # want it to be relabeled to a directory
                 path_props['type'] = \
-                    'dataset' if GitRepo.is_valid_repo(path) else 'directory'
+                    path_props.get(
+                        'type',
+                        'dataset' if GitRepo.is_valid_repo(path) else 'directory')
                 # this could contain all types of additional content
                 containing_dir = path
             else:

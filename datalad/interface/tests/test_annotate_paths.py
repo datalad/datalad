@@ -26,9 +26,7 @@ from datalad.api import annotate_paths
 from datalad.utils import chpwd
 
 
-
 __docformat__ = 'restructuredtext'
-
 
 demo_hierarchy = {
     'a': {  # dataset
