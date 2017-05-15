@@ -140,6 +140,10 @@ before_install:
 install:
   # Install standalone build of git-annex for the recent enough version
   - travis_retry sudo eatmydata apt-get install git-annex-standalone zip pandoc
+  # 11d3219985ec3f58c453a87e6614a5036fb925ae moved bundled ssh from bin/ to extra/ so it gets added at the end of the path
+  # and yoh suspects that it is the source of many if not all current breakage, so let's try to symlink them under bin
+  # and see if goes away
+  - sudo ln -s /usr/lib/git-annex.linux/extra/ssh* /usr/lib/git-annex.linux/bin/ 
   - travis_retry sudo eatmydata apt-get install shunit2
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
