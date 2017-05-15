@@ -334,7 +334,7 @@ def test_filter_unmodified(path):
 
 # Note: class name needs to match module's name
 @build_doc
-class Test_Utils(Interface):
+class TestUtils(Interface):
     """TestUtil's fake command"""
 
     _params_ = dict(
@@ -366,11 +366,11 @@ def test_eval_results_plus_build_doc():
 
     # docstring was build already:
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        Test_Utils().__call__(1)
+        TestUtils().__call__(1)
         assert_not_in("Building doc for", cml.out)
     # docstring accessible both ways:
     doc1 = Dataset.fake_command.__doc__
-    doc2 = Test_Utils().__call__.__doc__
+    doc2 = TestUtils().__call__.__doc__
 
     # docstring was built from Test_Util's definition:
     assert_equal(doc1, doc2)
@@ -391,10 +391,10 @@ def test_eval_results_plus_build_doc():
     with swallow_logs(new_level=logging.DEBUG) as cml:
         Dataset('/does/not/matter').fake_command(3)
         assert_in("Determined class of decorated function: {}"
-                  "".format(Test_Utils().__class__), cml.out)
+                  "".format(TestUtils().__class__), cml.out)
 
     # test results:
-    result = Test_Utils().__call__(2)
+    result = TestUtils().__call__(2)
     assert_equal(len(list(result)), 2)
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(len(list(result)), 3)
@@ -402,13 +402,13 @@ def test_eval_results_plus_build_doc():
     # test signature:
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
 
 
 def test_result_filter():
     # ensure baseline without filtering
     assert_equal(
-        [r['somekey'] for r in Test_Utils().__call__(4)],
+        [r['somekey'] for r in TestUtils().__call__(4)],
         [0, 1, 2, 3])
     # test two functionally equivalent ways to filter results
     # 1. Constraint-based -- filter by exception
@@ -418,13 +418,13 @@ def test_result_filter():
             EnsureKeyChoice('somekey', (0, 2)),
             lambda x: x['somekey'] in (0, 2)):
         assert_equal(
-            [r['somekey'] for r in Test_Utils().__call__(
+            [r['somekey'] for r in TestUtils().__call__(
                 4,
                 result_filter=filt)],
             [0, 2])
         # constraint returns full dict
         assert_dict_equal(
-            Test_Utils().__call__(
+            TestUtils().__call__(
                 4,
                 result_filter=filt)[-1],
             {'action': 'off', 'path': 'some', 'status': 'ok', 'somekey': 2})
@@ -434,9 +434,9 @@ def test_result_filter():
     def greatfilter(res, **kwargs):
         assert_equal(kwargs.get('dataset', 'bob'), 'awesome')
         return True
-    Test_Utils().__call__(4, dataset='awesome', result_filter=greatfilter)
+    TestUtils().__call__(4, dataset='awesome', result_filter=greatfilter)
 
     def sadfilter(res, **kwargs):
         assert_equal(kwargs.get('dataset', 'bob'), None)
         return True
-    Test_Utils().__call__(4, result_filter=sadfilter)
+    TestUtils().__call__(4, result_filter=sadfilter)
