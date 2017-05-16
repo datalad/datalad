@@ -10,6 +10,10 @@
 
 # Import necessary nodes
 import os
+from datalad.utils import auto_repr
+from datalad.utils import _path_
+from datalad.utils import updated
+from datalad.consts import METADATA_DIR
 from ..nodes.crawl_url import crawl_url
 from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match
@@ -17,6 +21,7 @@ from ..nodes.misc import assign
 from ..nodes.misc import find_files
 from ..nodes.misc import sub
 from ..nodes.misc import skip_if
+from ..nodes.misc import func_to_node
 from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ...support.strings import get_replacement_dict
@@ -40,7 +45,11 @@ def fetch_datacite_metadata():
 
 
 def process_datacite_xml(json_, xml_):
-    pass
+    # so we need json_['doi']  and the entirety of xml_
+    # actually the DOI is also present in xml_ as
+    # e.g. <identifier identifierType="DOI">10.6080/K00Z715X</identifier>
+    # so we could just store xml_
+    return xml_
 
 
 def get_metadata(dataset=None):
@@ -81,6 +90,26 @@ def get_metadata(dataset=None):
         all_datasets[dataset_] = dataset_meta
 
     return all_datasets
+
+
+@auto_repr
+class get_and_save_metadata(object):
+
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __call__(self, data):
+        # we do not take anything from data
+        meta = get_metadata(self.dataset)
+        if meta:
+            if not os.path.exists(METADATA_DIR):
+                os.makedirs(METADATA_DIR)
+            path_ = _path_(METADATA_DIR, 'datacite.xml')
+            with open(path_, 'w') as f:
+                f.write(meta.encode())
+            yield updated(data, {'filename': path_})
+        else:
+            yield data
 
 
 def superdataset_pipeline():
@@ -149,7 +178,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
         #
         # CRCNS requires authorization, so only README* should go straight under git
-        options=["-c", "annex.largefiles=exclude=README*"]
+        options=["-c", "annex.largefiles=exclude=README* and exclude=*/datacite.xml"]
     )
 
     crawler = crawl_url(dataset_url)
@@ -193,6 +222,11 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
             urls_pipe + [
                 annex,
             ],
+            # fetch and store meta-data for the dataset
+            [
+                get_and_save_metadata(dataset),
+                annex
+            ]
         ],
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
