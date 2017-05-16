@@ -15,6 +15,7 @@ import logging
 import re
 from os.path import join as opj
 from os.path import normpath
+from os.path import exists
 
 from git import GitConfigParser
 
@@ -30,8 +31,8 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
+from datalad.utils import with_pathsep as _with_sep
 
-from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 
@@ -66,15 +67,22 @@ def _parse_gitmodules(dspath):
     return mods
 
 
-def _parse_git_submodules(dspath):
+def _parse_git_submodules(dspath, recursive):
     """All known ones with some properties"""
-    modinfo = _parse_gitmodules(dspath)
+    if not exists(opj(dspath, ".gitmodules")):
+        # easy way out. if there is no .gitmodules file
+        # we cannot have (functional) subdatasets
+        return
+
+    # this will not work in direct mode, need better way #1422
+    cmd = ['git', '--work-tree=.', 'submodule', 'status']
+    if recursive:
+        cmd.append('--recursive')
 
     # need to go rogue  and cannot use proper helper in GitRepo
     # as they also pull in all of GitPython's magic
     stdout, stderr = GitRunner(cwd=dspath).run(
-        # this will not work in direct mode, need better way #1422
-        ['git', '--work-tree=.', 'submodule'],
+        cmd,
         log_stderr=False,
         log_stdout=True,
         log_online=False,
@@ -96,7 +104,6 @@ def _parse_git_submodules(dspath):
             props = submodule_nodescribe_props.match(line[1:])
             sm['reccommit'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
-        sm.update(modinfo.get(sm['path'], {}))
         yield sm
 
 
@@ -130,11 +137,17 @@ class Subdatasets(Interface):
     "url"
         URL of the subdataset recorded in the parent
 
+    Performance note: Requesting `bottomup` reporting order, or a particular
+    numerical `recursion_limit` implies an internal switch to an alternative
+    query implementation for recursive query that is more flexible, but also
+    notably slower (performs one call to Git per dataset versus a single call
+    for all combined).
+
     """
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to update.  If
+            doc="""specify the dataset to query.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
@@ -166,17 +179,55 @@ class Subdatasets(Interface):
             dataset, check_installed=False, purpose='subdataset reporting')
         refds_path = dataset.path
 
+        # XXX this seems strange, but is tested to be the case -- I'd rather set
+        # `check_installed` to true above and fail
+        if not GitRepo.is_valid_repo(refds_path):
+            return
+
         # return as quickly as possible
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
-        for r in _get_submodules(
-                dataset.path, fulfilled, recursive, recursion_limit,
-                bottomup):
-            # without the refds_path cannot be rendered/converted relative
-            # in the eval_results decorator
-            r['refds'] = refds_path
-            yield r
+        if bottomup or (recursive and recursion_limit is not None):
+            # IMPLEMENTATION 1
+            # slow but flexible (one Git call per dataset)
+            for r in _get_submodules(
+                    dataset.path, fulfilled, recursive, recursion_limit,
+                    bottomup):
+                # without the refds_path cannot be rendered/converted relative
+                # in the eval_results decorator
+                r['refds'] = refds_path
+                yield r
+        else:
+            # IMPLEMENTATION 2
+            # as fast as possible (just a single call to Git)
+            # need to track current parent
+            stack = [refds_path]
+            modinfo_cache = {}
+            for sm in _parse_git_submodules(refds_path, recursive=recursive):
+                # unwind the parent stack until we find the right one
+                # this assumes that submodules come sorted
+                while not sm['path'].startswith(_with_sep(stack[-1])):
+                    stack.pop()
+                parent = stack[-1]
+                if parent not in modinfo_cache:
+                    # read the parent .gitmodules, if not done yet
+                    modinfo_cache[parent] = _parse_gitmodules(parent)
+                # get URL info, etc.
+                sm.update(modinfo_cache[parent].get(sm['path'], {}))
+                subdsres = get_status_dict(
+                    'subdataset',
+                    status='ok',
+                    type_='dataset',
+                    refds=refds_path,
+                    logger=lgr)
+                subdsres.update(sm)
+                subdsres['parentpath'] = parent
+                if (fulfilled is None or
+                        GitRepo.is_valid_repo(sm['path']) == fulfilled):
+                    yield subdsres
+                # for the next "parent" commit this subdataset to the stack
+                stack.append(sm['path'])
 
 
 # internal helper that needs all switches, simply to avoid going through
@@ -185,8 +236,10 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     bottomup):
     if not GitRepo.is_valid_repo(dspath):
         return
+    modinfo = _parse_gitmodules(dspath)
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(dspath):
+    for sm in _parse_git_submodules(dspath, recursive=False):
+        sm.update(modinfo.get(sm['path'], {}))
         subdsres = get_status_dict(
             'subdataset',
             status='ok',

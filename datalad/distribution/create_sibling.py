@@ -25,7 +25,7 @@ from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
-from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.siblings import Siblings
 from datalad.distribution.add_sibling import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.add_sibling import _urljoin
@@ -207,14 +207,15 @@ def _create_dataset_sibling(
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
     lgr.debug("Adding the siblings")
-    AddSibling.__call__(
+    # TODO generator, yield the now swallowed results
+    Siblings.__call__(
+        'configure',
         dataset=ds,
         name=name,
         url=ds_target_url,
         pushurl=ds_target_pushurl,
         recursive=False,
         fetch=True,
-        force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
         publish_depends=publish_depends,
