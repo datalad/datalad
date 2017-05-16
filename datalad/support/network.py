@@ -401,8 +401,8 @@ class RI(object):
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()
             if ri != ri_:
-                lgr.warning("Parsed version of %s %r differs from original %r",
-                            self.__class__.__name__, ri_, ri)
+                lgr.debug("Parsed version of %s %r differs from original %r",
+                          self.__class__.__name__, ri_, ri)
 
     @classmethod
     def _get_blank_fields(cls, **fields):
@@ -713,14 +713,15 @@ class SSHRI(RI, RegexBasedURLMixin):
         # escape path so we have direct representation of the path to work with
         fields['path'] = unescape_ssh_path(fields['path'])
 
-    def as_str(self):
+    def as_str(self, escape=False):
         fields = self.fields  # copy so we could escape symbols
         url_fmt = '{hostname}'
         if fields['username']:
             url_fmt = "{username}@" + url_fmt
         if fields['path']:
             url_fmt += ':{path}'
-        fields['path'] = escape_ssh_path(fields['path'])
+        if escape:
+            fields['path'] = escape_ssh_path(fields['path'])
         return url_fmt.format(**fields)
 
     # TODO:

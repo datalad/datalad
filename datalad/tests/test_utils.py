@@ -46,6 +46,7 @@ from ..utils import on_windows
 from ..utils import _path_
 from ..utils import get_timestamp_suffix
 from ..utils import get_trace
+from ..utils import get_dataset_root
 
 from ..support.annexrepo import AnnexRepo
 
@@ -455,7 +456,7 @@ def test_knows_annex(here, there):
     assert_false(knows_annex(here))
     AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    GitRepo(path=there, url=here, create=True)
+    GitRepo.clone(path=there, url=here, create=True)
     assert_true(knows_annex(there))
 
 
@@ -578,3 +579,24 @@ def test_get_trace():
         ('C', 'D'),
         ('D', 'E'),
         ], 'A', 'E'), ['B', 'C', 'D'])
+
+
+@with_tempfile(mkdir=True)
+def test_get_dataset_root(path):
+    eq_(get_dataset_root('/nonexistent'), None)
+    with chpwd(path):
+        repo = AnnexRepo(os.curdir, create=True)
+        subdir = opj('some', 'deep')
+        fname = opj(subdir, 'dummy')
+        os.makedirs(subdir)
+        with open(fname, 'w') as f:
+            f.write('some')
+        repo.add(fname)
+        # we can find this repo
+        eq_(get_dataset_root(os.curdir), os.curdir)
+        # and we get the type of path that we fed in
+        eq_(get_dataset_root(abspath(os.curdir)), abspath(os.curdir))
+        # subdirs are no issue
+        eq_(get_dataset_root(subdir), os.curdir)
+        # non-dir paths are no issue
+        eq_(get_dataset_root(fname), os.curdir)

@@ -17,6 +17,9 @@ from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
+# import version helper from config to have only one implementation
+# config needs this to avoid circular imports
+from datalad.config import get_git_version as __get_git_version
 from .exceptions import CommandError
 
 __all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
@@ -40,7 +43,9 @@ class UnknownVersion:
 # Custom handlers
 #
 from datalad.cmd import Runner
+from datalad.cmd import GitRunner
 _runner = Runner()
+_git_runner = GitRunner()
 
 
 def _get_annex_version():
@@ -54,8 +59,35 @@ def _get_annex_version():
 
 
 def _get_git_version():
-    """Return version of available git"""
-    return _runner.run('git version'.split())[0].split()[2]
+    """Return version of git we use (might be bundled)"""
+    return __get_git_version(_git_runner)
+
+
+def _get_system_git_version():
+    """Return version of git available system-wide
+
+    Might be different from the one we are using, which might be
+    bundled with git-annex
+    """
+    return __get_git_version(_runner)
+
+
+def _get_system_ssh_version():
+    """Return version of ssh available system-wide
+
+    Annex prior 20170302 was using bundled version, but now would use system one
+    if installed
+    """
+    try:
+        out, err = _runner.run('ssh -V'.split())
+        # apparently spits out to err but I wouldn't trust it blindly
+        if err.startswith('OpenSSH'):
+            out = err
+        assert out.startswith('OpenSSH')  # that is the only one we care about atm
+        return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
+    except CommandError as exc:
+        lgr.warn("Could not determine version of ssh available: %s", exc_str(exc))
+        return None
 
 
 class ExternalVersions(object):
@@ -76,7 +108,9 @@ class ExternalVersions(object):
 
     CUSTOM = {
         'cmd:annex': _get_annex_version,
-        'cmd:git': _get_git_version
+        'cmd:git': _get_git_version,
+        'cmd:system-git': _get_system_git_version,
+        'cmd:system-ssh': _get_system_ssh_version,
     }
 
     def __init__(self):
@@ -163,7 +197,7 @@ class ExternalVersions(object):
         """Return dictionary (copy) of versions"""
         return self._versions.copy()
 
-    def dumps(self, indent=False, preamble="Versions:"):
+    def dumps(self, indent=False, preamble="Versions:", query=False):
         """Return listing of versions as a string
 
         Parameters
@@ -173,7 +207,12 @@ class ExternalVersions(object):
           is used). Otherwise returned in a single line
         preamble: str, optional
           What preamble to the listing to use
+        query : bool, optional
+          To query for versions of all "registered" custom externals, so to
+          get those which weren't queried for yet
         """
+        if query:
+            [self[k] for k in self.CUSTOM]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]

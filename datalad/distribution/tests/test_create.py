@@ -34,10 +34,10 @@ from datalad.tests.utils import with_tree
 _dataset_hierarchy_template = {
     'origin': {
         'file1': '',
-    'sub': {
-        'file2': 'file2',
-    'subsub': {
-        'file3': 'file3'}}}}
+        'sub': {
+            'file2': 'file2',
+            'subsub': {
+                'file3': 'file3'}}}}
 
 
 @with_tempfile(mkdir=True)
@@ -147,15 +147,17 @@ def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
     # an existing directory tree
     ds = Dataset(opj(path, 'origin')).create(force=True)
+    # we got a dataset ....
     ok_(ds.is_installed())
-    # the following create() calls need to ignore the dirty state
-    # of the parent, otherwise they would auto-save it and turn
-    # everything into one big dataset
-    subds = ds.create('sub', force=True, if_dirty='ignore')
+    # ... but it has untracked content
+    ok_(ds.repo.dirty)
+    subds = ds.create('sub', force=True)
     ok_(subds.is_installed())
-    subsubds = subds.create('subsub', force=True, if_dirty='ignore')
+    ok_(subds.repo.dirty)
+    subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
-    ds.save(recursive=True, auto_add_changes=True)
+    ok_(subsubds.repo.dirty)
+    ds.save(recursive=True, all_updated=True)
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 
@@ -171,7 +173,7 @@ def test_nested_create(path):
     os.makedirs(opj(ds.path, 'lvl1', 'empty'))
     with open(opj(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.save(auto_add_changes=True))
+    ok_(ds.save(all_updated=True))
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)
@@ -194,13 +196,25 @@ def test_nested_create(path):
     assert_raises(ValueError, ds.create, lvl2relpath)
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
-    assert_raises(CommandError, ds.create, lvl2relpath, force=True)
-    # it is not GitPython's state that is at fault here, test with fresh
-    # dataset isnstance
-    ds = Dataset(ds.path)
-    assert_raises(CommandError, ds.create, lvl2relpath, force=True)
-    # it seems we are at fault here
-    rmtree(opj(lvl2path, '.git'))
-    assert_raises(CommandError, ds.repo.add_submodule, lvl2relpath)
-    # despite the failure:
+    ds.create(lvl2relpath, force=True)
     assert_in(lvl2relpath, ds.get_subdatasets())
+
+
+# Imported from #1016
+@with_tree({'ds2': {'file1.txt': 'some'}})
+def test_saving_prior(topdir):
+    # the problem is that we might be saving what is actually needed to be
+    # "created"
+
+    # we would like to place this structure into a hierarchy of two datasets
+    # so we create first top one
+    ds1 = create(topdir, force=True)
+    # and everything is ok, stuff is not added BUT ds1 will be considered dirty
+    ok_(ds1.repo.dirty)
+    # And then we would like to initiate a sub1 subdataset
+    ds2 = create('ds2', dataset=ds1, force=True)
+    # But what will happen is file1.txt under ds2 would get committed first into
+    # ds1, and then the whole procedure actually crashes since because ds2/file1.txt
+    # is committed -- ds2 is already known to git and it just pukes with a bit
+    # confusing    'ds2' already exists in the index
+    assert_in('ds2', ds1.get_subdatasets())

@@ -12,43 +12,62 @@
 
 import logging
 
-from os import curdir
+from os import listdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
-from collections import defaultdict
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import save_message_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
-from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import jobs_opt
-from datalad.interface.utils import handle_dirty_dataset
-from datalad.interface.save import Save
+from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import _discover_trace_to_known
+from datalad.distribution.utils import _install_subds_inplace
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import Dataset
-from .dataset import resolve_path
-from .dataset import require_dataset
-from .install import _get_git_url_from_source
 
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.add')
+
+
+def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
+    # this beast walks the directory tree from a give `top` directory
+    # and discovers valid repos that are scattered around, regardless
+    # of whether they are already subdatasets or not
+    # for all found datasets it puts an entry into the SPEC and also
+    # and entry with the path in the SPEC of the parent dataset
+    if recursion_limit is not None and len(trace) > recursion_limit:
+        return
+    if not isdir(top):
+        return
+    if GitRepo.is_valid_repo(top):
+        # found a repo, add the entire thing
+        spec[top] = spec.get(top, []) + [top]
+        # and to the parent
+        if trace:
+            spec[trace[-1]] = spec.get(trace[-1], []) + [top]
+        trace = trace + [top]
+    for path in listdir(top):
+        path = opj(top, path)
+        if not isdir(path):
+            continue
+        _discover_subdatasets_recursively(path, trace, spec, recursion_limit)
 
 
 class Add(Interface):
@@ -58,18 +77,6 @@ class Add(Interface):
     into a directory of a dataset, and subsequently this command can be used to
     register this new content with the dataset. With recursion enabled,
     files will be added to their respective subdatasets as well.
-
-    Alternatively, a source location can be given to indicate where to obtain
-    data from. If no `path` argument is provided in this case, the content will
-    be obtained from the source location and a default local name, derived from
-    the source location will be generated. Alternatively, an explicit `path`
-    can be given to override the default.
-
-    If more than one `path` argument and a source location are provided, the
-    `path` arguments will be sequentially used to complete the source URL/path
-    (be means of concatenation), and an attempt is made to obtain data from
-    those locations.
-
 
     || REFLOW >>
     By default all files are added to the dataset's :term:`annex`, i.e. only
@@ -84,7 +91,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, :command:`git annex addurl`, or
+      Power-user info: This command uses :command:`git annex add`, or
       :command:`git add` to incorporate new dataset content.
     """
 
@@ -102,13 +109,7 @@ class Add(Interface):
             doc="""path/name of the component to be added. The component
             must either exist on the filesystem already, or a `source`
             has to be provided.""",
-            nargs="*",
-            constraints=EnsureStr() | EnsureNone()),
-        source=Parameter(
-            args=("-s", "--source",),
-            metavar='URL/PATH',
-            doc="url or local path of the to be added component's source",
-            action="append",
+            nargs="+",
             constraints=EnsureStr() | EnsureNone()),
         to_git=Parameter(
             args=("--to-git",),
@@ -116,11 +117,21 @@ class Add(Interface):
             doc="""flag whether to add data directly to Git, instead of
             tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport"""),
+            transport. If not specified - it will be up to git-annex to
+            decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        ds2super=Parameter(
+            args=("-S", "--ds2super", "--datasets-to-super",),
+            action='store_true',
+            doc="""given paths of dataset (toplevel) locations will cause
+            these datasets to be added to their respective superdatasets
+            underneath a given base `dataset` (instead of all their content
+            to themselves). If no base `dataset` is provided, this flag has
+            no effect. Regular files and directories are always added to
+            their respective datasets, regardless of this setting."""),
         save=nosave_opt,
-        if_dirty=if_dirty_opt,
+        message=save_message_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts,
@@ -131,248 +142,112 @@ class Add(Interface):
     @datasetmethod(name='add')
     def __call__(
             path=None,
-            source=None,
             dataset=None,
-            to_git=False,
+            to_git=None,
             save=True,
+            message=None,
             recursive=False,
             recursion_limit=None,
-            if_dirty='ignore',
+            ds2super=False,
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None,
             jobs=None):
 
         # parameter constraints:
-        if not path and not source:
-            raise InsufficientArgumentsError("insufficient information for "
-                                             "adding: requires at least a path "
-                                             "or a source.")
-
-        # When called from cmdline `path` and `source` will be a list even if
-        # there is only one item.
-        # Make sure we deal with the same when called via python API:
-        # always yields list; empty if None
-        path = assure_list(path)
-        source = assure_list(source)
-
-        # TODO: Q: are the list operations in the following 3 blocks (resolving
-        #          paths, sources and datasets) guaranteed to be stable
-        #          regarding order?
-
-        # resolve path(s):
-        # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
-        resolved_paths = [resolve_path(p, dataset) for p in path]
-
-        # must come after resolve_path()!!
-        # resolve dataset:
-        dataset = require_dataset(dataset, check_installed=True,
-                                  purpose='adding')
-        handle_dirty_dataset(dataset, if_dirty)
-
-        # resolve source(s):
-        resolved_sources = []
-        for s in source:
-            if not is_datalad_compat_ri(s):
-                raise ValueError("invalid source parameter: %s" % s)
-            resolved_sources.append(_get_git_url_from_source(s))
-
-        # find (sub-)datasets to add things to (and fail on invalid paths):
+        if not path:
+            raise InsufficientArgumentsError(
+                "insufficient information for adding: requires at least a path")
+        # never recursion, need to handle manually below to be able to
+        # discover untracked content
+        content_by_ds, unavailable_paths = Interface._prep(
+            path=path,
+            dataset=dataset,
+            recursive=False)
+        if unavailable_paths:
+            lgr.warning("ignoring non-existent path(s): %s",
+                        unavailable_paths)
         if recursive:
+            # with --recursive for each input path traverse the directory
+            # tree, when we find a dataset, add it to the spec, AND add it as
+            # a path to the spec of the parent
+            # MIH: wrap in list() to avoid exception, because dict size might
+            # change, but we want to loop over all that are in at the start
+            # only
+            for d in list(content_by_ds.keys()):
+                for p in content_by_ds[d]:
+                    _discover_subdatasets_recursively(
+                        p,
+                        [d],
+                        content_by_ds,
+                        recursion_limit)
 
-            # 1. Find the (sub-)datasets containing the given path(s):
-            # Note, that `get_containing_subdataset` raises if `p` is
-            # outside `dataset`, but it returns `dataset`, if `p` is inside
-            # a subdataset not included by `recursion_limit`. In the latter
-            # case, the git calls will fail instead.
-            # We could check for this right here and fail early, but this
-            # would lead to the need to discover the entire hierarchy no
-            # matter if actually required.
-            resolved_datasets = [dataset.get_containing_subdataset(
-                p, recursion_limit=recursion_limit) for p in resolved_paths]
+        if not content_by_ds:
+            raise InsufficientArgumentsError(
+                "non-existing paths given to add")
 
-            # 2. Find implicit subdatasets to call add on:
-            # If there are directories in resolved_paths (Note,
-            # that this includes '.' and '..'), check for subdatasets
-            # beneath them. These should be called recursively with '.'.
-            # Therefore add the subdatasets to resolved_datasets and
-            # corresponding '.' to resolved_paths, in order to generate the
-            # correct call.
-            for p in resolved_paths:
-                if isdir(p):
-                    for subds_path in \
-                        dataset.get_subdatasets(absolute=True, recursive=True,
-                                                recursion_limit=recursion_limit):
-                        if subds_path.startswith(_with_sep(p)):
-                            resolved_datasets.append(Dataset(subds_path))
-                            resolved_paths.append(curdir)
+        if dataset:
+            # remeber the datasets associated with actual inputs
+            input_ds = list(content_by_ds.keys())
+            # forge chain from base dataset to any leaf dataset
+            _discover_trace_to_known(dataset.path, [], content_by_ds)
+            if ds2super:
+                # now check all dataset entries corresponding to the original
+                # input to see if they contain their own paths and remove them
+                for inpds in input_ds:
+                    content_by_ds[inpds] = [p for p in content_by_ds[inpds]
+                                            if not p == inpds]
+                # and lastly remove all entries that contain no path to avoid
+                # saving any staged content in the final step
+                content_by_ds = {d: v for d, v in content_by_ds.items() if v}
 
-        else:
-            # if not recursive, try to add everything to dataset itself:
-            resolved_datasets = [dataset for i in range(len(resolved_paths))]
+        results = []
+        # simple loop over datasets -- save happens later
+        # start deep down
+        for ds_path in sorted(content_by_ds, reverse=True):
+            ds = Dataset(ds_path)
+            toadd = list(set(content_by_ds[ds_path]))
+            # handle anything that looks like a wannabe subdataset
+            for subds_path in [d for d in toadd
+                               if GitRepo.is_valid_repo(d) and
+                               d != ds_path and
+                               d not in ds.get_subdatasets(
+                                   recursive=False,
+                                   absolute=True,
+                                   fulfilled=True)]:
+                # TODO add check that the subds has a commit, and refuse
+                # to operate on it otherwise, or we would get a bastard
+                # submodule that cripples git operations
+                _install_subds_inplace(
+                    ds=ds,
+                    path=subds_path,
+                    relativepath=relpath(subds_path, ds_path))
+                # make sure that .gitmodules is added to the list of files
+                toadd.append(opj(ds.path, '.gitmodules'))
+                # report added subdatasets -- add below won't do it
+                results.append({
+                    'success': True,
+                    'file': Dataset(subds_path)})
+            # make sure any last minute additions make it to the saving stage
+            # XXX? should content_by_ds become OrderedDict so that possible
+            # super here gets processed last?
+            content_by_ds[ds_path] = toadd
+            added = ds.repo.add(
+                toadd,
+                git=to_git if isinstance(ds.repo, AnnexRepo) else True,
+                commit=False)
+            for a in added:
+                a['file'] = opj(ds_path, a['file'])
+            results.extend(added)
 
-        # we need a resolved dataset per path:
-        assert len(resolved_paths) == len(resolved_datasets)
+        if results and save:
+            # OPT: tries to save even unrelated stuff
+            save_dataset_hierarchy(
+                content_by_ds,
+                base=dataset.path if dataset and dataset.is_installed() else None,
+                message=message if message else '[DATALAD] added content')
 
-        # sort parameters for actual git/git-annex calls:
-        # (dataset, path, source)
-        from six.moves import zip_longest
-
-        param_tuples = list(zip_longest(resolved_datasets,
-                                        resolved_paths, resolved_sources))
-        # possible None-datasets in `param_tuples` were filled in by zip_longest
-        # and need to be replaced by `dataset`:
-        param_tuples = [(d if d is not None else dataset, p, s)
-                        for d, p, s in param_tuples]
-
-        calls = {d.path: {  # list of paths to 'git-add':
-                            'g_add': [],
-                            # list of paths to 'git-annex-add':
-                            'a_add': [],
-                            # list of sources to 'git-annex-addurl':
-                            'addurl_s': [],
-                            # list of (path, source) to
-                            # 'git-annex-addurl --file':
-                            'addurl_f': []
-                         } for d in [i for i, p, s in param_tuples]}
-
-        for ds, p, s in param_tuples:
-            # it should not happen, that `path` as well as `source` are None:
-            assert p or s
-            if not s:
-                # we have a path only
-                # Do not try to add to annex whenever there is no annex
-                if to_git or not isinstance(ds.repo, AnnexRepo):
-                    calls[ds.path]['g_add'].append(p)
-                else:
-                    calls[ds.path]['a_add'].append(p)
-            elif not p:
-                # we have a source only
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
-                calls[ds.path]['addurl_s'].append(s)
-            else:
-                # we have a path and a source
-                if to_git:
-                    raise NotImplementedError("Can't add a remote source "
-                                              "directly to git.")
-                calls[ds.path]['addurl_f'].append((p, s))
-
-        # now do the actual add operations:
-        # TODO: implement git/git-annex/git-annex-add options
-
-        datasets_return_values = defaultdict(list)
-        for dspath in calls:
-            ds = Dataset(dspath)
-            return_values = datasets_return_values[dspath]
-            lgr.info("Processing dataset %s ..." % ds)
-
-            # check every (sub-)dataset for annex once, since we can't add or
-            # addurl anything, if there is no annex:
-            # TODO: Q: Alternatively, just call git-annex-init if there's no
-            # annex yet and we have an annex-add/annex-addurl request?
-            _is_annex = isinstance(ds.repo, AnnexRepo)
-
-            if calls[ds.path]['g_add']:
-                lgr.debug("Adding %s to git", calls[dspath]['g_add'])
-                added = ds.repo.add(calls[dspath]['g_add'], git=True,
-                                  git_options=git_opts)
-                return_values.extend(added)
-            if calls[ds.path]['a_add']:
-                if _is_annex:
-                    lgr.debug("Adding %s to annex", calls[dspath]['a_add'])
-                    return_values.extend(
-                        ds.repo.add(calls[dspath]['a_add'],
-                                    git=False,
-                                    jobs=jobs,
-                                    git_options=git_opts,
-                                    annex_options=annex_opts,
-                                    options=annex_add_opts
-                                    )
-                    )
-                else:
-                    lgr.debug("{0} is no annex. Skip 'annex-add' for "
-                              "files {1}".format(ds, calls[dspath]['a_add']))
-                    return_values.extend(
-                        [{'file': f,
-                          'success': False,
-                          'note': "no annex at %s" % ds.path}
-                         for f in calls[dspath]['a_add']]
-                    )
-
-            # TODO: AnnexRepo.add_urls' return value doesn't contain the created
-            #       file name but the url
-            if calls[ds.path]['addurl_s']:
-                if _is_annex:
-                    lgr.debug("Adding urls %s to annex", calls[dspath]['addurl_s'])
-                    return_values.extend(
-                        ds.repo.add_urls(calls[ds.path]['addurl_s'],
-                                         options=annex_add_opts,
-                                         # TODO: extra parameter for addurl?
-                                         git_options=git_opts,
-                                         annex_options=annex_opts,
-                                         jobs=jobs,
-                                         )
-                    )
-                else:
-                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
-                              "files {1}".format(ds, calls[dspath]['addurl_s']))
-                    return_values.extend(
-                        [{'file': f,
-                          'success': False,
-                          'note': "no annex at %s" % ds.path}
-                         for f in calls[dspath]['addurl_s']]
-                    )
-
-            if calls[ds.path]['addurl_f']:
-                if _is_annex:
-                    for f, u in calls[ds.path]['addurl_f']:
-                        lgr.debug("Adding urls %s to files in annex",
-                                  calls[dspath]['addurl_f'])
-                        return_values.append(
-                            ds.repo.add_url_to_file(f, u,
-                                                    options=annex_add_opts,  # TODO: see above
-                                                    git_options=git_opts,
-                                                    annex_options=annex_opts,
-                                                    batch=True))
-                else:
-                    lgr.debug("{0} is no annex. Skip 'annex-addurl' for "
-                              "files {1}".format(ds, calls[dspath]['addurl_f']))
-                    return_values.extend(
-                        [{'file': f,
-                          'success': False,
-                          'note': "no annex at %s" % ds.path}
-                         for f in calls[dspath]['addurl_f']]
-                    )
-            return_values = None  # to avoid mis-use
-
-        # XXX or we could return entire datasets_return_values, could be useful
-        # that way.  But then should be unified with the rest of commands, e.g.
-        # get etc
-        return_values_flat = []
-        for dspath, return_values in datasets_return_values.items():
-            if save and len(return_values):
-                # we got something added -> save
-                # everything we care about at this point should be staged already
-                Save.__call__(
-                    message='[DATALAD] added content',
-                    dataset=ds,
-                    auto_add_changes=False,
-                    recursive=False)
-            # TODO: you feels that this is some common logic we already have somewhere
-            dsrelpath = relpath(dspath, dataset.path)
-            if dsrelpath != curdir:
-                # we need ot adjust 'file' entry in each record
-                for return_value in return_values:
-                    if 'file' in return_value:
-                        return_value['file'] = opj(dsrelpath, return_value['file'])
-                    return_values_flat.append(return_value)
-            else:
-                return_values_flat.extend(return_values)
-
-
-        return return_values_flat
+        return results
 
     @staticmethod
     def result_renderer_cmdline(res, args):
@@ -383,7 +258,9 @@ class Add(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was added")
+            ui.message("Nothing was added{}".format(
+                       '' if args.recursive else
+                       " (consider --recursive if that is unexpected)"))
             return
 
         msg = linesep.join([

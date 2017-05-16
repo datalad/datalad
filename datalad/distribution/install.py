@@ -56,7 +56,6 @@ from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
 from .utils import _clone_from_any_source
 from .utils import _handle_possible_annex_dataset
-from .utils import _save_installed_datasets
 
 __docformat__ = 'restructuredtext'
 
@@ -422,7 +421,7 @@ class Install(Interface):
                       "{0}: {1}".format(ds, relativepath))
 
             # FLOW_GUIDE 1.4.
-            lgr.info("Installing subdataset from '{0}' at: {0}".format(
+            lgr.info("Installing subdataset from '{0}' at {1}".format(
                 source, relativepath))
             destination_dataset = _install_subds_from_flexible_source(
                 ds,
@@ -560,3 +559,27 @@ class Install(Interface):
             n=len(res),
             items=items)
         ui.message(msg)
+
+
+# TODO when `install` is RF'ed, this should be replaced by a more general
+# implementation
+def _save_installed_datasets(ds, installed_datasets):
+    paths = [relpath(subds.path, ds.path) for subds in installed_datasets]
+    paths_str = ", ".join(paths)
+    msg = "installed subdataset{}: {}".format(
+        "s" if len(paths) > 1 else "", paths_str)
+    lgr.info("Saving possible changes to {0} - {1}".format(
+        ds, msg))
+    try:
+        ds.save(
+            files=paths + ['.gitmodules'],
+            message='[DATALAD] ' + msg,
+            all_updated=False,
+            recursive=False)
+    except ValueError as e:
+        if "did not match any file(s) known to git" in str(e):
+            # install doesn't add; therefore save call might included
+            # not yet added paths.
+            pass
+        else:
+            raise

@@ -13,6 +13,7 @@
 import os
 import json
 from abc import ABCMeta, abstractmethod, abstractproperty
+from six import add_metaclass
 
 from os.path import join as opj, exists, lexists, realpath, basename, dirname
 from os.path import normpath
@@ -31,12 +32,11 @@ __docformat__ = 'restructuredtext'
 
 
 @auto_repr
+@add_metaclass(ABCMeta)
 class JsonBaseDB(object):
     """
     Base class for DBs which would store to JSON files
     """
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, repo, name=None):
         #super(JsonBaseDB, self).__init__()

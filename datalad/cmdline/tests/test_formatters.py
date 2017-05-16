@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover
 
 from ..main import setup_parser
 from datalad.tests.utils import ok_, assert_in, ok_startswith
+from datalad.tests.utils import assert_not_in
 
 demo_example = """
 #!/bin/sh
@@ -54,6 +55,7 @@ datalad imagine --too \\
         --too say \\
         yes=no
 
+datalad shameful-command  #% SKIP
 #%
 # The result is not comprehensible.
 #%
@@ -76,7 +78,10 @@ def test_cmdline_example_to_rst():
     out = fmt.cmdline_example_to_rst(
         SIO(demo_example), ref='mydemo')
     out.seek(0)
-    assert_in('.. code-block:: sh', out.read())
+    out_text = out.read()
+    assert_in('.. code-block:: sh', out_text)
+    assert_not_in('shame', out_text)  # no SKIP'ed
+    assert_not_in('#', out_text)      # no comments
 
 def test_parser_access():
     parsers = setup_parser(return_subparsers=True)

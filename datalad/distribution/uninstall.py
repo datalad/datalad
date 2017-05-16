@@ -31,8 +31,10 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import save_dataset_hierarchy
+from datalad.interface.utils import _discover_trace_to_known
 from datalad.utils import rmtree
-from datalad.support.gitrepo import GitRepo
+from datalad.utils import get_dataset_root
+
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
@@ -64,11 +66,18 @@ def _uninstall_dataset(ds, check, has_super):
     # TODO check that the relevant branched are pushed to a remote
     if ds.get_subdatasets(fulfilled=True):
         raise ValueError('to be uninstalled dataset has present subdatasets, forgot --recursive?')
+    # Close any possibly associated process etc with underlying repo.
+    # Otherwise - rmtree could fail to remove e.g. under NFS which would
+    # still have some files opened by them (thus having .nfs00000xxxx
+    # files) forbidding rmdir to work in rmtree
+    ds.close()
     if ds.is_installed():
         rmtree(ds.path)
     if has_super and not exists(ds.path):
         # recreate an empty mountpoint to make Git happier
         os.makedirs(ds.path)
+    # invalidate loaded ConfigManager:
+    ds._cfg = None
     results.append(ds)
     return results
 
@@ -82,9 +91,7 @@ def _drop_files(ds, files, check):
         dropped = ds.repo.drop(files, options=opts)
         results.extend([opj(ds.path, f) for f in dropped])
     else:
-        # TODO think how to handle this best, when called `through` remove
-        # and it hits a plain git repo somewhere down below
-        raise ValueError("cannot uninstall, not an annex %s" % ds)
+        lgr.info("skip dropping files in %s, no annex", ds)
     return results
 
 
@@ -142,6 +149,9 @@ class Drop(Interface):
             check=True,
             if_dirty='save-before'):
 
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -219,6 +229,9 @@ class Uninstall(Interface):
             check=True,
             if_dirty='save-before'):
 
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -235,7 +248,7 @@ class Uninstall(Interface):
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            if not ds_path in paths:
+            if ds_path not in paths:
                 lgr.error(
                     "will not act on files at %s (consider the `drop` command)",
                     paths)
@@ -252,7 +265,7 @@ class Uninstall(Interface):
                 'inappropriate arguments, see previous error message(s)')
 
         handle_dirty_datasets(
-            content_by_ds.keys(), mode=if_dirty, base=dataset)
+            content_by_ds, mode=if_dirty, base=dataset)
 
         results = []
 
@@ -327,6 +340,9 @@ class Remove(Interface):
             if not dataset.is_installed() and not path:
                 # all done already
                 return []
+            if not path:
+                # act on the whole dataset if nothing else was specified
+                path = dataset.path if isinstance(dataset, Dataset) else dataset
         content_by_ds, unavailable_paths = Interface._prep(
             path=path,
             dataset=dataset,
@@ -337,7 +353,7 @@ class Remove(Interface):
             # we need to check whether any of these correspond
             # to a known subdataset, and add those to the list of
             # things to be removed
-            toppath = GitRepo.get_toppath(p)
+            toppath = get_dataset_root(p)
             if not toppath:
                 nonexistent_paths.append(p)
                 continue
@@ -357,8 +373,7 @@ class Remove(Interface):
                 "refusing to uninstall current or parent directory")
 
         handle_dirty_datasets(
-            content_by_ds.keys(), mode=if_dirty, base=dataset)
-
+            content_by_ds, mode=if_dirty, base=dataset)
         ds2save = set()
         results = []
         # iterate over all datasets, starting at the bottom
@@ -383,13 +398,22 @@ class Remove(Interface):
                 submodule = [sm for sm in superds.repo.repo.submodules
                              if sm.path == subds_relpath]
                 # there can only be one!
-                assert(len(submodule) == 1)
+                assert len(submodule) == 1, \
+                    "Found multiple subdatasets with registered path {}:" \
+                    "{}{}{}There should be only one." \
+                    "".format(subds_relpath, os.linesep,
+                              submodule, os.linesep)
                 submodule = submodule[0]
                 submodule.remove()
                 if exists(ds_path):
                     # could be an empty dir in case an already uninstalled subdataset
                     # got removed
                     os.rmdir(ds_path)
+                # need to save changes to .gitmodules later
+                content_by_ds[superds.path] = \
+                    content_by_ds.get(superds.path, []) \
+                    + [opj(superds.path, '.gitmodules'),
+                       ds_path]
                 ds2save.add(superds.path)
             else:
                 if check and hasattr(ds.repo, 'drop'):
@@ -397,11 +421,15 @@ class Remove(Interface):
                 results.extend(ds.repo.remove(paths, r=True))
                 ds2save.add(ds.path)
 
+        if dataset and dataset.is_installed():
+            # forge chain from base dataset to any leaf dataset
+            # in order to save state changes all the way up
+            _discover_trace_to_known(dataset.path, [], content_by_ds)
+
         save_dataset_hierarchy(
-            list(ds2save),
+            content_by_ds,
             base=dataset.path if dataset and dataset.is_installed() else None,
-            message='[DATALAD] removed content',
-            auto_add_changes=False)
+            message='[DATALAD] removed content')
         return results
 
     @classmethod

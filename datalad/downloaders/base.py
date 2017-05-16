@@ -20,6 +20,7 @@ from abc import ABCMeta, abstractmethod
 from os.path import exists, join as opj, isdir
 from six import PY2
 from six import binary_type, PY3
+from six import add_metaclass
 
 
 from .. import cfg
@@ -55,13 +56,12 @@ class DownloaderSession(object):
 
 
 @auto_repr
+@add_metaclass(ABCMeta)
 class BaseDownloader(object):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
     _DOWNLOAD_SIZE_TO_VERIFY_AUTH = 10000
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, credential=None, authenticator=None):
         """
@@ -297,7 +297,7 @@ class BaseDownloader(object):
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
                 t0 = time.time()
                 downloader_session.download(fp, pbar, size=size)
                 downloaded_time = time.time() - t0
@@ -427,7 +427,7 @@ class BaseDownloader(object):
         # FETCH CONTENT
         try:
             # Consider to improve to make it animated as well, or shorten here
-            #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+            #pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
             content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)

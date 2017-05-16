@@ -21,15 +21,18 @@ import shlex
 import atexit
 import functools
 
+from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type
 from os.path import abspath, isabs
 
+from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
+from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -56,7 +59,8 @@ class Runner(object):
     able to record calls and allows for dry runs.
     """
 
-    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol', '_log_outputs']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol',
+                 '_log_opts']
 
     def __init__(self, cwd=None, env=None, protocol=None, log_outputs=None):
         """
@@ -95,7 +99,11 @@ class Runner(object):
                 atexit.register(functools.partial(protocol.write_to_file, filename))
 
         self.protocol = protocol
-        self._log_outputs = log_outputs  # we don't know yet either we need ot log every output or not
+        # Various options for logging
+        self._log_opts = {}
+        # we don't know yet either we need ot log every output or not
+        if log_outputs is not None:
+            self._log_opts['outputs'] = log_outputs
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -128,17 +136,55 @@ class Runner(object):
             raise TypeError("Argument 'command' is neither a string, "
                             "nor a list nor a callable.")
 
-    @property
-    def log_outputs(self):
-        if self._log_outputs is None:
+    def _opt_env_adapter(v):
+        """If value is a string, split by ,"""
+        if v:
+            if v.isdigit():
+                log_env = bool(int(v))
+            else:
+                log_env = v.split(',')
+            return log_env
+        else:
+            return False
+
+    _LOG_OPTS_ADAPTERS = OrderedDict([
+        ('outputs', None),
+        ('cwd', None),
+        ('env', _opt_env_adapter),
+        ('stdin', None),
+    ])
+
+    def _get_log_setting(self, opt, default=False):
+        try:
+            return self._log_opts[opt]
+        except KeyError:
             try:
                 from . import cfg
-                self._log_outputs = \
-                    cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
-                # could be too early, then DON'T log!
-                return True
-        return self._log_outputs
+                return default
+            adapter = self._LOG_OPTS_ADAPTERS.get(opt, None)
+            self._log_opts[opt] = \
+                (cfg.getbool if not adapter else cfg.get_value)(
+                    'datalad.log.cmd', opt, default=default)
+            if adapter:
+                self._log_opts[opt] = adapter(self._log_opts[opt])
+            return self._log_opts[opt]
+
+    @property
+    def log_outputs(self):
+        return self._get_log_setting('outputs')
+
+    @property
+    def log_cwd(self):
+        return self._get_log_setting('cwd')
+
+    @property
+    def log_stdin(self):
+        return self._get_log_setting('stdin')
+
+    @property
+    def log_env(self):
+        return self._get_log_setting('env')
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
@@ -196,7 +242,10 @@ class Runner(object):
                 line = proc.stdout.readline()
                 if line and callable(log_stdout_):
                     # Let it be processed
-                    line = log_stdout_(line)
+                    line = log_stdout_(line.decode())
+                    if line is not None:
+                        # we are working with binary type here
+                        line = line.encode()
                 if line:
                     stdout += line
                     self._log_out(line.decode())
@@ -215,7 +264,10 @@ class Runner(object):
                 line = proc.stderr.readline()
                 if line and callable(log_stderr_):
                     # Let it be processed
-                    line = log_stderr_(line)
+                    line = log_stderr_(line.decode())
+                    if line is not None:
+                        # we are working with binary type here
+                        line = line.encode()
                 if line:
                     stderr += line
                     self._log_err(line.decode() if PY3 else line,
@@ -237,7 +289,7 @@ class Runner(object):
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
-            cwd=None, env=None, shell=None):
+            cwd=None, env=None, shell=None, stdin=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is
@@ -290,6 +342,9 @@ class Runner(object):
             Run command in a shell.  If not specified, then it runs in a shell
             only if command is specified as a string (not a list)
 
+        stdin: file descriptor
+            input stream to connect to stdin of the process.
+
         Returns
         -------
         (stdout, stderr)
@@ -308,7 +363,33 @@ class Runner(object):
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
         errstream = subprocess.PIPE if log_stderr else sys.stderr
 
-        self.log("Running: %s" % (cmd,))
+        popen_env = env or self.env
+
+        # TODO: if outputstream is sys.stdout and that one is set to StringIO
+        #       we have to "shim" it with something providing fileno().
+        # This happens when we do not swallow outputs, while allowing nosetest's
+        # StringIO to be provided as stdout, crashing the Popen requiring
+        # fileno().  In out swallow_outputs, we just use temporary files
+        # to overcome this problem.
+        # For now necessary test code should be wrapped into swallow_outputs cm
+        # to avoid the problem
+        log_msgs = ["Running: %s"]
+        log_args = [cmd]
+        if self.log_cwd:
+            log_msgs += ['cwd=%r']
+            log_args += [cwd or self.cwd]
+        if self.log_stdin:
+            log_msgs += ['stdin=%r']
+            log_args += [stdin]
+        log_env = self.log_env
+        if log_env and popen_env:
+            log_msgs += ["env=%r"]
+            log_args.append(
+                popen_env if log_env is True
+                else {k: popen_env[k] for k in log_env if k in popen_env}
+            )
+        log_msg = '\n'.join(log_msgs)
+        self.log(log_msg, *log_args)
 
         if self.protocol.do_execute_ext_commands:
 
@@ -326,7 +407,8 @@ class Runner(object):
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
-                                        env=env or self.env)
+                                        env=popen_env,
+                                        stdin=stdin)
 
             except Exception as e:
                 prot_exc = e
@@ -413,16 +495,21 @@ class Runner(object):
                     [str(f), "args=%s" % str(args), "kwargs=%s" % str(kwargs)],
                     None)
 
-    def log(self, msg, level=logging.DEBUG):
+    def log(self, msg, *args, **kwargs):
         """log helper
 
         Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
+        level = kwargs.pop('level', logging.DEBUG)
         if isinstance(self.protocol, NullProtocol):
-            lgr.log(level, msg)
+            lgr.log(level, msg, *args, **kwargs)
         else:
-            lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
+            if args:
+                msg = msg % args
+            lgr.log(level, "{%s} %s" % (
+                self.protocol.__class__.__name__, msg)
+            )
 
 
 class GitRunner(Runner):
@@ -433,26 +520,67 @@ class GitRunner(Runner):
     GIT_WORK_TREE environment variables set to the absolute path
     if is defined and is relative path
     """
+    _GIT_PATH = None
+
+    @borrowdoc(Runner)
+    def __init__(self, *args, **kwargs):
+        super(GitRunner, self).__init__(*args, **kwargs)
+        self._check_git_path()
+
+    @staticmethod
+    def _check_git_path():
+        """If using bundled git-annex, we would like to use bundled with it git
+
+        Thus we will store _GIT_PATH a path to git in the same directory as annex
+        if found.  If it is empty (but not None), we do nothing
+        """
+        if GitRunner._GIT_PATH is None:
+            from distutils.spawn import find_executable
+            annex_fpath = find_executable("git-annex")
+            if not annex_fpath:
+                # not sure how to live further anyways! ;)
+                alongside = False
+            else:
+                annex_path = os.path.dirname(os.path.realpath(annex_fpath))
+                if on_windows:
+                    # just bundled installations so git should be taken from annex
+                    alongside = True
+                else:
+                    alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+            GitRunner._GIT_PATH = annex_path if alongside else ''
+            lgr.debug(
+                "Will use git under %r (no adjustments to PATH if empty string)",
+                GitRunner._GIT_PATH
+            )
+            assert(GitRunner._GIT_PATH is not None)  # we made the decision!
 
     @staticmethod
     def get_git_environ_adjusted(env=None):
         """
         Replaces GIT_DIR and GIT_WORK_TREE with absolute paths if relative path and defined
         """
-        git_env = env.copy() if env else os.environ.copy()         # if env set copy else get os environment
+        # if env set copy else get os environment
+        git_env = env.copy() if env else os.environ.copy()
+        if GitRunner._GIT_PATH:
+            git_env['PATH'] = ':'.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+                if 'PATH' in git_env \
+                else GitRunner._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
-            if var:                                                # if env variable set
-                if not isabs(var):                                 # and it's a relative path
-                    git_env[varstring] = abspath(var)              # convert it to absolute path
+            if var:                                    # if env variable set
+                if not isabs(var):                     # and it's a relative path
+                    git_env[varstring] = abspath(var)  # to absolute path
                     lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
+
+        if 'GIT_SSH_COMMAND' not in git_env:
+            git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
 
         return git_env
 
     def run(self, cmd, env=None, *args, **kwargs):
         return super(GitRunner, self).run(
-            cmd, env=self.get_git_environ_adjusted(), *args, **kwargs)
+            cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
 
 
 # ####

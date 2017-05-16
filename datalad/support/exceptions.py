@@ -54,6 +54,33 @@ class MissingExternalDependency(RuntimeError):
         return to_str
 
 
+class DeprecatedError(RuntimeError):
+    """To raise whenever a deprecated entirely feature is used"""
+    def __init__(self, new=None, version=None, msg=''):
+        """
+
+        Parameters
+        ----------
+        new : str, optional
+          What new construct to use
+        version : str, optional
+          Since which version is deprecated
+        kwargs
+        """
+        super(DeprecatedError, self).__init__()
+        self.version = version
+        self.new = new
+        self.msg = msg
+
+    def __str__(self):
+        s = self.msg if self.msg else ''
+        if self.version:
+            s += (" is deprecated" if s else "Deprecated") + " since version %s." % self.version
+        if self.new:
+            s += " Use %s instead." % self.new
+        return s
+
+
 class OutdatedExternalDependency(MissingExternalDependency):
     """External dependency is present but outdated"""
 
@@ -82,7 +109,7 @@ class CommandNotAvailableError(CommandError):
     pass
 
 
-class FileNotInAnnexError(CommandError, IOError):
+class FileNotInAnnexError(IOError, CommandError):
     """Thrown if a file is not under control of git-annex.
     """
     def __init__(self, cmd="", msg="", code=None, filename=""):
@@ -221,6 +248,15 @@ class RemoteNotAvailableError(CommandError):
         super_str = super(RemoteNotAvailableError, self).__str__()
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
+
+
+class InvalidInstanceRequestError(RuntimeError):
+    """Thrown if a request to create a (flyweight) instance is invalid"""
+
+    def __init__(self, id_, msg=None):
+        super(InvalidInstanceRequestError, self).__init__(msg)
+        self.id = id_
+        self.msg = msg
 
 
 class IncompleteResultsError(RuntimeError):

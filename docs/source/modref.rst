@@ -59,7 +59,6 @@ Crawler
    :toctree: generated
 
    crawler.base
-   crawler.db
    crawler.pipeline
 
 Test infrastructure

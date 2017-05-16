@@ -15,7 +15,6 @@ import time
 
 import logging
 import shutil
-import stat
 import os
 import sys
 import tempfile
@@ -35,6 +34,7 @@ from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
 from os.path import stat
+from os.path import dirname
 
 
 from six import text_type, binary_type, string_types
@@ -278,7 +278,7 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     if chmod_files == 'auto':
         chmod_files = on_windows
 
-    if not os.path.islink(path):
+    if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
     else:
@@ -382,7 +382,7 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_list(s, copy=False):
+def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -390,13 +390,16 @@ def assure_list(s, copy=False):
     s: list or anything
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
     """
 
     if isinstance(s, list):
         return s if not copy else s[:]
     elif isinstance(s, text_type):
         return [s]
-    elif hasattr(s, '__iter__'):
+    elif iterate and hasattr(s, '__iter__'):
         return list(s)
     elif s is None:
         return []
@@ -691,11 +694,11 @@ def swallow_outputs():
 
 
 @contextmanager
-def swallow_logs(new_level=None, file_=None):
+def swallow_logs(new_level=None, file_=None, name='datalad'):
     """Context manager to consume all logs.
 
     """
-    lgr = logging.getLogger("datalad")
+    lgr = logging.getLogger(name)
 
     # Keep old settings
     old_level = lgr.level
@@ -792,6 +795,8 @@ def swallow_logs(new_level=None, file_=None):
     # we want to log levelname so we could test against it
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
+    # Inherit filters
+    swallow_handler.filters = sum([h.filters for h in old_handlers], [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
@@ -1035,7 +1040,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         for f in filenames:
             try:
                 rmtemp(f)
-            except OSError:
+            except OSError:  # pragma: no cover
                 pass
 
 
@@ -1157,6 +1162,23 @@ def walk(top, func, arg):
             continue
         if stat.S_ISDIR(st.st_mode):
             walk(name, func, arg)
+
+
+def get_dataset_root(path):
+    """Return the root of an existent dataset containing a given path
+
+    The root path is returned in the same absolute or relative form
+    as the input argument. If no associated dataset exists, or the
+    input path doesn't exist, None is returned.
+    """
+    suffix = os.sep + opj('.git', 'objects')
+    if not isdir(path):
+        path = dirname(path)
+    while not exists(path + suffix):
+        path = opj(path, os.pardir)
+        if not exists(path):
+            return None
+    return normpath(path)
 
 
 lgr.log(5, "Done importing datalad.utils")

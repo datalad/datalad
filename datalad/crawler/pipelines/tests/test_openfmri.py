@@ -400,7 +400,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     from datalad.api import crawl
 
     # make a brand new clone
-    GitRepo(clonedir, outd)
+    GitRepo.clone(outd, clonedir)
 
     def _pipeline(*args, **kwargs):
         """Helper to mock openfmri.pipeline invocation so it looks at our 'server'"""

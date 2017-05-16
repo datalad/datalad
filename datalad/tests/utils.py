@@ -81,6 +81,19 @@ def skip_if_scrapy_without_selector():
             % getattr(scrapy, '__version__'))
 
 
+def skip_if_url_is_not_available(url, regex=None):
+    # verify that dataset is available
+    from datalad.downloaders.providers import Providers
+    from datalad.downloaders.base import DownloadError
+    providers = Providers.from_config_files()
+    try:
+        content = providers.fetch(url)
+        if regex and re.search(regex, content):
+            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+    except DownloadError:
+        raise SkipTest("%s failed to download" % url)
+
+
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
@@ -142,63 +155,91 @@ from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
 
-def ok_clean_git_annex_proxy(path):
-    """Helper to check, whether an annex in direct mode is clean
-    """
-    # TODO: May be let's make a method of AnnexRepo for this purpose
-
-    ar = AnnexRepo(path)
-    cwd = getpwd()
-    chpwd(path)
-
-    try:
-        out = ar.proxy(['git', 'status'])
-    except CommandNotAvailableError as e:
-        raise SkipTest
-    finally:
-        chpwd(cwd)
-
-    assert_in(
-        "nothing to commit", out[0],
-        msg="git-status output via proxy not plausible: %s" % out[0]
-    )
-
-
-def ok_clean_git(path, annex=True, head_modified=[], index_modified=[], untracked=[]):
+def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
+                 untracked=[]):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
+
+    Note
+    ----
+    Parameters head_modified, index_modified and untracked currently work
+    in pure git or indirect mode annex only and are ignored otherwise!
+    Implementation is yet to do!
+
+    Parameters
+    ----------
+    path: str or Repo
+      in case of a str: path to the repository's base dir;
+      Note, that passing a Repo instance prevents detecting annex. This might be
+      useful in case of a non-initialized annex, a GitRepo is pointing to.
+    annex: bool or None
+      explicitly set to True or False to indicate, that an annex is (not)
+      expected; set to None to autodetect, whether there is an annex.
+      Default: None.
     """
-    from datalad.support.gitrepo import GitRepo
-    if isinstance(path, GitRepo):
-        path = path.path
+    # TODO: See 'Note' in docstring
 
-    ok_(exists(path))
-    ok_(exists(join(path, '.git')))
-    if annex:
-        ok_(exists(join(path, '.git', 'annex')))
-    repo = git.Repo(path)
+    if isinstance(path, AnnexRepo):
+        if annex is None:
+            annex = True
+        # if `annex` was set to False, but we find an annex => fail
+        assert_is(annex, True)
+        r = path
+    elif isinstance(path, GitRepo):
+        if annex is None:
+            annex = False
+        # explicitly given GitRepo instance doesn't make sense with 'annex' True
+        assert_is(annex, False)
+        r = path
+    else:
+        # 'path' is an actual path
+        try:
+            r = AnnexRepo(path, init=False, create=False)
+            if annex is None:
+                annex = True
+            # if `annex` was set to False, but we find an annex => fail
+            assert_is(annex, True)
+        except Exception:
+            # Instantiation failed => no annex
+            try:
+                r = GitRepo(path, init=False, create=False)
+            except Exception:
+                raise AssertionError("Couldn't find an annex or a git "
+                                     "repository at {}.".format(path))
+            if annex is None:
+                annex = False
+            # explicitly given GitRepo instance doesn't make sense with
+            # 'annex' True
+            assert_is(annex, False)
 
-    if repo.index.entries.keys():
-        ok_(repo.head.is_valid())
+    if annex and r.is_direct_mode():
+        if head_modified or index_modified or untracked:
+            raise NotImplementedError("TODO - see note in docstring")
+        ok_(not r.dirty)
+    else:
+        repo = r.repo
 
-        eq_(sorted(repo.untracked_files), sorted(untracked))
+        if repo.index.entries.keys():
+            ok_(repo.head.is_valid())
 
-        if not head_modified and not index_modified:
-            # get string representations of diffs with index to ease
-            # troubleshooting
-            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-            index_diffs = [str(d) for d in repo.index.diff(None)]
-            eq_(head_diffs, [])
-            eq_(index_diffs, [])
-        else:
-            if head_modified:
-                # we did ask for interrogating changes
-                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                eq_(head_modified_, head_modified)
-            if index_modified:
-                index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                eq_(index_modified_, index_modified)
+            eq_(sorted(repo.untracked_files), sorted(untracked))
+
+            if not head_modified and not index_modified:
+                # get string representations of diffs with index to ease
+                # troubleshooting
+                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+                index_diffs = [str(d) for d in repo.index.diff(None)]
+                eq_(head_diffs, [])
+                eq_(index_diffs, [])
+            else:
+                if head_modified:
+                    # we did ask for interrogating changes
+                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                    eq_(head_modified_, head_modified)
+                if index_modified:
+                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                    eq_(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -1030,15 +1071,18 @@ def with_testsui(t, responses=None, interactive=True):
 with_testsui.__test__ = False
 
 
-def assert_no_errors_logged(func):
+def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
     def new_func(*args, **kwargs):
         with swallow_logs(new_level=logging.ERROR) as cml:
             out = func(*args, **kwargs)
             if cml.out:
-                raise AssertionError("Expected no errors to be logged, but log output is %s"
-                                     % cml.out)
+                if not (skip_re and re.search(skip_re, cml.out)):
+                    raise AssertionError(
+                        "Expected no errors to be logged, but log output is %s"
+                        % cml.out
+                    )
         return out
 
     return new_func

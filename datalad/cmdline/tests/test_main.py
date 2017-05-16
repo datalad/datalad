@@ -15,9 +15,12 @@ from mock import patch
 
 import datalad
 from ..main import main
+from datalad import __version__
+from datalad.cmd import Runner
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_not_in
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -84,18 +87,24 @@ def test_help_np():
                   'Commands for meta data handling',
                   'Miscellaneous commands',
                   'General information',
-                  'Global options'})
+                  'Global options',
+                  'Plumbing commands'})
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
     # rewrite-urls
+    import shutil
+    accepted_width = shutil.get_terminal_size()[0] \
+        if hasattr(shutil, 'get_terminal_size') else 80
+
     long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
-                  if len(l) > 80 and '{' not in l  # on nd70 summary line is unsplit
+                  if len(l) > accepted_width and
+                  '{' not in l  # on nd70 summary line is unsplit
                   ]
     if long_lines:
         raise AssertionError(
-            "Following lines in --help output were longer than 80 chars:\n%s"
-            % '\n'.join(long_lines)
+            "Following lines in --help output were longer than %s chars:\n%s"
+            % (accepted_width, '\n'.join(long_lines))
         )
 
 
@@ -110,7 +119,22 @@ def test_subcmd_usage_on_unknown_args():
 
 
 def check_incorrect_option(opts, err_str):
-    stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    # The first line used to be:
+    # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
+    # But: what do we expect to be in sys.argv[0] here?
+    # It depends on how we invoke the test.
+    # - nosetests -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0}=='nosetests'
+    # - python -m nose -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0}=='python -m nose'
+    # - python -c "import nose; nose.main()" -s -v datalad/cmdline/tests/test_main.py would result in:
+    #   sys.argv[0]=='-c'
+    # This led to failure in case sys.argv[0] contained an option, that was
+    # defined to be a datalad option too, therefore was a 'known_arg' and was
+    # checked to meet its constraints.
+    # But sys.argv[0] actually isn't used by main at all. It simply doesn't
+    # matter what's in there. The only thing important to pass here is `opts`.
+    stdout, stderr = run_main(('datalad',) + opts, expect_stderr=True, exit_code=2)
     out = stdout + stderr
     assert_in("usage: ", out)
     assert_re_in(err_str, out, match=False)
@@ -125,3 +149,28 @@ def test_incorrect_options():
     err_insufficient = err_invalid # "specify"
     yield check_incorrect_option, ('--dbg',), err_insufficient
     yield check_incorrect_option, tuple(), err_insufficient
+
+def test_script_shims():
+    runner = Runner()
+    for script in [
+        'datalad',
+        'git-annex-remote-datalad-archives',
+        'git-annex-remote-datalad']:
+        # those must be available for execution, and should not contain
+        which, _ = runner(['which', script])
+        # test if there is no easy install shim in there
+        with open(which.rstrip()) as f:
+            content = f.read()
+        assert_not_in('EASY', content) # NOTHING easy should be there
+        assert_not_in('pkg_resources', content)
+
+        # and let's check that it is our script
+        out, err = runner([script, '--version'])
+        version = (out + err).splitlines()[0].split(' ', 1)[1]
+        # we can get git and non git .dev version... so for now
+        # relax
+        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
+        # extract numeric portion
+        assert get_numeric_portion(version) # that my lambda is correctish
+        assert_equal(get_numeric_portion(__version__),
+                     get_numeric_portion(version))
