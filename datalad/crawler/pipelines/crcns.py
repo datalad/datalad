@@ -102,9 +102,7 @@ class get_and_save_metadata(object):
         # we do not take anything from data
         meta = get_metadata(self.dataset)
         if meta:
-            if not os.path.exists(METADATA_DIR):
-                os.makedirs(METADATA_DIR)
-            path_ = _path_(METADATA_DIR, 'datacite.xml')
+            path_ = _path_('.datalad', 'meta.datacite.xml')
             with open(path_, 'w') as f:
                 f.write(meta.encode())
             yield updated(data, {'filename': path_})
