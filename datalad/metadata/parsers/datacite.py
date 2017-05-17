@@ -67,8 +67,9 @@ def _process_tree(tree, nstag):
         ('description', 'description', True, _unwrap, _merge),
         ('doap:Version', 'version', False, None, None),
         ('sameAs', "identifier[@identifierType='DOI']", False, None, None),
-        ('type', "resourceType[@resourceTypeGeneral='Dataset']", False, None,
-         None),
+		# conflicts with our notion for having a "type" to be internal and to demarkate a Dataset
+		# here might include the field e.g. Dataset/Neurophysiology, so skipping for now
+        # ('type', "resourceType[@resourceTypeGeneral='Dataset']", False, None, None),
         ('citation', "relatedIdentifier", True, None, None),
         ('keywords', "subject", True, None, None),
         ('formats', "format", True, None, None),

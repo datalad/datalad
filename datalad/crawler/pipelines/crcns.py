@@ -82,10 +82,10 @@ def get_metadata(dataset=None):
         dataset_ = reg.groups()[0].strip()
         dataset_meta = process_datacite_xml(json_, xml_)
         if 'This data is not yet available' in dataset_meta:
-		    # skip those for now.  Seems also to conflict with entries
-		    lgr.info("Skipping entry for %s since states that not yet available"
-		             , dataset_)
-		    continue
+            # skip those for now.  Seems also to conflict with entries
+            lgr.info("Skipping entry for %s since states that not yet available"
+                     , dataset_)
+            continue
 
         if dataset and dataset == dataset_:
             return dataset_meta
