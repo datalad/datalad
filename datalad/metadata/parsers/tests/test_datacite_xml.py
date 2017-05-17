@@ -93,6 +93,5 @@ def test_get_metadata(path):
   ],
   "name": "CRCNS.org xxx-1",
   "sameAs": "10.6080/K0QN64NG",
-  "title": "Main title",
-  "type": "Dataset/Neurophysiology"
+  "title": "Main title"
 }""")
