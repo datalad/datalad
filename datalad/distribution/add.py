@@ -17,6 +17,7 @@ from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
 
+from datalad.utils import unique
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -55,12 +56,11 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.add')
 
 
-def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
+def _discover_subdatasets_recursively(
+        discovered, top, trace, recursion_limit):
     # this beast walks the directory tree from a give `top` directory
     # and discovers valid repos that are scattered around, regardless
     # of whether they are already subdatasets or not
-    # for all found datasets it puts an entry into the SPEC and also
-    # and entry with the path in the SPEC of the parent dataset
     # `trace` must be a list that has at least one element (the base
     # dataset)
     if recursion_limit is not None and len(trace) > recursion_limit:
@@ -68,17 +68,24 @@ def _discover_subdatasets_recursively(top, trace, spec, recursion_limit):
     if not isdir(top):
         return
     if GitRepo.is_valid_repo(top):
-        # TODO RF prepare a proper annotated path dict with
-        # found a repo, add the entire thing
-        spec[top] = spec.get(top, []) + [top]
-        # and to the parent
-        spec[trace[-1]] = spec.get(trace[-1], []) + [top]
+        if top in discovered:
+            # this was found already, assume everythin beneath it too
+            return
+        discovered[top] = dict(
+            path=top,
+            # rsync-style: this, and its content
+            orig_request=opj(top, ''),
+            type='dataset',
+            parentds=trace[-1])
+        # new node in the trace down
         trace = trace + [top]
     for path in listdir(top):
         path = opj(top, path)
         if not isdir(path):
             continue
-        _discover_subdatasets_recursively(path, trace, spec, recursion_limit)
+        # next level down
+        _discover_subdatasets_recursively(
+            discovered, path, trace, recursion_limit)
 
 
 @build_doc
@@ -172,102 +179,138 @@ class Add(Interface):
             raise InsufficientArgumentsError(
                 "insufficient information for adding: requires at least a path")
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        # never recursion, need to handle manually below to be able to
-        # discover untracked content
+        common_report = dict(action='add', logger=lgr, refds=refds_path)
+
+        to_add = []
+        subds_to_add = {}
+        ds_to_annotate_from_recursion = {}
+        for ap in AnnotatePaths.__call__(
+                path=path,
+                dataset=dataset,
+                # never recursion, need to handle manually below to be able to
+                # discover untracked content
+                recursive=False,
+                action='add',
+                unavailable_path_status='impossible',
+                unavailable_path_msg="path does not exist: %s",
+                nondataset_path_status='impossible',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if ap.get('parentds', None) is None and ap.get('type', None) != 'dataset':
+                yield get_status_dict(
+                    status='impossible',
+                    message='"there is no dataset to add this path to',
+                    **dict(common_report, **ap))
+                continue
+            if ap.get('raw_input', False) and recursive and (
+                    ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
+                # this was an actually requested input path
+                # we need to recursive into all subdirs to find potentially
+                # unregistered subdatasets
+                # but only if this path has a parent, or is itself a dataset
+                # otherwise there is nothing to add to
+                _discover_subdatasets_recursively(
+                    ds_to_annotate_from_recursion,
+                    ap['path'], [ap['parentds'] if 'parentds' in ap else ap['path']],
+                    recursion_limit)
+            # record for further processing
+            if not ap['path'] in ds_to_annotate_from_recursion:
+                # if it was somehow already discovered
+                to_add.append(ap)
+            # TODO check if next isn't covered by discover_dataset_trace_to_targets already??
+            if dataset and ap.get('type', None) == 'dataset':
+                # duplicates not possible, annotated_paths returns unique paths
+                subds_to_add[ap['path']] = ap
+        for subds in ds_to_annotate_from_recursion:
+            if subds not in subds_to_add:
+                # always prefer the already annotated path
+                subds_to_add[subds] = ds_to_annotate_from_recursion[subds]
+
+        if dataset:
+            # we have a base dataset, discover any intermediate datasets between
+            # the base and any already discovered dataset
+            discovered = {}
+            discover_dataset_trace_to_targets(
+                # from here
+                dataset.path,
+                # to any dataset we are aware of
+                subds_to_add.keys(),
+                [],
+                discovered)
+            for parentds in discovered:
+                for subds in discovered[parentds]:
+                    subds_to_add[subds] = subds_to_add.get(
+                        subds,
+                        dict(path=subds, parentds=parentds, type='dataset'))
+
+        # merge custom paths and discovered dataset records, paths needs to go first,
+        # because we know most about then, and subsequent annotation call we skip the
+        # later duplicate ones
+        to_add.extend(subds_to_add.values())
+        # and compact, this should be OK as all the info is in each ap dict
+        to_add = unique(to_add, lambda x: x['path'])
+
+        if not to_add:
+            # nothing left to do, potentially all errored before
+            return
+
+        # now re-annotate all paths, this will be fast for already annotated ones
+        # and will amend the annotation for others, it will also deduplicate
         annotated_paths = AnnotatePaths.__call__(
-            path=path,
+            path=to_add,
             dataset=dataset,
+            # never recursion, done already
             recursive=False,
             action='add',
             unavailable_path_status='impossible',
             unavailable_path_msg="path does not exist: %s",
             nondataset_path_status='impossible',
-            on_failure='ignore')
-        content_by_ds, completed, nondataset_paths = \
+            return_type='generator',
+            # if there is an error now, we made this mistake in here
+            on_failure='stop')
+
+        content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 annotated_paths,
                 refds_path=refds_path,
-                # TODO RF to use full info and avoid rediscovery of props
-                path_only=True)
-        for r in completed:
-            yield r
-        common_report = dict(action='add', logger=lgr, refds=refds_path)
-
-        if recursive:
-            # with --recursive for each input path traverse the directory
-            # tree, when we find a dataset, add it to the spec, AND add it as
-            # a path to the spec of the parent
-            # MIH: wrap in list() to avoid exception, because dict size might
-            # change, but we want to loop over all that are in at the start
-            # only
-            # NOTE no results are generated in this loop, just discovery
-            for d in list(content_by_ds.keys()):
-                for p in content_by_ds[d]:
-                    _discover_subdatasets_recursively(
-                        # TODO RF to use annotated paths natively
-                        p['path'] if isinstance(p, dict) else p,
-                        [d],
-                        content_by_ds,
-                        recursion_limit)
+                path_only=False)
+        assert(not completed)
 
         if not content_by_ds:
             # we should have complained about any inappropriate path argument
             # above, so if nothing is left, we can simply exit
             return
 
-        if dataset:
-            # remember the datasets associated with actual inputs
-            # TODO this is each annotated path that is requested=True
-            # and either the 'parentds' or 'path' in case of a dataset
-            input_ds = list(content_by_ds.keys())
-            # forge chain from base dataset to any leaf dataset
-            discover_dataset_trace_to_targets(
-                # from here
-                dataset.path,
-                # to any dataset we are aware of
-                list(content_by_ds.keys()),
-                [],
-                content_by_ds)
-            # TODO make this flag go away, path annotation should have this sorted
-            # out before
-            if ds2super:
-                # now check all dataset entries corresponding to the original
-                # input to see if they contain their own paths and remove them
-                for inpds in input_ds:
-                    content_by_ds[inpds] = [p for p in content_by_ds[inpds]
-                                            if not p == inpds]
-                # and lastly remove all entries that contain no path to avoid
-                # saving any staged content in the final step
-                content_by_ds = {d: v for d, v in content_by_ds.items() if v}
-
         # simple loop over datasets -- save happens later
         # start deep down
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
-            toadd = list(set(content_by_ds[ds_path]))
-            # TODO generator: duplicate! those were found by annotate_paths already!
-            known_subds = ds.subdatasets(
-                recursive=False,
-                fulfilled=True,
-                result_xfm='paths')
+            torepoadd = []
             respath_by_status = {}
-            # handle anything that looks like a wannabe subdataset
-            for subds_path in [d for d in toadd
-                               if GitRepo.is_valid_repo(d) and
-                               d != ds_path]:
-                if subds_path in known_subds:
+            for ap in content_by_ds[ds_path]:
+                # we have a new story
+                ap.pop('status', None)
+                torepoadd.append(ap['path'])
+
+                # skip anything that doesn't look like a wannabe subdataset
+                if not ap.get('type', None) == 'dataset' or \
+                        ap['path'] == ds_path:
+                    continue
+
+                if ap.get('registered_subds', False):
                     # subdataset that might be in this list because of the
                     # need to save all the way up to a super dataset
                     respath_by_status['success'] = \
-                        respath_by_status.get('success', []) + [subds_path]
+                        respath_by_status.get('success', []) + [ap['path']]
                     yield get_status_dict(
-                        path=subds_path,
                         status='notneeded',
-                        type='dataset',
-                        message=("already known subdataset: %s", subds_path),
-                        **common_report)
+                        message="already known subdataset",
+                        **dict(common_report, **ap))
                     continue
-                subds = Dataset(subds_path)
+                subds = Dataset(ap['path'])
                 # check that the subds has a commit, and refuse
                 # to operate on it otherwise, or we would get a bastard
                 # submodule that cripples git operations
@@ -275,9 +318,9 @@ class Add(Interface):
                     yield get_status_dict(
                         ds=subds, status='impossible',
                         message='cannot add subdataset with no commits',
-                        **common_report)
+                        **dict(common_report, **ap))
                     continue
-                subds_relpath = relpath(subds_path, ds_path)
+                subds_relpath = relpath(ap['path'], ds_path)
                 # make an attempt to configure a submodule source URL based on the
                 # discovered remote configuration
                 remote, branch = subds.repo.get_tracking_branch()
@@ -288,22 +331,33 @@ class Add(Interface):
                 except CommandError as e:
                     yield get_status_dict(
                         ds=subds, status='error', message=e.stderr,
-                        **common_report)
+                        **dict(common_report, **ap))
                     continue
                 _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it
-                yield get_status_dict(ds=subds, status='ok', **common_report)
+                yield get_status_dict(
+                    ds=subds,
+                    status='ok',
+                    message='added new subdataset',
+                    **dict(common_report, **ap))
                 # make sure that .gitmodules is added to the list of files
-                toadd.append(opj(ds.path, '.gitmodules'))
+                gitmodules_path = opj(ds.path, '.gitmodules')
+                # for git
+                torepoadd.append(gitmodules_path)
+                # and for save
+                content_by_ds[ds_path].append(dict(
+                    path=gitmodules_path,
+                    parentds=ds_path,
+                    type='file'))
             # make sure any last minute additions make it to the saving stage
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
             # MIH: not sure WTF is going on, but if I don't create a new list
             # the content of `toadd` vanishes from the dict
-            content_by_ds[ds_path] = [a for a in toadd]
-            lgr.debug('Adding content to repo %s: %s', ds.repo, toadd)
+            #content_by_ds[ds_path] = [a for a in torepoadd]
+            lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
             added = ds.repo.add(
-                toadd,
+                torepoadd,
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
                 commit=False)
             for a in added:
@@ -312,6 +366,9 @@ class Add(Interface):
                     # technical reasons and has nothing to do with the actual content
                     continue
                 res = annexjson2result(a, ds, type='file', **common_report)
+                # TODO pull out correct ap for any path that comes out here
+                # (that we know things about), and use the original annotation
+                # instead of the annex report
                 if GitRepo.is_valid_repo(res['path']):
                     # more accurate report in case of an added submodule
                     # mountpoint.
@@ -326,8 +383,11 @@ class Add(Interface):
                     respath_by_status.get(success, []) + [res['path']]
                 yield res
 
+            # TODO pull out correct ap for any path that comes out here
+            # (that we know things about), and use the original annotation
+            # instead of the annex report
             for r in results_from_annex_noinfo(
-                    ds, toadd, respath_by_status,
+                    ds, torepoadd, respath_by_status,
                     dir_fail_msg='could not add some content in %s %s',
                     noinfo_dir_msg='nothing to add from %s',
                     noinfo_file_msg='already included in the dataset',
@@ -342,6 +402,8 @@ class Add(Interface):
 
         # OPT: tries to save even unrelated stuff
         # MIH: issue reference would help to evaluate this comment!
+        # TODO check what ap are coming down here, when save can accept
+        # them to finally become more clever deciding what to save
         for res in save_dataset_hierarchy(
                 # TODO RF pass annotated paths when receiver is ready
                 #content_by_ds,

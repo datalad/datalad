@@ -141,7 +141,7 @@ def test_add_recursive(path):
     ok_(subds.repo.dirty)
 
     # this tests wants to add the content to subdir before updating the
-    # parent, no we can finally say that explicitly
+    # parent, now we can finally say that explicitly
     added2 = ds.add('dir/.', to_git=True)
     # added to git, so parsed git output record
     assert_result_count(

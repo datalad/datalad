@@ -46,6 +46,22 @@ from datalad.utils import assure_list
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
+def annotated2ds_props(annotated):
+    """Return a dict with properties of all datasets in `annotated`.
+
+    Returns
+    -------
+    dict
+    """
+    props = {}
+    for a in annotated:
+        if a.get('type', None) == 'dataset':
+            dp = props.get(a['path'], {})
+            dp.update(a)
+            props[a['path']]
+    return props
+
+
 def annotated2content_by_ds(annotated, refds_path, path_only=False):
     """Helper to convert annotated paths into an old-style content_by_ds dict
 
@@ -65,56 +81,69 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
 
     Returns
     -------
-    dict, list, list
+    dict, dict, list, list
       Dict keys are dataset paths, values are determined by the `path_only`
-      switch. The first list contains all already "processed" results, which
+      switch. The keys in the second dict are paths to dataset, values are
+      dicts with all known properties about those datasets.
+      The first list contains all already "processed" results, which
       typically need to be re-yielded. The second list contains items (same
       type as dict values) for all annotated paths that have no associated
       parent dataset (i.e. nondataset paths) -- this list will be empty by
       default, unless `nondataset_path_status` was set to ''."""
     content_by_ds = {}
+    ds_props = {}
     nondataset_paths = []
     completed = []
     for r in annotated:
+        if r.get('type', None) == 'dataset':
+            # collect all properties of all known datasets from the annotated
+            # paths
+            dp = ds_props.get(r['path'], {})
+            dp.update(r)
+            ds_props[r['path']] = dp
         if r.get('status', None) in ('ok', 'notneeded', 'impossible', 'error'):
             completed.append(r)
             continue
         parentds = r.get('parentds', None)
         if r.get('type', None) == 'dataset':
             # to dataset handling first, it is the more complex beast
-            pristine_path = r.get('pristine_path', None)
+            orig_request = r.get('orig_request', None)
             # XXX might need RF to sort a single subdataset entry into
             # "itself" (e.g. '.'), and its parent ds. At present it is either
             # one XOR the other
-            if parentds is None or refds_path is None or (pristine_path and (
-                    pristine_path == curdir or
-                    pristine_path.endswith(dirsep) or
-                    pristine_path.endswith('{}{}'.format(dirsep, curdir)))):
+            if parentds is None or refds_path is None or (orig_request and (
+                    orig_request == curdir or
+                    orig_request.endswith(dirsep) or
+                    orig_request.endswith('{}{}'.format(dirsep, curdir)))):
                 # a dataset that floats by on its own OR
                 # behave similar to rsync, a trailing '/' indicates the
                 # content rather then the dataset itself
                 # in both cases we want to process this part as part
                 # of the same dataset, and not any potential parent
                 toappendto = content_by_ds.get(r['path'], [])
+                toappendto.append(r['path'] if path_only else r)
                 content_by_ds[r['path']] = toappendto
-            else:
-                # otherwise this refers to the dataset as a subdataset
+            if parentds and refds_path and \
+                    _with_sep(parentds).startswith(_with_sep(refds_path)):
+                # put also in parentds record if there is any, and the parent
+                # is underneath or identical to the reference dataset
                 toappendto = content_by_ds.get(parentds, [])
+                toappendto.append(r['path'] if path_only else r)
                 content_by_ds[parentds] = toappendto
         else:
             # files and dirs
             # common case, something with a parentds
             toappendto = content_by_ds.get(parentds, [])
+            toappendto.append(r['path'] if path_only else r)
             content_by_ds[parentds] = toappendto
-        toappendto.append(r['path'] if path_only else r)
 
-    return content_by_ds, completed, nondataset_paths
+    return content_by_ds, ds_props, completed, nondataset_paths
 
 
 def yield_recursive(ds, path, action, recursion_limit, cache=None):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
-    # else done elsewhere
+    # is elsewhere
     for subd_res in ds.subdatasets(
             recursive=True,
             recursion_limit=recursion_limit,
@@ -127,6 +156,9 @@ def yield_recursive(ds, path, action, recursion_limit, cache=None):
             subd_res['action'] = action
             # mark as "notprocessed"
             subd_res['status'] = ''
+            # we know that this is a known subdataset, that is how
+            # we got here, make a record
+            subd_res['registered_subds'] = True
             yield subd_res
 
 
@@ -144,6 +176,8 @@ class AnnotatePaths(Interface):
     subdataset record.
 
     FILLMEIN
+    registered_subds
+
 
     parentds -- not necessarily as superds! I.e. there might be a dataset
     upstairs, but it may not recognize a dataset underneath as a registered
@@ -290,13 +324,13 @@ class AnnotatePaths(Interface):
                 path_props = dict(
                     path=path,
                     # path was requested as input, and not somehow discovered
-                    requested=True,
+                    raw_input=True,
                     # make a record of what actually came in, sorting into
                     # dataset might later need to distinguish between a path
                     # that pointed to a dataset as a whole vs. a path that
                     # pointed to the dataset's content -- just do not destroy
                     # any information on the way down
-                    pristine_path=orig_path_request)
+                    orig_request=orig_path_request)
             if path in reported_paths:
                 # we already recorded this path in the output
                 # this can happen, whenever `path` is a subdataset, that was
@@ -323,22 +357,28 @@ class AnnotatePaths(Interface):
                 if not containing_dir:
                     containing_dir = curdir
 
-            dspath = get_dataset_root(containing_dir)
+            dspath = parent = get_dataset_root(containing_dir)
             if dspath:
                 if path_props.get('type', None) == 'dataset':
                     # for a dataset the root is not the parent, for anything else
                     # it is
-                    parent = None
+                    parent = path_props.get('parentds', None)
                     oneupdir = normpath(opj(containing_dir, pardir))
-                    if force_parentds_discovery or (
+                    if parent is None and (force_parentds_discovery or (
                             refds_path and _with_sep(oneupdir).startswith(
-                                _with_sep(refds_path))):
+                                _with_sep(refds_path)))):
                         # either forced, or only if we have a reference dataset, and
                         # only if we stay within this refds when searching for the
                         # parent
                         parent = get_dataset_root(normpath(opj(containing_dir, pardir)))
-                    if parent:
+                        # NOTE the `and refds_path` is critical, as it will determine
+                        # whether a top-level dataset that was discovered gets the
+                        # parent property or not, it won't get it without a common
+                        # base dataset, and that is how we always rolled
+                    if parent and refds_path:
                         path_props['parentds'] = parent
+                        # don't check whether this is actually a true subdataset of the
+                        # parent, done further down
                 else:
                     path_props['parentds'] = dspath
 
@@ -372,20 +412,26 @@ class AnnotatePaths(Interface):
                 continue
 
             containing_ds = None
-            if dspath and force_subds_discovery and (
-                    path_props.get('type', None) == 'directory' or
+            path_type = path_props.get('type', None)
+            if parent and force_subds_discovery and (
+                    (path_type == 'dataset' and 'registered_subds' not in path_props) or
+                    path_type == 'directory' or
                     lexists(path)):
-                # if the path doesn't exist, or is labeled a directory, make sure that
-                # it isn't actually a subdataset
-                containing_ds = Dataset(dspath)
+                # if the path doesn't exist, or is labeled a directory, or a dataset even
+                # a dataset (without this info) -> record whether this is a known subdataset
+                # to its parent
+                containing_ds = Dataset(parent)
                 # XXX cache!
                 subdss = containing_ds.subdatasets(
                     fulfilled=None, recursive=False,
                     result_xfm=None, result_filter=None, return_type='list')
                 if path in [s['path'] for s in subdss]:
+                    if path_type == 'directory' or not lexists(path):
+                        # first record that it isn't here, if just a dir or not here at all
+                        path_props['state'] = 'absent'
                     # this must be a directory, and it is not installed
                     path_props['type'] = 'dataset'
-                    path_props['state'] = 'absent'
+                    path_props['registered_subds'] = True
 
             if not lexists(path):
                 # not there (yet)

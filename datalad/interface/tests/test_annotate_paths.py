@@ -70,8 +70,8 @@ def test_annotate_paths(dspath, nodspath):
         # here is how this would go
         pwd_res = annotate_paths(path='.', on_failure='ignore')
         assert_result_count(
-            pwd_res, 1, type='dataset', path=dspath, pristine_path='.',
-            requested=True)
+            pwd_res, 1, type='dataset', path=dspath, orig_request='.',
+            raw_input=True)
     # now do it again, pointing to the ds directly
     res = ds.annotate_paths(on_failure='ignore')
     # no request, no refds, but otherwise the same
@@ -132,7 +132,7 @@ def test_annotate_paths(dspath, nodspath):
     res = ds.annotate_paths(fpath)
     assert_result_count(res, 1)
     assert_result_count(
-        res, 1, pristine_path=fpath, requested=True, type='file',
+        res, 1, orig_request=fpath, raw_input=True, type='file',
         path=opj(ds.path, fpath), parentds=opj(ds.path, 'a', 'aa'), status='')
     # now drop it
     dropres = ds.drop(fpath, check=False)
@@ -165,7 +165,8 @@ def test_annotate_paths(dspath, nodspath):
     after_res = ds.annotate_paths(subdspath, force_subds_discovery=False)
     assert_result_count(
         after_res, 1, type='directory',
-        **{k: before_res[0][k] for k in before_res[0] if k not in ('type',)})
+        path=before_res[0]['path'],
+        parentds=before_res[0]['parentds'])
     # which BTW has inter-option dependencies
     assert_raises(
         ValueError,

@@ -87,7 +87,9 @@ def test_create_raises(path, outside_path):
 @with_tempfile
 def test_create_curdir(path, path2):
     with chpwd(path, mkdir=True):
+        print('======DO========')
         create()
+        print('======DONE========')
     ds = Dataset(path)
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=True)
