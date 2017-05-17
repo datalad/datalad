@@ -73,8 +73,8 @@ def _discover_subdatasets_recursively(
             return
         discovered[top] = dict(
             path=top,
-            # rsync-style: this, and its content
-            orig_request=opj(top, ''),
+            # and its content
+            process_content=True,
             type='dataset',
             parentds=trace[-1])
         # new node in the trace down
