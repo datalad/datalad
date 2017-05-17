@@ -102,6 +102,8 @@ class get_and_save_metadata(object):
         # we do not take anything from data
         meta = get_metadata(self.dataset)
         if meta:
+		    if not os.path.exists('.datalad'):
+			    os.makedirs('.datalad')
             path_ = _path_('.datalad', 'meta.datacite.xml')
             with open(path_, 'w') as f:
                 f.write(meta.encode())
@@ -176,7 +178,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
         #
         # CRCNS requires authorization, so only README* should go straight under git
-        options=["-c", "annex.largefiles=exclude=README* and exclude=*/datacite.xml"]
+        options=["-c", "annex.largefiles=exclude=README* and exclude=*/meta.datacite.xml"]
     )
 
     crawler = crawl_url(dataset_url)
@@ -246,5 +248,5 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         ],
         annex.switch_branch('master'),
         annex.merge_branch('incoming-processed', allow_unrelated=True),
-        annex.finalize(cleanup=True),
+        annex.finalize(cleanup=True, aggregate=True),
     ]
