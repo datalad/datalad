@@ -49,7 +49,7 @@ def process_datacite_xml(json_, xml_):
     # actually the DOI is also present in xml_ as
     # e.g. <identifier identifierType="DOI">10.6080/K00Z715X</identifier>
     # so we could just store xml_
-    return xml_
+    return xml_.decode('utf-8')
 
 
 def get_metadata(dataset=None):
@@ -81,6 +81,11 @@ def get_metadata(dataset=None):
 
         dataset_ = reg.groups()[0].strip()
         dataset_meta = process_datacite_xml(json_, xml_)
+        if 'This data is not yet available' in dataset_meta:
+		    # skip those for now.  Seems also to conflict with entries
+		    lgr.info("Skipping entry for %s since states that not yet available"
+		             , dataset_)
+		    continue
 
         if dataset and dataset == dataset_:
             return dataset_meta
@@ -89,7 +94,7 @@ def get_metadata(dataset=None):
                         dataset_)
         all_datasets[dataset_] = dataset_meta
 
-    return all_datasets
+    return None if dataset else all_datasets
 
 
 @auto_repr
@@ -102,11 +107,12 @@ class get_and_save_metadata(object):
         # we do not take anything from data
         meta = get_metadata(self.dataset)
         if meta:
-		    if not os.path.exists('.datalad'):
-			    os.makedirs('.datalad')
+            meta_encoded = meta.encode('utf-8')
+            if not os.path.exists('.datalad'):
+                os.makedirs('.datalad')
             path_ = _path_('.datalad', 'meta.datacite.xml')
             with open(path_, 'w') as f:
-                f.write(meta.encode())
+                f.write(meta_encoded)
             yield updated(data, {'filename': path_})
         else:
             yield data
@@ -225,6 +231,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
             # fetch and store meta-data for the dataset
             [
                 get_and_save_metadata(dataset),
+                skip_if({'filename': '.*'}, re=True, negate=True),  # skip if no filename, ie no meta-data
                 annex
             ]
         ],
