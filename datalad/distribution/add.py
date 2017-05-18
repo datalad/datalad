@@ -411,6 +411,8 @@ class Add(Interface):
                     # (that we know things about), and use the original annotation
                     # instead of just the annex report
                     r = dict(torepoadd[r['path']], **r)
+
+                # XXX something is fishy with the next one, rethink when sober....
                 if r['path'] == ds_path and r['status'] == 'ok':
                     # this is for the entire dataset itself which was explicitly requested
                     # make sure to save all

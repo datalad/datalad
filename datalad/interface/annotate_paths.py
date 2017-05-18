@@ -138,7 +138,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
     return content_by_ds, ds_props, completed, nondataset_paths
 
 
-def yield_recursive(ds, path, action, recursion_limit, cache=None):
+def yield_recursive(ds, path, action, recursion_limit):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
     # is elsewhere
@@ -146,7 +146,6 @@ def yield_recursive(ds, path, action, recursion_limit, cache=None):
             recursive=True,
             recursion_limit=recursion_limit,
             return_type='generator'):
-        # XXX cache results!
         if subd_res['path'].startswith(_with_sep(path)):
             # this subdatasets is underneath the search path
             # be careful to not overwrite anything, in case
@@ -288,9 +287,7 @@ class AnnotatePaths(Interface):
                         refds,
                         refds_path,
                         action,
-                        recursion_limit,
-                        # XXX cache!
-                        cache=None):
+                        recursion_limit):
                     r.update(res_kwargs)
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
@@ -419,7 +416,6 @@ class AnnotatePaths(Interface):
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent
                 containing_ds = Dataset(parent)
-                # XXX cache!
                 subdss = containing_ds.subdatasets(
                     fulfilled=None, recursive=False,
                     result_xfm=None, result_filter=None, return_type='list')
@@ -451,8 +447,7 @@ class AnnotatePaths(Interface):
 
             if recursive:
                 containing_ds = Dataset(dspath) if containing_ds is None else containing_ds
-                # XXX cache!
-                for r in yield_recursive(containing_ds, path, action, recursion_limit, cache=None):
+                for r in yield_recursive(containing_ds, path, action, recursion_limit):
                     # capture reported paths
                     r.update(res_kwargs)
                     if 'refds' in r and not r['refds']:
