@@ -72,7 +72,7 @@ def get_metadata(dataset=None):
 
     all_datasets = {}
     for i, json_ in enumerate(rj['response']['docs']):
-        xml_ = base64.decodestring(json_['xml'])
+        xml_ = base64.decodestring(json_['xml'].decode())
         reg = re.search('AlternativeTitle.?>CRCNS.org ([^<]*)<', xml_)
 
         if not reg:
