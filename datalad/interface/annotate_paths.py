@@ -414,7 +414,7 @@ class AnnotatePaths(Interface):
             if parent and force_subds_discovery and (
                     (path_type == 'dataset' and 'registered_subds' not in path_props) or
                     path_type == 'directory' or
-                    lexists(path)):
+                    not lexists(path)):
                 # if the path doesn't exist, or is labeled a directory, or a dataset even
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent
