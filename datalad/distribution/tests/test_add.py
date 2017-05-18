@@ -72,6 +72,7 @@ tree_arg = dict(tree={'test.txt': 'some',
 def test_add_files(path):
     ds = Dataset(path)
     ds.create(force=True)
+    ok_(ds.repo.dirty)
 
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
@@ -89,8 +90,10 @@ def test_add_files(path):
         if arg[0] == test_list_4:
             result = ds.add('dir', to_git=arg[1], save=False)
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False)
-        # TODO eq_(result, arg[0])
+            result = ds.add(arg[0], to_git=arg[1], save=False, result_xfm='relpaths',
+                            return_type='item-or-list')
+            # order depends on how annex processes it, so let's sort
+            eq_(sorted(result), sorted(arg[0]))
         # added, but not committed:
         ok_(ds.repo.dirty)
 

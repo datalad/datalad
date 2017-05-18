@@ -108,9 +108,6 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
         if r.get('type', None) == 'dataset':
             # to dataset handling first, it is the more complex beast
             orig_request = r.get('orig_request', None)
-            # XXX might need RF to sort a single subdataset entry into
-            # "itself" (e.g. '.'), and its parent ds. At present it is either
-            # one XOR the other
             if parentds is None or refds_path is None or \
                     r.get('process_content', False) or (orig_request and (
                     orig_request == curdir or

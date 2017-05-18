@@ -257,8 +257,8 @@ def save_dataset_hierarchy(
     Parameters
     ----------
     info : dict
-      Absolute paths of datasets to be saved are the keys, and paths in each
-      dataset to be saved are the values
+      Absolute paths of datasets to be saved are the keys, and (annotated)
+      paths in each dataset to be saved are the values
     base : path or None, optional
       Common super dataset that should also be saved.
     message : str
@@ -282,11 +282,15 @@ def save_dataset_hierarchy(
     # sort all datasets under their potential superdatasets
     # start from the top to get all subdatasets down the line
     # and collate them into as few superdatasets as possible
+    # this is quick, just string operations
     superdss = get_tree_roots(dpaths)
     # for each "superdataset" check the tree of subdatasets and make sure
     # we gather all datasets between the super and any subdataset
     # so we can save them all bottom-up in order to be able to properly
     # save the superdataset
+    # if this is called from e.g. `add` this is actually no necessary,
+    # but in the general case we cannot avoid it
+    # TODO maybe introduce a switch?
     for superds_path in superdss:
         target_subs = superdss[superds_path]
         # populate `info` with intermediate datasets
@@ -297,6 +301,9 @@ def save_dataset_hierarchy(
             target_subs,
             [], info)
         # and now assign all paths to the corresponding datasets
+        # TODO this would be unnecessay if would would simply
+        # operate on annotated paths and sort into a dict
+        # via annotated2content_by_ds when needed here
         sort_paths_into_subdatasets(info)
     # iterate over all datasets, starting at the bottom
     for dpath in sorted(info.keys(), reverse=True):
@@ -415,6 +422,7 @@ def save_dataset(
     return ds.repo.repo.head.commit if _was_modified else None
 
 
+# TODO this is obsolete
 def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
     """Amend a path spec dictionary with entries for superdatasets
 

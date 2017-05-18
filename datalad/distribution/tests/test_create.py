@@ -87,9 +87,7 @@ def test_create_raises(path, outside_path):
 @with_tempfile
 def test_create_curdir(path, path2):
     with chpwd(path, mkdir=True):
-        print('======DO========')
         create()
-        print('======DONE========')
     ds = Dataset(path)
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=True)
@@ -178,6 +176,9 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
     ds.save(recursive=True, all_updated=True)
+    # TODO why would that be the desired case? E.g. 'file1' was
+    # untracked before and should remain as such
+    # this is actually #1419 set in stone!
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 

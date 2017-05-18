@@ -16,8 +16,11 @@ from os import listdir
 from os.path import isdir
 from os.path import join as opj
 from os.path import relpath
+from os.path import normpath
+from os.path import pardir
 
 from datalad.utils import unique
+from datalad.utils import get_dataset_root
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -33,10 +36,10 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.results import annexjson2result
 from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
-from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
+from datalad.interface.save import Save
 from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -140,6 +143,7 @@ class Add(Interface):
             decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        # TODO not functional anymore
         ds2super=Parameter(
             args=("-S", "--ds2super", "--datasets-to-super",),
             action='store_true',
@@ -163,6 +167,7 @@ class Add(Interface):
     def __call__(
             path=None,
             dataset=None,
+            # support passing this through in a path by path basis
             to_git=None,
             save=True,
             message=None,
@@ -286,14 +291,15 @@ class Add(Interface):
 
         # simple loop over datasets -- save happens later
         # start deep down
+        to_save = []
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
-            torepoadd = []
+            torepoadd = {}
             respath_by_status = {}
             for ap in content_by_ds[ds_path]:
                 # we have a new story
                 ap.pop('status', None)
-                torepoadd.append(ap['path'])
+                torepoadd[ap['path']] = ap
 
                 # skip anything that doesn't look like a wannabe subdataset
                 if not ap.get('type', None) == 'dataset' or \
@@ -333,6 +339,9 @@ class Add(Interface):
                         ds=subds, status='error', message=e.stderr,
                         **dict(common_report, **ap))
                     continue
+                # queue for saving using the updated annotated path
+                ap['registered_subds'] = True
+                to_save.append(ap)
                 _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it
                 yield get_status_dict(
@@ -343,32 +352,41 @@ class Add(Interface):
                 # make sure that .gitmodules is added to the list of files
                 gitmodules_path = opj(ds.path, '.gitmodules')
                 # for git
-                torepoadd.append(gitmodules_path)
+                torepoadd[gitmodules_path] = dict(path=gitmodules_path)
                 # and for save
-                content_by_ds[ds_path].append(dict(
+                to_save.append(dict(
                     path=gitmodules_path,
                     parentds=ds_path,
                     type='file'))
             # make sure any last minute additions make it to the saving stage
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
-            # MIH: not sure WTF is going on, but if I don't create a new list
-            # the content of `toadd` vanishes from the dict
-            #content_by_ds[ds_path] = [a for a in torepoadd]
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
             added = ds.repo.add(
-                torepoadd,
+                list(torepoadd.keys()),
                 git=to_git if isinstance(ds.repo, AnnexRepo) else True,
                 commit=False)
             for a in added:
+                res = annexjson2result(a, ds, type='file', **common_report)
+                success = success_status_map[res['status']]
+                respath_by_status[success] = \
+                    respath_by_status.get(success, []) + [res['path']]
+                # produce best possible path/result annotation
+                if res['path'] in torepoadd:
+                    # pull out correct ap for any path that comes out here
+                    # (that we know things about), and use the original annotation
+                    # instead of just the annex report
+                    res = dict(torepoadd[res['path']], **res)
+                # override this in all cases to be safe
+                res['parentds'] = ds.path
+                if success:
+                    # this was successfully added, queue for saving this very path
+                    # in the dataset
+                    to_save.append({k: v for k, v in res.items() if k != 'status'})
                 if a['file'] == '.gitmodules':
                     # filter out .gitmodules, because this is only included for
                     # technical reasons and has nothing to do with the actual content
                     continue
-                res = annexjson2result(a, ds, type='file', **common_report)
-                # TODO pull out correct ap for any path that comes out here
-                # (that we know things about), and use the original annotation
-                # instead of the annex report
                 if GitRepo.is_valid_repo(res['path']):
                     # more accurate report in case of an added submodule
                     # mountpoint.
@@ -378,14 +396,8 @@ class Add(Interface):
                     # coverage...
                     res['type'] = 'dataset'
                     res['message'] = 'added new state as submodule'
-                success = success_status_map[res['status']]
-                respath_by_status[success] = \
-                    respath_by_status.get(success, []) + [res['path']]
                 yield res
 
-            # TODO pull out correct ap for any path that comes out here
-            # (that we know things about), and use the original annotation
-            # instead of the annex report
             for r in results_from_annex_noinfo(
                     ds, torepoadd, respath_by_status,
                     dir_fail_msg='could not add some content in %s %s',
@@ -394,22 +406,52 @@ class Add(Interface):
                     action='add',
                     logger=lgr,
                     refds=refds_path):
+                if r['path'] in torepoadd:
+                    # pull out correct ap for any path that comes out here
+                    # (that we know things about), and use the original annotation
+                    # instead of just the annex report
+                    r = dict(torepoadd[r['path']], **r)
+                if r['path'] == ds_path and r['status'] == 'ok':
+                    # this is for the entire dataset itself which was explicitly requested
+                    # make sure to save all
+                    r['type'] = 'dataset'
+                    r['process_content'] = True
+                    to_save.append({k: v for k, v in r.items() if k != 'status'})
                 yield r
+            if refds_path and ds_path != refds_path and len(respath_by_status.get('success', [])):
+                # TODO XXX we have an issue here when with `add('.')` and annex ignores any
+                # dotfiles. In this case we end up not saving a dataset completely, because
+                # we rely on accurate reporting. there is an issue about this already
+                # TODO look up the issue ID
+                # if there is a base dataset, but we are below it, and we have anything done to this
+                # dataset -> queue dataset itself for saving its state in the parent
+                ds_ap = dict(
+                    path=ds.path,
+                    # we have to look for the parent here, as we must save the
+                    # subdataset in the parent and not the whole subdataset itself
+                    type='dataset')
+                parentds = get_dataset_root(normpath(opj(ds.path, pardir)))
+                if parentds:
+                    ds_ap['parentds'] = parentds
+                if dataset:
+                    ds_ap['refds'] = refds_path
+                to_save.append(ds_ap)
 
         if not save:
             lgr.debug('Not calling `save` as instructed')
             return
 
-        # OPT: tries to save even unrelated stuff
-        # MIH: issue reference would help to evaluate this comment!
-        # TODO check what ap are coming down here, when save can accept
-        # them to finally become more clever deciding what to save
-        for res in save_dataset_hierarchy(
-                # TODO RF pass annotated paths when receiver is ready
-                #content_by_ds,
-                {dspath: [p['path'] if isinstance(p, dict) else p
-                          for p in content_by_ds[dspath]]
-                 for dspath in content_by_ds},
-                base=dataset.path if dataset and dataset.is_installed() else None,
-                message=message if message else '[DATALAD] added content'):
+        # do not reuse any of the sorting done in here for saving, but instead
+        # pass on all the annotated paths to have `save` figure out what to do with
+        # them -- this is costs something, but should be safer, and frankly is
+        # more comprehensible
+        for res in Save.__call__(
+                # hand-selected annotated paths
+                files=to_save,
+                dataset=refds_path,
+                message=message if message else '[DATALAD] added content',
+                return_type='generator',
+                result_xfm=None,
+                result_filter=None,
+                on_failure='ignore'):
             yield res

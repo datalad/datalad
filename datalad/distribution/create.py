@@ -312,7 +312,9 @@ class Create(Interface):
             # comes around
             gitattr.write('** annex.largefiles=nothing\n')
 
-        # save everything
+        # save everything, we need to do this now and cannot merge with the
+        # call below, because we may need to add this subdataset to a parent
+        # but cannot until we have a first commit
         tbds.add('.datalad', to_git=True, save=save,
                  message='[DATALAD] new dataset')
 
@@ -323,7 +325,8 @@ class Create(Interface):
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(
-                    tbds.path, save=save, ds2super=True,
+                    tbds.path,
+                    save=True,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,

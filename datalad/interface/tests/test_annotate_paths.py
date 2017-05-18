@@ -46,7 +46,7 @@ demo_hierarchy = {
 
 def make_demo_hierarchy_datasets(path, tree, parent=None):
     if parent is None:
-        parent = Dataset(path).create(force=True, save=False)
+        parent = Dataset(path).create(force=True)
     for node, items in tree.items():
         if isinstance(items, dict):
             node_path = opj(path, node)

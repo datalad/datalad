@@ -14,23 +14,29 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os import curdir
+from os.path import abspath
+
+
+from datalad.utils import unique
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import require_dataset
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
+from datalad.interface.results import get_status_dict
 from datalad.interface.utils import save_dataset_hierarchy
-from datalad.interface.utils import amend_pathspec_with_superdatasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import get_dataset_root
+from datalad.interface.utils import get_tree_roots
+from datalad.interface.utils import discover_dataset_trace_to_targets
+from datalad.interface.utils import save_dataset
 
 from .base import Interface
 
@@ -76,6 +82,7 @@ class Save(Interface):
             action="store_true"),
         all_updated=Parameter(
             args=("-u", "--all-updated"),
+            # TODO do only if a path actually is a dataset, otherwise too much magic
             doc="""save changes of all known components in datasets that contain
             any of the given paths.""",
             action="store_true"),
@@ -92,6 +99,7 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
+    # TODO files -> path
     def __call__(message=None, files=None, dataset=None,
                  all_updated=False, all_changes=None, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False
@@ -106,59 +114,112 @@ class Save(Interface):
         if not dataset and not files:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
-            dataset = curdir
-        if dataset:
-            dataset = require_dataset(
-                dataset, check_installed=True, purpose='saving')
-        content_by_ds, unavailable_paths = Interface._prep(
-            path=files,
-            dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
+            dataset = abspath(curdir)
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-
-        if unavailable_paths:
-            for p in unavailable_paths:
-                yield get_status_dict(
-                    'get', path=p, status='impossible', refds=refds_path,
-                    logger=lgr, message=(
-                        "ignored non-existing path: %s",
-                        p))
-
-        # here we know all datasets associated with any inputs
-        # so we can expand "all_updated" right here to avoid confusion
-        # wrt to "super" and "intermediate" datasets discovered later on
-        if all_updated:
-            # and we do this by replacing any given paths with the respective
-            # datasets' base path
-            # MIH: this is wrong, it makes the desired use case indistinguishable
-            # from an explicit "save everything underneath the dataset root"
-            # remember that we have to call `git add` inside the technical reasons
-            # and here we need to avoid that somehow -- yet not like this (see #1419)
-            for ds in content_by_ds:
-                content_by_ds[ds] = [ds]
-
         if super_datasets:
-            content_by_ds = amend_pathspec_with_superdatasets(
-                content_by_ds,
-                # save up to and including the base dataset (if one is given)
-                # otherwise up to the very top
-                topmost=dataset if dataset else True,
-                limit_single=False)
+            # TODO search for the topmost superdataset of any path and
+            # make that one the reference
+            pass
 
-        if dataset:
-            # stuff all paths also into the base dataset slot to make sure
-            # we get all links between relevant subdatasets
-            bp = content_by_ds.get(dataset.path, [])
-            for c in content_by_ds:
-                bp.extend(content_by_ds[c])
-            content_by_ds[dataset.path] = list(set(bp))
+        to_process = []
+        for ap in AnnotatePaths.__call__(
+                path=files,
+                dataset=refds_path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='save',
+                unavailable_path_status='impossible',
+                unavailable_path_msg="path does not exist: %s",
+                nondataset_path_status='impossible',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if ap.get('type', None) == 'dataset' and all_updated:
+                ap['updated_only'] = True
+                ap['process_content'] = True
+            to_process.append(ap)
 
-        for res in save_dataset_hierarchy(
-                content_by_ds,
-                base=dataset.path if dataset and dataset.is_installed() else None,
+        if not to_process:
+            # nothing left to do, potentially all errored before
+            return
+
+        # sort all datasets under their potential superdatasets
+        # start from the top to get all subdatasets down the line
+        # and collate them into as few superdatasets as possible
+        # this is quick, just string operations
+        superdss = get_tree_roots(
+            unique([ap['parentds'] for ap in to_process if 'parentds' in ap]))
+        # for each "superdataset" check the tree of subdatasets and make sure
+        # we gather all datasets between the super and any subdataset
+        # so we can save them all bottom-up in order to be able to properly
+        # save the superdataset
+        # if this is called from e.g. `add` this is actually no necessary,
+        # but in the general case we cannot avoid it
+        # TODO maybe introduce a switch?
+        discovered = {}
+        for superds_path in superdss:
+            target_subs = superdss[superds_path]
+            discover_dataset_trace_to_targets(
+                # from here
+                superds_path,
+                # to all
+                target_subs,
+                [],
+                discovered)
+        # create a new minimally annotated path for each discovered dataset
+        for parentds in discovered:
+            for subds in discovered[parentds]:
+                to_process.append(dict(
+                    path=subds,
+                    parentds=parentds,
+                    type='dataset'))
+
+        # now re-annotate all paths, this will be fast for already annotated ones
+        # and will amend the annotation for others, deduplication happens here too
+        annotated_paths = AnnotatePaths.__call__(
+            path=to_process,
+            dataset=dataset,
+            # never recursion, done already
+            recursive=False,
+            action='save',
+            unavailable_path_status='impossible',
+            unavailable_path_msg="path does not exist: %s",
+            nondataset_path_status='impossible',
+            return_type='generator',
+            # if there is an error now, we made this mistake in here
+            on_failure='stop')
+
+        # now sort into datasets so we can process them one by one
+        content_by_ds, ds_props, completed, nondataset_paths = \
+            annotated2content_by_ds(
+                annotated_paths,
+                refds_path=refds_path,
+                path_only=False)
+        assert(not completed)
+
+        # iterate over all datasets, starting at the bottom
+        for dspath in sorted(content_by_ds.keys(), reverse=True):
+            ds = Dataset(dspath)
+            res = get_status_dict('save', ds=ds, logger=lgr)
+            if not ds.is_installed():
+                # TODO This is likely impossible now
+                res['status'] = 'impossible'
+                res['message'] = ('dataset %s is not installed', ds)
+                yield res
+                continue
+            saved_state = save_dataset(
+                ds,
+                # TODO pass all the goodness inside
+                [p['path'] if isinstance(p, dict) else p
+                 for p in content_by_ds[dspath]],
                 message=message,
-                version_tag=version_tag):
+                version_tag=version_tag)
+            if saved_state:
+                res['status'] = 'ok'
+            else:
+                res['status'] = 'notneeded'
             yield res
 
     @staticmethod
