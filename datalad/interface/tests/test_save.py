@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 from os.path import join as opj
 from datalad.utils import chpwd
 
@@ -28,6 +29,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 
 
@@ -121,11 +123,9 @@ def test_recursive_save(path):
         [ds.path])
 
     # make the new file known to its dataset
-    # with #1141 this would be
-    #ds.add(newfile_name, save=False)
-    subsubds.add(newfile_name, save=False)
+    ds.add(newfile_name, save=False)
 
-    # but remains dirty because of the untracked file down below
+    # but remains dirty because of the uncommited file down below
     assert ds.repo.dirty
     # auto-add will save nothing deep down without recursive
     assert_status('notneeded', ds.save(all_updated=True))
@@ -135,6 +135,20 @@ def test_recursive_save(path):
         ds.save(all_updated=True, recursive=True, result_filter=is_ok_dataset),
         'path',
         [subsubds.path, subds.path, ds.path])
+
+    # at this point the entire tree is clean
+    ok_clean_git(ds.path)
+    states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
+    # now we introduce new files all the way down
+    create_tree(subsubds.path, {"mike1": 'mike1'})
+    # now we save recursively, nothing should happen
+    assert_status('notneeded', ds.save(recursive=True))
+    subsubds_indexed = subsubds.repo.get_indexed_files()
+    assert_not_in('mike1', subsubds_indexed)
+    assert_equal(states, [d.repo.get_hexsha() for d in (ds, subds, subsubds)])
+    os.unlink(opj(subsubds.path, 'mike1'))
+    ok_clean_git(ds.path)
+
     # modify content in subsub and try saving
     testfname = newfile_name
     subsubds.unlock(testfname)
