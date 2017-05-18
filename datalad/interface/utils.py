@@ -113,6 +113,8 @@ def handle_dirty_dataset(ds, mode, msg=None):
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
 
+# TODO RF this thing should go away completely
+# and be replaced by the ability to deal with dirty datasets
 def handle_dirty_datasets(dpaths,
                           mode,
                           base=None,

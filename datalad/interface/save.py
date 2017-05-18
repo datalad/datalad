@@ -21,7 +21,6 @@ from datalad.utils import unique
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -31,7 +30,6 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
 from datalad.interface.results import get_status_dict
-from datalad.interface.utils import save_dataset_hierarchy
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.utils import get_tree_roots
