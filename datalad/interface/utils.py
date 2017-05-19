@@ -137,12 +137,17 @@ def handle_dirty_datasets(dpaths,
     None
     """
     if mode == 'save-before':
+        from datalad.interface.save import Save
         # TODO GENERATOR
         # new returns a generator and yields status dicts
-        list(save_dataset_hierarchy(
-            {d: [d] for d in dpaths},
-            base=base,
-            message=msg))
+        base = base if base and GitRepo.is_valid_repo(
+            base.path if isinstance(base, Dataset) else base) else None
+        if base or dpaths:
+            Save.__call__(
+                files=dpaths,
+                dataset=base if base and GitRepo.is_valid_repo(
+                    base.path if isinstance(base, Dataset) else base) else None,
+                message=msg)
     elif mode == 'ignore':
         return
     elif mode == 'fail':
@@ -185,90 +190,6 @@ def get_tree_roots(paths):
         subs = [p for p in paths if p.startswith(s)]
         roots[s.rstrip(sep)] = subs
     return roots
-
-
-# TODO almost obsolete
-def save_dataset_hierarchy(
-        info,
-        base=None,
-        message='[DATALAD] saved changes',
-        version_tag=None):
-    """Save (disjoint) hierarchies of datasets.
-
-    Saving is done in an order that guarantees that all to be saved
-    datasets reflect any possible change of any other to be saved
-    subdataset, before they are saved themselves.
-
-    Parameters
-    ----------
-    info : dict
-      Absolute paths of datasets to be saved are the keys, and (annotated)
-      paths in each dataset to be saved are the values
-    base : path or None, optional
-      Common super dataset that should also be saved.
-    message : str
-      Message to be used for saving individual datasets
-
-    Returns
-    -------
-    list
-      Instances of saved datasets, in the order in which they where saved.
-    """
-    if not isinstance(info, dict):
-        info = assure_list(info)
-        info = dict(zip(info, [[i] for i in info]))
-    dpaths = info.keys()
-    if base:
-        # just a convenience...
-        dpaths = assure_list(dpaths)
-        base_path = base.path if isinstance(base, Dataset) else base
-        if base_path not in dpaths:
-            dpaths.append(base_path)
-    # sort all datasets under their potential superdatasets
-    # start from the top to get all subdatasets down the line
-    # and collate them into as few superdatasets as possible
-    # this is quick, just string operations
-    superdss = get_tree_roots(dpaths)
-    # for each "superdataset" check the tree of subdatasets and make sure
-    # we gather all datasets between the super and any subdataset
-    # so we can save them all bottom-up in order to be able to properly
-    # save the superdataset
-    # if this is called from e.g. `add` this is actually no necessary,
-    # but in the general case we cannot avoid it
-    # TODO maybe introduce a switch?
-    for superds_path in superdss:
-        target_subs = superdss[superds_path]
-        # populate `info` with intermediate datasets
-        discover_dataset_trace_to_targets(
-            # from here
-            superds_path,
-            # to all
-            target_subs,
-            [], info)
-        # and now assign all paths to the corresponding datasets
-        # TODO this would be unnecessay if would would simply
-        # operate on annotated paths and sort into a dict
-        # via annotated2content_by_ds when needed here
-        sort_paths_into_subdatasets(info)
-    # iterate over all datasets, starting at the bottom
-    for dpath in sorted(info.keys(), reverse=True):
-        ds = Dataset(dpath)
-        res = get_status_dict('save', ds=ds, logger=lgr)
-        if not ds.is_installed():
-            res['status'] = 'impossible'
-            res['message'] = ('dataset %s is not installed', ds)
-            yield res
-            continue
-        saved_state = save_dataset(
-            ds,
-            info[dpath],
-            message=message,
-            version_tag=version_tag)
-        if saved_state:
-            res['status'] = 'ok'
-        else:
-            res['status'] = 'notneeded'
-        yield res
 
 
 def save_dataset(
@@ -528,7 +449,6 @@ def get_normalized_path_arguments(paths, dataset=None, default=None):
     return resolved_paths, dataset_path
 
 
-# TODO check of we can RF uninstall/remove to avoid this
 def path_is_under(values, path=None):
     """Whether a given path is a subdirectory of any of the given test values
 

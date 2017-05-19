@@ -432,8 +432,12 @@ class AnnotatePaths(Interface):
                 message = unavailable_path_msg if unavailable_path_msg else None
                 if message and '%s' in message:
                     message = (message, path)
+                path_props['message'] = message
                 res = get_status_dict(**dict(res_kwargs, **path_props))
-                res['status'] = unavailable_path_status
+                # assign given status, but only if the props don't indicate a status
+                # already
+                res['status'] = path_props.get(
+                    'unavailable_path_status', unavailable_path_status)
                 reported_paths[path] = res
                 yield res
                 continue

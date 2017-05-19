@@ -73,10 +73,11 @@ def test_clean_subds_removal(path):
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['one', 'two'])
     ok_clean_git(ds.path)
     # now kill one
-    res = ds.remove(
-        'one', result_xfm='datasets')
+    res = ds.remove('one', result_xfm=None)
     # subds1 got uninstalled, and ds got the removal of subds1 saved
-    eq_(res, [subds1, ds])
+    assert_result_count(res, 1, path=subds1.path, action='uninstall', status='ok')
+    assert_result_count(res, 1, path=subds1.path, action='remove', status='ok')
+    assert_result_count(res, 1, path=ds.path, action='save', status='ok')
     ok_(not subds1.is_installed())
     ok_clean_git(ds.path)
     # two must remain
@@ -94,11 +95,10 @@ def test_clean_subds_removal(path):
     assert(exists(subds2.path))
     res = ds.remove('two', result_xfm='datasets')
     ok_clean_git(ds.path)
-    # subds1 got uninstalled, and ds got the removal of subds1 saved
-    eq_(res, [subds2, ds])
-    eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
-    #import pdb; pdb.set_trace()
+    # subds2 was already uninstalled, now ds got the removal of subds2 saved
     assert(not exists(subds2.path))
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
+    eq_(res, [subds2, ds])
 
 
 @with_testrepos('.*basic.*', flavors=['clone'])
@@ -107,9 +107,14 @@ def test_uninstall_invalid(path):
     for method in (uninstall, remove, drop):
         assert_raises(InsufficientArgumentsError, method)
         # refuse to touch stuff outside the dataset
-        assert_raises(ValueError, method, dataset=ds, path='..')
-        # but it is only an error when there is actually something there
-        assert_status('notneeded', method(dataset=ds, path='../madeupnonexist'))
+        if method is remove:
+            assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
+            # same if it doesn't exist, for consistency
+            assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
+        else:
+            # TODO homogenize
+            assert_raises(ValueError, method, dataset=ds, path='..')
+            assert_status('notneeded', method(dataset=ds, path='../madeupnonexist'))
 
 
 @with_testrepos('basic_annex', flavors=['clone'])

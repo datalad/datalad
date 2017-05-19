@@ -38,7 +38,6 @@ from ..utils import eval_results
 from ..utils import build_doc
 from ..utils import handle_dirty_dataset
 from ..utils import get_paths_by_dataset
-from ..utils import save_dataset_hierarchy
 from ..utils import get_dataset_directories
 from ..utils import filter_unmodified
 from ..save import Save
@@ -179,7 +178,9 @@ def test_save_hierarchy(path):
     ds_bbaa.repo.remove('file_bbaa')
     for d in (ds, ds_bb, ds_bba, ds_bbaa):
         ok_(d.repo.dirty)
-    ds_bb.save(files=ds_bbaa.path, super_datasets=True)
+    # need to give file specifically, otherwise it will simply just preserve
+    # staged changes
+    ds_bb.save(files=opj(ds_bbaa.path, 'file_bbaa'))
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -192,7 +193,7 @@ def test_save_hierarchy(path):
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
     # generator
-    list(save_dataset_hierarchy((d.path, da.path, db.path)))
+    d.save(all_updated=True, recursive=True)
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)
@@ -211,6 +212,7 @@ def test_save_hierarchy(path):
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
     ds.save(files=(aa.path, ba.path, bb.path, c.path, ca.path, d.path),
+            all_updated=True,
             super_datasets=True)
     ok_clean_git(ds.path)
 

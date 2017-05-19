@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from os import curdir
 from os.path import abspath
+from os.path import relpath
 
 
 from datalad.utils import unique
@@ -126,6 +127,18 @@ class Save(Interface):
                 unavailable_path_msg="path does not exist: %s",
                 nondataset_path_status='impossible',
                 on_failure='ignore'):
+            # next check should not be done during annotation, as it is possibly expensive
+            # and not generally useful
+            if ap.get('status', None) == 'impossible' and \
+                    ap.get('state', None) == 'absent' and \
+                    ap.get('parentds', None):
+                # this is not here anymore, but it might actually have been a deleted
+                # component
+                if relpath(ap['path'], start=ap['parentds']) \
+                        in Dataset(ap['parentds']).repo.get_deleted_files():
+                    # ok, this is a staged deletion that we want to save
+                    ap['status'] = ''
+                    del ap['message']
             if ap.get('status', None):
                 # this is done
                 yield ap
@@ -152,6 +165,11 @@ class Save(Interface):
                 assert len(superdss) <= 1
                 dataset = list(superdss.keys())[0]
                 refds_path = dataset
+        elif refds_path:
+            # there is a single superdataset
+            superdss = {
+                refds_path: unique([ap['parentds']
+                                    for ap in to_process if 'parentds' in ap])}
         else:
             # sort all datasets under their potential superdatasets
             # start from the top to get all subdatasets down the line
@@ -192,8 +210,7 @@ class Save(Interface):
             # never recursion, done already
             recursive=False,
             action='save',
-            unavailable_path_status='impossible',
-            unavailable_path_msg="path does not exist: %s",
+            unavailable_path_status='',
             nondataset_path_status='impossible',
             return_type='generator',
             # if there is an error now, we made this mistake in here
