@@ -48,7 +48,7 @@ lgr = logging.getLogger('datalad.interface.save')
 
 def save_dataset(
         ds,
-        paths=None,
+        paths,
         message=None,
         version_tag=None):
     """Save changes in a single dataset.
@@ -57,8 +57,8 @@ def save_dataset(
     ----------
     ds : Dataset
       The dataset to be saved.
-    paths : list, optional
-      Paths to dataset components to be saved.
+    paths : list
+      Annotated paths to dataset components to be saved.
     message: str, optional
       (Commit) message to be attached to the saved state.
     version_tag : str, optional
@@ -81,11 +81,6 @@ def save_dataset(
     # and one level up
     orig_hexsha = ds.repo.get_hexsha()
 
-    # always yields list; empty if None
-    files = list(
-        set(
-            [opj(ds.path, f) if not isabs(f) else f for f in assure_list(paths)]))
-
     # try to consider existing and changed files, and prevent untracked
     # files from being added
     # XXX not acting upon untracked files would be very expensive, because
@@ -96,7 +91,7 @@ def save_dataset(
     # asking yourself why we need to `add` at all? For example, freshly
     # unlocked files in a v5 repo are listed as "typechange" and commit
     # refuses to touch them without an explicit `add`
-    tostage = [f for f in files if lexists(f)]
+    tostage = [f for f in paths if lexists(f)]
     if tostage:
         lgr.debug('staging files for commit: %s', tostage)
         if isinstance(ds.repo, AnnexRepo):
@@ -116,7 +111,7 @@ def save_dataset(
         _datalad_msg = True
 
     # TODO: Remove dirty() altogether???
-    if files or ds.repo.is_dirty(
+    if paths or ds.repo.is_dirty(
             index=True,
             untracked_files=False,
             submodules=True):
@@ -129,7 +124,7 @@ def save_dataset(
         # we will blindly call commit not knowing if there is anything to
         # commit -- this is cheaper than to anticipate all possible ways
         # a repo in whatever mode is dirty
-        ds.repo.commit(message, files=files, _datalad_msg=_datalad_msg,
+        ds.repo.commit(message, files=paths, _datalad_msg=_datalad_msg,
                        careless=True)
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
