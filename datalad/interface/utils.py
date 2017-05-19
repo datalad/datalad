@@ -187,64 +187,7 @@ def get_tree_roots(paths):
     return roots
 
 
-def sort_paths_into_subdatasets(spec):
-    """Sort a `content_by_ds` dict to have paths match their closest subdataset
-
-    This function is cheap and performs no Dataset requests (e.g. subdatasets)
-    or any kind of file-system lookups. Consequently, the result is not
-    guaranteed to yield a true path-subdataset assignment. It only works with
-    the dataset paths included in `spec`. Use a helper like
-    `discover_dataset_trace_to_targets()` to prepopulate the `spec` with all
-    relevant datasets to ensure a result that matches the content in the
-    filesystem.
-
-    Paths are sorted to be assigned to the dataset path key that is the
-    closest, but not identical match. Hence, if any path to a dataset
-    it contained in a `spec` value, it will not be re-assigned to its
-    "own" `spec`-key, but is assigned to its superdataset. However, see the
-    note below.
-
-    Note, no path is ever re-assigned upward in the hierarchy.
-
-    Parameters
-    ----------
-    spec : dict
-      content_by_ds style dict that will be sorted in-place.
-
-    Returns
-    -------
-    None
-    """
-    # paths to all known dataset, bottom-up
-    dspaths = [(p, _with_sep(p)) for p in sorted(spec.keys(), reverse=True)]
-    # loop over all dataset entries, top-down
-    for ds in sorted(spec):
-        # for each unique path recorded for this dataset check if it should
-        # move
-        paths = spec[ds]
-        filtered_paths = []
-        for path in unique(paths):
-            # check all other known dataset in bottom-up fashion
-            # for the first dataset that "contains" this path
-            moveto = None
-            for targetkey, targetpath in dspaths:
-                if targetkey == ds:
-                    # we reached the current dataset on out way up,
-                    # everything beyond here is already sorted
-                    break
-                if path.startswith(targetpath) and path != targetkey:
-                    # move path down
-                    moveto = targetkey
-                    # this was the longest match, done
-                    break
-            if moveto:
-                spec[moveto].append(path)
-            else:
-                filtered_paths.append(path)
-        # reassign what wasn't moved, deduplicated at the same time
-        spec[ds] = filtered_paths
-
-
+# TODO almost obsolete
 def save_dataset_hierarchy(
         info,
         base=None,
@@ -424,6 +367,7 @@ def save_dataset(
     return ds.repo.repo.head.commit if _was_modified else None
 
 
+# TODO becomes obsolete with Interface._prep() gone
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.
@@ -548,6 +492,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     return out, unavailable_paths, nondataset_paths
 
 
+# TODO becomes obsolete with Interface._prep() gone
 def get_normalized_path_arguments(paths, dataset=None, default=None):
     """Apply standard resolution to path arguments
 
@@ -583,6 +528,7 @@ def get_normalized_path_arguments(paths, dataset=None, default=None):
     return resolved_paths, dataset_path
 
 
+# TODO check of we can RF uninstall/remove to avoid this
 def path_is_under(values, path=None):
     """Whether a given path is a subdirectory of any of the given test values
 
@@ -614,6 +560,7 @@ def path_is_under(values, path=None):
     return False
 
 
+# TODO not used anywhere, except well tested...
 def get_dataset_directories(top, ignore_datalad=True):
     """Return a list of directories in the same dataset under a given path
 
@@ -661,11 +608,6 @@ def get_dataset_directories(top, ignore_datalad=True):
     return d
 
 
-# XXX the following present a different approach to
-# amend_pathspec_with_superdatasets() for discovering datasets between
-# processed ones and a base
-# let it simmer for a while and RF to use one or the other
-# this one here seems more leightweight and less convoluted
 def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
     """Discover the edges and nodes in a dataset tree to given target paths
 
