@@ -14,14 +14,13 @@ import logging
 import uuid
 
 from os import listdir
-from os.path import isdir, realpath, relpath, join as opj
+from os.path import isdir
+from os.path import join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.utils import save_dataset
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
-from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
@@ -36,12 +35,10 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
-from datalad.utils import with_pathsep
 
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
-from .dataset import resolve_path
 from .subdatasets import Subdatasets
 
 

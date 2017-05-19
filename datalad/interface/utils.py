@@ -36,7 +36,6 @@ import json
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
-from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import unique
 from datalad.support.exceptions import CommandError
@@ -46,7 +45,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
@@ -62,7 +60,6 @@ from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
 from .base import merge_allargs2kwargs
-from .results import get_status_dict
 from .results import known_result_xfms
 
 
