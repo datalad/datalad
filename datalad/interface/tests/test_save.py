@@ -73,7 +73,6 @@ def test_save(path):
         save("love marsians", all_updated=False)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
-
     files = ['one.txt', 'two.txt']
     for fn in files:
         with open(opj(path, fn), "w") as f:

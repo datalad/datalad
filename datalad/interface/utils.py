@@ -424,63 +424,6 @@ def save_dataset(
     return ds.repo.repo.head.commit if _was_modified else None
 
 
-# TODO this is obsolete
-def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
-    """Amend a path spec dictionary with entries for superdatasets
-
-    The result will be a superdataset entry (if a superdataset exists)
-    for each input dataset. This entry will (at least) contain the path
-    to the subdataset.
-
-    Parameters
-    ----------
-    spec : dict
-      Path spec
-    topmost : Dataset or bool
-      Flag whether to grab the immediate, or the top-most superdataset
-      for each entry, alternatively this can be a dataset instance
-      that is used as the topmost dataset.
-    limit_single : bool
-      If a `topmost` dataset is provided, and this flag is True, only
-      the given topmost dataset will be considered as superdataset. Any
-      datasets in the spec that are not underneath this dataset will
-      not have associated superdataset entries added to the spec.
-
-    Returns
-    -------
-    dict
-      Amended path spec dictionary
-    """
-    superdss = {}
-    for dpath in spec.keys():
-        superds = None
-        if isinstance(topmost, Dataset):
-            if limit_single and dpath == topmost.path:
-                # this is already the topmost, no further superdataset to
-                # consider
-                continue
-            if dpath.startswith(_with_sep(topmost.path)):
-                # the given topmost dataset is "above" the current
-                # datasets path
-                superds = topmost
-            elif limit_single:
-                continue
-        if not superds:
-            # grab the (topmost) superdataset
-            superds = Dataset(dpath).get_superdataset(
-                datalad_only=True, topmost=topmost)
-        if not superds:
-            continue
-        # register the subdatasets path in the spec of the superds
-        spaths = superdss.get(superds.path, [])
-        if not spaths:
-            spaths = spec.get(superds.path, [])
-        spaths.append(dpath)
-        superdss[superds.path] = spaths
-    spec.update(superdss)
-    return spec
-
-
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.

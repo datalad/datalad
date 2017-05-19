@@ -114,10 +114,6 @@ class Save(Interface):
             # we verify that there is an actual repo next
             dataset = abspath(curdir)
         refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        if super_datasets:
-            # TODO search for the topmost superdataset of any path and
-            # make that one the reference
-            pass
 
         to_process = []
         for ap in AnnotatePaths.__call__(
@@ -143,17 +139,31 @@ class Save(Interface):
             # nothing left to do, potentially all errored before
             return
 
-        # sort all datasets under their potential superdatasets
-        # start from the top to get all subdatasets down the line
-        # and collate them into as few superdatasets as possible
-        # this is quick, just string operations
-        superdss = get_tree_roots(
-            unique([ap['parentds'] for ap in to_process if 'parentds' in ap]))
+        if super_datasets:
+            # search for the topmost superdatasets of any path
+            dss = [Dataset(ap.get('parentds', ap['path'])) for ap in to_process]
+            superdss = [ds.get_superdataset(topmost=True)
+                        for ds in dss]
+            superdss = get_tree_roots(
+                unique(ds.path for ds in dss + superdss if ds))
+            if dataset:
+                # need to adjust the reference to the new superds
+                # if we had one ref before, we should still have exactly one
+                assert len(superdss) <= 1
+                dataset = list(superdss.keys())[0]
+                refds_path = dataset
+        else:
+            # sort all datasets under their potential superdatasets
+            # start from the top to get all subdatasets down the line
+            # and collate them into as few superdatasets as possible
+            # this is quick, just string operations
+            superdss = get_tree_roots(
+                unique([ap['parentds'] for ap in to_process if 'parentds' in ap]))
         # for each "superdataset" check the tree of subdatasets and make sure
         # we gather all datasets between the super and any subdataset
         # so we can save them all bottom-up in order to be able to properly
         # save the superdataset
-        # if this is called from e.g. `add` this is actually no necessary,
+        # if this is called from e.g. `add` this is actually not necessary,
         # but in the general case we cannot avoid it
         # TODO maybe introduce a switch?
         discovered = {}
