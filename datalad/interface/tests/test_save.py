@@ -99,6 +99,14 @@ def test_save(path):
     ds.save(all_updated=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
+    # now introduce a change downstairs
+    subds.create('someotherds')
+    ok_clean_git(subds.path, annex=isinstance(subds.repo, AnnexRepo))
+    ok_(ds.repo.dirty)
+    # and save via subdataset path, without all_updated
+    ds.save('subds')
+    ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
+
 
 @with_tempfile()
 def test_recursive_save(path):
