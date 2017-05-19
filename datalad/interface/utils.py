@@ -22,7 +22,6 @@ from os import listdir
 from os import linesep
 from os.path import join as opj
 from os.path import lexists
-from os.path import isabs
 from os.path import isdir
 from os.path import dirname
 from os.path import relpath
@@ -41,7 +40,6 @@ from datalad.utils import unique
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
@@ -186,102 +184,6 @@ def get_tree_roots(paths):
         subs = [p for p in paths if p.startswith(s)]
         roots[s.rstrip(sep)] = subs
     return roots
-
-
-def save_dataset(
-        ds,
-        paths=None,
-        message=None,
-        version_tag=None):
-    """Save changes in a single dataset.
-
-    Parameters
-    ----------
-    ds : Dataset
-      The dataset to be saved.
-    paths : list, optional
-      Paths to dataset components to be saved.
-    message: str, optional
-      (Commit) message to be attached to the saved state.
-    version_tag : str, optional
-      Tag to be assigned to the saved state.
-
-    Returns
-    -------
-    bool
-      Whether a new state was saved. If all to be saved content was unmodified
-      no new state will be saved.
-    """
-    # XXX paths must be in the given ds, no further sanity checks!
-
-    # make sure that all pending changes (batched annex operations, etc.)
-    # are actually reflected in Git
-    ds.repo.precommit()
-
-    # track what is to be committed, so it becomes
-    # possible to decide when/what to save further down
-    # and one level up
-    orig_hexsha = ds.repo.get_hexsha()
-
-    # always yields list; empty if None
-    files = list(
-        set(
-            [opj(ds.path, f) if not isabs(f) else f for f in assure_list(paths)]))
-
-    # try to consider existing and changed files, and prevent untracked
-    # files from being added
-    # XXX not acting upon untracked files would be very expensive, because
-    # I see no way to avoid using `add` below and git annex has no equivalent
-    # to git add's --update -- so for now don't bother
-    # XXX alternatively we could consider --no-ignore-removal to also
-    # have it delete any already vanished files
-    # asking yourself why we need to `add` at all? For example, freshly
-    # unlocked files in a v5 repo are listed as "typechange" and commit
-    # refuses to touch them without an explicit `add`
-    tostage = [f for f in files if lexists(f)]
-    if tostage:
-        lgr.debug('staging files for commit: %s', tostage)
-        if isinstance(ds.repo, AnnexRepo):
-            # to make this work without calling `git add` in addition,
-            # this needs git-annex v6.20161210 (see #1027)
-            ds.repo.add(tostage, commit=False)
-        else:
-            # --update will ignore any untracked files, sadly git-annex add
-            # above does not
-            # will complain about vanished files though, filter them here, but
-            # keep them for a later commit call
-            ds.repo.add(tostage, git_options=['--update'], commit=False)
-
-    _datalad_msg = False
-    if not message:
-        message = 'Recorded existing changes'
-        _datalad_msg = True
-
-    # TODO: Remove dirty() altogether???
-    if files or ds.repo.is_dirty(
-            index=True,
-            untracked_files=False,
-            submodules=True):
-        # either we have an explicit list of files, or we have something
-        # stages otherwise do not attempt to commit, as the underlying
-        # repo will happily commit any non-change
-        # not checking the working tree or untracked files should make this
-        # relatively cheap
-
-        # we will blindly call commit not knowing if there is anything to
-        # commit -- this is cheaper than to anticipate all possible ways
-        # a repo in whatever mode is dirty
-        ds.repo.commit(message, files=files, _datalad_msg=_datalad_msg,
-                       careless=True)
-
-    # MIH: let's tag even if there was nothing commit. I'd forget this
-    # option too often...
-    if version_tag:
-        ds.repo.tag(version_tag)
-
-    _was_modified = ds.repo.get_hexsha() != orig_hexsha
-
-    return ds.repo.repo.head.commit if _was_modified else None
 
 
 # TODO becomes obsolete with Interface._prep() gone
