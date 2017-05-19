@@ -175,10 +175,15 @@ def test_create_subdataset_hierarchy_from_top(path):
     subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
+    ok_(ds.id != subds.id != subsubds.id)
     ds.save(recursive=True, all_updated=True)
-    # TODO why would that be the desired case? E.g. 'file1' was
-    # untracked before and should remain as such
-    # this is actually #1419 set in stone!
+    # 'file*' in each repo was untracked before and should remain as such
+    # (we don't want a #1419 resurrection
+    ok_(ds.repo.dirty)
+    ok_(subds.repo.dirty)
+    ok_(subsubds.repo.dirty)
+    # if we add these three, we should get clean
+    ds.add(['file1', opj(subds.path, 'file2'), opj(subsubds.path, 'file3')])
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 
