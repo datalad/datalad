@@ -36,7 +36,6 @@ import json
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
-from datalad.utils import get_trace
 from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import unique
@@ -478,54 +477,6 @@ def path_is_under(values, path=None):
             # first match is enough
             return True
     return False
-
-
-# TODO not used anywhere, except well tested...
-def get_dataset_directories(top, ignore_datalad=True):
-    """Return a list of directories in the same dataset under a given path
-
-    Parameters
-    ----------
-    top : path
-      Top-level path
-    ignore_datalad : bool
-      Whether to exlcude the '.datalad' directory of a dataset and its content
-      from the results.
-
-    Returns
-    -------
-    list
-      List of directories matching the top-level path, regardless of whether
-      these directories are known to Git (i.e. contain tracked files). The
-      list does not include the top-level path itself, but it does include
-      any subdataset mount points (regardless of whether the particular
-      subdatasets are installed or not).
-    """
-    def func(arg, top, names):
-        refpath, ignore, dirs = arg
-        legit_names = []
-        for n in names:
-            path = opj(top, n)
-            if not isdir(path) or path in ignore:
-                pass
-            elif path != refpath and GitRepo.is_valid_repo(path):
-                # mount point, keep but don't dive into
-                dirs.append(path)
-            else:
-                legit_names.append(n)
-                dirs.append(path)
-        names[:] = legit_names
-
-    # collects the directories
-    refpath = get_dataset_root(top)
-    if not refpath:
-        raise ValueError("`top` path {} is not in a dataset".format(top))
-    ignore = [opj(refpath, get_git_dir(refpath))]
-    if ignore_datalad:
-        ignore.append(opj(refpath, '.datalad'))
-    d = []
-    walk(top, func, (refpath, ignore, d))
-    return d
 
 
 def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
