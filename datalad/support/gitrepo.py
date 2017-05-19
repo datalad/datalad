@@ -1960,11 +1960,18 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (not yet staged)"""
+    def get_missing_files(self):
+        """Return a list of paths with missing files (and no staged deletion)"""
         return [f.split('\t')[1]
                 for f in self.repo.git.diff('--raw', '--name-status').split('\n')
                 if f.split('\t')[0] == 'D']
+
+    def get_deleted_files(self):
+        """Return a list of paths with deleted files (staged deletion)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
+                if f.split('\t')[0] == 'D']
+
 
 # TODO
 # remove submodule
