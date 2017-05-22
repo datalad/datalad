@@ -81,51 +81,51 @@ def save_dataset(
     # and one level up
     orig_hexsha = ds.repo.get_hexsha()
 
-    # try to consider existing and changed files, and prevent untracked
-    # files from being added
-    # XXX not acting upon untracked files would be very expensive, because
-    # I see no way to avoid using `add` below and git annex has no equivalent
-    # to git add's --update -- so for now don't bother
-    # XXX alternatively we could consider --no-ignore-removal to also
-    # have it delete any already vanished files
+    # check whether we want to commit anything staged, or individual pieces
+    # this is independent of actually staging individual bits
+    save_entire_ds = False
+    for ap in paths:
+        if ap.get('type', None) == 'dataset' and ap['path'] == ds.path:
+            save_entire_ds = True
+
     # asking yourself why we need to `add` at all? For example, freshly
     # unlocked files in a v5 repo are listed as "typechange" and commit
     # refuses to touch them without an explicit `add`
-    tostage = [f for f in paths if lexists(f)]
-    if tostage:
-        lgr.debug('staging files for commit: %s', tostage)
-        if isinstance(ds.repo, AnnexRepo):
-            # to make this work without calling `git add` in addition,
-            # this needs git-annex v6.20161210 (see #1027)
-            ds.repo.add(tostage, commit=False)
-        else:
-            # --update will ignore any untracked files, sadly git-annex add
-            # above does not
-            # will complain about vanished files though, filter them here, but
-            # keep them for a later commit call
-            ds.repo.add(tostage, git_options=['--update'], commit=False)
+    to_gitadd = [ap['path'] for ap in paths
+                 # if not flagged as staged
+                 if not ap.get('staged', False) and
+                 # must exist, anything else needs no staging, can be committed directly
+                 lexists(ap['path']) and
+                 # not an annex repo, hence no choice other than git
+                 (not isinstance(ds.repo, AnnexRepo) or
+                  # even in an annex repo we want to use `git add` for submodules
+                  (ap.get('type', None) == 'dataset' and not ap['path'] == ds.path))]
+    to_annexadd = [ap['path'] for ap in paths
+                   # not passed to git add
+                   if ap['path'] not in to_gitadd and
+                   # if not flagged as staged
+                   not ap.get('staged', False) and
+                   # must exist, anything else needs no staging, can be committed directly
+                   lexists(ap['path'])]
+
+    if to_gitadd:
+        ds.repo.add(to_gitadd, git=True, commit=False)
+    if to_annexadd:
+        ds.repo.add(to_annexadd, commit=False)
 
     _datalad_msg = False
     if not message:
         message = 'Recorded existing changes'
         _datalad_msg = True
 
-    # TODO: Remove dirty() altogether???
-    if paths or ds.repo.is_dirty(
-            index=True,
-            untracked_files=False,
-            submodules=True):
-        # either we have an explicit list of files, or we have something
-        # stages otherwise do not attempt to commit, as the underlying
-        # repo will happily commit any non-change
-        # not checking the working tree or untracked files should make this
-        # relatively cheap
-
-        # we will blindly call commit not knowing if there is anything to
-        # commit -- this is cheaper than to anticipate all possible ways
-        # a repo in whatever mode is dirty
-        ds.repo.commit(message, files=paths, _datalad_msg=_datalad_msg,
-                       careless=True)
+    # we will blindly call commit not knowing if there is anything to
+    # commit -- this is cheaper than to anticipate all possible ways
+    # a repo in whatever mode is dirty
+    ds.repo.commit(
+        message,
+        files=[ap['path'] for ap in paths] if not save_entire_ds else None,
+        _datalad_msg=_datalad_msg,
+        careless=True)
 
     # MIH: let's tag even if there was nothing commit. I'd forget this
     # option too often...
@@ -133,7 +133,6 @@ def save_dataset(
         ds.repo.tag(version_tag)
 
     _was_modified = ds.repo.get_hexsha() != orig_hexsha
-
     return ds.repo.repo.head.commit if _was_modified else None
 
 
@@ -331,9 +330,7 @@ class Save(Interface):
                 continue
             saved_state = save_dataset(
                 ds,
-                # TODO pass all the goodness inside
-                [p['path'] if isinstance(p, dict) else p
-                 for p in content_by_ds[dspath]],
+                content_by_ds[dspath],
                 message=message,
                 version_tag=version_tag)
             if saved_state:

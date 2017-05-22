@@ -443,6 +443,9 @@ class Add(Interface):
             lgr.debug('Not calling `save` as instructed')
             return
 
+        # TODO tell save what was staged already! Set 'staged=True' for
+        # respective annotated paths that are fed into `save`
+
         # do not reuse any of the sorting done in here for saving, but instead
         # pass on all the annotated paths to have `save` figure out what to do with
         # them -- this is costs something, but should be safer, and frankly is
