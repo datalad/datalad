@@ -341,6 +341,8 @@ class Add(Interface):
                     continue
                 # queue for saving using the updated annotated path
                 ap['registered_subds'] = True
+                # I hope this is true in direct mode too
+                ap['staged'] = True
                 to_save.append(ap)
                 _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it
@@ -382,6 +384,8 @@ class Add(Interface):
                 if success:
                     # this was successfully added, queue for saving this very path
                     # in the dataset
+                    ap = {k: v for k, v in res.items() if k != 'status'}
+                    ap['staged'] = True
                     to_save.append({k: v for k, v in res.items() if k != 'status'})
                 if a['file'] == '.gitmodules':
                     # filter out .gitmodules, because this is only included for
