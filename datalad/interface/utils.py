@@ -843,7 +843,7 @@ def eval_results(func):
     return eval_func(func)
 
 
-def build_doc(cls):
+def build_doc(cls, **kwargs):
     """Decorator to build docstrings for datalad commands
 
     It's intended to decorate the class, the __call__-method of which is the
@@ -881,6 +881,11 @@ def build_doc(cls):
                 has_default=True),
             linesep)
 
+    cls_doc = cls.__doc__
+    if hasattr(cls, '_docs_'):
+        # expand docs
+        cls_doc = cls_doc.format(**cls._docs_)
+
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
         eval_doc += cls.__call__.__doc__
@@ -889,7 +894,7 @@ def build_doc(cls):
     spec = getattr(cls, '_params_', dict())
     update_docstring_with_parameters(
         cls.__call__, spec,
-        prefix=alter_interface_docs_for_api(cls.__doc__),
+        prefix=alter_interface_docs_for_api(cls_doc),
         suffix=alter_interface_docs_for_api(eval_doc)
     )
 

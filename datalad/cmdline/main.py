@@ -178,8 +178,12 @@ def setup_parser(
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
+                intf_doc = _intf.__doc__.strip()
+                if hasattr(_intf, '_docs_'):
+                    # expand docs
+                    intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__.strip())
+                    intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
