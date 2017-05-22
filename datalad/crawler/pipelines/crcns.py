@@ -10,6 +10,7 @@
 
 # Import necessary nodes
 import os
+from six import text_type
 from datalad.utils import auto_repr
 from datalad.utils import _path_
 from datalad.utils import updated
@@ -49,7 +50,7 @@ def process_datacite_xml(json_, xml_):
     # actually the DOI is also present in xml_ as
     # e.g. <identifier identifierType="DOI">10.6080/K00Z715X</identifier>
     # so we could just store xml_
-    return xml_.decode('utf-8')
+    return xml_
 
 
 def get_metadata(dataset=None):
@@ -72,7 +73,10 @@ def get_metadata(dataset=None):
 
     all_datasets = {}
     for i, json_ in enumerate(rj['response']['docs']):
-        xml_ = base64.decodestring(json_['xml'].decode())
+        json_xml = json_['xml']
+        if isinstance(json_xml, text_type):
+            json_xml = json_xml.encode()
+        xml_ = base64.decodestring(json_xml).decode('utf-8')
         reg = re.search('AlternativeTitle.?>CRCNS.org ([^<]*)<', xml_)
 
         if not reg:
