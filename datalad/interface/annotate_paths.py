@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+import textwrap
 
 from os import curdir
 from os.path import join as opj
@@ -159,64 +160,101 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
+# "complete" list of recognized properties, there could be other ones
+# as any command can inject anything
+known_props = {
+    'annexkey': 'annex key for the content of a file',
+    'action': 'label of the action that triggered the path annotation',
+    'logger': 'logger for reporting a message',
+    'message': 'message (plus possible tsring expansion arguments)',
+    'orig_request': 'original input by which a path was determined',
+    'parentds':
+        'path of dataset containing the annotated path (superdataset for subdatasets)',
+    'path': 'absolute path that is annotated',
+    'process_content': 'flag that content underneath the path is to be processed',
+    'process_updated_only':
+        'flag that only known dataset components are to be processed',
+    'raw_input': 'flag whether this path was given as raw (non-annotated) input',
+    'reccommit': 'the recorded commit for a subdataset in a superdataset',
+    'reccommit_descr': 'a human-readable description of `reccommit`',
+    'refds': 'path of a reference/base dataset the annotated path is part of',
+    'registered_subds': 'flag whether a dataset is known to be a true subdataset of `parentds`',
+    'source_url': 'URL a dataset was installed from', # unify with `url`?
+    'staged': 'flag whether a path is known to be "staged" in its containing dataset',
+    'state':
+        'state indicator for a path in its containing dataset (clean, modified, absent (also for files), conflict)',
+    'status': 'action result status (ok, notneeded, impossible, error)',
+    'type': 'nature of the path (file, directory, dataset)',
+    'url': 'registered URL for a subdataset in a superdataset',  # unify with `source_url`?
+}
+
+
 @build_doc
 class AnnotatePaths(Interface):
     """Analyze and act upon input paths
 
-    Mention:
+    Given paths (or more generally location requests) are inspected and
+    annotated with a number of properties. A list of recognized properties
+    is provided below.
 
-    rsync-like semantics: dir vs dir/ or dir/.
-
-    takes annotated paths
-
-    The following properties are reported (if possible) for each matching
-    subdataset record.
-
-    FILLMEIN
-    registered_subds
+    || PYTHON >>Input `paths` for this command can either be un-annotated
+    (raw) path strings, or already (partially) annotated paths. In the latter
+    case, further annotation is limited to yet-unknown properties, and is
+    potentially faster than initial annotation.<< PYTHON ||
 
 
-    parentds -- not necessarily as superds! I.e. there might be a dataset
-    upstairs, but it may not recognize a dataset underneath as a registered
-    subdataset (yet).
+    *Recognized path properties*
+
+    {proplist}
 
     """
+    _docs_ = dict(
+        proplist='\n\n    '.join(
+            '"{}"\n{}'.format(
+                k,
+                textwrap.fill(known_props[k],
+                              initial_indent='        ',
+                              subsequent_indent='        '))
+            for k in sorted(known_props)))
+
     _params_ = dict(
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="""path/name of the requested dataset component. The component
-            must already be known to a dataset. To add new components to a
-            dataset use the `add` command""",
+            doc="""path to be annotated""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to configure.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the input and/or the current working directory""",
+            doc="""an optional reference/base dataset for the paths""",
             constraints=EnsureDataset() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         action=Parameter(
             args=("--action",),
             metavar="LABEL",
-            doc="""""",
+            doc="""an "action" property value to include in the
+            path annotation""",
             constraints=EnsureStr() | EnsureNone()),
         unavailable_path_status=Parameter(
             args=("--unavailable-path-status",),
             metavar="LABEL",
-            doc="""""",
+            doc="""a "status" property value to include in the
+            annotation for paths that are underneath a dataset, but
+            do not exist on the filesystem""",
             constraints=EnsureStr() | EnsureNone()),
         unavailable_path_msg=Parameter(
             args=("--unavailable-path-msg",),
             metavar="message",
-            doc="""""",
+            doc="""a "message" property value to include in the
+            annotation for paths that are underneath a dataset, but
+            do not exist on the filesystem""",
             constraints=EnsureStr() | EnsureNone()),
         nondataset_path_status=Parameter(
             args=("--nondataset-path-status",),
             metavar="LABEL",
-            doc="""""",
+            doc="""a "status" property value to include in the
+            annotation for paths that are not underneath any dataset""",
             constraints=EnsureStr() | EnsureNone()),
         force_parentds_discovery=Parameter(
             args=("--no-parentds-discovery",),
