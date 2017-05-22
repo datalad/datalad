@@ -783,7 +783,7 @@ class GitRepo(RepoInterface):
         files = _remove_empty_items(files)
         out = []
 
-        if files:
+        if files or git_options:
             try:
                 # without --verbose git 2.9.3  add does not return anything
                 add_out = self._git_custom_command(
@@ -815,7 +815,7 @@ class GitRepo(RepoInterface):
                 raise
 
         else:
-            lgr.warning("add was called with empty file list.")
+            lgr.warning("add was called with empty file list and no options.")
 
         if commit:
             if msg is None:
