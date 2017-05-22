@@ -209,9 +209,17 @@ def test_save_hierarchy(path):
     ca.repo.remove('file_ca')
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
-    ds.save(files=(aa.path, ba.path, bb.path, c.path, ca.path, d.path),
-            super_datasets=True)
-    ok_clean_git(ds.path)
+    ds.save(
+        # append trailing slashes to the path to indicate that we want to
+        # have the staged content in the dataset saved, rather than only the
+        # subdataset state in the respective superds.
+        # an alternative would have been to pass `save` annotated paths of
+        # type {'path': dspath, 'process_content': True} for each dataset
+        # in question, but here we want to test how this would most likely
+        # by used from cmdline
+        files=[opj(p, '')
+               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
+        super_datasets=True)
 
 
 def test_interface_prep():
