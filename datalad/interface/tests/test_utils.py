@@ -86,11 +86,10 @@ def test_dirty(path):
     # tainted: untracked
     with open(opj(ds.path, 'something'), 'w') as f:
         f.write('some')
-    orig_state = _check_auto_save(ds, orig_state)
+    # we don't want to auto-add untracked files by saving (anymore)
+    assert_raises(AssertionError, _check_auto_save, ds, orig_state)
     # tainted: staged
-    with open(opj(ds.path, 'staged'), 'w') as f:
-        f.write('some')
-    ds.repo.add('staged', git=True)
+    ds.repo.add('something', git=True)
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!
@@ -192,7 +191,7 @@ def test_save_hierarchy(path):
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
     # generator
-    d.save(all_updated=True, recursive=True)
+    d.save(recursive=True)
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)
@@ -211,7 +210,6 @@ def test_save_hierarchy(path):
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
     ds.save(files=(aa.path, ba.path, bb.path, c.path, ca.path, d.path),
-            all_updated=True,
             super_datasets=True)
     ok_clean_git(ds.path)
 
@@ -255,7 +253,7 @@ def test_filter_unmodified(path):
     # dataset does not have the recent change saved
     assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
 
-    ds.save(all_updated=True)
+    ds.save()
 
     modspec, unavail = Save._prep('.', ds, recursive=True)
     # arg sorting is not affected

@@ -93,8 +93,9 @@ def test_update_simple(origin, src_path, dst_path):
 
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, 'subm 2'), {'load.dat': 'heavy'})
-    source.save(message="saving changes within subm2",
-                recursive=True, all_updated=True)
+    source.add(opj('subm 2', 'load.dat'),
+               message="saving changes within subm2",
+               recursive=True)
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
         status='ok', type='dataset')

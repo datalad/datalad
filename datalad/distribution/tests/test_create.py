@@ -176,7 +176,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
     ok_(ds.id != subds.id != subsubds.id)
-    ds.save(recursive=True, all_updated=True)
+    ds.save(recursive=True)
     # 'file*' in each repo was untracked before and should remain as such
     # (we don't want a #1419 resurrection
     ok_(ds.repo.dirty)
@@ -199,7 +199,7 @@ def test_nested_create(path):
     os.makedirs(opj(ds.path, 'lvl1', 'empty'))
     with open(opj(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.save(all_updated=True))
+    ok_(ds.add('.'))
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)

@@ -23,6 +23,7 @@ from os.path import lexists
 
 from datalad.utils import unique
 from datalad.utils import assure_list
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -85,7 +86,7 @@ def save_dataset(
     # this is independent of actually staging individual bits
     save_entire_ds = False
     for ap in paths:
-        if ap.get('type', None) == 'dataset' and ap['path'] == ds.path:
+        if ap['path'] == ds.path:
             save_entire_ds = True
 
     # asking yourself why we need to `add` at all? For example, freshly
@@ -105,11 +106,21 @@ def save_dataset(
                    if ap['path'] not in to_gitadd and
                    # if not flagged as staged
                    not ap.get('staged', False) and
+                   # prevent `git annex add .` in a subdataset, if not desired
+                   not ap.get('process_updated_only', False) and
                    # must exist, anything else needs no staging, can be committed directly
                    lexists(ap['path'])]
 
-    if to_gitadd:
-        ds.repo.add(to_gitadd, git=True, commit=False)
+    if to_gitadd or save_entire_ds:
+        # need to call GitRep.add() directly, as AnnexRepo.add() doesn't support
+        # git_options
+        GitRepo.add(
+            ds.repo,
+            to_gitadd,
+            git=True,
+            # this makes sure that pending submodule updates are added too
+            git_options=['--update'] if save_entire_ds else None,
+            commit=False)
     if to_annexadd:
         ds.repo.add(to_annexadd, commit=False)
 
@@ -175,9 +186,8 @@ class Save(Interface):
             action="store_true"),
         all_updated=Parameter(
             args=("-u", "--all-updated"),
-            # TODO do only if a path actually is a dataset, otherwise too much magic
-            doc="""save changes of all known components in datasets that contain
-            any of the given paths.""",
+            doc="""if no explicit paths are given, save changes of all known
+            components in a datasets""",
             action="store_true"),
         version_tag=Parameter(
             args=("--version-tag",),
@@ -194,7 +204,7 @@ class Save(Interface):
     @eval_results
     # TODO files -> path
     def __call__(message=None, files=None, dataset=None,
-                 all_updated=False, all_changes=None, version_tag=None,
+                 all_updated=True, all_changes=None, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False
                  ):
         if all_changes is not None:
@@ -237,9 +247,13 @@ class Save(Interface):
                 # this is done
                 yield ap
                 continue
-            if ap.get('type', None) == 'dataset' and all_updated:
-                ap['updated_only'] = True
+            # for things like: `ds.save()`
+            # or recursively discovered datasets
+            if ap['path'] == refds_path or \
+                    (ap.get('type', None) == 'dataset' and
+                     not ap.get('raw_input', False)):
                 ap['process_content'] = True
+                ap['process_updated_only'] = all_updated
             to_process.append(ap)
 
         if not to_process:

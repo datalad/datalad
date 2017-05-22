@@ -176,7 +176,7 @@ def test_aggregation(path):
     assert_true(success)
 
     # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data', all_updated=True)
+    ds.save('with aggregated meta data')
 
     # now clone the beast to simulate a new user installing an empty dataset
     clone = install(
