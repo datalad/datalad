@@ -116,6 +116,8 @@ def test_get_subdatasets(path):
         ['sub dataset1',
          'sub dataset1/sub sub dataset1',
          'sub dataset1/sub sub dataset1/subm 1'])
+    # but it has to be a subdataset, otherwise no match
+    eq_(ds.subdatasets(contains=ds.path), [])
     # which is what get_containing_subdataset() does
     eq_(ds.subdatasets(recursive=True,
                        contains=target_sub,
