@@ -24,6 +24,7 @@ from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag
@@ -35,6 +36,7 @@ from datalad.utils import with_pathsep as _with_sep
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
+from .dataset import resolve_path
 
 lgr = logging.getLogger('datalad.distribution.subdatasets')
 
@@ -160,6 +162,13 @@ class Subdatasets(Interface):
             constraints=EnsureBool() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        contains=Parameter(
+            args=('--contains',),
+            metavar='PATH',
+            doc="""limit report to the subdatasets containing the
+            given path. If a root path of a subdataset is given the last
+            reported dataset will be the subdataset itself.""",
+            constraints=EnsureStr() | EnsureNone()),
         bottomup=Parameter(
             args=("--bottomup",),
             action="store_true",
@@ -174,6 +183,7 @@ class Subdatasets(Interface):
             fulfilled=None,
             recursive=False,
             recursion_limit=None,
+            contains=None,
             bottomup=False):
         dataset = require_dataset(
             dataset, check_installed=False, purpose='subdataset reporting')
@@ -188,12 +198,14 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
-        if bottomup or (recursive and recursion_limit is not None):
+        if bottomup or contains or (recursive and recursion_limit is not None):
             # IMPLEMENTATION 1
             # slow but flexible (one Git call per dataset)
+            if contains:
+                contains = resolve_path(contains, dataset)
             for r in _get_submodules(
                     dataset.path, fulfilled, recursive, recursion_limit,
-                    bottomup):
+                    contains, bottomup):
                 # without the refds_path cannot be rendered/converted relative
                 # in the eval_results decorator
                 r['refds'] = refds_path
@@ -233,12 +245,21 @@ class Subdatasets(Interface):
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
 def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
-                    bottomup):
+                    contains, bottomup):
     if not GitRepo.is_valid_repo(dspath):
         return
     modinfo = _parse_gitmodules(dspath)
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath, recursive=False):
+        if contains and \
+                not (contains == sm['path'] or
+                     contains.startswith(_with_sep(sm['path']))):
+            # we are not looking for this subds, because it doesn't
+            # match the target path
+            continue
+        #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
+        #if common.endswith(sep) and common == with_pathsep(subds):
+        #    candidates.append(common)
         sm.update(modinfo.get(sm['path'], {}))
         subdsres = get_status_dict(
             'subdataset',
@@ -264,6 +285,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     (recursion_limit - 1)
                     if isinstance(recursion_limit, int)
                     else recursion_limit,
+                    contains,
                     bottomup):
                 yield r
         if bottomup and \

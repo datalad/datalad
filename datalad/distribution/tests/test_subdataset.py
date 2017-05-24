@@ -10,6 +10,7 @@
 import os
 from os.path import join as opj
 from os.path import relpath
+from os.path import pardir
 
 from ..dataset import Dataset
 from datalad.api import subdatasets
@@ -86,3 +87,48 @@ def test_get_subdatasets(path):
     for r in res:
         for prop in ('url', 'state', 'reccommit', 'subds_name'):
             assert_in(prop, r)
+
+    #
+    # test --contains
+    #
+    target_sub = 'sub dataset1/sub sub dataset1/subm 1'
+    # give the closest direct subdataset
+    eq_(ds.subdatasets(contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1'])
+    # should find the actual subdataset trail
+    eq_(ds.subdatasets(recursive=True,
+                       contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1',
+         'sub dataset1/sub sub dataset1/subm 1'])
+    # doesn't affect recursion limit
+    eq_(ds.subdatasets(recursive=True, recursion_limit=2,
+                       contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1'])
+    # for a direct dataset path match, return the matching dataset
+    eq_(ds.subdatasets(recursive=True,
+                       contains=target_sub,
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1',
+         'sub dataset1/sub sub dataset1/subm 1'])
+    # which is what get_containing_subdataset() does
+    eq_(ds.subdatasets(recursive=True,
+                       contains=target_sub,
+                       result_xfm='paths')[-1],
+        ds.get_containing_subdataset(target_sub).path)
+    # no error if contains is bullshit
+    eq_(ds.subdatasets(recursive=True,
+                       contains='errrr_nope',
+                       result_xfm='paths'),
+        [])
+    # TODO maybe at a courtesy bullshit detector some day
+    eq_(ds.subdatasets(recursive=True,
+                       contains=opj(pardir, 'errrr_nope'),
+                       result_xfm='paths'),
+        [])
+

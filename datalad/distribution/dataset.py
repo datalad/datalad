@@ -361,6 +361,12 @@ class Dataset(object):
         Note: The "mount point" of a subdataset is classified as belonging to
         that respective subdataset.
 
+        WARNING: This function is rather expensive, because it queries for all
+        subdatasets recursively, and repeatedly -- which can take a substantial
+        amount of time for datasets with many (sub-)subdatasets.  In Many cases
+        the `subdatasets` command can be used with its `contains` parameter to
+        achieve the desired result in a less expensive way.
+
         Parameters
         ----------
         path : str
