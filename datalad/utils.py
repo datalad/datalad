@@ -1181,5 +1181,20 @@ def get_dataset_root(path):
     return normpath(path)
 
 
+def try_multiple(ntrials, exception, base, f, *args, **kwargs):
+    """Call f multiple times making exponentially growing delay between the calls"""
+    from .dochelpers import exc_str
+    for trial in xrange(1, ntrials+1):
+        try:
+            return f(*args, **kwargs)
+        except exception as exc:
+            if trial == ntrials:
+                raise  # just reraise on the last trial
+            t = base ** trial
+            lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
+            sleep(t)
+
+
 lgr.log(5, "Done importing datalad.utils")
 
