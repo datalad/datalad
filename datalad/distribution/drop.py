@@ -182,7 +182,7 @@ class Drop(Interface):
                 recursion_limit=recursion_limit,
                 action='drop',
                 # justification for status:
-                # content need not be drop where there is none
+                # content need not be dropped where there is none
                 unavailable_path_status='notneeded',
                 nondataset_path_status='error',
                 on_failure='ignore'):

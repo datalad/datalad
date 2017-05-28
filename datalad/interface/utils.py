@@ -107,58 +107,6 @@ def handle_dirty_dataset(ds, mode, msg=None):
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
 
-# TODO RF this thing should go away completely
-# and be replaced by the ability to deal with dirty datasets
-def handle_dirty_datasets(dpaths,
-                          mode,
-                          base=None,
-                          msg='[DATALAD] auto-saved changes'):
-    """Detect and treat unsaved changes as instructed by `mode`
-
-    Parameters
-    ----------
-    dpaths : sequence(path)
-      Dataset to be inspected. Does nothing if `None`.
-    mode : {'fail', 'ignore', 'save-before'}
-      How to act upon discovering unsaved changes.
-    base : path or None, optional
-      Path of a common super dataset that should also be handled.
-    msg : str
-      Custom message to use for a potential saved state.
-
-    Returns
-    -------
-    None
-    """
-    if mode == 'save-before':
-        from datalad.interface.save import Save
-        # TODO GENERATOR
-        # new returns a generator and yields status dicts
-        base = base if base and GitRepo.is_valid_repo(
-            base.path if isinstance(base, Dataset) else base) else None
-        if base or dpaths:
-            Save.__call__(
-                files=dpaths,
-                dataset=base if base and GitRepo.is_valid_repo(
-                    base.path if isinstance(base, Dataset) else base) else None,
-                message=msg)
-    elif mode == 'ignore':
-        return
-    elif mode == 'fail':
-        for dpath in dpaths:
-            ds = Dataset(dpath)
-            if not ds.repo:
-                continue
-            ds.repo.precommit()
-            if ds.repo.is_dirty(index=True,
-                                untracked_files=True,
-                                submodules=True):
-                raise RuntimeError(
-                    'dataset {} has unsaved changes'.format(ds))
-    else:
-        raise ValueError("unknown if-dirty mode '{}'".format(mode))
-
-
 def get_tree_roots(paths):
     """Return common root paths for a set of paths
 

@@ -50,7 +50,9 @@ def test_safetynet(path):
         with chpwd(p):
             # will never remove PWD, or anything outside the dataset
             for target in (ds.path, os.curdir, os.pardir, opj(os.pardir, os.pardir)):
-                assert_raises(ValueError, uninstall, path=target)
+                assert_status(
+                    ('error', 'impossible'),
+                    uninstall(path=target, on_failure='ignore'))
 
 
 @with_tempfile()
@@ -59,7 +61,7 @@ def test_uninstall_uninstalled(path):
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
     assert_status('error', ds.drop(on_failure="ignore"))
-    assert_status('notneeded', ds.uninstall())
+    assert_status('error', ds.uninstall(on_failure='ignore'))
     assert_status('notneeded', ds.remove())
 
 
@@ -105,14 +107,9 @@ def test_uninstall_invalid(path):
     for method in (uninstall, remove, drop):
         assert_raises(InsufficientArgumentsError, method)
         # refuse to touch stuff outside the dataset
-        if method in (remove, drop):
-            assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
-            # same if it doesn't exist, for consistency
-            assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
-        else:
-            # TODO homogenize
-            assert_raises(ValueError, method, dataset=ds, path='..')
-            assert_status('notneeded', method(dataset=ds, path='../madeupnonexist'))
+        assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
+        # same if it doesn't exist, for consistency
+        assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -160,8 +157,10 @@ def test_uninstall_git_file(path):
         message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
-    assert_status('error', res)
-    assert_in("will not act on files", res[0]['message'][0])
+    assert_result_count(
+        res, 1,
+        status='impossible',
+        message='can only uninstall datasets (consider the `drop` command)')
 
     # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
