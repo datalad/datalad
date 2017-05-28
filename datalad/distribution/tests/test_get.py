@@ -23,6 +23,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.tests.utils import ok_
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testrepos
@@ -98,7 +99,7 @@ def test_get_invalid_call(path, file_outside):
     assert_raises(InsufficientArgumentsError, get, None)
     assert_raises(InsufficientArgumentsError, get, [])
     # invalid dataset:
-    assert_raises(ValueError, get, None, dataset=path)
+    assert_status('impossible', get(None, dataset=path, on_failure='ignore'))
 
     # have a plain git:
     ds = Dataset(path)
@@ -126,10 +127,12 @@ def test_get_invalid_call(path, file_outside):
 
     res = ds.get("NotExistingFile.txt", on_failure='ignore')
     assert_status('impossible', res)
-    assert_message("path does not exist: %s", res)
+    assert_message("path does not exist", res)
 
     # path outside repo errors as with most other commands:
-    assert_raises(ValueError, ds.get, file_outside)
+    res = ds.get(file_outside, on_failure='ignore')
+    assert_in_results(
+        res, status='impossible', message='path not associated with any dataset')
 
 
 @with_testrepos('basic_annex', flavors='clone')
@@ -264,14 +267,13 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
+    ok_clean_git(subds1.path)
     # explicitly given path in subdataset => implicit recursion:
     # MIH: Nope, we fulfill the dataset handle, but that doesn't
     #      imply fulfilling all file handles
     result = ds.get(rel_path_sub1, recursive=True)
     # all good actions
-    assert_status(('ok', 'notneeded'), result)
-    # pre-existing subds is reported as notneeded
-    assert_in_results(result, status='notneeded', path=subds1.path)
+    assert_status('ok', result)
 
     assert_in_results(result, path=opj(ds.path, rel_path_sub1), status='ok')
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
@@ -439,12 +441,12 @@ def test_recurse_existing(src, path):
 
     # make sure recursion_limit works as expected across a range of depths
     for depth in range(len(origin_ds)):
-        # need to switch off default filter to get full hierarchy of datasets
-        datasets = install(
+        res = install(
             path, source=src, recursive=True, recursion_limit=depth,
-            result_xfm='datasets', return_type='list', result_filter=None)
+            result_xfm=None, return_type='list', result_filter=None)
         # we expect one dataset per level
-        eq_(len(datasets), depth + 1)
+        assert_result_count(
+            res, depth + 1, type='dataset', status='ok')
         rmtree(path)
 
     # now install all but the last two levels, no data
