@@ -23,21 +23,17 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset, \
-    datasetmethod, require_dataset
+    datasetmethod
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
-from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
 from datalad.interface.save import Save
-from datalad.utils import get_dataset_root
 from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
 from datalad.distribution.drop import check_argument

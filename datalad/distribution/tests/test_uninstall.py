@@ -9,7 +9,6 @@
 
 """
 
-import logging
 import os
 from os.path import join as opj, split as psplit
 from os.path import exists, lexists
@@ -22,7 +21,7 @@ from datalad.api import drop
 from datalad.api import remove
 from datalad.api import install
 from datalad.api import create
-from datalad.support.exceptions import InsufficientArgumentsError, CommandError
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -39,7 +38,6 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.utils import chpwd
 from datalad.support.external_versions import external_versions
-from datalad.utils import swallow_logs
 
 from ..dataset import Dataset
 
