@@ -355,6 +355,9 @@ class Dataset(object):
 
         return Dataset(sds_path)
 
+    # TODO this function is obselete and replaced by a faster
+    # `subdatasets --contains` -- remove once `aggregate` is RF'ed to no
+    # longer use it
     def get_containing_subdataset(self, path, recursion_limit=None):
         """Get the (sub-)dataset containing `path`
 

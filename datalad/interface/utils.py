@@ -271,6 +271,8 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
             if not _ds_looked_up:
                 # we didn't deal with it before
 
+                # TODO this is a slow call, no need for dedicated RF, will vanish
+                # together with the entire function
                 smpath = ds.get_containing_subdataset(
                     path, recursion_limit=1).path
                 if smpath != dspath:
