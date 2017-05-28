@@ -325,12 +325,19 @@ def test_uninstall_recursive(path):
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
-    ds.save()
     ok_clean_git(ds.path)
     # fail on missing --recursive because subdataset is present
     assert_raises(IncompleteResultsError, ds.remove)
     ok_clean_git(ds.path)
     ds.remove(recursive=True)
+    # completely gone
+    ok_(not ds.is_installed())
+    ok_(not exists(ds.path))
+    # now do it again, but without a reference dataset
+    ds = Dataset(path).create()
+    ds.create('deep')
+    ok_clean_git(ds.path)
+    remove(ds.path, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
