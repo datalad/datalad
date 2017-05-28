@@ -22,6 +22,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
@@ -68,13 +69,24 @@ class Clean(Interface):
     @eval_results
     def __call__(dataset=None, what=None, recursive=False, recursion_limit=None):
         ds = require_dataset(dataset, purpose='clean-up')
-        content_by_ds, unavailable_paths = Interface._prep(
-            dataset=ds,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
         res_kwargs = dict(action='clean', logger=lgr, refds=ds.path)
-
-        for d in content_by_ds:
+        for ap in AnnotatePaths.__call__(
+                dataset=ds.path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='clean',
+                unavailable_path_status='impossible',
+                nondataset_path_status='impossible',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                yield ap
+                continue
+            if ap.get('type', None) != 'dataset':
+                ap.update(status='impossible',
+                          message='only datasets can be cleaned')
+                yield ap
+                continue
+            d = ap['path']
             for dirpath, flag, msg, sing_pl in [
                 (ARCHIVES_TEMP_DIR, "cached-archives",
                  "temporary archive", ("directory", "directories")),
