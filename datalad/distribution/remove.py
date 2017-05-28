@@ -121,6 +121,7 @@ class Remove(Interface):
                 action='remove',
                 unavailable_path_status='',
                 nondataset_path_status='error',
+                return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
                 # this is done

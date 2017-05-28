@@ -430,6 +430,7 @@ class Get(Interface):
                 # testing which ones could be obtained
                 unavailable_path_status='',
                 nondataset_path_status='impossible',
+                return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
                 # we know what to report already

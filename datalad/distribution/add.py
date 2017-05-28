@@ -199,6 +199,7 @@ class Add(Interface):
                 unavailable_path_status='impossible',
                 unavailable_path_msg="path does not exist: %s",
                 nondataset_path_status='impossible',
+                return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
                 # this is done

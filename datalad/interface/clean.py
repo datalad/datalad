@@ -77,6 +77,7 @@ class Clean(Interface):
                 action='clean',
                 unavailable_path_status='impossible',
                 nondataset_path_status='impossible',
+                return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
                 yield ap

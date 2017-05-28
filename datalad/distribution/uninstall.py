@@ -146,6 +146,7 @@ class Uninstall(Interface):
                 # content need not be uninstalled where there is none
                 unavailable_path_status='notneeded',
                 nondataset_path_status='error',
+                return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
                 # this is done
