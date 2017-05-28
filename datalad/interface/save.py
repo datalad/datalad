@@ -16,13 +16,10 @@ import logging
 from os import curdir
 from os.path import abspath
 from os.path import relpath
-from os.path import isabs
-from os.path import join as opj
 from os.path import lexists
 
 
 from datalad.utils import unique
-from datalad.utils import assure_list
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
