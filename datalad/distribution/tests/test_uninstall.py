@@ -58,7 +58,7 @@ def test_uninstall_uninstalled(path):
     # goal oriented error reporting. here:
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
-    assert_status('notneeded', ds.drop())
+    assert_status('error', ds.drop(on_failure="ignore"))
     assert_status('notneeded', ds.uninstall())
     assert_status('notneeded', ds.remove())
 
@@ -105,7 +105,7 @@ def test_uninstall_invalid(path):
     for method in (uninstall, remove, drop):
         assert_raises(InsufficientArgumentsError, method)
         # refuse to touch stuff outside the dataset
-        if method is remove:
+        if method in (remove, drop):
             assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
             # same if it doesn't exist, for consistency
             assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
