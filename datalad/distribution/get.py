@@ -432,14 +432,14 @@ class Get(Interface):
                 unavailable_path_status='',
                 nondataset_path_status='impossible',
                 on_failure='ignore'):
+            if ap.get('status', None):
+                # we know what to report already
+                yield ap
+                continue
             if ap.get('state', None) == 'absent' and ap.get('raw_input', False):
                 # if this wasn't found, but directly requested, queue for further
                 # exploration
                 unavailable_paths.append(ap)
-                continue
-            if ap.get('status', None):
-                # we know what to report already
-                yield ap
                 continue
             if ap.get('type', None) == 'dataset' and \
                     GitRepo.is_valid_repo(ap['path']) and \
@@ -534,16 +534,18 @@ class Get(Interface):
                         if res['type'] == 'dataset':
                             # make a record
                             yielded_ds.append(res['path'])
-                    # paranoia, so popular these days...
-                    assert GitRepo.is_valid_repo(res['path'])
                     yield res
                     if not (res['status'] == 'ok' and res['type'] == 'dataset'):
                         # not a dataset that was just installed, we just reported it
                         # upstairs, and can ignore it from now on
                         continue
+                    # paranoia, so popular these days...
+                    assert GitRepo.is_valid_repo(res['path'])
                     # keep a copy of the install record for `get` later on
-                    rec_get.append(
-                        {k: v for k, v in res.items() if not k == 'status'})
+                    get_ap = {k: v for k, v in res.items()
+                              if not k == 'status'}
+                    get_ap['process_content'] = get_data
+                    rec_get.append(get_ap)
 
         if not get_data:
             # done already
