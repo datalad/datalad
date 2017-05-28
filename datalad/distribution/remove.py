@@ -102,7 +102,7 @@ class Remove(Interface):
         if not dataset and not path:
             raise InsufficientArgumentsError(
                 "insufficient information for `remove`: requires at least a path or dataset")
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         res_kwargs['refds'] = refds_path
         if refds_path and not path and not GitRepo.is_valid_repo(refds_path):
             # nothing here, nothing to remove

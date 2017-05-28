@@ -183,7 +183,7 @@ class Add(Interface):
         if not path:
             raise InsufficientArgumentsError(
                 "insufficient information for adding: requires at least a path")
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         common_report = dict(action='add', logger=lgr, refds=refds_path)
 
         to_add = []

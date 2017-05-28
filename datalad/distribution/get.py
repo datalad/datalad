@@ -409,14 +409,13 @@ class Get(Interface):
         # 4. Shoot info of which handles to get in each subdataset to,
         #    git-annex, once at the very end
 
-        dataset_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         if not (dataset or path):
             raise InsufficientArgumentsError(
                 "Neither dataset nor target path(s) provided")
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
-            path = dataset_path
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+            path = refds_path
 
         # remember which results we already reported, to avoid duplicates
         yielded_ds = []
@@ -424,7 +423,7 @@ class Get(Interface):
         unavailable_paths = []
         for ap in AnnotatePaths.__call__(
                 path=path,
-                dataset=dataset,
+                dataset=refds_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 action='get',

@@ -27,6 +27,8 @@ from ..dochelpers import exc_str
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
+from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import resolve_path
 
 
 def get_api_name(intfspec):
@@ -349,6 +351,15 @@ class Interface(object):
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)
+
+    @classmethod
+    def get_refds_path(cls, dataset):
+        """Return a resolved reference dataset path from a `dataset` argument"""
+        # theoretically a dataset could come in as a relative path -> resolve
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if refds_path:
+            refds_path = resolve_path(refds_path)
+        return refds_path
 
     @staticmethod
     def _prep(

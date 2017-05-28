@@ -299,7 +299,7 @@ class AnnotatePaths(Interface):
         # everything in one big loop to be able too yield as fast a possible
         # without any precomputing for all paths
 
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         # prep common result props
         res_kwargs = dict(
             action=action if action else 'annotate_path',

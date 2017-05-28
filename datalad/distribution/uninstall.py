@@ -133,7 +133,7 @@ class Uninstall(Interface):
             path=path,
             dataset=dataset,
             recursive=recursive)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         res_kwargs = dict(action='uninstall', logger=lgr, refds=refds_path)
 
         if path_is_under(content_by_ds.keys()):

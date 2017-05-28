@@ -218,7 +218,7 @@ class Save(Interface):
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
             dataset = abspath(curdir)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
 
         to_process = []
         for ap in AnnotatePaths.__call__(

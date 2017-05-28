@@ -171,7 +171,7 @@ class Drop(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        refds_path = Interface.get_refds_path(dataset)
         res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
         for r in results_from_paths(
                 # justification for status:
