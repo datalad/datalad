@@ -24,7 +24,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
-from datalad.utils import knows_annex
+from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import require_dataset
@@ -91,28 +91,41 @@ class Update(Interface):
             reobtain_data=False):
         """
         """
-        if dataset and not path:
-            # act on the whole dataset if nothing else was specified
-            path = dataset.path if isinstance(dataset, Dataset) else dataset
+
         if not dataset and not path:
             # try to find a dataset in PWD
             dataset = require_dataset(
                 None, check_installed=True, purpose='updating')
-        content_by_ds, unavailable_paths = Interface._prep(
-            path=path,
-            dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
         refds_path = Interface.get_refds_path(dataset)
-        # report input paths that cannot be updates, because they are not there
-        for up in unavailable_paths:
-            yield get_status_dict('update', path=up, status='impossible',
-                                  logger=lgr, refds=refds_path)
+        if dataset and not path:
+            # act on the whole dataset if nothing else was specified
+            path = refds_path
 
-        for ds_path in content_by_ds:
-            ds = Dataset(ds_path)
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                path=path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='update',
+                unavailable_path_status='impossible',
+                nondataset_path_status='error',
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if not ap.get('type', None) == 'dataset':
+                ap.update(
+                    status='impossible',
+                    message="can only update datasets")
+                yield ap
+                continue
+            # this is definitely as dataset from here on
+            ds = Dataset(ap['path'])
             repo = ds.repo
             # prepare return value
+            # TODO reuse AP for return props
             res = get_status_dict('update', ds=ds, logger=lgr, refds=refds_path)
             # get all remotes which have references (would exclude
             # special remotes)
