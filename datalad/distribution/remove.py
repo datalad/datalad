@@ -184,6 +184,16 @@ class Remove(Interface):
                                 # but at the same time allow for continued processing
                                 uninstall_failed = True
                             yield r
+                    if ap['path'] == ds_path:
+                        # this is the top-level, "I know what I am doing"-uninstall
+                        for r in _uninstall_dataset(ds, check=check, has_super=False,
+                                                    **res_kwargs):
+                            if r['status'] in ('impossible', 'error'):
+                                # we need to inspect if something went wrong, in order
+                                # to prevent failure from removing a non-empty dir below,
+                                # but at the same time allow for continued processing
+                                uninstall_failed = True
+                            yield r
                     if not ap.get('raw_input', False):
                         # we only ever want to actually unregister subdatasets that
                         # were given explicitly
@@ -215,16 +225,6 @@ class Remove(Interface):
                         # doesn't exist on the filesystem anymore
                         ap['unavailable_path_status'] = ''
                         to_save.append(ap)
-                    if ap['path'] == ds_path:
-                        # this is the top-level, "I know what I am doing"-uninstall
-                        for r in _uninstall_dataset(ds, check=check, has_super=False,
-                                                    **res_kwargs):
-                            if r['status'] in ('impossible', 'error'):
-                                # we need to inspect if something went wrong, in order
-                                # to prevent failure from removing a non-empty dir below,
-                                # but at the same time allow for continued processing
-                                uninstall_failed = True
-                            yield r
                     if not uninstall_failed and exists(ap['path']):
                         # could be an empty dir in case an already uninstalled subdataset
                         # got removed
