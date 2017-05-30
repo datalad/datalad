@@ -145,6 +145,7 @@ install:
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
+  - pip install 'sphinx>=1.6.2'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # TMPDIRs
