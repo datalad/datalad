@@ -34,6 +34,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.utils import chpwd
+from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
 from datalad.utils import swallow_logs
 
@@ -362,3 +363,14 @@ def test_remove_recreation(path):
     ds = create(path)
     ok_clean_git(ds.path)
     ok_(ds.is_installed())
+
+
+@with_tempfile()
+def test_remove_nowhining(path):
+    # when removing a dataset under a dataset (but not a subdataset)
+    # should not provide a meaningless message that something was not right
+    ds = create(path)
+    # just install/clone inside of it
+    subds_path = _path_(path, 'subds')
+    install(subds_path, source=path)
+    remove(subds_path)  # should remove just fine
