@@ -21,9 +21,11 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import create_tree
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import annotate_paths
+from datalad.interface.annotate_paths import get_modified_subpaths
 from datalad.utils import chpwd
 
 
@@ -53,6 +55,19 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
             nodeds = Dataset(node_path).create(force=True)
             make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
     return parent
+
+
+@with_tempfile(mkdir=True)
+def test_invalid_call(path):
+    # inter-option dependencies
+    assert_raises(
+        ValueError,
+        annotate_paths, '',
+        force_subds_discovery=True, force_parentds_discovery=False)
+    # modified_since needs a actual dataset
+    assert_raises(
+        ValueError,
+        annotate_paths, dataset=path, modified_since="something")
 
 
 @with_tree(demo_hierarchy)
@@ -167,12 +182,6 @@ def test_annotate_paths(dspath, nodspath):
         after_res, 1, type='directory',
         path=before_res[0]['path'],
         parentds=before_res[0]['parentds'])
-    # which BTW has inter-option dependencies
-    assert_raises(
-        ValueError,
-        ds.annotate_paths, subdspath,
-        force_subds_discovery=True, force_parentds_discovery=False)
-
     # feed annotated paths into annotate_paths, it shouldn't change things
     # upon second run
     # datasets and file
@@ -188,5 +197,39 @@ def test_annotate_paths(dspath, nodspath):
     res_recursion_again = ds.annotate_paths(res, recursive=True)
     assert_result_count(res_recursion_again, 7)
     # doesn't change a thing
-    # TODO right now does change some props
     eq_(orig_res, res_recursion_again)
+
+
+@with_tree(demo_hierarchy['b'])
+def test_get_modified_subpaths(path):
+    ds = Dataset(path).create(force=True)
+    suba = ds.create('ba', force=True)
+    subb = ds.create('bb', force=True)
+    subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
+    ds.add('.', recursive=True)
+    ok_clean_git(path)
+
+    orig_base_commit = ds.repo.repo.commit()
+
+    aps = [dict(path=path)]
+    # nothing was modified compared to the status quo, output must be empty
+    eq_([], list(get_modified_subpaths(aps, ds, orig_base_commit)))
+
+    # modify one subdataset
+    added_path = opj(subsub.path, 'added')
+    create_tree(subsub.path, {'added': 'test'})
+    subsub.add('added')
+
+    # still nothing was modified compared to orig commit, because the base
+    # dataset does not have the recent change saved
+    eq_([], list(get_modified_subpaths(aps, ds, orig_base_commit)))
+
+    # no save uptop
+    ds.save()
+    # only the actually modified components per dataset are kept
+    mod = list(get_modified_subpaths(aps, ds, orig_base_commit))
+    #assert_result_count(mod, 1)
+    #assert_result_count(mod, 1, path=subb.path, type='dataset', parentds=ds.path)
+
+    # deal with removal (force insufiicient copies error)
+    #ds.remove(opj(subsub.path, 'file_bbaa'), check=False)

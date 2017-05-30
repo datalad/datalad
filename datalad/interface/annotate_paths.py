@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import textwrap
+import stat
 
 from os import curdir
 from os.path import join as opj
@@ -23,6 +24,7 @@ from os.path import pardir
 from os.path import normpath
 from os.path import sep as dirsep
 
+from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -30,8 +32,10 @@ from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 
@@ -160,6 +164,110 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
+def get_modified_subpaths(aps, refds, since):
+    """
+    Parameters
+    ----------
+    aps : list
+    refds : Dataset
+    since : str
+      Commit-ish
+    """
+    # TODO needs recursion limit
+    print("INFX", refds)
+    # NOTE this is implemented as a generator despite that fact that we need
+    # to sort through _all_ the inputs initially, diff'ing each involved
+    # dataset takes time that we can use to already act on intermediate
+    # result paths, without having to wait for 100% completion
+    if since is None:
+        # we want all, subds not matching the ref are assumed to have been
+        # sorted out before (e.g. one level up)
+        for r in aps:
+            yield r
+
+    # life is simple: we diff the base dataset, and kill anything that
+    # does not start with something that is in the diff
+    # we cannot really limit the diff paths easily because we might get
+    # or miss content (e.g. subdatasets) if we don't figure out which ones
+    # are known -- and we don't want that
+    try:
+        # TODO use GitRepo.diff() when available (gh-1217)
+        import pdb; pdb.set_trace()
+        diff = refds.repo.repo.commit().diff(since)
+    except GitCommandError as exc:
+        # could fail because `since` points to non existing location.
+        # Unfortunately there might be no meaningful message
+        # e.g. "fatal: ambiguous argument 'HEAD^': unknown revision or path not in the working tree"
+        # logged within this GitCommandError for some reason! So let's check
+        # that value of since post-error for being correct:
+        try:
+            refds.repo._git_custom_command(
+                [],
+                ['git', 'show', '--stat', since, '--'],
+                expect_stderr=True, expect_fail=True)
+            raise  # re-raise since our idea was incorrect
+        except CommandError as ce_exc:
+            if ce_exc.stderr.startswith('fatal: bad revision'):
+                raise ValueError(
+                    "Value since=%r is not valid. Git reports: %s" %
+                    (since, exc_str(ce_exc))
+                )
+            else:
+                raise  # re-raise
+
+    if not len(diff):
+        # nothing modified nothing to report
+        print("NODIFF")
+        return
+
+    # get the all modified submodules and the hexsha on record for the modification
+    # TODO what about subdataset mount points that are missing, test required
+    # TODO is it really the right hexsha (a_blob.hexsha?)
+    # TODO I somewhat doubt that this hexsha is what we want, don't we want the
+    # one commited and representing the sha of the commit that is on record in the
+    # parent?
+    mod_subs = dict(
+        (opj(refds.path, d.b_path), d.b_blob.hexsha if d.b_blob else None)
+        # now you are wondering about this test, heh? if you push the left kidney
+        # aside deep in the GitPython sources you can find this:
+        # "submodules are directories with link-status"
+        for d in diff if d.b_blob.mode == stat.S_IFDIR | stat.S_IFLNK)
+    # and the other modified paths from the diff
+    modified = {opj(refds.path, d.b_path) for d in diff}
+    #modified.difference_update(mod_subs.keys())
+
+    print("FUCKMOD", mod_subs)
+    print("FUCKNONMOD", modified)
+    # now we can grab the APs that are in this dataset and yield them
+    for ap in aps:
+        for m in modified:
+            if ap['path'] == m:
+                # is directly modified, yield input AP
+                yield ap
+                break
+            if m.startswith(_with_sep(ap['path'])):
+                # a modified path is underneath this AP
+                # yield the modified one instead
+                yield dict(
+                    path=m,
+                    type='dataset' if m in mod_subs else 'file',
+                    parentds=refds.path)
+                continue
+
+    # now for all submodules that were found modified
+    for sub in mod_subs:
+        # these AP match something inside this submodule
+        sub_aps = [ap for ap in aps if ap['path'].startswith(_with_sep(sub))]
+        if not sub_aps:
+            continue
+        for r in get_modified_subpaths(
+                sub_aps,
+                Dataset(sub),
+                # new "since" is modification SHA on record for the submodule
+                mod_subs[sub]):
+            yield r
+
+
 # "complete" list of recognized properties, there could be other ones
 # as any command can inject anything
 known_props = {
@@ -270,7 +378,15 @@ class AnnotatePaths(Interface):
             doc="""Flag to disable reporting type='dataset' for subdatasets, even
             when they are not installed, or their mount point directory doesn't
             exist. Disabling saves on command run time, if this information is
-            not needed."""))
+            not needed."""),
+        modified_since=Parameter(
+            args=("--modified-since",),
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""specifies a commit (treeish, tag, etc) in the base `dataset`
+            based on which to decide whether a requested path was modified.
+            Unmodified paths will not be annotated. If a requested path was not
+            modified but some content underneath it was, then the request is replaced
+            by the modified paths and those are annotated instead."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
@@ -285,7 +401,8 @@ class AnnotatePaths(Interface):
             unavailable_path_msg=None,
             nondataset_path_status='error',
             force_parentds_discovery=True,
-            force_subds_discovery=True):
+            force_subds_discovery=True,
+            modified_since=None):
         # upfront check for the fastest possible response
         if path is None and dataset is None:
             return
@@ -300,6 +417,10 @@ class AnnotatePaths(Interface):
         # without any precomputing for all paths
 
         refds_path = Interface.get_refds_path(dataset)
+        if modified_since and not GitRepo.is_valid_repo(refds_path):
+            raise ValueError(
+                "modification detection only works with a base dataset (non-given or found)")
+
         # prep common result props
         res_kwargs = dict(
             action=action if action else 'annotate_path',
@@ -341,6 +462,15 @@ class AnnotatePaths(Interface):
         # available in a single pass, at the cheapest possible cost
         reported_paths = {}
         requested_paths = assure_list(path)
+
+        if modified_since:
+            # replace the requested paths by those paths that were actually
+            # modified underneath or at a requested
+            requested_paths = get_modified_subpaths(
+                requested_paths,
+                refds=Dataset(refds_path),
+                modified_since=modified_since)
+
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplciates manually below via `reported_paths`
         for path in requested_paths:
