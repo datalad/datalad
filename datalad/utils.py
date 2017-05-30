@@ -1184,7 +1184,7 @@ def get_dataset_root(path):
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str
-    for trial in xrange(1, ntrials+1):
+    for trial in range(1, ntrials+1):
         try:
             return f(*args, **kwargs)
         except exception as exc:
