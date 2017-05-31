@@ -129,7 +129,7 @@ before_install:
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
-  - travis_retry sudo apt-get install eatmydata  # to speeup some installations
+  - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - sudo eatmydata tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
