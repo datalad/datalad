@@ -22,6 +22,8 @@ import shutil
 from importlib import import_module
 import os
 
+from six import text_type
+
 import datalad
 
 from datalad.cmdline import helpers
@@ -303,7 +305,7 @@ def main(args=None):
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
                 if exc.msg:
-                    os.write(2, exc.msg)
+                    os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
                     os.write(1, exc.stdout)
                 if exc.stderr:
