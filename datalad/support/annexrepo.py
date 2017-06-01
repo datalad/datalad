@@ -1199,6 +1199,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of dict
         """
 
+        if update and not git:
+            raise InsufficientArgumentsError("option 'update' requires 'git', too")
+
         if git_options:
             # TODO: note that below we would use 'add with --dry-run
             # so passed here options might need to be passed into it??
@@ -1266,11 +1269,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # to maintain behaviour similar to git
                     options += ['--include-dotfiles']
 
-            if self.is_direct_mode() and git and update:
-                # Fix for direct mode when adding to git with --update
+            if git and update:
+                # explicitly use git-add with --update instead of git-annex-add
                 # TODO: This might still need some work, when --update AND files
                 # are specified!
-                self.GIT_DIRECT_MODE_PROXY = True
+                if self.is_direct_mode():
+                    self.GIT_DIRECT_MODE_PROXY = True
                 try:
                     return_list = super(AnnexRepo, self).add(
                                                files,
@@ -1283,9 +1287,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                _datalad_msg=_datalad_msg,
                                                update=update)
                 finally:
-                    # don't accidentally cause other git calls to be done via
-                    # annex-proxy
-                    self.GIT_DIRECT_MODE_PROXY = False
+                    if self.is_direct_mode():
+                        # don't accidentally cause other git calls to be done
+                        # via annex-proxy
+                        self.GIT_DIRECT_MODE_PROXY = False
 
             else:
                 return_list = list(self._run_annex_command_json(
