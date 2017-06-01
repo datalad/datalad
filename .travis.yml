@@ -164,7 +164,8 @@ script:
   # Run tests
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
   # Generate documentation and run doctests
-  - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
+  # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
+  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest; fi
   # Run javascript tests
   - grunt test --verbose
   # Run doc examples if no spaces in the TMPDIR

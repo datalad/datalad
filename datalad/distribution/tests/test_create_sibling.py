@@ -268,6 +268,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # on elderly git we don't change receive setting
         ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
+        # it seems that with some recent git behavior has changed a bit
+        # and index might get touched
+        if _path_('.git/index') in modified_files:
+            ok_modified_files.add(_path_('.git/index'))
         assert_set_equal(modified_files, ok_modified_files)
 
 
