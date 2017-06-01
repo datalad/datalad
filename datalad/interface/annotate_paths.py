@@ -192,7 +192,6 @@ def get_modified_subpaths(aps, refds, since):
     # are known -- and we don't want that
     try:
         # TODO use GitRepo.diff() when available (gh-1217)
-        import pdb; pdb.set_trace()
         diff = refds.repo.repo.commit().diff(since)
     except GitCommandError as exc:
         # could fail because `since` points to non existing location.

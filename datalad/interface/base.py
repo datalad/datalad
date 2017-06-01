@@ -315,12 +315,16 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Remove', 'Get', 'Clone', 'Subdatasets', 'Install', 'Add', 'Siblings', 'AnnotatePaths'):
+        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Remove', 'Get', 'Clone', 'Subdatasets', 'Install', 'Add', 'Siblings', 'AnnotatePaths', 'Diff'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
-            kwargs['result_renderer'] = args.common_output_format
+            # allow commands to override the default, unless something other than
+            # default is requested
+            kwargs['result_renderer'] = \
+                args.common_output_format if args.common_output_format != 'default' \
+                else getattr(cls, 'result_renderer', args.common_output_format)
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = \

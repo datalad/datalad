@@ -67,9 +67,10 @@ Plumbing commands
 .. toctree::
    :maxdepth: 1
 
+   generated/man/datalad-annotate-paths
    generated/man/datalad-clone
    generated/man/datalad-create-test-dataset
+   generated/man/datalad-diff
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
    generated/man/datalad-subdatasets
-   generated/man/datalad-annotate-paths
