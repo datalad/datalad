@@ -710,8 +710,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # might be an annex in direct mode
             if git_options is None:
                 git_options = []
-            git_options.extend(['-c', 'core.bare=False'])
             # TODO: Apparently doesn't work with git 2.11.0
+            # Note: Since we are in a classmethod, GitRepo.get_toppath uses
+            # Runner directly instead of _git_custom_command, which is why the
+            # common mechanics for direct mode are not applied.
+            # This is why there is no solution for git 2.11 yet
+            git_options.extend(['-c', 'core.bare=False', '--work-tree=.'])
+
             toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
                                           git_options=git_options)
 
@@ -1266,15 +1271,21 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # TODO: This might still need some work, when --update AND files
                 # are specified!
                 self.GIT_DIRECT_MODE_PROXY = True
-                return_list = super(AnnexRepo, self).add(
-                                           files,
-                                           commit=commit,
-                                           msg=msg,
-                                           git=True,
-                                           git_options=git_options,
-                                           _datalad_msg=_datalad_msg,
-                                           update=update)
-                self.GIT_DIRECT_MODE_PROXY = False
+                try:
+                    return_list = super(AnnexRepo, self).add(
+                                               files,
+                                               # Note: committing is dealed with
+                                               # later on
+                                               commit=False,
+                                               msg=msg,
+                                               git=True,
+                                               git_options=git_options,
+                                               _datalad_msg=_datalad_msg,
+                                               update=update)
+                finally:
+                    # don't accidentally cause other git calls to be done via
+                    # annex-proxy
+                    self.GIT_DIRECT_MODE_PROXY = False
 
             else:
                 return_list = list(self._run_annex_command_json(
