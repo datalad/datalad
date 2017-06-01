@@ -22,6 +22,8 @@ import shutil
 from importlib import import_module
 import os
 
+from six import text_type
+
 import datalad
 
 from datalad.cmdline import helpers
@@ -338,6 +340,8 @@ def main(args=None):
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
+                if exc.msg:
+                    os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
                     os.write(1, exc.stdout.encode()) \
                         if hasattr(exc.stdout, 'encode')  \
@@ -346,7 +350,9 @@ def main(args=None):
                     os.write(2, exc.stderr.encode()) \
                         if hasattr(exc.stderr, 'encode')  \
                         else os.write(2, exc.stderr)
-                sys.exit(exc.code)
+                # We must not exit with 0 code if any exception got here but
+                # had no code defined
+                sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
