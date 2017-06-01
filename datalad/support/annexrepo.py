@@ -715,10 +715,59 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Runner directly instead of _git_custom_command, which is why the
             # common mechanics for direct mode are not applied.
             # This is why there is no solution for git 2.11 yet
-            git_options.extend(['-c', 'core.bare=False', '--work-tree=.'])
 
-            toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-                                          git_options=git_options)
+            # Note 2: Actually, the above issue is irrelevant. The git
+            # executable has no repository it is bound to, since it's the
+            # purpose of the call to find this repository. Therefore
+            # core.bare=False has no effect at all.
+
+            # Disabeld. See notes.
+            # git_options.extend(['-c', 'core.bare=False'])
+            # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+            #                               git_options=git_options)
+
+            # basically a copy of code in GitRepo.get_toppath
+            # except it uses 'git rev-parse --git-dir' as a workaround for
+            # direct mode:
+
+            from datalad.cmd import Runner
+            from os.path import dirname
+            from os.path import abspath
+            from os import pardir
+
+
+            cmd = ['git']
+            if git_options:
+                cmd.extend(git_options)
+            cmd += ["rev-parse", "--absolute-git-dir"]
+
+            try:
+                with swallow_logs():
+                    toppath, err = Runner().run(
+                        cmd,
+                        cwd=path,
+                        log_stdout=True, log_stderr=True,
+                        expect_fail=True, expect_stderr=True)
+                    toppath = toppath.rstrip('\n\r')
+            except CommandError:
+                return None
+            except OSError:
+                toppath = AnnexRepo.get_toppath(dirname(path),
+                                                follow_up=follow_up,
+                                                git_options=git_options)
+            # we got the git-dir. Assuming the root dir we are looking for is
+            # one level up:
+            toppath = normpath(opj(toppath, pardir))
+
+            if follow_up:
+                path_ = path
+                path_prev = ""
+                while path_ and path_ != path_prev:  # on top /.. = /
+                    if realpath(path_) == toppath:
+                        toppath = path_
+                        break
+                    path_prev = path_
+                    path_ = dirname(path_)
 
         return toppath
 
