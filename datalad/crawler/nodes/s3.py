@@ -69,6 +69,7 @@ class crawl_s3(object):
                  ncommits=None,
                  recursive=False,
                  versioned=True,
+                 exclude=None,
                  ):
         """
 
@@ -98,6 +99,9 @@ class crawl_s3(object):
         versioned: bool, optional
           Either to expect bucket to be versioned and demand all versions per
           prefix and generate versioned urls
+        exclude: str, optional
+          Regular expression to search to decide which files to exclude from
+          consideration
         """
         self.bucket = bucket
         if prefix and not prefix.endswith('/'):
@@ -113,6 +117,7 @@ class crawl_s3(object):
         self.ncommits = ncommits
         self.recursive = recursive
         self.versioned = versioned
+        self.exclude = exclude
 
     def __call__(self, data):
 
@@ -207,6 +212,9 @@ class crawl_s3(object):
             filename = e.name if e is not None else None
             if (self.strip_prefix and self.prefix):
                  filename = _strip_prefix(filename, self.prefix)
+            if filename and self.exclude and re.search(self.exclude, filename):
+                stats.skipped += 1
+                continue
 
             if filename in staged or e is None:
                 # we should finish this one and commit
