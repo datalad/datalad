@@ -144,7 +144,7 @@ class Diff(Interface):
     # TODO describe properties that are reported
 
     # make the custom renderer the default one, as the global default renderer
-    # does yield meaningful output for this command
+    # does not yield meaningful output for this command
     result_renderer = 'tailored'
 
     _params_ = dict(
