@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 import logging
 import re
 import shlex
+import os
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -514,7 +515,7 @@ class GitRepo(RepoInterface):
 
         self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self.repo = repo
+        self._repo = repo
         self._cfg = None
 
         if create and not GitRepo.is_valid_repo(path):
@@ -527,7 +528,7 @@ class GitRepo(RepoInterface):
                     "Initialize empty Git repository at '%s'%s",
                     path,
                     ' %s' % git_opts if git_opts else '')
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
                                                   mkdir=True,
                                                   odbt=default_git_odbt,
                                                   **git_opts)
@@ -535,9 +536,9 @@ class GitRepo(RepoInterface):
                 lgr.error(exc_str(e))
                 raise
         else:
-            if self.repo is None:
+            if self._repo is None:
                 try:
-                    self.repo = self.cmd_call_wrapper(Repo, path)
+                    self._repo = self.cmd_call_wrapper(Repo, path)
                     lgr.debug("Using existing Git repository at {0}".format(path))
                 except (GitCommandError,
                         NoSuchPathError,
@@ -548,8 +549,21 @@ class GitRepo(RepoInterface):
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
         # calls above from being actually executed (DryRunProtocol)
-        if self.repo is not None:
-            self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+        if self._repo is not None:
+            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
+        self.inode = os.stat(self.realpath).st_ino
+
+    @property
+    def repo(self):
+        # TODO: Make repo lazy loading to avoid building a GitPython Repo
+        # instance as long as we don't actually access it!
+        inode = os.stat(self.realpath).st_ino
+        if self.inode != inode:
+            # reset background processes invoked by GitPython:
+            self._repo.git.clear_cache()
+            self.inode = inode
+        return self._repo
 
     @classmethod
     def clone(cls, url, path, *args, **kwargs):
