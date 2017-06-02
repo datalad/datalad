@@ -202,7 +202,7 @@ def get_modified_subpaths(aps, refds, revision):
             recursive=False,
             return_type='generator',
             result_renderer=None):
-        if r['status'] != 'ok':
+        if r['status'] in ('impossible', 'error'):
             # something unexpected, tell daddy
             yield r
             continue
@@ -230,8 +230,8 @@ def get_modified_subpaths(aps, refds, revision):
 
     # now for all submodules that were found modified
     for sub in [m for m in modified if m.get('type', None) == 'dataset']:
-        # these AP match something inside this submodule
-        sub_aps = [ap for ap in aps if ap['path'].startswith(_with_sep(sub['path']))]
+        # these AP match something inside this submodule, or the whole submodule
+        sub_aps = [ap for ap in aps if _with_sep(ap['path']).startswith(_with_sep(sub['path']))]
         if not sub_aps:
             continue
         # we are interested in the modifications within this subdataset
@@ -384,7 +384,8 @@ class AnnotatePaths(Interface):
             modified_since=None):
         # upfront check for the fastest possible response
         if path is None and dataset is None:
-            return
+            # nothing given, try "here"
+            dataset = curdir
 
         if force_subds_discovery and not force_parentds_discovery:
             raise ValueError(
@@ -396,7 +397,7 @@ class AnnotatePaths(Interface):
         # without any precomputing for all paths
 
         refds_path = Interface.get_refds_path(dataset)
-        if modified_since and not GitRepo.is_valid_repo(refds_path):
+        if modified_since and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
             raise ValueError(
                 "modification detection only works with a base dataset (non-given or found)")
 
@@ -436,7 +437,6 @@ class AnnotatePaths(Interface):
                         path.append(r)
                     else:
                         yield r
-                return
             else:
                 # yield the dataset itself
                 r = get_status_dict(ds=refds, status='', **res_kwargs)
@@ -445,6 +445,7 @@ class AnnotatePaths(Interface):
                     path.append(r)
                 else:
                     yield r
+            if not modified_since:
                 return
 
         # goal: structure in a way that makes most information on any path
@@ -454,14 +455,14 @@ class AnnotatePaths(Interface):
 
         if modified_since:
             # replace the requested paths by those paths that were actually
-            # modified underneath or at a requested
+            # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
                 requested_paths,
                 refds=Dataset(refds_path),
-                modified_since=modified_since)
+                revision=modified_since)
 
         # do not loop over unique(), this could be a list of dicts
-        # we avoid duplciates manually below via `reported_paths`
+        # we avoid duplicates manually below via `reported_paths`
         for path in requested_paths:
             orig_path_request = path
             if isinstance(path, dict):
@@ -469,6 +470,8 @@ class AnnotatePaths(Interface):
                 path = path['path']
                 # use known info on this path
                 path_props = orig_path_request
+                # we need to mark our territory, who knows where this has been
+                path_props.update(res_kwargs)
             else:
                 # this is raw, resolve
                 path = resolve_path(path, refds_path)
@@ -608,6 +611,7 @@ class AnnotatePaths(Interface):
 
             if recursive:
                 containing_ds = Dataset(dspath) if containing_ds is None else containing_ds
+                rec_paths = []
                 for r in yield_recursive(containing_ds, path, action, recursion_limit):
                     # capture reported paths
                     r.update(res_kwargs)
@@ -615,6 +619,19 @@ class AnnotatePaths(Interface):
                         # avoid cruft
                         del r['refds']
                     reported_paths[r['path']] = r
-                    yield r
-
+                    if modified_since:
+                        # we cannot yield right away, maybe it wasn't modified
+                        rec_paths.append(r)
+                    else:
+                        yield r
+            if modified_since:
+                # replace the recursively discovered paths by those paths that
+                # were actually modified underneath or at a requested location
+                for r in get_modified_subpaths(
+                        rec_paths,
+                        refds=Dataset(refds_path),
+                        revision=modified_since):
+                    res = get_status_dict(**dict(r, **res_kwargs))
+                    reported_paths[res['path']] = res
+                    yield res
         return

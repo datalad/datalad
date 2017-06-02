@@ -79,11 +79,12 @@ def test_annotate_paths(dspath, nodspath):
     ok_clean_git(ds.path)
 
     with chpwd(dspath):
-        # even when ran in a dataset, this command doesn't discover
-        # any path without an input
-        eq_(annotate_paths(on_failure='ignore'), [])
-        # here is how this would go
+        # with and without an explicitly given path the result is almost the
+        # same inside a dataset
+        without_path = annotate_paths(on_failure='ignore')
         pwd_res = annotate_paths(path='.', on_failure='ignore')
+        assert_result_count(
+            without_path, 1, type='dataset', path=dspath)
         assert_result_count(
             pwd_res, 1, type='dataset', path=dspath, orig_request='.',
             raw_input=True)
