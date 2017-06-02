@@ -209,27 +209,95 @@ def test_get_modified_subpaths(path):
     ds.add('.', recursive=True)
     ok_clean_git(path)
 
-    orig_base_commit = ds.repo.repo.commit()
+    orig_base_commit = ds.repo.repo.commit().hexsha
 
-    aps = [dict(path=path)]
     # nothing was modified compared to the status quo, output must be empty
-    eq_([], list(get_modified_subpaths(aps, ds, orig_base_commit)))
+    eq_([],
+        list(get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds, orig_base_commit)))
 
     # modify one subdataset
-    added_path = opj(subsub.path, 'added')
     create_tree(subsub.path, {'added': 'test'})
     subsub.add('added')
 
-    # still nothing was modified compared to orig commit, because the base
-    # dataset does not have the recent change saved
-    eq_([], list(get_modified_subpaths(aps, ds, orig_base_commit)))
+    # it will replace the requested path with the path of the closest
+    # submodule that is modified
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds, orig_base_commit),
+        1,
+        type='dataset', path=subb.path)
 
-    # no save uptop
-    ds.save()
-    # only the actually modified components per dataset are kept
-    mod = list(get_modified_subpaths(aps, ds, orig_base_commit))
-    #assert_result_count(mod, 1)
-    #assert_result_count(mod, 1, path=subb.path, type='dataset', parentds=ds.path)
+    # make another one dirty
+    create_tree(suba.path, {'added': 'test'})
+
+    # now a single query path will result in the two modified subdatasets
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds, orig_base_commit),
+        2,
+        type='dataset')
+
+    # now save uptop, this will the new state of subb, but keep suba dirty
+    ds.save(subb.path, recursive=True)
+    # now if we ask for what was last saved, we only get the new state of subb
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds,
+            'HEAD~1..HEAD'),
+        1,
+        type='dataset', path=subb.path)
+    # comparing the working tree to head will the dirty suba instead
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds,
+            'HEAD'),
+        1,
+        type='dataset', path=suba.path)
+
+    # add/save everything, become clean
+    ds.add('.', recursive=True)
+    ok_clean_git(path)
+    # nothing is reported as modified
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds,
+            'HEAD'),
+        0)
+    # but looking all the way back, we find all changes
+    assert_result_count(
+        get_modified_subpaths(
+            [dict(path=ds.path)],
+            ds,
+            orig_base_commit),
+        2,
+        type='dataset')
+
+    # now we ask specifically for the file we added to subsub above
+    query = [dict(path=opj(subsub.path, 'added'))]
+    res = list(get_modified_subpaths(query, ds, orig_base_commit))
+    # we only get this one result back, and not all the submodule state changes
+    # that were also saved in the superdatasets
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1, type='file', path=opj(subsub.path, 'added'), state='added')
+    # but if we are only looking at the last saved change (suba), we will not
+    # find our query return something
+    res = get_modified_subpaths(query, ds, 'HEAD^')
+    assert_result_count(res, 0)
 
     # deal with removal (force insufiicient copies error)
-    #ds.remove(opj(subsub.path, 'file_bbaa'), check=False)
+    ds.remove(suba.path, check=False)
+    ok_clean_git(path)
+    res = list(get_modified_subpaths([dict(path=ds.path)], ds, 'HEAD~1..HEAD'))
+    # removed submodule + .gitmodules update
+    assert_result_count(res, 2)
+    assert_result_count(
+        res, 1,
+        type_src='dataset', path=suba.path)

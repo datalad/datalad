@@ -164,106 +164,86 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
-def get_modified_subpaths(aps, refds, since):
+def get_modified_subpaths(aps, refds, revision):
     """
     Parameters
     ----------
     aps : list
     refds : Dataset
-    since : str
+    revision : str
       Commit-ish
     """
     # TODO needs recursion limit
-    print("INFX", refds)
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
     # dataset takes time that we can use to already act on intermediate
     # result paths, without having to wait for 100% completion
-    if since is None:
+    if revision is None:
         # we want all, subds not matching the ref are assumed to have been
         # sorted out before (e.g. one level up)
         for r in aps:
             yield r
 
-    # life is simple: we diff the base dataset, and kill anything that
-    # does not start with something that is in the diff
-    # we cannot really limit the diff paths easily because we might get
-    # or miss content (e.g. subdatasets) if we don't figure out which ones
-    # are known -- and we don't want that
-    try:
-        # TODO use GitRepo.diff() when available (gh-1217)
-        diff = refds.repo.repo.commit().diff(since)
-    except GitCommandError as exc:
-        # could fail because `since` points to non existing location.
-        # Unfortunately there might be no meaningful message
-        # e.g. "fatal: ambiguous argument 'HEAD^': unknown revision or path not in the working tree"
-        # logged within this GitCommandError for some reason! So let's check
-        # that value of since post-error for being correct:
-        try:
-            refds.repo._git_custom_command(
-                [],
-                ['git', 'show', '--stat', since, '--'],
-                expect_stderr=True, expect_fail=True)
-            raise  # re-raise since our idea was incorrect
-        except CommandError as ce_exc:
-            if ce_exc.stderr.startswith('fatal: bad revision'):
-                raise ValueError(
-                    "Value since=%r is not valid. Git reports: %s" %
-                    (since, exc_str(ce_exc))
-                )
-            else:
-                raise  # re-raise
+    # life is simple: we diff the base dataset
+    modified = []
+    for r in refds.diff(
+            # we cannot really limit the diff paths easily because we might get
+            # or miss content (e.g. subdatasets) if we don't figure out which
+            # ones are known -- and we don't want that
+            path=None,
+            # `revision` can be anything that Git support for `diff`
+            revision=revision,
+            staged=False,
+            # we might want to consider putting 'untracked' here
+            # maybe that is a little faster, not tested yet
+            ignore_subdatasets='none',
+            # no recursion, we needs to update `revision` for every subdataset
+            # before we can `diff`
+            recursive=False,
+            return_type='generator',
+            result_renderer=None):
+        if r['status'] != 'ok':
+            # something unexpected, tell daddy
+            yield r
+            continue
+        r['status'] = ''
+        modified.append(r)
 
-    if not len(diff):
+    if not len(modified):
         # nothing modified nothing to report
-        print("NODIFF")
         return
 
-    # get the all modified submodules and the hexsha on record for the modification
-    # TODO what about subdataset mount points that are missing, test required
-    # TODO is it really the right hexsha (a_blob.hexsha?)
-    # TODO I somewhat doubt that this hexsha is what we want, don't we want the
-    # one commited and representing the sha of the commit that is on record in the
-    # parent?
-    mod_subs = dict(
-        (opj(refds.path, d.b_path), d.b_blob.hexsha if d.b_blob else None)
-        # now you are wondering about this test, heh? if you push the left kidney
-        # aside deep in the GitPython sources you can find this:
-        # "submodules are directories with link-status"
-        for d in diff if d.b_blob.mode == stat.S_IFDIR | stat.S_IFLNK)
-    # and the other modified paths from the diff
-    modified = {opj(refds.path, d.b_path) for d in diff}
-    #modified.difference_update(mod_subs.keys())
-
-    print("FUCKMOD", mod_subs)
-    print("FUCKNONMOD", modified)
     # now we can grab the APs that are in this dataset and yield them
     for ap in aps:
         for m in modified:
-            if ap['path'] == m:
+            if ap['path'] == m['path']:
                 # is directly modified, yield input AP
+                # but update with what we learned about the modification
+                ap.update(m)
                 yield ap
                 break
-            if m.startswith(_with_sep(ap['path'])):
+            if m['path'].startswith(_with_sep(ap['path'])):
                 # a modified path is underneath this AP
                 # yield the modified one instead
-                yield dict(
-                    path=m,
-                    type='dataset' if m in mod_subs else 'file',
-                    parentds=refds.path)
+                yield m
                 continue
 
     # now for all submodules that were found modified
-    for sub in mod_subs:
+    for sub in [m for m in modified if m.get('type', None) == 'dataset']:
         # these AP match something inside this submodule
-        sub_aps = [ap for ap in aps if ap['path'].startswith(_with_sep(sub))]
+        sub_aps = [ap for ap in aps if ap['path'].startswith(_with_sep(sub['path']))]
         if not sub_aps:
             continue
+        # we are interested in the modifications within this subdataset
+        # from the state we previously had on record, till the state
+        # we have in record now
+        diff_range = '{}..{}'.format(
+            sub['revision_src'] if sub['revision_src'] else '',
+            sub['revision'] if sub['revision'] else '')
         for r in get_modified_subpaths(
                 sub_aps,
-                Dataset(sub),
-                # new "since" is modification SHA on record for the submodule
-                mod_subs[sub]):
+                Dataset(sub['path']),
+                diff_range):
             yield r
 
 
