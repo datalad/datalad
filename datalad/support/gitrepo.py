@@ -870,10 +870,15 @@ class GitRepo(RepoInterface):
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-
-        if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
-            # flush possibly cached in GitPython changes to index:
-            self.repo.index.write()
+        # All GitPython commands should take care about flushing index
+        # whenever they modify it, so we would not care to do anything
+        # if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
+        #     # flush possibly cached in GitPython changes to index:
+        #     # if self.repo.git:
+        #     #     sys.stderr.write("CLEARING\n")
+        #     #     self.repo.git.clear_cache()
+        #     self.repo.index.write()
+        pass
 
     @staticmethod
     def _get_prefixed_commit_msg(msg):
