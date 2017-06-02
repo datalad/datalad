@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import textwrap
-import stat
 
 from os import curdir
 from os.path import join as opj
@@ -24,18 +23,14 @@ from os.path import pardir
 from os.path import normpath
 from os.path import sep as dirsep
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 
@@ -266,7 +261,7 @@ known_props = {
     'revision_descr': 'a human-readable description of `revision`',
     'refds': 'path of a reference/base dataset the annotated path is part of',
     'registered_subds': 'flag whether a dataset is known to be a true subdataset of `parentds`',
-    'source_url': 'URL a dataset was installed from', # unify with `url`?
+    'source_url': 'URL a dataset was installed from',  # unify with `url`?
     'staged': 'flag whether a path is known to be "staged" in its containing dataset',
     'state':
         'state indicator for a path in its containing dataset (clean, modified, absent (also for files), conflict)',
@@ -293,6 +288,10 @@ class AnnotatePaths(Interface):
     *Recognized path properties*
 
     {proplist}
+
+    In the case of enabled modification detection the results may contain
+    additional properties regarding the nature of the modification. See the
+    documentation of the `diff` command for details.
 
     """
     _docs_ = dict(
