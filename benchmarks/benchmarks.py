@@ -106,11 +106,7 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
     """
 
     timeout = 3600
-    # need to assure that we are working in a different repository now
-    # see https://github.com/datalad/datalad/issues/1512
-    # might not be sufficient due to side effects between tests and
-    # thus getting into the same situation
-    ds_count = 0
+
     def setup_cache(self):
         # creating in CWD so things get removed when ASV is done
         ds_path = create_test_dataset("testds1", spec='2/-2/-2', seed=0)[0]
@@ -132,13 +128,7 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
         tempdir = osp.dirname(tarfile_path)
         with tarfile.open(tarfile_path) as tar:
             tar.extractall(tempdir)
-
-        # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
-        epath = opj(tempdir, 'testds1')
-        epath_unique = epath + str(SuperdatasetsOperationsSuite.ds_count)
-        os.rename(epath, epath_unique)
-        SuperdatasetsOperationsSuite.ds_count += 1
-        self.ds = Dataset(epath_unique)
+        self.ds = Dataset(opj(tempdir, 'testds1'))
 
     def teardown(self, tarfile_path):
         for path in [self.ds.path + '_', self.ds.path]:
