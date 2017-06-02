@@ -67,7 +67,7 @@ def test_invalid_call(path):
     # modified_since needs a actual dataset
     assert_raises(
         ValueError,
-        annotate_paths, dataset=path, modified_since="something")
+        annotate_paths, dataset=path, modified="something")
 
 
 @with_tree(demo_hierarchy)
