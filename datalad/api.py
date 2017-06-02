@@ -67,7 +67,6 @@ def _generate_func_api():
             "returning the result"
         return call_
 
-    always_render = cfg.obtain('datalad.api.alwaysrender')
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance
@@ -89,13 +88,6 @@ def _generate_func_api():
                 )
                 # TODO: END to be removed, when @build_doc is applied everywhere
             globals()[api_name] = intf.__call__
-            # And the one with '_' suffix which would use cmdline results
-            # renderer
-            if hasattr(intf, 'result_renderer_cmdline'):
-                intf__ = call_gen(intf.__call__, intf.result_renderer_cmdline)
-                globals()[get_api_name(intfspec) + '_'] = intf__
-                if always_render:
-                    globals()[get_api_name(intfspec)] = intf__
 
 # Invoke above helper
 _generate_func_api()
