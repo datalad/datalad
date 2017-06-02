@@ -686,8 +686,9 @@ def eval_results(func):
             action_summary = {}
             for res in results:
                 actsum = action_summary.get(res['action'], {})
-                actsum[res['status']] = actsum.get(res['status'], 0) + 1
-                action_summary[res['action']] = actsum
+                if res['status']:
+                    actsum[res['status']] = actsum.get(res['status'], 0) + 1
+                    action_summary[res['action']] = actsum
                 ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
