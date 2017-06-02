@@ -14,7 +14,6 @@ import os
 import logging
 from collections import OrderedDict
 from os.path import join as opj
-from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import assert_in
