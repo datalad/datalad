@@ -357,14 +357,16 @@ class AnnotatePaths(Interface):
             when they are not installed, or their mount point directory doesn't
             exist. Disabling saves on command run time, if this information is
             not needed."""),
-        modified_since=Parameter(
-            args=("--modified-since",),
+        modified=Parameter(
+            args=("--modified",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""specifies a commit (treeish, tag, etc) in the base `dataset`
-            based on which to decide whether a requested path was modified.
-            Unmodified paths will not be annotated. If a requested path was not
-            modified but some content underneath it was, then the request is replaced
-            by the modified paths and those are annotated instead."""))
+            doc="""comparison reference specification for modification detection.
+            This can be (mostly) anything that `git diff` understands (commit,
+            treeish, tag, etc). See the documentation of `datalad diff --revision`
+            for details. Unmodified paths will not be annotated. If a requested
+            path was not modified but some content underneath it was, then the
+            request is replaced by the modified paths and those are annotated
+            instead."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
@@ -380,7 +382,7 @@ class AnnotatePaths(Interface):
             nondataset_path_status='error',
             force_parentds_discovery=True,
             force_subds_discovery=True,
-            modified_since=None):
+            modified=None):
         # upfront check for the fastest possible response
         if path is None and dataset is None:
             # nothing given, try "here"
@@ -396,7 +398,7 @@ class AnnotatePaths(Interface):
         # without any precomputing for all paths
 
         refds_path = Interface.get_refds_path(dataset)
-        if modified_since and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
+        if modified and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
             raise ValueError(
                 "modification detection only works with a base dataset (non-given or found)")
 
@@ -431,7 +433,7 @@ class AnnotatePaths(Interface):
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
                         del r['refds']
-                    if modified_since:
+                    if modified:
                         # we cannot yield right away, maybe it wasn't modified
                         path.append(r)
                     else:
@@ -439,12 +441,12 @@ class AnnotatePaths(Interface):
             else:
                 # yield the dataset itself
                 r = get_status_dict(ds=refds, status='', **res_kwargs)
-                if modified_since:
+                if modified:
                     # we cannot yield right away, maybe it wasn't modified
                     path.append(r)
                 else:
                     yield r
-            if not modified_since:
+            if not modified:
                 return
 
         # goal: structure in a way that makes most information on any path
@@ -452,13 +454,13 @@ class AnnotatePaths(Interface):
         reported_paths = {}
         requested_paths = assure_list(path)
 
-        if modified_since:
+        if modified:
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
                 requested_paths,
                 refds=Dataset(refds_path),
-                revision=modified_since)
+                revision=modified)
 
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
@@ -618,18 +620,18 @@ class AnnotatePaths(Interface):
                         # avoid cruft
                         del r['refds']
                     reported_paths[r['path']] = r
-                    if modified_since:
+                    if modified:
                         # we cannot yield right away, maybe it wasn't modified
                         rec_paths.append(r)
                     else:
                         yield r
-            if modified_since:
+            if modified:
                 # replace the recursively discovered paths by those paths that
                 # were actually modified underneath or at a requested location
                 for r in get_modified_subpaths(
                         rec_paths,
                         refds=Dataset(refds_path),
-                        revision=modified_since):
+                        revision=modified):
                     res = get_status_dict(**dict(r, **res_kwargs))
                     reported_paths[res['path']] = res
                     yield res
