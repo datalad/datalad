@@ -561,7 +561,7 @@ eval_defaults = dict(
     result_filter=None,
     result_renderer=None,
     result_xfm=None,
-    on_failure='stop',
+    on_failure='continue',
 )
 
 
