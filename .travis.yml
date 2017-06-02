@@ -129,7 +129,7 @@ before_install:
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
-  - travis_retry sudo apt-get install eatmydata  # to speeup some installations
+  - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - sudo eatmydata tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
   # Install grunt-cli
@@ -145,6 +145,7 @@ install:
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
+  - pip install 'sphinx>=1.6.2'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # TMPDIRs
@@ -163,7 +164,8 @@ script:
   # Run tests
   - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
   # Generate documentation and run doctests
-  - PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest
+  # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
+  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest; fi
   # Run javascript tests
   - grunt test --verbose
   # Run doc examples if no spaces in the TMPDIR
