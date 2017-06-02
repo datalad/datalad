@@ -109,15 +109,9 @@ def save_dataset(
                    lexists(ap['path'])]
 
     if to_gitadd or save_entire_ds:
-        # need to call GitRep.add() directly, as AnnexRepo.add() doesn't support
-        # git_options
-        GitRepo.add(
-            ds.repo,
-            to_gitadd,
-            git=True,
-            # this makes sure that pending submodule updates are added too
-            git_options=['--update'] if save_entire_ds else None,
-            commit=False)
+        ds.repo.add(to_gitadd, git=True, commit=False,
+                    # this makes sure that pending submodule updates are added too
+                    update=save_entire_ds)
     if to_annexadd:
         ds.repo.add(to_annexadd, commit=False)
 
