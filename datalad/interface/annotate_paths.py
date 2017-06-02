@@ -418,6 +418,7 @@ class AnnotatePaths(Interface):
                 return
 
             refds = Dataset(refds_path)
+            path = []
             if recursive:
                 # if we have nothing given, but need recursion, we need to feed
                 # the dataset path itself
@@ -430,11 +431,20 @@ class AnnotatePaths(Interface):
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
                         del r['refds']
-                    yield r
+                    if modified_since:
+                        # we cannot yield right away, maybe it wasn't modified
+                        path.append(r)
+                    else:
+                        yield r
                 return
             else:
                 # yield the dataset itself
-                yield get_status_dict(ds=refds, status='', **res_kwargs)
+                r = get_status_dict(ds=refds, status='', **res_kwargs)
+                if modified_since:
+                    # we cannot yield right away, maybe it wasn't modified
+                    path.append(r)
+                else:
+                    yield r
                 return
 
         # goal: structure in a way that makes most information on any path
