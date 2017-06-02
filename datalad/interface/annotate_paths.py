@@ -262,8 +262,8 @@ known_props = {
     'process_updated_only':
         'flag that only known dataset components are to be processed',
     'raw_input': 'flag whether this path was given as raw (non-annotated) input',
-    'reccommit': 'the recorded commit for a subdataset in a superdataset',
-    'reccommit_descr': 'a human-readable description of `reccommit`',
+    'revision': 'the recorded commit for a subdataset in a superdataset',
+    'revision_descr': 'a human-readable description of `revision`',
     'refds': 'path of a reference/base dataset the annotated path is part of',
     'registered_subds': 'flag whether a dataset is known to be a true subdataset of `parentds`',
     'source_url': 'URL a dataset was installed from', # unify with `url`?

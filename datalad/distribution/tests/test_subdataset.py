@@ -85,7 +85,7 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('url', 'state', 'reccommit', 'subds_name'):
+        for prop in ('url', 'state', 'revision', 'subds_name'):
             assert_in(prop, r)
 
     #

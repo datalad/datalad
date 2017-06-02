@@ -99,12 +99,12 @@ def _parse_git_submodules(dspath, recursive):
         sm['state'] = status_map[line[0]]
         props = submodule_full_props.match(line[1:])
         if props:
-            sm['reccommit'] = props.group(1)
+            sm['revision'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
-            sm['reccommit_descr'] = props.group(3)
+            sm['revision_descr'] = props.group(3)
         else:
             props = submodule_nodescribe_props.match(line[1:])
-            sm['reccommit'] = props.group(1)
+            sm['revision'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
         yield sm
 
@@ -126,14 +126,14 @@ class Subdatasets(Interface):
     "parentds"
         Absolute path to the parent dataset
 
-    "reccommit"
+    "revision"
         SHA1 of the subdataset commit recorded in the parent dataset
 
     "state"
         Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
         as reported by `git submodule`
 
-    "reccommit_descr"
+    "revision_descr"
         Output of `git describe` for the subdataset
 
     "url"
