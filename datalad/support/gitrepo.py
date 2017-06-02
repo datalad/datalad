@@ -552,13 +552,22 @@ class GitRepo(RepoInterface):
         if self._repo is not None:
             self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
-        self.inode = os.stat(self.realpath).st_ino
+        # with DryRunProtocol path might still not exist
+        if exists(self.realpath):
+            self.inode = os.stat(self.realpath).st_ino
+        else:
+            self.inode = None
 
     @property
     def repo(self):
         # TODO: Make repo lazy loading to avoid building a GitPython Repo
         # instance as long as we don't actually access it!
-        inode = os.stat(self.realpath).st_ino
+
+        # with DryRunProtocol path not exist
+        if exists(self.realpath):
+            inode = os.stat(self.realpath).st_ino
+        else:
+            inode = None
         if self.inode != inode:
             # reset background processes invoked by GitPython:
             self._repo.git.clear_cache()
