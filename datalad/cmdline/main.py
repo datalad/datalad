@@ -327,16 +327,14 @@ def main(args=None):
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
-                # we didn't get everything we wanted: still try to present what
-                # we got as usual, but exit with an error
-                try:
-                    if hasattr(cmdlineargs, 'result_renderer'):
-                        cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                except Exception as exc2:
-                    # could be anything really, but we do not want to blow
-                    #  loud in exception handler
-                    lgr.warning("Failed to render partial results: %s", exc_str(exc2))
-                lgr.error('could not perform all requested actions: %s',
+                # rendering for almost all commands now happens 'online'
+                # hence we are no longer attempting to render the actual
+                # results in an IncompleteResultsError, ubt rather trust that
+                # this happened before
+
+                # in general we do not want to see the error again, but
+                # present in debug output
+                lgr.debug('could not perform all requested actions: %s',
                           exc_str(exc))
                 sys.exit(1)
             except CommandError as exc:
