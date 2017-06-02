@@ -122,6 +122,8 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
             ap = dict(
                 mode_src=int(m_src, base=8),
                 mode=int(m_dst, base=8),
+                revision_src=sha_src if sha_src != '0' * 40 else None,
+                revision=sha_dst if sha_dst != '0' * 40 else None,
                 parentds=dspath)
             _translate_status(status, ap)
             _translate_type(ap['mode'], ap, 'type')
@@ -139,6 +141,8 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
 class Diff(Interface):
     """Report changes of dataset component between revisions.
     """
+    # TODO describe properties that are reported
+
     # make the custom renderer the default one, as the global default renderer
     # does yield meaningful output for this command
     result_renderer = 'tailored'
