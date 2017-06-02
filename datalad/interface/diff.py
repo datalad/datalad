@@ -53,7 +53,7 @@ state_map = {
 
 
 def _translate_status(label, ap):
-    if label[0] in ('C', 'R'):
+    if label[0] in ('C', 'R', 'M') and len(label) > 1:
         ap['perc_similarity'] = float(label[1:])
         label = label[0]
     ap['state'] = state_map[label]
