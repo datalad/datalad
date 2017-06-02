@@ -163,23 +163,31 @@ class Remove(Interface):
                 # remove submodule reference
                 submodule = [sm for sm in superds.repo.repo.submodules
                              if sm.path == subds_relpath]
-                # there can only be one!
-                assert len(submodule) == 1, \
-                    "Found multiple subdatasets with registered path {}:" \
-                    "{}{}{}There should be only one." \
-                    "".format(subds_relpath, os.linesep,
-                              submodule, os.linesep)
-                submodule = submodule[0]
-                submodule.remove()
+                if submodule:
+                    # there can only be one!
+                    assert len(submodule) == 1, \
+                        "Found multiple subdatasets with registered path {}:" \
+                        "{}{}{}There should be only one." \
+                        "".format(subds_relpath, os.linesep,
+                                  submodule, os.linesep)
+                    submodule = submodule[0]
+                    submodule.remove()
+
+                    # need to save changes to .gitmodules later
+                    content_by_ds[superds.path] = \
+                        content_by_ds.get(superds.path, []) \
+                        + [opj(superds.path, '.gitmodules'),
+                           ds_path]
+                else:
+                    lgr.info(
+                        "This dataset was not found to be a subdataset of %s",
+                        superds
+                    )
+
                 if exists(ds_path):
                     # could be an empty dir in case an already uninstalled subdataset
                     # got removed
                     os.rmdir(ds_path)
-                # need to save changes to .gitmodules later
-                content_by_ds[superds.path] = \
-                    content_by_ds.get(superds.path, []) \
-                    + [opj(superds.path, '.gitmodules'),
-                       ds_path]
             else:
                 if check and hasattr(ds.repo, 'drop'):
                     for r in _drop_files(ds, paths, check=True):
