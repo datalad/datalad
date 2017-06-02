@@ -98,7 +98,7 @@ class Parameter(object):
         if sdoc is not None:
             if sdoc[0] == '(' and sdoc[-1] == ')':
                 sdoc = sdoc[1:-1]
-            if self.cmd_kwargs.get('nargs', None) == '?' \
+            if self.cmd_kwargs.get('nargs', None) == '*' \
                     or self.cmd_kwargs.get('action', None) == 'append':
                 sdoc = 'list of {}'.format(sdoc)
             paramsdoc += " : %s" % sdoc

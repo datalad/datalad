@@ -240,6 +240,8 @@ class Dataset(object):
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
+        # TODO wipe this function out completely once we are comfortable
+        # with it. Internally we don't need or use it anymore.
         import inspect
         lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
         from datalad.api import subdatasets

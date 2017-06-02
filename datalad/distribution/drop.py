@@ -18,6 +18,7 @@ from os.path import join as opj
 from os.path import isabs
 from os.path import normpath
 
+from datalad.utils import assure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
@@ -28,6 +29,9 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
 from datalad.interface.results import results_from_paths
+from datalad.interface.results import annexjson2result
+from datalad.interface.results import success_status_map
+from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -52,25 +56,55 @@ check_argument = Parameter(
     dest='check')
 
 
-res_kwargs = dict(action='drop', logger=lgr)
+def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
+    """Helper to drop content in datasets.
 
-
-def _drop_files(ds, files, check, noannex_iserror=True):
+    Parameters
+    ----------
+    ds : Dataset
+    paths : path or list(path)
+      which content to drop
+    check : bool
+      whether to instruct annex to perform minimum copy availability
+      checks
+    noannex_iserror : bool
+      whether calling this function on a pur Git repo results in an
+      'impossible' or 'notneeded' result.
+    **kwargs
+      additional payload for the result dicts
+    """
+    if 'action' not in kwargs:
+        kwargs['action'] = 'drop'
+    # always need to make sure that we pass a list
+    # `normalize_paths` decorator will otherwise screw all logic below
+    paths = assure_list(paths)
     if not hasattr(ds.repo, 'drop'):
-        msg = 'no annex in dataset'
-        for f in files:
+        for p in paths:
             yield get_status_dict(
                 status='impossible' if noannex_iserror else 'notneeded',
-                path=f if isabs(f) else normpath(opj(ds.path, f)),
-                message=msg, **res_kwargs)
+                path=p if isabs(p) else normpath(opj(ds.path, p)),
+                message="no annex'ed content",
+                **kwargs)
         return
 
     opts = ['--force'] if not check else []
-    # TODO capture for which files it fails and report them properly
-    # not embedded in a command error
-    for f in ds.repo.drop(files, options=opts):
-        yield get_status_dict(
-            status='ok', path=opj(ds.path, f), **res_kwargs)
+    respath_by_status = {}
+    for res in ds.repo.drop(paths, options=opts):
+        res = annexjson2result(
+            # annex reports are always about files
+            res, ds, type_='file', **kwargs)
+        success = success_status_map[res['status']]
+        respath_by_status[success] = \
+            respath_by_status.get(success, []) + [res['path']]
+        yield res
+    # report on things requested that annex was silent about
+    for r in results_from_annex_noinfo(
+            ds, paths, respath_by_status,
+            dir_fail_msg='could not drop some content in %s %s',
+            noinfo_dir_msg='nothing to drop from %s',
+            noinfo_file_msg="no annex'ed content",
+            **kwargs):
+        yield r
 
 
 @build_doc
@@ -137,6 +171,8 @@ class Drop(Interface):
             dataset=dataset,
             recursive=recursive,
             recursion_limit=recursion_limit)
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
         for r in results_from_paths(
                 # justification for status:
                 # content need not be drop where there is none
@@ -153,6 +189,6 @@ class Drop(Interface):
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            for r in _drop_files(ds, paths, check=check):
+            for r in _drop_files(ds, paths, check=check, **res_kwargs):
                 yield r
         # there is nothing to save at the end
