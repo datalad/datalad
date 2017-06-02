@@ -195,9 +195,9 @@ class Diff(Interface):
     @datasetmethod(name='diff')
     @eval_results
     def __call__(
+            path=None,
             dataset=None,
             revision='HEAD',
-            path=None,
             staged=False,
             ignore_subdatasets='none',
             recursive=False,
@@ -261,7 +261,12 @@ class Diff(Interface):
             return
         path = relpath(res['path'], start=res['refds']) \
             if 'refds' in res else res['path']
-        ui.message('{}: {}{}'.format(
+        type_ = res.get('type', res.get('type_src', ''))
+        max_len = len('typechange(dataset)')
+        state_msg = '{}{}'.format(
             res['state'],
-            path,
-            '({})'.format(res['type']) if res['type'] else ''))
+            '({})'.format(type_ if type_ else ''))
+        ui.message('{fill}{state_msg}: {path}'.format(
+            fill=' ' * max(0, max_len - len(state_msg)),
+            state_msg=state_msg,
+            path=path))
