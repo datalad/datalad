@@ -210,6 +210,8 @@ def get_modified_subpaths(aps, refds, revision):
 
     # now we can grab the APs that are in this dataset and yield them
     for ap in aps:
+        # need to preserve pristine info first
+        ap = ap if isinstance(ap, dict) else rawpath2ap(ap, refds.path)
         for m in modified:
             if ap['path'] == m['path']:
                 # is directly modified, yield input AP
@@ -223,10 +225,16 @@ def get_modified_subpaths(aps, refds, revision):
                 yield m
                 continue
 
+    mod_subs = [m for m in modified if m.get('type', None) == 'dataset']
+    if not mod_subs:
+        return
+
+    aps = [ap if isinstance(ap, dict) else rawpath2ap(ap, refds.path) for ap in aps]
     # now for all submodules that were found modified
     for sub in [m for m in modified if m.get('type', None) == 'dataset']:
+        sub_path_ = _with_sep(sub['path'])
         # these AP match something inside this submodule, or the whole submodule
-        sub_aps = [ap for ap in aps if _with_sep(ap['path']).startswith(_with_sep(sub['path']))]
+        sub_aps = [ap for ap in aps if _with_sep(ap['path']).startswith(sub_path_)]
         if not sub_aps:
             continue
         # we are interested in the modifications within this subdataset
@@ -240,6 +248,24 @@ def get_modified_subpaths(aps, refds, revision):
                 Dataset(sub['path']),
                 diff_range):
             yield r
+
+
+def rawpath2ap(path, refds_path):
+    orig_path_request = path
+    # this is raw, resolve
+    path = resolve_path(path, refds_path)
+    # collect info on this path
+    path_props = dict(
+        path=path,
+        # path was requested as input, and not somehow discovered
+        raw_input=True,
+        # make a record of what actually came in, sorting into
+        # dataset might later need to distinguish between a path
+        # that pointed to a dataset as a whole vs. a path that
+        # pointed to the dataset's content -- just do not destroy
+        # any information on the way down
+        orig_request=orig_path_request)
+    return path_props
 
 
 # "complete" list of recognized properties, there could be other ones
@@ -465,28 +491,14 @@ class AnnotatePaths(Interface):
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
         for path in requested_paths:
-            orig_path_request = path
-            if isinstance(path, dict):
-                # this is an annotated path!
-                path = path['path']
-                # use known info on this path
-                path_props = orig_path_request
-                # we need to mark our territory, who knows where this has been
-                path_props.update(res_kwargs)
-            else:
-                # this is raw, resolve
-                path = resolve_path(path, refds_path)
-                # collect info on this path
-                path_props = dict(
-                    path=path,
-                    # path was requested as input, and not somehow discovered
-                    raw_input=True,
-                    # make a record of what actually came in, sorting into
-                    # dataset might later need to distinguish between a path
-                    # that pointed to a dataset as a whole vs. a path that
-                    # pointed to the dataset's content -- just do not destroy
-                    # any information on the way down
-                    orig_request=orig_path_request)
+            if not isinstance(path, dict):
+                path = rawpath2ap(path, refds_path)
+            # this is now an annotated path!
+            path_props = path
+            path = path['path']
+            # we need to mark our territory, who knows where this has been
+            path_props.update(res_kwargs)
+
             if path in reported_paths:
                 # we already recorded this path in the output
                 # this can happen, whenever `path` is a subdataset, that was
@@ -610,9 +622,9 @@ class AnnotatePaths(Interface):
             reported_paths[path] = res
             yield res
 
+            rec_paths = []
             if recursive:
                 containing_ds = Dataset(dspath) if containing_ds is None else containing_ds
-                rec_paths = []
                 for r in yield_recursive(containing_ds, path, action, recursion_limit):
                     # capture reported paths
                     r.update(res_kwargs)
