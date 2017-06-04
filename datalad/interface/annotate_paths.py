@@ -411,7 +411,9 @@ class AnnotatePaths(Interface):
             modified=None):
         # upfront check for the fastest possible response
         if path is None and dataset is None:
-            # nothing given, try "here"
+            # nothing given, try "here", but do not use `require_dataset`, as
+            # it will determine the root dataset of `curdir` and further down
+            # lead to path annotation of upstairs directories
             dataset = curdir
 
         if force_subds_discovery and not force_parentds_discovery:
