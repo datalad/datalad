@@ -434,7 +434,11 @@ class AnnotatePaths(Interface):
             refds=refds_path,
             logger=lgr)
 
-        if not path and refds_path:
+        # handle the case of recursion into a single dataset without any
+        # extra fancy processing first -- full recursion can be done
+        # faster than manual recursion, hence we gain quite some speed
+        # from these few lines of extra code
+        if not modified and not path and refds_path:
             if not GitRepo.is_valid_repo(refds_path):
                 yield get_status_dict(
                     # doesn't matter if the path is in another dataset
@@ -447,6 +451,10 @@ class AnnotatePaths(Interface):
 
             refds = Dataset(refds_path)
             path = []
+            # yield the dataset itself
+            r = get_status_dict(ds=refds, status='', **res_kwargs)
+            yield r
+
             if recursive:
                 # if we have nothing given, but need recursion, we need to feed
                 # the dataset path itself
@@ -459,21 +467,8 @@ class AnnotatePaths(Interface):
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
                         del r['refds']
-                    if modified:
-                        # we cannot yield right away, maybe it wasn't modified
-                        path.append(r)
-                    else:
-                        yield r
-            else:
-                # yield the dataset itself
-                r = get_status_dict(ds=refds, status='', **res_kwargs)
-                if modified:
-                    # we cannot yield right away, maybe it wasn't modified
-                    path.append(r)
-                else:
                     yield r
-            if not modified:
-                return
+            return
 
         # goal: structure in a way that makes most information on any path
         # available in a single pass, at the cheapest possible cost
@@ -484,7 +479,8 @@ class AnnotatePaths(Interface):
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
-                requested_paths,
+                # either the request, or the base dataset, if there was no request
+                requested_paths if requested_paths else [refds_path],
                 refds=Dataset(refds_path),
                 revision=modified)
 
@@ -637,7 +633,7 @@ class AnnotatePaths(Interface):
                         rec_paths.append(r)
                     else:
                         yield r
-            if modified:
+            if modified and rec_paths:
                 # replace the recursively discovered paths by those paths that
                 # were actually modified underneath or at a requested location
                 for r in get_modified_subpaths(

@@ -106,17 +106,18 @@ def test_annotate_paths(dspath, nodspath):
     # recursion with proper base dataset
     parentds = Dataset(opj(dspath, 'a'))
     base_res = parentds.annotate_paths(recursive=True)
-    # needs to find 'aa'
-    assert_result_count(base_res, 1)
+    # needs to find 'aa' and the base
+    assert_result_count(base_res, 2)
+    assert_result_count(base_res, 2, type='dataset')
     assert_result_count(
         base_res, 1, type='dataset', state='clean', parentds=parentds.path,
         path=opj(parentds.path, 'aa'), status='')
     # same recursion but without a base dataset
     res = annotate_paths(path=opj(dspath, 'a'), recursive=True)
-    # needs to find 'aa' again, but also 'a' now
+    # needs to find 'aa' and 'a' again
     assert_result_count(res, 2)
     eq_(res[-1],
-        {k: base_res[0][k] for k in base_res[0]
+        {k: base_res[-1][k] for k in base_res[-1]
          if k not in ('refds',)})
     assert_result_count(
         res, 1, type='dataset', status='',
