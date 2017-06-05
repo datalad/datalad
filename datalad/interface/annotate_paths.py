@@ -28,6 +28,7 @@ from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
@@ -187,7 +188,8 @@ def get_modified_subpaths(aps, refds, revision):
             # ones are known -- and we don't want that
             path=None,
             # `revision` can be anything that Git support for `diff`
-            revision=revision,
+            # `True` is code for diff without revision
+            revision=revision if revision is not True else None,
             staged=False,
             # we might want to consider putting 'untracked' here
             # maybe that is a little faster, not tested yet
@@ -385,14 +387,18 @@ class AnnotatePaths(Interface):
             not needed."""),
         modified=Parameter(
             args=("--modified",),
-            constraints=EnsureStr() | EnsureNone(),
+            nargs='?',
+            const=True,
+            constraints=EnsureStr() | EnsureBool() | EnsureNone(),
             doc="""comparison reference specification for modification detection.
             This can be (mostly) anything that `git diff` understands (commit,
             treeish, tag, etc). See the documentation of `datalad diff --revision`
             for details. Unmodified paths will not be annotated. If a requested
             path was not modified but some content underneath it was, then the
             request is replaced by the modified paths and those are annotated
-            instead."""))
+            instead. This option can be used without an argument to test against
+            changes that have been made, but have not yet been staged for a
+            commit."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
@@ -410,7 +416,7 @@ class AnnotatePaths(Interface):
             force_subds_discovery=True,
             modified=None):
         # upfront check for the fastest possible response
-        if path is None and dataset is None:
+        if not path and dataset is None:
             # nothing given, try "here", but do not use `require_dataset`, as
             # it will determine the root dataset of `curdir` and further down
             # lead to path annotation of upstairs directories
@@ -426,7 +432,7 @@ class AnnotatePaths(Interface):
         # without any precomputing for all paths
 
         refds_path = Interface.get_refds_path(dataset)
-        if modified and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
+        if modified is not None and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
             raise ValueError(
                 "modification detection only works with a base dataset (non-given or found)")
 
@@ -477,7 +483,7 @@ class AnnotatePaths(Interface):
         reported_paths = {}
         requested_paths = assure_list(path)
 
-        if modified:
+        if modified is not None:
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
@@ -630,12 +636,12 @@ class AnnotatePaths(Interface):
                         # avoid cruft
                         del r['refds']
                     reported_paths[r['path']] = r
-                    if modified:
+                    if modified is not None:
                         # we cannot yield right away, maybe it wasn't modified
                         rec_paths.append(r)
                     else:
                         yield r
-            if modified and rec_paths:
+            if modified is not None and rec_paths:
                 # replace the recursively discovered paths by those paths that
                 # were actually modified underneath or at a requested location
                 for r in get_modified_subpaths(
