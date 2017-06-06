@@ -2369,6 +2369,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                careless=True, files=None, proxy=False):
         self.precommit()
 
+        # Note: `proxy` is for explicitly enforcing the use of git-annex-proxy
+        #       in direct mode. This is needed in very special cases, which
+        #       might go away once we figured out a better way. In any case, it
+        #       should turn into something that is automatically considered and
+        #       not done by the caller of this method.
+
         if proxy:
             if not self.is_direct_mode():
                 raise CommandNotAvailableError(
@@ -2428,9 +2434,28 @@ class AnnexRepo(GitRepo, RepoInterface):
                     else:
                         raise
         else:
-            super(AnnexRepo, self).commit(msg, options,
-                                          _datalad_msg=_datalad_msg,
-                                          careless=careless, files=files)
+
+            # Note: See the note on `proxy` parameter at the top of this method.
+            #       Trying to automatically use git-annex-proxy, whenever we
+            #       fail to commit the usual way via options to git in direct
+            #       mode. In particular this can happen if sth was staged via
+            #       git-annex-proxy, which is needed for --update option for
+            #       example.
+
+            try:
+                super(AnnexRepo, self).commit(msg, options,
+                                              _datalad_msg=_datalad_msg,
+                                              careless=careless, files=files)
+            except CommandError as e:
+                if self.is_direct_mode() and \
+                   "fatal: This operation must be run in a work tree" in \
+                   e.stderr:
+                    lgr.debug("Commit failed. "
+                              "Trying to commit via git-annex-proxy.")
+                    self.commit(msg, options, _datalad_msg=_datalad_msg,
+                                careless=careless, files=files, proxy=True)
+                else:
+                    raise 
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
