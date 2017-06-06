@@ -343,7 +343,15 @@ class Add(Interface):
                 # queue for saving using the updated annotated path
                 ap['registered_subds'] = True
                 # I hope this is true in direct mode too
-                ap['staged'] = True
+                # TODO this is disabled, because in some circumstances
+                # staging just doesn't happen, and it is unclear when
+                # exactly -- the case that prompted disabling was a submodule
+                # that had no content except for other submodules was not staged,
+                # whereas another submodule on the same level in the same
+                # superdataset which also has one file in it was staged
+                # disable to work correctly, while paying a little bit of
+                # slow down
+                #ap['staged'] = True
                 to_save.append(ap)
                 _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it

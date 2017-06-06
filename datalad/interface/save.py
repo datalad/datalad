@@ -20,7 +20,6 @@ from os.path import lexists
 
 
 from datalad.utils import unique
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -85,6 +84,7 @@ def save_dataset(
     for ap in paths:
         if ap['path'] == ds.path:
             save_entire_ds = True
+            break
 
     # asking yourself why we need to `add` at all? For example, freshly
     # unlocked files in a v5 repo are listed as "typechange" and commit
@@ -295,12 +295,23 @@ class Save(Interface):
                 [],
                 discovered)
         # create a new minimally annotated path for each discovered dataset
+        discovered_added = set()
         for parentds in discovered:
             for subds in discovered[parentds]:
                 to_process.append(dict(
                     path=subds,
                     parentds=parentds,
                     type='dataset'))
+                discovered_added.add(subds)
+        # make sure we have an entry for each dataset, including those
+        # tha are just parents
+        for parentds in discovered:
+            if parentds not in discovered_added:
+                to_process.append(dict(
+                    path=parentds,
+                    type='dataset',
+                    # make sure we save content of superds later on
+                    process_content=True))
 
         # now re-annotate all paths, this will be fast for already annotated ones
         # and will amend the annotation for others, deduplication happens here too
