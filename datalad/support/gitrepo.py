@@ -41,7 +41,7 @@ from git.exc import InvalidGitRepositoryError
 from git.objects.blob import Blob
 
 from datalad import ssh_manager
-from datalad.cmd import Runner, GitRunner
+from datalad.cmd import GitRunner
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
@@ -725,7 +725,7 @@ class GitRepo(RepoInterface):
         cmd += ["rev-parse", "--show-toplevel"]
         try:
             with swallow_logs():
-                toppath, err = Runner().run(
+                toppath, err = GitRunner().run(
                     cmd,
                     cwd=path,
                     log_stdout=True, log_stderr=True,

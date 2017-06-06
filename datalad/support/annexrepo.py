@@ -730,20 +730,22 @@ class AnnexRepo(GitRepo, RepoInterface):
             # except it uses 'git rev-parse --git-dir' as a workaround for
             # direct mode:
 
-            from datalad.cmd import Runner
             from os.path import dirname
-            from os.path import abspath
             from os import pardir
-
 
             cmd = ['git']
             if git_options:
                 cmd.extend(git_options)
-            cmd += ["rev-parse", "--absolute-git-dir"]
+
+            cmd.append("rev-parse")
+            if external_versions['cmd:git'] >= '2.13.0':
+                cmd.append("--absolute-git-dir")
+            else:
+                cmd.append("--git-dir")
 
             try:
                 with swallow_logs():
-                    toppath, err = Runner().run(
+                    toppath, err = GitRunner().run(
                         cmd,
                         cwd=path,
                         log_stdout=True, log_stderr=True,
@@ -755,9 +757,14 @@ class AnnexRepo(GitRepo, RepoInterface):
                 toppath = AnnexRepo.get_toppath(dirname(path),
                                                 follow_up=follow_up,
                                                 git_options=git_options)
+
+            if external_versions['cmd:git'] < '2.13.0':
+                # we got a path relative to `path` instead of an absolute one
+                toppath = opj(path, toppath)
+
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:
-            toppath = normpath(opj(toppath, pardir))
+            toppath = realpath(normpath(opj(toppath, pardir)))
 
             if follow_up:
                 path_ = path
