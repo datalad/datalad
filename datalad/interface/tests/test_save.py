@@ -231,3 +231,16 @@ def test_recursive_save(path):
                  'savingtestmessage')
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'savingtestmessage')
+
+    # and if we try to save while being within that subsubds path
+    subsubds.unlock('testnew2')
+    create_tree(subsubds.path, {"testnew2": 'smth2'})
+
+    # trying to replicate https://github.com/datalad/datalad/issues/1540
+    subsubds.save(message="saving new changes", all_updated=True)  # no super
+    with chpwd(subds.path):
+        # no explicit dataset is provided by path is provided
+        save(files=['subsub'], message='saving sub', super_datasets=True)
+    # super should get it saved too
+    assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
+                 'saving sub')
