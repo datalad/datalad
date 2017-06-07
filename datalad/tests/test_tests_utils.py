@@ -142,7 +142,9 @@ def test_with_testrepos():
 def test_get_resolved_values():
     from datalad.tests.utils import _get_resolved_flavors
     flavors = ['networkish', 'local']
-    eq_(flavors, _get_resolved_flavors(flavors))
+    eq_(([] if os.environ.get('DATALAD_TESTS_NONETWORK') else ['networkish'])
+        + ['local'],
+        _get_resolved_flavors(flavors))
 
     with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
         eq_(_get_resolved_flavors(flavors), ['local'])
