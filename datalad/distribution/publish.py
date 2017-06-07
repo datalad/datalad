@@ -14,14 +14,12 @@ import logging
 import re
 from collections import OrderedDict
 from os.path import join as opj
-from os.path import sep as dirsep
 
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
-from datalad.interface.utils import filter_unmodified
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
@@ -557,22 +555,3 @@ class Publish(Interface):
                     force=force,
                     **res_kwargs):
                 yield r
-
-    @staticmethod
-    def result_renderer_cmdline(results, args):
-        from datalad.ui import ui
-        for res, res_label in zip(results, ('published', 'skipped')):
-            if not res:
-                if res_label == 'published':
-                    ui.message("Nothing was %s" % res_label)
-                continue
-            msg = "{n} {obj} {res_label}:\n".format(
-                obj='items were' if len(res) > 1 else 'item was',
-                n=len(res),
-                res_label=res_label)
-            for item in res:
-                if isinstance(item, Dataset):
-                    msg += "Dataset: %s\n" % item.path
-                else:
-                    msg += "File: %s\n" % item
-            ui.message(msg)
