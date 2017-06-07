@@ -64,14 +64,14 @@ matrix:
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
-    - _DATALAD_NONPR_ONLY=1
+
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
-    - _DATALAD_NONPR_ONLY=1
+
   - python: 2.7
     env:
     - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
