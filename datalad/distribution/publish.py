@@ -183,17 +183,14 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # if not annex_ignore:
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
-    knew_remote_uuid = None
-    if isinstance(ds.repo, AnnexRepo):
-        try:
-            ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
-            knew_remote_uuid = True
-        except CommandError:
-            knew_remote_uuid = False
-    if knew_remote_uuid:
+    knew_remote_uuid = True
+    if isinstance(ds.repo, AnnexRepo) and \
+            ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
         # we can try publishing right away
         for r in _publish_data():
             yield r
+    else:
+        knew_remote_uuid = False
 
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
