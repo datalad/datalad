@@ -478,24 +478,6 @@ class Interface(object):
         return content_by_ds, unavailable_paths
 
 
-def report_result_objects(cls, res, args, passive):
-    from datalad.ui import ui
-    from datalad.distribution.dataset import Dataset
-    if not res:
-        ui.message("Nothing was {}".format(passive))
-        return
-    msg = "{n} {obj} {action}:\n".format(
-        obj='items were' if len(res) > 1 else 'item was',
-        n=len(res),
-        action=passive)
-    for item in res:
-        if isinstance(item, Dataset):
-            msg += "Dataset: %s\n" % item.path
-        else:
-            msg += "File: %s\n" % item
-    ui.message(msg)
-
-
 def merge_allargs2kwargs(call, args, kwargs):
     """Generate a kwargs dict from a call signature and *args, **kwargs"""
     from inspect import getargspec
