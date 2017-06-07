@@ -268,7 +268,7 @@ def _add_remote(
             action='add-sibling',
             status='error',
             path=ds.path,
-            type_='sibling',
+            type='sibling',
             name=name,
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
@@ -295,7 +295,7 @@ def _configure_remote(
     result_props = dict(
         action='configure-sibling',
         path=ds.path,
-        type_='sibling',
+        type='sibling',
         name=name,
         **res_kwargs)
     # cheat and pretend it is all new and shiny already
@@ -352,7 +352,7 @@ def _query_remotes(
             action='query-sibling',
             status='ok',
             path=ds.path,
-            type_='sibling',
+            type='sibling',
             name=remote,
             **res_kwargs)
         # now pull everything we know out of the config
@@ -376,7 +376,7 @@ def _remove_remote(
     result_props = dict(
         action='remove-sibling',
         path=ds.path,
-        type_='sibling',
+        type='sibling',
         name=name,
         **res_kwargs)
     try:

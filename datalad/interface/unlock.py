@@ -113,7 +113,7 @@ class Unlock(Interface):
 
             for r in ds.repo.unlock(files):
                 yield get_status_dict(
-                    path=r, status='ok', type_='file', **res_kwargs)
+                    path=r, status='ok', type='file', **res_kwargs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):

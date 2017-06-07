@@ -19,19 +19,20 @@ from os.path import curdir
 from os.path import exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.distribution.dataset import Dataset, datasetmethod
 from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
 from datalad.distribution.drop import check_argument
+from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.utils import handle_dirty_datasets
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
 from datalad.utils import rmtree
 
 
@@ -126,67 +127,65 @@ class Uninstall(Interface):
             check=True,
             if_dirty='save-before'):
 
+        refds_path = Interface.get_refds_path(dataset)
+        res_kwargs = dict(action='uninstall', logger=lgr, refds=refds_path)
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
-            path = dataset.path if isinstance(dataset, Dataset) else dataset
-        content_by_ds, unavailable_paths = Interface._prep(
-            path=path,
-            dataset=dataset,
-            recursive=recursive)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        res_kwargs = dict(action='uninstall', logger=lgr, refds=refds_path)
+            path = refds_path
+        if not dataset and not path:
+            raise InsufficientArgumentsError(
+                "insufficient information for `uninstall`: requires at least a path or dataset")
 
-        if path_is_under(content_by_ds.keys()):
-            # behave like `rm` and refuse to remove where we are
-            raise ValueError(
-                "refusing to uninstall current or parent directory")
-        for r in results_from_paths(
+        to_uninstall = []
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                path=path,
+                recursive=recursive,
+                action='uninstall',
                 # justification for status:
-                # no dataset at target -> already uninstalled
-                # (or never was there)
-                unavailable_paths, status='notneeded',
-                message="path does not exist: %s",
-                **res_kwargs):
-            yield r
-        # upfront sanity and compliance checks
-        # check that we have no top-level datasets and not files to process
-        clean_content_by_ds = {}
-        for ds_path in content_by_ds:
-            ds = Dataset(ds_path)
-            paths = content_by_ds[ds_path]
-            args_ok = True
-            if ds_path not in paths:
-                yield get_status_dict(
-                    status='error',
-                    message=(
-                        "will not act on files at %s (consider the `drop` command)",
-                        paths),
-                    ds=ds,
-                    **res_kwargs)
-                args_ok = False
-            if not ds.get_superdataset(datalad_only=False, topmost=False):
-                yield get_status_dict(
-                    status='error',
-                    message=(
-                        "will not uninstall top-level dataset at %s (consider the `remove` command)",
-                        ds.path),
-                    ds=ds,
-                    **res_kwargs)
-                args_ok = False
-            if not args_ok:
+                # content need not be uninstalled where there is none
+                unavailable_path_status='notneeded',
+                nondataset_path_status='error',
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
                 continue
-            clean_content_by_ds[ds_path] = paths
-        content_by_ds = clean_content_by_ds
-
-        # TODO generator
-        # this should yield what it did
-        handle_dirty_datasets(
-            content_by_ds, mode=if_dirty, base=dataset)
+            # upfront sanity and compliance checks
+            # check that we have no top-level datasets and not files to process
+            if ap.get('type') == 'dataset' and \
+                    not ap.get('state', None) == 'absent' and \
+                    path_is_under(ap['path']):
+                ap.update(
+                    status='error',
+                    message="refusing to uninstall current or parent directory")
+                yield ap
+                continue
+            if not ap.get('type', None) == 'dataset':
+                ap.update(
+                    status='impossible',
+                    message="can only uninstall datasets (consider the `drop` command)")
+                yield ap
+                continue
+            # we only have dataset from here
+            if not ap.get('parentds', None):
+                ap.update(
+                    status='error',
+                    message="will not uninstall top-level dataset (consider `remove` command)")
+                yield ap
+                continue
+            if not ap['path'] == refds_path:
+                ap['process_content'] = True
+            to_uninstall.append(ap)
 
         # iterate over all datasets, starting at the bottom
         # to deinit contained submodules first
-        for ds_path in sorted(content_by_ds, reverse=True):
-            ds = Dataset(ds_path)
+        for ap in sorted(to_uninstall, key=lambda x: x['path'], reverse=True):
+            ds = Dataset(ap['path'])
+            # TODO generator
+            # this should yield what it did
+            handle_dirty_dataset(ds, mode=if_dirty)
             # we confirmed the super dataset presence above
             for r in _uninstall_dataset(ds, check=check, has_super=True,
                                         **res_kwargs):

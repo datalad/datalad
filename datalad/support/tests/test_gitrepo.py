@@ -977,7 +977,7 @@ def test_GitRepo_count_objects(repo_path):
 
 
 @with_tempfile
-def test_get_deleted(path):
+def test_get_missing(path):
     repo = GitRepo(path, create=True)
     os.makedirs(opj(path, 'deep'))
     with open(opj(path, 'test1'), 'w') as f:
@@ -987,9 +987,17 @@ def test_get_deleted(path):
     repo.add('.', commit=True)
     ok_clean_git(path, annex=False)
     os.unlink(opj(path, 'test1'))
-    eq_(repo.get_deleted_files(), ['test1'])
+    eq_(repo.get_missing_files(), ['test1'])
     rmtree(opj(path, 'deep'))
-    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
+    eq_(sorted(repo.get_missing_files()), [opj('deep', 'test2'), 'test1'])
+    # nothing is actually known to be deleted
+    eq_(repo.get_deleted_files(), [])
+    # do proper removal
+    repo.remove(opj(path, 'test1'))
+    # no longer missing
+    eq_(repo.get_missing_files(), [opj('deep', 'test2')])
+    # but deleted
+    eq_(repo.get_deleted_files(), ['test1'])
 
 
 @with_tempfile

@@ -45,7 +45,6 @@ except ImportError as exc:
     raise SkipTest(exc_str(exc))
 
 from datalad.api import search
-from datalad.api import search_
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -176,7 +175,7 @@ def test_aggregation(path):
     assert_true(success)
 
     # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data', all_updated=True)
+    ds.save('with aggregated meta data')
 
     # now clone the beast to simulate a new user installing an empty dataset
     clone = install(
@@ -235,18 +234,6 @@ def test_aggregation(path):
                      [opj(path, n) for n in names])
     # should yield (location, report) tuples
     assert_names(child_res, ['sub', 'sub/subsub'])
-
-    # result should be identical to invoking search from api
-    # and search_ should spit out locations out
-    with swallow_outputs() as cmo:
-        res = list(search_('child', dataset=clone))
-        assert_equal(res, child_res)
-        assert_in(res[0][0], cmo.out)
-    # and overarching search_ just for smoke testing of processing outputs
-    # and not puking (e.g. under PY3)
-    with swallow_outputs() as cmo:
-        assert list(search_('.', regex=True, dataset=clone))
-        assert cmo.out
 
     # test searching among specified properties only
     assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
@@ -331,7 +318,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
 
     # but search should not fail
     with swallow_outputs():
-        res1 = list(search_('.', regex=True, dataset=ds))
+        res1 = list(search('.', regex=True, dataset=ds))
     assert res1
 
     # and let's see now if we wouldn't fail if dataset is duplicate if we
@@ -340,7 +327,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
         source=subds.path, path="subds2",
         result_xfm='datasets', return_type='item-or-list')
     with swallow_outputs():
-        res2 = list(search_('.', regex=True, dataset=ds))
+        res2 = list(search('.', regex=True, dataset=ds))
     # TODO: bring back when meta data RF is complete with aggregate
     #assert_equal(len(res1) + 1, len(res2))
     #assert_equal(

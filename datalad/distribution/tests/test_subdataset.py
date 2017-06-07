@@ -10,6 +10,7 @@
 import os
 from os.path import join as opj
 from os.path import relpath
+from os.path import pardir
 
 from ..dataset import Dataset
 from datalad.api import subdatasets
@@ -35,7 +36,7 @@ def test_get_subdatasets(path):
     # obtain key subdataset, so all leave subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
     eq_(ds.subdatasets(result_xfm='relpaths'), ['sub dataset1'])
-    eq_([(r['parentpath'], r['path']) for r in ds.subdatasets()],
+    eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
         [(path, opj(path, 'sub dataset1'))])
     eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
         'sub dataset1',
@@ -58,7 +59,7 @@ def test_get_subdatasets(path):
         'sub dataset1',
         'sub dataset1/sub sub dataset1',
     ])
-    eq_([(relpath(r['parentpath'], start=ds.path), relpath(r['path'], start=ds.path))
+    eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
         (os.curdir, 'sub dataset1'),
         ('sub dataset1', 'sub dataset1/sub sub dataset1'),
@@ -84,5 +85,52 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('url', 'state', 'reccommit', 'name'):
+        for prop in ('url', 'state', 'revision', 'subds_name'):
             assert_in(prop, r)
+
+    #
+    # test --contains
+    #
+    target_sub = 'sub dataset1/sub sub dataset1/subm 1'
+    # give the closest direct subdataset
+    eq_(ds.subdatasets(contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1'])
+    # should find the actual subdataset trail
+    eq_(ds.subdatasets(recursive=True,
+                       contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1',
+         'sub dataset1/sub sub dataset1/subm 1'])
+    # doesn't affect recursion limit
+    eq_(ds.subdatasets(recursive=True, recursion_limit=2,
+                       contains=opj(target_sub, 'something_inside'),
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1'])
+    # for a direct dataset path match, return the matching dataset
+    eq_(ds.subdatasets(recursive=True,
+                       contains=target_sub,
+                       result_xfm='relpaths'),
+        ['sub dataset1',
+         'sub dataset1/sub sub dataset1',
+         'sub dataset1/sub sub dataset1/subm 1'])
+    # but it has to be a subdataset, otherwise no match
+    eq_(ds.subdatasets(contains=ds.path), [])
+    # which is what get_containing_subdataset() does
+    eq_(ds.subdatasets(recursive=True,
+                       contains=target_sub,
+                       result_xfm='paths')[-1],
+        ds.get_containing_subdataset(target_sub).path)
+    # no error if contains is bullshit
+    eq_(ds.subdatasets(recursive=True,
+                       contains='errrr_nope',
+                       result_xfm='paths'),
+        [])
+    # TODO maybe at a courtesy bullshit detector some day
+    eq_(ds.subdatasets(recursive=True,
+                       contains=opj(pardir, 'errrr_nope'),
+                       result_xfm='paths'),
+        [])
+

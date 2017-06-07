@@ -180,8 +180,12 @@ def setup_parser(
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
+                intf_doc = _intf.__doc__.strip()
+                if hasattr(_intf, '_docs_'):
+                    # expand docs
+                    intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__.strip())
+                    intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -325,16 +329,14 @@ def main(args=None):
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
-                # we didn't get everything we wanted: still try to present what
-                # we got as usual, but exit with an error
-                try:
-                    if hasattr(cmdlineargs, 'result_renderer'):
-                        cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                except Exception as exc2:
-                    # could be anything really, but we do not want to blow
-                    #  loud in exception handler
-                    lgr.warning("Failed to render partial results: %s", exc_str(exc2))
-                lgr.error('could not perform all requested actions: %s',
+                # rendering for almost all commands now happens 'online'
+                # hence we are no longer attempting to render the actual
+                # results in an IncompleteResultsError, ubt rather trust that
+                # this happened before
+
+                # in general we do not want to see the error again, but
+                # present in debug output
+                lgr.debug('could not perform all requested actions: %s',
                           exc_str(exc))
                 sys.exit(1)
             except CommandError as exc:

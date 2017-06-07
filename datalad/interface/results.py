@@ -37,8 +37,11 @@ success_status_map = {
 }
 
 
-def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
+def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
                     refds=None, status=None, message=None, **kwargs):
+    # `type` is intentionally not `type_` or something else, as a mismatch
+    # with the dict key 'type' causes too much pain all over the place
+    # just for not shadowing the builtin `type` in this function
     """Helper to create a result dictionary.
 
     Most arguments match their key in the resulting dict. Only exceptions are
@@ -57,31 +60,31 @@ def get_status_dict(action=None, ds=None, path=None, type_=None, logger=None,
     """
 
     d = {}
-    if action:
+    if action is not None:
         d['action'] = action
     if ds:
         d['path'] = ds.path
         d['type'] = 'dataset'
     # now overwrite automatic
-    if path:
+    if path is not None:
         d['path'] = path
-    if type_:
-        d['type'] = type_
+    if type:
+        d['type'] = type
     if logger:
         d['logger'] = logger
     if refds:
         d['refds'] = refds
-    if status:
+    if status is not None:
         # TODO check for known status label
         d['status'] = status
-    if message:
+    if message is not None:
         d['message'] = message
     if kwargs:
         d.update(kwargs)
     return d
 
 
-def results_from_paths(paths, action=None, type_=None, logger=None, refds=None,
+def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
                        status=None, message=None):
     """
     Helper to yield analog result dicts for each path in a sequence.
@@ -99,7 +102,7 @@ def results_from_paths(paths, action=None, type_=None, logger=None, refds=None,
     """
     for p in assure_list(paths):
         yield get_status_dict(
-            action, path=p, type_=type_, logger=logger, refds=refds,
+            action, path=p, type=type, logger=logger, refds=refds,
             status=status, message=(message, p) if '%s' in message else message)
 
 
@@ -329,7 +332,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 # after all we have the directory itself, but not
                 # (some) of its requested_paths
                 yield get_status_dict(
-                    status='impossible', type_='directory',
+                    status='impossible', type='directory',
                     message=(dir_fail_msg, p, failure_results),
                     **common_report)
             else:
@@ -340,13 +343,13 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 yield get_status_dict(
                     status='ok' if success_results else 'notneeded',
                     message=None if success_results else (noinfo_dir_msg, p),
-                    type_='directory', **common_report)
+                    type='directory', **common_report)
             continue
         else:
             # not a directory, and we have had no word from `git annex`,
             # yet no exception, hence the file was most probably
             # already in the desired state
             yield get_status_dict(
-                status='notneeded', type_='file',
+                status='notneeded', type='file',
                 message=noinfo_file_msg,
                 **common_report)

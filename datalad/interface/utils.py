@@ -22,7 +22,6 @@ from os import listdir
 from os import linesep
 from os.path import join as opj
 from os.path import lexists
-from os.path import isabs
 from os.path import isdir
 from os.path import dirname
 from os.path import relpath
@@ -36,18 +35,14 @@ import json
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import assure_list
-from datalad.utils import get_trace
-from datalad.utils import walk
 from datalad.utils import get_dataset_root
 from datalad.utils import unique
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.utils import get_git_dir
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
@@ -63,7 +58,6 @@ from .base import Interface
 from .base import update_docstring_with_parameters
 from .base import alter_interface_docs_for_api
 from .base import merge_allargs2kwargs
-from .results import get_status_dict
 from .results import known_result_xfms
 
 
@@ -108,52 +102,7 @@ def handle_dirty_dataset(ds, mode, msg=None):
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
         from datalad.interface.save import Save
-        Save.__call__(dataset=ds, message=msg, all_updated=True)
-    else:
-        raise ValueError("unknown if-dirty mode '{}'".format(mode))
-
-
-def handle_dirty_datasets(dpaths,
-                          mode,
-                          base=None,
-                          msg='[DATALAD] auto-saved changes'):
-    """Detect and treat unsaved changes as instructed by `mode`
-
-    Parameters
-    ----------
-    dpaths : sequence(path)
-      Dataset to be inspected. Does nothing if `None`.
-    mode : {'fail', 'ignore', 'save-before'}
-      How to act upon discovering unsaved changes.
-    base : path or None, optional
-      Path of a common super dataset that should also be handled.
-    msg : str
-      Custom message to use for a potential saved state.
-
-    Returns
-    -------
-    None
-    """
-    if mode == 'save-before':
-        # TODO GENERATOR
-        # new returns a generator and yields status dicts
-        list(save_dataset_hierarchy(
-            {d: [d] for d in dpaths},
-            base=base,
-            message=msg))
-    elif mode == 'ignore':
-        return
-    elif mode == 'fail':
-        for dpath in dpaths:
-            ds = Dataset(dpath)
-            if not ds.repo:
-                continue
-            ds.repo.precommit()
-            if ds.repo.is_dirty(index=True,
-                                untracked_files=True,
-                                submodules=True):
-                raise RuntimeError(
-                    'dataset {} has unsaved changes'.format(ds))
+        Save.__call__(dataset=ds, message=msg)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
@@ -185,292 +134,7 @@ def get_tree_roots(paths):
     return roots
 
 
-def sort_paths_into_subdatasets(spec):
-    """Sort a `content_by_ds` dict to have paths match their closest subdataset
-
-    This function is cheap and performs no Dataset requests (e.g. subdatasets)
-    or any kind of file-system lookups. Consequently, the result is not
-    guaranteed to yield a true path-subdataset assignment. It only works with
-    the dataset paths included in `spec`. Use a helper like
-    `discover_dataset_trace_to_targets()` to prepopulate the `spec` with all
-    relevant datasets to ensure a result that matches the content in the
-    filesystem.
-
-    Paths are sorted to be assigned to the dataset path key that is the
-    closest, but not identical match. Hence, if any path to a dataset
-    it contained in a `spec` value, it will not be re-assigned to its
-    "own" `spec`-key, but is assigned to its superdataset. However, see the
-    note below.
-
-    Note, no path is ever re-assigned upward in the hierarchy.
-
-    Parameters
-    ----------
-    spec : dict
-      content_by_ds style dict that will be sorted in-place.
-
-    Returns
-    -------
-    None
-    """
-    # paths to all known dataset, bottom-up
-    dspaths = [(p, _with_sep(p)) for p in sorted(spec.keys(), reverse=True)]
-    # loop over all dataset entries, top-down
-    for ds in sorted(spec):
-        # for each unique path recorded for this dataset check if it should
-        # move
-        paths = spec[ds]
-        filtered_paths = []
-        for path in unique(paths):
-            # check all other known dataset in bottom-up fashion
-            # for the first dataset that "contains" this path
-            moveto = None
-            for targetkey, targetpath in dspaths:
-                if targetkey == ds:
-                    # we reached the current dataset on out way up,
-                    # everything beyond here is already sorted
-                    break
-                if path.startswith(targetpath) and path != targetkey:
-                    # move path down
-                    moveto = targetkey
-                    # this was the longest match, done
-                    break
-            if moveto:
-                spec[moveto].append(path)
-            else:
-                filtered_paths.append(path)
-        # reassign what wasn't moved, deduplicated at the same time
-        spec[ds] = filtered_paths
-
-
-def save_dataset_hierarchy(
-        info,
-        base=None,
-        message='[DATALAD] saved changes',
-        version_tag=None):
-    """Save (disjoint) hierarchies of datasets.
-
-    Saving is done in an order that guarantees that all to be saved
-    datasets reflect any possible change of any other to be saved
-    subdataset, before they are saved themselves.
-
-    Parameters
-    ----------
-    info : dict
-      Absolute paths of datasets to be saved are the keys, and paths in each
-      dataset to be saved are the values
-    base : path or None, optional
-      Common super dataset that should also be saved.
-    message : str
-      Message to be used for saving individual datasets
-
-    Returns
-    -------
-    list
-      Instances of saved datasets, in the order in which they where saved.
-    """
-    if not isinstance(info, dict):
-        info = assure_list(info)
-        info = dict(zip(info, [[i] for i in info]))
-    dpaths = info.keys()
-    if base:
-        # just a convenience...
-        dpaths = assure_list(dpaths)
-        base_path = base.path if isinstance(base, Dataset) else base
-        if base_path not in dpaths:
-            dpaths.append(base_path)
-    # sort all datasets under their potential superdatasets
-    # start from the top to get all subdatasets down the line
-    # and collate them into as few superdatasets as possible
-    superdss = get_tree_roots(dpaths)
-    # for each "superdataset" check the tree of subdatasets and make sure
-    # we gather all datasets between the super and any subdataset
-    # so we can save them all bottom-up in order to be able to properly
-    # save the superdataset
-    for superds_path in superdss:
-        target_subs = superdss[superds_path]
-        # populate `info` with intermediate datasets
-        discover_dataset_trace_to_targets(
-            # from here
-            superds_path,
-            # to all
-            target_subs,
-            [], info)
-        # and now assign all paths to the corresponding datasets
-        sort_paths_into_subdatasets(info)
-    # iterate over all datasets, starting at the bottom
-    for dpath in sorted(info.keys(), reverse=True):
-        ds = Dataset(dpath)
-        res = get_status_dict('save', ds=ds, logger=lgr)
-        if not ds.is_installed():
-            res['status'] = 'impossible'
-            res['message'] = ('dataset %s is not installed', ds)
-            yield res
-            continue
-        saved_state = save_dataset(
-            ds,
-            info[dpath],
-            message=message,
-            version_tag=version_tag)
-        if saved_state:
-            res['status'] = 'ok'
-        else:
-            res['status'] = 'notneeded'
-        yield res
-
-
-def save_dataset(
-        ds,
-        paths=None,
-        message=None,
-        version_tag=None):
-    """Save changes in a single dataset.
-
-    Parameters
-    ----------
-    ds : Dataset
-      The dataset to be saved.
-    paths : list, optional
-      Paths to dataset components to be saved.
-    message: str, optional
-      (Commit) message to be attached to the saved state.
-    version_tag : str, optional
-      Tag to be assigned to the saved state.
-
-    Returns
-    -------
-    bool
-      Whether a new state was saved. If all to be saved content was unmodified
-      no new state will be saved.
-    """
-    # XXX paths must be in the given ds, no further sanity checks!
-
-    # make sure that all pending changes (batched annex operations, etc.)
-    # are actually reflected in Git
-    ds.repo.precommit()
-
-    # track what is to be committed, so it becomes
-    # possible to decide when/what to save further down
-    # and one level up
-    orig_hexsha = ds.repo.get_hexsha()
-
-    # always yields list; empty if None
-    files = list(
-        set(
-            [opj(ds.path, f) if not isabs(f) else f for f in assure_list(paths)]))
-
-    # try to consider existing and changed files, and prevent untracked
-    # files from being added
-    # XXX not acting upon untracked files would be very expensive, because
-    # I see no way to avoid using `add` below and git annex has no equivalent
-    # to git add's --update -- so for now don't bother
-    # XXX alternatively we could consider --no-ignore-removal to also
-    # have it delete any already vanished files
-    # asking yourself why we need to `add` at all? For example, freshly
-    # unlocked files in a v5 repo are listed as "typechange" and commit
-    # refuses to touch them without an explicit `add`
-    tostage = [f for f in files if lexists(f)]
-    if tostage:
-        lgr.debug('staging files for commit: %s', tostage)
-        if isinstance(ds.repo, AnnexRepo):
-            # to make this work without calling `git add` in addition,
-            # this needs git-annex v6.20161210 (see #1027)
-            ds.repo.add(tostage, commit=False)
-        else:
-            # --update will ignore any untracked files, sadly git-annex add
-            # above does not
-            # will complain about vanished files though, filter them here, but
-            # keep them for a later commit call
-            ds.repo.add(tostage, git_options=['--update'], commit=False)
-
-    _datalad_msg = False
-    if not message:
-        message = 'Recorded existing changes'
-        _datalad_msg = True
-
-    # TODO: Remove dirty() altogether???
-    if files or ds.repo.is_dirty(
-            index=True,
-            untracked_files=False,
-            submodules=True):
-        # either we have an explicit list of files, or we have something
-        # stages otherwise do not attempt to commit, as the underlying
-        # repo will happily commit any non-change
-        # not checking the working tree or untracked files should make this
-        # relatively cheap
-
-        # we will blindly call commit not knowing if there is anything to
-        # commit -- this is cheaper than to anticipate all possible ways
-        # a repo in whatever mode is dirty
-        ds.repo.commit(message, files=files, _datalad_msg=_datalad_msg,
-                       careless=True)
-
-    # MIH: let's tag even if there was nothing commit. I'd forget this
-    # option too often...
-    if version_tag:
-        ds.repo.tag(version_tag)
-
-    _was_modified = ds.repo.get_hexsha() != orig_hexsha
-
-    return ds.repo.repo.head.commit if _was_modified else None
-
-
-def amend_pathspec_with_superdatasets(spec, topmost=True, limit_single=False):
-    """Amend a path spec dictionary with entries for superdatasets
-
-    The result will be a superdataset entry (if a superdataset exists)
-    for each input dataset. This entry will (at least) contain the path
-    to the subdataset.
-
-    Parameters
-    ----------
-    spec : dict
-      Path spec
-    topmost : Dataset or bool
-      Flag whether to grab the immediate, or the top-most superdataset
-      for each entry, alternatively this can be a dataset instance
-      that is used as the topmost dataset.
-    limit_single : bool
-      If a `topmost` dataset is provided, and this flag is True, only
-      the given topmost dataset will be considered as superdataset. Any
-      datasets in the spec that are not underneath this dataset will
-      not have associated superdataset entries added to the spec.
-
-    Returns
-    -------
-    dict
-      Amended path spec dictionary
-    """
-    superdss = {}
-    for dpath in spec.keys():
-        superds = None
-        if isinstance(topmost, Dataset):
-            if limit_single and dpath == topmost.path:
-                # this is already the topmost, no further superdataset to
-                # consider
-                continue
-            if dpath.startswith(_with_sep(topmost.path)):
-                # the given topmost dataset is "above" the current
-                # datasets path
-                superds = topmost
-            elif limit_single:
-                continue
-        if not superds:
-            # grab the (topmost) superdataset
-            superds = Dataset(dpath).get_superdataset(
-                datalad_only=True, topmost=topmost)
-        if not superds:
-            continue
-        # register the subdatasets path in the spec of the superds
-        spaths = superdss.get(superds.path, [])
-        if not spaths:
-            spaths = spec.get(superds.path, [])
-        spaths.append(dpath)
-        superdss[superds.path] = spaths
-    spec.update(superdss)
-    return spec
-
-
+# TODO becomes obsolete with Interface._prep() gone
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.
@@ -512,7 +176,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     # paths that don't exist (yet)
     unavailable_paths = []
     nondataset_paths = []
-    for path in paths:
+    for path in unique(paths):
         if not lexists(path):
             # not there yet, impossible to say which ds it will actually
             # be in, if any
@@ -527,24 +191,55 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
             d = dirname(path)
             if not d:
                 d = curdir
-        # this could be `None` if there is no git repo
-        dspath = dir_lookup.get(d, get_dataset_root(d))
-        dir_lookup[d] = dspath
+
+        dspath = dir_lookup.get(d, None)
+        if dspath:
+            _ds_looked_up = True
+        else:
+            _ds_looked_up = False
+            # this could be `None` if there is no git repo
+            dspath = get_dataset_root(d)
+            dir_lookup[d] = dspath
+
         if not dspath:
             nondataset_paths.append(path)
             continue
+
+        if path in out.get(dspath, []):
+            # we already recorded this path in the output
+            # this can happen, whenever `path` is a subdataset, that was
+            # discovered via recursive processing of another path before
+            continue
+
         if isdir(path):
             ds = Dataset(dspath)
             # we need to doublecheck that this is not a subdataset mount
-            # point, in which case get_toppath() would point to the parent
-            smpath = ds.get_containing_subdataset(
-                path, recursion_limit=1).path
-            if smpath != dspath:
-                # fix entry
-                dir_lookup[d] = smpath
-                # submodule still needs to be obtained
-                unavailable_paths.append(path)
-                continue
+            # point, in which case get_dataset_root() would point to the parent.
+
+            if not _ds_looked_up:
+                # we didn't deal with it before
+
+                # TODO this is a slow call, no need for dedicated RF, will vanish
+                # together with the entire function
+                smpath = ds.get_containing_subdataset(
+                    path, recursion_limit=1).path
+                if smpath != dspath:
+                    # fix entry
+                    dir_lookup[d] = smpath
+                    # submodule still needs to be obtained
+                    unavailable_paths.append(path)
+                    continue
+            else:
+                # we figured out the dataset previously, so we can spare some
+                # effort by not calling ds.subdatasets or
+                # ds.get_containing_subdataset. Instead we just need
+                # get_dataset_root, which is cheaper
+                if dspath != get_dataset_root(dspath):
+                    # if the looked up path isn't the default value,
+                    # it's a 'fixed' entry for an unavailable dataset (see above)
+                    unavailable_paths.append(path)
+                    continue
+
             if recursive:
                 # make sure we get everything relevant in all _checked out_
                 # subdatasets, obtaining of previously unavailable subdataset
@@ -561,10 +256,12 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                         out[subdspath] = out.get(
                             subdspath,
                             [subdspath] if sub_paths else [])
+
         out[dspath] = out.get(dspath, []) + [path]
     return out, unavailable_paths, nondataset_paths
 
 
+# TODO becomes obsolete with Interface._prep() gone
 def get_normalized_path_arguments(paths, dataset=None, default=None):
     """Apply standard resolution to path arguments
 
@@ -631,58 +328,6 @@ def path_is_under(values, path=None):
     return False
 
 
-def get_dataset_directories(top, ignore_datalad=True):
-    """Return a list of directories in the same dataset under a given path
-
-    Parameters
-    ----------
-    top : path
-      Top-level path
-    ignore_datalad : bool
-      Whether to exlcude the '.datalad' directory of a dataset and its content
-      from the results.
-
-    Returns
-    -------
-    list
-      List of directories matching the top-level path, regardless of whether
-      these directories are known to Git (i.e. contain tracked files). The
-      list does not include the top-level path itself, but it does include
-      any subdataset mount points (regardless of whether the particular
-      subdatasets are installed or not).
-    """
-    def func(arg, top, names):
-        refpath, ignore, dirs = arg
-        legit_names = []
-        for n in names:
-            path = opj(top, n)
-            if not isdir(path) or path in ignore:
-                pass
-            elif path != refpath and GitRepo.is_valid_repo(path):
-                # mount point, keep but don't dive into
-                dirs.append(path)
-            else:
-                legit_names.append(n)
-                dirs.append(path)
-        names[:] = legit_names
-
-    # collects the directories
-    refpath = get_dataset_root(top)
-    if not refpath:
-        raise ValueError("`top` path {} is not in a dataset".format(top))
-    ignore = [opj(refpath, get_git_dir(refpath))]
-    if ignore_datalad:
-        ignore.append(opj(refpath, '.datalad'))
-    d = []
-    walk(top, func, (refpath, ignore, d))
-    return d
-
-
-# XXX the following present a different approach to
-# amend_pathspec_with_superdatasets() for discovering datasets between
-# processed ones and a base
-# let it simmer for a while and RF to use one or the other
-# this one here seems more leightweight and less convoluted
 def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
     """Discover the edges and nodes in a dataset tree to given target paths
 
@@ -719,6 +364,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
     if basepath in targetpaths:
         # found a targetpath, commit the trace
         for i, p in enumerate(current_trace[:-1]):
+            # TODO RF prepare proper annotated path dicts
             spec[p] = list(set(spec.get(p, []) + [current_trace[i + 1]]))
     if not isdir(basepath):
         # nothing underneath this one -> done
@@ -915,7 +561,7 @@ eval_defaults = dict(
     result_filter=None,
     result_renderer=None,
     result_xfm=None,
-    on_failure='stop',
+    on_failure='continue',
 )
 
 
@@ -960,6 +606,7 @@ def eval_results(func):
     """
 
     default_logchannels = {
+        '': 'debug',
         'ok': 'debug',
         'notneeded': 'debug',
         'impossible': 'warning',
@@ -989,7 +636,7 @@ def eval_results(func):
                 [i for i in mod.__dict__
                  if type(mod.__dict__[i]) == type and
                  issubclass(mod.__dict__[i], Interface) and
-                 i.lower() == wrapped.__module__.split('.')[-1]]
+                 i.lower() == wrapped.__module__.split('.')[-1].replace('_', '')]
             assert(len(command_class_names) == 1)
             command_class_name = command_class_names[0]
         else:
@@ -1039,8 +686,9 @@ def eval_results(func):
             action_summary = {}
             for res in results:
                 actsum = action_summary.get(res['action'], {})
-                actsum[res['status']] = actsum.get(res['status'], 0) + 1
-                action_summary[res['action']] = actsum
+                if res['status']:
+                    actsum[res['status']] = actsum.get(res['status'], 0) + 1
+                    action_summary[res['action']] = actsum
                 ## log message, if a logger was given
                 # remove logger instance from results, as it is no longer useful
                 # after logging was done, it isn't serializable, and generally
@@ -1051,9 +699,16 @@ def eval_results(func):
                     res_lgr = getattr(res_lgr, default_logchannels[res['status']])
                 if res_lgr and 'message' in res:
                     msg = res['message']
+                    msgargs = None
                     if isinstance(msg, tuple):
+                        msgargs = msg[1:]
+                        msg = msg[0]
+                    if 'path' in res:
+                        msg = '{} [{}({})]'.format(
+                            msg, res['action'], res['path'])
+                    if msgargs:
                         # support string expansion of logging to avoid runtime cost
-                        res_lgr(*msg)
+                        res_lgr(msg, *msgargs)
                     else:
                         res_lgr(msg)
                 ## error handling
@@ -1143,7 +798,7 @@ def eval_results(func):
     return eval_func(func)
 
 
-def build_doc(cls):
+def build_doc(cls, **kwargs):
     """Decorator to build docstrings for datalad commands
 
     It's intended to decorate the class, the __call__-method of which is the
@@ -1181,6 +836,11 @@ def build_doc(cls):
                 has_default=True),
             linesep)
 
+    cls_doc = cls.__doc__
+    if hasattr(cls, '_docs_'):
+        # expand docs
+        cls_doc = cls_doc.format(**cls._docs_)
+
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
         eval_doc += cls.__call__.__doc__
@@ -1189,7 +849,7 @@ def build_doc(cls):
     spec = getattr(cls, '_params_', dict())
     update_docstring_with_parameters(
         cls.__call__, spec,
-        prefix=alter_interface_docs_for_api(cls.__doc__),
+        prefix=alter_interface_docs_for_api(cls_doc),
         suffix=alter_interface_docs_for_api(eval_doc)
     )
 

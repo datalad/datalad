@@ -41,7 +41,7 @@ from git.exc import InvalidGitRepositoryError
 from git.objects.blob import Blob
 
 from datalad import ssh_manager
-from datalad.cmd import Runner, GitRunner
+from datalad.cmd import GitRunner
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
@@ -725,7 +725,7 @@ class GitRepo(RepoInterface):
         cmd += ["rev-parse", "--show-toplevel"]
         try:
             with swallow_logs():
-                toppath, err = Runner().run(
+                toppath, err = GitRunner().run(
                     cmd,
                     cwd=path,
                     log_stdout=True, log_stderr=True,
@@ -760,7 +760,8 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None,
+            _datalad_msg=False, update=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -775,7 +776,20 @@ class GitRepo(RepoInterface):
         git: bool
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
+        update: bool
+          --update option for git-add. From git's manpage:
+           Update the index just where it already has an entry matching
+           <pathspec>. This removes as well as modifies index entries to match
+           the working tree, but adds no new files.
+
+           If no <pathspec> is given when --update option is used, all tracked
+           files in the entire working tree are updated (old versions of Git
+           used to limit the update to the current directory and its
+           subdirectories).
         """
+
+        # TODO: git_options is used as options for the git-add here,
+        # instead of options to the git executable => rename for consistency
 
         # needs to be True - see docstring:
         assert(git)
@@ -783,12 +797,13 @@ class GitRepo(RepoInterface):
         files = _remove_empty_items(files)
         out = []
 
-        if files:
+        if files or git_options or update:
             try:
                 # without --verbose git 2.9.3  add does not return anything
                 add_out = self._git_custom_command(
                     files,
-                    ['git', 'add'] + assure_list(git_options) + ['--verbose']
+                    ['git', 'add'] + assure_list(git_options) +
+                    to_options(update=update) + ['--verbose']
                 )
                 # get all the entries
                 out = self._process_git_get_output(*add_out)
@@ -815,7 +830,7 @@ class GitRepo(RepoInterface):
                 raise
 
         else:
-            lgr.warning("add was called with empty file list.")
+            lgr.warning("add was called with empty file list and no options.")
 
         if commit:
             if msg is None:
@@ -1965,11 +1980,18 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (not yet staged)"""
+    def get_missing_files(self):
+        """Return a list of paths with missing files (and no staged deletion)"""
         return [f.split('\t')[1]
                 for f in self.repo.git.diff('--raw', '--name-status').split('\n')
                 if f.split('\t')[0] == 'D']
+
+    def get_deleted_files(self):
+        """Return a list of paths with deleted files (staged deletion)"""
+        return [f.split('\t')[1]
+                for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
+                if f.split('\t')[0] == 'D']
+
 
 # TODO
 # remove submodule
