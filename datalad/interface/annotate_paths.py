@@ -201,7 +201,9 @@ def get_modified_subpaths(aps, refds, revision):
             # before we can `diff`
             recursive=False,
             return_type='generator',
-            result_renderer=None):
+            result_renderer=None,
+            # need to be able to yield the errors
+            on_failure='ignore'):
         if r['status'] in ('impossible', 'error'):
             # something unexpected, tell daddy
             yield r
