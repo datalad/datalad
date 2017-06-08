@@ -92,7 +92,11 @@ def check_basic_xnat_interface(url, project, subjects):
 def test_basic_xnat_interface():
     for url, project, subjects in [
         ('https://www.nitrc.org/ir', 'fcon_1000', ['xnat_S00401', 'xnat_S00447']),
-        ('https://central.xnat.org', 'CENTRAL_OASIS_LONG', ['OAS2_0001', 'OAS2_0176'])
+        ('https://central.xnat.org', 'CENTRAL_OASIS_LONG', ['OAS2_0001', 'OAS2_0176']),
+    # Should have worked, since we do have authentication setup for hcp, but
+    # failed to authenticate.  need to recall what is differently done for the test
+    # since it downloads just fine using download-url
+    #   ('https://db.humanconnectome.org', 'HCP_Retest', ['103818', '149741']),
     ]:
         yield check_basic_xnat_interface, url, project, subjects
 
