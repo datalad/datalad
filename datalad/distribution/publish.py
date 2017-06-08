@@ -26,10 +26,10 @@ from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
 from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandError
 
 from datalad.utils import assure_list
 
@@ -138,6 +138,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # TODO: i think this whole modification detection could be done by path
     # annotation at the very beginning -- keeping it for now to not get too
     # dizzy in the forehead....
+    # TODO RF diff detection into a standalone helper
     if force:
         # if forced -- we push regardless if there are differences or not
         diff = True
@@ -279,7 +280,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
         yield get_status_dict(ds=ds, status='ok', **kwargs)
 
-    if knew_remote_uuid is False:
+    if isinstance(ds.repo, AnnexRepo) and knew_remote_uuid is False:
         # publish only after we tried to sync/push and if it was annex repo
         for r in _publish_data():
             yield r
@@ -414,6 +415,7 @@ class Publish(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
+            # TODO this description is no longer correct
             doc="path(s), that may point to file handle(s) to publish including "
                 "their actual content or to subdataset(s) to be published. If a "
                 "file handle is published with its data, this implicitly means "
@@ -427,6 +429,11 @@ class Publish(Interface):
             doc="""enforce doing publish activities (git push etc) regardless of
             the analysis if they seemed needed""",
             action='store_true'),
+        # TODO add option to decide what branch/repo to push
+        #transfer_data=Parameter(
+        #    args=("--transfer-data",),
+        #    doc="""ADDME""",
+        #    constraints=EnsureChoice('auto', 'none', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         git_opts=git_opts,
@@ -444,6 +451,7 @@ class Publish(Interface):
             since=None,
             missing='fail',
             force=False,
+            #transfer_data='auto',
             recursive=False,
             recursion_limit=None,
             git_opts=None,
