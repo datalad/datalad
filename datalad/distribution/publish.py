@@ -194,6 +194,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
+        yield get_status_dict(ds=ds, status='notneeded', **kwargs)
         # there could still be paths to be copied
     else:
         # publishing of `remote` might depend on publishing other
@@ -285,6 +286,8 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
 
 def _get_remote_info(ds_path, ds_remote_info, to, missing):
+    """Returns None if desired info was obtained, or a tuple (status, message)
+    if not"""
     ds = Dataset(ds_path)
     if to is None:
         # we need an upstream remote, if there's none given. We could
@@ -303,45 +306,41 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             elif len(cand_remotes) == 1:
                 track_remote = cand_remotes[0]
             else:
-                lgr.warning(
-                    'No target sibling configured for default publication, '
-                    'please specific via --to')
+                return ('impossible',
+                        'No target sibling configured for default publication, '
+                        'please specific via --to')
         if track_remote:
             ds_remote_info[ds_path] = dict(zip(
                 ('remote', 'refspec'),
                 (track_remote, track_refspec)))
         elif missing == 'skip':
-            lgr.warning(
-                'Cannot determine target sibling, skipping %s',
-                ds)
             ds_remote_info[ds_path] = None
+            return ('notneeded',
+                    'Cannot determine target sibling, skipping publication')
         else:
-            # we have no remote given and no upstream => fail
-            raise InsufficientArgumentsError(
-                'Cannot determine target sibling for %s' % (ds,))
+            # we have no remote given and no upstream
+            return 'error', 'Cannot determine a default target sibling for publication'
     elif to not in ds.repo.get_remotes():
         # unknown given remote
         if missing == 'skip':
-            lgr.warning(
-                "Unknown target sibling '%s', skipping %s",
-                to, ds)
             ds_remote_info[ds_path] = None
+            return ('notneeded',
+                    ("Unkown target sibling '%s', skipping publication", to))
         elif missing == 'inherit':
             superds = ds.get_superdataset()
             if not superds:
-                raise RuntimeError(
-                    "%s has no super-dataset to inherit settings for the remote %s"
-                    % (ds, to)
-                )
+                return ('error',
+                        ("No super-dataset to inherit settings for remote %s", to))
             # XXX due to difference between create-sibling and create-sibling-github
             # would not be as transparent to inherit for -github
             lgr.info("Will try to create a sibling inheriting settings from %s", superds)
             # XXX explicit None as sshurl for now
+            # TODO this is not good: e.g. #1344
             ds.create_sibling(None, name=to, inherit=True)
             ds_remote_info[ds_path] = {'remote': to}
         else:
-            raise ValueError(
-                "Unknown target sibling '%s' for %s" % (to, ds))
+            return ('error',
+                    ("Unknown target sibling '%s' for publication", to))
     else:
         # all good: remote given and is known
         ds_remote_info[ds_path] = {'remote': to}
@@ -495,19 +494,30 @@ class Publish(Interface):
                 # this is done
                 yield ap
                 continue
+            remote_info_result = None
             if ap.get('type', 'dataset') != 'dataset':
                 # for everything that is not a dataset get the remote info
                 # for the parent
                 parentds = ap.get('parentds', None)
                 if parentds and parentds not in ds_remote_info:
-                    _get_remote_info(
+                    remote_info_result = _get_remote_info(
                         parentds, ds_remote_info, to, missing)
-            if ap.get('type', None) == 'dataset' and \
-                    not ap.get('state', None) == 'absent':
+            else:
+                # this is a dataset
+                if ap.get('state', None) == 'absent':
+                    ap['status'] = 'impossible'
+                    ap['message'] = 'subdataset is not installed'
+                    yield ap
+                    continue
                 # if this is a dataset, get the remote info for itself
-                _get_remote_info(
+                remote_info_result = _get_remote_info(
                     ap['path'], ds_remote_info, to, missing)
                 ap['process_content'] = True
+            if remote_info_result is not None:
+                ap['status'] = remote_info_result[0]
+                ap['message'] = remote_info_result[1]
+                yield ap
+                continue
             to_process.append(ap)
 
         content_by_ds, ds_props, completed, nondataset_paths = \
@@ -534,12 +544,22 @@ class Publish(Interface):
         lgr.debug("Attempt to publish %i datasets", len(content_by_ds))
         for ds_path in content_by_ds:
             remote_info = ds_remote_info.get(ds_path, None)
-            if not remote_info:
-                # in case we are skipping
-                # TODO what are the conditions under which this could happen?
-                # TODO yield
-                lgr.debug("Skipping dataset at '%s'", ds_path)
-                continue
+            if remote_info is None:
+                # maybe this dataset wasn't annotated above, try to get info
+                remote_info_result = _get_remote_info(
+                    ds_path, ds_remote_info, to, missing)
+                if remote_info_result is not None:
+                    yield get_status_dict(
+                        type='dataset',
+                        path=ds_path,
+                        status=remote_info_result[0],
+                        message=remote_info_result[1],
+                        **res_kwargs)
+                    continue
+                # continue with freshly obtained info
+                remote_info = ds_remote_info[ds_path]
+                # condition above must catch all other cases
+                assert remote_info
             # and publish
             ds = Dataset(ds_path)
             for r in _publish_dataset(
