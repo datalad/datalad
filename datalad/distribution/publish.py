@@ -60,6 +60,17 @@ def _log_push_info(pi_list, log_nothing=True):
     return error
 
 
+def _push(ds, remote, things2push):
+    lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
+    _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
+    if things2push and ds.config.get('remote.{}.push'.format(remote)):
+        # since current state of ideas is to push both auto-detected and the
+        # possibly prescribed, if anything was, let's push again to possibly
+        # push left-over prescribed ones.
+        lgr.debug("Secondary push since custom push targets provided")
+        _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
+
+
 def has_diff(ds, refspec, remote, paths):
     if refspec:
         remote_branch_name = refspec[11:] \
@@ -267,14 +278,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         things2push = [t for t in things2push
                        if t not in ds.config.get('remote.{}.push'.format(remote), [])]
         # now we know what to push where
-        lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-        _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
-        if things2push and ds.config.get('remote.{}.push'.format(remote)):
-            # since current state of ideas is to push both auto-detected and the
-            # possibly prescribed, if anything was, let's push again to possibly
-            # push left-over prescribed ones.
-            lgr.debug("Secondary push since custom push targets provided")
-            _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
+        _push(ds, remote, things2push)
 
         yield get_status_dict(ds=ds, status='ok', **kwargs)
 
