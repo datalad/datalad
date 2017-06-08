@@ -101,7 +101,7 @@ def test_publish_simple(origin, src_path, dst_path):
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
     # and nothing is pushed
-    eq_(res, [])
+    assert_result_count(res, 1, status='notneeded')
 
     ok_clean_git(source.repo, annex=None)
     ok_clean_git(target, annex=None)
@@ -152,9 +152,13 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
-    with assert_raises(ValueError) as cm:
-        publish(dataset=source, to="target", recursive=True)
-    assert_in("Unknown target sibling 'target'", exc_str(cm.exception))
+    res = publish(dataset=source, to="target", recursive=True, on_failure='ignore')
+    assert_result_count(res, 3)
+    assert_result_count(
+        res, 1, status='ok', type='dataset', path=source.path)
+    assert_result_count(
+        res, 2, status='error',
+        message=("Unknown target sibling '%s' for publication", 'target'))
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
@@ -176,9 +180,10 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         )
 
     # testing result list
-    assert_status('ok', res)  # nothing failed/was skipped
-    for item in res:
-        eq_(item['type'], 'dataset')
+    # base dataset was already published above, notneeded again
+    assert_status(('ok', 'notneeded'), res)  # nothing failed
+    assert_result_count(
+        res, 3, type='dataset')
     eq_({r['path'] for r in res},
         {src_path, sub1.path, sub2.path})
 
@@ -197,19 +202,19 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
-    # TODO this should yield 'notneeded' instead
-    assert_result_count(res_, 0)
+    assert_result_count(
+        res_, 3, status='notneeded', type='dataset')
 
     # still nothing gets pushed, because origin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
-    # TODO this should yield 'notneeded' instead
-    assert_result_count(res_, 0)
+    assert_result_count(
+        res_, 3, status='notneeded', type='dataset')
 
     # and we should not fail if we run it from within the dataset
     with chpwd(source.path):
         res_ = publish(recursive=True, since='HEAD^')
-        # TODO this should yield 'notneeded' instead
-        assert_result_count(res_, 0)
+        assert_result_count(
+            res_, 3, status='notneeded', type='dataset')
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:
@@ -227,7 +232,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # note: will publish to origin here since that is what it tracks
     res_ = publish(dataset=source, recursive=True)
     # TODO this is what it is now, next comment has prev state and comment
-    assert_result_count(res_, 2)
+    assert_status(('ok', 'notneeded'), res)
+    assert_result_count(res_, 2, status='ok')
     assert_result_count(res_, 1, path=sub2.path, type='dataset')
     assert_result_count(res_, 1, path=opj(sub2.path, 'file.dat'), type='file')
     ## only updates published, i.e. just the subdataset, super wasn't altered
@@ -240,7 +246,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # TODO do without data transfer
     res_ = publish(dataset=source, to='target', recursive=True)
     # TODO this is what it is now, next comment has prev state
-    assert_result_count(res_, 2)
+    assert_status(('ok', 'notneeded'), res)
+    assert_result_count(res_, 2, status='ok')
     assert_result_count(res_, 1, path=sub2.path, type='dataset')
     assert_result_count(res_, 1, path=opj(sub2.path, 'file.dat'), type='file')
     #eq_(res_published, [Dataset(sub2.path)])
@@ -335,18 +342,21 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     res = publish(dataset=source, to="target", path=['.'])
     # there is nothing to publish on 2nd attempt
     #eq_(res, ([source, 'test-annex.dat'], []))
-    assert_result_count(res, 0)
+    assert_result_count(res, 1, status='notneeded')
 
     source.repo.fetch("target")
     import glob
-    res = publish(dataset=source, to="target", path=glob.glob1(source.path, '*'), result_xfm='paths')
+    res = publish(dataset=source, to="target", path=glob.glob1(source.path, '*'))
     # Note: This leads to recursive publishing, since expansion of '*'
     #       contains the submodules themselves in this setup
 
     # only the subdatasets, targets are plain git repos, hence
     # no file content is pushed, all content in super was pushed
     # before
-    eq_({sub1.path, sub2.path}, set(res))
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, status='ok', path=sub1.path)
+    assert_result_count(res, 1, status='ok', path=sub2.path)
+    assert_result_count(res, 1, status='notneeded', path=source.path)
 
 
 @skip_ssh
