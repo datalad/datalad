@@ -791,7 +791,6 @@ def skip_if_no_network(func=None):
 
     If not used as a decorator, and just a function, could be used at the module level
     """
-
     def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
             raise SkipTest("Skipping since no network settings")
@@ -799,6 +798,7 @@ def skip_if_no_network(func=None):
     if func:
         @wraps(func)
         def newfunc(*args, **kwargs):
+            import pdb; pdb.set_trace()
             check_and_raise()
             return func(*args, **kwargs)
         # right away tag the test as a networked test
