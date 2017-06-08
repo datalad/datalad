@@ -35,60 +35,10 @@ from datalad.utils import getpwd
 #track_num_objects.unit = "objects"
 
 
-class SuprocBenchmarks(object):
-    # manually set a number since otherwise takes way too long!
-    # see https://github.com/spacetelescope/asv/issues/497
-    #number = 3
-    # although seems to work ok with a timer which accounts for subprocesses
-
-    # custom timer so we account for subprocess times
-    timer = timeit.default_timer
+from .common import SuprocBenchmarks
 
 
-class StartupSuite(SuprocBenchmarks):
-    """
-    Benchmarks for datalad commands startup
-    """
-
-    def setup(self):
-        # we need to prepare/adjust PATH to point to installed datalad
-        # We will base it on taking sys.executable
-        python_path = osp.dirname(sys.executable)
-        self.env = os.environ.copy()
-        self.env['PATH'] = '%s:%s' % (python_path, self.env.get('PATH', ''))
-
-    def time_help_np(self):
-        call(["datalad", "--help-np"], env=self.env)
-        
-    def time_import(self):
-        call([sys.executable, "-c", "import datalad"])
-
-    def time_import_api(self):
-        call([sys.executable, "-c", "import datalad.api"])
-
-
-class RunnerSuite(SuprocBenchmarks):
-    """Some rudimentary tests to see if there is no major slowdowns from Runner
-    """
-
-    def setup(self):
-        from datalad.cmd import Runner
-        self.runner = Runner()
-        # older versions might not have it
-        try:
-            from datalad.cmd import GitRunner
-            self.git_runner = GitRunner()
-        except ImportError:
-            pass
-
-    def time_echo(self):
-        self.runner.run("echo")
-
-    def time_echo_gitrunner(self):
-        self.git_runner.run("echo")
-
-
-class CreateTestDatasetSuite(SuprocBenchmarks):
+class testds(SuprocBenchmarks):
     """
     Benchmarks to test on create_test_dataset how fast we could generate datasets
     """
@@ -100,7 +50,7 @@ class CreateTestDatasetSuite(SuprocBenchmarks):
         create_test_dataset(spec='2/2', seed=0)
 
 
-class SuperdatasetsOperationsSuite(SuprocBenchmarks):
+class supers(SuprocBenchmarks):
     """
     Benchmarks on common operations on collections of datasets using datalad API
     """
@@ -135,13 +85,15 @@ class SuperdatasetsOperationsSuite(SuprocBenchmarks):
 
         # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
         epath = opj(tempdir, 'testds1')
-        epath_unique = epath + str(SuperdatasetsOperationsSuite.ds_count)
+        epath_unique = epath + str(self.__class__.ds_count)
         os.rename(epath, epath_unique)
-        SuperdatasetsOperationsSuite.ds_count += 1
+        self.__class__.ds_count += 1
         self.ds = Dataset(epath_unique)
+        print("Finished setup for %s" % tempdir)
 
     def teardown(self, tarfile_path):
         for path in [self.ds.path + '_', self.ds.path]:
+            print("Cleaning up %s" % path)
             if osp.exists(path):
                 rmtree(path)
 
