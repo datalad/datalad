@@ -60,6 +60,40 @@ def _log_push_info(pi_list, log_nothing=True):
     return error
 
 
+def has_diff(ds, refspec, remote, paths):
+    if refspec:
+        remote_branch_name = refspec[11:] \
+            if refspec.startswith('refs/heads/') \
+            else refspec
+    else:
+        # there was no tracking branch, check the push target
+        remote_branch_name = ds.repo.get_active_branch()
+
+    if remote_branch_name not in ds.repo.repo.remotes[remote].refs:
+        lgr.debug("Remote '%s' has no branch matching %r. Will publish",
+                  remote, remote_branch_name)
+        # we don't have any remote state, need to push for sure
+        return True
+
+    lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
+              remote_branch_name, remote)
+    current_commit = ds.repo.repo.commit()
+    remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
+    within_ds_paths = [p['path'] for p in paths if p['path'] != ds.path]
+    if within_ds_paths:
+        # only if any paths is different from just the parentds root
+        # in which case we can do the same muuuch cheaper (see below)
+        # if there were custom paths, we will look at the diff
+        lgr.debug("Since paths provided, looking at diff")
+        return len(current_commit.diff(
+            remote_ref,
+            paths=within_ds_paths)) > 0
+    else:
+        # if commits differ at all
+        lgr.debug("Since no paths provided, comparing commits")
+        return current_commit != remote_ref.commit
+
+
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False,
                      **kwargs):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
@@ -138,45 +172,9 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # TODO: i think this whole modification detection could be done by path
     # annotation at the very beginning -- keeping it for now to not get too
     # dizzy in the forehead....
-    # TODO RF diff detection into a standalone helper
-    if force:
-        # if forced -- we push regardless if there are differences or not
-        diff = True
-    # check if there are any differences wrt the to-be-published paths,
-    # and if not skip this dataset
-    else:
-        if refspec:
-            remote_branch_name = refspec[11:] \
-                if refspec.startswith('refs/heads/') \
-                else refspec
-        else:
-            # there was no tracking branch, check the push target
-            remote_branch_name = ds.repo.get_active_branch()
 
-        if remote_branch_name in ds.repo.repo.remotes[remote].refs:
-            lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
-                      remote_branch_name, remote)
-            current_commit = ds.repo.repo.commit()
-            remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
-            within_ds_paths = [p['path'] for p in paths if p['path'] != ds.path]
-            if within_ds_paths:
-                # only if any paths is different from just the parentds root
-                # in which case we can do the same muuuch cheaper (see below)
-                # if there were custom paths, we will look at the diff
-                lgr.debug("Since paths provided, looking at diff")
-                diff = current_commit.diff(
-                    remote_ref,
-                    paths=within_ds_paths
-                )
-            else:
-                # if commits differ at all
-                lgr.debug("Since no paths provided, comparing commits")
-                diff = current_commit != remote_ref.commit
-        else:
-            lgr.debug("Remote '%s' has no branch matching %r. Will publish",
-                      remote, remote_branch_name)
-            # we don't have any remote state, need to push for sure
-            diff = True
+    # if forced -- we push regardless if there are differences or not
+    diff = True if force else has_diff(ds, refspec, remote, paths)
 
     # # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # annex_ignore = ds.config.getbool('remote.{}.annex-ignore'.format(remote), None)
