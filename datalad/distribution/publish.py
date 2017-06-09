@@ -106,69 +106,70 @@ def has_diff(ds, refspec, remote, paths):
         return current_commit != remote_ref.commit
 
 
+def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
+    remote_wanted = ds.repo.get_preferred_content('wanted', remote)
+    if (paths or annex_copy_options or remote_wanted) and \
+        isinstance(ds.repo, AnnexRepo) and not \
+        ds.config.getbool(
+            'remote.{}'.format(remote),
+            'annex-ignore',
+            False):
+        lgr.info("Publishing {0} data to {1}".format(ds, remote))
+        # overwrite URL with pushurl if any, reason:
+        # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
+        # Note: This shouldn't happen anymore with newly added siblings.
+        #       But for now check for it, until we agree on how to fix existing
+        #       ones.
+        pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
+        annexurl = ds.config.get('remote.{}.annexurl'.format(remote), None)
+        annex_copy_options_ = annex_copy_options or ''
+        if pushurl and not annexurl:
+            annex_copy_options_ += ' -c "remote.{}.annexurl={}"'.format(remote, pushurl)
+        if not paths and remote_wanted:
+            lgr.debug("Invoking copy --auto")
+            annex_copy_options_ += ' --auto'
+        # TODO:  we might need additional logic comparing the state of git-annex
+        # branch locally and on remote to see if information about the 'copy'
+        # was also reflected on the remote end
+        #git_annex_hexsha = ds.repo.get_hexsha('git-annex')
+        # TODO: must be the same if we merged/pushed before, if not -- skip
+        # special logic may be with a warning
+        if not force:
+            # if we force, we do not trust local knowledge and do the checks
+            annex_copy_options_ += ' --fast'
+        # TODO this things needs to return JSON
+        for r in ds.repo.copy_to(
+                files=[ap['path'] for ap in paths],
+                remote=remote,
+                options=annex_copy_options_):
+            # TODO RF to have copy_to() yield JSON and convert that one
+            # at present only the "good" results come out
+            yield get_status_dict(status='ok', path=opj(ds.path, r),
+                                  type='file', parentds=ds.path, **kwargs)
+        # if ds.submodules:
+        #     # NOTE: we might need to init them on the remote, but needs to
+        #     #  be done only if remote is sshurl and it is not bare there
+        #     #  (which I think we do not even support ATM)...
+        #     #  or we could do that in the hook, as it is done for now
+        #     #  (see create_sibling.py)
+        #     #
+        #     pass
+
+        # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
+        #     # there were changes which should be pushed
+        #     lgr.debug(
+        #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
+        #         remote)
+        #     ds.repo.fetch(remote=remote, refspec='git-annex')
+        #     ds.repo.merge_annex(remote)
+        #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
+
+
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False,
                      **kwargs):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
-
-    def _publish_data():
-        remote_wanted = ds.repo.get_preferred_content('wanted', remote)
-        if (paths or annex_copy_options or remote_wanted) and \
-            isinstance(ds.repo, AnnexRepo) and not \
-            ds.config.getbool(
-                'remote.{}'.format(remote),
-                'annex-ignore',
-                False):
-            lgr.info("Publishing {0} data to {1}".format(ds, remote))
-            # overwrite URL with pushurl if any, reason:
-            # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
-            # Note: This shouldn't happen anymore with newly added siblings.
-            #       But for now check for it, until we agree on how to fix existing
-            #       ones.
-            pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
-            annexurl = ds.config.get('remote.{}.annexurl'.format(remote), None)
-            annex_copy_options_ = annex_copy_options or ''
-            if pushurl and not annexurl:
-                annex_copy_options_ += ' -c "remote.{}.annexurl={}"'.format(remote, pushurl)
-            if not paths and remote_wanted:
-                lgr.debug("Invoking copy --auto")
-                annex_copy_options_ += ' --auto'
-            # TODO:  we might need additional logic comparing the state of git-annex
-            # branch locally and on remote to see if information about the 'copy'
-            # was also reflected on the remote end
-            #git_annex_hexsha = ds.repo.get_hexsha('git-annex')
-            # TODO: must be the same if we merged/pushed before, if not -- skip
-            # special logic may be with a warning
-            if not force:
-                # if we force, we do not trust local knowledge and do the checks
-                annex_copy_options_ += ' --fast'
-            # TODO this things needs to return JSON
-            for r in ds.repo.copy_to(
-                    files=[ap['path'] for ap in paths],
-                    remote=remote,
-                    options=annex_copy_options_):
-                # TODO RF to have copy_to() yield JSON and convert that one
-                # at present only the "good" results come out
-                yield get_status_dict(status='ok', path=opj(ds.path, r),
-                                      type='file', parentds=ds.path, **kwargs)
-            # if ds.submodules:
-            #     # NOTE: we might need to init them on the remote, but needs to
-            #     #  be done only if remote is sshurl and it is not bare there
-            #     #  (which I think we do not even support ATM)...
-            #     #  or we could do that in the hook, as it is done for now
-            #     #  (see create_sibling.py)
-            #     #
-            #     pass
-
-            # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
-            #     # there were changes which should be pushed
-            #     lgr.debug(
-            #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
-            #         remote)
-            #     ds.repo.fetch(remote=remote, refspec='git-annex')
-            #     ds.repo.merge_annex(remote)
-            #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
 
     # Plan:
     # 1. Check if there is anything to push, and if so
@@ -198,7 +199,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     if isinstance(ds.repo, AnnexRepo) and \
             ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
         # we can try publishing right away
-        for r in _publish_data():
+        for r in _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
             yield r
     else:
         knew_remote_uuid = False
@@ -284,7 +285,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
     if isinstance(ds.repo, AnnexRepo) and knew_remote_uuid is False:
         # publish only after we tried to sync/push and if it was annex repo
-        for r in _publish_data():
+        for r in _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
             yield r
 
 
