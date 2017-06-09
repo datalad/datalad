@@ -48,6 +48,7 @@ from ..utils import get_timestamp_suffix
 from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
+from ..utils import check_free_space
 
 from ..support.annexrepo import AnnexRepo
 
@@ -637,3 +638,19 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
         # non-dir paths are no issue
         eq_(get_dataset_root(fname), os.curdir)
+
+
+@with_tempfile(mkdir=True)
+def test_check_free_space(topdir):
+    from datalad.support.exceptions import OutOfSpaceError
+    # We would be golden whenever we would this much of free space
+    abit = 1
+    lots = 1024**10  # 1000000.0 YB
+
+    targetpath = _path_(topdir, "some/subdir/file")
+    check_free_space(targetpath, 0)     # we have that much
+    check_free_space(targetpath, abit)  # we have that much
+
+    with assert_raises(OutOfSpaceError) as exc:
+        check_free_space(targetpath, lots)
+        ok_startswith(str(exc), "For %s of size " % targetpath)
