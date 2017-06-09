@@ -209,11 +209,7 @@ class OutOfSpaceError(CommandError):
 
     def __init__(self, sizemore_msg=None, **kwargs):
         super(OutOfSpaceError, self).__init__(**kwargs)
-        self.sizemore_msg = sizemore_msg
-
-    def __str__(self):
-        super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
-        return "%s needs %s more" % (super_str, self.sizemore_msg)
+        self.msg = "%s needs %s more" % (self.msg or "free space", sizemore_msg)
 
 
 class RemoteNotAvailableError(CommandError):

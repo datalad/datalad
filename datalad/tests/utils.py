@@ -791,7 +791,6 @@ def skip_if_no_network(func=None):
 
     If not used as a decorator, and just a function, could be used at the module level
     """
-
     def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
             raise SkipTest("Skipping since no network settings")

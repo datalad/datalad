@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from humanize.filesize import naturalsize
+
 import collections
 import hashlib
 import re
@@ -966,6 +968,36 @@ def get_path_prefix(path, pwd=None):
     else:
         # just return absolute path
         return path
+
+
+def get_deepest_existing_dir(path):
+    """Return the deepest existing directory containing path"""
+    while path and not (os.path.exists(path) and os.path.isdir(path)):
+        path = os.path.dirname(path)
+    return path or "."
+
+
+def check_free_space(target_path, size):
+    """Check for free space to be available
+
+    Raises
+    ------
+    OutOfSpaceError
+    """
+    if not size:
+        return
+    fpath_dir = get_deepest_existing_dir(target_path)
+    statvfs = os.statvfs(fpath_dir)
+    # statvfs.f_frsize * statvfs.f_bfree  # Actual number of free bytes
+    free_bytes = statvfs.f_frsize * statvfs.f_bavail  # Number of free
+    # bytes that ordinary users
+    if free_bytes < size:
+        from datalad.support.exceptions import OutOfSpaceError
+        raise OutOfSpaceError(
+            msg="For %s of size %s: %s"
+                % (target_path, naturalsize(size), fpath_dir),
+            sizemore_msg="%s" % naturalsize(size - free_bytes)
+        )
 
 
 def knows_annex(path):

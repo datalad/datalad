@@ -94,8 +94,12 @@ class DownloadURL(Interface):
             # providers.get_provider(url).get_downloader(url).download(url, path=path)
             # for now -- via sugaring
             try:
-                downloaded_path = providers.download(url, path=path, overwrite=overwrite)
-                downloaded_paths.append(downloaded_path)
+                if path == '-':
+                    print(providers.fetch(url))
+                    # TODO: obtain also result headers and format appropriately
+                else:
+                    downloaded_path = providers.download(url, path=path, overwrite=overwrite)
+                    downloaded_paths.append(downloaded_path)
                 # ui.message("%s -> %s" % (url, downloaded_path))
             except Exception as e:
                 failed_urls.append(url)
