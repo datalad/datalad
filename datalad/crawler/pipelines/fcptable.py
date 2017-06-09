@@ -182,4 +182,7 @@ def pipeline(dataset):
         ],
         annex.switch_branch('master'),
         annex.finalize(cleanup=True),
+        # TODO:  if we want to aggregate with info for data from NITRC XNAT, we should
+        # match 'label' for each subject which is "Site_subjid".  subjid you can
+        # get from this dataset by globing I guess
     ]

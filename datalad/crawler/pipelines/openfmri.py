@@ -46,7 +46,7 @@ TOPURL = "https://openfmri.org/dataset/"
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
 def superdataset_pipeline(url=TOPURL, **kwargs):
-    annex = Annexificator(no_annex=True, allow_dirty=True)
+    annex = Annexificator(no_annex=True, allow_dirty=False)
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     return [
         crawl_url(url),
