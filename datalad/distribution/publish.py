@@ -590,8 +590,9 @@ class Publish(Interface):
                     ds,
                     remote=remote_info['remote'],
                     refspec=remote_info.get('refspec', None),
-                    # RF to take APs
-                    paths=content_by_ds[ds_path],
+                    # only send paths that were explicitly requested
+                    paths=[p for p in content_by_ds[ds_path]
+                           if p.get('raw_input', False)],
                     annex_copy_options=annex_copy_opts,
                     force=force,
                     **res_kwargs):
