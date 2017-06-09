@@ -55,6 +55,12 @@ lgr = getLogger('datalad.crawl.tests')
 
 from ..xnat import XNATServer
 from ..xnat import PROJECT_ACCESS_TYPES
+from ..xnat import superdataset_pipeline
+from ..xnat import pipeline
+from datalad.tests.utils import skip_if_no_network
+
+NITRC_IR = 'https://www.nitrc.org/ir'
+CENTRAL_XNAT = 'https://central.xnat.org'
 
 
 def check_basic_xnat_interface(url, project, subjects):
@@ -100,8 +106,8 @@ def check_basic_xnat_interface(url, project, subjects):
 @use_cassette('test_basic_xnat_interface')
 def test_basic_xnat_interface():
     for url, project, subjects in [
-        ('https://www.nitrc.org/ir', 'fcon_1000', ['xnat_S00401', 'xnat_S00447']),
-        ('https://central.xnat.org', 'CENTRAL_OASIS_LONG', ['OAS2_0001', 'OAS2_0176']),
+        (NITRC_IR, 'fcon_1000', ['xnat_S00401', 'xnat_S00447']),
+        (CENTRAL_XNAT, 'CENTRAL_OASIS_LONG', ['OAS2_0001', 'OAS2_0176']),
     # Should have worked, since we do have authentication setup for hcp, but
     # failed to authenticate.  need to recall what is differently done for the test
     # since it downloads just fine using download-url
@@ -110,12 +116,37 @@ def test_basic_xnat_interface():
         yield check_basic_xnat_interface, url, project, subjects
 
 
-# TODO: RF to provide a generic/reusable test for this
+@skip_if_no_network
 @with_tempfile(mkdir=True)
-def _test_smoke_pipelines(d):
+def test_smoke_pipelines(d):
     # Just to verify that we can correctly establish the pipelines
     AnnexRepo(d, create=True)
     with chpwd(d):
         with swallow_logs():
-            for p in [pipeline('bogus'), collection_pipeline()]:
+            for p in [superdataset_pipeline(NITRC_IR)]:
+                print p
                 ok_(len(p) > 1)
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_nitrc_superpipeline(outd):
+    with chpwd(outd):
+        pipeline = superdataset_pipeline(NITRC_IR)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+    # TODO: actual tests on what stuff was crawled
+test_nitrc_superpipeline.tags = ['integration']
+
+
+@skip_if_no_network
+@with_tempfile
+def test_nitrc_pipeline(outd):
+    from datalad.distribution.dataset import Dataset
+    ds = Dataset(outd).create()
+    with chpwd(outd):
+        out = run_pipeline(
+            pipeline(NITRC_IR, dataset='fcon_1000', subjects=['xnat_S00401'])
+        )
+    eq_(len(out), 1)
+test_nitrc_superpipeline.tags = ['integration']
