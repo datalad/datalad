@@ -32,6 +32,7 @@ from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
+from ...utils import check_free_space
 from ...utils import try_multiple
 from ...utils import assure_list
 
@@ -519,6 +520,10 @@ class Annexificator(object):
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(url_status.size), url))
             try:
+                if url_status and url_status.size:
+                    # Get amount of freespace on the drive, and fail early if
+                    # we have no sufficient storage
+                    check_free_space(fpath, url_status.size)
                 out_json = try_multiple(
                     6, AnnexBatchCommandError, 3,  # up to 3**5=243 sec sleep
                     _call,
