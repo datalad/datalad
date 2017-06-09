@@ -92,6 +92,7 @@ class XNATServer(object):
     def __call__(self, query,
                  format='json',
                  options=None,
+                 return_plain=False,
                  fields_to_check=DEFAULT_RESULT_FIELDS):
         query_url = "%s/%s" % (self.topurl, query)
         options = options or {}
@@ -104,6 +105,8 @@ class XNATServer(object):
         if format == 'json':
             j = json.loads(out)
             j = lower_case_the_keys(j)
+            if return_plain:
+                return j
             assert j.keys() == ['resultset']
             j = lower_case_the_keys(j['resultset'])
             if fields_to_check:
@@ -111,7 +114,7 @@ class XNATServer(object):
             return lower_case_the_keys(j['result'])
         return out
 
-    def get_projects(self, limit=None):
+    def get_projects(self, limit=None, asdict=True):
         """Get list of projects 
         
         Parameters
@@ -125,18 +128,18 @@ class XNATServer(object):
         if limit:
             kw['options'] = {"accessible": "true"} if limit else None
             kw['fields_to_check'] = DEFAULT_RESULT_FIELDS | {'title', 'xdat_user_id'}
-        out = list_to_dict(self('data/projects', **kw), 'id')
+        out = self('data/projects', **kw)
         if limit:
             limit = assure_list(limit)
             # double check that all the project_access thingies in the set which
             # we know
             assert all(p['project_access'] in PROJECT_ACCESS_TYPES
-                       for p in out.values())
-            out = {
-                pid: p for pid, p in out.items()
+                       for p in out)
+            out = [
+                p for p in out
                 if p['project_access'] in limit
-            }
-        return out
+            ]
+        return list_to_dict(out, 'id') if asdict else out
 
     def get_subjects(self, project):
         return list_to_dict(
@@ -166,7 +169,102 @@ class XNATServer(object):
         return files
 
     def get_all_files_for_project(self, project, subjects=None, experiments=None):
+        # TODO: grow the dictionary with all the information about subject/experiment/file
+        # to be yielded so we could tune up file name anyway we like
         for subject in (subjects or self.get_subjects(project)):
             for experiment in (experiments or self.get_experiments(project, subject)):
                 for file_ in self.get_files(project, subject, experiment):
                     yield file_
+
+
+# define a pipeline factory function accepting necessary keyword arguments
+# Should have no strictly positional arguments
+def superdataset_pipeline(url, limit=None, **kwargs):
+    """
+    
+    Parameters
+    ----------
+    url
+    limit :
+      Types of access to limit to, see XNAT.get_datasets
+    kwargs
+
+    Returns
+    -------
+
+    """
+
+    annex = Annexificator(no_annex=True, allow_dirty=False)
+    lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
+    limit = assure_list(limit)
+
+    def get_projects(data):
+        xnat = XNATServer(url)
+        for p in xnat.get_projects(asdict=False, limit=limit or PROJECT_ACCESS_TYPES):
+            yield updated(data, p)
+
+    return [
+        get_projects,
+        assign({'dataset': '%(id)s',
+                'dataset_name': '%(id)s',
+                'url': url
+                }, interpolate=True),
+        # TODO: should we respect  x quarantine_status
+        annex.initiate_dataset(
+            template="xnat",
+            data_fields=['dataset', 'url', 'project_access'],  # TODO: may be project_access
+            # let's all specs and modifications reside in master
+            # branch='incoming',  # there will be archives etc
+            existing='skip'
+            # further any additional options
+        )
+    ]
+
+
+def pipeline(url, dataset, project_access='public', subjects=None):
+    subjects = assure_list(subjects)
+
+    xnat = XNATServer(url)
+
+    def get_project_info(data):
+        out = xnat('data/projects/%s' % dataset,
+                   return_plain=True
+                   )
+        items = out['items']
+        assert len(items) == 1
+        dataset_meta = items[0]['data_fields']
+        # TODO: save into a file
+        yield data
+
+    def get_files(data):
+
+        for f in xnat.get_all_files_for_project(dataset, subjects=subjects):
+            # TODO: tune up filename
+            # TODO: get url
+            prefix = '/data/experiments/'
+            assert f['uri'].startswith('%s' % prefix)
+            # TODO:  use label for subject/experiment
+            # TODO: might want to allow for
+            #   XNAT2BIDS whenever that one is available:
+            #     http://reproducibility.stanford.edu/accepted-projects-for-the-2nd-crn-coding-sprint/
+            yield updated(data,
+                          {'url': url + f['uri'],
+                           'path': f['uri'][len(prefix):]
+                           })
+
+    annex = Annexificator(
+        create=False,  # must be already initialized etc
+        # leave in Git only obvious descriptors and code snippets -- the rest goes to annex
+        # so may be eventually we could take advantage of git tags for changing layout
+        statusdb='json',
+        special_remotes=['datalad'] if project_access != 'public' else None
+    )
+
+    return [
+        get_project_info,
+        [
+            get_files,
+            annex
+        ],
+        annex.finalize(cleanup=True, aggregate=True),
+    ]
