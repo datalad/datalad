@@ -230,6 +230,8 @@ def pipeline(url, dataset, project_access='public', subjects=None):
         out = xnat('data/projects/%s' % dataset,
                    return_plain=True
                    )
+        # for NITRC I need to get more!
+        # "http://nitrc_es.projects.nitrc.org/datalad/%s" % dataset
         items = out['items']
         assert len(items) == 1
         dataset_meta = items[0]['data_fields']
