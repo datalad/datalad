@@ -15,6 +15,8 @@ import re
 from collections import OrderedDict
 from os.path import join as opj
 
+from git.remote import PushInfo as PI
+
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
@@ -43,32 +45,31 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.publish')
 
 
-def _log_push_info(pi_list, log_nothing=True):
-    from git.remote import PushInfo as PI
-
-    error = False
-    if pi_list:
-        for push_info in pi_list:
-            if (push_info.flags & PI.ERROR) == PI.ERROR:
-                lgr.debug('Push failed: %s', push_info.summary)
-                error = True
-            else:
-                lgr.debug('Pushed: %s', push_info.summary)
-    else:
-        if log_nothing:
-            lgr.debug("Pushed: nothing")
-    return error
-
-
 def _push(ds, remote, things2push):
     lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-    _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
+    push_res = ds.repo.push(remote=remote, refspec=things2push)
     if things2push and ds.config.get('remote.{}.push'.format(remote)):
-        # since current state of ideas is to push both auto-detected and the
-        # possibly prescribed, if anything was, let's push again to possibly
-        # push left-over prescribed ones.
+        # we aim to push both auto-detected and possibly configured once
+        # above we pushed the result of auto-detection, now push the
+        # configured ones
         lgr.debug("Secondary push since custom push targets provided")
-        _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
+        push_res.extend(
+            ds.repo.push(remote=remote))
+    if not push_res:
+        return 'notneeded', 'Git reported nothing was pushed'
+    errors = ['{} -> {} {}'.format(
+        pi.local_ref,
+        pi.remote_ref,
+        pi.summary.strip()) for pi in push_res if (pi.flags & PI.ERROR) == PI.ERROR]
+    successes = [pi.summary.strip() for pi in push_res if (pi.flags & PI.ERROR) != PI.ERROR]
+    if errors:
+        return 'error', \
+               ('failed to push to %s: %s;%s',
+                remote,
+                '; '.join(errors),
+                ' pushed: {}'.format(successes) if successes else '')
+    else:
+        return 'ok', ('pushed to %s: %s', remote, successes)
 
 
 def has_diff(ds, refspec, remote, paths):
@@ -278,9 +279,8 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         things2push = [t for t in things2push
                        if t not in ds.config.get('remote.{}.push'.format(remote), [])]
         # now we know what to push where
-        _push(ds, remote, things2push)
-
-        yield get_status_dict(ds=ds, status='ok', **kwargs)
+        status, msg = _push(ds, remote, things2push)
+        yield get_status_dict(ds=ds, status=status, message=msg, **kwargs)
 
     if isinstance(ds.repo, AnnexRepo) and knew_remote_uuid is False:
         # publish only after we tried to sync/push and if it was annex repo

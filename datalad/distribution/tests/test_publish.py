@@ -15,6 +15,8 @@ from os.path import exists
 from os.path import lexists
 from ..dataset import Dataset
 from datalad.api import publish, install
+from datalad.api import install
+from datalad.api import create
 from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -27,6 +29,7 @@ from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
+from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
@@ -145,6 +148,10 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
+    # we will be trying to push into this later on, need to give permissions...
+    origin_sub2 = Dataset(opj(origin, 'subm 2'))
+    origin_sub2.config.set(
+        'receive.denyCurrentBranch', 'updateInstead', where='local')
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -230,9 +237,11 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     Dataset(sub2.path).add('file.dat')
 
     # note: will publish to origin here since that is what it tracks
-    res_ = publish(dataset=source, recursive=True)
+    print('=========THIS========')
+    res_ = publish(dataset=source, recursive=True, on_failure='ignore')
     # TODO this is what it is now, next comment has prev state and comment
-    assert_status(('ok', 'notneeded'), res)
+    print("RES", res_)
+    assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 2, status='ok')
     assert_result_count(res_, 1, path=sub2.path, type='dataset')
     assert_result_count(res_, 1, path=opj(sub2.path, 'file.dat'), type='file')
