@@ -10,6 +10,7 @@
 """
 
 import logging
+import os
 from os.path import join as opj
 from os.path import exists
 from os.path import lexists
@@ -152,6 +153,9 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     origin_sub2 = Dataset(opj(origin, 'subm 2'))
     origin_sub2.config.set(
         'receive.denyCurrentBranch', 'updateInstead', where='local')
+    # TODO this manual fixup is needed due to gh-1548 -- needs proper solution
+    os.remove(opj(origin_sub2.path, '.git'))
+    os.rename(opj(origin, '.git', 'modules', 'subm 2'), opj(origin_sub2.path, '.git'))
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -237,10 +241,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     Dataset(sub2.path).add('file.dat')
 
     # note: will publish to origin here since that is what it tracks
-    print('=========THIS========')
     res_ = publish(dataset=source, recursive=True, on_failure='ignore')
     # TODO this is what it is now, next comment has prev state and comment
-    print("RES", res_)
     assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 2, status='ok')
     assert_result_count(res_, 1, path=sub2.path, type='dataset')
