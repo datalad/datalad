@@ -54,6 +54,7 @@ lgr = getLogger('datalad.crawl.tests')
 #
 
 from ..xnat import XNATServer
+from ..xnat import PROJECT_ACCESS_TYPES
 
 
 def check_basic_xnat_interface(url, project, subjects):
@@ -62,6 +63,14 @@ def check_basic_xnat_interface(url, project, subjects):
     # verify that we still have projects we want!
 
     assert_in(project, projects)
+    projects_public = nitrc.get_projects(limit='public')
+    import json
+    print json.dumps(projects_public, indent=2)
+    assert len(projects_public) < len(projects)
+    assert not set(projects_public).difference(projects)
+    eq_(set(projects),
+        set(nitrc.get_projects(limit=PROJECT_ACCESS_TYPES)))
+
     subjects_ = nitrc.get_subjects(project)
     assert len(subjects_)
     experiments = nitrc.get_experiments(project, subjects[0])
@@ -73,7 +82,7 @@ def check_basic_xnat_interface(url, project, subjects):
     files2 = nitrc.get_files(project, subjects[1], experiments.keys()[0])
     assert files2
 
-    ok_startswith(files1[0]['URI'], '/data')
+    ok_startswith(files1[0]['uri'], '/data')
     gen = nitrc.get_all_files_for_project(project,
                                           subjects=subjects,
                                           experiments=[experiments.keys()[0]])
