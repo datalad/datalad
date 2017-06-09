@@ -438,3 +438,29 @@ def test_publish_depends(
     source.publish(to='target2')
     for p in (target1_path, target2_path, target3_path):
         ok_file_has_content(opj(p, 'probe1'), 'probe1')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_gh1426(origin_path, target_path):
+    # set up a pair of repos, one the published copy of the other
+    origin = create(origin_path)
+    target = AnnexRepo(target_path, create=True)
+    target.config.set(
+        'receive.denyCurrentBranch', 'updateInstead', where='local')
+    origin.siblings('add', name='target', url=target_path)
+    origin.publish(to='target')
+    ok_clean_git(origin.path)
+    ok_clean_git(target.path)
+    eq_(origin.repo.get_hexsha(), target.get_hexsha())
+
+    # gist of #1426 is that a newly added subdataset does not cause the
+    # superdataset to get published
+    origin.create('sub')
+    ok_clean_git(origin.path)
+    assert_not_equal(origin.repo.get_hexsha(), target.get_hexsha())
+    # now push
+    res = origin.publish(to='target')
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, status='ok', type='dataset', path=origin.path)
+    eq_(origin.repo.get_hexsha(), target.get_hexsha())
