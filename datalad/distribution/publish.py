@@ -73,6 +73,7 @@ def _push(ds, remote, things2push):
 
 
 def has_diff(ds, refspec, remote, paths):
+    """Return bool if a dataset was modified wrt to a given remote state"""
     if refspec:
         remote_branch_name = refspec[11:] \
             if refspec.startswith('refs/heads/') \
@@ -113,6 +114,8 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
     if ds.config.getbool('remote.{}'.format(remote), 'annex-ignore', False):
         # configuration says: don't do it
         return
+    # TODO do we really have to call annex for that, or can we take it from
+    # the config instead?
     remote_wanted = ds.repo.get_preferred_content('wanted', remote)
     if not (paths or annex_copy_options or remote_wanted):
         # nothing that we could tell git annex
@@ -200,14 +203,24 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # if not annex_ignore:
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
-    knew_remote_uuid = True
-    if isinstance(ds.repo, AnnexRepo) and \
-            ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
-        # we can try publishing right away
-        for r in _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
-            yield r
-    else:
-        knew_remote_uuid = False
+    updated_annex_branch = False
+    if isinstance(ds.repo, AnnexRepo):
+        # remote might be set to be ignored by annex, or we might not even know yet its uuid
+        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+            ds.repo.fetch(remote=remote)
+            ds.repo.merge_annex(remote)
+            updated_annex_branch = True
+            if ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+                # proper initializes remote annex -> publish
+                for r in _publish_data(ds, remote, paths, annex_copy_options,
+                                       force, **kwargs):
+                    yield r
+            else:
+                # this remote either isn't an annex, or hasn't been properly initialized
+                for ap in paths:
+                    ap['status'] = 'impossible'
+                    ap['message'] = 'remote annex not available, or not properly configured'
+                    yield ap
 
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
@@ -239,7 +252,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # we need to annex merge first. Otherwise a git push might be
         # rejected if involving all matching branches for example.
         # Once at it, also push the annex branch right here.
-        if isinstance(ds.repo, AnnexRepo):
+        if not updated_annex_branch and isinstance(ds.repo, AnnexRepo):
             lgr.debug("Obtain remote annex info from '%s'", remote)
             ds.repo.fetch(remote=remote)
             ds.repo.merge_annex(remote)
@@ -287,11 +300,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # now we know what to push where
         status, msg = _push(ds, remote, things2push)
         yield get_status_dict(ds=ds, status=status, message=msg, **kwargs)
-
-    if isinstance(ds.repo, AnnexRepo) and knew_remote_uuid is False:
-        # publish only after we tried to sync/push and if it was annex repo
-        for r in _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
-            yield r
 
 
 def _get_remote_info(ds_path, ds_remote_info, to, missing):
