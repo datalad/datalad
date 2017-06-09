@@ -203,24 +203,25 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # if not annex_ignore:
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
-    updated_annex_branch = False
     if isinstance(ds.repo, AnnexRepo):
         # remote might be set to be ignored by annex, or we might not even know yet its uuid
         if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
             ds.repo.fetch(remote=remote)
             ds.repo.merge_annex(remote)
-            updated_annex_branch = True
-            if ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
-                # proper initializes remote annex -> publish
-                for r in _publish_data(ds, remote, paths, annex_copy_options,
-                                       force, **kwargs):
-                    yield r
-            else:
-                # this remote either isn't an annex, or hasn't been properly initialized
-                for ap in paths:
-                    ap['status'] = 'impossible'
-                    ap['message'] = 'remote annex not available, or not properly configured'
-                    yield ap
+            ds.config.reload()
+        if ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+            # proper initializes remote annex -> publish
+            for r in _publish_data(ds, remote, paths, annex_copy_options,
+                                   force, **kwargs):
+                yield r
+        else:
+            # this remote either isn't an annex, or hasn't been properly initialized
+            for ap in paths:
+                ap['status'] = 'impossible'
+                ap['message'] = \
+                    ("annex for remote '%s' not available, or not properly configured",
+                     remote)
+                yield ap
 
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
@@ -252,7 +253,8 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # we need to annex merge first. Otherwise a git push might be
         # rejected if involving all matching branches for example.
         # Once at it, also push the annex branch right here.
-        if not updated_annex_branch and isinstance(ds.repo, AnnexRepo):
+        # even if we already fetched above we need to do it again
+        if isinstance(ds.repo, AnnexRepo):
             lgr.debug("Obtain remote annex info from '%s'", remote)
             ds.repo.fetch(remote=remote)
             ds.repo.merge_annex(remote)

@@ -302,21 +302,17 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     source.repo.add_remote("target", dst_path)
 
     # now, set up targets for the submodules:
-    sub1_target = GitRepo(sub1_pub, create=True)
+    # the need to be annexes, because we want to be able to copy data to them
+    # further down
+    sub1_target = AnnexRepo(sub1_pub, create=True)
     sub1_target.checkout("TMP", ["-b"])
-    sub2_target = GitRepo(sub2_pub, create=True)
+    sub2_target = AnnexRepo(sub2_pub, create=True)
     sub2_target.checkout("TMP", ["-b"])
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
     sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
-    # TMP: Insert the fetch to prevent GitPython to fail after the push,
-    # because it cannot resolve the SHA of the old commit of the remote,
-    # that git reports back after the push.
-    # TODO: Figure out, when to fetch things in general; Alternatively:
-    # Is there an option for push, that prevents GitPython from failing?
-    source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['test-annex.dat'], result_xfm='paths')
     # first it would publish data and then push
     # TODO order is not fixed (yet)
@@ -349,13 +345,11 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     res = dst_clone.get('test-annex.dat')
     ok_(dst_clone.repo.file_has_content('test-annex.dat'))
 
-    source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['.'])
     # there is nothing to publish on 2nd attempt
     #eq_(res, ([source, 'test-annex.dat'], []))
     assert_result_count(res, 1, status='notneeded')
 
-    source.repo.fetch("target")
     import glob
     res = publish(dataset=source, to="target", path=glob.glob1(source.path, '*'))
     # Note: This leads to recursive publishing, since expansion of '*'
