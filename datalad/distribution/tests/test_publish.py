@@ -242,26 +242,18 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # note: will publish to origin here since that is what it tracks
     res_ = publish(dataset=source, recursive=True, on_failure='ignore')
-    # TODO this is what it is now, next comment has prev state and comment
-    assert_status(('ok', 'notneeded'), res_)
-    assert_result_count(res_, 2, status='ok')
-    assert_result_count(res_, 1, path=sub2.path, type='dataset')
-    assert_result_count(res_, 1, path=opj(sub2.path, 'file.dat'), type='file')
     ## only updates published, i.e. just the subdataset, super wasn't altered
     ## nothing copied!
-    #eq_(res_published, [Dataset(sub2.path)])
-    #eq_(res_skipped, [])
+    assert_status(('ok', 'notneeded'), res_)
+    assert_result_count(res_, 1, status='ok', path=sub2.path, type='dataset')
+    assert_result_count(res_, 0, path=opj(sub2.path, 'file.dat'), type='file')
 
     # since published to origin -- destination should not get that file
     nok_(lexists(opj(sub2_target.path, 'file.dat')))
-    # TODO do without data transfer
     res_ = publish(dataset=source, to='target', recursive=True)
-    # TODO this is what it is now, next comment has prev state
     assert_status(('ok', 'notneeded'), res)
-    assert_result_count(res_, 2, status='ok')
-    assert_result_count(res_, 1, path=sub2.path, type='dataset')
-    assert_result_count(res_, 1, path=opj(sub2.path, 'file.dat'), type='file')
-    #eq_(res_published, [Dataset(sub2.path)])
+    assert_result_count(res_, 1, status='ok', path=sub2.path, type='dataset')
+    assert_result_count(res_, 0, path=opj(sub2.path, 'file.dat'), type='file')
 
     # Note: with updateInstead only in target2 and not saving change in
     # super-dataset we would have made remote dataset, if we had entire
@@ -270,18 +262,17 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # and the file itself was transferred
     ok_(lexists(opj(sub2_target.path, 'file.dat')))
-    ok_(sub2_target.file_has_content('file.dat'))
+    nok_(sub2_target.file_has_content('file.dat'))
 
-    # TODO bring back when above runs without data transfer
-    ## but now we can redo publish recursively, at least stating to consider
-    ## explicitly to copy .
-    #res_ = publish(
-    #    '.',
-    #    dataset=source, to='target',
-    #    recursive=True
-    #)
-    #ok_(sub2_target.file_has_content('file.dat'))
-    #eq_(res_published, ['file.dat'])  # note that this report makes little sense without path to the repository
+    ## but now we can redo publish recursively, with explicitly requested data transfer
+    res_ = publish(
+        dataset=source, to='target',
+        recursive=True,
+        transfer_data='all'
+    )
+    ok_(sub2_target.file_has_content('file.dat'))
+    assert_result_count(
+        res_, 1, status='ok', path=opj(sub2.path, 'file.dat'))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -433,8 +424,7 @@ def test_publish_depends(
     ok_(lexists(opj(target3_path, 'probe1')))
     # but it has no data copied
     target3 = Dataset(target3_path)
-    # TODO data transfer switch
-    ok_(target3.repo.file_has_content('probe1'))
+    nok_(target3.repo.file_has_content('probe1'))
 
     # but if we publish specifying its path, it gets copied
     source.publish('probe1', to='target3')
