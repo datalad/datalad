@@ -108,6 +108,7 @@ def has_diff(ds, refspec, remote, paths):
 
 
 def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
+    # paths are plain paths not annotated ones
     if not isinstance(ds.repo, AnnexRepo):
         # impossible to publish annex'ed data
         return
@@ -146,7 +147,10 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
         annex_copy_options_ += ' --fast'
     # TODO this things needs to return JSON
     for r in ds.repo.copy_to(
-            files=[ap['path'] for ap in paths],
+            files=[p for p in paths
+                   # TODO we may have to check for any file in Git, but this one can
+                   # easily happen with --since
+                   if not p == opj(ds.path, '.gitmodules')],
             remote=remote,
             options=annex_copy_options_):
         # TODO RF to have copy_to() yield JSON and convert that one
@@ -174,7 +178,7 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
 
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False,
-                     **kwargs):
+                     transfer_data='auto', **kwargs):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
@@ -197,32 +201,62 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # if forced -- we push regardless if there are differences or not
     diff = True if force else has_diff(ds, refspec, remote, paths)
 
+    #
+    # publish data (annex copy --to)
+    #
     # # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # annex_ignore = ds.config.getbool('remote.{}.annex-ignore'.format(remote), None)
     # annex_uuid = ds.config.get('remote.{}.annex-uuid'.format(remote), None)
     # if not annex_ignore:
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
-    if isinstance(ds.repo, AnnexRepo):
+
+    # skip right away if data transfer is not desired
+    if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
         # remote might be set to be ignored by annex, or we might not even know yet its uuid
         if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
             ds.repo.fetch(remote=remote)
             ds.repo.merge_annex(remote)
             ds.config.reload()
         if ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
-            # proper initializes remote annex -> publish
-            for r in _publish_data(ds, remote, paths, annex_copy_options,
-                                   force, **kwargs):
+            # what data to copy
+            if transfer_data == 'all':
+                tocopy = ['.']
+            elif transfer_data == 'auto':
+                # keep only paths that were requested and are not the base path of the dataset
+                # if the resulting list is empty, the "auto" mode of _publish_data() will
+                # kick in and consult "wanted"
+                tocopy = [p['path'] for p in paths
+                          if p.get('raw_input', False) and
+                          not p['path'] == ds.path]
+            else:
+                raise ValueError(
+                    "unknown label '{}' for `transfer_data` option".format(
+                        transfer_data))
+            # properly initialized remote annex -> publish data
+            for r in _publish_data(
+                    ds,
+                    remote,
+                    tocopy,
+                    annex_copy_options,
+                    force,
+                    **kwargs):
                 yield r
         else:
             # this remote either isn't an annex, or hasn't been properly initialized
             for ap in paths:
-                ap['status'] = 'impossible'
+                # this is only a problem if this path
+                ap['status'] = 'impossible' \
+                               if transfer_data == 'all' or ap.get('raw_input', False) \
+                               else 'notneeded'
                 ap['message'] = \
                     ("annex for remote '%s' not available, or not properly configured",
                      remote)
                 yield ap
 
+    #
+    # publish dataset (git push)
+    #
     if not diff:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
         yield get_status_dict(ds=ds, status='notneeded', **kwargs)
@@ -448,10 +482,10 @@ class Publish(Interface):
             the analysis if they seemed needed""",
             action='store_true'),
         # TODO add option to decide what branch/repo to push
-        #transfer_data=Parameter(
-        #    args=("--transfer-data",),
-        #    doc="""ADDME""",
-        #    constraints=EnsureChoice('auto', 'none', 'all')),
+        transfer_data=Parameter(
+            args=("--transfer-data",),
+            doc="""ADDME""",
+            constraints=EnsureChoice('auto', 'none', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         git_opts=git_opts,
@@ -469,7 +503,7 @@ class Publish(Interface):
             since=None,
             missing='fail',
             force=False,
-            #transfer_data='auto',
+            transfer_data='auto',
             recursive=False,
             recursion_limit=None,
             git_opts=None,
@@ -594,8 +628,13 @@ class Publish(Interface):
                     refspec=remote_info.get('refspec', None),
                     # only send paths that were explicitly requested
                     paths=[p for p in content_by_ds[ds_path]
-                           if p.get('raw_input', False)],
+                           # do not feed (sub)dataset paths into the beast
+                           # makes no sense to try to annex copy them
+                           # for the base dataset itself let `transfer_data`
+                           # decide
+                           if p.get('type', None) != 'dataset'],
                     annex_copy_options=annex_copy_opts,
                     force=force,
+                    transfer_data=transfer_data,
                     **res_kwargs):
                 yield r
