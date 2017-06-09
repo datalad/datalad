@@ -157,6 +157,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._annex_common_options = []
         # Workaround for per-call config issue with git 2.11.0
         self.GIT_DIRECT_MODE_WRAPPER_ACTIVE = False
+        self.GIT_DIRECT_MODE_PROXY = False
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -709,10 +710,71 @@ class AnnexRepo(GitRepo, RepoInterface):
             # might be an annex in direct mode
             if git_options is None:
                 git_options = []
-            git_options.extend(['-c', 'core.bare=False'])
             # TODO: Apparently doesn't work with git 2.11.0
-            toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-                                          git_options=git_options)
+            # Note: Since we are in a classmethod, GitRepo.get_toppath uses
+            # Runner directly instead of _git_custom_command, which is why the
+            # common mechanics for direct mode are not applied.
+            # This is why there is no solution for git 2.11 yet
+
+            # Note 2: Actually, the above issue is irrelevant. The git
+            # executable has no repository it is bound to, since it's the
+            # purpose of the call to find this repository. Therefore
+            # core.bare=False has no effect at all.
+
+            # Disabeld. See notes.
+            # git_options.extend(['-c', 'core.bare=False'])
+            # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
+            #                               git_options=git_options)
+
+            # basically a copy of code in GitRepo.get_toppath
+            # except it uses 'git rev-parse --git-dir' as a workaround for
+            # direct mode:
+
+            from os.path import dirname
+            from os import pardir
+
+            cmd = ['git']
+            if git_options:
+                cmd.extend(git_options)
+
+            cmd.append("rev-parse")
+            if external_versions['cmd:git'] >= '2.13.0':
+                cmd.append("--absolute-git-dir")
+            else:
+                cmd.append("--git-dir")
+
+            try:
+                with swallow_logs():
+                    toppath, err = GitRunner().run(
+                        cmd,
+                        cwd=path,
+                        log_stdout=True, log_stderr=True,
+                        expect_fail=True, expect_stderr=True)
+                    toppath = toppath.rstrip('\n\r')
+            except CommandError:
+                return None
+            except OSError:
+                toppath = AnnexRepo.get_toppath(dirname(path),
+                                                follow_up=follow_up,
+                                                git_options=git_options)
+
+            if external_versions['cmd:git'] < '2.13.0':
+                # we got a path relative to `path` instead of an absolute one
+                toppath = opj(path, toppath)
+
+            # we got the git-dir. Assuming the root dir we are looking for is
+            # one level up:
+            toppath = realpath(normpath(opj(toppath, pardir)))
+
+            if follow_up:
+                path_ = path
+                path_prev = ""
+                while path_ and path_ != path_prev:  # on top /.. = /
+                    if realpath(path_) == toppath:
+                        toppath = path_
+                        break
+                    path_prev = path_
+                    path_ = dirname(path_)
 
         return toppath
 
@@ -955,7 +1017,23 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _git_custom_command(self, *args, **kwargs):
 
-        if self.GIT_DIRECT_MODE_WRAPPER_ACTIVE:
+        if self.GIT_DIRECT_MODE_PROXY:
+            proxy_str = "git annex proxy -- "
+            proxy_list = ['git', 'annex', 'proxy', '--']
+            cmd = kwargs.pop("cmd_str", None)
+            if not cmd:
+                cmd = args[1]
+            assert(cmd is not None)
+
+            if isinstance(cmd, string_types):
+                cmd = proxy_str + cmd
+            else:
+                cmd = proxy_list + cmd
+
+            args = (args[0], cmd) + args[2:]
+            return super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
+
+        elif self.GIT_DIRECT_MODE_WRAPPER_ACTIVE:
             old = self.config.get('core.bare')
             lgr.debug("old config: %s(%s)" % (old, type(old)))
             if old is not False:
@@ -968,6 +1046,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             elif old:
                 self.config.set('core.bare', old, where='local')
             return out, err
+
         else:
             return super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
 
@@ -1137,7 +1216,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     def add(self, files, git=None, backend=None, options=None, commit=False,
             msg=None, dry_run=False,
             jobs=None,
-            git_options=None, annex_options=None, _datalad_msg=False):
+            git_options=None, annex_options=None, _datalad_msg=False,
+            update=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -1156,11 +1236,27 @@ class AnnexRepo(GitRepo, RepoInterface):
         dry_run : bool, optional
           Calls git add with --dry-run -N --ignore-missing, to just output list
           of files to be added
+        update: bool
+          --update option for git-add. From git's manpage:
+           Update the index just where it already has an entry matching
+           <pathspec>. This removes as well as modifies index entries to match
+           the working tree, but adds no new files.
+
+           If no <pathspec> is given when --update option is used, all tracked
+           files in the entire working tree are updated (old versions of Git
+           used to limit the update to the current directory and its
+           subdirectories).
+
+           Note: Used only, if a call to git-add instead of git-annex-add is
+           performed
 
         Returns
         -------
         list of dict
         """
+
+        if update and not git:
+            raise InsufficientArgumentsError("option 'update' requires 'git', too")
 
         if git_options:
             # TODO: note that below we would use 'add with --dry-run
@@ -1179,7 +1275,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             git_options = ['--dry-run', '-N', '--ignore-missing']
             try:
                 return_list = super(AnnexRepo, self).add(
-                    files, git_options=git_options)
+                    files, git_options=git_options, update=update)
             except CommandError as e:
                 if "fatal: This operation must be run in a work tree" \
                    in e.stderr and \
@@ -1202,7 +1298,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Theoretically we could have done for git as well, if it could have
             # been batched
             # Call git annex add for any to have full control of either to go
-            # to git or to anex
+            # to git or to annex
             # 1. Figure out what actually will be added
             to_be_added_recs = self.add(files, git=True, dry_run=True)
             # collect their sizes for the progressbar
@@ -1229,15 +1325,39 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # to maintain behaviour similar to git
                     options += ['--include-dotfiles']
 
-            return_list = list(self._run_annex_command_json(
-                'add',
-                args=options + files,
-                backend=backend,
-                expect_fail=True,
-                jobs=jobs,
-                expected_entries=expected_additions,
-                expect_stderr=True
-            ))
+            if git and update:
+                # explicitly use git-add with --update instead of git-annex-add
+                # TODO: This might still need some work, when --update AND files
+                # are specified!
+                if self.is_direct_mode():
+                    self.GIT_DIRECT_MODE_PROXY = True
+                try:
+                    return_list = super(AnnexRepo, self).add(
+                                               files,
+                                               # Note: committing is dealed with
+                                               # later on
+                                               commit=False,
+                                               msg=msg,
+                                               git=True,
+                                               git_options=git_options,
+                                               _datalad_msg=_datalad_msg,
+                                               update=update)
+                finally:
+                    if self.is_direct_mode():
+                        # don't accidentally cause other git calls to be done
+                        # via annex-proxy
+                        self.GIT_DIRECT_MODE_PROXY = False
+
+            else:
+                return_list = list(self._run_annex_command_json(
+                    'add',
+                    args=options + files,
+                    backend=backend,
+                    expect_fail=True,
+                    jobs=jobs,
+                    expected_entries=expected_additions,
+                    expect_stderr=True
+                ))
 
         if commit:
             if msg is None:
@@ -2249,6 +2369,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                careless=True, files=None, proxy=False):
         self.precommit()
 
+        # Note: `proxy` is for explicitly enforcing the use of git-annex-proxy
+        #       in direct mode. This is needed in very special cases, which
+        #       might go away once we figured out a better way. In any case, it
+        #       should turn into something that is automatically considered and
+        #       not done by the caller of this method.
+
         if proxy:
             if not self.is_direct_mode():
                 raise CommandNotAvailableError(
@@ -2308,9 +2434,28 @@ class AnnexRepo(GitRepo, RepoInterface):
                     else:
                         raise
         else:
-            super(AnnexRepo, self).commit(msg, options,
-                                          _datalad_msg=_datalad_msg,
-                                          careless=careless, files=files)
+
+            # Note: See the note on `proxy` parameter at the top of this method.
+            #       Trying to automatically use git-annex-proxy, whenever we
+            #       fail to commit the usual way via options to git in direct
+            #       mode. In particular this can happen if sth was staged via
+            #       git-annex-proxy, which is needed for --update option for
+            #       example.
+
+            try:
+                super(AnnexRepo, self).commit(msg, options,
+                                              _datalad_msg=_datalad_msg,
+                                              careless=careless, files=files)
+            except CommandError as e:
+                if self.is_direct_mode() and \
+                   "fatal: This operation must be run in a work tree" in \
+                   e.stderr:
+                    lgr.debug("Commit failed. "
+                              "Trying to commit via git-annex-proxy.")
+                    self.commit(msg, options, _datalad_msg=_datalad_msg,
+                                careless=careless, files=files, proxy=True)
+                else:
+                    raise 
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

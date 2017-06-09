@@ -289,7 +289,7 @@ class Install(Interface):
         # code below deals with a single path only
         path = path[0] if path else None
         # pre-compute for results below
-        refds_path = ds.path if isinstance(ds, Dataset) else ds
+        refds_path = Interface.get_refds_path(ds)
 
         if source == path:
             # even if they turn out to be identical after resolving symlinks

@@ -21,18 +21,21 @@ from os.path import normpath
 from datalad.utils import assure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.gitrepo import GitRepo
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
 from datalad.interface.results import annexjson2result
 from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
-from datalad.interface.utils import handle_dirty_datasets
+from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 
@@ -92,7 +95,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
     for res in ds.repo.drop(paths, options=opts):
         res = annexjson2result(
             # annex reports are always about files
-            res, ds, type_='file', **kwargs)
+            res, ds, type='file', **kwargs)
         success = success_status_map[res['status']]
         respath_by_status[success] = \
             respath_by_status.get(success, []) + [res['path']]
@@ -163,32 +166,55 @@ class Drop(Interface):
             check=True,
             if_dirty='save-before'):
 
+        if not dataset and not path:
+            raise InsufficientArgumentsError(
+                "insufficient information for `drop`: requires at least a path or dataset")
+        refds_path = Interface.get_refds_path(dataset)
+        res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
-            path = dataset.path if isinstance(dataset, Dataset) else dataset
-        content_by_ds, unavailable_paths = Interface._prep(
-            path=path,
-            dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
-        res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
-        for r in results_from_paths(
+            path = refds_path
+        to_drop = []
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                path=path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='drop',
                 # justification for status:
-                # content need not be drop where there is none
-                unavailable_paths, status='notneeded',
-                message="path does not exist: %s",
-                **res_kwargs):
-            yield r
-        # TODO generator
-        # this should yield what it did
-        handle_dirty_datasets(
-            content_by_ds.keys(), mode=if_dirty, base=dataset)
+                # content need not be dropped where there is none
+                unavailable_path_status='notneeded',
+                nondataset_path_status='error',
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if ap.get('type', None) == 'dataset' and \
+                    GitRepo.is_valid_repo(ap['path']) and \
+                    not ap['path'] == refds_path:
+                ap['process_content'] = True
+            to_drop.append(ap)
+
+        content_by_ds, ds_props, completed, nondataset_paths = \
+            annotated2content_by_ds(
+                to_drop,
+                refds_path=refds_path,
+                path_only=False)
+        assert(not completed)
 
         # iterate over all datasets, order doesn't matter
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
-            paths = content_by_ds[ds_path]
-            for r in _drop_files(ds, paths, check=check, **res_kwargs):
+            # TODO generator
+            # this should yield what it did
+            handle_dirty_dataset(ds, mode=if_dirty)
+            # ignore submodule entries
+            content = [ap['path'] for ap in content_by_ds[ds_path]
+                       if ap.get('type', None) != 'dataset' or ap['path'] == ds.path]
+            if not content:
+                continue
+            for r in _drop_files(ds, content, check=check, **res_kwargs):
                 yield r
         # there is nothing to save at the end

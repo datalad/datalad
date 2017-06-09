@@ -56,11 +56,7 @@ def test_add_insufficient_args(path):
     # existing path outside
     with open(opj(path, 'outside'), 'w') as f:
         f.write('doesnt matter')
-    # should be
-    #assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
-    # but actually is
-    # RF Interface._prep() in some way, not sure how yet
-    assert_raises(ValueError, ds.add, opj(path, 'outside'), on_failure='ignore')
+    assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
 
 
 tree_arg = dict(tree={'test.txt': 'some',
@@ -76,6 +72,7 @@ tree_arg = dict(tree={'test.txt': 'some',
 def test_add_files(path):
     ds = Dataset(path)
     ds.create(force=True)
+    ok_(ds.repo.dirty)
 
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
@@ -93,8 +90,10 @@ def test_add_files(path):
         if arg[0] == test_list_4:
             result = ds.add('dir', to_git=arg[1], save=False)
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False)
-        # TODO eq_(result, arg[0])
+            result = ds.add(arg[0], to_git=arg[1], save=False, result_xfm='relpaths',
+                            return_type='item-or-list')
+            # order depends on how annex processes it, so let's sort
+            eq_(sorted(result), sorted(arg[0]))
         # added, but not committed:
         ok_(ds.repo.dirty)
 
@@ -144,7 +143,9 @@ def test_add_recursive(path):
     assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
     ok_(subds.repo.dirty)
 
-    added2 = ds.add('dir', to_git=True)
+    # this tests wants to add the content to subdir before updating the
+    # parent, now we can finally say that explicitly
+    added2 = ds.add('dir/.', to_git=True)
     # added to git, so parsed git output record
     assert_result_count(
         added2, 1,

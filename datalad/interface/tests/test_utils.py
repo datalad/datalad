@@ -14,7 +14,6 @@ import os
 import logging
 from collections import OrderedDict
 from os.path import join as opj
-from os.path import relpath
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import assert_in
@@ -38,8 +37,6 @@ from ..utils import eval_results
 from ..utils import build_doc
 from ..utils import handle_dirty_dataset
 from ..utils import get_paths_by_dataset
-from ..utils import save_dataset_hierarchy
-from ..utils import get_dataset_directories
 from ..utils import filter_unmodified
 from ..save import Save
 from datalad.api import create
@@ -88,11 +85,10 @@ def test_dirty(path):
     # tainted: untracked
     with open(opj(ds.path, 'something'), 'w') as f:
         f.write('some')
-    orig_state = _check_auto_save(ds, orig_state)
+    # we don't want to auto-add untracked files by saving (anymore)
+    assert_raises(AssertionError, _check_auto_save, ds, orig_state)
     # tainted: staged
-    with open(opj(ds.path, 'staged'), 'w') as f:
-        f.write('some')
-    ds.repo.add('staged', git=True)
+    ds.repo.add('something', git=True)
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!
@@ -179,7 +175,9 @@ def test_save_hierarchy(path):
     ds_bbaa.repo.remove('file_bbaa')
     for d in (ds, ds_bb, ds_bba, ds_bbaa):
         ok_(d.repo.dirty)
-    ds_bb.save(files=ds_bbaa.path, super_datasets=True)
+    # need to give file specifically, otherwise it will simply just preserve
+    # staged changes
+    ds_bb.save(files=opj(ds_bbaa.path, 'file_bbaa'))
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -192,7 +190,7 @@ def test_save_hierarchy(path):
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
     # generator
-    list(save_dataset_hierarchy((d.path, da.path, db.path)))
+    d.save(recursive=True)
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)
@@ -210,52 +208,17 @@ def test_save_hierarchy(path):
     ca.repo.remove('file_ca')
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
-    ds.save(files=(aa.path, ba.path, bb.path, c.path, ca.path, d.path),
-            super_datasets=True)
-    ok_clean_git(ds.path)
-
-
-@with_tempfile(mkdir=True)
-def test_get_dataset_directories(path):
-    assert_raises(ValueError, get_dataset_directories, path)
-    ds = Dataset(path).create()
-    # ignores .git always and .datalad by default
-    assert_equal(get_dataset_directories(path), [])
-    assert_equal(get_dataset_directories(path, ignore_datalad=False),
-                 [opj(path, '.datalad')])
-    # find any directory, not just those known to git
-    testdir = opj(path, 'newdir')
-    os.makedirs(testdir)
-    assert_equal(get_dataset_directories(path), [testdir])
-    # do not find files
-    with open(opj(path, 'somefile'), 'w') as f:
-        f.write('some')
-    assert_equal(get_dataset_directories(path), [testdir])
-    # find more than one directory
-    testdir2 = opj(path, 'newdir2')
-    os.makedirs(testdir2)
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2]))
-    # find subdataset mount points
-    subdsdir = opj(path, 'sub')
-    subds = ds.create(subdsdir)
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
-    # do not find content within subdataset dirs
-    os.makedirs(opj(path, 'sub', 'deep'))
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
-    subsubdsdir = opj(subdsdir, 'subsub')
-    subds.create(subsubdsdir)
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, subdsdir]))
-    # find nested directories
-    testdir3 = opj(testdir2, 'newdir21')
-    os.makedirs(testdir3)
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
-    # only return hits below the search path
-    assert_equal(sorted(get_dataset_directories(testdir2)), sorted([testdir3]))
-    # empty subdataset mount points are reported too
-    ds.uninstall(subds.path, check=False, recursive=True)
-    ok_(not subds.is_installed())
-    ok_(os.path.exists(subds.path))
-    assert_equal(sorted(get_dataset_directories(path)), sorted([testdir, testdir2, testdir3, subdsdir]))
+    ds.save(
+        # append trailing slashes to the path to indicate that we want to
+        # have the staged content in the dataset saved, rather than only the
+        # subdataset state in the respective superds.
+        # an alternative would have been to pass `save` annotated paths of
+        # type {'path': dspath, 'process_content': True} for each dataset
+        # in question, but here we want to test how this would most likely
+        # by used from cmdline
+        files=[opj(p, '')
+               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
+        super_datasets=True)
 
 
 def test_interface_prep():
@@ -297,7 +260,7 @@ def test_filter_unmodified(path):
     # dataset does not have the recent change saved
     assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
 
-    ds.save(all_updated=True)
+    ds.save()
 
     modspec, unavail = Save._prep('.', ds, recursive=True)
     # arg sorting is not affected
@@ -334,7 +297,7 @@ def test_filter_unmodified(path):
 
 # Note: class name needs to match module's name
 @build_doc
-class Test_Utils(Interface):
+class TestUtils(Interface):
     """TestUtil's fake command"""
 
     _params_ = dict(
@@ -366,11 +329,11 @@ def test_eval_results_plus_build_doc():
 
     # docstring was build already:
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        Test_Utils().__call__(1)
+        TestUtils().__call__(1)
         assert_not_in("Building doc for", cml.out)
     # docstring accessible both ways:
     doc1 = Dataset.fake_command.__doc__
-    doc2 = Test_Utils().__call__.__doc__
+    doc2 = TestUtils().__call__.__doc__
 
     # docstring was built from Test_Util's definition:
     assert_equal(doc1, doc2)
@@ -391,10 +354,10 @@ def test_eval_results_plus_build_doc():
     with swallow_logs(new_level=logging.DEBUG) as cml:
         Dataset('/does/not/matter').fake_command(3)
         assert_in("Determined class of decorated function: {}"
-                  "".format(Test_Utils().__class__), cml.out)
+                  "".format(TestUtils().__class__), cml.out)
 
     # test results:
-    result = Test_Utils().__call__(2)
+    result = TestUtils().__call__(2)
     assert_equal(len(list(result)), 2)
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(len(list(result)), 3)
@@ -402,13 +365,13 @@ def test_eval_results_plus_build_doc():
     # test signature:
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(Test_Utils.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
 
 
 def test_result_filter():
     # ensure baseline without filtering
     assert_equal(
-        [r['somekey'] for r in Test_Utils().__call__(4)],
+        [r['somekey'] for r in TestUtils().__call__(4)],
         [0, 1, 2, 3])
     # test two functionally equivalent ways to filter results
     # 1. Constraint-based -- filter by exception
@@ -418,13 +381,13 @@ def test_result_filter():
             EnsureKeyChoice('somekey', (0, 2)),
             lambda x: x['somekey'] in (0, 2)):
         assert_equal(
-            [r['somekey'] for r in Test_Utils().__call__(
+            [r['somekey'] for r in TestUtils().__call__(
                 4,
                 result_filter=filt)],
             [0, 2])
         # constraint returns full dict
         assert_dict_equal(
-            Test_Utils().__call__(
+            TestUtils().__call__(
                 4,
                 result_filter=filt)[-1],
             {'action': 'off', 'path': 'some', 'status': 'ok', 'somekey': 2})
@@ -434,9 +397,9 @@ def test_result_filter():
     def greatfilter(res, **kwargs):
         assert_equal(kwargs.get('dataset', 'bob'), 'awesome')
         return True
-    Test_Utils().__call__(4, dataset='awesome', result_filter=greatfilter)
+    TestUtils().__call__(4, dataset='awesome', result_filter=greatfilter)
 
     def sadfilter(res, **kwargs):
         assert_equal(kwargs.get('dataset', 'bob'), None)
         return True
-    Test_Utils().__call__(4, result_filter=sadfilter)
+    TestUtils().__call__(4, result_filter=sadfilter)

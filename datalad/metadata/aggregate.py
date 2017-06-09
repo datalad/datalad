@@ -208,6 +208,8 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
             # save then bottom-up
             testpath = dirname(subds_relpath)
             while testpath:
+                # TODO this is a slow call that implies pretty bad repeated traversal
+                # of dataset trees -- RF to use `subdatasets --contains`
                 repo = ds.get_containing_subdataset(testpath)
                 repo.repo.add(relpath(subds_relpath, testpath), git=True)
                 modified_ds = _save_helper(repo, save, modified_ds)

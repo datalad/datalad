@@ -1151,36 +1151,6 @@ def get_trace(edges, start, end, trace=None):
     return None
 
 
-# this is imported from PY2 os.path (removed in PY3)
-def walk(top, func, arg):
-    """Directory tree walk with callback function.
-
-    For each directory in the directory tree rooted at top (including top
-    itself, but excluding '.' and '..'), call func(arg, dirname, fnames).
-    dirname is the name of the directory, and fnames a list of the names of
-    the files and subdirectories in dirname (excluding '.' and '..').  func
-    may modify the fnames list in-place (e.g. via del or slice assignment),
-    and walk will only recurse into the subdirectories whose names remain in
-    fnames; this can be used to implement a filter, or to impose a specific
-    order of visiting.  No semantics are defined for, or required of, arg,
-    beyond that arg is always passed to func.  It can be used, e.g., to pass
-    a filename pattern, or a mutable object designed to accumulate
-    statistics.  Passing None for arg is common."""
-    try:
-        names = os.listdir(top)
-    except os.error:
-        return
-    func(arg, top, names)
-    for name in names:
-        name = opj(top, name)
-        try:
-            st = os.lstat(name)
-        except os.error:
-            continue
-        if stat.S_ISDIR(st.st_mode):
-            walk(name, func, arg)
-
-
 def get_dataset_root(path):
     """Return the root of an existent dataset containing a given path
 
@@ -1201,6 +1171,21 @@ def get_dataset_root(path):
         # no luck, next round
         apath = abspath(path)
     return None
+
+
+def try_multiple(ntrials, exception, base, f, *args, **kwargs):
+    """Call f multiple times making exponentially growing delay between the calls"""
+    from .dochelpers import exc_str
+    for trial in range(1, ntrials+1):
+        try:
+            return f(*args, **kwargs)
+        except exception as exc:
+            if trial == ntrials:
+                raise  # just reraise on the last trial
+            t = base ** trial
+            lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
+            sleep(t)
 
 
 lgr.log(5, "Done importing datalad.utils")

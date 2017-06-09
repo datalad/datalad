@@ -645,14 +645,14 @@ def test_install_skip_list_arguments(src, path, path_outside):
     eq_(len(result), 4)
     # check that we have an 'impossible' status for both invalid args
     # but all the other tasks have been accomplished
-    for skipped in [opj(ds.path, 'not_existing'), path_outside]:
+    for skipped, msg in [(opj(ds.path, 'not_existing'), "path does not exist"),
+                         (path_outside, "path not associated with any dataset")]:
         assert_result_count(
-            result, 1, status='impossible',
-            message=('path does not exist: %s', skipped))
+            result, 1, status='impossible', message=msg, path=skipped)
     for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
         assert_result_count(
             result, 1, status='ok',
-            message=('Installed subdataset %s%s', sub, ''))
+            message=('Installed subdataset in order to get %s', sub.path))
         ok_(sub.is_installed())
 
     # return of get is always a list, by default, even if just one thing was gotten

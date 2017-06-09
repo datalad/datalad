@@ -46,7 +46,7 @@ def test_failure(path):
 @with_tree(_dataset_template)
 def test_tarball(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
-    ds.save(all_updated=True)
+    ds.add('.')
     committed_date = ds.repo.get_committed_date()
     with chpwd(path):
         _mod, tarball1 = ds.export('tarball')

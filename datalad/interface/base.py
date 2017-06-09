@@ -27,6 +27,8 @@ from ..dochelpers import exc_str
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
+from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import resolve_path
 
 
 def get_api_name(intfspec):
@@ -313,12 +315,20 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ in ('Update', 'Save', 'Create', 'Unlock', 'Clean', 'Drop', 'Uninstall', 'Remove', 'Get', 'Clone', 'Subdatasets', 'Install', 'Add', 'Siblings'):
+        if cls.__name__ not in (
+                'AddArchiveContent', 'AddSibling', 'AggregateMetaData',
+                'CrawlInit', 'Crawl', 'CreateSiblingGithub', 'CreateSibling',
+                'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
+                'Publish', 'RewriteURLs', 'SSHRun', 'Search'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
             kwargs['result_xfm'] = None
-            kwargs['result_renderer'] = args.common_output_format
+            # allow commands to override the default, unless something other than
+            # default is requested
+            kwargs['result_renderer'] = \
+                args.common_output_format if args.common_output_format != 'default' \
+                else getattr(cls, 'result_renderer', args.common_output_format)
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = \
@@ -349,6 +359,15 @@ class Interface(object):
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)
+
+    @classmethod
+    def get_refds_path(cls, dataset):
+        """Return a resolved reference dataset path from a `dataset` argument"""
+        # theoretically a dataset could come in as a relative path -> resolve
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if refds_path:
+            refds_path = resolve_path(refds_path)
+        return refds_path
 
     @staticmethod
     def _prep(
@@ -457,24 +476,6 @@ class Interface(object):
         if unavailable_paths:
             lgr.debug('Encountered unavaliable paths: %s', unavailable_paths)
         return content_by_ds, unavailable_paths
-
-
-def report_result_objects(cls, res, args, passive):
-    from datalad.ui import ui
-    from datalad.distribution.dataset import Dataset
-    if not res:
-        ui.message("Nothing was {}".format(passive))
-        return
-    msg = "{n} {obj} {action}:\n".format(
-        obj='items were' if len(res) > 1 else 'item was',
-        n=len(res),
-        action=passive)
-    for item in res:
-        if isinstance(item, Dataset):
-            msg += "Dataset: %s\n" % item.path
-        else:
-            msg += "File: %s\n" % item
-    ui.message(msg)
 
 
 def merge_allargs2kwargs(call, args, kwargs):
