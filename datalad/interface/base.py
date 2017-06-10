@@ -322,7 +322,7 @@ class Interface(object):
         # run indented code unconditionally
         if cls.__name__ not in (
                 'AddArchiveContent', 'AggregateMetaData',
-                'CrawlInit', 'Crawl', 'CreateSiblingGithub', 'CreateSibling',
+                'CrawlInit', 'Crawl', 'CreateSiblingGithub',
                 'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
                 'Publish', 'SSHRun', 'Search'):
             # set all common args explicitly  to override class defaults
