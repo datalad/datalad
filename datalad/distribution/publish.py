@@ -526,6 +526,14 @@ class Publish(Interface):
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
+        if dataset and to and since == '':
+            # default behavior - only updated since last update
+            # so we figure out what was the last update
+            # XXX here we assume one to one mapping of names from local branches
+            # to the remote
+            active_branch = dataset.repo.get_active_branch()
+            since = '%s/%s' % (to, active_branch)
+
         # here is the plan
         # 1. figure out remote to publish to
         # 2. figure out which content needs to be published to this remote
