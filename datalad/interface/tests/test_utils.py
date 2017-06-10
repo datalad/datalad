@@ -12,7 +12,6 @@
 
 import os
 import logging
-from collections import OrderedDict
 from os.path import join as opj
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
@@ -20,7 +19,6 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
 from datalad.tests.utils import slow
@@ -38,7 +36,6 @@ from ..utils import eval_results
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
 from ..utils import get_paths_by_dataset
-from ..save import Save
 from datalad.api import create
 
 
@@ -220,12 +217,6 @@ def test_save_hierarchy(path):
         files=[opj(p, '')
                for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
         super_datasets=True)
-
-
-def test_interface_prep():
-    # verify sanity if nothing was given, as it would look like from the
-    # cmdline
-    assert_equal(Save._prep(path=[], dataset=None), ({}, []))
 
 
 # Note: class name needs to match module's name

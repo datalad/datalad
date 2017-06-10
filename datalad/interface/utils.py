@@ -140,7 +140,7 @@ def get_tree_roots(paths):
     return roots
 
 
-# TODO becomes obsolete with Interface._prep() gone
+# TODO becomes obsolete with use in `unlock` gone
 def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
                          out=None, dir_lookup=None, sub_paths=True):
     """Sort a list of paths per dataset they are contained in.
@@ -267,7 +267,7 @@ def get_paths_by_dataset(paths, recursive=False, recursion_limit=None,
     return out, unavailable_paths, nondataset_paths
 
 
-# TODO becomes obsolete with Interface._prep() gone
+# TODO becomes obsolete with use in `unlock` gone
 def get_normalized_path_arguments(paths, dataset=None, default=None):
     """Apply standard resolution to path arguments
 
