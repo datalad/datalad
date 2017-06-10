@@ -510,7 +510,7 @@ class CreateSibling(Interface):
                 # make sure dependencies are valid
                 # TODO: inherit -- we might want to automagically create
                 # those dependents as well???
-                unknown_deps = set(assure_list(deps)).difference(checkds_remotes)
+                unknown_deps = set(assure_list(publish_depends)).difference(checkds_remotes)
                 if unknown_deps:
                     ap['status'] = 'error'
                     ap['message'] = (

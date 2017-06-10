@@ -366,13 +366,18 @@ def test_publish_depends(
         annex_group='backup',
         name='target1')
     # fails with unknown remote
-    assert_raises(
-        ValueError,
-        source.create_sibling,
+    res = source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
-        publish_depends='bogus')
+        publish_depends='bogus',
+        on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error',
+        message=(
+            'unknown sibling(s) specified as publication dependency: %s',
+            set(['bogus'])))
     # for real
     source.create_sibling(
         'ssh://datalad-test' + target2_path,
