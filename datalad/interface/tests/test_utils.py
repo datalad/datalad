@@ -35,7 +35,6 @@ from ..base import Interface
 from ..utils import eval_results
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
-from ..utils import get_paths_by_dataset
 from datalad.api import create
 
 
@@ -94,33 +93,6 @@ def test_dirty(path):
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
-
-
-@with_tempfile(mkdir=True)
-def test_paths_by_dataset(path):
-    ds = Dataset(path).create()
-    subds = ds.create('one')
-    subsubds = subds.create('two')
-    d, ua, ne = get_paths_by_dataset([path])
-    for t in (ua, ne):
-        assert_equal(t, [])
-    assert_equal(d, {ds.path: [ds.path]})
-
-    d, ua, ne = get_paths_by_dataset(
-        [path], recursive=True)
-    for t in (ua, ne):
-        assert_equal(t, [])
-
-    os.makedirs(opj(ds.path, 'one', 'some'))
-    hidden = subds.create(opj('some', 'deep'))
-    testpath = opj(subds.path, 'some')
-    d, ua, ne = get_paths_by_dataset([testpath], recursive=True)
-    for t in (ua, ne):
-        assert_equal(t, [])
-    # must contain the containing dataset, and the testpath exactly
-    assert_equal(d[subds.path], [testpath])
-    # and also the subdataset underneath
-    assert_equal(d[hidden.path], [hidden.path])
 
 
 demo_hierarchy = {
