@@ -24,8 +24,6 @@ from collections import OrderedDict
 from ..ui import ui
 from ..dochelpers import exc_str
 
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
@@ -373,114 +371,6 @@ class Interface(object):
         if refds_path:
             refds_path = resolve_path(refds_path)
         return refds_path
-
-    @staticmethod
-    def _prep(
-            path=None,
-            dataset=None,
-            recursive=False,
-            recursion_limit=None,
-            dir_lookup=None,
-            sub_paths=True):
-        """Common input argument validation and pre-processing
-
-        This method pre-processes the two most common input argument types:
-        a base dataset, and one or more given paths. One or the other needs
-        to be different from `None` or an `InsufficientArgumentsError` will
-        be raised.
-
-        Paths are normalized based on current practice (if relative, they
-        are interpreted relative to a base dataset, if one is provided, or
-        relative to the current working directory if not).
-
-        Paths are then sorted by the datasets that contain them. If paths are
-        detected that are not associated with any dataset `ValueError` is
-        raised. If a `dataset` is given, any paths associated with a dataset
-        that is not this dataset or a subdataset of it will also trigger a
-        `ValueError`.
-
-        Parameters
-        ----------
-        path : path or list(path) or None
-          Path input argument
-        dataset : path or Dataset or None
-          Dataset input argument. If given, the output dict is guaranteed
-          to carry a key for this dataset, but not necessarily any paths
-          as values.
-        recursive : bool
-          Whether to discover subdatasets under any of the given paths
-          recursively
-        recursion_limit : None or int
-          Optional recursion limit specification (max levels of recursion)
-        dir_lookup : dict, optional
-          Passed to `get_paths_by_dataset`
-        sub_paths : bool, optional
-          Passed to `get_paths_by_dataset`  :-P
-
-        Returns
-        -------
-        (dict, list)
-          The dictionary contains keys of absolute dataset paths and lists with
-          the normalized (generally absolute) paths of presently existing
-          locations associated with the respective dataset as values. The list
-          return in addition contains all paths that are part of a dataset, but
-          presently do not exist on the filesystem.
-        """
-        from .utils import get_normalized_path_arguments
-        from .utils import get_paths_by_dataset
-        # upfront check prior any resolution attempt to avoid disaster
-        if path is None and dataset is None:
-            raise InsufficientArgumentsError(
-                "at least a dataset or a path must be given")
-
-        path, dataset_path = get_normalized_path_arguments(
-            path, dataset)
-        if not path and dataset_path and recursive:
-            # if we have nothing given, but need recursion, we need to feed
-            # the dataset path to the sorting to make it work
-            # but we also need to fish it out again afterwards
-            tosort = [dataset_path]
-            fishout_dataset_path = True
-        else:
-            tosort = path
-            fishout_dataset_path = False
-        content_by_ds, unavailable_paths, nondataset_paths = \
-            get_paths_by_dataset(tosort,
-                                 recursive=recursive,
-                                 recursion_limit=recursion_limit,
-                                 dir_lookup=dir_lookup,
-                                 sub_paths=sub_paths)
-        if fishout_dataset_path:  # explicit better than implicit, duplication is evil
-            # fish out the dataset path that we inserted above
-            content_by_ds[dataset_path] = [p for p in content_by_ds[dataset_path]
-                                           if p != dataset_path]
-        if not path and dataset_path:
-            # no files given, but a dataset -> operate on whole dataset
-            # but do not specify any paths to process -- needs to be tailored
-            # by caller
-            content_by_ds[dataset_path] = content_by_ds.get(dataset_path, [])
-        if dataset_path and not content_by_ds and not unavailable_paths:
-            # we got a dataset, but there is nothing actually installed
-            nondataset_paths.append(dataset_path)
-        if dataset_path:
-            # check that we only got SUBdatasets
-            dataset_path = _with_sep(dataset_path)
-            for ds in content_by_ds:
-                if not _with_sep(ds).startswith(dataset_path):
-                    nondataset_paths.extend(content_by_ds[ds])
-        # complain about nondataset and non-existing paths
-        if nondataset_paths:
-            if dataset_path:
-                raise ValueError(
-                    "will not touch paths outside of base datasets(%s): %s"
-                    % (dataset_path, nondataset_paths))
-            else:
-                raise ValueError(
-                    "will not touch paths outside of installed datasets: %s"
-                    % nondataset_paths)
-        if unavailable_paths:
-            lgr.debug('Encountered unavaliable paths: %s', unavailable_paths)
-        return content_by_ds, unavailable_paths
 
 
 def merge_allargs2kwargs(call, args, kwargs):
