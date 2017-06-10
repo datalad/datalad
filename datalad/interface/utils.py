@@ -392,126 +392,61 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
         discover_dataset_trace_to_targets(p, targetpaths, current_trace, spec)
 
 
-def filter_unmodified(content_by_ds, refds, since):
-    """Filter per-dataset path specifications based on modification history.
+# define parameters to be used by eval_results to tune behavior
+# Note: This is done outside eval_results in order to be available when building
+# docstrings for the decorated functions
+# TODO: May be we want to move them to be part of the classes _params. Depends
+# on when and how eval_results actually has to determine the class.
+# Alternatively build a callable class with these to even have a fake signature
+# that matches the parameters, so they can be evaluated and defined the exact
+# same way.
 
-    This function takes a path specification dictionary, as produced by
-    `Interface._prep()` and filters it such that only that subset of paths
-    remains in the dictionary that corresponding to the set of changes in
-    the given reference dataset since a given state.
-
-    The change set is traced across all related subdatasets, i.e. if a submodule
-    in the reference dataset is reported as modified then all paths for any given
-    subdataset in the modified one are tested for changes too (based on the
-    state at which the parent dataset reports a change in the subdataset), and so
-    on.
-
-    In doing so, not only unmodified given paths are removed, but also modified
-    given paths are replaced by the set of actually modified paths within them.
-
-    Only committed changes are considered!
-
-    Parameters
-    ----------
-    content_by_ds : dict
-      Per-dataset path specifications, as produced ,for example, by
-      `Interface._prep()`
-    refds : Dataset or *Repo or path
-      Reference dataset for which to determine the initial change set
-    since : state
-      Any commit-ish/tree-ish supported by Git (tag, commit, branch, ...).
-      Changes between this given state and the most recent commit are
-      evaluated.
-
-    Returns
-    -------
-    dict
-      Filtered path spec dictionary. If `since` is not None, the output is
-      guaranteed to only contain paths to modified, and presently existing
-      components of subdatasets of the given reference dataset (and itself).
-    """
-    if since is None:
-        # we want all, subds not matching the ref are assumed to have been
-        # sorted out before (e.g. one level up)
-        return content_by_ds
-    # turn refds argument into a usable repo instance
-    if not hasattr(refds, 'path'):
-        # not a Repo or Dataset
-        refds_path = refds
-        refds = GitRepo(refds, create=False)
-    else:
-        refds_path = refds.path
-    repo = refds.repo
-    if hasattr(repo, 'repo'):
-        # TODO use GitRepo.diff() when available (gh-1217)
-        repo = repo.repo
-
-    dict_class = content_by_ds.__class__    # could be ordered dict
-
-    # life is simple: we diff the base dataset, and kill anything that
-    # does not start with something that is in the diff
-    # we cannot really limit the diff paths easily because we might get
-    # or miss content (e.g. subdatasets) if we don't figure out which ones
-    # are known -- and we don't want that
-    try:
-        diff = repo.commit().diff(since)
-    except GitCommandError as exc:
-        # could fail because `since` points to non existing location.
-        # Unfortunately there might be no meaningful message
-        # e.g. "fatal: ambiguous argument 'HEAD^': unknown revision or path not in the working tree"
-        # logged within this GitCommandError for some reason! So let's check
-        # that value of since post-error for being correct:
-        try:
-            refds.repo._git_custom_command(
-                [],
-                ['git', 'show', '--stat', since, '--'],
-                expect_stderr=True, expect_fail=True)
-            raise  # re-raise since our idea was incorrect
-        except CommandError as ce_exc:
-            if ce_exc.stderr.startswith('fatal: bad revision'):
-                raise ValueError(
-                    "Value since=%r is not valid. Git reports: %s" %
-                    (since, exc_str(ce_exc))
-                )
-            else:
-                raise  # re-raise
-
-    # get all modified paths (with original? commit) that are still
-    # present
-    modified = dict((opj(refds_path, d.b_path),
-                    d.b_blob.hexsha if d.b_blob else None)
-                    for d in diff)
-    if not modified:
-        # nothing modified nothing to report
-        return dict_class()
-    # determine the subset that is a directory and hence is relevant for possible
-    # subdatasets
-    modified_dirs = {_with_sep(d) for d in modified if isdir(d)}
-    # find the subdatasets matching modified paths, this will also kick out
-    # any paths that are not in the dataset sub-hierarchy
-    mod_subs = dict_class(
-        (candds, paths)
-        for candds, paths in content_by_ds.items()
-        if candds != refds_path and
-           any(_with_sep(candds).startswith(md) for md in modified_dirs)
-    )
-    # now query the next level down
-    keep_subs = \
-        [filter_unmodified(mod_subs, subds_path, modified[subds_path])
-         for subds_path in mod_subs
-         if subds_path in modified]
-    # merge result list into a single dict
-    keep = dict_class(
-        (k, v) for d in keep_subs for k, v in d.items()
-    )
-
-    paths_refds = content_by_ds[refds_path]
-    keep[refds_path] = [m for m in modified
-                        if lexists(m)  # still around
-                        and (m in paths_refds  # listed file, or subds
-                        # or a modified path under a given directory
-                        or any(m.startswith(_with_sep(p)) for p in paths_refds))]
-    return keep
+eval_params = dict(
+    return_type=Parameter(
+        doc="""return value behavior switch. If 'item-or-list' a single
+        value is returned instead of a one-item return value list, or a
+        list in case of multiple return values. `None` is return in case
+        of an empty list.""",
+        constraints=EnsureChoice('generator', 'list', 'item-or-list')),
+    result_filter=Parameter(
+        doc="""if given, each to-be-returned
+        status dictionary is passed to this callable, and is only
+        returned if the callable's return value does not
+        evaluate to False or a ValueError exception is raised. If the given
+        callable supports `**kwargs` it will additionally be passed the
+        keyword arguments of the original API call.""",
+        constraints=EnsureCallable() | EnsureNone()),
+    result_xfm=Parameter(
+        doc="""if given, each to-be-returned result
+        status dictionary is passed to this callable, and its return value
+        becomes the result instead. This is different from
+        `result_filter`, as it can perform arbitrary transformation of the
+        result value. This is mostly useful for top-level command invocations
+        that need to provide the results in a particular format. Instead of
+        a callable, a label for a pre-crafted result transformation can be
+        given.""",
+        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
+    result_renderer=Parameter(
+        doc="""format of return value rendering on stdout""",
+        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
+    on_failure=Parameter(
+        doc="""behavior to perform on failure: 'ignore' any failure is reported,
+        but does not cause an exception; 'continue' if any failure occurs an
+        exception will be raised at the end, but processing other actions will
+        continue for as long as possible; 'stop': processing will stop on first
+        failure and an exception is raised. A failure is any result with status
+        'impossible' or 'error'. Raised exception is an IncompleteResultsError
+        that carries the result dictionaries of the failures in its `failed`
+        attribute.""",
+        constraints=EnsureChoice('ignore', 'continue', 'stop')),
+)
+eval_defaults = dict(
+    return_type='list',
+    result_filter=None,
+    result_renderer=None,
+    result_xfm=None,
+    on_failure='continue',
+)
 
 
 def eval_results(func):
