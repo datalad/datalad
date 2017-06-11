@@ -149,8 +149,8 @@ class Subdatasets(Interface):
     "gitmodule_url"
         URL of the subdataset recorded in the parent
 
-    "gitmodule_..."
-        Any additional configuration property recorded.
+    "gitmodule_<label>"
+        Any additional configuration property on record.
 
     Performance note: Requesting `bottomup` reporting order, or a particular
     numerical `recursion_limit` implies an internal switch to an alternative
