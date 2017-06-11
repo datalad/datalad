@@ -293,15 +293,16 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
+        sm.update(modinfo.get(sm['path'], {}))
         if set_property or delete_property:
             # do modifications now before we read the info out for reporting
             # use 'submodule "NAME"' section ID style as this seems to be the default
-            submodule_section = 'submodule "{}"'.format(modinfo[sm['path']]['gitmodule_name'])
+            submodule_section = 'submodule "{}"'.format(sm['gitmodule_name'])
             # first deletions
             for dprop in assure_list(delete_property):
                 parser.remove_option(submodule_section, dprop)
                 # also kick from the info we just read above
-                modinfo[sm['path']].pop('gitmodule_{}'.format(dprop), None)
+                sm.pop('gitmodule_{}'.format(dprop), None)
             # and now setting values
             for sprop in assure_list(set_property):
                 parser.set_value(
@@ -309,12 +310,11 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     sprop[0],
                     sprop[1])
                 # also add to the info we just read above
-                modinfo[sm['path']]['gitmodule_{}'.format(sprop[0])] = sprop[1]
+                sm['gitmodule_{}'.format(sprop[0])] = sprop[1]
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
         #    candidates.append(common)
-        sm.update(modinfo.get(sm['path'], {}))
         subdsres = get_status_dict(
             'subdataset',
             status='ok',
