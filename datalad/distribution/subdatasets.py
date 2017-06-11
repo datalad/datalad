@@ -112,7 +112,6 @@ def _parse_git_submodules(dspath, recursive):
 
 def _get_gitmodule_parser(dspath):
     """Get a parser instance for write access"""
-    from git import GitConfigParser
     gitmodule_path = opj(dspath, ".gitmodules")
     parser = GitConfigParser(gitmodule_path, read_only=False, merge_includes=False)
     parser.read()
