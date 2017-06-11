@@ -33,6 +33,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import assure_list
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
@@ -109,6 +110,15 @@ def _parse_git_submodules(dspath, recursive):
         yield sm
 
 
+def _get_gitmodule_parser(dspath):
+    """Get a parser instance for write access"""
+    from git import GitConfigParser
+    gitmodule_path = opj(dspath, ".gitmodules")
+    parser = GitConfigParser(gitmodule_path, read_only=False, merge_includes=False)
+    parser.read()
+    return parser
+
+
 @build_doc
 class Subdatasets(Interface):
     """Report subdatasets and their properties.
@@ -136,8 +146,11 @@ class Subdatasets(Interface):
     "revision_descr"
         Output of `git describe` for the subdataset
 
-    "url"
+    "gitmodule_url"
         URL of the subdataset recorded in the parent
+
+    "gitmodule_..."
+        Any additional configuration property recorded.
 
     Performance note: Requesting `bottomup` reporting order, or a particular
     numerical `recursion_limit` implies an internal switch to an alternative
@@ -173,7 +186,24 @@ class Subdatasets(Interface):
             args=("--bottomup",),
             action="store_true",
             doc="""whether to report subdatasets in bottom-up order along
-            each branch in the dataset tree, and not top-down."""))
+            each branch in the dataset tree, and not top-down."""),
+        set_property=Parameter(
+            args=('--set-property',),
+            metavar='VALUE',
+            nargs=2,
+            action='append',
+            doc="""Name and value of one or more subdataset properties to
+            be set in the parent dataset's .gitmodules file.[CMD:  This
+            option can be given multiple times. CMD]""",
+            constraints=EnsureStr() | EnsureNone()),
+        delete_property=Parameter(
+            args=('--delete-property',),
+            metavar='NAME',
+            action='append',
+            doc="""Name of one or more subdataset properties to be removed
+            from the parent dataset's .gitmodules file.[CMD:  This
+            option can be given multiple times. CMD]""",
+            constraints=EnsureStr() | EnsureNone()))
 
     @staticmethod
     @datasetmethod(name='subdatasets')
@@ -184,9 +214,11 @@ class Subdatasets(Interface):
             recursive=False,
             recursion_limit=None,
             contains=None,
-            bottomup=False):
+            bottomup=False,
+            set_property=None,
+            delete_property=None):
         dataset = require_dataset(
-            dataset, check_installed=False, purpose='subdataset reporting')
+            dataset, check_installed=False, purpose='subdataset reporting/modification')
         refds_path = dataset.path
 
         # XXX this seems strange, but is tested to be the case -- I'd rather set
@@ -198,14 +230,15 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
-        if bottomup or contains or (recursive and recursion_limit is not None):
+        if bottomup or contains or set_property or delete_property or \
+                (recursive and recursion_limit is not None):
             # IMPLEMENTATION 1
             # slow but flexible (one Git call per dataset)
             if contains:
                 contains = resolve_path(contains, dataset)
             for r in _get_submodules(
                     dataset.path, fulfilled, recursive, recursion_limit,
-                    contains, bottomup):
+                    contains, bottomup, set_property, delete_property):
                 # without the refds_path cannot be rendered/converted relative
                 # in the eval_results decorator
                 r['refds'] = refds_path
@@ -245,10 +278,14 @@ class Subdatasets(Interface):
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
 def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
-                    contains, bottomup):
+                    contains, bottomup, set_property, delete_property):
     if not GitRepo.is_valid_repo(dspath):
         return
     modinfo = _parse_gitmodules(dspath)
+    # write access parser
+    parser = None
+    if set_property or delete_property:
+        parser = _get_gitmodule_parser(dspath)
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath, recursive=False):
         if contains and \
@@ -257,6 +294,24 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
+        if set_property or delete_property:
+            # do modifications now before we read the info out for reporting
+            # use 'submodule "NAME"' section ID style as this seems to be the default
+            submodule_section = 'submodule "{}"'.format(modinfo[sm['path']]['gitmodule_name'])
+            # first deletions
+            for dprop in assure_list(delete_property):
+                parser.remove_option(submodule_section, dprop)
+                # also kick from the info we just read above
+                modinfo[sm['path']].pop('gitmodule_{}'.format(dprop), None)
+            # and now setting values
+            for sprop in assure_list(set_property):
+                parser.set_value(
+                    submodule_section,
+                    sprop[0],
+                    sprop[1])
+                # also add to the info we just read above
+                modinfo[sm['path']]['gitmodule_{}'.format(sprop[0])] = sprop[1]
+
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
         #    candidates.append(common)
@@ -286,7 +341,9 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     if isinstance(recursion_limit, int)
                     else recursion_limit,
                     contains,
-                    bottomup):
+                    bottomup,
+                    set_property,
+                    delete_property):
                 yield r
         if bottomup and \
                 (fulfilled is None or
