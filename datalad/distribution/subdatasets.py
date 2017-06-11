@@ -349,3 +349,6 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm['path']) == fulfilled):
             yield subdsres
+    if parser is not None:
+        # release parser lock manually, auto-cleanup is not reliable in PY3
+        parser.release()
