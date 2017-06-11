@@ -34,6 +34,7 @@ from datalad.support.param import Parameter
 from datalad.support.network import get_local_file_url
 from datalad.dochelpers import exc_str
 from datalad.utils import rmtree
+from datalad.utils import assure_list
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -65,10 +66,11 @@ class Clone(Interface):
     Primary differences over a direct `git clone` call are 1) the automatic
     initialization of a dataset annex (pure Git repositories are equally
     supported); 2) automatic registration of the newly obtained dataset
-    as a subdataset (submodule), if a parent dataset is specified; and
+    as a subdataset (submodule), if a parent dataset is specified;
     3) support for datalad's resource identifiers and automatic generation of
     alternative access URL for common cases (such as appending '.git' to the
-    URL in case the accessing the base URL failed).
+    URL in case the accessing the base URL failed); and 4) ability to
+    take additional alternative source locations as an argument.
     """
     # by default ignore everything but install results
     # i.e. no "add to super dataset"
@@ -97,6 +99,13 @@ class Clone(Interface):
             similar to :command:`git clone`"""),
         description=dataset_description,
         reckless=reckless_opt,
+        alt_sources=Parameter(
+            args=('--alternative-sources',),
+            metavar='SOURCE',
+            nargs='+',
+            doc="""Alternative sources to be tried if a dataset cannot
+            be obtained from the main `source`""",
+            constraints=EnsureStr() | EnsureNone()),
         # TODO next ones should be there, but cannot go anywhere
         # git_opts=git_opts,
         # git_clone_opts=git_clone_opts,
@@ -112,7 +121,8 @@ class Clone(Interface):
             path=None,
             dataset=None,
             description=None,
-            reckless=False):
+            reckless=False,
+            alt_sources=None):
             # TODO next ones should be there, but cannot go anywhere
             # git_opts=None,
             # git_clone_opts=None,
@@ -207,12 +217,16 @@ class Clone(Interface):
 
         # generate candidate URLs from source argument to overcome a few corner cases
         # and hopefully be more robust than git clone
-        candidate_sources = _get_flexible_source_candidates(source)
-        lgr.info("Cloning dataset from '%s' to '%s'", source, dest_path)
+        candidate_sources = []
+        # combine all given sources (incl. alternatives), maintain order
+        for s in [source] + assure_list(alt_sources):
+            candidate_sources.extend(_get_flexible_source_candidates(s))
+        lgr.info("Cloning dataset from '%s' (trying %i location candidates) to '%s'",
+                 source, len(candidate_sources), dest_path)
         for source_ in candidate_sources:
             try:
                 lgr.debug("Attempting to clone dataset from '%s' to '%s'",
-                         source_, dest_path)
+                          source_, dest_path)
                 GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
