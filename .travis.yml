@@ -113,6 +113,11 @@ matrix:
     - DATALAD_REPO_DIRECT=1
 
   allow_failures:
+  # Test under NFS mount  (full, only in master)
+  - python: 2.7
+    env:
+    - TMPDIR="/tmp/nfsmount"
+    - _DATALAD_NONPR_ONLY=1
   # For now, don't fail entirely when direct mode fails
   - env: DATALAD_REPO_DIRECT=1
 
