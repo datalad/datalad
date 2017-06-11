@@ -61,10 +61,10 @@ def _parse_gitmodules(dspath):
         if not modpath or not sec.startswith('submodule '):
             continue
         modpath = normpath(opj(dspath, modpath))
-        modprops = {opt: parser.get_value(sec, opt)
+        modprops = {'gitmodule_{}'.format(opt): parser.get_value(sec, opt)
                     for opt in parser.options(sec)
                     if not (opt.startswith('__') or opt == 'path')}
-        modprops['subds_name'] = sec[11:-1]
+        modprops['gitmodule_name'] = sec[11:-1]
         mods[modpath] = modprops
     return mods
 
