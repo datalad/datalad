@@ -81,7 +81,7 @@ def _generate_func_api():
                     'crawl-init', 'crawl', 'create-sibling',
                     'create-sibling-github', 'create-test-dataset',
                     'download-url', 'export', 'ls', 'move', 'publish',
-                    'rewrite-urls', 'search', 'sshrun', 'test'):
+                    'search', 'sshrun', 'test'):
                 # FIXME no longer using an interface class instance
                 # convert the parameter SPEC into a docstring for the function
                 update_docstring_with_parameters(

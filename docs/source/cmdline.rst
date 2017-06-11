@@ -32,7 +32,6 @@ Dataset operations
    generated/man/datalad-install
    generated/man/datalad-publish
    generated/man/datalad-remove
-   generated/man/datalad-rewrite-urls
    generated/man/datalad-save
    generated/man/datalad-update
    generated/man/datalad-uninstall
