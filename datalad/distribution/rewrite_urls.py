@@ -37,6 +37,7 @@ def get_module_parser(repo):
     return parser
 
 
+# TODO dissolve this command and add functionality to `subdatasets`
 class RewriteURLs(Interface):
     """Rewrite the URLs of sub-datasets of a dataset
     """
