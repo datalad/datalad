@@ -13,8 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
+import os
 from os.path import join as opj
 from os.path import normpath
+from os.path import relpath
 from os.path import exists
 
 from git import GitConfigParser
@@ -192,7 +194,13 @@ class Subdatasets(Interface):
             nargs=2,
             action='append',
             doc="""Name and value of one or more subdataset properties to
-            be set in the parent dataset's .gitmodules file.[CMD:  This
+            be set in the parent dataset's .gitmodules file. The value can be
+            a Python format() template string (e.g. '{gitmodule_name}').
+            Supported keywords are any item reported in the result properties
+            of this command, plus 'refds_relpath' and 'refds_relname':
+            the relative path of a subdataset with respect to the base dataset
+            of the command call, and, in the latter case, the same string with
+            all directory separators replaced by dashes.[CMD:  This
             option can be given multiple times. CMD]""",
             constraints=EnsureStr() | EnsureNone()),
         delete_property=Parameter(
@@ -237,7 +245,8 @@ class Subdatasets(Interface):
                 contains = resolve_path(contains, dataset)
             for r in _get_submodules(
                     dataset.path, fulfilled, recursive, recursion_limit,
-                    contains, bottomup, set_property, delete_property):
+                    contains, bottomup, set_property, delete_property,
+                    refds_path):
                 # without the refds_path cannot be rendered/converted relative
                 # in the eval_results decorator
                 r['refds'] = refds_path
@@ -277,7 +286,8 @@ class Subdatasets(Interface):
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
 def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
-                    contains, bottomup, set_property, delete_property):
+                    contains, bottomup, set_property, delete_property,
+                    refds_path):
     if not GitRepo.is_valid_repo(dspath):
         return
     modinfo = _parse_gitmodules(dspath)
@@ -305,12 +315,20 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                 sm.pop('gitmodule_{}'.format(dprop), None)
             # and now setting values
             for sprop in assure_list(set_property):
+                prop, val = sprop
+                if '{' in val:
+                    # expand template string
+                    val = val.format(
+                        **dict(
+                            sm,
+                            refds_relpath=relpath(sm['path'], refds_path),
+                            refds_relname=relpath(sm['path'], refds_path).replace(os.sep, '-')))
                 parser.set_value(
                     submodule_section,
-                    sprop[0],
-                    sprop[1])
+                    prop,
+                    val)
                 # also add to the info we just read above
-                sm['gitmodule_{}'.format(sprop[0])] = sprop[1]
+                sm['gitmodule_{}'.format(prop)] = val
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
@@ -342,7 +360,8 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     contains,
                     bottomup,
                     set_property,
-                    delete_property):
+                    delete_property,
+                    refds_path):
                 yield r
         if bottomup and \
                 (fulfilled is None or

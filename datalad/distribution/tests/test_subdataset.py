@@ -92,17 +92,20 @@ def test_get_subdatasets(path):
         assert_not_in('mike', r)
 
     # now add info to all datasets
-    res = ds.subdatasets(recursive=True, set_property=[('mike', 'slow'), ('something', 'else')])
+    res = ds.subdatasets(
+        recursive=True,
+        set_property=[('mike', 'slow'),
+                      ('expansion', '{refds_relname}')])
     assert_status('ok', res)
     for r in res:
         eq_(r['gitmodule_mike'], 'slow')
-        eq_(r['gitmodule_something'], 'else')
+        eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
     # plain query again to see if it got into the files
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
         eq_(r['gitmodule_mike'], 'slow')
-        eq_(r['gitmodule_something'], 'else')
+        eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
 
     # and remove again
     res = ds.subdatasets(recursive=True, delete_property=('mike', 'something'))
