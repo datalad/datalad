@@ -11,7 +11,6 @@
 
 import logging
 from os.path import abspath
-from os.path import commonprefix
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
@@ -19,7 +18,6 @@ from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
-from os.path import sep
 from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
@@ -32,7 +30,6 @@ from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
@@ -40,8 +37,7 @@ from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 
 from datalad.utils import getpwd
-from datalad.utils import optional_args, expandpath, is_explicit_path, \
-    with_pathsep
+from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 
@@ -354,61 +350,6 @@ class Dataset(object):
         # tries its best to not resolve symlinks now
 
         return Dataset(sds_path)
-
-    # TODO this function is obselete and replaced by a faster
-    # `subdatasets --contains` -- remove once `aggregate` is RF'ed to no
-    # longer use it
-    def get_containing_subdataset(self, path, recursion_limit=None):
-        """Get the (sub-)dataset containing `path`
-
-        Note: The "mount point" of a subdataset is classified as belonging to
-        that respective subdataset.
-
-        WARNING: This function is rather expensive, because it queries for all
-        subdatasets recursively, and repeatedly -- which can take a substantial
-        amount of time for datasets with many (sub-)subdatasets.  In Many cases
-        the `subdatasets` command can be used with its `contains` parameter to
-        achieve the desired result in a less expensive way.
-
-        Parameters
-        ----------
-        path : str
-          Path to determine the containing (sub-)dataset for
-        recursion_limit: int or None
-          limit the subdatasets to take into account to the given number of
-          hierarchy levels
-
-        Returns
-        -------
-        Dataset
-        """
-
-        if recursion_limit is not None and (recursion_limit < 1):
-            lgr.warning("recursion limit < 1 (%s) always results in self.",
-                        recursion_limit)
-            return self
-
-        if is_explicit_path(path):
-            path = resolve_path(path, self)
-            if not path.startswith(self.path):
-                raise PathOutsideRepositoryError(file_=path, repo=self)
-            path = relpath(path, self.path)
-
-        candidates = []
-        # TODO: this one would follow all the sub-datasets, which might
-        # be inefficient if e.g. there is lots of other sub-datasets already
-        # installed but under another sub-dataset.  There is a TODO 'pattern'
-        # option which we could use I guess eventually
-        for subds in self.subdatasets(recursive=True,
-                                      #pattern=
-                                      recursion_limit=recursion_limit,
-                                      result_xfm='relpaths'):
-            common = commonprefix((with_pathsep(subds), with_pathsep(path)))
-            if common.endswith(sep) and common == with_pathsep(subds):
-                candidates.append(common)
-        if candidates:
-            return Dataset(path=opj(self.path, max(candidates, key=len)))
-        return self
 
 
 @optional_args
