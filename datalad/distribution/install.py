@@ -18,7 +18,7 @@ from os.path import relpath
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
-from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import jobs_opt
 # from datalad.interface.common_opts import git_opts
 # from datalad.interface.common_opts import git_clone_opts
@@ -127,7 +127,7 @@ class Install(Interface):
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
             action="store_true"),
-        description=dataset_description,
+        description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         save=nosave_opt,

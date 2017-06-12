@@ -17,10 +17,10 @@ from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
 from datalad.support.constraints import EnsureChoice
 
 
-dataset_description = Parameter(
+location_description = Parameter(
     args=("-D", "--description",),
     constraints=EnsureStr() | EnsureNone(),
-    doc="""short description of newly installed dataset instances. Its primary
+    doc="""short description to use for a dataset location. Its primary
     purpose is to help humans to identify a dataset copy (e.g., "mike's dataset
     on lab server"). Note that when a dataset is published, this information
     becomes available on the remote side.""")
