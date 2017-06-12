@@ -1081,6 +1081,45 @@ def test_GitRepo_flyweight(path1, path2):
     ok_(repo1 == repo3)
 
 
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_GitRepo_flyweight_monitoring_inode(path, store):
+    # testing for issue #1512
+
+    repo = GitRepo(path, create=True)
+    with open(opj(path, "testfile.txt"), "w") as f:
+        f.write("whatever")
+    repo.add("testfile.txt", commit=True, msg="some load")
+
+    # requesting HEAD info from
+    hexsha = repo.repo.head.object.hexsha
+
+    # move everything to store
+    import os
+    import shutil
+    old_inode = os.stat(path).st_ino
+    shutil.copytree(path, store, symlinks=True)
+    # kill original
+    rmtree(path)
+    assert (not exists(path))
+    # recreate
+    shutil.copytree(store, path, symlinks=True)
+    new_inode = os.stat(path).st_ino
+    assert_not_equal(old_inode, new_inode)
+    # Now, there is a running git process by GitPython's Repo instance,
+    # connected to an invalid inode!
+    # GitRepo needs to make sure to stop them, whenever we access the instance
+    # again (or request a flyweight instance).
+
+    # The following two accesses fail in issue #1512:
+    # 1. requesting HEAD info from old instance
+    hexsha = repo.repo.head.object.hexsha
+
+    # 2. get a "new" instance and requesting HEAD
+    repo2 = GitRepo(path)
+    hexsha2 = repo2.repo.head.object.hexsha
+
+
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
                  'ignore.me': 'ignored content',
                  'dontigno.re': 'other content'})
