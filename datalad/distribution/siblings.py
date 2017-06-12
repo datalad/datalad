@@ -23,6 +23,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
@@ -39,6 +40,7 @@ from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
+from datalad.interface.common_opts import location_description
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import swallow_logs
 from datalad.dochelpers import exc_str
@@ -78,11 +80,25 @@ class Siblings(Interface):
         Absolute path of the dataset
 
     "url"
-        At minimum a "fetch" URL, possibly also a "pushurl"
+        For regular siblings at minimum a "fetch" URL, possibly also a
+        "pushurl"
 
     Additionally, any further configuration will also be reported using
     a key that matches that in the Git configuration.
+
+    By default, sibling information is rendered as one line per sibling
+    following this scheme::
+
+      <dataset_path>: <sibling_name>(<+|->) [<access_specification]
+
+    where the `+` and `-` labels indicate the presence or absence of a
+    remote data annex at a particular remote, and `access_specification`
+    contains either a URL and/or a type label for the sibling.
     """
+    # make the custom renderer the default, path reporting isn't the top
+    # priority here
+    result_renderer = 'tailored'
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -125,9 +141,9 @@ class Siblings(Interface):
                 sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.""",
             constraints=EnsureStr() | EnsureNone()),
+        description=location_description,
 
         ## info options
-        # --description gh-1484
         # --template/cfgfrom gh-1462 (maybe also for a one-time inherit)
         # --wanted gh-925 (also see below for add_sibling approach)
 
@@ -155,6 +171,7 @@ class Siblings(Interface):
             name=None,
             url=None,
             pushurl=None,
+            description=None,
             # TODO consider true, for now like add_sibling
             fetch=False,
             as_common_datasrc=None,
@@ -184,7 +201,7 @@ class Siblings(Interface):
             dataset, check_installed=False, purpose='sibling configuration')
         refds_path = dataset.path
 
-        res_kwargs = dict(refds=refds_path)
+        res_kwargs = dict(refds=refds_path, logger=lgr)
 
         ds_name = basename(dataset.path)
 
@@ -198,7 +215,7 @@ class Siblings(Interface):
                 # for top-level dataset there is no layout questions
                 _mangle_urls(url, ds_name),
                 _mangle_urls(pushurl, ds_name),
-                fetch,
+                fetch, description,
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_group, annex_groupwanted,
                 inherit,
@@ -230,16 +247,38 @@ class Siblings(Interface):
                     subds_url,
                     subds_pushurl,
                     fetch,
+                    description,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_group, annex_groupwanted,
                     inherit,
                     **res_kwargs):
                 yield r
 
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.ui import ui
+        if res['status'] != 'ok':
+            # logging complained about this already
+            return
+        path = relpath(res['path'],
+                       res['refds']) if res.get('refds', None) else res['path']
+        got_url = 'url' in res
+        spec = '{}{}{}{}'.format(
+            res.get('url', ''),
+            ' (' if got_url else '',
+            res.get('annex-externaltype', 'git'),
+            ')' if got_url else '')
+        ui.message('{path}: {name}({with_annex}) [{spec}]'.format(
+            **dict(
+                res,
+                path=path,
+                with_annex='+' if 'annex-uuid' in res else '-',
+                spec=spec)))
+
 
 # always copy signature from above to avoid bugs
 def _add_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -275,7 +314,7 @@ def _add_remote(
         return
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, url, pushurl, fetch,
+            ds, name, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_group, annex_groupwanted,
             inherit,
@@ -287,7 +326,7 @@ def _add_remote(
 
 # always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -298,41 +337,55 @@ def _configure_remote(
         type='sibling',
         name=name,
         **res_kwargs)
-    # cheat and pretend it is all new and shiny already
-    try:
-        from datalad.distribution.add_sibling import AddSibling
-        added = AddSibling.__call__(
-            dataset=ds,
-            name=name,
-            url=url,
-            pushurl=pushurl,
-            as_common_datasrc=as_common_datasrc,
-            publish_depends=publish_depends,
-            publish_by_default=publish_by_default,
-            annex_wanted=annex_wanted,
-            annex_group=annex_group,
-            annex_groupwanted=annex_groupwanted,
-            inherit=inherit,
-            # never recursive, done outside
-            recursive=False,
-            # we want to do this in our wrapper code
-            fetch=False,
-            # configure is what `force` was used for previously
-            force=True)
-        # just make sure the legacy code doesn't surprise us
-        assert(len(added) == 1)
-    except Exception as e:
-        yield get_status_dict(
-            status='error',
-            message=exc_str(e),
-            **result_props)
+    if name is None:
+        result_props['status'] = 'error'
+        result_props['message'] = 'need sibling `name` for configuration'
+        yield result_props
         return
+    # cheat and pretend it is all new and shiny already
+    if url: # poor AddSibling blows otherwise
+        try:
+            from datalad.distribution.add_sibling import AddSibling
+            added = AddSibling.__call__(
+                dataset=ds,
+                name=name,
+                url=url,
+                pushurl=pushurl,
+                as_common_datasrc=as_common_datasrc,
+                publish_depends=publish_depends,
+                publish_by_default=publish_by_default,
+                annex_wanted=annex_wanted,
+                annex_group=annex_group,
+                annex_groupwanted=annex_groupwanted,
+                inherit=inherit,
+                # never recursive, done outside
+                recursive=False,
+                # we want to do this in our wrapper code
+                fetch=False,
+                # configure is what `force` was used for previously
+                force=True)
+            # just make sure the legacy code doesn't surprise us
+            assert(len(added) == 1)
+        except Exception as e:
+            yield get_status_dict(
+                status='error',
+                message=exc_str(e),
+                **result_props)
+            return
 
     if fetch:
         # fetch the remote so we are up to date
         lgr.debug("Fetching sibling %s of %s", name, ds)
         # TODO better use `ds.update`
         ds.repo.fetch(name)
+
+    if description:
+        if not isinstance(ds.repo, AnnexRepo):
+            result_props['status'] = 'impossible'
+            result_props['message'] = 'cannot set description of a plain Git repository'
+            yield result_props
+            return
+        ds.repo._run_annex_command('describe', annex_options=[name, description])
     # report all we know at once
     info = list(_query_remotes(ds, name))[0]
     info.update(dict(status='ok', **result_props))
@@ -341,31 +394,80 @@ def _configure_remote(
 
 # always copy signature from above to avoid bugs
 def _query_remotes(
-        ds, name, url=None, pushurl=None, fetch=None,
+        ds, name, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
         **res_kwargs):
-    remotes = [name] if name else ds.repo.get_remotes()
+    annex_info = {}
+    available_space = None
+    if isinstance(ds.repo, AnnexRepo):
+        # pull repo info from annex
+        # TODO maybe we should make this step optional to save the call
+        # in some cases. Would need an additional flag...
+        try:
+            # need to do in safety net because of gh-1560
+            raw_info = ds.repo.repo_info(fast=True)
+        except CommandError:
+            raw_info = {}
+        available_space = raw_info.get('available local disk space', None)
+        for trust in ('trusted', 'semitrusted', 'untrusted'):
+            ri = raw_info.get('{} repositories'.format(trust), [])
+            for r in ri:
+                uuid = r.get('uuid', '00000000-0000-0000-0000-00000000000')
+                if uuid.startswith('00000000-0000-0000-0000-00000000000'):
+                    continue
+                ainfo = annex_info.get(uuid, {})
+                ainfo['description'] = r.get('description', None)
+                annex_info[uuid] = ainfo
+    known_remotes = ds.repo.get_remotes()
+    # treat the local repo as any other remote using 'here' as a label
+    remotes = [name] if name else ['here'] + known_remotes
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
-            status='ok',
             path=ds.path,
             type='sibling',
             name=remote,
             **res_kwargs)
+        if remote != 'here' and remote not in known_remotes:
+            info['status'] = 'error'
+            info['message'] = 'unknown sibling name'
+            yield info
+            continue
         # now pull everything we know out of the config
         # simply because it is cheap and we don't have to go through
         # tons of API layers to be able to work with it
-        for remotecfg in [k for k in ds.config.keys()
-                          if k.startswith('remote.{}.'.format(remote))]:
-            info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
+        if remote == 'here':
+            # special case: this repo
+            # aim to provide info using the same keys as for remotes
+            # (see below)
+            for src, dst in (('annex.uuid', 'annex-uuid'),
+                             ('core.bare', 'annex-bare'),
+                             ('annex.version', 'annex-version')):
+                val = ds.config.get(src, None)
+                if val is None:
+                    continue
+                info[dst] = val
+            if not available_space is None:
+                info['available_local_disk_space'] = available_space
+        else:
+            # common case: actual remotes
+            for remotecfg in [k for k in ds.config.keys()
+                              if k.startswith('remote.{}.'.format(remote))]:
+                info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
+        if 'annex-uuid' in info:
+            ainfo = annex_info.get(info['annex-uuid'])
+            annex_description = ainfo.get('description', None)
+            if annex_description is not None:
+                info['annex-description'] = annex_description
+
+        info['status'] = 'ok'
         yield info
 
 
 def _remove_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,

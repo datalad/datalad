@@ -32,7 +32,7 @@ from datalad.interface.common_opts import recursion_flag
 # from datalad.interface.common_opts import git_opts
 # from datalad.interface.common_opts import annex_opts
 # from datalad.interface.common_opts import annex_get_opts
-from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.common_opts import reckless_opt
 from datalad.interface.common_opts import verbose
@@ -366,7 +366,7 @@ class Get(Interface):
             doc="""whether to obtain data for all file handles. If disabled, `get`
             operations are limited to dataset handles.[CMD:  This option prevents data
             for file handles from being obtained CMD]"""),
-        description=dataset_description,
+        description=location_description,
         reckless=reckless_opt,
         # git_opts=git_opts,
         # annex_opts=annex_opts,

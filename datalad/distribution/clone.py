@@ -19,7 +19,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import location_description
 # from datalad.interface.common_opts import git_opts
 # from datalad.interface.common_opts import git_clone_opts
 # from datalad.interface.common_opts import annex_opts
@@ -97,7 +97,7 @@ class Clone(Interface):
             doc="""path to clone into.  If no `path` is provided a
             destination path will be derived from a source URL
             similar to :command:`git clone`"""),
-        description=dataset_description,
+        description=location_description,
         reckless=reckless_opt,
         alt_sources=Parameter(
             args=('--alternative-sources',),
