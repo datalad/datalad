@@ -403,8 +403,8 @@ def _query_remotes(
                 ainfo['description'] = r.get('description', None)
                 annex_info[uuid] = ainfo
     known_remotes = ds.repo.get_remotes()
-    # treat the local repo as any other remote using 'HERE' as a label
-    remotes = [name] if name else ['HERE'] + known_remotes
+    # treat the local repo as any other remote using 'here' as a label
+    remotes = [name] if name else ['here'] + known_remotes
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
@@ -412,7 +412,7 @@ def _query_remotes(
             type='sibling',
             name=remote,
             **res_kwargs)
-        if remote != 'HERE' and remote not in known_remotes:
+        if remote != 'here' and remote not in known_remotes:
             info['status'] = 'error'
             info['message'] = 'unknown sibling name'
             yield info
@@ -420,7 +420,7 @@ def _query_remotes(
         # now pull everything we know out of the config
         # simply because it is cheap and we don't have to go through
         # tons of API layers to be able to work with it
-        if remote == 'HERE':
+        if remote == 'here':
             # special case: this repo
             # aim to provide info using the same keys as for remotes
             # (see below)

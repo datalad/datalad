@@ -179,14 +179,14 @@ def test_siblings(origin, repo_path):
 
 @with_tempfile(mkdir=True)
 def test_here(path):
-    # few smoke tests regarding the 'HERE' sibling
+    # few smoke tests regarding the 'here' sibling
     ds = create(path)
     res = ds.siblings(
         'query',
         on_failure='ignore')
     assert_status('ok', res)
     assert_result_count(res, 1)
-    assert_result_count(res, 1, name='HERE')
+    assert_result_count(res, 1, name='here')
     here = res[0]
     eq_(ds.repo.uuid, here['annex-uuid'])
     assert_in('annex-description', here)
