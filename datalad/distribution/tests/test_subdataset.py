@@ -95,7 +95,7 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(
         recursive=True,
         set_property=[('mike', 'slow'),
-                      ('expansion', '{refds_relname}')])
+                      ('expansion', '<{refds_relname}>')])
     assert_status('ok', res)
     for r in res:
         eq_(r['gitmodule_mike'], 'slow')

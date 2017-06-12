@@ -203,7 +203,8 @@ class Subdatasets(Interface):
             action='append',
             doc="""Name and value of one or more subdataset properties to
             be set in the parent dataset's .gitmodules file. The value can be
-            a Python format() template string (e.g. '{gitmodule_name}').
+            a Python format() template string wrapped in '<>' (e.g.
+            '<{gitmodule_name}>').
             Supported keywords are any item reported in the result properties
             of this command, plus 'refds_relpath' and 'refds_relname':
             the relative path of a subdataset with respect to the base dataset
@@ -331,9 +332,9 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             # and now setting values
             for sprop in assure_list(set_property):
                 prop, val = sprop
-                if '{' in val:
+                if val.startswith('<') and val.endswith('>') and '{' in val:
                     # expand template string
-                    val = val.format(
+                    val = val[1:-1].format(
                         **dict(
                             sm,
                             refds_relpath=relpath(sm['path'], refds_path),
