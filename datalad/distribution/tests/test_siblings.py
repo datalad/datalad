@@ -192,3 +192,15 @@ def test_here(path):
     assert_in('annex-description', here)
     assert_in('annex-bare', here)
     assert_in('available_local_disk_space', here)
+
+    # set a description
+    res = ds.siblings(
+        'configure',
+        name='here',
+        description='very special',
+        on_failure='ignore')
+    assert_status('ok', res)
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, name='here')
+    here = res[0]
+    eq_('very special', here['annex-description'])

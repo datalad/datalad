@@ -40,6 +40,7 @@ from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
+from datalad.interface.common_opts import location_description
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import swallow_logs
 from datalad.dochelpers import exc_str
@@ -140,9 +141,9 @@ class Siblings(Interface):
                 sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.""",
             constraints=EnsureStr() | EnsureNone()),
+        description=location_description,
 
         ## info options
-        # --description gh-1484
         # --template/cfgfrom gh-1462 (maybe also for a one-time inherit)
         # --wanted gh-925 (also see below for add_sibling approach)
 
@@ -170,6 +171,7 @@ class Siblings(Interface):
             name=None,
             url=None,
             pushurl=None,
+            description=None,
             # TODO consider true, for now like add_sibling
             fetch=False,
             as_common_datasrc=None,
@@ -213,7 +215,7 @@ class Siblings(Interface):
                 # for top-level dataset there is no layout questions
                 _mangle_urls(url, ds_name),
                 _mangle_urls(pushurl, ds_name),
-                fetch,
+                fetch, description,
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_group, annex_groupwanted,
                 inherit,
@@ -245,6 +247,7 @@ class Siblings(Interface):
                     subds_url,
                     subds_pushurl,
                     fetch,
+                    description,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_group, annex_groupwanted,
                     inherit,
@@ -275,7 +278,7 @@ class Siblings(Interface):
 
 # always copy signature from above to avoid bugs
 def _add_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -311,7 +314,7 @@ def _add_remote(
         return
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, url, pushurl, fetch,
+            ds, name, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_group, annex_groupwanted,
             inherit,
@@ -323,7 +326,7 @@ def _add_remote(
 
 # always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -334,41 +337,55 @@ def _configure_remote(
         type='sibling',
         name=name,
         **res_kwargs)
-    # cheat and pretend it is all new and shiny already
-    try:
-        from datalad.distribution.add_sibling import AddSibling
-        added = AddSibling.__call__(
-            dataset=ds,
-            name=name,
-            url=url,
-            pushurl=pushurl,
-            as_common_datasrc=as_common_datasrc,
-            publish_depends=publish_depends,
-            publish_by_default=publish_by_default,
-            annex_wanted=annex_wanted,
-            annex_group=annex_group,
-            annex_groupwanted=annex_groupwanted,
-            inherit=inherit,
-            # never recursive, done outside
-            recursive=False,
-            # we want to do this in our wrapper code
-            fetch=False,
-            # configure is what `force` was used for previously
-            force=True)
-        # just make sure the legacy code doesn't surprise us
-        assert(len(added) == 1)
-    except Exception as e:
-        yield get_status_dict(
-            status='error',
-            message=exc_str(e),
-            **result_props)
+    if name is None:
+        result_props['status'] = 'error'
+        result_props['message'] = 'need sibling `name` for configuration'
+        yield result_props
         return
+    # cheat and pretend it is all new and shiny already
+    if url: # poor AddSibling blows otherwise
+        try:
+            from datalad.distribution.add_sibling import AddSibling
+            added = AddSibling.__call__(
+                dataset=ds,
+                name=name,
+                url=url,
+                pushurl=pushurl,
+                as_common_datasrc=as_common_datasrc,
+                publish_depends=publish_depends,
+                publish_by_default=publish_by_default,
+                annex_wanted=annex_wanted,
+                annex_group=annex_group,
+                annex_groupwanted=annex_groupwanted,
+                inherit=inherit,
+                # never recursive, done outside
+                recursive=False,
+                # we want to do this in our wrapper code
+                fetch=False,
+                # configure is what `force` was used for previously
+                force=True)
+            # just make sure the legacy code doesn't surprise us
+            assert(len(added) == 1)
+        except Exception as e:
+            yield get_status_dict(
+                status='error',
+                message=exc_str(e),
+                **result_props)
+            return
 
     if fetch:
         # fetch the remote so we are up to date
         lgr.debug("Fetching sibling %s of %s", name, ds)
         # TODO better use `ds.update`
         ds.repo.fetch(name)
+
+    if description:
+        if not isinstance(ds.repo, AnnexRepo):
+            result_props['status'] = 'impossible'
+            result_props['message'] = 'cannot set description of a plain Git repository'
+            yield result_props
+            return
+        ds.repo._run_annex_command('describe', annex_options=[name, description])
     # report all we know at once
     info = list(_query_remotes(ds, name))[0]
     info.update(dict(status='ok', **result_props))
@@ -377,7 +394,7 @@ def _configure_remote(
 
 # always copy signature from above to avoid bugs
 def _query_remotes(
-        ds, name, url=None, pushurl=None, fetch=None,
+        ds, name, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
@@ -450,7 +467,7 @@ def _query_remotes(
 
 
 def _remove_remote(
-        ds, name, url, pushurl, fetch,
+        ds, name, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
