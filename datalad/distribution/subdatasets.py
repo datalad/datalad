@@ -29,6 +29,8 @@ from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import require_dataset
@@ -36,6 +38,7 @@ from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import assure_list
+from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
@@ -86,14 +89,17 @@ def _parse_git_submodules(dspath, recursive):
 
     # need to go rogue  and cannot use proper helper in GitRepo
     # as they also pull in all of GitPython's magic
-    stdout, stderr = GitRunner(cwd=dspath).run(
-        cmd,
-        log_stderr=False,
-        log_stdout=True,
-        log_online=False,
-        expect_stderr=False,
-        shell=False,
-        expect_fail=False)
+    try:
+        stdout, stderr = GitRunner(cwd=dspath).run(
+            cmd,
+            log_stderr=False,
+            log_stdout=True,
+            log_online=False,
+            expect_stderr=False,
+            shell=False,
+            expect_fail=False)
+    except CommandError as e:
+        raise InvalidGitRepositoryError(exc_str(e))
 
     for line in stdout.split('\n'):
         if not line:
@@ -237,50 +243,57 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
-        if bottomup or contains or set_property or delete_property or \
-                (recursive and recursion_limit is not None):
-            # IMPLEMENTATION 1
-            # slow but flexible (one Git call per dataset)
-            if contains:
-                contains = resolve_path(contains, dataset)
-            for r in _get_submodules(
-                    dataset.path, fulfilled, recursive, recursion_limit,
-                    contains, bottomup, set_property, delete_property,
-                    refds_path):
-                # without the refds_path cannot be rendered/converted relative
-                # in the eval_results decorator
-                r['refds'] = refds_path
-                yield r
-        else:
-            # IMPLEMENTATION 2
-            # as fast as possible (just a single call to Git)
-            # need to track current parent
-            stack = [refds_path]
-            modinfo_cache = {}
-            for sm in _parse_git_submodules(refds_path, recursive=recursive):
-                # unwind the parent stack until we find the right one
-                # this assumes that submodules come sorted
-                while not sm['path'].startswith(_with_sep(stack[-1])):
-                    stack.pop()
-                parent = stack[-1]
-                if parent not in modinfo_cache:
-                    # read the parent .gitmodules, if not done yet
-                    modinfo_cache[parent] = _parse_gitmodules(parent)
-                # get URL info, etc.
-                sm.update(modinfo_cache[parent].get(sm['path'], {}))
-                subdsres = get_status_dict(
-                    'subdataset',
-                    status='ok',
-                    type='dataset',
-                    refds=refds_path,
-                    logger=lgr)
-                subdsres.update(sm)
-                subdsres['parentds'] = parent
-                if (fulfilled is None or
-                        GitRepo.is_valid_repo(sm['path']) == fulfilled):
-                    yield subdsres
-                # for the next "parent" commit this subdataset to the stack
-                stack.append(sm['path'])
+        try:
+            if not (bottomup or contains or set_property or delete_property or \
+                    (recursive and recursion_limit is not None)):
+                # FAST IMPLEMENTATION FOR THE STRAIGHTFORWARD CASE
+                # as fast as possible (just a single call to Git)
+                # need to track current parent
+                stack = [refds_path]
+                modinfo_cache = {}
+                for sm in _parse_git_submodules(refds_path, recursive=recursive):
+                    # unwind the parent stack until we find the right one
+                    # this assumes that submodules come sorted
+                    while not sm['path'].startswith(_with_sep(stack[-1])):
+                        stack.pop()
+                    parent = stack[-1]
+                    if parent not in modinfo_cache:
+                        # read the parent .gitmodules, if not done yet
+                        modinfo_cache[parent] = _parse_gitmodules(parent)
+                    # get URL info, etc.
+                    sm.update(modinfo_cache[parent].get(sm['path'], {}))
+                    subdsres = get_status_dict(
+                        'subdataset',
+                        status='ok',
+                        type='dataset',
+                        refds=refds_path,
+                        logger=lgr)
+                    subdsres.update(sm)
+                    subdsres['parentds'] = parent
+                    if (fulfilled is None or
+                            GitRepo.is_valid_repo(sm['path']) == fulfilled):
+                        yield subdsres
+                    # for the next "parent" commit this subdataset to the stack
+                    stack.append(sm['path'])
+                # MUST RETURN: the rest of the function is doing another implementation
+                return
+        except InvalidGitRepositoryError as e:
+            lgr.debug("fast subdataset query failed, trying slow robust one (%s)",
+                      exc_str(e))
+
+        # MORE ROBUST, FLEXIBLE, BUT SLOWER IMPLEMENTATION
+        # slow but flexible (one Git call per dataset), but deals with subdatasets in
+        # direct mode
+        if contains:
+            contains = resolve_path(contains, dataset)
+        for r in _get_submodules(
+                dataset.path, fulfilled, recursive, recursion_limit,
+                contains, bottomup, set_property, delete_property,
+                refds_path):
+            # without the refds_path cannot be rendered/converted relative
+            # in the eval_results decorator
+            r['refds'] = refds_path
+            yield r
 
 
 # internal helper that needs all switches, simply to avoid going through
