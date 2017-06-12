@@ -82,7 +82,20 @@ class Siblings(Interface):
 
     Additionally, any further configuration will also be reported using
     a key that matches that in the Git configuration.
+
+    By default, sibling information is rendered as one line per sibling
+    following this scheme::
+
+      <dataset_path>: <sibling_name>(<+|->) [<access_specification]
+
+    where the `+` and `-` labels indicate the presence or absence of a
+    remote data annex at a particular remote, and `access_specification`
+    contains either a URL and/or a type label for the sibling.
     """
+    # make the custom renderer the default, path reporting isn't the top
+    # priority here
+    result_renderer = 'tailored'
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -235,6 +248,24 @@ class Siblings(Interface):
                     inherit,
                     **res_kwargs):
                 yield r
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.ui import ui
+        path = relpath(res['path'],
+                       res['refds']) if res.get('refds', None) else res['path']
+        got_url = 'url' in res
+        spec = '{}{}{}{}'.format(
+            res.get('url', ''),
+            ' (' if got_url else '',
+            res.get('annex-externaltype', 'git'),
+            ')' if got_url else '')
+        ui.message('{path}: {name}({with_annex}) [{spec}]'.format(
+            **dict(
+                res,
+                path=path,
+                with_annex='+' if 'annex-uuid' in res else '-',
+                spec=spec)))
 
 
 # always copy signature from above to avoid bugs
