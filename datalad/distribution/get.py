@@ -116,36 +116,33 @@ def _install_subds_from_flexible_source(
     clone_urls = _get_flexible_source_candidates_for_submodule(
         ds, sm_path, sm_url)
 
+    # prevent inevitable exception from `clone`
+    dest_path = opj(ds.path, sm_path)
+    clone_urls = [src for src in clone_urls if src != dest_path]
+
     # now loop over all candidates and try to clone
     subds = None
-    dest_path = opj(ds.path, sm_path)
-    for src in clone_urls:
-        if src == dest_path:
-            # prevent inevitable exception from `clone`
-            lgr.warn(
-                "Candidate subdataset source URL is identical to the installation target path [%s]. Skipping.",
-                src)
-            continue
-        try:
-            subds = Clone.__call__(
-                src,
-                path=dest_path,
-                # pretend no parent -- we don't want clone to add to ds
-                # because this is a submodule already!
-                dataset=None,
-                reckless=reckless,
-                description=description,
-                result_xfm='datasets',
-                # not really need, but should protect against future RF
-                on_failure='stop',
-                result_renderer='disabled',
-                return_type='item-or-list')
-            # failure will raise an exception, hence if we got here we can
-            # leave the loop and have a successful clone
-            break
-        except IncompleteResultsError:
-            # details of the failure are logged already by common code
-            pass
+    try:
+        subds = Clone.__call__(
+            clone_urls[0],
+            path=dest_path,
+            # pretend no parent -- we don't want clone to add to ds
+            # because this is a submodule already!
+            dataset=None,
+            reckless=reckless,
+            # if we have more than one source, pass as alternatives
+            alt_sources=clone_urls[1:],
+            description=description,
+            result_xfm='datasets',
+            # not really need, but should protect against future RF
+            on_failure='stop',
+            result_renderer='disabled',
+            return_type='item-or-list')
+        # failure will raise an exception, hence if we got here we can
+        # leave the loop and have a successful clone
+    except IncompleteResultsError:
+        # details of the failure are logged already by common code
+        pass
     if subds is None:
         raise InstallFailedError(
             msg="Failed to install dataset from{}: {}".format(
@@ -231,7 +228,7 @@ def _install_necessary_subdatasets(
             sd = _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
                 relpath(cur_subds['path'], start=cur_subds['parentds']),
-                cur_subds['url'],
+                cur_subds['gitmodule_url'],
                 reckless,
                 description=description)
         except Exception as e:
@@ -283,7 +280,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 subds = _install_subds_from_flexible_source(
                     ds,
                     relpath(sub['path'], start=ds.path),
-                    sub['url'],
+                    sub['gitmodule_url'],
                     reckless,
                     description=description)
                 yield get_status_dict(
