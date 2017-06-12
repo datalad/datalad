@@ -92,12 +92,14 @@ def _parse_git_submodules(dspath, recursive):
     try:
         stdout, stderr = GitRunner(cwd=dspath).run(
             cmd,
-            log_stderr=False,
+            log_stderr=True,
             log_stdout=True,
+            # not sure why exactly, but log_online has to be false!
             log_online=False,
             expect_stderr=False,
             shell=False,
-            expect_fail=False)
+            # we don't want it to scream on stdout
+            expect_fail=True)
     except CommandError as e:
         raise InvalidGitRepositoryError(exc_str(e))
 
