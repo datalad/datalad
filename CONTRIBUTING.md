@@ -92,6 +92,7 @@ we outline the workflow used by the developers:
     - `bf-` for bug fixes
     - `rf-` for refactoring
     - `doc-` for documentation contributions (including in the code docstrings).
+    - `bm-` for changes to benchmarks
     We recommend to not work in the ``master`` branch!
 
 4. Work on this copy on your computer using Git to do the version control. When
@@ -101,7 +102,7 @@ we outline the workflow used by the developers:
           git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could
+   `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
    also use `TST` for commits concerned solely with tests, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for

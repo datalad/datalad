@@ -544,7 +544,7 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'tailored') | EnsureNone()),
+        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
         but does not cause an exception; 'continue' if any failure occurs an
@@ -584,6 +584,7 @@ def eval_results(func):
     `result_renderer` keyword argument of each decorated command. Supported
     modes are: 'default' (one line per result with action, status, path,
     and an optional message); 'json' (one object per result, like git-annex),
+    'json_pp' (like 'json', but pretty-printed spanning multiple lines),
     'tailored' custom output formatting provided by each command
     class (if any).
 
@@ -741,11 +742,12 @@ def eval_results(func):
                             res['message'][0] % res['message'][1:]
                             if isinstance(res['message'], tuple) else res['message'])
                         if 'message' in res else ''))
-                elif result_renderer == 'json':
+                elif result_renderer in ('json', 'json_pp'):
                     ui.message(json.dumps(
                         {k: v for k, v in res.items()
                          if k not in ('message', 'logger')},
-                        sort_keys=True))
+                        sort_keys=True,
+                        indent=2 if result_renderer.endswith('_pp') else None))
                 elif result_renderer == 'tailored':
                     if hasattr(_func_class, 'custom_result_renderer'):
                         _func_class.custom_result_renderer(res, **_kwargs)

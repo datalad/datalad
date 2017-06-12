@@ -24,7 +24,7 @@ from datalad.interface.utils import build_doc
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
 from datalad.support.constraints import EnsureStr
@@ -111,7 +111,7 @@ class Create(Interface):
             args=("-f", "--force",),
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
-        description=dataset_description,
+        description=location_description,
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any

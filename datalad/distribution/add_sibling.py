@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for adding a sibling to a dataset
+"""[obsolete: use `siblings add`]
 """
 
 __docformat__ = 'restructuredtext'
@@ -60,7 +60,7 @@ def _check_deps(repo, deps):
 
 
 class AddSibling(Interface):
-    """Add a sibling to a dataset.
+    """THIS COMMAND IS OBSOLETE: Use `siblings add`.
 
     """
 
