@@ -18,6 +18,7 @@ from datalad.api import subdatasets
 from nose.tools import eq_
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
 
 
@@ -85,8 +86,39 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('url', 'state', 'revision', 'subds_name'):
+        for prop in ('gitmodule_url', 'state', 'revision', 'gitmodule_name'):
             assert_in(prop, r)
+        # random property is unknown
+        assert_not_in('mike', r)
+
+    # now add info to all datasets
+    res = ds.subdatasets(
+        recursive=True,
+        set_property=[('mike', 'slow'),
+                      ('expansion', '<{refds_relname}>')])
+    assert_status('ok', res)
+    for r in res:
+        eq_(r['gitmodule_mike'], 'slow')
+        eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
+    # plain query again to see if it got into the files
+    res = ds.subdatasets(recursive=True)
+    assert_status('ok', res)
+    for r in res:
+        eq_(r['gitmodule_mike'], 'slow')
+        eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
+
+    # and remove again
+    res = ds.subdatasets(recursive=True, delete_property=('mike', 'something'))
+    assert_status('ok', res)
+    for r in res:
+        for prop in ('gitmodule_mike', 'gitmodule_something'):
+            assert_not_in(prop, r)
+    # and again, because above yields on the fly edit
+    res = ds.subdatasets(recursive=True)
+    assert_status('ok', res)
+    for r in res:
+        for prop in ('gitmodule_mike', 'gitmodule_something'):
+            assert_not_in(prop, r)
 
     #
     # test --contains

@@ -40,8 +40,6 @@ _group_dataset = (
          'CreateSiblingGithub',
          'create-sibling-github'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.rewrite_urls', 'RewriteURLs',
-         'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
         ('datalad.export', 'Export', 'export'),

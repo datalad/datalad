@@ -228,7 +228,7 @@ def _install_necessary_subdatasets(
             sd = _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
                 relpath(cur_subds['path'], start=cur_subds['parentds']),
-                cur_subds['url'],
+                cur_subds['gitmodule_url'],
                 reckless,
                 description=description)
         except Exception as e:
@@ -280,7 +280,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 subds = _install_subds_from_flexible_source(
                     ds,
                     relpath(sub['path'], start=ds.path),
-                    sub['url'],
+                    sub['gitmodule_url'],
                     reckless,
                     description=description)
                 yield get_status_dict(
