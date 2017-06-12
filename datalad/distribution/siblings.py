@@ -387,7 +387,11 @@ def _query_remotes(
         # pull repo info from annex
         # TODO maybe we should make this step optional to save the call
         # in some cases. Would need an additional flag...
-        raw_info = ds.repo.repo_info(fast=True)
+        try:
+            # need to do in safety net because of gh-1560
+            raw_info = ds.repo.repo_info(fast=True)
+        except CommandError:
+            raw_info = {}
         available_space = raw_info.get('available local disk space', None)
         for trust in ('trusted', 'semitrusted', 'untrusted'):
             ri = raw_info.get('{} repositories'.format(trust), [])
