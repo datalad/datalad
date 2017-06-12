@@ -10,7 +10,9 @@
 """
 
 from os.path import join as opj, basename
-from datalad.api import install, siblings
+from datalad.api import create
+from datalad.api import install
+from datalad.api import siblings
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
@@ -173,3 +175,20 @@ def test_siblings(origin, repo_path):
             ok_(pushurl.endswith(basename(repo.path)))
         eq_(url, r['url'])
         eq_(pushurl, r['pushurl'])
+
+
+@with_tempfile(mkdir=True)
+def test_here(path):
+    # few smoke tests regarding the 'HERE' sibling
+    ds = create(path)
+    res = ds.siblings(
+        'query',
+        on_failure='ignore')
+    assert_status('ok', res)
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, name='HERE')
+    here = res[0]
+    eq_(ds.repo.uuid, here['annex-uuid'])
+    assert_in('annex-description', here)
+    assert_in('annex-bare', here)
+    assert_in('available_local_disk_space', here)

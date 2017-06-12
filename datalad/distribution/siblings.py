@@ -23,6 +23,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
@@ -380,8 +381,26 @@ def _query_remotes(
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
         **res_kwargs):
+    annex_info = {}
+    available_space = None
+    if isinstance(ds.repo, AnnexRepo):
+        # pull repo info from annex
+        # TODO maybe we should make this step optional to save the call
+        # in some cases. Would need an additional flag...
+        raw_info = ds.repo.repo_info(fast=True)
+        available_space = raw_info.get('available local disk space', None)
+        for trust in ('trusted', 'semitrusted', 'untrusted'):
+            ri = raw_info.get('{} repositories'.format(trust), [])
+            for r in ri:
+                uuid = r.get('uuid', '00000000-0000-0000-0000-00000000000')
+                if uuid.startswith('00000000-0000-0000-0000-00000000000'):
+                    continue
+                ainfo = annex_info.get(uuid, {})
+                ainfo['description'] = r.get('description', None)
+                annex_info[uuid] = ainfo
     known_remotes = ds.repo.get_remotes()
-    remotes = [name] if name else known_remotes
+    # treat the local repo as any other remote using 'HERE' as a label
+    remotes = [name] if name else ['HERE'] + known_remotes
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
@@ -389,7 +408,7 @@ def _query_remotes(
             type='sibling',
             name=remote,
             **res_kwargs)
-        if remote not in known_remotes:
+        if remote != 'HERE' and remote not in known_remotes:
             info['status'] = 'error'
             info['message'] = 'unknown sibling name'
             yield info
@@ -397,9 +416,30 @@ def _query_remotes(
         # now pull everything we know out of the config
         # simply because it is cheap and we don't have to go through
         # tons of API layers to be able to work with it
-        for remotecfg in [k for k in ds.config.keys()
-                          if k.startswith('remote.{}.'.format(remote))]:
-            info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
+        if remote == 'HERE':
+            # special case: this repo
+            # aim to provide info using the same keys as for remotes
+            # (see below)
+            for src, dst in (('annex.uuid', 'annex-uuid'),
+                             ('core.bare', 'annex-bare'),
+                             ('annex.version', 'annex-version')):
+                val = ds.config.get(src, None)
+                if val is None:
+                    continue
+                info[dst] = val
+            if not available_space is None:
+                info['available_local_disk_space'] = available_space
+        else:
+            # common case: actual remotes
+            for remotecfg in [k for k in ds.config.keys()
+                              if k.startswith('remote.{}.'.format(remote))]:
+                info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
+        if 'annex-uuid' in info:
+            ainfo = annex_info.get(info['annex-uuid'])
+            annex_description = ainfo.get('description', None)
+            if annex_description is not None:
+                info['annex-description'] = annex_description
+
         info['status'] = 'ok'
         yield info
 
