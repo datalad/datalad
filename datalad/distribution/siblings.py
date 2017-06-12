@@ -197,7 +197,7 @@ class Siblings(Interface):
             dataset, check_installed=False, purpose='sibling configuration')
         refds_path = dataset.path
 
-        res_kwargs = dict(refds=refds_path)
+        res_kwargs = dict(refds=refds_path, logger=lgr)
 
         ds_name = basename(dataset.path)
 
@@ -252,6 +252,9 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+        if res['status'] != 'ok':
+            # logging complained about this already
+            return
         path = relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
         got_url = 'url' in res
@@ -377,21 +380,27 @@ def _query_remotes(
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
         **res_kwargs):
-    remotes = [name] if name else ds.repo.get_remotes()
+    known_remotes = ds.repo.get_remotes()
+    remotes = [name] if name else known_remotes
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
-            status='ok',
             path=ds.path,
             type='sibling',
             name=remote,
             **res_kwargs)
+        if remote not in known_remotes:
+            info['status'] = 'error'
+            info['message'] = 'unknown sibling name'
+            yield info
+            continue
         # now pull everything we know out of the config
         # simply because it is cheap and we don't have to go through
         # tons of API layers to be able to work with it
         for remotecfg in [k for k in ds.config.keys()
                           if k.startswith('remote.{}.'.format(remote))]:
             info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
+        info['status'] = 'ok'
         yield info
 
 
