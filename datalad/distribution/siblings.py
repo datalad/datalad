@@ -79,7 +79,8 @@ class Siblings(Interface):
         Absolute path of the dataset
 
     "url"
-        At minimum a "fetch" URL, possibly also a "pushurl"
+        For regular siblings at minimum a "fetch" URL, possibly also a
+        "pushurl"
 
     Additionally, any further configuration will also be reported using
     a key that matches that in the Git configuration.
