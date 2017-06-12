@@ -507,7 +507,9 @@ class CreateSibling(Interface):
                 # this can happen when there is `since`, but we have no
                 # use for anything but datasets here
                 continue
-            checkds_remotes = Dataset(ap['path']).repo.get_remotes()
+            checkds_remotes = Dataset(ap['path']).repo.get_remotes() \
+                if ap.get('state', None) != 'absent' \
+                else []
             if publish_depends:
                 # make sure dependencies are valid
                 # TODO: inherit -- we might want to automagically create
