@@ -24,6 +24,7 @@ from collections import OrderedDict
 from os.path import abspath, isabs
 from os.path import join as opj
 from os.path import dirname
+from ntpath import splitdrive as win_splitdrive
 
 from six import string_types
 from six import iteritems
@@ -282,11 +283,22 @@ class SimpleURLStamper(object):
 
 def _guess_ri_cls(ri):
     """Factory function which would determine which type of a ri a provided string is"""
+    TYPES = {
+        'url': URL,
+        'ssh':  SSHRI,
+        'file': PathRI,
+        'datalad': DataLadRI
+    }
+    # go in exotic mode when this is an absolutte windows path
+    if win_splitdrive(ri)[0]:
+        # OMG we got something from windows
+        lgr.log(5, "Detected file ri")
+        return TYPES['file']
+
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
     fields = URL._pr_to_fields(urlparse(ri))
     lgr.log(5, "Parsed ri %s into fields %s" % (ri, fields))
-
     type_ = 'url'
     # Special treatments
     # file:///path should stay file:
@@ -314,12 +326,6 @@ def _guess_ri_cls(ri):
         # e.g. //a/path
         type_ = 'datalad'
 
-    TYPES = {
-        'url': URL,
-        'ssh':  SSHRI,
-        'file': PathRI,
-        'datalad': DataLadRI
-    }
     cls = TYPES[type_]
     # just parse the ri according to regex matchint ssh "ri" specs
     lgr.log(5, "Detected %s ri" % type_)
