@@ -55,7 +55,8 @@ def test_siblings(origin, repo_path):
         name="test-remote",
         url=httpurl1,
         publish_depends=['r1', 'r2'],
-        on_failure='ignore')
+        on_failure='ignore',
+        result_renderer=None)
     assert_status('error', res)
     assert_in('unknown sibling(s) specified as publication dependency',
               res[0]['message'])
@@ -65,7 +66,8 @@ def test_siblings(origin, repo_path):
     res = siblings('configure',
                    dataset=source, name="test-remote",
                    url=httpurl1,
-                   result_xfm='paths')
+                   result_xfm='paths',
+                   result_renderer=None)
 
     eq_(res, [source.path])
     assert_in("test-remote", source.repo.get_remotes())
@@ -74,26 +76,31 @@ def test_siblings(origin, repo_path):
 
     # reconfiguring doesn't change anything
     siblings('configure', dataset=source, name="test-remote",
-             url=httpurl1)
+             url=httpurl1,
+             result_renderer=None)
     assert_in("test-remote", source.repo.get_remotes())
     eq_(httpurl1,
         source.repo.get_remote_url("test-remote"))
     # re-adding doesn't work
     res = siblings('add', dataset=source, name="test-remote",
-                   url=httpurl1, on_failure='ignore')
+                   url=httpurl1, on_failure='ignore',
+                   result_renderer=None)
     assert_status('error', res)
     # only after removal
-    res = siblings('remove', dataset=source, name="test-remote")
+    res = siblings('remove', dataset=source, name="test-remote",
+                   result_renderer=None)
     assert_status('ok', res)
     assert_not_in("test-remote", source.repo.get_remotes())
     res = siblings('add', dataset=source, name="test-remote",
-                   url=httpurl1, on_failure='ignore')
+                   url=httpurl1, on_failure='ignore',
+                   result_renderer=None)
     assert_status('ok', res)
 
     # add to another remote automagically taking it from the url
     # and being in the dataset directory
     with chpwd(source.path):
-        res = siblings('add', url=httpurl2)
+        res = siblings('add', url=httpurl2,
+                       result_renderer=None)
     assert_result_count(
         res, 1,
         name="remote2.example.com", type='sibling')
@@ -101,8 +108,9 @@ def test_siblings(origin, repo_path):
 
     # don't fail with conflicting url, when using force:
     res = siblings('configure',
-                    dataset=source, name="test-remote",
-                    url=httpurl1 + "/elsewhere")
+                   dataset=source, name="test-remote",
+                   url=httpurl1 + "/elsewhere",
+                   result_renderer=None)
     assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
@@ -132,7 +140,8 @@ def test_siblings(origin, repo_path):
     res = siblings('configure',
                    dataset=source, name="test-remote",
                    url=httpurl1 + "/elsewhere",
-                   pushurl=sshurl)
+                   pushurl=sshurl,
+                   result_renderer=None)
     assert_status('ok', res)
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
@@ -145,7 +154,8 @@ def test_siblings(origin, repo_path):
             dataset=source, name="test-remote",
             url=httpurl1 + "/%NAME",
             pushurl=sshurl + "/%NAME",
-            recursive=True):
+            recursive=True,
+            result_renderer=None):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
@@ -163,7 +173,8 @@ def test_siblings(origin, repo_path):
             dataset=source, name="test-remote-2",
             url=httpurl1,
             pushurl=sshurl,
-            recursive=True):
+            recursive=True,
+            result_renderer=None):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote-2", repo.get_remotes())
         url = repo.get_remote_url("test-remote-2")
@@ -183,7 +194,8 @@ def test_here(path):
     ds = create(path)
     res = ds.siblings(
         'query',
-        on_failure='ignore')
+        on_failure='ignore',
+        result_renderer=None)
     assert_status('ok', res)
     assert_result_count(res, 1)
     assert_result_count(res, 1, name='here')
@@ -198,7 +210,8 @@ def test_here(path):
         'configure',
         name='here',
         description='very special',
-        on_failure='ignore')
+        on_failure='ignore',
+        result_renderer=None)
     assert_status('ok', res)
     assert_result_count(res, 1)
     assert_result_count(res, 1, name='here')
