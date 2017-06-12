@@ -73,7 +73,8 @@ def _translate_type(mode, ap, prop):
 
 def _parse_git_diff(dspath, diff_thingie=None, paths=None,
                     ignore_submodules='none', staged=False):
-    cmd = ['git', 'diff', '--raw',
+    # use '--work-tree=.' to get direct omde to cooperate
+    cmd = ['git', '--work-tree=.', 'diff', '--raw',
            # file names NULL terminated
            '-z',
            # how to treat submodules (see git diff docs)
