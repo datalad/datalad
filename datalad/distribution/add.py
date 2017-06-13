@@ -15,12 +15,12 @@ import logging
 from os import listdir
 from os.path import isdir
 from os.path import join as opj
-from os.path import relpath
 from os.path import normpath
 from os.path import pardir
 
 from datalad.utils import unique
 from datalad.utils import get_dataset_root
+from datalad.utils import posix_relpath
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -327,7 +327,7 @@ class Add(Interface):
                         message='cannot add subdataset with no commits',
                         **dict(common_report, **ap))
                     continue
-                subds_relpath = relpath(ap['path'], ds_path)
+                subds_relpath = posix_relpath(ap['path'], ds_path)
                 # make an attempt to configure a submodule source URL based on the
                 # discovered remote configuration
                 remote, branch = subds.repo.get_tracking_branch()
