@@ -98,10 +98,6 @@ class AddSibling(Interface):
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
-        fetch=Parameter(
-            args=("--fetch",),
-            action="store_true",
-            doc="""fetch the sibling after adding"""),
         force=Parameter(
             args=("--force", "-f",),
             action="store_true",
@@ -119,7 +115,7 @@ class AddSibling(Interface):
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(url=None, name=None, dataset=None,
-                 pushurl=None, fetch=False, force=False,
+                 pushurl=None, force=False,
                  as_common_datasrc=None, publish_depends=None,
                  publish_by_default=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
@@ -133,7 +129,6 @@ class AddSibling(Interface):
         #  which remote it is actively tracking in current branch... but may be
         #  would be too much magic
 
-        # XXX possibly fail if fetch is False and as_common_datasrc
         # not yet sure if that is an error
         if (url is None and pushurl is None):
             raise InsufficientArgumentsError(
@@ -247,10 +242,6 @@ class AddSibling(Interface):
                 repo.add_remote(name, repoinfo['url'])
             if pushurl:
                 repo.set_remote_url(name, repoinfo['pushurl'], push=True)
-            if fetch:
-                # fetch the remote so we are up to date
-                lgr.debug("Fetching sibling %s of %s", name, repo_name)
-                repo.fetch(name)
 
             if inherit:
                 # Adjust variables which we should inherit
