@@ -232,8 +232,9 @@ def posix_relpath(path, start=None):
     # join POSIX style
     return posixpath.join(
         # split and relpath native style
+        # python2.7 ntpath implementation of relpath cannot handle start=None
         *psplit(
-            relpath(path, start=start)))
+            relpath(path, start=start if start is not None else '')))
 
 
 def is_explicit_path(path):
