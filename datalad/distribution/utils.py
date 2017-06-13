@@ -63,12 +63,14 @@ def get_git_dir(path):
     """
 
     from os.path import isfile
-    from os import readlink
 
     dot_git = opj(path, ".git")
     if not exists(dot_git):
         raise RuntimeError("Missing .git in %s." % path)
     elif islink(dot_git):
+        # readlink cannot be imported on windows, but there should also
+        # be no symlinks
+        from os import readlink
         git_dir = readlink(dot_git)
     elif isdir(dot_git):
         git_dir = ".git"
