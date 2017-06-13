@@ -16,6 +16,7 @@ import logging
 import re
 
 from os.path import join as opj
+from os.path import relpath
 from datalad import cfg
 
 from datalad.interface.common_opts import recursion_flag, recursion_limit
@@ -30,7 +31,7 @@ from datalad.support.exceptions import MissingExternalDependency
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
     require_dataset, Dataset
-from .add_sibling import AddSibling
+from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
@@ -302,16 +303,15 @@ class CreateSiblingGithub(Interface):
         # dataset instance and mountpoint relative to the top
         toprocess = [(ds, '')]
         if recursive:
-            for d in ds.get_subdatasets(
+            for sub in ds.subdatasets(
                     fulfilled=None,  # we want to report on missing dataset in here
-                    absolute=False,
                     recursive=recursive,
-                    recursion_limit=recursion_limit):
-                sub = Dataset(opj(ds.path, d))
+                    recursion_limit=recursion_limit,
+                    result_xfm='datasets'):
                 if not sub.is_installed():
                     lgr.info('Ignoring unavailable subdataset %s', sub)
                     continue
-                toprocess.append((sub, d))
+                toprocess.append((sub, relpath(sub.path, start=ds.path)))
 
         # check for existing remote configuration
         filtered = []
@@ -349,13 +349,13 @@ class CreateSiblingGithub(Interface):
                 ignore_var = 'remote.{}.annex-ignore'.format(name)
                 if not ignore_var in d.config:
                     d.config.add(ignore_var, 'true', where='local')
-                AddSibling()(
+                Siblings()(
+                    'configure',
                     dataset=d,
                     name=name,
                     url=url,
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
-                    force=existing in {'reconfigure'},
                     publish_depends=publish_depends)
 
         # TODO let submodule URLs point to Github (optional)

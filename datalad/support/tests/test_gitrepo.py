@@ -128,7 +128,7 @@ def test_GitRepo_add(src, path):
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty)
 
     filename = "another.txt"
     with open(opj(path, filename), 'w') as f:
@@ -178,7 +178,9 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(path, annex=False, untracked=[])
+    ok_clean_git(gr)
+    eq_("Testing GitRepo.commit().{}".format(linesep),
+        gr.repo.head.commit.message)
 
     with open(opj(path, filename), 'w') as f:
         f.write("changed content")
@@ -186,7 +188,23 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("commit with options", options=to_options(dry_run=True))
     # wasn't actually committed:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty)
+
+    # commit with empty message:
+    gr.commit()
+    ok_clean_git(gr)
+
+    # nothing to commit doesn't raise by default:
+    gr.commit()
+    # but does with careless=False:
+    assert_raises(CommandError, gr.commit, careless=False)
+
+    # committing untracked file raises:
+    with open(opj(path, "untracked"), "w") as f:
+        f.write("some")
+    assert_raises(FileNotInRepositoryError, gr.commit, files="untracked")
+    # not existing file as well:
+    assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -959,7 +977,7 @@ def test_GitRepo_count_objects(repo_path):
 
 
 @with_tempfile
-def test_get_deleted(path):
+def test_get_missing(path):
     repo = GitRepo(path, create=True)
     os.makedirs(opj(path, 'deep'))
     with open(opj(path, 'test1'), 'w') as f:
@@ -969,9 +987,17 @@ def test_get_deleted(path):
     repo.add('.', commit=True)
     ok_clean_git(path, annex=False)
     os.unlink(opj(path, 'test1'))
-    eq_(repo.get_deleted_files(), ['test1'])
+    eq_(repo.get_missing_files(), ['test1'])
     rmtree(opj(path, 'deep'))
-    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
+    eq_(sorted(repo.get_missing_files()), [opj('deep', 'test2'), 'test1'])
+    # nothing is actually known to be deleted
+    eq_(repo.get_deleted_files(), [])
+    # do proper removal
+    repo.remove(opj(path, 'test1'))
+    # no longer missing
+    eq_(repo.get_missing_files(), [opj('deep', 'test2')])
+    # but deleted
+    eq_(repo.get_deleted_files(), ['test1'])
 
 
 @with_tempfile
@@ -1053,6 +1079,45 @@ def test_GitRepo_flyweight(path1, path2):
 
     # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_GitRepo_flyweight_monitoring_inode(path, store):
+    # testing for issue #1512
+
+    repo = GitRepo(path, create=True)
+    with open(opj(path, "testfile.txt"), "w") as f:
+        f.write("whatever")
+    repo.add("testfile.txt", commit=True, msg="some load")
+
+    # requesting HEAD info from
+    hexsha = repo.repo.head.object.hexsha
+
+    # move everything to store
+    import os
+    import shutil
+    old_inode = os.stat(path).st_ino
+    shutil.copytree(path, store, symlinks=True)
+    # kill original
+    rmtree(path)
+    assert (not exists(path))
+    # recreate
+    shutil.copytree(store, path, symlinks=True)
+    new_inode = os.stat(path).st_ino
+    assert_not_equal(old_inode, new_inode)
+    # Now, there is a running git process by GitPython's Repo instance,
+    # connected to an invalid inode!
+    # GitRepo needs to make sure to stop them, whenever we access the instance
+    # again (or request a flyweight instance).
+
+    # The following two accesses fail in issue #1512:
+    # 1. requesting HEAD info from old instance
+    hexsha = repo.repo.head.object.hexsha
+
+    # 2. get a "new" instance and requesting HEAD
+    repo2 = GitRepo(path)
+    hexsha2 = repo2.repo.head.object.hexsha
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},

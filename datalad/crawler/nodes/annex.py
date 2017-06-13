@@ -38,6 +38,7 @@ from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
 from ...utils import getpwd
+from ...utils import try_multiple
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
@@ -168,11 +169,8 @@ class initiate_dataset(object):
             # place hack from 'add-to-super' times here
             sds = ds.get_superdataset()
             if sds is not None:
-                from datalad.distribution.utils import _install_subds_inplace
-                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
-                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
-                _install_subds_inplace(ds=sds, path=ds.path,
-                                       relativepath=subdsrelpath)
+                lgr.debug("Adding %s as a subdataset to %s", ds, sds)
+                sds.add(ds.path, save=False)
                 # this leaves the subdataset staged in the parent
             elif str(self.add_to_super) != 'auto':
                 raise ValueError(
@@ -519,7 +517,11 @@ class Annexificator(object):
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(url_status.size), url))
             try:
-                out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+                out_json = try_multiple(
+                    6, AnnexBatchCommandError, 3,  # up to 3**5=243 sec sleep
+                    _call,
+                    self.repo.add_url_to_file, fpath, url,
+                    options=annex_options, batch=True)
             except AnnexBatchCommandError as exc:
                 if self.skip_problematic:
                     lgr.warning("Skipping %s due to %s", url, exc_str(exc))
@@ -849,7 +851,7 @@ class Annexificator(object):
             self._statusdb.save()
         # there is something to commit and backends was set but no .gitattributes yet
         path = self.repo.path
-        if self.repo.dirty and not exists(opj(path, '.gitattributes')):
+        if self.repo.dirty and not exists(opj(path, '.gitattributes')) and isinstance(self.repo, AnnexRepo):
             backends = self.repo.default_backends
             if backends:
                 # then record default backend into the .gitattributes

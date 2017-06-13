@@ -17,6 +17,9 @@ from distutils.version import LooseVersion
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
+# import version helper from config to have only one implementation
+# config needs this to avoid circular imports
+from datalad.config import get_git_version as __get_git_version
 from .exceptions import CommandError
 
 __all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
@@ -55,11 +58,6 @@ def _get_annex_version():
         return out.split('\n')[0].split(':')[1].strip()
 
 
-def __get_git_version(runner):
-    """Return version of available git"""
-    return runner.run('git version'.split())[0].split()[2]
-
-
 def _get_git_version():
     """Return version of git we use (might be bundled)"""
     return __get_git_version(_git_runner)
@@ -72,6 +70,24 @@ def _get_system_git_version():
     bundled with git-annex
     """
     return __get_git_version(_runner)
+
+
+def _get_system_ssh_version():
+    """Return version of ssh available system-wide
+
+    Annex prior 20170302 was using bundled version, but now would use system one
+    if installed
+    """
+    try:
+        out, err = _runner.run('ssh -V'.split())
+        # apparently spits out to err but I wouldn't trust it blindly
+        if err.startswith('OpenSSH'):
+            out = err
+        assert out.startswith('OpenSSH')  # that is the only one we care about atm
+        return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
+    except CommandError as exc:
+        lgr.warn("Could not determine version of ssh available: %s", exc_str(exc))
+        return None
 
 
 class ExternalVersions(object):
@@ -94,6 +110,7 @@ class ExternalVersions(object):
         'cmd:annex': _get_annex_version,
         'cmd:git': _get_git_version,
         'cmd:system-git': _get_system_git_version,
+        'cmd:system-ssh': _get_system_ssh_version,
     }
 
     def __init__(self):

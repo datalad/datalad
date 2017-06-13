@@ -44,8 +44,8 @@ findme = 5.0
 
 _dataset_config_template = {
     'ds': {
-    '.datalad': {
-        'config': _config_file_content}}}
+        '.datalad': {
+            'config': _config_file_content}}}
 
 
 @with_tree(tree=_dataset_config_template)
@@ -159,8 +159,8 @@ def test_something(path, new_home):
         assert(exists(global_gitconfig))
         # it did not go into the dataset's config!
         assert_not_in('datalad.unittest.youcan', cfg)
-        # does not monitor changes!
-        globalcfg.reload()
+        # does not monitor additions!
+        globalcfg.reload(force=True)
         assert_in('datalad.unittest.youcan', globalcfg)
         with swallow_logs():
             assert_raises(
@@ -188,10 +188,11 @@ def test_something(path, new_home):
     cfg.set('datalad.godgiven', 'false')
     assert_equal(cfg.get('datalad.godgiven'), True)
 
+
 @with_tree(tree={
     'ds': {
-    '.datalad': {
-        'config': """\
+        '.datalad': {
+            'config': """\
 [crazy]
     fa = !git remote | xargs -r -I REMOTE /bin/bash -c 'echo I: Fetching from REMOTE && git fetch --prune REMOTE && git fetch -t REMOTE' && [ -d .git/svn ] && bash -c 'echo I: Fetching from SVN && git svn fetch' || : && [ -e .gitmodules ] && bash -c 'echo I: Fetching submodules && git submodule foreach git fa' && [ -d .git/sd ] && bash -c 'echo I: Fetching bugs into sd && git-sd pull --all' || :
     pa = !git paremotes | tr ' ' '\\n'  | xargs -r -l1 git push

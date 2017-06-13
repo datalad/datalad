@@ -135,13 +135,6 @@ definitions = {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
     },
-    'datalad.api.alwaysrender': {
-        'ui': ('yesno', {
-               'title': 'Python API output rendering',
-               'text': 'Should the high-level API functions be altered to render output like the command line interface would do, in order to make interactive use less cumbersome?'}),
-        'default': False,
-        'type': EnsureBool(),
-    },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '

@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from six import text_type
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
@@ -24,7 +25,7 @@ from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
-from datalad.distribution.add_sibling import AddSibling
+from datalad.distribution.siblings import Siblings
 from datalad.distribution.add_sibling import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.add_sibling import _urljoin
@@ -99,11 +100,7 @@ def _create_dataset_sibling(
 
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
-    # .git/config seems to not like all the escapes since they aren't needed
-    # XXX yoh broke consistency with this escape argument present only in SSHRI
-    #     but here it could be a simple URL as tests show
-    ds_sshurl = ssh_url.as_str(escape=False) \
-        if isinstance(ssh_url, SSHRI) else ssh_url.as_str()
+    ds_sshurl = ssh_url.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%RELNAME', ds_name) \
         if target_url else ds_sshurl
@@ -147,7 +144,17 @@ def _create_dataset_sibling(
                 path_exists = False
             except CommandError as e:
                 # If fails to rmdir -- either contains stuff no permissions
-                _msg += " And it fails to rmdir (%s)." % (e.stderr.strip(), )
+                # TODO: fixup encode/decode dance again :-/ we should have got
+                # unicode/str here by now.  I guess it is the same as
+                # https://github.com/ReproNim/niceman/issues/83
+                # where I have reused this Runner thing
+                try:
+                    # ds_name is unicode which makes _msg unicode so we must be
+                    # unicode-ready
+                    err_str = text_type(e.stderr)
+                except UnicodeDecodeError:
+                    err_str = e.stderr.decode(errors='replace')
+                _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
 
         if path_exists:
             if existing == 'error':
@@ -200,14 +207,15 @@ def _create_dataset_sibling(
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
     lgr.debug("Adding the siblings")
-    AddSibling.__call__(
+    # TODO generator, yield the now swallowed results
+    Siblings.__call__(
+        'configure',
         dataset=ds,
         name=name,
         url=ds_target_url,
         pushurl=ds_target_pushurl,
         recursive=False,
         fetch=True,
-        force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
         publish_depends=publish_depends,
@@ -576,9 +584,11 @@ class CreateSibling(Interface):
                               "datalad repository.\nError: %s" % exc_str(e))
 
         # in reverse order would be depth first
-        lgr.debug("Running post-update hooks in all created siblings")
+        lgr.info("Running post-update hooks in all created siblings")
+        # TODO: add progressbar
         for path in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
+            lgr.debug("Running hook for %s", path)
             try:
                 ssh("cd {} && hooks/post-update".format(
                     sh_quote(_path_(path, ".git")))
@@ -662,25 +672,30 @@ class CreateSibling(Interface):
         # make sure hooks directory exists (see #1251)
         ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
-        # post-update hook should create its log directory if doesn't exist
-        logs_remote_dir = opj(path, WEB_META_LOG)
-
-        make_log_dir = 'mkdir -p "{}"'.format(logs_remote_dir)
 
         # create json command for current dataset
-        json_command = r'''
-        mkdir -p {};
-        ( which datalad > /dev/null \
-        && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file '{}'; ) \
-        || echo "no datalad found - skipping generation of indexes for web frontend"; \
-        ) &> "{}/{}"
-        '''.format(logs_remote_dir,
-                   str(path),
-                   logs_remote_dir,
-                   'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT)
+        log_filename = 'datalad-publish-hook-$(date +%s).log' % TIMESTAMP_FMT
+        hook_content = r'''#!/bin/bash
 
-        # collate content for post_update hook
-        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', make_log_dir, json_command])
+git update-server-info
+
+#
+# DataLad
+#
+# (Re)generate meta-data for DataLad Web UI and possibly init new submodules
+dsdir="{path}"
+logfile="$dsdir/{WEB_META_LOG}/{log_filename}"
+
+mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
+
+( which datalad > /dev/null \
+  && ( cd ..; GIT_DIR="$PWD/.git" datalad ls -a --json file "$dsdir"; ) \
+  || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
+) &> "$logfile"
+
+# Some submodules might have been added and thus we better init them
+( cd ..; git submodule update --init >> "$logfile" 2>&1 || : ; )
+'''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:
             # create post_update hook script
@@ -714,6 +729,7 @@ class CreateSibling(Interface):
             with open(js_file) as asset:
                 try:
                     from jsmin import jsmin
+                    # jsmin = lambda x: x   # no minimization
                     minified = jsmin(asset.read())                      # minify asset
                 except ImportError:
                     lgr.warning(

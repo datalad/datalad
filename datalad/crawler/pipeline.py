@@ -256,7 +256,11 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         # since it is done below at the node level
     else:  # it is a "node" which should generate (or return) us an iterable to feed
         # its elements into the rest of the pipeline
-        lgr.debug("Node: %s" % node)
+        try:
+            node_str = node._custom_str
+        except AttributeError:
+            node_str = str(node)
+        lgr.debug("Node: %s", node_str)
         prev_stats = data.get('datalad_stats', None)  # so we could check if the node doesn't dump it
         data_in_to_loop = node(data)
 

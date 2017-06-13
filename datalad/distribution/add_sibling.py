@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for adding a sibling to a dataset
+"""[obsolete: use `siblings add`]
 """
 
 __docformat__ = 'restructuredtext'
@@ -16,6 +16,7 @@ import logging
 
 from collections import OrderedDict
 from os.path import join as opj, basename
+from os.path import relpath
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -59,7 +60,7 @@ def _check_deps(repo, deps):
 
 
 class AddSibling(Interface):
-    """Add a sibling to a dataset.
+    """THIS COMMAND IS OBSOLETE: Use `siblings add`.
 
     """
 
@@ -162,18 +163,18 @@ class AddSibling(Interface):
         repos[ds_basename] = {'repo': ds.repo}
 
         if recursive:
-            for subds_name in ds.get_subdatasets(recursive=True):
-                subds_path = opj(ds.path, subds_name)
-                subds = Dataset(subds_path)
+            for subds in ds.subdatasets(recursive=True, result_xfm='datasets'):
                 lgr.debug("Adding sub-dataset %s for adding a sibling",
-                          subds_path)
+                          subds.path)
                 if not subds.is_installed():
                     lgr.info("Skipping adding sibling for %s since it "
                              "is not installed", subds)
                     continue
-                repos[ds_basename + '/' + subds_name] = {
+                # MIH why not simply absolute paths?
+                repos[ds_basename + '/' + relpath(subds.path, start=ds.path)] = {
                     #                repos[subds_name] = {
-                    'repo': GitRepo(subds_path, create=False)
+                    # MIH this next line is strange, why not subds.repo? why GitRepo?
+                    'repo': GitRepo(subds.path, create=False)
                 }
 
         # Note: This is copied from create_sibling

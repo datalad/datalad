@@ -173,8 +173,10 @@ cd $SUPERDATASET
 datalad install ///
 cd datasets.datalad.org
 
-datalad create -d . workshops  # create subdataset to hold various workshops datasets
-cd workshops
+# -redone because now datasets.datalad.org already has workshops dataset
+# and datalad should refuse to create a new one (without removing old one first)
+datalad create -d . workshops-redone  # create subdataset to hold various workshops datasets
+cd workshops-redone
 mv "$TOPDIR/nipype-workshop-2017" nipype-2017  # chose shorter name
 # add it as a subdataset (git submodule) within
 datalad add -d . nipype-2017
@@ -234,7 +236,7 @@ datalad create-sibling -s public --inherit -r --existing skip
 # we can describe via
 #%
 
-git -C workshops/nipype-2017/ds000114 annex wanted public 'include=derivatives/*'
+git -C workshops-redone/nipype-2017/ds000114 annex wanted public 'include=derivatives/*'
 
 #%
 # And now I was ready to publish changes to the entire collection of datasets
@@ -257,7 +259,7 @@ datalad publish -r --to=public
 #%
 
 (
-  cd $PUBLISHDIR/workshops/nipype-2017/ds000114
+  cd $PUBLISHDIR/workshops-redone/nipype-2017/ds000114
   git checkout nipype_test1
   # rerun the hook to regenerate meta-data for web-frontend
   cd .git;  hooks/post-update

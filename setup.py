@@ -59,6 +59,7 @@ requires = {
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
+        'wrapt',
     ] + pbar_requires,
     'downloaders': [
         'boto',
@@ -104,7 +105,8 @@ requires.update({
     ],
     'devel-utils': [
         'nose-timer',
-        'line-profiler',
+        # disable for now, as it pulls in ipython 6, which is PY3 only
+        #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
         # keyring)  but not installable on travis, IIRC since it needs connectivity
         # to the dbus whenever installed or smth like that, thus disabled here

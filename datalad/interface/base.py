@@ -12,16 +12,23 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.interface.base')
+
 import sys
 import re
 import textwrap
-from os.path import curdir
+import inspect
+from collections import OrderedDict
 
 from ..ui import ui
 from ..dochelpers import exc_str
 
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
+from datalad.support.constraints import EnsureKeyChoice
+from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import resolve_path
 
 
 def get_api_name(intfspec):
@@ -304,11 +311,63 @@ class Interface(object):
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
+        # we are coming from the entry point, this is the toplevel command,
+        # let it run like generator so we can act on partial results quicker
+        # TODO remove following condition test when transition is complete and
+        # run indented code unconditionally
+        if cls.__name__ not in (
+                'AddArchiveContent', 'AddSibling', 'AggregateMetaData',
+                'CrawlInit', 'Crawl', 'CreateSiblingGithub', 'CreateSibling',
+                'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
+                'Publish', 'SSHRun', 'Search'):
+            # set all common args explicitly  to override class defaults
+            # that are tailored towards the the Python API
+            kwargs['return_type'] = 'generator'
+            kwargs['result_xfm'] = None
+            # allow commands to override the default, unless something other than
+            # default is requested
+            kwargs['result_renderer'] = \
+                args.common_output_format if args.common_output_format != 'default' \
+                else getattr(cls, 'result_renderer', args.common_output_format)
+            if '{' in args.common_output_format:
+                # stupid hack, could and should become more powerful
+                kwargs['result_renderer'] = \
+                    lambda x, **kwargs: ui.message(args.common_output_format.format(**x))
+            if args.common_on_failure:
+                kwargs['on_failure'] = args.common_on_failure
+            # compose filter function from to be invented cmdline options
+            result_filter = None
+            if args.common_report_status:
+                if args.common_report_status == 'success':
+                    result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
+                elif args.common_report_status == 'failure':
+                    result_filter = EnsureKeyChoice('status', ('impossible', 'error'))
+                else:
+                    result_filter = EnsureKeyChoice('status', (args.common_report_status,))
+            if args.common_report_type:
+                tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
+                result_filter = result_filter & tfilt if result_filter else tfilt
+            kwargs['result_filter'] = result_filter
         try:
-            return cls.__call__(**kwargs)
+            ret = cls.__call__(**kwargs)
+            if inspect.isgenerator(ret):
+                ret = list(ret)
+            if args.common_output_format == 'tailored' and \
+                    hasattr(cls, 'custom_result_summary_renderer'):
+                cls.custom_result_summary_renderer(ret)
+            return ret
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
             sys.exit(1)
+
+    @classmethod
+    def get_refds_path(cls, dataset):
+        """Return a resolved reference dataset path from a `dataset` argument"""
+        # theoretically a dataset could come in as a relative path -> resolve
+        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if refds_path:
+            refds_path = resolve_path(refds_path)
+        return refds_path
 
     @staticmethod
     def _prep(
@@ -414,22 +473,26 @@ class Interface(object):
                 raise ValueError(
                     "will not touch paths outside of installed datasets: %s"
                     % nondataset_paths)
+        if unavailable_paths:
+            lgr.debug('Encountered unavaliable paths: %s', unavailable_paths)
         return content_by_ds, unavailable_paths
 
 
-def report_result_objects(cls, res, args, passive):
-    from datalad.ui import ui
-    from datalad.distribution.dataset import Dataset
-    if not res:
-        ui.message("Nothing was {}".format(passive))
-        return
-    msg = "{n} {obj} {action}:\n".format(
-        obj='items were' if len(res) > 1 else 'item was',
-        n=len(res),
-        action=passive)
-    for item in res:
-        if isinstance(item, Dataset):
-            msg += "Dataset: %s\n" % item.path
-        else:
-            msg += "File: %s\n" % item
-    ui.message(msg)
+def merge_allargs2kwargs(call, args, kwargs):
+    """Generate a kwargs dict from a call signature and *args, **kwargs"""
+    from inspect import getargspec
+    argspec = getargspec(call)
+    defaults = argspec.defaults
+    nargs = len(argspec.args)
+    assert (nargs >= len(defaults))
+    # map any args to their name
+    argmap = list(zip(argspec.args[:len(args)], args))
+    kwargs_ = OrderedDict(argmap)
+    # map defaults of kwargs to their names (update below)
+    for k, v in zip(argspec.args[-len(defaults):], defaults):
+        if k not in kwargs_:
+            kwargs_[k] = v
+    # update with provided kwarg args
+    kwargs_.update(kwargs)
+    assert (nargs == len(kwargs_))
+    return kwargs_

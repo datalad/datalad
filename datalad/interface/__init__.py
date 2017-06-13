@@ -28,8 +28,8 @@ _group_dataset = (
         ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.uninstall', 'Drop', 'drop', 'drop'),
-        ('datalad.distribution.uninstall', 'Remove', 'remove', 'remove'),
+        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
+        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
@@ -40,8 +40,6 @@ _group_dataset = (
          'CreateSiblingGithub',
          'create-sibling-github'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.rewrite_urls', 'RewriteURLs',
-         'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
         ('datalad.export', 'Export', 'export'),
@@ -72,7 +70,12 @@ _group_misc = (
 _group_plumbing = (
     'Plumbing commands',
     [
+        ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.interface.diff', 'Diff', 'diff'),
+        ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
+        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])

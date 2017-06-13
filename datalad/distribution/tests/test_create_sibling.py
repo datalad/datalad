@@ -70,9 +70,14 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
     for path in not_paths:
         assert_false(exists(opj(target_path, path)))
 
-    # correct ls_json command in hook content (path wrapped in quotes)
-    ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -a --json file \'%s\'.*' % target_path,
+    hook_path = _path_(target_path, '.git/hooks/post-update')
+    ok_file_has_content(hook_path,
+                        '.*\ndsdir="%s"\n.*' % target_path,
+                        re_=True,
+                        flags=re.DOTALL)
+    # correct ls_json command in hook content (path wrapped in "quotes)
+    ok_file_has_content(hook_path,
+                        '.*datalad ls -a --json file "\$dsdir".*',
                         re_=True,
                         flags=re.DOTALL)
 
@@ -117,7 +122,9 @@ def test_invalid_call(path):
 def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
-    source = install(src_path, source=origin)
+    source = install(
+        src_path, source=origin,
+        result_xfm='datasets', return_type='item-or-list')
 
     target_path = opj(target_rootpath, "basic")
     with swallow_logs(new_level=logging.ERROR) as cml:
@@ -263,6 +270,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # on elderly git we don't change receive setting
         ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
+        # it seems that with some recent git behavior has changed a bit
+        # and index might get touched
+        if _path_('.git/index') in modified_files:
+            ok_modified_files.add(_path_('.git/index'))
         assert_set_equal(modified_files, ok_modified_files)
 
 
@@ -273,7 +284,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))
@@ -338,11 +349,11 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
-    eq_(len(source.get_subdatasets()), 2)
+    source = install(src_path, source=origin, recursive=True)
+    eq_(len(source.subdatasets()), 2)
     # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
-    eq_(len(source.get_subdatasets()), 3)
+    eq_(len(source.subdatasets()), 3)
     ok_clean_git(source.path)
 
     # and now we create a sibling for the new subdataset only

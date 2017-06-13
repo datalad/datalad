@@ -17,9 +17,6 @@ from nose.tools import assert_raises, assert_equal
 from .. import __main__, __version__
 from ..auto import AutomagicIO
 
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import swallow_outputs
-from datalad.cmdline.main import main
 
 @patch('sys.stdout', new_callable=StringIO)
 def test_main_help(stdout):
@@ -43,16 +40,3 @@ def test_main_run_a_script(stdout, mock_activate):
     assert_equal(stdout.getvalue().rstrip(), "Running the script")
     # And we have "activated"
     mock_activate.assert_called_once_with()
-
-@skip_ssh
-def test_exit_code():
-    # will relay actual exit code on CommandError
-    cmd = ['sshrun', 'localhost', 'exit 42']
-    with assert_raises(SystemExit) as cme:
-        if isinstance(sys.stdout, StringIO):  # running nosetests without -s
-            with swallow_outputs():  # need to give smth with .fileno ;)
-                main(cmd)
-        else:
-            # to test both scenarios
-            main(cmd)
-    assert_equal(cme.exception.code, 42)

@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import wrapt
 
 from contextlib import contextmanager
 from functools import wraps
@@ -35,6 +36,7 @@ from os.path import isdir
 from os.path import relpath
 from os.path import stat
 from os.path import dirname
+from os.path import split as psplit
 
 
 from six import text_type, binary_type, string_types
@@ -278,7 +280,7 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     if chmod_files == 'auto':
         chmod_files = on_windows
 
-    if not os.path.islink(path):
+    if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
     else:
@@ -382,7 +384,7 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_list(s, copy=False):
+def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -390,13 +392,16 @@ def assure_list(s, copy=False):
     s: list or anything
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
     """
 
     if isinstance(s, list):
         return s if not copy else s[:]
     elif isinstance(s, text_type):
         return [s]
-    elif hasattr(s, '__iter__'):
+    elif iterate and hasattr(s, '__iter__'):
         return list(s)
     elif s is None:
         return []
@@ -525,10 +530,25 @@ def saved_generator(gen):
 #
 # Decorators
 #
+def better_wraps(to_be_wrapped):
+    """Decorator to replace `functools.wraps`
+
+    This is based on `wrapt` instead of `functools` and in opposition to `wraps`
+    preserves the correct signature of the decorated function.
+    It is written with the intention to replace the use of `wraps` without any
+    need to rewrite the actual decorators.
+    """
+
+    @wrapt.decorator(adapter=to_be_wrapped)
+    def intermediator(to_be_wrapper, instance, args, kwargs):
+        return to_be_wrapper(*args, **kwargs)
+
+    return intermediator
+
 
 # Borrowed from pandas
 # Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
-# Licese: BSD-3
+# License: BSD-3
 def optional_args(decorator):
     """allows a decorator to take optional positional and keyword arguments.
         Assumes that taking a single, callable, positional argument means that
@@ -539,7 +559,7 @@ def optional_args(decorator):
 
         Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
-    @wraps(decorator)
+    @better_wraps(decorator)
     def wrapper(*args, **kwargs):
         def dec(f):
             return decorator(f, *args, **kwargs)
@@ -1037,7 +1057,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         for f in filenames:
             try:
                 rmtemp(f)
-            except OSError:
+            except OSError:  # pragma: no cover
                 pass
 
 
@@ -1131,36 +1151,6 @@ def get_trace(edges, start, end, trace=None):
     return None
 
 
-# this is imported from PY2 os.path (removed in PY3)
-def walk(top, func, arg):
-    """Directory tree walk with callback function.
-
-    For each directory in the directory tree rooted at top (including top
-    itself, but excluding '.' and '..'), call func(arg, dirname, fnames).
-    dirname is the name of the directory, and fnames a list of the names of
-    the files and subdirectories in dirname (excluding '.' and '..').  func
-    may modify the fnames list in-place (e.g. via del or slice assignment),
-    and walk will only recurse into the subdirectories whose names remain in
-    fnames; this can be used to implement a filter, or to impose a specific
-    order of visiting.  No semantics are defined for, or required of, arg,
-    beyond that arg is always passed to func.  It can be used, e.g., to pass
-    a filename pattern, or a mutable object designed to accumulate
-    statistics.  Passing None for arg is common."""
-    try:
-        names = os.listdir(top)
-    except os.error:
-        return
-    func(arg, top, names)
-    for name in names:
-        name = opj(top, name)
-        try:
-            st = os.lstat(name)
-        except os.error:
-            continue
-        if stat.S_ISDIR(st.st_mode):
-            walk(name, func, arg)
-
-
 def get_dataset_root(path):
     """Return the root of an existent dataset containing a given path
 
@@ -1171,11 +1161,31 @@ def get_dataset_root(path):
     suffix = os.sep + opj('.git', 'objects')
     if not isdir(path):
         path = dirname(path)
-    while not exists(path + suffix):
-        path = opj(path, os.pardir)
-        if not exists(path):
-            return None
-    return normpath(path)
+    apath = abspath(path)
+    # while we can still go up
+    while psplit(apath)[1]:
+        if exists(path + suffix):
+            return path
+        # new test path in the format we got it
+        path = normpath(opj(path, os.pardir))
+        # no luck, next round
+        apath = abspath(path)
+    return None
+
+
+def try_multiple(ntrials, exception, base, f, *args, **kwargs):
+    """Call f multiple times making exponentially growing delay between the calls"""
+    from .dochelpers import exc_str
+    for trial in range(1, ntrials+1):
+        try:
+            return f(*args, **kwargs)
+        except exception as exc:
+            if trial == ntrials:
+                raise  # just reraise on the last trial
+            t = base ** trial
+            lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
+            sleep(t)
 
 
 lgr.log(5, "Done importing datalad.utils")

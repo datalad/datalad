@@ -62,6 +62,9 @@ _TEMP_PATHS_CLONES = set()
 neq_ = assert_not_equal
 nok_ = assert_false
 
+lgr = logging.getLogger("datalad.tests.utils")
+
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
@@ -79,6 +82,19 @@ def skip_if_scrapy_without_selector():
         raise SkipTest(
             "scrapy misses Selector (too old? version: %s)"
             % getattr(scrapy, '__version__'))
+
+
+def skip_if_url_is_not_available(url, regex=None):
+    # verify that dataset is available
+    from datalad.downloaders.providers import Providers
+    from datalad.downloaders.base import DownloadError
+    providers = Providers.from_config_files()
+    try:
+        content = providers.fetch(url)
+        if regex and re.search(regex, content):
+            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+    except DownloadError:
+        raise SkipTest("%s failed to download" % url)
 
 
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
@@ -143,14 +159,14 @@ from ..utils import chpwd, getpwd
 
 
 def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
-                 untracked=[]):
+                 untracked=[], ignore_submodules=False):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
 
     Note
     ----
-    Parameters head_modified, index_modified and untracked currently work
+    Parameters head_modified and index_modified currently work
     in pure git or indirect mode annex only and are ignored otherwise!
     Implementation is yet to do!
 
@@ -164,6 +180,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
       explicitly set to True or False to indicate, that an annex is (not)
       expected; set to None to autodetect, whether there is an annex.
       Default: None.
+    ignore_submodules: bool
+      if True, submodules are not inspected
     """
     # TODO: See 'Note' in docstring
 
@@ -200,17 +218,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             # 'annex' True
             assert_is(annex, False)
 
+    eq_(sorted(r.untracked_files), sorted(untracked))
+
     if annex and r.is_direct_mode():
-        if head_modified or index_modified or untracked:
-            raise NotImplementedError("TODO - see note in docstring")
-        ok_(not r.dirty)
+        if head_modified or index_modified:
+            lgr.warning("head_modified and index_modified are not quite valid "
+                        "concepts in direct mode! Looking for any change "
+                        "(staged or not) instead.")
+            status = r.get_status(untracked=False, submodules=not ignore_submodules)
+            modified = []
+            for s in status:
+                modified.extend(status[s])
+            eq_(sorted(head_modified + index_modified),
+                sorted(f for f in modified))
+        else:
+            ok_(not r.is_dirty(untracked_files=not untracked,
+                               submodules=not ignore_submodules))
     else:
         repo = r.repo
 
         if repo.index.entries.keys():
             ok_(repo.head.is_valid())
-
-            eq_(sorted(repo.untracked_files), sorted(untracked))
 
             if not head_modified and not index_modified:
                 # get string representations of diffs with index to ease
@@ -931,6 +959,66 @@ def assert_dict_equal(d1, d2):
     eq_(d1, d2)
 
 
+def assert_status(label, results):
+    """Verify that each status dict in the results has a given status label
+
+    `label` can be a sequence, in which case status must be one of the items
+    in this sequence.
+    """
+    label = assure_list(label)
+    for r in assure_list(results):
+        assert_in('status', r)
+        assert_in(r['status'], label)
+
+
+def assert_message(message, results):
+    """Verify that each status dict in the results has a message
+
+    This only tests the message template string, and not a formatted message
+    with args expanded.
+    """
+    for r in assure_list(results):
+        assert_in('message', r)
+        m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
+        assert_equal(m, message)
+
+
+def assert_result_count(results, n, **kwargs):
+    """Verify specific number of results (matching criteria, if any)"""
+    count = 0
+    for r in assure_list(results):
+        if not len(kwargs):
+            count += 1
+        elif all(k in r and r[k] == v for k, v in kwargs.items()):
+            count += 1
+    assert_equal(n, count)
+
+
+def assert_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is found in
+    one of the results"""
+    found = False
+    for r in assure_list(results):
+        if all(k in r and r[k] == v for k, v in kwargs.items()):
+            found = True
+    assert found
+
+
+def assert_not_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is not in any
+    of the results"""
+    for r in assure_list(results):
+        assert any(k not in r or r[k] != v for k, v in kwargs.items())
+
+
+def assert_result_values_equal(results, prop, values):
+    """Verify that the values of all results for a given key in the status dicts
+    match the given sequence"""
+    assert_equal(
+        [r[prop] for r in results],
+        values)
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
@@ -990,7 +1078,10 @@ def dump_graph(graph, flatten=False):
     if flatten:
         from datalad.metadata import flatten_metadata_graph
         graph = flatten_metadata_graph(graph)
-    return dumps(graph, indent=1)
+    return dumps(
+        graph,
+        indent=1,
+        default=lambda x: 'non-serializable object skipped')
 
 
 # List of most obscure filenames which might or not be supported by different

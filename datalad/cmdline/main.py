@@ -22,6 +22,8 @@ import shutil
 from importlib import import_module
 import os
 
+from six import text_type
+
 import datalad
 
 from datalad.cmdline import helpers
@@ -106,6 +108,40 @@ def setup_parser(
         help="""configuration variable setting. Overrides any configuration
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
+    parser.add_argument(
+        '--output-format', dest='common_output_format',
+        default='default',
+        metavar="{default,json,json_pp,tailored,'<template>'",
+        help="""select format for returned command results. 'default' give one line
+        per result reporting action, status, path and an optional message;
+        'json' renders a JSON object with all properties for each result (one per 
+        line); 'json_pp' pretty-prints JSON spanning multiple lines; 'tailored'
+        enables a command-specific rendering style that is typically
+        tailored to human consumption (no result output otherwise),
+        '<template>' reports any value(s) of any result properties in any format
+        indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices).""")
+    parser.add_argument(
+        '--report-status', dest='common_report_status',
+        choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
+        help="""constrain command result report to records matching the given
+        status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands
+        for 'impossible' OR 'error'.""")
+    parser.add_argument(
+        '--report-type', dest='common_report_type',
+        choices=['dataset', 'file'],
+        action='append',
+        help="""constrain command result report to records matching the given
+        type. Can be given more than once to match multiple types.""")
+    parser.add_argument(
+        '--on-failure', dest='common_on_failure',
+        choices=['ignore', 'continue', 'stop'],
+        # no default: better be configure per-command
+        help="""when an operation fails: 'ignore' and continue with remaining
+        operations, the error is logged but does not lead to a non-zero exit code
+        of the command; 'continue' works like 'ignore', but an error causes a
+        non-zero exit code; 'stop' halts on first failure and yields non-zero exit
+        code. A failure is any result with status 'impossible' or 'error'.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -145,8 +181,12 @@ def setup_parser(
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
+                intf_doc = _intf.__doc__.strip()
+                if hasattr(_intf, '_docs_'):
+                    # expand docs
+                    intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__.strip())
+                    intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -252,6 +292,9 @@ def main(args=None):
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
 
+    # enable overrides
+    datalad.cfg.reload()
+
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
@@ -287,26 +330,32 @@ def main(args=None):
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
-                # we didn't get everything we wanted: still try to present what
-                # we got as usual, but exit with an error
-                try:
-                    if hasattr(cmdlineargs, 'result_renderer'):
-                        cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                except Exception as exc2:
-                    # could be anything really, but we do not want to blow
-                    #  loud in exception handler
-                    lgr.warning("Failed to render partial results: %s", exc_str(exc2))
-                lgr.error('could not perform all requested actions: %s',
+                # rendering for almost all commands now happens 'online'
+                # hence we are no longer attempting to render the actual
+                # results in an IncompleteResultsError, ubt rather trust that
+                # this happened before
+
+                # in general we do not want to see the error again, but
+                # present in debug output
+                lgr.debug('could not perform all requested actions: %s',
                           exc_str(exc))
                 sys.exit(1)
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
+                if exc.msg:
+                    os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
-                    os.write(1, exc.stdout)
+                    os.write(1, exc.stdout.encode()) \
+                        if hasattr(exc.stdout, 'encode')  \
+                        else os.write(1, exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr)
-                sys.exit(exc.code)
+                    os.write(2, exc.stderr.encode()) \
+                        if hasattr(exc.stderr, 'encode')  \
+                        else os.write(2, exc.stderr)
+                # We must not exit with 0 code if any exception got here but
+                # had no code defined
+                sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)

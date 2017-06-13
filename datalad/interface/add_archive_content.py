@@ -328,7 +328,7 @@ class AddArchiveContent(Interface):
                         lgr.warning("Path %s points to non-existing file %s" % (extracted_path, link_path))
                         stats.skipped += 1
                         continue
-                    # TODO: check if points outside of the archive -- warning and skip
+                        # TODO: check if points outside of the archive -- warning and skip
 
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
@@ -359,27 +359,46 @@ class AddArchiveContent(Interface):
                     # but also allow for it in the orig
                     target_file_orig = opj(prefix_dir, target_file_orig)
 
+                target_file_path_orig = opj(annex.path, target_file_orig)
+
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
-                if lexists(target_file):
-                    if md5sum(target_file) == md5sum(extracted_path):
-                        # must be having the same content, we should just add possibly a new extra URL
-                        pass
+                target_file_path = opj(extract_rpath, target_file) \
+                    if extract_rpath else target_file
+
+                target_file_path = opj(annex.path, target_file_path)
+
+                if lexists(target_file_path):
+                    handle_existing = True
+                    if md5sum(target_file_path) == md5sum(extracted_path):
+                        if not annex.is_under_annex(extracted_path):
+                            # if under annex -- must be having the same content,
+                            # we should just add possibly a new extra URL
+                            # but if under git -- we cannot/should not do
+                            # anything about it ATM
+                            if existing != 'overwrite':
+                                continue
+                        else:
+                            handle_existing = False
+                    if not handle_existing:
+                        pass  # nothing... just to avoid additional indentation
                     elif existing == 'fail':
                         raise RuntimeError(
                             "File {} already exists, but new (?) file {} was instructed "
-                            "to be placed there while overwrite=False".format(target_file, extracted_file))
+                            "to be placed there while overwrite=False".format
+                                (target_file_path, extracted_file)
+                        )
                     elif existing == 'overwrite':
                         stats.overwritten += 1
                         # to make sure it doesn't conflict -- might have been a tree
-                        rmtree(target_file)
+                        rmtree(target_file_path)
                     else:
-                        target_file_orig_ = target_file
+                        target_file_path_orig_ = target_file_path
 
                         # To keep extension intact -- operate on the base of the filename
-                        p, fn = os.path.split(target_file)
+                        p, fn = os.path.split(target_file_path)
                         ends_with_dot = fn.endswith('.')
                         fn_base, fn_ext = file_basename(fn, return_ext=True)
 
@@ -392,19 +411,19 @@ class AddArchiveContent(Interface):
                         # keep incrementing index in the suffix until file doesn't collide
                         suf, i = '', 0
                         while True:
-                            target_file_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
-                            if not lexists(target_file_new):
+                            target_file_path_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
+                            if not lexists(target_file_path_new):
                                 break
-                            lgr.debug("File %s already exists" % target_file_new)
+                            lgr.debug("File %s already exists" % target_file_path_new)
                             i += 1
                             suf = '.%d' % i
-                        target_file = target_file_new
+                        target_file_path = target_file_path_new
                         lgr.debug("Original file %s will be saved into %s"
-                                  % (target_file_orig_, target_file))
+                                  % (target_file_path_orig_, target_file_path))
                         # TODO: should we reserve smth like
                         # stats.clobbed += 1
 
-                if target_file != target_file_orig:
+                if target_file_path != target_file_path_orig:
                     stats.renamed += 1
 
                 #target_path = opj(getpwd(), target_file)
@@ -416,11 +435,10 @@ class AddArchiveContent(Interface):
                     pass
 
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
-                          target_file, url, annex_options)
+                          target_file_path, url, annex_options)
 
-                target_file_rpath = opj(extract_rpath, target_file) if extract_rpath else target_file
                 out_json = annex.add_url_to_file(
-                    target_file_rpath,
+                    target_file_path,
                     url, options=annex_options,
                     batch=True)
 
@@ -432,7 +450,7 @@ class AddArchiveContent(Interface):
                         stats.dropped += 1
                     stats.add_annex += 1
                 else:
-                    lgr.debug("File {} was added to git, not adding url".format(target_file))
+                    lgr.debug("File {} was added to git, not adding url".format(target_file_path))
                     stats.add_git += 1
 
                 if delete_after:
@@ -477,7 +495,7 @@ class AddArchiveContent(Interface):
                 commit_stats = outside_stats if outside_stats else stats
                 annex.precommit()  # so batched ones close and files become annex symlinks etc
                 precommitted = True
-                if annex.repo.is_dirty(untracked_files=False):
+                if annex.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive, commit_stats.as_str(mode='full')),

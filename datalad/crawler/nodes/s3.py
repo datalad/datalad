@@ -42,6 +42,8 @@ def get_version_for_key(k, fmt='0.0.%Y%m%d'):
 
     Uses 0.0.YYYYMMDD by default
     """
+    if isinstance(k, Prefix):
+        return None
     t = iso8601_to_epoch(k.last_modified)
     # format it
     return time.strftime(fmt, time.gmtime(t))
@@ -67,6 +69,7 @@ class crawl_s3(object):
                  ncommits=None,
                  recursive=False,
                  versioned=True,
+                 exclude=None,
                  ):
         """
 
@@ -96,6 +99,9 @@ class crawl_s3(object):
         versioned: bool, optional
           Either to expect bucket to be versioned and demand all versions per
           prefix and generate versioned urls
+        exclude: str, optional
+          Regular expression to search to decide which files to exclude from
+          consideration
         """
         self.bucket = bucket
         if prefix and not prefix.endswith('/'):
@@ -111,6 +117,7 @@ class crawl_s3(object):
         self.ncommits = ncommits
         self.recursive = recursive
         self.versioned = versioned
+        self.exclude = exclude
 
     def __call__(self, data):
 
@@ -205,13 +212,16 @@ class crawl_s3(object):
             filename = e.name if e is not None else None
             if (self.strip_prefix and self.prefix):
                  filename = _strip_prefix(filename, self.prefix)
+            if filename and self.exclude and re.search(self.exclude, filename):
+                stats.skipped += 1
+                continue
 
             if filename in staged or e is None:
                 # we should finish this one and commit
                 if staged:
                     if self.versionfx and e_prev is not None:
                         version = self.versionfx(e_prev)
-                        if version not in stats.versions:
+                        if version is not None and version not in stats.versions:
                             stats.versions.append(version)
                     if versions_db:
                         # save current "version" DB so we would know where to pick up from
