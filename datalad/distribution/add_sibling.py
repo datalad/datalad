@@ -17,15 +17,11 @@ import logging
 from os.path import basename
 
 from datalad.utils import assure_list
-from datalad.dochelpers import exc_str
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
-from datalad.support.gitrepo import GitRepo
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import RI
-from datalad.support.network import URL
 from ..interface.base import Interface
-from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import annex_wanted_opt
@@ -34,7 +30,6 @@ from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
-from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
 
@@ -102,7 +97,6 @@ class AddSibling(Interface):
             action="store_true",
             doc="""if sibling `name` exists already, force to (re-)configure its
                 URLs""",),
-        as_common_datasrc=as_common_datasrc,
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
         annex_wanted=annex_wanted_opt,
@@ -115,7 +109,7 @@ class AddSibling(Interface):
     @datasetmethod(name='add_sibling')
     def __call__(url=None, name=None, dataset=None,
                  pushurl=None, force=False,
-                 as_common_datasrc=None, publish_depends=None,
+                 publish_depends=None,
                  publish_by_default=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit=False):
@@ -200,6 +194,7 @@ class AddSibling(Interface):
                 conflicting.append(repo_name)
 
         if not force and conflicting:
+            # TODO yield
             raise RuntimeError("Sibling '{0}' already exists with conflicting"
                                " settings for {1} dataset(s). {2}".format(
                                    name, len(conflicting), conflicting))
@@ -277,53 +272,6 @@ class AddSibling(Interface):
                     refspec)
                 ds.config.add(dfltvar, refspec, 'local')
             ds.config.reload()
-
-        assert isinstance(ds.repo, GitRepo)  # just against silly code
-        if isinstance(ds.repo, AnnexRepo):
-            # we need to check if added sibling an annex, and try to enable it
-            # another part of the fix for #463 and #432
-            try:
-                if not ds.config.obtain(
-                        'remote.{}.annex-ignore'.format(name),
-                        default=False,
-                        valtype=EnsureBool(),
-                        store=False):
-                    ds.repo.enable_remote(name)
-            except CommandError as exc:
-                lgr.info("Failed to enable annex remote %s, "
-                         "could be a pure git" % name)
-                lgr.debug("Exception was: %s" % exc_str(exc))
-            if as_common_datasrc:
-                ri = RI(repo_props['url'])
-                if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
-                    # XXX what if there is already a special remote
-                    # of this name? Above check for remotes ignores special
-                    # remotes. we need to `git annex dead REMOTE` on reconfigure
-                    # before we can init a new one
-                    # XXX except it is not enough
-
-                    # make special remote of type=git (see #335)
-                    ds.repo._run_annex_command(
-                        'initremote',
-                        annex_options=[
-                            as_common_datasrc,
-                            'type=git',
-                            'location={}'.format(repo_props['url']),
-                            'autoenable=true'])
-                else:
-                    lgr.warning(
-                        'Not configuring "%s" as a common data source, '
-                        'URL protocol is not http or https',
-                        name)
-            if annex_wanted:
-                ds.repo.set_wanted(name, annex_wanted)
-            if annex_group:
-                ds.repo.set_group(name, annex_group)
-            if annex_groupwanted:
-                if not annex_group:
-                    raise InsufficientArgumentsError(
-                        "To set groupwanted, you need to provide annex_group option")
-                ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
     @staticmethod
     def _inherit_annex_var(ds, remote, cfgvar):

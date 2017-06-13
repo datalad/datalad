@@ -27,10 +27,13 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureBool
 from datalad.support.param import Parameter
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import RI
+from datalad.support.network import URL
+from datalad.support.gitrepo import GitRepo
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import as_common_datasrc
@@ -353,7 +356,6 @@ def _configure_remote(
                 name=name,
                 url=url,
                 pushurl=pushurl,
-                as_common_datasrc=as_common_datasrc,
                 publish_depends=publish_depends,
                 publish_by_default=publish_by_default,
                 annex_wanted=annex_wanted,
@@ -382,6 +384,57 @@ def _configure_remote(
             yield result_props
             return
         ds.repo._run_annex_command('describe', annex_options=[name, description])
+
+    assert isinstance(ds.repo, GitRepo)  # just against silly code
+    if isinstance(ds.repo, AnnexRepo):
+        # we need to check if added sibling an annex, and try to enable it
+        # another part of the fix for #463 and #432
+        try:
+            if not ds.config.obtain(
+                    'remote.{}.annex-ignore'.format(name),
+                    default=False,
+                    valtype=EnsureBool(),
+                    store=False):
+                ds.repo.enable_remote(name)
+        except CommandError as exc:
+            # TODO yield
+            lgr.info("Failed to enable annex remote %s, "
+                     "could be a pure git" % name)
+            lgr.debug("Exception was: %s" % exc_str(exc))
+        if as_common_datasrc:
+            ri = RI(url)
+            if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
+                # XXX what if there is already a special remote
+                # of this name? Above check for remotes ignores special
+                # remotes. we need to `git annex dead REMOTE` on reconfigure
+                # before we can init a new one
+                # XXX except it is not enough
+
+                # make special remote of type=git (see #335)
+                ds.repo._run_annex_command(
+                    'initremote',
+                    annex_options=[
+                        as_common_datasrc,
+                        'type=git',
+                        'location={}'.format(url),
+                        'autoenable=true'])
+            else:
+                # TODO yield
+                lgr.warning(
+                    'Not configuring "%s" as a common data source, '
+                    'URL protocol is not http or https',
+                    name)
+        if annex_wanted:
+            ds.repo.set_wanted(name, annex_wanted)
+        if annex_group:
+            ds.repo.set_group(name, annex_group)
+        if annex_groupwanted:
+            # TODO move check upfront
+            if not annex_group:
+                raise InsufficientArgumentsError(
+                    "To set groupwanted, you need to provide annex_group option")
+            ds.repo.set_groupwanted(annex_group, annex_groupwanted)
+
     # report all we know at once
     info = list(_query_remotes(ds, name))[0]
     info.update(dict(status='ok', **result_props))
