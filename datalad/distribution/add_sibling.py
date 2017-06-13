@@ -325,7 +325,6 @@ class AddSibling(Interface):
                         "To set groupwanted, you need to provide annex_group option")
                 ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
-
     @staticmethod
     def _inherit_annex_var(ds, remote, cfgvar):
         var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
@@ -343,24 +342,6 @@ class AddSibling(Interface):
                     'Inherited publish_depends from %s: %s',
                     ds, var)
         return var
-
-    @staticmethod
-    def result_renderer_cmdline(res, args):
-        from datalad.ui import ui
-        if res is None:
-            res = []
-        if not isinstance(res, list):
-            res = [res]
-        if not len(res):
-            ui.message("No sibling was added")
-            return
-        items= '\n'.join(map(str, res))
-        msg = "Added sibling to {ds}:\n{items}".format(
-            ds='{} datasets'.format(len(res))
-            if len(res) > 1
-            else 'one dataset',
-            items=items)
-        ui.message(msg)
 
 
 # TODO: RF nicely, test, make clear how different from urljoin etc
