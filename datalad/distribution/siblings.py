@@ -17,6 +17,7 @@ from os.path import basename
 from os.path import relpath
 
 # XXX confusing: we have urljoin, _urljoin, dlurljoin
+from datalad.distribution.add_sibling import AddSibling
 from datalad.distribution.add_sibling import _urljoin
 
 from datalad.interface.base import Interface
@@ -45,6 +46,7 @@ from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import location_description
 from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -356,7 +358,6 @@ def _configure_remote(
     # cheat and pretend it is all new and shiny already
     if url: # poor AddSibling blows otherwise
         try:
-            from datalad.distribution.add_sibling import AddSibling
             AddSibling.__call__(
                 dataset=ds,
                 name=name,
@@ -390,6 +391,35 @@ def _configure_remote(
             yield result_props
             return
         ds.repo._run_annex_command('describe', annex_options=[name, description])
+
+    if inherit:
+        # Adjust variables which we should inherit
+        delayed_super = _DelayedSuper(ds.repo)
+        publish_depends = AddSibling._inherit_config_var(
+            delayed_super, depvar, publish_depends)
+        publish_by_default = AddSibling._inherit_config_var(
+            delayed_super, dfltvar, publish_by_default)
+        # Copy relevant annex settings for the sibling
+        # makes sense only if current AND super are annexes, so it is
+        # kinda a boomer, since then forbids having a super a pure git
+        if isinstance(ds.repo, AnnexRepo) and \
+                isinstance(delayed_super.repo, AnnexRepo):
+            if annex_wanted is None:
+                annex_wanted = AddSibling._inherit_annex_var(
+                    delayed_super, name, 'wanted'
+                )
+            if annex_group is None:
+                # I think it might be worth inheritting group regardless what
+                # value is
+                #if annex_wanted in {'groupwanted', 'standard'}:
+                annex_group = AddSibling._inherit_annex_var(
+                    delayed_super, name, 'group'
+                )
+            if annex_wanted == 'groupwanted' and annex_groupwanted is None:
+                # we better have a value for the expression for that group
+                annex_groupwanted = AddSibling._inherit_annex_var(
+                    delayed_super, name, 'groupwanted'
+                )
 
     if publish_depends:
         if depvar in ds.config:
@@ -575,3 +605,38 @@ def _remove_remote(
     yield get_status_dict(
         status='ok',
         **result_props)
+
+
+class _DelayedSuper(object):
+    """A helper to delay deduction on super dataset until needed
+
+    But if asked and not found -- blow up
+    """
+
+    def __init__(self, repo):
+        self._child_dataset = Dataset(repo.path)
+        self._super = None
+
+    def __str__(self):
+        return str(self.super)
+
+    @property
+    def super(self):
+        if self._super is None:
+            # here we must analyze current_ds's super, not the super_ds
+            self._super = self._child_dataset.get_superdataset()
+            if not self._super:
+                raise RuntimeError(
+                    "Cannot determine super dataset for %s, thus "
+                    "cannot inherit anything" % self._child_dataset
+                )
+        return self._super
+
+    # Lean proxies going through .super
+    @property
+    def config(self):
+        return self.super.config
+
+    @property
+    def repo(self):
+        return self.super.repo

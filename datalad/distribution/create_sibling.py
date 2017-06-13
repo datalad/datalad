@@ -12,7 +12,6 @@
 __docformat__ = 'restructuredtext'
 
 from six import text_type
-from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -23,10 +22,9 @@ from datalad import ssh_manager
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
-from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.distribution.siblings import Siblings
-from datalad.distribution.add_sibling import _DelayedSuper
+from datalad.distribution.siblings import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
@@ -41,7 +39,6 @@ from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.utils import filter_unmodified
-from datalad.support.network import SSHRI
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
