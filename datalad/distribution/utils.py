@@ -17,6 +17,7 @@ from os.path import join as opj
 from os.path import islink
 from os.path import isabs
 from os.path import normpath
+import posixpath
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import DataLadRI
@@ -148,7 +149,13 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
         else:
             base_path = ri.path
             base_suffix = ''
-        ri.path = normpath(opj(base_path, src, base_suffix))
+        if isinstance(ri, PathRI):
+            # this is a path, so stay native
+            ri.path = normpath(opj(base_path, src, base_suffix))
+        else:
+            # we are handling a URL, use POSIX path conventions
+            ri.path = posixpath.normpath(
+                posixpath.join(base_path, src, base_suffix))
 
     src = str(ri)
 
