@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from collections import OrderedDict
 from os.path import basename
 
 from datalad.utils import assure_list
@@ -151,9 +150,8 @@ class AddSibling(Interface):
 
         _check_deps(ds.repo, publish_depends)
 
-        ds_basename = basename(ds.path)
-        repos = OrderedDict()
-        repos[ds_basename] = {'repo': ds.repo}
+        repo_name = basename(ds.path)
+        repo_props = {'repo': ds.repo}
 
         # Note: This is copied from create_sibling
         # as it is the same logic as for its target_dir.
@@ -163,25 +161,17 @@ class AddSibling(Interface):
 
         replicate_local_structure = "%NAME" not in url
 
-        # TODO RF: no recursive processing anymore, loop not needed anymore
-        for repo_name in repos:
-            repo = repos[repo_name]
-            if not replicate_local_structure:
-                repo['url'] = url.replace("%NAME",
-                                           repo_name.replace("/", "-"))
-                if pushurl:
-                    repo['pushurl'] = pushurl.replace("%NAME",
-                                                       repo_name.replace("/",
+        if not replicate_local_structure:
+            repo_props['url'] = url.replace("%NAME",
+                                            repo_name.replace("/", "-"))
+            if pushurl:
+                repo_props['pushurl'] = pushurl.replace("%NAME",
+                                                        repo_name.replace("/",
                                                                           "-"))
-            else:
-                repo['url'] = url
-                if pushurl:
-                    repo['pushurl'] = pushurl
-
-                if repo_name != ds_basename:
-                    repo['url'] = _urljoin(repo['url'], repo_name[len(ds_basename) + 1:])
-                    if pushurl:
-                        repo['pushurl'] = _urljoin(repo['pushurl'], repo_name[len(ds_basename) + 1:])
+        else:
+            repo_props['url'] = url
+            if pushurl:
+                repo_props['pushurl'] = pushurl
 
         # define config var name for potential publication dependencies
         depvar = 'remote.{}.datalad-publish-depends'.format(name)
@@ -191,159 +181,150 @@ class AddSibling(Interface):
         # collect existing remotes:
         already_existing = list()
         conflicting = list()
-        for repo_name in repos:
-            repoinfo = repos[repo_name]
-            repo = repoinfo['repo']
-            if name in repo.get_remotes():
-                already_existing.append(repo_name)
-                lgr.debug("Remote '{0}' already exists "
-                          "in '{1}'.""".format(name, repo_name))
+        if name in ds.repo.get_remotes():
+            already_existing.append(repo_name)
+            lgr.debug("Remote '{0}' already exists "
+                      "in '{1}'.""".format(name, repo_name))
 
-                existing_url = repo.get_remote_url(name)
-                existing_pushurl = \
-                    repo.get_remote_url(name, push=True)
+            existing_url = ds.repo.get_remote_url(name)
+            existing_pushurl = \
+                ds.repo.get_remote_url(name, push=True)
 
-                if existing_url and \
-                        repoinfo['url'].rstrip('/') != existing_url.rstrip('/') \
-                        or (pushurl and existing_pushurl and
-                            repoinfo['pushurl'].rstrip('/') !=
-                            existing_pushurl.rstrip('/')) \
-                        or (pushurl and not existing_pushurl) \
-                        or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
-                    conflicting.append(repo_name)
+            if existing_url and \
+                    repo_props['url'].rstrip('/') != existing_url.rstrip('/') \
+                    or (pushurl and existing_pushurl and
+                        repo_props['pushurl'].rstrip('/') !=
+                        existing_pushurl.rstrip('/')) \
+                    or (pushurl and not existing_pushurl) \
+                    or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
+                conflicting.append(repo_name)
 
         if not force and conflicting:
             raise RuntimeError("Sibling '{0}' already exists with conflicting"
                                " settings for {1} dataset(s). {2}".format(
                                    name, len(conflicting), conflicting))
 
-        successfully_added = list()
-        for repo_name in repos:
-            repoinfo = repos[repo_name]
-            repo = repoinfo['repo']
-            if repo_name in already_existing:
-                if not force and \
-                        repo_name not in conflicting \
-                        and repo.get_remote_url(name) is not None:
-                    lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
-                    continue
-                # rewrite url
-                repo.set_remote_url(name, repoinfo['url'])
-                fetchvar = 'remote.{}.fetch'.format(name)
-                if fetchvar not in repo.config:
-                    # place default fetch refspec in config
-                    # same as `git remote add` would have added
-                    repo.config.add(
-                        fetchvar,
-                        '+refs/heads/*:refs/remotes/{}/*'.format(name),
-                        where='local')
-            else:
-                # add the remote
-                repo.add_remote(name, repoinfo['url'])
-            if pushurl:
-                repo.set_remote_url(name, repoinfo['pushurl'], push=True)
+        if repo_name in already_existing:
+            if not force and \
+                    repo_name not in conflicting \
+                    and ds.repo.get_remote_url(name) is not None:
+                lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
+                # TODO yield
+                return
+            # rewrite url
+            ds.repo.set_remote_url(name, repo_props['url'])
+            fetchvar = 'remote.{}.fetch'.format(name)
+            if fetchvar not in ds.repo.config:
+                # place default fetch refspec in config
+                # same as `git remote add` would have added
+                ds.repo.config.add(
+                    fetchvar,
+                    '+refs/heads/*:refs/remotes/{}/*'.format(name),
+                    where='local')
+        else:
+            # add the remote
+            ds.repo.add_remote(name, repo_props['url'])
+        if pushurl:
+            ds.repo.set_remote_url(name, repo_props['pushurl'], push=True)
 
-            if inherit:
-                # Adjust variables which we should inherit
-                delayed_super = _DelayedSuper(repo)
-                publish_depends = AddSibling._inherit_config_var(
-                    delayed_super, depvar, publish_depends)
-                publish_by_default = AddSibling._inherit_config_var(
-                    delayed_super, dfltvar, publish_by_default)
-                # Copy relevant annex settings for the sibling
-                # makes sense only if current AND super are annexes, so it is
-                # kinda a boomer, since then forbids having a super a pure git
-                if isinstance(repo, AnnexRepo) \
-                    and isinstance(delayed_super.repo, AnnexRepo):
-                    if annex_wanted is None:
-                        annex_wanted = AddSibling._inherit_annex_var(
-                            delayed_super, name, 'wanted'
-                        )
-                    if annex_group is None:
-                        # I think it might be worth inheritting group regardless what
-                        # value is
-                        #if annex_wanted in {'groupwanted', 'standard'}:
-                        annex_group = AddSibling._inherit_annex_var(
-                            delayed_super, name, 'group'
-                        )
-                    if annex_wanted == 'groupwanted' and annex_groupwanted is None:
-                        # we better have a value for the expression for that group
-                        annex_groupwanted = AddSibling._inherit_annex_var(
-                            delayed_super, name, 'groupwanted'
-                        )
+        if inherit:
+            # Adjust variables which we should inherit
+            delayed_super = _DelayedSuper(ds.repo)
+            publish_depends = AddSibling._inherit_config_var(
+                delayed_super, depvar, publish_depends)
+            publish_by_default = AddSibling._inherit_config_var(
+                delayed_super, dfltvar, publish_by_default)
+            # Copy relevant annex settings for the sibling
+            # makes sense only if current AND super are annexes, so it is
+            # kinda a boomer, since then forbids having a super a pure git
+            if isinstance(ds.repo, AnnexRepo) \
+                and isinstance(delayed_super.repo, AnnexRepo):
+                if annex_wanted is None:
+                    annex_wanted = AddSibling._inherit_annex_var(
+                        delayed_super, name, 'wanted'
+                    )
+                if annex_group is None:
+                    # I think it might be worth inheritting group regardless what
+                    # value is
+                    #if annex_wanted in {'groupwanted', 'standard'}:
+                    annex_group = AddSibling._inherit_annex_var(
+                        delayed_super, name, 'group'
+                    )
+                if annex_wanted == 'groupwanted' and annex_groupwanted is None:
+                    # we better have a value for the expression for that group
+                    annex_groupwanted = AddSibling._inherit_annex_var(
+                        delayed_super, name, 'groupwanted'
+                    )
 
-            if publish_depends:
-                if depvar in ds.config:
-                    # config vars are incremental, so make sure we start from
-                    # scratch
-                    ds.config.unset(depvar, where='local', reload=False)
-                for d in assure_list(publish_depends):
-                    lgr.info(
-                        'Configure additional publication dependency on "%s"',
-                        d)
-                    ds.config.add(depvar, d, where='local', reload=False)
-                ds.config.reload()
+        if publish_depends:
+            if depvar in ds.config:
+                # config vars are incremental, so make sure we start from
+                # scratch
+                ds.config.unset(depvar, where='local', reload=False)
+            for d in assure_list(publish_depends):
+                lgr.info(
+                    'Configure additional publication dependency on "%s"',
+                    d)
+                ds.config.add(depvar, d, where='local', reload=False)
+            ds.config.reload()
 
-            if publish_by_default:
-                if dfltvar in ds.config:
-                    ds.config.unset(dfltvar, where='local', reload=False)
-                for refspec in assure_list(publish_by_default):
-                    lgr.info(
-                        'Configure additional default publication refspec "%s"',
-                        refspec)
-                    ds.config.add(dfltvar, refspec, 'local')
-                ds.config.reload()
+        if publish_by_default:
+            if dfltvar in ds.config:
+                ds.config.unset(dfltvar, where='local', reload=False)
+            for refspec in assure_list(publish_by_default):
+                lgr.info(
+                    'Configure additional default publication refspec "%s"',
+                    refspec)
+                ds.config.add(dfltvar, refspec, 'local')
+            ds.config.reload()
 
-            assert isinstance(repo, GitRepo)  # just against silly code
-            if isinstance(repo, AnnexRepo):
-                # we need to check if added sibling an annex, and try to enable it
-                # another part of the fix for #463 and #432
-                try:
-                    if not ds.config.obtain(
-                            'remote.{}.annex-ignore'.format(name),
-                            default=False,
-                            valtype=EnsureBool(),
-                            store=False):
-                        repo.enable_remote(name)
-                except CommandError as exc:
-                    lgr.info("Failed to enable annex remote %s, "
-                             "could be a pure git" % name)
-                    lgr.debug("Exception was: %s" % exc_str(exc))
-                if as_common_datasrc:
-                    ri = RI(repoinfo['url'])
-                    if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
-                        # XXX what if there is already a special remote
-                        # of this name? Above check for remotes ignores special
-                        # remotes. we need to `git annex dead REMOTE` on reconfigure
-                        # before we can init a new one
-                        # XXX except it is not enough
+        assert isinstance(ds.repo, GitRepo)  # just against silly code
+        if isinstance(ds.repo, AnnexRepo):
+            # we need to check if added sibling an annex, and try to enable it
+            # another part of the fix for #463 and #432
+            try:
+                if not ds.config.obtain(
+                        'remote.{}.annex-ignore'.format(name),
+                        default=False,
+                        valtype=EnsureBool(),
+                        store=False):
+                    ds.repo.enable_remote(name)
+            except CommandError as exc:
+                lgr.info("Failed to enable annex remote %s, "
+                         "could be a pure git" % name)
+                lgr.debug("Exception was: %s" % exc_str(exc))
+            if as_common_datasrc:
+                ri = RI(repo_props['url'])
+                if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
+                    # XXX what if there is already a special remote
+                    # of this name? Above check for remotes ignores special
+                    # remotes. we need to `git annex dead REMOTE` on reconfigure
+                    # before we can init a new one
+                    # XXX except it is not enough
 
-                        # make special remote of type=git (see #335)
-                        repo._run_annex_command(
-                            'initremote',
-                            annex_options=[
-                                as_common_datasrc,
-                                'type=git',
-                                'location={}'.format(repoinfo['url']),
-                                'autoenable=true'])
-                    else:
-                        lgr.warning(
-                            'Not configuring "%s" as a common data source, '
-                            'URL protocol is not http or https',
-                            name)
-                if annex_wanted:
-                    repo.set_wanted(name, annex_wanted)
-                if annex_group:
-                    repo.set_group(name, annex_group)
-                if annex_groupwanted:
-                    if not annex_group:
-                        raise InsufficientArgumentsError(
-                            "To set groupwanted, you need to provide annex_group option")
-                    repo.set_groupwanted(annex_group, annex_groupwanted)
+                    # make special remote of type=git (see #335)
+                    ds.repo._run_annex_command(
+                        'initremote',
+                        annex_options=[
+                            as_common_datasrc,
+                            'type=git',
+                            'location={}'.format(repo_props['url']),
+                            'autoenable=true'])
+                else:
+                    lgr.warning(
+                        'Not configuring "%s" as a common data source, '
+                        'URL protocol is not http or https',
+                        name)
+            if annex_wanted:
+                ds.repo.set_wanted(name, annex_wanted)
+            if annex_group:
+                ds.repo.set_group(name, annex_group)
+            if annex_groupwanted:
+                if not annex_group:
+                    raise InsufficientArgumentsError(
+                        "To set groupwanted, you need to provide annex_group option")
+                ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
-            successfully_added.append(repo_name)
-
-        return successfully_added
 
     @staticmethod
     def _inherit_annex_var(ds, remote, cfgvar):

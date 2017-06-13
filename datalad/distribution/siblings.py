@@ -348,7 +348,7 @@ def _configure_remote(
     if url: # poor AddSibling blows otherwise
         try:
             from datalad.distribution.add_sibling import AddSibling
-            added = AddSibling.__call__(
+            AddSibling.__call__(
                 dataset=ds,
                 name=name,
                 url=url,
@@ -362,8 +362,6 @@ def _configure_remote(
                 inherit=inherit,
                 # configure is what `force` was used for previously
                 force=True)
-            # just make sure the legacy code doesn't surprise us
-            assert(len(added) == 1)
         except Exception as e:
             yield get_status_dict(
                 status='error',
