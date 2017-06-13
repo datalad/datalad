@@ -8,7 +8,7 @@ Uploaders:
 Build-Depends:
  debhelper (>= 9),
  dh-python,
- git-annex (>= 6.20170101~) | git-annex-standalone (>= 6.20170101~),
+ git-annex (>= 6.20170525~) | git-annex-standalone (>= 6.20170525~),
  help2man,
  patool,
  python-all,
@@ -36,6 +36,7 @@ Build-Depends:
  python-setuptools,
  python-simplejson,
  python-six (>= 1.8.0~),
+ python-wrapt,
 Standards-Version: 3.9.8
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
@@ -87,6 +88,7 @@ Depends:
  python-tqdm | python-progressbar,
  python-simplejson,
  python-six (>= 1.8.0~),
+ python-wrapt,
  ${misc:Depends},
  ${python:Depends}
 Recommends:

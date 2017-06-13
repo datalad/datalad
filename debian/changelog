@@ -1,6 +1,8 @@
 datalad (0.5.99+git587-gcb6e6c4f-1) neurodebian-devel; urgency=medium
 
   * Trying a fresh snapshot
+  * debian/control
+    - added python-wrapt to bdepends/depends
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 13 Jun 2017 00:11:30 -0400
 
