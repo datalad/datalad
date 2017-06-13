@@ -289,8 +289,10 @@ def _guess_ri_cls(ri):
         'file': PathRI,
         'datalad': DataLadRI
     }
-    # go in exotic mode when this is an absolutte windows path
-    if win_splitdrive(ri)[0]:
+    # go in exotic mode if this is an absolute windows path
+    win_split = win_splitdrive(ri)
+    # we need a drive and a path, otherwise this could be a false positive
+    if win_split[0] and win_split[1]:
         # OMG we got something from windows
         lgr.log(5, "Detected file ri")
         return TYPES['file']
