@@ -350,6 +350,8 @@ def _configure_remote(
         return
     # define config var name for potential publication dependencies
     depvar = 'remote.{}.datalad-publish-depends'.format(name)
+    # and default pushes
+    dfltvar = "remote.{}.push".format(name)
 
     # cheat and pretend it is all new and shiny already
     if url: # poor AddSibling blows otherwise
@@ -399,6 +401,16 @@ def _configure_remote(
                 'Configure additional publication dependency on "%s"',
                 d)
             ds.config.add(depvar, d, where='local', reload=False)
+        ds.config.reload()
+
+    if publish_by_default:
+        if dfltvar in ds.config:
+            ds.config.unset(dfltvar, where='local', reload=False)
+        for refspec in assure_list(publish_by_default):
+            lgr.info(
+                'Configure additional default publication refspec "%s"',
+                refspec)
+            ds.config.add(dfltvar, refspec, 'local')
         ds.config.reload()
 
     assert isinstance(ds.repo, GitRepo)  # just against silly code

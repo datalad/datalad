@@ -251,15 +251,6 @@ class AddSibling(Interface):
                         delayed_super, name, 'groupwanted'
                     )
 
-        if publish_by_default:
-            if dfltvar in ds.config:
-                ds.config.unset(dfltvar, where='local', reload=False)
-            for refspec in assure_list(publish_by_default):
-                lgr.info(
-                    'Configure additional default publication refspec "%s"',
-                    refspec)
-                ds.config.add(dfltvar, refspec, 'local')
-            ds.config.reload()
 
     @staticmethod
     def _inherit_annex_var(ds, remote, cfgvar):
