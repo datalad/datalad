@@ -15,8 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from collections import OrderedDict
-from os.path import join as opj, basename
-from os.path import relpath
+from os.path import basename
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -27,7 +26,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import RI
 from datalad.support.network import URL
 from ..interface.base import Interface
-from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import publish_by_default
@@ -81,6 +79,7 @@ class AddSibling(Interface):
             constraints=EnsureStr() | EnsureNone()),
         url=Parameter(
             args=('url',),
+            # TODO RF recursive no longer an option, adjust docs
             doc="""the URL of or path to the dataset sibling named by
                 `name`.  If you want to recursively add siblings, it is expected, that
                 you pass a template for building the URLs of the siblings of
@@ -99,7 +98,6 @@ class AddSibling(Interface):
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
-        recursive=recursion_flag,
         fetch=Parameter(
             args=("--fetch",),
             action="store_true",
@@ -121,7 +119,7 @@ class AddSibling(Interface):
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(url=None, name=None, dataset=None,
-                 pushurl=None, recursive=False, fetch=False, force=False,
+                 pushurl=None, fetch=False, force=False,
                  as_common_datasrc=None, publish_depends=None,
                  publish_by_default=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
@@ -162,21 +160,6 @@ class AddSibling(Interface):
         repos = OrderedDict()
         repos[ds_basename] = {'repo': ds.repo}
 
-        if recursive:
-            for subds in ds.subdatasets(recursive=True, result_xfm='datasets'):
-                lgr.debug("Adding sub-dataset %s for adding a sibling",
-                          subds.path)
-                if not subds.is_installed():
-                    lgr.info("Skipping adding sibling for %s since it "
-                             "is not installed", subds)
-                    continue
-                # MIH why not simply absolute paths?
-                repos[ds_basename + '/' + relpath(subds.path, start=ds.path)] = {
-                    #                repos[subds_name] = {
-                    # MIH this next line is strange, why not subds.repo? why GitRepo?
-                    'repo': GitRepo(subds.path, create=False)
-                }
-
         # Note: This is copied from create_sibling
         # as it is the same logic as for its target_dir.
         # TODO: centralize and generalize template symbol handling
@@ -185,6 +168,7 @@ class AddSibling(Interface):
 
         replicate_local_structure = "%NAME" not in url
 
+        # TODO RF: no recursive processing anymore, loop not needed anymore
         for repo_name in repos:
             repo = repos[repo_name]
             if not replicate_local_structure:
@@ -405,6 +389,7 @@ class AddSibling(Interface):
             else 'one dataset',
             items=items)
         ui.message(msg)
+
 
 # TODO: RF nicely, test, make clear how different from urljoin etc
 def _urljoin(base, url):

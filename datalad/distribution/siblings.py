@@ -358,8 +358,6 @@ def _configure_remote(
                 annex_group=annex_group,
                 annex_groupwanted=annex_groupwanted,
                 inherit=inherit,
-                # never recursive, done outside
-                recursive=False,
                 # we want to do this in our wrapper code
                 fetch=False,
                 # configure is what `force` was used for previously
