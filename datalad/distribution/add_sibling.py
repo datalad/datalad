@@ -251,18 +251,6 @@ class AddSibling(Interface):
                         delayed_super, name, 'groupwanted'
                     )
 
-        if publish_depends:
-            if depvar in ds.config:
-                # config vars are incremental, so make sure we start from
-                # scratch
-                ds.config.unset(depvar, where='local', reload=False)
-            for d in assure_list(publish_depends):
-                lgr.info(
-                    'Configure additional publication dependency on "%s"',
-                    d)
-                ds.config.add(depvar, d, where='local', reload=False)
-            ds.config.reload()
-
         if publish_by_default:
             if dfltvar in ds.config:
                 ds.config.unset(dfltvar, where='local', reload=False)

@@ -46,6 +46,7 @@ from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import location_description
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import swallow_logs
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -347,6 +348,9 @@ def _configure_remote(
         result_props['message'] = 'need sibling `name` for configuration'
         yield result_props
         return
+    # define config var name for potential publication dependencies
+    depvar = 'remote.{}.datalad-publish-depends'.format(name)
+
     # cheat and pretend it is all new and shiny already
     if url: # poor AddSibling blows otherwise
         try:
@@ -384,6 +388,18 @@ def _configure_remote(
             yield result_props
             return
         ds.repo._run_annex_command('describe', annex_options=[name, description])
+
+    if publish_depends:
+        if depvar in ds.config:
+            # config vars are incremental, so make sure we start from
+            # scratch
+            ds.config.unset(depvar, where='local', reload=False)
+        for d in assure_list(publish_depends):
+            lgr.info(
+                'Configure additional publication dependency on "%s"',
+                d)
+            ds.config.add(depvar, d, where='local', reload=False)
+        ds.config.reload()
 
     assert isinstance(ds.repo, GitRepo)  # just against silly code
     if isinstance(ds.repo, AnnexRepo):
