@@ -536,15 +536,21 @@ class GitRepo(RepoInterface):
                 lgr.error(exc_str(e))
                 raise
         else:
-            if self._repo is None:
-                try:
-                    self._repo = self.cmd_call_wrapper(Repo, path)
-                    lgr.debug("Using existing Git repository at {0}".format(path))
-                except (GitCommandError,
-                        NoSuchPathError,
-                        InvalidGitRepositoryError) as e:
-                    lgr.error("%s: %s" % (type(e), str(e)))
-                    raise
+            # Note: We used to call gitpy.Repo(path) here, which potentially
+            # raised NoSuchPathError or InvalidGitRepositoryError. This is
+            # used by callers of GitRepo.__init__() to detect whether we have a
+            # valid repo at `path`. Now, with switching to lazy loading property
+            # `repo`, we detect those cases without instantiating a
+            # gitpy.Repo().
+
+            if not exists(path):
+                raise NoSuchPathError(path)
+
+            # TODO: GitRepo.is_valid_repo() checks for .git/objects instead
+            # This probably needs to change, so we can use it here.
+            # Note, that a submodule might have just a .git file!
+            if not exists(opj(path, '.git')):
+                raise InvalidGitRepositoryError(path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -560,9 +566,6 @@ class GitRepo(RepoInterface):
 
     @property
     def repo(self):
-        # TODO: Make repo lazy loading to avoid building a GitPython Repo
-        # instance as long as we don't actually access it!
-
         # with DryRunProtocol path not exist
         if exists(self.realpath):
             inode = os.stat(self.realpath).st_ino
@@ -572,6 +575,19 @@ class GitRepo(RepoInterface):
             # reset background processes invoked by GitPython:
             self._repo.git.clear_cache()
             self.inode = inode
+
+        if self._repo is None:
+            # Note, that this may raise GitCommandError, NoSuchPathError,
+            # InvalidGitRepositoryError:
+            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            lgr.debug("Using existing Git repository at {0}".format(self.path))
+
+        # inject git options into GitPython's git call wrapper:
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # call of Repo(path) above from being actually executed (DryRunProtocol)
+        if self._repo is not None:
+            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
         return self._repo
 
     @classmethod
