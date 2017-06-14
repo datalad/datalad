@@ -38,6 +38,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
+from datalad.tests.utils import usecase
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
@@ -422,6 +423,7 @@ def test_remove_nowhining(path):
     remove(subds_path)  # should remove just fine
 
 
+@usecase
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 @use_cassette('test_remove_recursive_2')
