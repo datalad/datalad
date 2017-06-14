@@ -1170,6 +1170,12 @@ class GitRepo(RepoInterface):
         remotes : list of str
           List of names of the remotes
         """
+
+        # TODO: read directly from config and spare instantiation of gitpy.Repo
+        # since we need it in AnnexRepo constructor. Furthermore gitpy does it
+        # the same way and the use of a Repo instance seems to have no reason
+        # other than a nice object oriented look.
+
         if with_refs_only:
             # older versions of GitPython might not tolerate remotes without
             # any references at all, so we need to catch

@@ -181,6 +181,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # check for possible SSH URLs of the remotes in order to set up
         # shared connections:
+
+
+        # TODO: This uses `repo` via GitRepo.get_Remotes:
+        # Contradicts lazy loading of repo, if we use it in the constructor!
+
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
@@ -787,6 +792,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # changed, we also need to override _flyweight_invalid and explicitly
         # pass allow_noninitialized=False!
 
+        # TODO: Again, this isn't true, since it doesn't respect a .git file:
         initialized_annex = GitRepo.is_valid_repo(path) and \
             exists(opj(path, '.git', 'annex'))
         if allow_noninitialized:
