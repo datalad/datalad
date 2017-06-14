@@ -169,7 +169,7 @@ publish_by_default = Parameter(
 
 annex_wanted_opt = Parameter(
     args=("--annex-wanted",),
-    metavar='EXP',
+    metavar='EXPR',
     doc="""expression to specify 'wanted' content for the repository/sibling.
     See https://git-annex.branchable.com/git-annex-wanted/ for more
     information""",
@@ -177,7 +177,7 @@ annex_wanted_opt = Parameter(
 
 annex_group_opt = Parameter(
     args=("--annex-group",),
-    metavar='GROUP',
+    metavar='EXPR',
     doc="""expression to specify a group for the repository.
     See https://git-annex.branchable.com/git-annex-group/ for more
     information""",

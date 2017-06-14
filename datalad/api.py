@@ -77,7 +77,7 @@ def _generate_func_api():
             spec = getattr(intf, '_params_', dict())
             api_name = get_api_name(intfspec)
             if api_name in (
-                    'add-archive-content', 'add-sibling', 'aggregate-metadata',
+                    'add-archive-content', 'aggregate-metadata',
                     'crawl-init', 'crawl', 'create-sibling',
                     'create-sibling-github', 'create-test-dataset',
                     'download-url', 'export', 'ls', 'move', 'publish',
