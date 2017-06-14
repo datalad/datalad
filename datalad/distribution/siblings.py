@@ -368,9 +368,7 @@ def _configure_remote(
                 annex_wanted=annex_wanted,
                 annex_group=annex_group,
                 annex_groupwanted=annex_groupwanted,
-                inherit=inherit,
-                # configure is what `force` was used for previously
-                force=True)
+                inherit=inherit)
         except Exception as e:
             yield get_status_dict(
                 status='error',

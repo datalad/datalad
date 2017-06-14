@@ -91,11 +91,6 @@ class AddSibling(Interface):
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
-        force=Parameter(
-            args=("--force", "-f",),
-            action="store_true",
-            doc="""if sibling `name` exists already, force to (re-)configure its
-                URLs""",),
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
         annex_wanted=annex_wanted_opt,
@@ -107,12 +102,11 @@ class AddSibling(Interface):
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(url=None, name=None, dataset=None,
-                 pushurl=None, force=False,
+                 pushurl=None,
                  publish_depends=None,
                  publish_by_default=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit=False):
-
         # TODO: Detect malformed URL and fail?
 
         # TODO: allow for no url if 'inherit' and deduce from the super ds
@@ -190,19 +184,7 @@ class AddSibling(Interface):
                     or (publish_depends and set(ds.config.get(depvar, [])) != set(publish_depends)):
                 conflicting.append(repo_name)
 
-        if not force and conflicting:
-            # TODO yield
-            raise RuntimeError("Sibling '{0}' already exists with conflicting"
-                               " settings for {1} dataset(s). {2}".format(
-                                   name, len(conflicting), conflicting))
-
         if repo_name in already_existing:
-            if not force and \
-                    repo_name not in conflicting \
-                    and ds.repo.get_remote_url(name) is not None:
-                lgr.debug("Skipping {0}. Nothing to do.".format(repo_name))
-                # TODO yield
-                return
             # rewrite url
             ds.repo.set_remote_url(name, repo_props['url'])
             fetchvar = 'remote.{}.fetch'.format(name)
