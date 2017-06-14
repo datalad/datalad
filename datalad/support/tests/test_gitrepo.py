@@ -1105,7 +1105,10 @@ def test_GitRepo_flyweight_monitoring_inode(path, store):
     # recreate
     shutil.copytree(store, path, symlinks=True)
     new_inode = os.stat(path).st_ino
-    assert_not_equal(old_inode, new_inode)
+
+    if old_inode == new_inode:
+        raise SkipTest("inode did not change. Nothing to test for.")
+
     # Now, there is a running git process by GitPython's Repo instance,
     # connected to an invalid inode!
     # GitRepo needs to make sure to stop them, whenever we access the instance

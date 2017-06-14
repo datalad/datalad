@@ -25,10 +25,10 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
+from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_not_equal
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 
@@ -376,7 +376,10 @@ def test_Dataset_flyweight_monitoring_inode(path, store):
     # recreate
     shutil.copytree(store, path, symlinks=True)
     new_inode = os.stat(path).st_ino
-    assert_not_equal(old_inode, new_inode)
+
+    if old_inode == new_inode:
+        raise SkipTest("inode did not change. Nothing to test for.")
+
     # Now, there is a running git process by GitPython's Repo instance,
     # connected to an invalid inode!
     # GitRepo needs to make sure to stop them, whenever we access the instance
