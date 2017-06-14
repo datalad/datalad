@@ -88,6 +88,15 @@ def test_annotate_paths(dspath, nodspath):
         assert_result_count(
             pwd_res, 1, type='dataset', path=dspath, orig_request='.',
             raw_input=True)
+        # make sure going into a subdataset vs giving it as a path has no
+        # structural impact
+        eq_(
+            [{k: v for k, v in ap.items()
+              if k not in ('registered_subds', 'raw_input', 'orig_request', 'refds')}
+             for ap in annotate_paths(path='b', recursive=True)],
+            [{k: v for k, v in ap.items()
+              if k not in ('registered_subds', 'raw_input', 'orig_request', 'refds')}
+             for ap in annotate_paths(dataset='b', recursive=True)])
     # now do it again, pointing to the ds directly
     res = ds.annotate_paths(on_failure='ignore')
     # no request, no refds, but otherwise the same

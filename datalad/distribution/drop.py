@@ -83,11 +83,13 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
     paths = assure_list(paths)
     if not hasattr(ds.repo, 'drop'):
         for p in paths:
-            yield get_status_dict(
+            r = get_status_dict(
                 status='impossible' if noannex_iserror else 'notneeded',
                 path=p if isabs(p) else normpath(opj(ds.path, p)),
                 message="no annex'ed content",
                 **kwargs)
+            r['action'] = 'drop'
+            yield r
         return
 
     opts = ['--force'] if not check else []
@@ -107,6 +109,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
             noinfo_dir_msg='nothing to drop from %s',
             noinfo_file_msg="no annex'ed content",
             **kwargs):
+        r['action'] = 'drop'
         yield r
 
 

@@ -147,6 +147,9 @@ def yield_recursive(ds, path, action, recursion_limit):
             recursive=True,
             recursion_limit=recursion_limit,
             return_type='generator'):
+        # this check is not the same as subdatasets --contains=path
+        # because we want all subdataset below a path, not just the
+        # containing one
         if subd_res['path'].startswith(_with_sep(path)):
             # this subdatasets is underneath the search path
             # be careful to not overwrite anything, in case
@@ -554,6 +557,9 @@ class AnnotatePaths(Interface):
                 else:
                     path_props['parentds'] = dspath
 
+            # test for `dspath` not `parent`, we only need to know whether there is
+            # ANY dataset, not which one is the true parent, logic below relies on
+            # the fact that we end here, if there is no dataset at all
             if not dspath:
                 # not in any dataset
                 res = get_status_dict(
@@ -628,7 +634,17 @@ class AnnotatePaths(Interface):
 
             rec_paths = []
             if recursive:
-                containing_ds = Dataset(dspath) if containing_ds is None else containing_ds
+                # here we need to consider the special case that `path` is
+                # a dataset itself, if a recursion_limit is given (e.g.
+                # `remove` will do that by default), we need to recurse
+                # from the dataset itself, and not its parent to get things
+                # right -- this will also avoid needless discovery of
+                # unrelated subdatasets
+                if path_props.get('type', None) == 'dataset':
+                    containing_ds = Dataset(path)
+                else:
+                    # regular parent, we might have a dataset already
+                    containing_ds = Dataset(parent) if containing_ds is None else containing_ds
                 for r in yield_recursive(containing_ds, path, action, recursion_limit):
                     # capture reported paths
                     r.update(res_kwargs)

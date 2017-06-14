@@ -243,7 +243,8 @@ class Save(Interface):
             # or recursively discovered datasets
             if ap['path'] == refds_path or \
                     (ap.get('type', None) == 'dataset' and
-                     not ap.get('raw_input', False)):
+                     not ap.get('raw_input', False) and
+                     not ap.get('state', None) == 'absent'):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
