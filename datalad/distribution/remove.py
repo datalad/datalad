@@ -221,6 +221,7 @@ class Remove(Interface):
                         # inform `save` that it is OK that this path
                         # doesn't exist on the filesystem anymore
                         ap['unavailable_path_status'] = ''
+                        ap['process_content'] = False
                         to_save.append(ap)
                     if not uninstall_failed and exists(ap['path']):
                         # could be an empty dir in case an already uninstalled subdataset
@@ -250,7 +251,8 @@ class Remove(Interface):
         for res in Save.__call__(
                 # TODO compose hand-selected annotated paths
                 files=to_save,
-                dataset=refds_path,
+                # we might have removed the reference dataset by now, recheck
+                dataset=refds_path if GitRepo.is_valid_repo(refds_path) else None,
                 # TODO allow for custom message
                 #message=message if message else '[DATALAD] removed content',
                 message='[DATALAD] removed content',
