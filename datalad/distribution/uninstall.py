@@ -156,7 +156,7 @@ class Uninstall(Interface):
             # check that we have no top-level datasets and not files to process
             if ap.get('type') == 'dataset' and \
                     not ap.get('state', None) == 'absent' and \
-                    path_is_under(ap['path']):
+                    path_is_under([ap['path']]):  # wants a sequence!
                 ap.update(
                     status='error',
                     message="refusing to uninstall current or parent directory")
