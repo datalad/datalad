@@ -182,6 +182,9 @@ class Uninstall(Interface):
         # iterate over all datasets, starting at the bottom
         # to deinit contained submodules first
         for ap in sorted(to_uninstall, key=lambda x: x['path'], reverse=True):
+            if ap.get('state', None) == 'absent':
+                # already gone
+                continue
             ds = Dataset(ap['path'])
             # TODO generator
             # this should yield what it did
