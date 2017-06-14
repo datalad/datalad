@@ -218,10 +218,3 @@ class AddSibling(Interface):
                     'Inherited publish_depends from %s: %s',
                     ds, var)
         return var
-
-
-# TODO: RF nicely, test, make clear how different from urljoin etc
-def _urljoin(base, url):
-    return base + url if (base.endswith('/') or url.startswith('/')) else base + '/' + url
-
-

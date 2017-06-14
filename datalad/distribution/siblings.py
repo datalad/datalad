@@ -16,9 +16,7 @@ import logging
 from os.path import basename
 from os.path import relpath
 
-# XXX confusing: we have urljoin, _urljoin, dlurljoin
 from datalad.distribution.add_sibling import AddSibling
-from datalad.distribution.add_sibling import _urljoin
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -49,6 +47,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
+from datalad.utils import slash_join
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -242,8 +241,8 @@ class Siblings(Interface):
                 result_xfm='datasets'):
             subds_name = relpath(subds.path, start=dataset.path)
             if replicate_local_structure:
-                subds_url = _urljoin(url, subds_name)
-                subds_pushurl = _urljoin(pushurl, subds_name)
+                subds_url = slash_join(url, subds_name)
+                subds_pushurl = slash_join(pushurl, subds_name)
             else:
                 subds_url = \
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))

@@ -1188,5 +1188,19 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             sleep(t)
 
 
+def slash_join(base, extension):
+    """Join two strings with a '/', avoiding duplicate slashes
+
+    If any of the strings is None the other is returned as is.
+    """
+    if extension is None:
+        return base
+    if base is None:
+        return extension
+    return '/'.join(
+        (base.rstrip('/'),
+         extension.lstrip('/')))
+
+
 lgr.log(5, "Done importing datalad.utils")
 
