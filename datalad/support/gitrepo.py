@@ -518,7 +518,8 @@ class GitRepo(RepoInterface):
         self._repo = repo
         self._cfg = None
 
-        if create and not GitRepo.is_valid_repo(path):
+        _valid_repo = GitRepo.is_valid_repo(path)
+        if create and not _valid_repo:
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
@@ -545,11 +546,7 @@ class GitRepo(RepoInterface):
 
             if not exists(path):
                 raise NoSuchPathError(path)
-
-            # TODO: GitRepo.is_valid_repo() checks for .git/objects instead
-            # This probably needs to change, so we can use it here.
-            # Note, that a submodule might have just a .git file!
-            if not exists(opj(path, '.git')):
+            if not _valid_repo:
                 raise InvalidGitRepositoryError(path)
 
         # inject git options into GitPython's git call wrapper:
@@ -713,7 +710,7 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return exists(opj(path, '.git', 'objects'))
+        return exists(opj(path, '.git'))
 
     @property
     def config(self):
