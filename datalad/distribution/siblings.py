@@ -349,6 +349,19 @@ def _configure_remote(
         result_props['message'] = 'need sibling `name` for configuration'
         yield result_props
         return
+
+    if publish_depends:
+        # Check if all `deps` remotes are known to the `repo`
+        unknown_deps = set(assure_list(publish_depends)).difference(
+            ds.repo.get_remotes())
+        if unknown_deps:
+            result_props['status'] = 'error'
+            result_props['message'] = (
+                'unknown sibling(s) specified as publication dependency: %s',
+                unknown_deps)
+            yield result_props
+            return
+
     # define config var name for potential publication dependencies
     depvar = 'remote.{}.datalad-publish-depends'.format(name)
     # and default pushes
@@ -362,12 +375,7 @@ def _configure_remote(
                 name=name,
                 url=url,
                 pushurl=pushurl,
-                publish_depends=publish_depends,
-                publish_by_default=publish_by_default,
-                annex_wanted=annex_wanted,
-                annex_group=annex_group,
-                annex_groupwanted=annex_groupwanted,
-                inherit=inherit)
+                publish_depends=publish_depends)
         except Exception as e:
             yield get_status_dict(
                 status='error',
@@ -402,14 +410,14 @@ def _configure_remote(
         if isinstance(ds.repo, AnnexRepo) and \
                 isinstance(delayed_super.repo, AnnexRepo):
             if annex_wanted is None:
-                annex_wanted = AddSibling._inherit_annex_var(
+                annex_wanted = _inherit_annex_var(
                     delayed_super, name, 'wanted'
                 )
             if annex_group is None:
                 # I think it might be worth inheritting group regardless what
                 # value is
                 #if annex_wanted in {'groupwanted', 'standard'}:
-                annex_group = AddSibling._inherit_annex_var(
+                annex_group = _inherit_annex_var(
                     delayed_super, name, 'group'
                 )
             if annex_wanted == 'groupwanted' and annex_groupwanted is None:
@@ -602,6 +610,24 @@ def _remove_remote(
     yield get_status_dict(
         status='ok',
         **result_props)
+
+
+def _inherit_annex_var(ds, remote, cfgvar):
+    var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
+    if var:
+        lgr.info("Inherited annex config from %s %s = %s",
+                 ds, cfgvar, var)
+    return var
+
+
+def _inherit_config_var(ds, cfgvar, var):
+    if var is None:
+        var = ds.config.get(cfgvar)
+        if var:
+            lgr.info(
+                'Inherited publish_depends from %s: %s',
+                ds, var)
+    return var
 
 
 class _DelayedSuper(object):

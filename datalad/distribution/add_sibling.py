@@ -22,11 +22,6 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.network import RI
 from ..interface.base import Interface
 from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import publish_by_default
-from datalad.interface.common_opts import annex_wanted_opt
-from datalad.interface.common_opts import annex_group_opt
-from datalad.interface.common_opts import annex_groupwanted_opt
-from datalad.interface.common_opts import inherit_opt
 from datalad.distribution.dataset import EnsureDataset, \
     datasetmethod, require_dataset
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -35,6 +30,8 @@ from datalad.support.exceptions import InsufficientArgumentsError
 lgr = logging.getLogger('datalad.distribution.add_sibling')
 
 
+# TODO the only reason this function is still here is that #1544
+# isn't merged yet -- which removes the only remaining usage
 def _check_deps(repo, deps):
     """Check if all `deps` remotes are known to the `repo`
 
@@ -92,21 +89,13 @@ class AddSibling(Interface):
                 dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
-        publish_by_default=publish_by_default,
-        annex_wanted=annex_wanted_opt,
-        annex_group=annex_group_opt,
-        annex_groupwanted=annex_groupwanted_opt,
-        inherit=inherit_opt
     )
 
     @staticmethod
     @datasetmethod(name='add_sibling')
     def __call__(url=None, name=None, dataset=None,
                  pushurl=None,
-                 publish_depends=None,
-                 publish_by_default=None,
-                 annex_wanted=None, annex_group=None, annex_groupwanted=None,
-                 inherit=False):
+                 publish_depends=None):
         # TODO: Detect malformed URL and fail?
 
         # TODO: allow for no url if 'inherit' and deduce from the super ds
@@ -134,8 +123,6 @@ class AddSibling(Interface):
         ds = require_dataset(dataset, check_installed=True,
                              purpose='sibling addition')
         assert(ds.repo is not None)
-
-        _check_deps(ds.repo, publish_depends)
 
         repo_name = basename(ds.path)
         repo_props = {'repo': ds.repo}
@@ -200,21 +187,3 @@ class AddSibling(Interface):
             ds.repo.add_remote(name, repo_props['url'])
         if pushurl:
             ds.repo.set_remote_url(name, repo_props['pushurl'], push=True)
-
-    @staticmethod
-    def _inherit_annex_var(ds, remote, cfgvar):
-        var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
-        if var:
-            lgr.info("Inherited annex config from %s %s = %s",
-                     ds, cfgvar, var)
-        return var
-
-    @staticmethod
-    def _inherit_config_var(ds, cfgvar, var):
-        if var is None:
-            var = ds.config.get(cfgvar)
-            if var:
-                lgr.info(
-                    'Inherited publish_depends from %s: %s',
-                    ds, var)
-        return var

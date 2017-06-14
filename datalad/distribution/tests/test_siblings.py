@@ -58,8 +58,9 @@ def test_siblings(origin, repo_path):
         on_failure='ignore',
         result_renderer=None)
     assert_status('error', res)
-    assert_in('unknown sibling(s) specified as publication dependency',
-              res[0]['message'])
+    eq_(res[0]['message'],
+        ('unknown sibling(s) specified as publication dependency: %s',
+         set(('r1', 'r2'))))
     # prior config was not changed by failed call above
     eq_(source.config.get(depvar, None), 'stupid')
 
