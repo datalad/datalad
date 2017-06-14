@@ -220,6 +220,7 @@ class Siblings(Interface):
         for r in worker(
                 # always copy signature to below to avoid bugs!
                 ds, name,
+                ds.repo.get_remotes(),
                 # for top-level dataset there is no layout questions
                 _mangle_urls(url, ds_name),
                 _mangle_urls(pushurl, ds_name),
@@ -252,6 +253,7 @@ class Siblings(Interface):
             for r in worker(
                     # always copy signature from above to avoid bugs
                     subds, name,
+                    subds.repo.get_remotes(),
                     subds_url,
                     subds_pushurl,
                     fetch,
@@ -286,7 +288,7 @@ class Siblings(Interface):
 
 # always copy signature from above to avoid bugs
 def _add_remote(
-        ds, name, url, pushurl, fetch, description,
+        ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -316,7 +318,7 @@ def _add_remote(
 
     if not name:
         raise InsufficientArgumentsError("no sibling name given")
-    if name in ds.repo.get_remotes():
+    if name in known_remotes:
         yield get_status_dict(
             action='add-sibling',
             status='error',
@@ -328,7 +330,7 @@ def _add_remote(
         return
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, url, pushurl, fetch, description,
+            ds, name, known_remotes, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_group, annex_groupwanted,
             inherit,
@@ -340,7 +342,7 @@ def _add_remote(
 
 # always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, url, pushurl, fetch, description,
+        ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
@@ -360,7 +362,7 @@ def _configure_remote(
     if publish_depends:
         # Check if all `deps` remotes are known to the `repo`
         unknown_deps = set(assure_list(publish_depends)).difference(
-            ds.repo.get_remotes())
+            known_remotes)
         if unknown_deps:
             result_props['status'] = 'error'
             result_props['message'] = (
@@ -513,7 +515,7 @@ def _configure_remote(
 
 # always copy signature from above to avoid bugs
 def _query_remotes(
-        ds, name, url=None, pushurl=None, fetch=None, description=None,
+        ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
@@ -539,7 +541,6 @@ def _query_remotes(
                 ainfo = annex_info.get(uuid, {})
                 ainfo['description'] = r.get('description', None)
                 annex_info[uuid] = ainfo
-    known_remotes = ds.repo.get_remotes()
     # treat the local repo as any other remote using 'here' as a label
     remotes = [name] if name else ['here'] + known_remotes
     for remote in remotes:
@@ -586,7 +587,7 @@ def _query_remotes(
 
 
 def _remove_remote(
-        ds, name, url, pushurl, fetch, description,
+        ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
