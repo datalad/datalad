@@ -185,6 +185,10 @@ class Siblings(Interface):
         # TODO: Detect malformed URL and fail?
         # XXX possibly fail if fetch is False and as_common_datasrc
 
+        if annex_groupwanted and not annex_group:
+            raise InsufficientArgumentsError(
+                "To set groupwanted, you need to provide annex_group option")
+
         # TODO catch invalid action specified
         action_worker_map = {
             'query': _query_remotes,
@@ -468,6 +472,8 @@ def _configure_remote(
                     ds.repo.enable_remote(name)
             except CommandError as exc:
                 # TODO yield
+                # this is unlikely to ever happen, now done for AnnexRepo instances
+                # only
                 lgr.info("Failed to enable annex remote %s, "
                          "could be a pure git" % name)
                 lgr.debug("Exception was: %s" % exc_str(exc))
@@ -499,10 +505,6 @@ def _configure_remote(
             if annex_group:
                 ds.repo.set_group(name, annex_group)
             if annex_groupwanted:
-                # TODO move check upfront
-                if not annex_group:
-                    raise InsufficientArgumentsError(
-                        "To set groupwanted, you need to provide annex_group option")
                 ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
     #
