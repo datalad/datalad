@@ -15,9 +15,9 @@ import logging
 from os import listdir
 from os.path import isdir
 from os.path import join as opj
-from os.path import relpath
 from os.path import normpath
 from os.path import pardir
+from os.path import relpath
 
 from datalad.utils import unique
 from datalad.utils import get_dataset_root

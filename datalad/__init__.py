@@ -25,12 +25,16 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
-
 import atexit
-atexit.register(ssh_manager.close, allow_fail=False)
+from datalad.utils import on_windows
+if not on_windows:
+    lgr.log(5, "Instantiating ssh manager")
+    from .support.sshconnector import SSHManager
+    ssh_manager = SSHManager()
+    atexit.register(ssh_manager.close, allow_fail=False)
+else:
+    ssh_manager = None
+
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__

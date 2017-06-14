@@ -315,11 +315,11 @@ def path_is_under(values, path=None):
     """
     if path is None:
         from datalad.utils import getpwd
-        pwd = getpwd()
+        path = getpwd()
     if isinstance(values, dict):
         values = chain(*values.values())
     for p in values:
-        rpath = relpath(p, start=pwd)
+        rpath = relpath(p, start=path)
         if rpath == curdir \
                 or rpath == pardir \
                 or set(psplit(rpath)) == {pardir}:

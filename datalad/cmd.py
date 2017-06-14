@@ -24,7 +24,7 @@ import functools
 from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type
-from os.path import abspath, isabs
+from os.path import abspath, isabs, pathsep
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
@@ -562,7 +562,7 @@ class GitRunner(Runner):
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
         if GitRunner._GIT_PATH:
-            git_env['PATH'] = ':'.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+            git_env['PATH'] = pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
                 else GitRunner._GIT_PATH
 

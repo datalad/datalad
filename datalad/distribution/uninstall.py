@@ -156,7 +156,7 @@ class Uninstall(Interface):
             # check that we have no top-level datasets and not files to process
             if ap.get('type') == 'dataset' and \
                     not ap.get('state', None) == 'absent' and \
-                    path_is_under(ap['path']):
+                    path_is_under([ap['path']]):  # wants a sequence!
                 ap.update(
                     status='error',
                     message="refusing to uninstall current or parent directory")
@@ -182,6 +182,9 @@ class Uninstall(Interface):
         # iterate over all datasets, starting at the bottom
         # to deinit contained submodules first
         for ap in sorted(to_uninstall, key=lambda x: x['path'], reverse=True):
+            if ap.get('state', None) == 'absent':
+                # already gone
+                continue
             ds = Dataset(ap['path'])
             # TODO generator
             # this should yield what it did

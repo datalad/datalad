@@ -29,6 +29,7 @@ from os.path import basename
 from os.path import curdir
 from os.path import pardir
 from os.path import sep
+import posixpath
 from weakref import WeakValueDictionary
 
 
@@ -52,6 +53,8 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import swallow_logs
 from datalad.utils import updated
+from datalad.utils import posix_relpath
+
 
 # imports from same module:
 from .external_versions import external_versions
@@ -1864,8 +1867,11 @@ class GitRepo(RepoInterface):
             cmd += ['-b', branch]
         if url is None:
             if not isabs(path):
-                path = opj(curdir, path)
-            url = path
+                # need to recode into a relative path "URL" in POSIX
+                # style, even on windows
+                url = posixpath.join(curdir, posix_relpath(path))
+            else:
+                url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
         # TODO: return value
