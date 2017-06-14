@@ -9,6 +9,20 @@ This is a very high level and scarce summary of the changes between releases.
 We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
 for more details ATM.
 
+# 0.6.1 (??? ??, 2017) -- will be better than ever
+
+I bet we will fix some bugs and make a world even a better place.
+
+## Fixes
+
+??
+
+## Enhancements and new features
+
+??
+
+
+
 ## 0.6.0 (Jun 14, 2017) -- German perfectionism
 
 This release includes a **huge** refactoring to make code base and functionality
