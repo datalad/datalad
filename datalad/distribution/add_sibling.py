@@ -95,39 +95,12 @@ class AddSibling(Interface):
     def __call__(url=None, name=None, dataset=None,
                  pushurl=None,
                  publish_depends=None):
-
-        # not yet sure if that is an error
-        if (url is None and pushurl is None):
-            raise InsufficientArgumentsError(
-                """insufficient information to add a sibling
-                (needs at least a dataset, and a URL).""")
-
-        ds = require_dataset(dataset, check_installed=True,
-                             purpose='sibling addition')
-        assert(ds.repo is not None)
-
+        ds = dataset
         repo_name = basename(ds.path)
         repo_props = {'repo': ds.repo}
-
-        # Note: This is copied from create_sibling
-        # as it is the same logic as for its target_dir.
-        # TODO: centralize and generalize template symbol handling
-        # TODO: Check pushurl for template symbols too. Probably raise if only
-        #       one of them uses such symbols
-
-        replicate_local_structure = "%NAME" not in url
-
-        if not replicate_local_structure:
-            repo_props['url'] = url.replace("%NAME",
-                                            repo_name.replace("/", "-"))
-            if pushurl:
-                repo_props['pushurl'] = pushurl.replace("%NAME",
-                                                        repo_name.replace("/",
-                                                                          "-"))
-        else:
-            repo_props['url'] = url
-            if pushurl:
-                repo_props['pushurl'] = pushurl
+        repo_props['url'] = url
+        if pushurl:
+            repo_props['pushurl'] = pushurl
 
         # define config var name for potential publication dependencies
         depvar = 'remote.{}.datalad-publish-depends'.format(name)
