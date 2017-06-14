@@ -221,7 +221,7 @@ class Clone(Interface):
         # combine all given sources (incl. alternatives), maintain order
         for s in [source] + assure_list(alt_sources):
             candidate_sources.extend(_get_flexible_source_candidates(s))
-        lgr.info("Cloning dataset from '%s' (trying %i location candidates) to '%s'",
+        lgr.info("Cloning dataset from '%s' (trying %i location candidate(s)) to '%s'",
                  source, len(candidate_sources), dest_path)
         for source_ in candidate_sources:
             try:
