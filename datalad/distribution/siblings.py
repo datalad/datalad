@@ -189,6 +189,7 @@ class Siblings(Interface):
             recursive=False,
             recursion_limit=None):
 
+        # TODO: Detect malformed URL and fail?
         # XXX possibly fail if fetch is False and as_common_datasrc
 
         # TODO catch invalid mode specified
@@ -290,6 +291,12 @@ def _add_remote(
         annex_wanted, annex_group, annex_groupwanted,
         inherit,
         **res_kwargs):
+    # TODO: allow for no url if 'inherit' and deduce from the super ds
+    #       create-sibling already does it -- generalize/use
+    #  Actually we could even inherit/deduce name from the super by checking
+    #  which remote it is actively tracking in current branch... but may be
+    #  would be too much magic
+
     # it seems that the only difference is that `add` should fail if a remote
     # already exists
     if (url is None and pushurl is None):

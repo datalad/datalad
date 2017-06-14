@@ -19,7 +19,6 @@ from os.path import basename
 from datalad.utils import assure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.network import RI
 from ..interface.base import Interface
 from datalad.interface.common_opts import publish_depends
 from datalad.distribution.dataset import EnsureDataset, \
@@ -96,29 +95,12 @@ class AddSibling(Interface):
     def __call__(url=None, name=None, dataset=None,
                  pushurl=None,
                  publish_depends=None):
-        # TODO: Detect malformed URL and fail?
-
-        # TODO: allow for no url if 'inherit' and deduce from the super ds
-        #       create-sibling already does it -- generalize/use
-        #  Actually we could even inherit/deduce name from the super by checking
-        #  which remote it is actively tracking in current branch... but may be
-        #  would be too much magic
 
         # not yet sure if that is an error
         if (url is None and pushurl is None):
             raise InsufficientArgumentsError(
                 """insufficient information to add a sibling
                 (needs at least a dataset, and a URL).""")
-        if url is None:
-            url = pushurl
-
-        if not name:
-            urlri = RI(url)
-            # use the hostname as default remote name
-            name = urlri.hostname
-            lgr.debug(
-                "No sibling name given, use URL hostname '%s' as sibling name",
-                name)
 
         ds = require_dataset(dataset, check_installed=True,
                              purpose='sibling addition')
