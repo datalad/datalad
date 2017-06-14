@@ -43,6 +43,7 @@ from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import location_description
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.update import Update
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import slash_join
@@ -264,7 +265,7 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if res['status'] != 'ok':
+        if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
             return
         path = relpath(res['path'],
@@ -404,9 +405,18 @@ def _configure_remote(
 
         if fetch:
             # fetch the remote so we are up to date
-            lgr.debug("Fetching sibling %s of %s", name, ds)
-            # TODO better use `ds.update`
-            ds.repo.fetch(name)
+            for r in Update.__call__(
+                    dataset=res_kwargs['refds'],
+                    path=[dict(path=ds.path, type='dataset')],
+                    sibling=name,
+                    merge=False,
+                    recursive=False,
+                    on_failure='ignore',
+                    return_type='generator',
+                    result_xfm=None):
+                # fixup refds
+                r.update(res_kwargs)
+                yield r
 
         if inherit:
             # Adjust variables which we should inherit
