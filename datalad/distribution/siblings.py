@@ -407,9 +407,9 @@ def _configure_remote(
     if inherit:
         # Adjust variables which we should inherit
         delayed_super = _DelayedSuper(ds.repo)
-        publish_depends = AddSibling._inherit_config_var(
+        publish_depends = _inherit_config_var(
             delayed_super, depvar, publish_depends)
-        publish_by_default = AddSibling._inherit_config_var(
+        publish_by_default = _inherit_config_var(
             delayed_super, dfltvar, publish_by_default)
         # Copy relevant annex settings for the sibling
         # makes sense only if current AND super are annexes, so it is
