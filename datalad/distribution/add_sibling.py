@@ -137,8 +137,5 @@ class AddSibling(Interface):
                     fetchvar,
                     '+refs/heads/*:refs/remotes/{}/*'.format(name),
                     where='local')
-        else:
-            # add the remote
-            ds.repo.add_remote(name, repo_props['url'])
         if pushurl:
             ds.repo.set_remote_url(name, repo_props['pushurl'], push=True)

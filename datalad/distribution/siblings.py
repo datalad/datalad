@@ -328,6 +328,9 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    # this remote is fresh: make it known
+    # just minimalistic name and URL, the rest is coming from `configure`
+    ds.repo.add_remote(name, url)
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
             ds, name, known_remotes, url, pushurl, fetch, description,
@@ -508,7 +511,7 @@ def _configure_remote(
             ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
     # report all we know at once
-    info = list(_query_remotes(ds, name))[0]
+    info = list(_query_remotes(ds, name, known_remotes))[0]
     info.update(dict(status='ok', **result_props))
     yield info
 
