@@ -792,9 +792,24 @@ class AnnexRepo(GitRepo, RepoInterface):
         # changed, we also need to override _flyweight_invalid and explicitly
         # pass allow_noninitialized=False!
 
-        # TODO: Again, this isn't true, since it doesn't respect a .git file:
+        def git_file_has_annex(p):
+            """Return True if `p` contains a .git file, that points to a git
+            dir with a subdir 'annex'"""
+            _git = opj(p, '.git')
+            if not os.path.isfile(_git):
+                return False
+            with open(_git, "r") as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    return exists(opj(p, line[8:], 'annex'))
+                else:
+                    lgr.debug("Invalid .git file: %s", _git)
+                    return False
+
         initialized_annex = GitRepo.is_valid_repo(path) and \
-            exists(opj(path, '.git', 'annex'))
+            (exists(opj(path, '.git', 'annex')) or
+             git_file_has_annex(path))
+
         if allow_noninitialized:
             try:
                 return initialized_annex \
