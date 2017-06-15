@@ -23,6 +23,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
+from datalad.tests.utils import slow
 from datalad.utils import swallow_logs
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod
@@ -162,6 +163,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
     return parent
 
 
+@slow  # 74.4509s
 @with_tree(demo_hierarchy)
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities

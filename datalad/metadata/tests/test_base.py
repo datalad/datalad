@@ -31,6 +31,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import slow
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -134,6 +135,7 @@ def test_basic_metadata(path):
     assert_not_in('dcterms:hasPart', meta[0])
 
 
+@slow  # 37.1036s
 @skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):

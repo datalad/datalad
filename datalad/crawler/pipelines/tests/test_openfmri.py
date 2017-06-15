@@ -29,6 +29,7 @@ from ....api import clean
 from ....utils import chpwd
 from ....utils import find_files
 from ....utils import swallow_logs
+from ....tests.utils import integration
 from ....tests.utils import with_tree
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
@@ -179,6 +180,8 @@ _versioned_files = """
                             <a href="ds666-beh_R1.0.1.tar.gz">Beh data on AWS version 2</a>
 """
 
+
+@integration
 @with_tree(tree={
     'ds666': {
         # there could also be a case of a file with "unique" name without versioned counterpart
@@ -411,9 +414,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         output, stats = crawl()  # we should be able to recrawl without doing anything
         ok_(stats, ActivityStats(files=6, skipped=6, urls=5))
 
-test_openfmri_pipeline1.tags = ['integration']
 
-
+@integration
 @with_tree(tree={
     'ds666': {
         'index.html': """<html><body>
@@ -496,7 +498,6 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1'])
 
     check_dropall_get(repo)
-test_openfmri_pipeline2.tags = ['integration']
 
 
 from ..openfmri_s3 import collection_pipeline, pipeline
