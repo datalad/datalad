@@ -2298,59 +2298,85 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: JSON
         return out.splitlines()
 
-    def get_wanted(self, remote=None):
-        """Get `wanted` for the remote.  "" corresponds to none set
+    def get_preferred_content(self, property, remote=None):
+        """Get preferred content configuration of a repository or remote
 
         Parameters
         ----------
+        property : {'wanted', 'required', 'group'}
+          Type of property to query
         remote : str, optional
-           If not specified (None), returns `wanted` for current repository
+          If not specified (None), returns the property for the local
+          repository.
+
+        Returns
+        -------
+        str
+          Either the setting is returned, or an empty string if there
+          is none.
+
+        Raises
+        ------
+        ValueError
+          If an unknown property label is given.
+
+        CommandError
+          If the annex call errors.
         """
+        if property not in ('wanted', 'required', 'group'):
+            raise ValueError(
+                'unknown preferred content property: {}'.format(property))
         return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.']
-        )
+            property,
+            annex_options=[remote or '.'])
 
-    def set_wanted(self, remote=None, expr=None):
-        """Set `wanted` `expr` for the remote."""
-        return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.', expr]
-        )
-
-    def get_group(self, remote=None):
-        """Get `group` for the remote.  "" corresponds to none set
+    def set_preferred_content(self, property, expr, remote=None):
+        """Set preferred content configuration of a repository or remote
 
         Parameters
         ----------
+        property : {'wanted', 'required', 'group'}
+          Type of property to query
+        expr : str
+          Any expression or label supported by git-annex for the
+          given property.
         remote : str, optional
-           If not specified (None), returns `group` for current repository
+          If not specified (None), sets the property for the local
+          repository.
+
+        Returns
+        -------
+        str
+          Raw git-annex output in response to the set command.
+
+        Raises
+        ------
+        ValueError
+          If an unknown property label is given.
+
+        CommandError
+          If the annex call errors.
         """
+        if property not in ('wanted', 'required', 'group'):
+            raise ValueError(
+                'unknown preferred content property: {}'.format(property))
         return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.']
-        )
+            property,
+            annex_options=[remote or '.', expr])
 
-    def set_group(self, remote=None, group=None):
-        """Set `group` of the remote."""
-        return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.', group]
-        )
-
-    def get_groupwanted(self, name=None):
+    def get_groupwanted(self, name):
         """Get `groupwanted` expression for a group `name`
 
         Parameters
         ----------
-        name : str, optional
+        name : str
            Name of the groupwanted group
         """
         return self._run_simple_annex_command(
             'groupwanted', annex_options=[name]
         )
 
-    def set_groupwanted(self, name=None, expr=None):
+    def set_groupwanted(self, name, expr):
         """Set `expr` for the `name` groupwanted"""
         return self._run_simple_annex_command(
             'groupwanted', annex_options=[name, expr]

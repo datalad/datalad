@@ -65,7 +65,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # `refspec`
 
     def _publish_data():
-        remote_wanted = ds.repo.get_wanted(remote)
+        remote_wanted = ds.repo.get_preferred_content('wanted', remote)
         if (paths or annex_copy_options or remote_wanted) and \
               isinstance(ds.repo, AnnexRepo) and not \
               ds.config.getbool(
@@ -179,7 +179,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     knew_remote_uuid = None
     if isinstance(ds.repo, AnnexRepo):
         try:
-            ds.repo.get_wanted(remote)  # could be just checking config.remote.uuid
+            ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
             knew_remote_uuid = True
         except CommandError:
             knew_remote_uuid = False

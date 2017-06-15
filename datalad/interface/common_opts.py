@@ -169,15 +169,23 @@ publish_by_default = Parameter(
 
 annex_wanted_opt = Parameter(
     args=("--annex-wanted",),
-    metavar='EXP',
+    metavar='EXPR',
     doc="""expression to specify 'wanted' content for the repository/sibling.
     See https://git-annex.branchable.com/git-annex-wanted/ for more
     information""",
     constraints=EnsureStr() | EnsureNone())
 
+annex_required_opt = Parameter(
+    args=("--annex-required",),
+    metavar='EXPR',
+    doc="""expression to specify 'required' content for the repository/sibling.
+    See https://git-annex.branchable.com/git-annex-required/ for more
+    information""",
+    constraints=EnsureStr() | EnsureNone())
+
 annex_group_opt = Parameter(
     args=("--annex-group",),
-    metavar='GROUP',
+    metavar='EXPR',
     doc="""expression to specify a group for the repository.
     See https://git-annex.branchable.com/git-annex-group/ for more
     information""",

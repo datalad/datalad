@@ -252,7 +252,7 @@ datalad save -u -m "Alice always helps"
 
 HOME="$BOBS_HOME"
 cd ~/myanalysis
-datalad add-sibling -s alice "$ALICES_HOME/bobs_analysis"
+datalad siblings add -s alice --url "$ALICES_HOME/bobs_analysis"
 
 #%
 # Once registered, Bob can update his dataset based on Alice's version, and merge

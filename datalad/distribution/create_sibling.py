@@ -12,7 +12,6 @@
 __docformat__ = 'restructuredtext'
 
 from six import text_type
-from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -23,12 +22,10 @@ from datalad import ssh_manager
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
-from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.distribution.siblings import Siblings
-from datalad.distribution.add_sibling import _DelayedSuper
+from datalad.distribution.siblings import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
-from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
@@ -41,7 +38,6 @@ from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.utils import filter_unmodified
-from datalad.support.network import SSHRI
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -54,6 +50,7 @@ from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
 from datalad.utils import not_supported_on_windows
 from datalad.utils import _path_
+from datalad.utils import slash_join
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
@@ -473,8 +470,7 @@ class CreateSibling(Interface):
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
-            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
-
+            sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
 
         # check the login URL
         sshri = RI(sshurl)
