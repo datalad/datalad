@@ -175,6 +175,14 @@ annex_wanted_opt = Parameter(
     information""",
     constraints=EnsureStr() | EnsureNone())
 
+annex_required_opt = Parameter(
+    args=("--annex-required",),
+    metavar='EXPR',
+    doc="""expression to specify 'required' content for the repository/sibling.
+    See https://git-annex.branchable.com/git-annex-required/ for more
+    information""",
+    constraints=EnsureStr() | EnsureNone())
+
 annex_group_opt = Parameter(
     args=("--annex-group",),
     metavar='EXPR',

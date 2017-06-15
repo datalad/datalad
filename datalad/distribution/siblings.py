@@ -37,6 +37,7 @@ from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_depends
 from datalad.interface.common_opts import publish_by_default
 from datalad.interface.common_opts import annex_wanted_opt
+from datalad.interface.common_opts import annex_required_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
@@ -154,6 +155,7 @@ class Siblings(Interface):
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
         annex_wanted=annex_wanted_opt,
+        annex_required=annex_required_opt,
         annex_group=annex_group_opt,
         annex_groupwanted=annex_groupwanted_opt,
         inherit=inherit_opt,
@@ -177,6 +179,7 @@ class Siblings(Interface):
             publish_depends=None,
             publish_by_default=None,
             annex_wanted=None,
+            annex_required=None,
             annex_group=None,
             annex_groupwanted=None,
             inherit=False,
@@ -224,7 +227,7 @@ class Siblings(Interface):
                 _mangle_urls(pushurl, ds_name),
                 fetch, description,
                 as_common_datasrc, publish_depends, publish_by_default,
-                annex_wanted, annex_group, annex_groupwanted,
+                annex_wanted, annex_required, annex_group, annex_groupwanted,
                 inherit,
                 **res_kwargs):
             yield r
@@ -257,7 +260,7 @@ class Siblings(Interface):
                     fetch,
                     description,
                     as_common_datasrc, publish_depends, publish_by_default,
-                    annex_wanted, annex_group, annex_groupwanted,
+                    annex_wanted, annex_required, annex_group, annex_groupwanted,
                     inherit,
                     **res_kwargs):
                 yield r
@@ -288,7 +291,7 @@ class Siblings(Interface):
 def _add_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_group, annex_groupwanted,
+        annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit,
         **res_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
@@ -334,7 +337,7 @@ def _add_remote(
     for r in _configure_remote(
             ds, name, known_remotes, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
-            annex_wanted, annex_group, annex_groupwanted,
+            annex_wanted, annex_required, annex_group, annex_groupwanted,
             inherit,
             **res_kwargs):
         if r['action'] == 'configure-sibling':
@@ -346,7 +349,7 @@ def _add_remote(
 def _configure_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_group, annex_groupwanted,
+        annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit,
         **res_kwargs):
     result_props = dict(
@@ -432,8 +435,10 @@ def _configure_remote(
                     isinstance(delayed_super.repo, AnnexRepo):
                 if annex_wanted is None:
                     annex_wanted = _inherit_annex_var(
-                        delayed_super, name, 'wanted'
-                    )
+                        delayed_super, name, 'wanted')
+                if annex_required is None:
+                    annex_required = _inherit_annex_var(
+                        delayed_super, name, 'required')
                 if annex_group is None:
                     # I think it might be worth inheritting group regardless what
                     # value is
@@ -513,6 +518,8 @@ def _configure_remote(
                         **result_props)
             if annex_wanted:
                 ds.repo.set_wanted(annex_wanted, name)
+            if annex_required:
+                ds.repo.set_required(annex_required, name)
             if annex_group:
                 ds.repo.set_group(annex_group, name)
             if annex_groupwanted:
@@ -539,7 +546,7 @@ def _configure_remote(
 def _query_remotes(
         ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
-        annex_wanted=None, annex_group=None, annex_groupwanted=None,
+        annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
         inherit=None,
         **res_kwargs):
     annex_info = {}
@@ -611,7 +618,7 @@ def _query_remotes(
 def _remove_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_group, annex_groupwanted,
+        annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit,
         **res_kwargs):
     if not name:
