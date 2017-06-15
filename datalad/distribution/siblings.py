@@ -613,6 +613,14 @@ def _query_remotes(
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description
+        if get_annex_info and isinstance(ds.repo, AnnexRepo):
+            for prop in ('wanted', 'required', 'group'):
+                var = ds.repo.get_preferred_content(prop, remote)
+                if var:
+                    info['annex-{}'.format(prop)] = var
+            groupwanted = ds.repo.get_groupwanted(remote)
+            if groupwanted:
+                info['annex-groupwanted'] = groupwanted
 
         info['status'] = 'ok'
         yield info
