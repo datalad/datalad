@@ -522,12 +522,11 @@ def _configure_remote(
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
                         **result_props)
-            if annex_wanted:
-                ds.repo.set_wanted(annex_wanted, name)
-            if annex_required:
-                ds.repo.set_required(annex_required, name)
-            if annex_group:
-                ds.repo.set_group(annex_group, name)
+            for prop, var in (('wanted', annex_wanted),
+                              ('required', annex_required),
+                              ('group', annex_group)):
+                if var:
+                    ds.repo.set_preferred_content(prop, var, name)
             if annex_groupwanted:
                 ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
@@ -654,7 +653,10 @@ def _remove_remote(
 
 
 def _inherit_annex_var(ds, remote, cfgvar):
-    var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
+    if cfgvar == 'groupwanted':
+        var = getattr(ds.repo, 'get_%s' % cfgvar)(remote)
+    else:
+        var = ds.repo.get_preferred_content(cfgvar, remote)
     if var:
         lgr.info("Inherited annex config from %s %s = %s",
                  ds, cfgvar, var)

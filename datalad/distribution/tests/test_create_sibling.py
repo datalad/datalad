@@ -415,8 +415,8 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     remote = "magical"
     ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
     if standardgroup:
-        ds.repo.set_wanted('standard', remote)
-        ds.repo.set_group(standardgroup, remote)
+        ds.repo.set_preferred_content('wanted', 'standard', remote)
+        ds.repo.set_preferred_content('group', standardgroup, remote)
     ds.publish(to=remote)
 
     # now a month later we created a new subdataset
@@ -437,8 +437,8 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
     ds.publish(to=remote, recursive=True, missing='inherit')
     # we added the remote and set all the
-    eq_(subds.repo.get_wanted(remote), 'standard' if standardgroup else '')
-    eq_(subds.repo.get_group(remote), standardgroup or '')
+    eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
+    eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
 
     ok_(target_sub.is_installed())  # it is there now
     eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
