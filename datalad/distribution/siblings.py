@@ -505,11 +505,12 @@ def _configure_remote(
                             'location={}'.format(url),
                             'autoenable=true'])
                 else:
-                    # TODO yield
-                    lgr.warning(
-                        'Not configuring "%s" as a common data source, '
-                        'URL protocol is not http or https',
-                        name)
+                    yield dict(
+                        status='impossible',
+                        name=name,
+                        message='cannot configure as a common data source, '
+                                'URL protocol is not http or https',
+                        **result_props)
             if annex_wanted:
                 ds.repo.set_wanted(name, annex_wanted)
             if annex_group:
