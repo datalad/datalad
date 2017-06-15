@@ -2327,6 +2327,23 @@ class AnnexRepo(GitRepo, RepoInterface):
         return self._set_preferred_content(
             'wanted', remote=remote, expr=expr)
 
+    def get_required(self, remote=None):
+        """Get `required` content configuration for a remote.
+
+        "" corresponds to none set
+
+        Parameters
+        ----------
+        remote : str, optional
+           If not specified (None), returns `required` for this repository
+        """
+        return self._get_preferred_content('required', remote=remote)
+
+    def set_required(self, remote=None, expr=None):
+        """Set `required` `expr` for a remote or this repository"""
+        return self._set_preferred_content(
+            'required', remote=remote, expr=expr)
+
     def get_group(self, remote=None):
         """Get `group` for the remote or this repository
 
