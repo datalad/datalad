@@ -415,8 +415,8 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     remote = "magical"
     ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
     if standardgroup:
-        ds.repo.set_wanted(remote, 'standard')
-        ds.repo.set_group(remote, standardgroup)
+        ds.repo.set_wanted('standard', remote)
+        ds.repo.set_group(standardgroup, remote)
     ds.publish(to=remote)
 
     # now a month later we created a new subdataset

@@ -2304,7 +2304,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             kind,
             annex_options=[remote or '.'])
 
-    def _set_preferred_content(self, kind, remote=None, expr=None):
+    def _set_preferred_content(self, kind, expr, remote=None):
         "Internal helper for 'wanted' and 'required' (and similar)"
         return self._run_simple_annex_command(
             kind,
@@ -2322,10 +2322,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self._get_preferred_content('wanted', remote=remote)
 
-    def set_wanted(self, remote=None, expr=None):
+    def set_wanted(self, expr, remote=None):
         """Set `wanted` `expr` for a remote or this repository"""
         return self._set_preferred_content(
-            'wanted', remote=remote, expr=expr)
+            'wanted', expr, remote=remote)
 
     def get_required(self, remote=None):
         """Get `required` content configuration for a remote.
@@ -2339,10 +2339,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self._get_preferred_content('required', remote=remote)
 
-    def set_required(self, remote=None, expr=None):
+    def set_required(self, expr, remote=None):
         """Set `required` `expr` for a remote or this repository"""
         return self._set_preferred_content(
-            'required', remote=remote, expr=expr)
+            'required', expr, remote=remote)
 
     def get_group(self, remote=None):
         """Get `group` for the remote or this repository
@@ -2356,10 +2356,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self._get_preferred_content('group', remote=remote)
 
-    def set_group(self, remote=None, group=None):
+    def set_group(self, group, remote=None):
         """Set `group` of a remote or this repository"""
         return self._set_preferred_content(
-            'group', remote=remote, expr=group)
+            'group', group, remote=remote)
 
     def get_groupwanted(self, name):
         """Get `groupwanted` expression for a group `name`

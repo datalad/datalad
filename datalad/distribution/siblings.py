@@ -512,9 +512,9 @@ def _configure_remote(
                                 'URL protocol is not http or https',
                         **result_props)
             if annex_wanted:
-                ds.repo.set_wanted(name, annex_wanted)
+                ds.repo.set_wanted(annex_wanted, name)
             if annex_group:
-                ds.repo.set_group(name, annex_group)
+                ds.repo.set_group(annex_group, name)
             if annex_groupwanted:
                 ds.repo.set_groupwanted(annex_group, annex_groupwanted)
 
