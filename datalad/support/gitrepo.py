@@ -1171,11 +1171,8 @@ class GitRepo(RepoInterface):
           List of names of the remotes
         """
 
-        # TODO: read directly from config and spare instantiation of gitpy.Repo
-        # since we need it in AnnexRepo constructor. Furthermore gitpy does it
-        # the same way and the use of a Repo instance seems to have no reason
-        # other than a nice object oriented look.
-
+        # Note: This still uses GitPython and therefore might cause a gitpy.Repo
+        # instance to be created.
         if with_refs_only:
             # older versions of GitPython might not tolerate remotes without
             # any references at all, so we need to catch
@@ -1188,8 +1185,17 @@ class GitRepo(RepoInterface):
                     if "not have any references" not in str(exc):
                         # was some other reason
                         raise
-        else:
-            remotes = [remote.name for remote in self.repo.remotes]
+
+        # Note: read directly from config and spare instantiation of gitpy.Repo
+        # since we need this in AnnexRepo constructor. Furthermore gitpy does it
+        # pretty much the same way and the use of a Repo instance seems to have
+        # no reason other than a nice object oriented look.
+        from datalad.utils import unique
+
+        self.config.reload()
+        remotes = unique([x[7:] for x in self.config.sections()
+                          if x.startswith("remote.")])
+
         if with_urls_only:
             remotes = [
                 r for r in remotes

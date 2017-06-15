@@ -181,11 +181,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # check for possible SSH URLs of the remotes in order to set up
         # shared connections:
-
-
-        # TODO: This uses `repo` via GitRepo.get_Remotes:
-        # Contradicts lazy loading of repo, if we use it in the constructor!
-
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
