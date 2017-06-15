@@ -2298,45 +2298,51 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: JSON
         return out.splitlines()
 
+    def _get_preferred_content(self, kind, remote=None):
+        "Internal helper for 'wanted' and 'required' (and similar)"
+        return self._run_simple_annex_command(
+            kind,
+            annex_options=[remote or '.'])
+
+    def _set_preferred_content(self, kind, remote=None, expr=None):
+        "Internal helper for 'wanted' and 'required' (and similar)"
+        return self._run_simple_annex_command(
+            kind,
+            annex_options=[remote or '.', expr])
+
     def get_wanted(self, remote=None):
-        """Get `wanted` for the remote.  "" corresponds to none set
+        """Get `wanted` content configuration for a remote.
+
+        "" corresponds to none set
 
         Parameters
         ----------
         remote : str, optional
-           If not specified (None), returns `wanted` for current repository
+           If not specified (None), returns `wanted` for this repository
         """
-        return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.']
-        )
+        return self._get_preferred_content('wanted', remote=remote)
 
     def set_wanted(self, remote=None, expr=None):
-        """Set `wanted` `expr` for the remote."""
-        return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.', expr]
-        )
+        """Set `wanted` `expr` for a remote or this repository"""
+        return self._set_preferred_content(
+            'wanted', remote=remote, expr=expr)
 
     def get_group(self, remote=None):
-        """Get `group` for the remote.  "" corresponds to none set
+        """Get `group` for the remote or this repository
+
+        "" corresponds to none set
 
         Parameters
         ----------
         remote : str, optional
            If not specified (None), returns `group` for current repository
         """
-        return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.']
-        )
+        return self._get_preferred_content('group', remote=remote)
 
     def set_group(self, remote=None, group=None):
-        """Set `group` of the remote."""
-        return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.', group]
-        )
+        """Set `group` of a remote or this repository"""
+        return self._set_preferred_content(
+            'group', remote=remote, expr=group)
 
     def get_groupwanted(self, name=None):
         """Get `groupwanted` expression for a group `name`
