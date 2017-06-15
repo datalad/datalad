@@ -37,6 +37,7 @@ from os.path import relpath
 from os.path import stat
 from os.path import dirname
 from os.path import split as psplit
+import posixpath
 
 
 from six import text_type, binary_type, string_types
@@ -222,6 +223,18 @@ def expandpath(path, force_absolute=True):
     if force_absolute:
         path = abspath(path)
     return path
+
+
+def posix_relpath(path, start=None):
+    """Behave like os.path.relpath, but always return POSIX paths...
+
+    on any platform."""
+    # join POSIX style
+    return posixpath.join(
+        # split and relpath native style
+        # python2.7 ntpath implementation of relpath cannot handle start=None
+        *psplit(
+            relpath(path, start=start if start is not None else '')))
 
 
 def is_explicit_path(path):
