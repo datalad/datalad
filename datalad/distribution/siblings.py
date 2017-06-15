@@ -159,7 +159,12 @@ class Siblings(Interface):
         annex_group=annex_group_opt,
         annex_groupwanted=annex_groupwanted_opt,
         inherit=inherit_opt,
-
+        get_annex_info=Parameter(
+            args=("--no-annex-info",),
+            dest='get_annex_info',
+            action="store_false",
+            doc="""Whether to query all information about the annex configurations
+            of siblings. Can be disabled if speed is a concern"""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
 
@@ -183,6 +188,7 @@ class Siblings(Interface):
             annex_group=None,
             annex_groupwanted=None,
             inherit=False,
+            get_annex_info=True,
             recursive=False,
             recursion_limit=None):
 
@@ -228,7 +234,7 @@ class Siblings(Interface):
                 fetch, description,
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_required, annex_group, annex_groupwanted,
-                inherit,
+                inherit, get_annex_info,
                 **res_kwargs):
             yield r
         if not recursive:
@@ -261,7 +267,7 @@ class Siblings(Interface):
                     description,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_required, annex_group, annex_groupwanted,
-                    inherit,
+                    inherit, get_annex_info,
                     **res_kwargs):
                 yield r
 
@@ -292,7 +298,7 @@ def _add_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit,
+        inherit, get_annex_info,
         **res_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
@@ -338,7 +344,7 @@ def _add_remote(
             ds, name, known_remotes, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_required, annex_group, annex_groupwanted,
-            inherit,
+            inherit, get_annex_info,
             **res_kwargs):
         if r['action'] == 'configure-sibling':
             r['action'] = 'add-sibling'
@@ -350,7 +356,7 @@ def _configure_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit,
+        inherit, get_annex_info,
         **res_kwargs):
     result_props = dict(
         action='configure-sibling',
@@ -537,7 +543,7 @@ def _configure_remote(
         ds.repo._run_annex_command('describe', annex_options=[name, description])
 
     # report all we know at once
-    info = list(_query_remotes(ds, name, known_remotes))[0]
+    info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]
     info.update(dict(status='ok', **result_props))
     yield info
 
@@ -547,14 +553,12 @@ def _query_remotes(
         ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
-        inherit=None,
+        inherit=None, get_annex_info=True,
         **res_kwargs):
     annex_info = {}
     available_space = None
-    if isinstance(ds.repo, AnnexRepo):
+    if get_annex_info and isinstance(ds.repo, AnnexRepo):
         # pull repo info from annex
-        # TODO maybe we should make this step optional to save the call
-        # in some cases. Would need an additional flag...
         try:
             # need to do in safety net because of gh-1560
             raw_info = ds.repo.repo_info(fast=True)
@@ -605,7 +609,7 @@ def _query_remotes(
             for remotecfg in [k for k in ds.config.keys()
                               if k.startswith('remote.{}.'.format(remote))]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
-        if 'annex-uuid' in info:
+        if get_annex_info and 'annex-uuid' in info:
             ainfo = annex_info.get(info['annex-uuid'])
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
@@ -619,7 +623,7 @@ def _remove_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit,
+        inherit, get_annex_info,
         **res_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
