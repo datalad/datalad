@@ -522,17 +522,18 @@ def _configure_remote(
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
                         **result_props)
-            for prop, var in (('wanted', annex_wanted),
-                              ('required', annex_required),
-                              ('group', annex_group)):
-                if var:
-                    ds.repo.set_preferred_content(prop, var, name)
-            if annex_groupwanted:
-                ds.repo.set_groupwanted(annex_group, annex_groupwanted)
-
     #
     # place configure steps that also work for 'here' below
     #
+    if isinstance(ds.repo, AnnexRepo):
+        for prop, var in (('wanted', annex_wanted),
+                          ('required', annex_required),
+                          ('group', annex_group)):
+            if var is not None:
+                ds.repo.set_preferred_content(prop, var, '.' if name =='here' else name)
+        if annex_groupwanted:
+            ds.repo.set_groupwanted(annex_group, annex_groupwanted)
+
     if description:
         if not isinstance(ds.repo, AnnexRepo):
             result_props['status'] = 'impossible'
@@ -615,7 +616,8 @@ def _query_remotes(
                 info['annex-description'] = annex_description
         if get_annex_info and isinstance(ds.repo, AnnexRepo):
             for prop in ('wanted', 'required', 'group'):
-                var = ds.repo.get_preferred_content(prop, remote)
+                var = ds.repo.get_preferred_content(
+                    prop, '.' if remote == 'here' else remote)
                 if var:
                     info['annex-{}'.format(prop)] = var
             groupwanted = ds.repo.get_groupwanted(remote)
