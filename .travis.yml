@@ -17,6 +17,7 @@ env:
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=
     - NOSE_OPTS=-s
+    - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
   matrix:
@@ -37,6 +38,16 @@ matrix:
     - _DATALAD_NONPR_ONLY=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
+  - python: 2.7
+    # Run slow etc tests under a single tricky scenario
+    env:
+    - NOSE_SELECTION_OP=""
+    - TMPDIR="/var/tmp/sym link"
+  - python: 3.4
+    # Run slow etc tests under a single tricky scenario
+    env:
+    - NOSE_SELECTION_OP=""
+    - TMPDIR="/var/tmp/sym link"
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
@@ -167,7 +178,7 @@ script:
   # Verify that setup.py build doesn't puke
   - python setup.py build
   # Run tests
-  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
+  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)" --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
   - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest; fi
