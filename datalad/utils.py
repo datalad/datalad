@@ -316,11 +316,14 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            for i in range(10):
+            # on windows boxes there is evidence for a latency of
+            # more than a second until a file is considered no
+            # longer "in-use"
+            for i in range(50):
                 try:
                     os.unlink(f)
-                except OSError as e:
-                    if i < 9:
+                except (OSError, WindowsError) as e:
+                    if i < 49:
                         sleep(0.1)
                         continue
                     else:
