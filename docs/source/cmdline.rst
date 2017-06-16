@@ -43,6 +43,7 @@ Meta data handling
    :maxdepth: 1
 
    generated/man/datalad-search
+   generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
 
 Miscellaneous commands
