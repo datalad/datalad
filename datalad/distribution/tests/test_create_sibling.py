@@ -40,6 +40,7 @@ from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import slow
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
@@ -277,6 +278,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_set_equal(modified_files, ok_modified_files)
 
 
+@slow  # 53.8496s
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)

@@ -31,6 +31,7 @@ from ...support.exceptions import FileNotInRepositoryError
 from ...support.exceptions import CommandError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...tests.utils import swallow_logs
+from ...tests.utils import integration
 from ...utils import chpwd, getpwd, rmtemp
 from ...utils import find_files
 from ...utils import rmtree
@@ -291,6 +292,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
+@integration
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
@@ -314,9 +316,6 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0)
 
     chpwd(orig_pwd)  # just to avoid warnings ;)
-
-# looking for the future tagging of lengthy tests
-test_add_archive_content.tags = ['integration']
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)

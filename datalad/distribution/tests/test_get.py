@@ -37,6 +37,7 @@ from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import slow
 from datalad.utils import with_pathsep
 from datalad.utils import chpwd
 from datalad.utils import assure_list
@@ -239,6 +240,7 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
+@slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
 def test_get_recurse_subdatasets(src, path):
@@ -360,6 +362,7 @@ def test_get_install_missing_subdataset(src, path):
     ok_(all([sub.is_installed() for sub in subs]))
 
 
+@slow  # 13.4610s
 # @with_tree(tree={'file_in_git.txt': 'no idea',
 #                  'subds': {'file_in_annex.txt': 'content'}})
 @with_tempfile(mkdir=True)
@@ -408,6 +411,7 @@ def test_autoresolve_multiple_datasets(src, path):
         ok_(ds2.repo.file_has_content('test-annex.dat') is True)
 
 
+@slow  # 20 sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_autoresolve_recurse_subdatasets(src, path):
@@ -434,6 +438,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
         "file_in_annex.txt") is True)
 
 
+@slow  # 92sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_recurse_existing(src, path):
@@ -475,6 +480,7 @@ def test_recurse_existing(src, path):
     ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
 
 
+@slow  # 33sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_get_in_unavailable_subdataset(src, path):
