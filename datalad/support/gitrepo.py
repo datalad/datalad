@@ -521,7 +521,8 @@ class GitRepo(RepoInterface):
         self._repo = repo
         self._cfg = None
 
-        if create and not GitRepo.is_valid_repo(path):
+        _valid_repo = GitRepo.is_valid_repo(path)
+        if create and not _valid_repo:
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
@@ -539,15 +540,17 @@ class GitRepo(RepoInterface):
                 lgr.error(exc_str(e))
                 raise
         else:
-            if self._repo is None:
-                try:
-                    self._repo = self.cmd_call_wrapper(Repo, path)
-                    lgr.debug("Using existing Git repository at {0}".format(path))
-                except (GitCommandError,
-                        NoSuchPathError,
-                        InvalidGitRepositoryError) as e:
-                    lgr.error("%s: %s" % (type(e), str(e)))
-                    raise
+            # Note: We used to call gitpy.Repo(path) here, which potentially
+            # raised NoSuchPathError or InvalidGitRepositoryError. This is
+            # used by callers of GitRepo.__init__() to detect whether we have a
+            # valid repo at `path`. Now, with switching to lazy loading property
+            # `repo`, we detect those cases without instantiating a
+            # gitpy.Repo().
+
+            if not exists(path):
+                raise NoSuchPathError(path)
+            if not _valid_repo:
+                raise InvalidGitRepositoryError(path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -563,9 +566,6 @@ class GitRepo(RepoInterface):
 
     @property
     def repo(self):
-        # TODO: Make repo lazy loading to avoid building a GitPython Repo
-        # instance as long as we don't actually access it!
-
         # with DryRunProtocol path not exist
         if exists(self.realpath):
             inode = os.stat(self.realpath).st_ino
@@ -575,6 +575,19 @@ class GitRepo(RepoInterface):
             # reset background processes invoked by GitPython:
             self._repo.git.clear_cache()
             self.inode = inode
+
+        if self._repo is None:
+            # Note, that this may raise GitCommandError, NoSuchPathError,
+            # InvalidGitRepositoryError:
+            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            lgr.debug("Using existing Git repository at {0}".format(self.path))
+
+        # inject git options into GitPython's git call wrapper:
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # call of Repo(path) above from being actually executed (DryRunProtocol)
+        if self._repo is not None:
+            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
         return self._repo
 
     @classmethod
@@ -700,7 +713,7 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return exists(opj(path, '.git', 'objects'))
+        return exists(opj(path, '.git'))
 
     @property
     def config(self):
@@ -1160,6 +1173,9 @@ class GitRepo(RepoInterface):
         remotes : list of str
           List of names of the remotes
         """
+
+        # Note: This still uses GitPython and therefore might cause a gitpy.Repo
+        # instance to be created.
         if with_refs_only:
             # older versions of GitPython might not tolerate remotes without
             # any references at all, so we need to catch
@@ -1172,8 +1188,17 @@ class GitRepo(RepoInterface):
                     if "not have any references" not in str(exc):
                         # was some other reason
                         raise
-        else:
-            remotes = [remote.name for remote in self.repo.remotes]
+
+        # Note: read directly from config and spare instantiation of gitpy.Repo
+        # since we need this in AnnexRepo constructor. Furthermore gitpy does it
+        # pretty much the same way and the use of a Repo instance seems to have
+        # no reason other than a nice object oriented look.
+        from datalad.utils import unique
+
+        self.config.reload()
+        remotes = unique([x[7:] for x in self.config.sections()
+                          if x.startswith("remote.")])
+
         if with_urls_only:
             remotes = [
                 r for r in remotes
