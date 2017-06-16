@@ -172,18 +172,21 @@ def test_annotate_paths(dspath, nodspath):
     # now try the same on an uninstalled dataset
     subdspath = opj('b', 'bb')
     # before
-    before_res = ds.annotate_paths(subdspath, recursive=True)
+    before_res = ds.annotate_paths(subdspath, recursive=True,
+                                   unavailable_path_status='error')
     assert_result_count(before_res, 3, status='', type='dataset')
     uninstall_res = ds.uninstall(subdspath, recursive=True, check=False)
     assert_result_count(uninstall_res, 3, status='ok', type='dataset')
     # after
-    after_res = ds.annotate_paths(subdspath)
+    after_res = ds.annotate_paths(subdspath,
+                                  unavailable_path_status='error',
+                                  on_failure='ignore')
     # uninstall hides all low-level datasets
     assert_result_count(after_res, 1)
     # but for the top-most uninstalled one it merely reports absent state now
     assert_result_count(
         after_res, 1, state='absent',
-        **{k: before_res[0][k] for k in before_res[0] if k not in ('state',)})
+        **{k: before_res[0][k] for k in before_res[0] if k not in ('state', 'status')})
     # however, this beauty doesn't come for free, so it can be disabled
     # which will make the uninstalled subdataset like a directory in the
     # parent (or even just a non-existing path, if the mountpoint dir isn't
