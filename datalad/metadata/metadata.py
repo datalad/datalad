@@ -125,39 +125,41 @@ class Metadata(Interface):
             nargs='+',
             action='append',
             metavar=('KEY', 'VAL'),
-            doc="""
-          The values of matching keys in the given dict appended to
-          any possibly existing values. The metadata keys need not
-          necessarily exist before.""",
+            doc="""metadata items to add. If only a key is given, a
+            corresponding tag is added. If a key-value mapping (multiple
+            values at once are supported) is given, the values are
+            added to the metadata item of that key.""",
             constraints=EnsureStr() | EnsureNone()),
         init=Parameter(
             args=('-i', '--init',),
             nargs='+',
             action='append',
             metavar=('KEY', 'VAL'),
-            doc="""
-          Metadata items for the keys in the given dict are set
-          to the respective values, if the key is not yet present
-          in a file's metadata.""",
+            doc="""like --add, but tags are only added if no tag was present
+            before. Likewise, values are only added to a metadata key, if that
+            key did not exist before.""",
             constraints=EnsureStr() | EnsureNone()),
         remove=Parameter(
             args=('--remove',),
             nargs='+',
             action='append',
             metavar=('KEY', 'VAL'),
-            doc="""
-          Values in the given dict are removed from the metadata items
-          matching the respective key, if they exist in a file's metadata.
-          Non-existing values, or keys do not lead to failure.""",
+            doc="""metadata values to remove. If only a key is given, a
+            corresponding tag is removed. If a key-value mapping (multiple
+            values at once are supported) is given, only those values are
+            removed from the metadata item of that key. If no values are left
+            after the removal, the entire item of that key is removed.""",
             constraints=EnsureStr() | EnsureNone()),
         reset=Parameter(
             args=('--reset',),
             nargs='+',
             action='append',
             metavar=('KEY', 'VAL'),
-            doc="""
-          Metadata items matching keys in the given dict are (re)set
-          to the respective values.""",
+            doc="""metadata items to remove. If only a key is given, a
+            corresponding metadata key with all its values is removed.
+            If a key-value mapping (multiple values at once are supported)
+            is given, any existing values for this key are replaced by the
+            given ones.""",
             constraints=EnsureStr() | EnsureNone()),
         # TODO --defprefix
         dataset_global=Parameter(
