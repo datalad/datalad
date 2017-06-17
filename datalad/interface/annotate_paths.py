@@ -478,14 +478,6 @@ class AnnotatePaths(Interface):
                     if 'refds' in r and not r['refds']:
                         # avoid cruft
                         del r['refds']
-                    if r.get('state', None) == 'absent':
-                        # not there (yet)
-                        message = unavailable_path_msg \
-                            if unavailable_path_msg else None
-                        if message and '%s' in message:
-                            message = (message, path)
-                        r['message'] = message
-                        r['status'] = unavailable_path_status
                     yield r
             return
 
