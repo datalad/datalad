@@ -2859,23 +2859,24 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        dict
-          One item per file (could be more items than input arguments
-          when directories are given). Keys are filenames, values are
-          dictionaries with metadata key/value pairs. Note that annex
+        generator
+          One tuple per file (could be more items than input arguments
+          when directories are given). First tuple item is the filename,
+          second item is a dictionary with metadata key/value pairs. Note that annex
           metadata tags are stored under the key 'tag', which is a
           regular metadata item that can be manipulated like any other.
         """
         if not files:
-            return {}
+            return
         files = assure_list(files)
         args = ['--json']
         args.extend(files)
-        return {res['file']:
+        for res in self._run_annex_command_json('metadata', args):
+            yield (
+                res['file'],
                 res['fields'] if timestamps else \
                 {k: v for k, v in res['fields'].items()
-                 if not k.endswith('lastchanged')}
-                for res in self._run_annex_command_json('metadata', args)}
+                 if not k.endswith('lastchanged')})
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,
@@ -2913,11 +2914,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        None
+        generator
+          JSON obj per modified file
         """
 
         def _genspec(expr, d):
-            return [expr.format(k, v) for k, v in d.items()]
+            return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
 
         args = []
         spec = []
@@ -2941,10 +2943,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         # append actual file path arguments
         args.extend(assure_list(files))
 
-        # XXX do we need the return values for anything?
-        self._run_annex_command_json(
-            'metadata',
-            args)
+        for jsn in self._run_annex_command_json(
+                'metadata',
+                args):
+            yield jsn
 
 
 # TODO: Why was this commented out?
