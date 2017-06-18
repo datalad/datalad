@@ -436,6 +436,7 @@ class Metadata(Interface):
             path=path,
             type=' ({})'.format(res['type']) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
-            meta=','.join(k for k in sorted(meta.keys()) if not k == 'tag'),
+            meta=','.join(k for k in sorted(meta.keys()) if not k == 'tag')
+                 if meta else ' -',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(meta['tag']))))
