@@ -13,7 +13,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
+import json
+from os import makedirs
+from os.path import dirname
 from os.path import relpath
+from os.path import exists
 from os.path import join as opj
 
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -32,6 +36,8 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.utils import assure_list
+from datalad.utils import unique
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -250,7 +256,58 @@ class Metadata(Interface):
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
             ds = Dataset(ds_path)
-            if not dataset_global and not isinstance(ds.repo, AnnexRepo):
+            if dataset_global:
+                db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
+                db = {}
+                if exists(db_path):
+                    db_fp = open(db_path)
+                    # need to read manually, load() would puke on an empty file
+                    db_content = db_fp.read()
+                    # minimize time for collision
+                    db_fp.close()
+                    if db_content:
+                        db = json.loads(db_content)
+                # TODO make manipulation order identical to what git-annex does
+                if init:
+                    for k, v in init.items():
+                        if k not in db:
+                            db[k] = v
+                if purge:
+                    for k in purge:
+                        if k in db:
+                            del db[k]
+                if reset:
+                    for k, v in reset.items():
+                        db[k] = v
+                if add:
+                    for k, v in add.items():
+                        db[k] = sorted(unique(
+                            db.get(k, []) + v))
+                if remove:
+                    for k, v in remove.items():
+                        db[k] = list(set(db.get(k, [])).difference(v))
+                # store, if there is anything
+                if db:
+                    if not exists(dirname(db_path)):
+                        makedirs(dirname(db_path))
+                    db_fp = open(db_path, 'w')
+                    # produce relatively compact, but also diff-friendly format
+                    json.dump(
+                        db,
+                        db_fp,
+                        indent=0,
+                        separators=(',', ':\n'),
+                        sort_keys=True)
+                    # minimize time for collision
+                    db_fp.close()
+                    # use add not save to also cover case of a fresh file
+                    # TODO message
+                    ds.add(db_path)
+                elif exists(db_path):
+                    # no metadata left, kill file
+                    # TODO message
+                    ds.remove(db_path)
+            elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:
                     yield dict(
