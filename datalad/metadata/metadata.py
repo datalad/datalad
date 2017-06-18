@@ -23,6 +23,7 @@ from os.path import join as opj
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
+from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
@@ -166,7 +167,6 @@ class Metadata(Interface):
             is given, any existing values for this key are replaced by the
             given ones.""",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO conflict in case of incompatible re-definition
         define_key=Parameter(
             args=('--define-key',),
             nargs=2,
@@ -264,10 +264,15 @@ class Metadata(Interface):
         assert(not completed)
 
         # iterate over all datasets, order doesn't matter
+        to_save = []
         for ds_path in content_by_ds:
             # ignore submodule entries
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
+            if not content:
+                # nothing other than subdatasets were given or discovered in
+                # this dataset, ignore
+                continue
             ds = Dataset(ds_path)
             if dataset_global or define_key:
                 db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
@@ -293,16 +298,34 @@ class Metadata(Interface):
                     db[k] = sorted(unique(
                         db.get(k, []) + v))
                 for k, v in remove.items():
-                    db[k] = list(set(db.get(k, [])).difference(v))
+                    existing_data = db.get(k, [])
+                    if isinstance(existing_data, dict):
+                        db[k] = {dk: existing_data[dk]
+                                 for dk in set(existing_data).difference(v)}
+                    else:
+                        db[k] = list(set(existing_data).difference(v))
+                    # wipe out if empty
+                    if not db[k]:
+                        del db[k]
+
+                added_def = False
                 if define_key:
                     defs = db.get('definition', {})
                     for k, v in define_key.items():
-                        if k in defs and not defs[k] == v:
-                            # TODO yield error
-                            continue
-                        defs[k] = v
+                        if k in defs:
+                            if not defs[k] == v:
+                                yield get_status_dict(
+                                    status='error',
+                                    ds=ds,
+                                    message=(
+                                        "conflicting definition for key '%s': '%s' != '%s'",
+                                        k, v, defs[k]),
+                                    **res_kwargs)
+                                continue
+                        else:
+                            defs[k] = v
+                            added_def = True
                     db['definition'] = defs
-
                 # store, if there is anything
                 if db:
                     if not exists(dirname(db_path)):
@@ -318,13 +341,24 @@ class Metadata(Interface):
                     # minimize time for collision
                     db_fp.close()
                     # use add not save to also cover case of a fresh file
-                    # TODO message
-                    ds.add(db_path)
+                    ds.add(db_path, save=False)
+                    to_save.append(dict(
+                        path=db_path,
+                        parentds=ds.path,
+                        type='file'))
                 elif exists(db_path):
                     # no metadata left, kill file
-                    # TODO message
                     ds.remove(db_path)
-                # TODO yield dataset meta
+                    to_save.append(dict(
+                        path=ds.path,
+                        type='dataset'))
+                if added_def or init or add or remove or reset or purge:
+                    # if anything happended or could have happended
+                    yield get_status_dict(
+                        status='ok',
+                        ds=ds,
+                        metadata=db,
+                        **res_kwargs)
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:
@@ -375,6 +409,18 @@ class Metadata(Interface):
                         metadata=meta,
                         **res_kwargs)
                     yield r
+        # save potential modifications to dataset global metadata
+        if not to_save:
+            return
+        for res in Save.__call__(
+                files=to_save,
+                dataset=refds_path,
+                message='[DATALAD] dataset metadata update',
+                return_type='generator',
+                result_xfm=None,
+                result_filter=None,
+                on_failure='ignore'):
+            yield res
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
@@ -386,8 +432,9 @@ class Metadata(Interface):
         path = relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
         meta = res.get('metadata', {})
-        ui.message('{path}:{spacer}{meta}{tags}'.format(
+        ui.message('{path}{type}:{spacer}{meta}{tags}'.format(
             path=path,
+            type=' ({})'.format(res['type']) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys()) if not k == 'tag'),
             tags='' if 'tag' not in meta else ' [{}]'.format(

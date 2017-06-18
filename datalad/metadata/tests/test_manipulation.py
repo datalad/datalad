@@ -10,7 +10,9 @@
 """Test meta data manipulation"""
 
 
+import os
 from os.path import join as opj
+from os.path import exists
 
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
@@ -26,12 +28,13 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 
 
 @with_tempfile(mkdir=True)
-def test_basic(path):
+def test_basic_filemeta(path):
     with chpwd(path):
         # no repo -> error
         assert_status('error', metadata(on_failure='ignore'))
@@ -154,3 +157,106 @@ def test_basic(path):
         # order of values is not maintained
         metadata=dict(new=['george'], super=['fresh']))
 
+
+@with_tempfile(mkdir=True)
+def test_basic_dsmeta(path):
+    ds = Dataset(path).create()
+    ok_clean_git(path)
+    # ensure clean slate
+    assert_result_count(ds.metadata(), 0)
+    # init
+    res = ds.metadata(init=['tag1', 'tag2'], dataset_global=True,
+                      return_type='item-or-list')
+    eq_(res['metadata']['tag'], ['tag1', 'tag2'])
+    # init again does nothing
+    res = ds.metadata(init=['tag3'], dataset_global=True,
+                      return_type='item-or-list')
+    eq_(res['metadata']['tag'], ['tag1', 'tag2'])
+    # reset whole key
+    res = ds.metadata(reset=['tag'], dataset_global=True)
+    assert_result_count(ds.metadata(), 0)
+    # add something arbitrary
+    res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
+                      dataset_global=True, return_type='item-or-list')
+    eq_(res['metadata']['dtype'], ['heavy'])
+    # sorted!
+    eq_(res['metadata']['readme'], ['long', 'short'])
+    # supply key definitions, no need for dataset_global
+    res = ds.metadata(define_key=dict(mykey='truth'),
+                      return_type='item-or-list')
+    eq_(res['metadata']['definition'], {'mykey': 'truth'})
+    # re-supply different key definitions -> error
+    res = ds.metadata(define_key=dict(mykey='lie'), on_failure='ignore')
+    assert_result_count(
+        res, 1, status='error',
+        message=("conflicting definition for key '%s': '%s' != '%s'",
+                 "mykey", "lie", "truth"))
+    res = ds.metadata(define_key=dict(otherkey='altfact'),
+                      return_type='item-or-list')
+    assert_dict_equal(
+        res['metadata']['definition'],
+        {'mykey': 'truth', 'otherkey': 'altfact'})
+    # 'definition' is a regular key, we can remove items
+    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True,
+                      return_type='item-or-list')
+    assert_dict_equal(
+        res['metadata']['definition'],
+        {'otherkey': 'altfact'})
+    res = ds.metadata(remove=dict(definition=['otherkey']), dataset_global=True,
+                      return_type='item-or-list')
+    # when there are no items left, the key vanishes too
+    assert('definition' not in res['metadata'])
+    # we still have metadata, so there is a DB file
+    assert(res['metadata'])
+    db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
+    assert(exists(db_path))
+    ok_clean_git(ds.path)
+    # but if we remove it, the file is gone
+    res = ds.metadata(reset=['readme', 'dtype'], dataset_global=True,
+                      return_type='item-or-list')
+    eq_(res['metadata'], {})
+    assert(not exists(db_path))
+    ok_clean_git(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_mod_hierarchy(path):
+    base = Dataset(path).create()
+    sub = base.create('sub')
+    basedb_path = opj(base.path, '.datalad', 'metadata', 'dataset.json')
+    subdb_path = opj(sub.path, '.datalad', 'metadata', 'dataset.json')
+    assert(not exists(basedb_path))
+    assert(not exists(subdb_path))
+    # modify sub through base
+    res = base.metadata('sub', init=['tag1'], dataset_global=True)
+    # only sub modified
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, status='ok', action='metadata',
+                        metadata={'tag': ['tag1']})
+    assert_result_count(res, 2, status='ok', action='save')
+    assert(not exists(basedb_path))
+    assert(exists(subdb_path))
+    # saved all the way up
+    ok_clean_git(base.path)
+    # now again, different init, sub has tag already, should be spared
+    res = base.metadata(init=['tag2'], dataset_global=True)
+    assert_result_count(res, 2)
+    assert_result_count(res, 1, status='ok', action='metadata',
+                        metadata={'tag': ['tag2']}, path=base.path)
+    assert_result_count(res, 1, status='ok', action='save', path=base.path)
+
+    # and again with removal of all metadata in sub
+    ok_clean_git(base.path)
+    # put to probe files so we see that nothing unrelated gets saved
+    create_tree(base.path, {'probe': 'content', 'sub': {'probe': 'othercontent'}})
+    res = base.metadata('sub', reset=['tag'], dataset_global=True)
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, status='ok', action='metadata',
+                        metadata={})
+    assert_result_count(res, 1, status='ok', action='save', path=base.path)
+    assert(exists(basedb_path))
+    assert(not exists(subdb_path))
+    # when we remove the probe files things should be clean
+    os.remove(opj(base.path, 'probe'))
+    os.remove(opj(sub.path, 'probe'))
+    ok_clean_git(base.path)
