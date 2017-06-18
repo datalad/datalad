@@ -36,7 +36,6 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.utils import assure_list
 from datalad.utils import unique
 
 lgr = logging.getLogger('datalad.metadata.metadata')
@@ -167,7 +166,19 @@ class Metadata(Interface):
             is given, any existing values for this key are replaced by the
             given ones.""",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO --defprefix
+        # TODO conflict in case of incompatible re-definition
+        define_key=Parameter(
+            args=('--define-key',),
+            nargs=2,
+            action='append',
+            metavar=('KEY', 'DEFINITION'),
+            doc="""convenience option to add an item in the dataset's
+            global metadata ('definition' key). This can be used to
+            define (custom) keys used in the datasets's metadata, for
+            example by providing a URL to an ontology term for a given
+            key label. This option does not need --dataset-global to
+            be set to be in effect.""",
+            constraints=EnsureStr() | EnsureNone()),
         dataset_global=Parameter(
             args=('-g', '--dataset-global'),
             action='store_true',
@@ -191,6 +202,7 @@ class Metadata(Interface):
             init=None,
             remove=None,
             reset=None,
+            define_key=None,
             dataset_global=False,
             recursive=False,
             recursion_limit=None):
@@ -199,6 +211,7 @@ class Metadata(Interface):
         purge, reset = _parse_argspec(reset)
         tag_add, add = _parse_argspec(add)
         tag_init, init = _parse_argspec(init)
+        define_key = dict(define_key) if define_key else None
         # merge all potential sources of tag specifications
         all_untag = remove.get('tag', []) + untag
         if all_untag:
@@ -256,7 +269,7 @@ class Metadata(Interface):
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
             ds = Dataset(ds_path)
-            if dataset_global:
+            if dataset_global or define_key:
                 db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
                 db = {}
                 if exists(db_path):
@@ -268,24 +281,28 @@ class Metadata(Interface):
                     if db_content:
                         db = json.loads(db_content)
                 # TODO make manipulation order identical to what git-annex does
-                if init:
-                    for k, v in init.items():
-                        if k not in db:
-                            db[k] = v
-                if purge:
-                    for k in purge:
-                        if k in db:
-                            del db[k]
-                if reset:
-                    for k, v in reset.items():
+                for k, v in init.items() if init else []:
+                    if k not in db:
                         db[k] = v
-                if add:
-                    for k, v in add.items():
-                        db[k] = sorted(unique(
-                            db.get(k, []) + v))
-                if remove:
-                    for k, v in remove.items():
-                        db[k] = list(set(db.get(k, [])).difference(v))
+                for k in purge:
+                    if k in db:
+                        del db[k]
+                for k, v in reset.items():
+                    db[k] = v
+                for k, v in add.items():
+                    db[k] = sorted(unique(
+                        db.get(k, []) + v))
+                for k, v in remove.items():
+                    db[k] = list(set(db.get(k, [])).difference(v))
+                if define_key:
+                    defs = db.get('definition', {})
+                    for k, v in define_key.items():
+                        if k in defs and not defs[k] == v:
+                            # TODO yield error
+                            continue
+                        defs[k] = v
+                    db['definition'] = defs
+
                 # store, if there is anything
                 if db:
                     if not exists(dirname(db_path)):
@@ -307,6 +324,7 @@ class Metadata(Interface):
                     # no metadata left, kill file
                     # TODO message
                     ds.remove(db_path)
+                # TODO yield dataset meta
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:
@@ -318,43 +336,45 @@ class Metadata(Interface):
                         **res_kwargs)
                 continue
             ds_paths = [p['path'] for p in content]
-            if reset or purge or add or init or remove:
-                mod_paths = []
-                for mp in ds.repo.set_metadata(
-                        ds_paths,
-                        reset=reset,
-                        add=add,
-                        init=init,
-                        remove=remove,
-                        purge=purge,
-                        # we always go recursive
-                        # TODO is that a good thing? But how to otherwise distinuish
-                        # this kind of recursive from the one across datasets in
-                        # the API?
-                        recursive=True):
-                    if mp.get('success', False):
-                        mod_paths.append(mp['file'])
-                    else:
-                        yield get_status_dict(
-                            status='error',
-                            message='setting metadata failed',
-                            path=opj(ds.path, mp[0]),
-                            type='file',
-                            **res_kwargs)
-                # query the actually modified paths only
-                ds_paths = mod_paths
+            if not dataset_global:
+                if reset or purge or add or init or remove:
+                    # file metadata manipulation
+                    mod_paths = []
+                    for mp in ds.repo.set_metadata(
+                            ds_paths,
+                            reset=reset,
+                            add=add,
+                            init=init,
+                            remove=remove,
+                            purge=purge,
+                            # we always go recursive
+                            # TODO is that a good thing? But how to otherwise distinuish
+                            # this kind of recursive from the one across datasets in
+                            # the API?
+                            recursive=True):
+                        if mp.get('success', False):
+                            mod_paths.append(mp['file'])
+                        else:
+                            yield get_status_dict(
+                                status='error',
+                                message='setting metadata failed',
+                                path=opj(ds.path, mp[0]),
+                                type='file',
+                                **res_kwargs)
+                    # query the actually modified paths only
+                    ds_paths = mod_paths
 
-            # and lastly, query -- even if we set before -- there could
-            # be side-effect from multiple set paths on an individual
-            # path, hence we need to query to get the final result
-            for file, meta in ds.repo.get_metadata(ds_paths):
-                r = get_status_dict(
-                    status='ok',
-                    path=opj(ds.path, file),
-                    type='file',
-                    metadata=meta,
-                    **res_kwargs)
-                yield r
+                # and lastly, query -- even if we set before -- there could
+                # be side-effect from multiple set paths on an individual
+                # path, hence we need to query to get the final result
+                for file, meta in ds.repo.get_metadata(ds_paths):
+                    r = get_status_dict(
+                        status='ok',
+                        path=opj(ds.path, file),
+                        type='file',
+                        metadata=meta,
+                        **res_kwargs)
+                    yield r
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
