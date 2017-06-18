@@ -165,56 +165,49 @@ def test_basic_dsmeta(path):
     # ensure clean slate
     assert_result_count(ds.metadata(), 0)
     # init
-    res = ds.metadata(init=['tag1', 'tag2'], dataset_global=True,
-                      return_type='item-or-list')
-    eq_(res['metadata']['tag'], ['tag1', 'tag2'])
+    res = ds.metadata(init=['tag1', 'tag2'], dataset_global=True)
+    eq_(res[0]['metadata']['tag'], ['tag1', 'tag2'])
     # init again does nothing
-    res = ds.metadata(init=['tag3'], dataset_global=True,
-                      return_type='item-or-list')
-    eq_(res['metadata']['tag'], ['tag1', 'tag2'])
+    res = ds.metadata(init=['tag3'], dataset_global=True)
+    eq_(res[0]['metadata']['tag'], ['tag1', 'tag2'])
     # reset whole key
     res = ds.metadata(reset=['tag'], dataset_global=True)
     assert_result_count(ds.metadata(), 0)
     # add something arbitrary
     res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
-                      dataset_global=True, return_type='item-or-list')
-    eq_(res['metadata']['dtype'], ['heavy'])
+                      dataset_global=True)
+    eq_(res[0]['metadata']['dtype'], ['heavy'])
     # sorted!
-    eq_(res['metadata']['readme'], ['long', 'short'])
+    eq_(res[0]['metadata']['readme'], ['long', 'short'])
     # supply key definitions, no need for dataset_global
-    res = ds.metadata(define_key=dict(mykey='truth'),
-                      return_type='item-or-list')
-    eq_(res['metadata']['definition'], {'mykey': 'truth'})
+    res = ds.metadata(define_key=dict(mykey='truth'))
+    eq_(res[0]['metadata']['definition'], {'mykey': 'truth'})
     # re-supply different key definitions -> error
     res = ds.metadata(define_key=dict(mykey='lie'), on_failure='ignore')
     assert_result_count(
         res, 1, status='error',
         message=("conflicting definition for key '%s': '%s' != '%s'",
                  "mykey", "lie", "truth"))
-    res = ds.metadata(define_key=dict(otherkey='altfact'),
-                      return_type='item-or-list')
+    res = ds.metadata(define_key=dict(otherkey='altfact'))
     assert_dict_equal(
-        res['metadata']['definition'],
+        res[0]['metadata']['definition'],
         {'mykey': 'truth', 'otherkey': 'altfact'})
     # 'definition' is a regular key, we can remove items
-    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True,
-                      return_type='item-or-list')
+    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True)
     assert_dict_equal(
-        res['metadata']['definition'],
+        res[0]['metadata']['definition'],
         {'otherkey': 'altfact'})
-    res = ds.metadata(remove=dict(definition=['otherkey']), dataset_global=True,
-                      return_type='item-or-list')
+    res = ds.metadata(remove=dict(definition=['otherkey']), dataset_global=True)
     # when there are no items left, the key vanishes too
-    assert('definition' not in res['metadata'])
+    assert('definition' not in res[0]['metadata'])
     # we still have metadata, so there is a DB file
-    assert(res['metadata'])
+    assert(res[0]['metadata'])
     db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
     assert(exists(db_path))
     ok_clean_git(ds.path)
     # but if we remove it, the file is gone
-    res = ds.metadata(reset=['readme', 'dtype'], dataset_global=True,
-                      return_type='item-or-list')
-    eq_(res['metadata'], {})
+    res = ds.metadata(reset=['readme', 'dtype'], dataset_global=True)
+    eq_(res[0]['metadata'], {})
     assert(not exists(db_path))
     ok_clean_git(ds.path)
 
