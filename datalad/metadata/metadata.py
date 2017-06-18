@@ -99,17 +99,78 @@ def _get_key(k):
 
 @build_doc
 class Metadata(Interface):
-    """Metadata manipulation for datasets and their components
+    """Metadata manipulation for files and whole datasets
 
-    The field names are limited to alphanumerics (and [_-.]),
-    and are case insensitive
+    Two types of metadata are supported:
 
-    # TODO
-    Mention that a tag is just an entry in the 'tag' field and
-    -a or -i without values is equivalent to adding a tag.
+    1. metadata describing a dataset as a whole (dataset-global), and
 
-    --remove without a value is equivalent to purging the entire
-    entry of the key
+    2. metadata for individual files in a dataset.
+
+    Both types can be accessed and modified with this command.
+    Note, however, that this only refers to Datalad's native metadata,
+    and not to any other metadata that is possibly stored in files of a
+    dataset.
+
+    Datalad's native metadata capability is primarily targeting data
+    description via arbitrary tags and other (brief) key-value attributes
+    (with possibly multiple values for a single key).
+
+    Metadata key names are limited to alphanumerics (and [_-.]). Moreover,
+    all key names are converted to lower case.
+
+
+    *Dataset (global) metadata*
+
+    Metadata describing a dataset as a whole is stored in JSON format
+    in the dataset at .datalad/metadata/dataset.json. The amount of
+    metadata that can be stored is not limited by Datalad. However,
+    it should be kept brief as this information is stored in the Git
+    history of the dataset, and access or modification requires to
+    read the entire file.
+
+    Arbitrary metadata keys can be used. However, Datalad reserves the
+    keys 'tag' and 'definition' for its own use. The can still be
+    manipulated without any restrictions like any other metadata items,
+    but doing so can impact Datalad's metadata-related functionality,
+    handle with care.
+
+    The 'tag' key is used to store a list of (unique) tags.
+
+    The 'definition' key is used to store key-value mappings that define
+    metadata keys used elsewhere in the metadata. Using the feature is
+    optional (see --define-key). It can be useful in the context of
+    data discovery needs, where metadata keys can be precisely defined
+    by linking them to specific ontology terms.
+
+
+    *File metadata*
+
+    Metadata storage for individual files is provided by git-annex, and
+    generally the same rules as for dataset-global metadata apply.
+    However, there is just one reserved key name: 'tag'.
+
+    Again, the amount of metadata is not limited, but metadata is stored
+    in git-annex' internal data structures in the Git repository of a
+    dataset. Large amounts of metadata can slow its performance.
+
+
+    || CMDLINE >>
+    *Output rendering*
+
+    By default, a short summary of the metadata for each dataset
+    (component) is rendered::
+
+      <path> (<type>): -|<keys> [<tags>]
+
+    where <path> is the path of the respective component, <type> a label
+    for the type of dataset components metadata is presented for. Non-existant
+    metadata is indicated by a dash, otherwise a comma-separated list of
+    metadata keys (except for 'tag'), is followed by a list of tags, if there
+    are any.
+
+
+    << CMDLINE ||
     """
     # make the custom renderer the default, path reporting isn't the top
     # priority here
