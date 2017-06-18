@@ -181,7 +181,7 @@ def test_basic_dsmeta(path):
     eq_(res[0]['metadata']['readme'], ['long', 'short'])
     # supply key definitions, no need for dataset_global
     res = ds.metadata(define_key=dict(mykey='truth'))
-    eq_(res[0]['metadata']['definition'], {'mykey': 'truth'})
+    eq_(res[0]['metadata']['definition'], {'mykey': u'truth'})
     # re-supply different key definitions -> error
     res = ds.metadata(define_key=dict(mykey='lie'), on_failure='ignore')
     assert_result_count(
@@ -191,12 +191,12 @@ def test_basic_dsmeta(path):
     res = ds.metadata(define_key=dict(otherkey='altfact'))
     assert_dict_equal(
         res[0]['metadata']['definition'],
-        {'mykey': 'truth', 'otherkey': 'altfact'})
+        {'mykey': u'truth', 'otherkey': 'altfact'})
     # 'definition' is a regular key, we can remove items
     res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True)
     assert_dict_equal(
         res[0]['metadata']['definition'],
-        {'otherkey': 'altfact'})
+        {'otherkey': u'altfact'})
     res = ds.metadata(remove=dict(definition=['otherkey']), dataset_global=True)
     # when there are no items left, the key vanishes too
     assert('definition' not in res[0]['metadata'])
