@@ -250,9 +250,8 @@ class Metadata(Interface):
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
             ds = Dataset(ds_path)
-            if not isinstance(ds.repo, AnnexRepo):
+            if not dataset_global and not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
-                # TODO adjust when dataset-global metadata is supported
                 for ap in [c for c in content if ap.get('raw_input', False)]:
                     yield dict(
                         ap,
