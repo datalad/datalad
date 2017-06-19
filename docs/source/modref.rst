@@ -16,14 +16,67 @@ functions it provides.
 High-level user interface
 =========================
 
+Dataset operations
+------------------
+
 .. currentmodule:: datalad
 .. autosummary::
-   :toctree: generated
 
-   api
+   api.add
+   api.create
+   api.create_sibling
+   api.create_sibling_github
+   api.drop
+   api.export
+   api.get
+   api.install
+   api.publish
+   api.remove
+   api.save
+   api.update
+   api.uninstall
+   api.unlock
 
-Plumbing
-========
+Meta data handling
+------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+
+   api.search
+   api.aggregate_metadata
+
+Plumbing commands
+-----------------
+
+.. currentmodule:: datalad
+.. autosummary::
+
+   api.annotate_paths
+   api.clean
+   api.clone
+   api.create_test_dataset
+   api.diff
+   api.download_url
+   api.ls
+   api.sshrun
+   api.siblings
+   api.subdatasets
+
+Miscellaneous commands
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+
+   api.add_archive_content
+   api.crawl
+   api.crawl_init
+   api.test
+
+
+Support functionality
+=====================
 
 .. currentmodule:: datalad
 .. autosummary::
