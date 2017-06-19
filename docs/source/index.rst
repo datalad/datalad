@@ -15,6 +15,7 @@ Concepts and technologies
 
    background
    related
+   basics
    metadata
    config
    usecases/index
@@ -27,7 +28,6 @@ Commands and API
 .. toctree::
    :maxdepth: 2
 
-   basics
    cmdline
    modref
 
