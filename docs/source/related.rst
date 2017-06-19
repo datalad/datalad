@@ -102,7 +102,7 @@ Unified distribution                                           |tup|
 - meta-data aggregation                                        |tup| flexible
 ===================================   =====  ===============   ==============
 
-.. |tup| unicode:: U+1F592 .. thumbs up
+.. |tup| unicode:: U+2713 .. check mark
    :trim:
-.. |tdo| unicode:: U+1F593 .. thumbs down
+.. |tdo| unicode:: U+2014 .. mdash
    :trim:
