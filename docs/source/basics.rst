@@ -58,6 +58,30 @@ live on different servers all around the world.
 API principles
 ==============
 
+URLs and shortcuts
+------------------
+
+In most places where DataLad accepts URLs as arguments these URLs can be
+regular ``http`` or ``https`` protocol URLs (e.g. https://www.example.com/path),
+but also SSH URLs, such as ``ssh://me@localhost/path``. Additionally, DataLad
+supports SSH login style resource identifiers, such as ``me@localhost:/path``.
+Besides these, the symbol ``///`` can be used to point to DataLad's canonical
+:term:`superdataset` at http://datasets.datalad.org/ , which provides an
+automated collection of datasets from various portals and sites (see
+:ref:`chap_crawler`).  Here are some common examples in command line notation:
+
+``datalad install ///``
+    install canonical superdataset (alone, without subdatasets) in a
+    `datasets.datalad.org/` subdirectory under the current directory
+``datalad install -r ///openfmri``
+    install openfmri superdataset with a collection of all datasets available
+    from http://openfmri.org as subdatasets in the `openfmri/` subdirectory
+``datalad install -g -J3 -r ///labs/haxby``
+    install the superdataset of the collection of datasets released by the
+    lab of Dr. James V. Haxby with all subdatasets, while
+    fetching all data files using 3 parallel download processes.
+
+
 install vs get
 --------------
 
@@ -100,24 +124,6 @@ rerun the script.
 If you would like to fetch data (possibly while installing any necessary to be
 installed sub-dataset to get to the file) -- use ``get``.
 
-
-URL shortcuts
--------------
-
-``///`` could be used to point to our canonical :term:`superdataset` at
-http://datasets.datalad.org/ , which is largely generated through automated
-crawling (see :ref:`chap_crawler`) of data portals.  Some common examples in command line
-interface:
-
-``datalad install ///``
-    install our canonical super-dataset (alone, no sub-datasets installed during
-    this command) under `datasets.datalad.org/` directory in your current directory
-``datalad install -r ///openfmri``
-    install openfmri super-dataset from our website, with all sub-datasets
-    under `openfmri/` directory in your current directory
-``datalad install -g -J3 -r ///labs/haxby``
-    install Dr. James V. Haxby lab's super-dataset with all sub-datasets, while
-    fetching all data files (present in current version) in 3 parallel processes.
 
 
 Dataset argument
