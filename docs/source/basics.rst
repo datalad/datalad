@@ -7,12 +7,13 @@
 Basic principles
 ****************
 
-DataLad was designed so it could be used both as a command-line tool, and as
-a Python module. Sections following this one (:ref:`chap_cmdline` and :ref:`chap_modref`)
-provide detailed description of the commands and functions of the two interfaces.  This section
-presents common concepts.  Although examples will be presented using command line
-interface commands, all functionality with identically named functions and options
-are available through Python API.
+DataLad is designed to be used both as a command-line tool, and as a Python
+module. The sections :ref:`chap_cmdline` and :ref:`chap_modref` provide
+detailed description of the commands and functions of the two interfaces.  This
+section presents common concepts.  Although examples will frequently be
+presented using command line interface commands, all functionality with
+identically named functions and options are available through Python API as
+well.
 
 Distribution
 ============

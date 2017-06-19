@@ -18,7 +18,6 @@ Concepts and technologies
    basics
    usecases/index
    metadata
-   config
    faq
    glossary
 
@@ -30,6 +29,7 @@ Commands and API
 
    cmdline
    modref
+   config
 
 Automated data distributions
 ============================
