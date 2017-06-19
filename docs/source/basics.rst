@@ -82,15 +82,40 @@ automated collection of datasets from various portals and sites (see
     fetching all data files using 3 parallel download processes.
 
 
-install vs get
---------------
+`--dataset` argument
+--------------------
 
-``install`` and ``get`` commands, both in Python and command line interfaces, might
-seem confusingly similar at first. Both of them could be used to install
-any number of subdatasets, and fetch content of the data files.  Differences lie
-primarily in their default behaviour and outputs, and thus intended use.
-Both ``install`` and ``get`` take local paths as their arguments, but their
-default behavior and output might differ;
+All commands which operate with/on datasets (practically all commands) have a
+``dataset`` argument (``-d`` or ``--dataset`` in command line) which takes a
+path to the dataset that the command should operate on. If a dataset is
+identified this way then any relative path that is provided as an argument to
+the command will be interpreted as being relative to the topmost directory of that
+dataset.  If no dataset argument is provided, relative paths are considered to be
+relative to the current directory.
+
+There are also some useful pre-defined "shortcut" values for dataset arguments:
+
+``///``
+   refers to the "canonical" dataset located under `$HOME/datalad/`.
+   So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
+   under ``$HOME/datalad/crcns``.  This is the same as running
+   ``datalad install $HOME/datalad/crcns``.
+``^``
+   topmost superdataset containing the dataset the current directory is part of.
+   For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
+   to search metadata of the entire superdataset you are under (in this case
+   ``///``), run ``datalad search -d^ [something to search]``.
+
+
+Commands `install` vs `get`
+---------------------------
+
+The ``install`` and ``get`` commands might seem confusingly similar at first.
+Both of them could be used to install any number of subdatasets, and fetch
+content of the data files.  Differences lie primarily in their default
+behaviour and outputs, and thus intended use.  Both ``install`` and ``get``
+take local paths as their arguments, but their default behavior and output
+might differ;
 
 - **install** primarily operates and reports at the level of **datasets**, and
   returns as a result dataset(s)
@@ -126,28 +151,4 @@ installed sub-dataset to get to the file) -- use ``get``.
 
 
 
-Dataset argument
-----------------
 
-All commands which operate with/on datasets (e.g., `install`, `uninstall`, etc.)
-have `dataset` argument (`-d` or `--dataset` in command line) which takes path
-to the dataset you want to operate on. If you specify a dataset explicitly,
-then any relative path you provide as an argument to the command will be taken
-relative to the top directory of that dataset.  If no dataset argument is
-provided, relative paths are taken relative to the current directory.
-
-There are also some "shortcut" values for dataset argument you might find useful:
-
-``///``
-   "central" dataset located under `$HOME/datalad/`.  You could install it by running
-   ```datalad install -s /// $HOME/datalad``` or simply by running
-   ```datalad search smth``` in interactive shell session outside of any dataset,
-   which will present you with a choice to install it for you.
-   So running ``datalad install -d/// crcns`` will install crcns subdataset
-   under your `$HOME/datalad/crcns`.  It is analogous to running
-   ```datalad install $HOME/datalad/crcns```.
-``^``
-   top-most super-dataset containing dataset of your current location.  E.g., if
-   you are under `$HOME/datalad/openfmri/ds000001/sub-01` directory and want to
-   search meta-data of the entire super-dataset you are under (in this case `///`), run
-   ``datalad search -d^ [something to search]``.
