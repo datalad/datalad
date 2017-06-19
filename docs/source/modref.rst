@@ -21,6 +21,7 @@ Dataset operations
 
 .. currentmodule:: datalad
 .. autosummary::
+   :toctree: generated
 
    api.add
    api.create
@@ -42,6 +43,7 @@ Meta data handling
 
 .. currentmodule:: datalad
 .. autosummary::
+   :toctree: generated
 
    api.search
    api.aggregate_metadata
@@ -51,6 +53,7 @@ Plumbing commands
 
 .. currentmodule:: datalad
 .. autosummary::
+   :toctree: generated
 
    api.annotate_paths
    api.clean
@@ -68,6 +71,7 @@ Miscellaneous commands
 
 .. currentmodule:: datalad
 .. autosummary::
+   :toctree: generated
 
    api.add_archive_content
    api.crawl
