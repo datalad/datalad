@@ -77,10 +77,10 @@ def _generate_func_api():
             spec = getattr(intf, '_params_', dict())
             api_name = get_api_name(intfspec)
             if api_name in (
-                    'add-archive-content', 'aggregate-metadata',
-                    'crawl-init', 'crawl', 'create-sibling',
-                    'create-sibling-github', 'create-test-dataset',
-                    'download-url', 'export', 'ls', 'move', 'publish',
+                    'add_archive_content', 'aggregate_metadata',
+                    'crawl_init', 'crawl', 'create_sibling',
+                    'create_sibling_github', 'create_test_dataset',
+                    'download_url', 'export', 'ls', 'move', 'publish',
                     'search', 'sshrun', 'test'):
                 # FIXME no longer using an interface class instance
                 # convert the parameter SPEC into a docstring for the function
