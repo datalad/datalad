@@ -15,9 +15,9 @@ Concepts and technologies
 
    background
    related
-   metadata
-   config
+   basics
    usecases/index
+   metadata
    faq
    glossary
 
@@ -27,9 +27,9 @@ Commands and API
 .. toctree::
    :maxdepth: 2
 
-   basics
    cmdline
    modref
+   config
 
 Automated data distributions
 ============================
