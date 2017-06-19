@@ -80,7 +80,7 @@ def _generate_func_api():
                     'add_archive_content', 'aggregate_metadata',
                     'crawl_init', 'crawl', 'create_sibling',
                     'create_sibling_github', 'create_test_dataset',
-                    'download_url', 'export', 'ls', 'move', 'publish',
+                    'export', 'ls', 'move', 'publish',
                     'search', 'sshrun', 'test'):
                 # FIXME no longer using an interface class instance
                 # convert the parameter SPEC into a docstring for the function
