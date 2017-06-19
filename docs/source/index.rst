@@ -16,9 +16,9 @@ Concepts and technologies
    background
    related
    basics
+   usecases/index
    metadata
    config
-   usecases/index
    faq
    glossary
 
