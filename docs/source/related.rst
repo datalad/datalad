@@ -1,10 +1,10 @@
-Related efforts and solutions
-*****************************
+Delineation from related solutions
+**********************************
 
-To our knowledge, there is no other effort with as broad of a scope as datalad
-that aims to unify access to vast arrays of scientific data in a domain and
+To our knowledge, there is no other effort with a scope as broad as DataLad's.
+Datalad aims to unify access to vast arrays of (scientific) data in a domain and
 data modality agnostic fashion with as few and universally available software
-dependencies.
+dependencies as possible.
 
 The most comparable project regarding the idea of federating access to various
 data providers is the iRODS_-based `INCF Dataspace`_ project.  IRODS is a
@@ -24,15 +24,15 @@ without the need for centralized coordination and permission management.
 Data catalogs
 =============
 
-Existing data-portals, neuroscience-focused (e.g. `Human Connectome`_,
-OpenfMRI_) or generic ones, such as DataDryad_, concentrate on collecting,
-cataloging, and making data available. They offer an abstraction from local
-data management peculiarities (organization, updates, sharing).  Ad-hoc
-collections of pointers to available data, such as `reddit datasets`_ and
-`Inside-R datasets`_, do not provide any unified interface to acquire and
-manage such data.  Such portals can be used as seed information and data
-providers for datalad. These portal could in turn adopt datalad to expose
-readily usable data collections via a federated infrastructure.
+Existing data-portals, such as DataDryad_, or domain-specific ones (e.g. `Human
+Connectome`_, OpenfMRI_), concentrate on collecting, cataloging, and making
+data available. They offer an abstraction from local data management
+peculiarities (organization, updates, sharing).  Ad-hoc collections of pointers
+to available data, such as `reddit datasets`_ and `Inside-R datasets`_, do not
+provide any unified interface to assemble and manage such data.  Data portals
+can be used as seed information and data providers for DataLad. These portals
+could in turn adopt DataLad to expose readily usable data collections via a
+federated infrastructure.
 
 .. _Human Connectome: http://www.humanconnectomeproject.org
 .. _OpenfMRI: http://openfmri.org
@@ -45,16 +45,20 @@ Data delivery/management middleware
 ===================================
 
 Even though there are projects to manage data directly with dVCS (e.g. Git),
-such as the `Rdatasets Git repository`_ this approach does not scale to the
-data size typically observed in the neuroscience context.  In scientific
-software development, many projects are also confronted with the problem of
-managing large data arrays needed, for example, for software testing. An
-exemplar project is `ITK Data`_ which is conceptually similar to git-annex:
-data content is referenced by unique keys (checksums), which are made
-redundantly available through multiple remote key-store farms and can be
-obtained using specialized functionality in the CMake software build system.
-However, the scope of this project is limited to software QA, and only provides
-an ad-hoc collection of guidelines and supporting scripts.
+such as the `Rdatasets Git repository`_ this approach does not scale, for example
+to the amount of data typically observed in a scientific context. Datalad
+uses git-annex_ to support managing large amounts of data with Git, while
+avoiding the scalability issues of putting data directly into Git repositories.
+
+In scientific software development, frequently using Git for source code
+management, many projects are also confronted with the problem of managing
+large data arrays needed, for example, for software testing. An exemplar
+project is `ITK Data`_ which is conceptually similar to git-annex: data content
+is referenced by unique keys (checksums), which are made redundantly available
+through multiple remote key-store farms and can be obtained using specialized
+functionality in the CMake software build system.  However, the scope of this
+project is limited to software QA, and only provides an ad-hoc collection of
+guidelines and supporting scripts.
 
 .. _Rdatasets Git repository: http://github.com/vincentarelbundock/Rdatasets
 .. _ITK Data: http://www.itk.org/Wiki/ITK/Git/Develop/Data
@@ -64,12 +68,13 @@ distributed data management tools, such as git-media_, git-fat_, and others.
 None of the alternative frameworks provides all of the features of git-annex,
 such as integration with native Git workflows, distributed redundant storage,
 and partial checkouts in one project.  Additional features of git-annex which
-are not exercised directly by datalad (git-annex assistant, encryption support,
-etc.) make it even more appealing for extended coverage of possible scenarios.
+are not necessarily needed by DataLad (git-annex assistant, encryption support,
+etc.) make it even more appealing for extended coverage of numerous scenarios.
 Moreover, neither of the alternative solutions has already reached a maturity,
 availability, and level of adoption that would be comparable to that of
 git-annex.
 
+.. _git-annex: http://git-annex.branchable.com
 .. _comparison: http://git-annex.branchable.com/not}
 .. _git-media: https://github.com/schacon/git-media
 .. _git-fat: https://github.com/jedbrown/git-fat}
@@ -79,30 +84,36 @@ git-annex.
 Git/Git-annex/DataLad
 =====================
 
-Although DataLad could be used in many usecases without invoking underlying
-git or git-annex directly, it is useful to appreciate that DataLad is build
-atop of very flexible and powerful tools.  Knowing basics of git and git-annex
-in addition to DataLad would help to not only make better use of DataLad but
-also to enable more advanced and more efficient data management scenarios.
+Although it is possible, and intended, to use DataLad without ever invoking git
+or git-annex commands directly, it is useful to appreciate that DataLad is
+build atop of very flexible and powerful tools.  Knowing basics of git and
+git-annex in addition to DataLad helps to not only make better use of
+DataLad but also to enable more advanced and more efficient data management
+scenarios. Datalad makes use of lower-level configuration and data structures
+as much as possible. Consequently, it is possible to manipulate Datalad
+datasets with low-level tools if needed. Moreover, Datalad datasets are
+compatible with tools and services designed to work with plain Git repositories,
+such as the popular GitHub_ service.
 
-To explain better how datalad compliments existing ecosystem of tools, let's
-review major additions each additional "toolkit layer" adds to the picture:
+.. _github: https://github.com
 
-===================================   =====  ===============   ==============
-Feature                                Git      Git-annex      DataLad
-===================================   =====  ===============   ==============
-Text files version control            |tup|  |tup| can mix     |tup| can mix
-Data files version control                   |tup|             |tup|
-Auto-crawling available resources            |tup| newsfeeds   |tup| flexible
-Unified authentication frontend                                |tup|
-Unified distribution                                           |tup|
-- recursive operation on datasets                              |tup|
-- crossing datasets boundaries                                 |tup|
-- meta-data support                          |tup| per-file    |tup| flexible
-- meta-data aggregation                                        |tup| flexible
-===================================   =====  ===============   ==============
+To better illustrate the different scopes, the following table provides an
+overview of the features that are contributed by each software technology
+layer.
+
+================================================   =============  ===============   ==============
+Feature                                             Git            Git-annex         DataLad
+================================================   =============  ===============   ==============
+Version control (text, code)                       |tup|          |tup| can mix     |tup| can mix
+Version control (binary data)                      (not advised)  |tup|             |tup|
+Auto-crawling available resources                                 |tup| RSS feeds   |tup| flexible
+Unified dataset handling                                                            |tup|
+- recursive operation on datasets                                                   |tup|
+- seamless operation across datasets boundaries                                     |tup|
+- meta-data support                                               |tup| per-file    |tup|
+- meta-data aggregation                                                             |tup| flexible
+Unified authentication interface                                                    |tup|
+================================================   =============  ===============   ==============
 
 .. |tup| unicode:: U+2713 .. check mark
-   :trim:
-.. |tdo| unicode:: U+2014 .. mdash
    :trim:
