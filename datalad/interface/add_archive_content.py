@@ -28,6 +28,7 @@ from os.path import dirname
 from os.path import normpath
 
 from .base import Interface
+from datalad.interface.utils import build_doc
 from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
@@ -57,6 +58,7 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 # all but by default to print only the one associated with this given action
 
 
+@build_doc
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
@@ -69,6 +71,8 @@ class AddArchiveContent(Interface):
         annex-repo$ datalad add-archive-content my_big_tarball.tar.gz
 
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     _params_ = dict(
         delete=Parameter(
             args=("-d", "--delete"),

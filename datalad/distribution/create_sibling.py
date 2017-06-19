@@ -29,6 +29,7 @@ from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
@@ -253,6 +254,7 @@ def _create_dataset_sibling(
     return remoteds_path
 
 
+@build_doc
 class CreateSibling(Interface):
     """Create a dataset sibling on a UNIX-like SSH-accessible machine
 
@@ -274,6 +276,8 @@ class CreateSibling(Interface):
     mechanism is provided to produce a flat list of datasets (see
     --target-dir).
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         # TODO: Figure out, whether (and when) to use `sshurl` as push url

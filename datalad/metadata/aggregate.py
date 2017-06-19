@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj, exists, relpath, dirname
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt
@@ -38,6 +39,7 @@ def _store_json(ds, path, meta):
     ds.repo.add(fname, git=True)
 
 
+@build_doc
 class AggregateMetaData(Interface):
     """Aggregate meta data of a dataset for later query.
 
@@ -52,6 +54,8 @@ class AggregateMetaData(Interface):
     List
       Any datasets where (updated) aggregated meta data was saved.
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
