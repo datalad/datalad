@@ -15,14 +15,48 @@ presented using command line interface commands, all functionality with
 identically named functions and options are available through Python API as
 well.
 
-Distribution
-============
+Datasets
+========
 
-Organization
-------------
+A Datalad :term:`dataset` is a Git repository that may or may not have a data
+:term:`annex` that is used to manage data referenced in a dataset. In practice,
+most DataLad datasets will come with an annex.
 
-DataLad "distribution" is just a :term:`superdataset` which organizes multiple
-:term:`dataset`'s using standard git mechanism of sub-modules.
+Datasets can contain other datasets (:term:`subdataset`\s), which can in turn
+contain subdatasets, and so on. There is no limit to the depth of nesting
+datasets. Each dataset in such a hierarchy has its own annex and its own
+history. The parent or :term:`superdataset` only tracks the specific state of a
+subdataset, and information on where it can be obtained. This is a powerful yet
+lightweight mechanism for combining multiple individual datasets for a specific
+purpose, such as the combination of source code repositories with other
+resources for a tailored application. In many cases DataLad can work with a
+hierarchy of datasets just as if it were a single dataset.
+
+A superdataset can also be seen as a curated collection of datasets, for example,
+for a certain data modality, a field of science, a certain author, or some
+all from one project (maybe the resource for a movie production). The lightweight
+coupling between super and subdatasets enables scenarios where individual datasets
+are maintained by a disjoint set of people, and the dataset collection itself can
+be curated by a completely independent entity. Any individual dataset can be
+part of any number of such collections.
+
+Benefitting from Git's support for workflows based on decentralized "clones" of
+a repository, DataLad's datasets can be (re-)published to a new location
+without loosing the connection between the "original" and the new "copy". This
+is extremely useful for collaborative work, but also in more mundane scenarios
+such as data backup, or temporary deployment fo a dataset on a compute cluster,
+or in the cloud.  Using git-annex, data can also get synchronized across
+different location of a dataset (:term:`sibling`\s in DataLad terminology).
+Using metadata tags, it is even possible to configure different levels of
+desired data redundancy across the network of dataset, or to prevent
+publication of sensitive data to publicly accessible repositories. Individual
+datasets in a hierarchy of (sub)datasets need not be stored at the same location.
+Continuing with an earlier example, it is possible to post a curated
+collection of datasets, as a superdataset, on Github, while the actual datasets
+live on different servers all around the world.
+
+API principles
+==============
 
 install vs get
 --------------
