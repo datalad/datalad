@@ -34,6 +34,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_set_equal
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
@@ -109,11 +110,15 @@ def test_invalid_call(path):
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
     # fails to reconfigure by default with generated
-    assert_raises(ValueError, ds.create_sibling, 'bogus:/tmp/somewhere')
     # and also when given an existing name
-    assert_raises(
-        ValueError,
-        ds.create_sibling, 'localhost:/tmp/somewhere', name='bogus')
+    for res in (ds.create_sibling('bogus:/tmp/somewhere', on_failure='ignore'),
+                ds.create_sibling('localhost:/tmp/somewhere', name='bogus', on_failure='ignore')):
+        assert_result_count(
+            res, 1,
+            status='error',
+            message=(
+                "sibling '%s' already configured (specify alternative name, or force reconfiguration via --existing",
+                'bogus'))
 
 
 @skip_ssh
@@ -330,7 +335,11 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         # since is an empty value to force it to consider all changes since we published
         # already
         with chpwd(source.path):
-            publish(to=remote_name)  # no recursion
+            # as we discussed in gh-1495 we use the last-published state of the base
+            # dataset as the indicator for modification detection with since=''
+            # hence we must not publish the base dataset on its own without recursion,
+            # if we want to have this mechanism do its job
+            #publish(to=remote_name)  # no recursion
             assert_create_sshwebserver(
                 name=remote_name,
                 sshurl="ssh://localhost" + target_path_,

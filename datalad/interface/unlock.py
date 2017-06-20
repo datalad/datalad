@@ -13,7 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from os import curdir
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -23,10 +22,9 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.interface.utils import get_normalized_path_arguments
-from datalad.interface.utils import get_paths_by_dataset
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import build_doc
 from datalad.interface.common_opts import recursion_flag
@@ -73,60 +71,57 @@ class Unlock(Interface):
             recursive=False,
             recursion_limit=None):
 
-        # TODO: require dataset
-
         if path is None and dataset is None:
             raise InsufficientArgumentsError(
                 "insufficient arguments for unlocking: needs at least "
                 "a dataset or a path to unlock.")
 
-        resolved_paths, dataset_path = get_normalized_path_arguments(
-            path, dataset, default=curdir)
+        refds_path = Interface.get_refds_path(dataset)
+        res_kwargs = dict(action='unlock', logger=lgr, refds=refds_path)
 
-        content_by_ds, unavailable_paths, nondataset_paths = \
-            get_paths_by_dataset(resolved_paths,
-                                 recursive=recursive,
-                                 recursion_limit=recursion_limit)
-        res_kwargs = dict(
-            action='unlock', logger=lgr,
-            refds=dataset.path if isinstance(dataset, Dataset) else dataset)
+        to_process = []
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                path=path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='unlock',
+                unavailable_path_status='impossible',
+                unavailable_path_msg="path does not exist",
+                nondataset_path_status='impossible',
+                modified=None,
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if ap.get('type', 'dataset') == 'dataset':
+                # this is a dataset
+                ap['process_content'] = True
+            to_process.append(ap)
 
-        for r in results_from_paths(
-                nondataset_paths, status='impossible',
-                message="path does not belong to any dataset: %s",
-                **res_kwargs):
-            yield r
-        for r in results_from_paths(
-                unavailable_paths, status='impossible',
-                message="path does not exist", **res_kwargs):
-            yield r
+        content_by_ds, ds_props, completed, nondataset_paths = \
+            annotated2content_by_ds(
+                to_process,
+                refds_path=refds_path,
+                path_only=False)
+        assert(not completed)
 
         for ds_path in sorted(content_by_ds.keys()):
             ds = Dataset(ds_path)
+            content = content_by_ds[ds_path]
 
             if not isinstance(ds.repo, AnnexRepo):
-                lgr.debug("'%s' has no annex, nothing to unlock",
-                          ds)
+                for ap in content:
+                    ap['status'] = 'notneeded'
+                    ap['message'] = "not annex'ed, nothing to unlock"
+                    ap.update(res_kwargs)
+                    yield ap
                 continue
 
-            files = content_by_ds[ds_path]
+            files = [ap['path'] for ap in content]
 
             for r in ds.repo.unlock(files):
                 yield get_status_dict(
                     path=r, status='ok', type='file', **res_kwargs)
-
-    @staticmethod
-    def custom_result_renderer(res, **kwargs):
-        from datalad.ui import ui
-        if res is None:
-            res = []
-        if not isinstance(res, list):
-            res = [res]
-        if not len(res):
-            ui.message("Nothing was unlocked")
-            return
-        items = '\n'.join(map(str, res))
-        msg = "Unlocked {n} files:\n{items}".format(
-            n=len(res),
-            items=items)
-        ui.message(msg)
