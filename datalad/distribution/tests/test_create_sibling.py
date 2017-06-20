@@ -34,6 +34,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_set_equal
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
