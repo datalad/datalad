@@ -454,11 +454,7 @@ class CreateSibling(Interface):
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
-<<<<<<< HEAD
             sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
-=======
-            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
->>>>>>> ee6d7e3c... RF: new-style `create-sibling`
 
         # check the login URL
         sshri = RI(sshurl)
