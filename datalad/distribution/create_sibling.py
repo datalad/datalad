@@ -499,7 +499,7 @@ class CreateSibling(Interface):
                 # this is done
                 yield ap
                 continue
-            if ap.get('type', None) != 'dataset':
+            if ap.get('type', None) != 'dataset' or ap.get('state', None) == 'absent':
                 # this can happen when there is `since`, but we have no
                 # use for anything but datasets here
                 continue
