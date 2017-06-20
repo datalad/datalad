@@ -74,6 +74,9 @@ def _parse_gitmodules(dspath):
                     if not (opt.startswith('__') or opt == 'path')}
         modprops['gitmodule_name'] = sec[11:-1]
         mods[modpath] = modprops
+    # make sure we let go of any resources held be the parser
+    # we cannot rely on __del__
+    parser.release()
     return mods
 
 
@@ -120,14 +123,6 @@ def _parse_git_submodules(dspath, recursive):
             sm['revision'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
         yield sm
-
-
-def _get_gitmodule_parser(dspath):
-    """Get a parser instance for write access"""
-    gitmodule_path = opj(dspath, ".gitmodules")
-    parser = GitConfigParser(gitmodule_path, read_only=False, merge_includes=False)
-    parser.read()
-    return parser
 
 
 @build_doc
@@ -330,8 +325,13 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     modinfo = _parse_gitmodules(dspath)
     # write access parser
     parser = None
-    if set_property or delete_property:
-        parser = _get_gitmodule_parser(dspath)
+    # TODO bring back in more global scope from below once segfaults are
+    # figured out
+    #if set_property or delete_property:
+    #    gitmodule_path = opj(dspath, ".gitmodules")
+    #    parser = GitConfigParser(
+    #        gitmodule_path, read_only=False, merge_includes=False)
+    #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath, recursive=False):
         if contains and \
@@ -342,6 +342,10 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             continue
         sm.update(modinfo.get(sm['path'], {}))
         if set_property or delete_property:
+            gitmodule_path = opj(dspath, ".gitmodules")
+            parser = GitConfigParser(
+                gitmodule_path, read_only=False, merge_includes=False)
+            parser.read()
             # do modifications now before we read the info out for reporting
             # use 'submodule "NAME"' section ID style as this seems to be the default
             submodule_section = 'submodule "{}"'.format(sm['gitmodule_name'])
@@ -369,6 +373,8 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             Dataset(dspath).add(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties')
+            # let go of resources, locks, ...
+            parser.release()
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
