@@ -21,12 +21,14 @@ import sys
 
 from datalad.support.param import Parameter
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 
 from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.sshrun')
 
 
+@build_doc
 class SSHRun(Interface):
     """Run command on remote machines via SSH.
 
@@ -35,6 +37,8 @@ class SSHRun(Interface):
     connection management. Its primary use case is to be used with Git
     as 'core.sshCommand' or via "GIT_SSH_COMMAND".
     """
+    # prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         login=Parameter(

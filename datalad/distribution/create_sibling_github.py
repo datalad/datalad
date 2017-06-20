@@ -29,6 +29,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import MissingExternalDependency
 from ..interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
     require_dataset, Dataset
 from datalad.distribution.siblings import Siblings
@@ -189,6 +190,7 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
 template_fx = lambda x: re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', x))
 
 
+@build_doc
 class CreateSiblingGithub(Interface):
     """Create dataset sibling on Github.
 
@@ -211,6 +213,8 @@ class CreateSiblingGithub(Interface):
     interface (https://github.com/sociomantic/git-hub) by running:
     :kbd:`git hub setup`.
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(

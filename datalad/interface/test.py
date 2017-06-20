@@ -14,13 +14,17 @@ __docformat__ = 'restructuredtext'
 
 import datalad
 from .base import Interface
+from datalad.interface.utils import build_doc
 
 
+@build_doc
 class Test(Interface):
     """Run internal DataLad (unit)tests.
 
     This can be used to verify correct operation on the system
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     @staticmethod
     def __call__():
         datalad.test()

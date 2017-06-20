@@ -193,7 +193,8 @@ def is_api_arg(arg):
     return arg != 'self' and not arg.startswith('_')
 
 
-def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
+def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
+                                     add_args=None):
     """Generate a useful docstring from a parameter spec
 
     Amends any existing docstring of a callable with a textual
@@ -204,7 +205,11 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
     # get the signature
     ndefaults = 0
     args, varargs, varkw, defaults = getargspec(func)
-    if not defaults is None:
+    if add_args:
+        add_argnames = sorted(add_args.keys())
+        args.extend(add_argnames)
+        defaults = defaults + tuple(add_args[k] for k in add_argnames)
+    if defaults is not None:
         ndefaults = len(defaults)
     # start documentation with what the callable brings with it
     doc = prefix if prefix else u''
@@ -223,7 +228,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
             # somewhat OK
             defaults_idx = ndefaults - len(args) + i
             if defaults_idx >= 0:
-                if not param.constraints is None:
+                if param.constraints is not None:
                     param.constraints(defaults[defaults_idx])
             orig_docs = param._doc
             param._doc = alter_interface_docs_for_api(param._doc)

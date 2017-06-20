@@ -25,6 +25,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.dochelpers import exc_str
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 
 lgr = logging.getLogger('datalad.export')
 
@@ -36,9 +37,12 @@ def _get_exporter_names():
             if not e.endswith('__init__.py')]
 
 
+@build_doc
 class Export(Interface):
     """Export a dataset to another representation
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(

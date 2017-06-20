@@ -17,6 +17,7 @@ from os.path import curdir
 from os.path import sep as dirsep
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.interface.utils import filter_unmodified
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
@@ -279,6 +280,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     return published, skipped
 
 
+@build_doc
 class Publish(Interface):
     """Publish a dataset to a known :term:`sibling`.
 
@@ -307,6 +309,8 @@ class Publish(Interface):
       Git repositories, or git-annex special remotes (if their support data
       upload).
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
     #      - it is used, when no destination is given
