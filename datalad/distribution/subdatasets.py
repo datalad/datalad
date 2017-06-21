@@ -33,6 +33,7 @@ from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
@@ -345,6 +346,9 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     val)
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
+            Dataset(dspath).add(
+                '.gitmodules', to_git=True,
+                message='[DATALAD] modified subdataset properties')
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
