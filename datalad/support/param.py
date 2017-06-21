@@ -98,8 +98,14 @@ class Parameter(object):
         if sdoc is not None:
             if sdoc[0] == '(' and sdoc[-1] == ')':
                 sdoc = sdoc[1:-1]
-            if self.cmd_kwargs.get('nargs', None) == '*' \
-                    or self.cmd_kwargs.get('action', None) == 'append':
+            nargs = self.cmd_kwargs.get('nargs', '')
+            if isinstance(nargs, int):
+                sdoc = '{}-item sequence of {}'.format(nargs, sdoc)
+            elif nargs == '+':
+                sdoc = 'non-empty sequence of {}'.format(sdoc)
+            elif nargs == '*':
+                sdoc = 'sequence of {}'.format(sdoc)
+            if self.cmd_kwargs.get('action', None) == 'append':
                 sdoc = 'list of {}'.format(sdoc)
             paramsdoc += " : %s" % sdoc
             if has_default:
