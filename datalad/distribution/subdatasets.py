@@ -198,7 +198,7 @@ class Subdatasets(Interface):
             each branch in the dataset tree, and not top-down."""),
         set_property=Parameter(
             args=('--set-property',),
-            metavar='VALUE',
+            metavar=('NAME', 'VALUE'),
             nargs=2,
             action='append',
             doc="""Name and value of one or more subdataset properties to
