@@ -13,14 +13,27 @@ for more details ATM.
 
 I bet we will fix some bugs and make a world even a better place.
 
-## Fixes
+### Major refactoring and deprecations
 
-??
+- `add-sibling` has been fully replaced by the `siblings` command
+- `create-sibling`, and `unlock` have been rewritting to support the
+  same common API as most other commands
 
 ## Enhancements and new features
 
-??
+- `siblings` can now be used to query and configure a local repository by
+  using the sibling name ``here``
+- `siblings` can now query and set annex preferred content configuration. This
+  includes ``wanted`` (as previously supported in other commands), and now
+  also ``required``
+- documentation for all commands is now built in a uniform fashion, leading to
+  more...guess what...uniform documentation
+- Significant parts of the documentation of been updated
 
+## Fixes
+
+- API documentation is now rendered properly as HTML, and is easier to browse by
+  having more compact pages
 
 
 ## 0.6.0 (Jun 14, 2017) -- German perfectionism

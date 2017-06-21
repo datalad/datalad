@@ -5,6 +5,7 @@ Datalad |---| data management and distribution suite: Documentation
    :maxdepth: 1
 
    gettingstarted
+   changelog
    acknowledgements
 
 Concepts and technologies
