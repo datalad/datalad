@@ -162,11 +162,22 @@ class Subdatasets(Interface):
     "gitmodule_<label>"
         Any additional configuration property on record.
 
-    Performance note: Requesting `bottomup` reporting order, or a particular
-    numerical `recursion_limit` implies an internal switch to an alternative
-    query implementation for recursive query that is more flexible, but also
-    notably slower (performs one call to Git per dataset versus a single call
-    for all combined).
+    Performance note: Property modification, requesting `bottomup` reporting
+    order, or a particular numerical `recursion_limit` implies an internal
+    switch to an alternative query implementation for recursive query that is
+    more flexible, but also notably slower (performs one call to Git per
+    dataset versus a single call for all combined).
+
+    The following properties for subdatasets are recognized by DataLad
+    (without the 'gitmodule_' prefix that is used in the query results):
+
+    "datalad-recursiveinstall"
+        If set to 'skip', the respective subdataset is skipped when DataLad
+        is recursively installing its superdataset. However, the subdataset
+        remains installable when explicitly requested, and no other features
+        are impaired.
+
+
 
     """
     _params_ = dict(
