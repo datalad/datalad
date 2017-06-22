@@ -1327,7 +1327,7 @@ class Annexificator(object):
                         tag_ = last_version
                     # TODO: config.tag.sign
                     stats_str = "\n\n" + total_stats.as_str(mode='full')
-                    tags = self.repo.repo.tags
+                    tags = [t['name'] for t in self.repo.get_tags()]
                     if tag_ in tags:
                         # TODO: config.tag.allow_override
                         if existing_tag == '+suffix':
