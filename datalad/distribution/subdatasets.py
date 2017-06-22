@@ -169,7 +169,7 @@ class Subdatasets(Interface):
     dataset versus a single call for all combined).
 
     The following properties for subdatasets are recognized by DataLad
-    (without the 'gitmodule_' prefix that is used in the query results):
+    (without the 'gitmodule\_' prefix that is used in the query results):
 
     "datalad-recursiveinstall"
         If set to 'skip', the respective subdataset is skipped when DataLad
