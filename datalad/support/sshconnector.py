@@ -176,8 +176,9 @@ class SSHConnection(object):
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
+        null = open('/dev/null')
         try:
-            out, err = self.runner.run(cmd, stdin=open('/dev/null'))
+            out, err = self.runner.run(cmd, stdin=null)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -186,6 +187,8 @@ class SSHConnection(object):
             # SSH died and left socket behind, or server closed connection
             self.close()
             res = False
+        finally:
+            null.close()
         lgr.debug("Check of %s has %s", self, {True: 'succeeded', False: 'failed'}[res])
         return res
 
