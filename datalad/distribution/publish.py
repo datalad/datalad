@@ -90,21 +90,25 @@ def has_diff(ds, refspec, remote, paths):
 
     lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
               remote_branch_name, remote)
-    current_commit = ds.repo.repo.commit()
+    current_commit = ds.repo.get_hexsha()
     remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
-    within_ds_paths = [p['path'] for p in paths if p['path'] != ds.path]
+    within_ds_paths = [p for p in paths if p['path'] != ds.path]
     if within_ds_paths:
         # only if any paths is different from just the parentds root
         # in which case we can do the same muuuch cheaper (see below)
         # if there were custom paths, we will look at the diff
         lgr.debug("Since paths provided, looking at diff")
-        return len(current_commit.diff(
-            remote_ref,
-            paths=within_ds_paths)) > 0
+        return len(ds.diff(
+            path=within_ds_paths,
+            revision=remote_ref.name,
+            # only commited changes in this dataset
+            staged=False,
+            # consider only commited changes in subdataset
+            ignore_subdatasets='dirty')) > 0
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
-        return current_commit != remote_ref.commit
+        return current_commit != remote_ref.commit.hexsha
 
 
 def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
