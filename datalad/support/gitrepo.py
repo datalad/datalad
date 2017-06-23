@@ -2015,7 +2015,7 @@ class GitRepo(RepoInterface):
         # sorting
         stdout, stderr = self._git_custom_command(
             '',
-            ['git', 'tag', '--format=%(refname:strip=2)%00%(objectname)',
+            ['git', 'tag', '--format=%(refname:strip=2)%00%(object)',
              '--sort=*committerdate'])
         fields = ('name', 'hexsha')
         tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
