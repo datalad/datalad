@@ -108,7 +108,7 @@ def test_crawl_s3_commit_versions(path):
     eq_(total_stats,
         # Deletions come as 'files' as well atm
         ActivityStats(files=17, overwritten=3, downloaded=14, urls=14, add_annex=14, removed=3, downloaded_size=112))
-    tags = [t['name'] for t in annex.repo.get_tags()]
+    tags = annex.repo.get_tags(output='name')
     assert_in(target_version, tags)
     # and we actually got 7 more commits
     for t in range(1, 8):

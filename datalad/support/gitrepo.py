@@ -1999,8 +1999,14 @@ class GitRepo(RepoInterface):
             '', ['git', 'tag', str(tag)]
         )
 
-    def get_tags(self):
+    def get_tags(self, output=None):
         """Get list of tags
+
+        Parameters
+        ----------
+        output : str, optional
+          If given, limit the return value to a list of values matching that
+          particular key of the tag properties.
 
         Returns
         -------
@@ -2019,7 +2025,10 @@ class GitRepo(RepoInterface):
              '--sort=*committerdate'])
         fields = ('name', 'hexsha')
         tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
-        return tags
+        if output:
+            return [t[output] for t in tags]
+        else:
+            return tags
 
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
