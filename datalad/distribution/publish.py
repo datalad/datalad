@@ -82,7 +82,8 @@ def has_diff(ds, refspec, remote, paths):
         # there was no tracking branch, check the push target
         remote_branch_name = ds.repo.get_active_branch()
 
-    if remote_branch_name not in ds.repo.repo.remotes[remote].refs:
+    remote_ref = '/'.join((remote, remote_branch_name))
+    if remote_ref not in ds.repo.get_remote_branches():
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
                   remote, remote_branch_name)
         # we don't have any remote state, need to push for sure
@@ -91,7 +92,6 @@ def has_diff(ds, refspec, remote, paths):
     lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
               remote_branch_name, remote)
     current_commit = ds.repo.get_hexsha()
-    remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
     within_ds_paths = [p for p in paths if p['path'] != ds.path]
     if within_ds_paths:
         # only if any paths is different from just the parentds root
@@ -100,7 +100,7 @@ def has_diff(ds, refspec, remote, paths):
         lgr.debug("Since paths provided, looking at diff")
         return len(ds.diff(
             path=within_ds_paths,
-            revision=remote_ref.name,
+            revision=remote_ref,
             # only commited changes in this dataset
             staged=False,
             # consider only commited changes in subdataset
@@ -108,7 +108,7 @@ def has_diff(ds, refspec, remote, paths):
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
-        return current_commit != remote_ref.commit.hexsha
+        return current_commit != ds.repo.get_hexsha(remote_ref)
 
 
 def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
