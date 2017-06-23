@@ -3153,6 +3153,7 @@ class BatchedAnnex(object):
             process = self._process
             lgr.debug("Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
+            process.stdout.close()
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
