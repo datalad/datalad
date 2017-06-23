@@ -2048,5 +2048,5 @@ class GitRepo(RepoInterface):
 
 
 # TODO
-# remove submodule
+# remove submodule: nope, this is just deinit_submodule + remove
 # status?
