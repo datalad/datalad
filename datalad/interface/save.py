@@ -134,8 +134,9 @@ def save_dataset(
     if version_tag:
         ds.repo.tag(version_tag)
 
-    _was_modified = ds.repo.get_hexsha() != orig_hexsha
-    return ds.repo.repo.head.commit if _was_modified else None
+    current_hexsha = ds.repo.get_hexsha()
+    _was_modified = current_hexsha != orig_hexsha
+    return current_hexsha if _was_modified else None
 
 
 @build_doc
@@ -363,7 +364,7 @@ class Save(Interface):
         if not res or res.get('type', None) != 'dataset' or 'path' not in res:
             return
         ds = Dataset(res['path'])
-        commit = ds.repo.repo.head.commit
+        commit = ds.repo.get_hexsha()
         ui.message('Saved state: {0} for {1}'.format(
-            commit.hexsha,
+            commit,
             ds))
