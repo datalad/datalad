@@ -33,6 +33,7 @@ from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
@@ -49,6 +50,7 @@ lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 submodule_full_props = re.compile(r'([0-9a-f]+) (.*) \((.*)\)$')
 submodule_nodescribe_props = re.compile(r'([0-9a-f]+) (.*)$')
+valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 status_map = {
     ' ': 'clean',
@@ -156,11 +158,22 @@ class Subdatasets(Interface):
     "gitmodule_<label>"
         Any additional configuration property on record.
 
-    Performance note: Requesting `bottomup` reporting order, or a particular
-    numerical `recursion_limit` implies an internal switch to an alternative
-    query implementation for recursive query that is more flexible, but also
-    notably slower (performs one call to Git per dataset versus a single call
-    for all combined).
+    Performance note: Property modification, requesting `bottomup` reporting
+    order, or a particular numerical `recursion_limit` implies an internal
+    switch to an alternative query implementation for recursive query that is
+    more flexible, but also notably slower (performs one call to Git per
+    dataset versus a single call for all combined).
+
+    The following properties for subdatasets are recognized by DataLad
+    (without the 'gitmodule\_' prefix that is used in the query results):
+
+    "datalad-recursiveinstall"
+        If set to 'skip', the respective subdataset is skipped when DataLad
+        is recursively installing its superdataset. However, the subdataset
+        remains installable when explicitly requested, and no other features
+        are impaired.
+
+
 
     """
     _params_ = dict(
@@ -193,11 +206,13 @@ class Subdatasets(Interface):
             each branch in the dataset tree, and not top-down."""),
         set_property=Parameter(
             args=('--set-property',),
-            metavar='VALUE',
+            metavar=('NAME', 'VALUE'),
             nargs=2,
             action='append',
             doc="""Name and value of one or more subdataset properties to
-            be set in the parent dataset's .gitmodules file. The value can be
+            be set in the parent dataset's .gitmodules file. The property name
+            is case-insensitive, must start with a letter, and consist only
+            of alphanumeric characters. The value can be
             a Python format() template string wrapped in '<>' (e.g.
             '<{gitmodule_name}>').
             Supported keywords are any item reported in the result properties
@@ -241,6 +256,12 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
+        if set_property:
+            for k, v in set_property:
+                if valid_key.match(k) is None:
+                    raise ValueError(
+                        "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
+                        k)
         try:
             if not (bottomup or contains or set_property or delete_property or \
                     (recursive and recursion_limit is not None)):
@@ -351,6 +372,9 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                 sm['gitmodule_{}'.format(prop)] = val
             # let go of resources, locks, ...
             parser.release()
+            Dataset(dspath).add(
+                '.gitmodules', to_git=True,
+                message='[DATALAD] modified subdataset properties')
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
