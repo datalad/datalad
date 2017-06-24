@@ -53,15 +53,9 @@ class Plugin(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         plugin=Parameter(
             args=("plugin",),
-            choices=_get_plugin_names(),
+            nargs='?',
             doc="""label of the type or format the dataset shall be exported
             to."""),
-        output=Parameter(
-            args=('-o', '--output'),
-            doc="""output destination specification to be passes to the exporter.
-            The particular semantics of the option value depend on the actual
-            exporter. Typically, this will be a file name or a path to a
-            directory."""),
         showpluginhelp=Parameter(
             args=('-H', '--show-plugin-help',),
             dest='showpluginhelp',
@@ -71,7 +65,11 @@ class Plugin(Interface):
 
     @staticmethod
     @datasetmethod(name='plugin')
-    def __call__(plugin, dataset=None, showpluginhelp=False, output=None, **kwargs):
+    def __call__(plugin=None, dataset=None, showpluginhelp=False, **kwargs):
+        if plugin is None:
+            from datalad.ui import ui
+            ui.message('\n'.join(_get_plugin_names()))
+            return
         # get a handle on the relevant plugin module
         import datalad.plugin as plugin_mod
         try:
@@ -96,6 +94,8 @@ class Plugin(Interface):
 
     @staticmethod
     def result_renderer_cmdline(res, args):
+        if res is None:
+            return
         pluginmod, result = res
         if args.showpluginhelp:
             # the function that prints the help was returned as result
