@@ -1999,6 +1999,37 @@ class GitRepo(RepoInterface):
             '', ['git', 'tag', str(tag)]
         )
 
+    def get_tags(self, output=None):
+        """Get list of tags
+
+        Parameters
+        ----------
+        output : str, optional
+          If given, limit the return value to a list of values matching that
+          particular key of the tag properties.
+
+        Returns
+        -------
+        list
+          Each item is a dictionary with information on a tag. At present
+          this includes 'hexsha', and 'name', where the latter is the string
+          label of the tag, and the format the hexsha of the object the tag
+          is attched to. The list is sorted by commit date, with the most
+          recent commit being the last element.
+        """
+        # TODO it would be straightforward to add more info and tweak the
+        # sorting
+        stdout, stderr = self._git_custom_command(
+            '',
+            ['git', 'tag', '--format=%(refname:strip=2)%00%(object)',
+             '--sort=*committerdate'])
+        fields = ('name', 'hexsha')
+        tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
+        if output:
+            return [t[output] for t in tags]
+        else:
+            return tags
+
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
 
