@@ -50,6 +50,7 @@ lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 submodule_full_props = re.compile(r'([0-9a-f]+) (.*) \((.*)\)$')
 submodule_nodescribe_props = re.compile(r'([0-9a-f]+) (.*)$')
+valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 status_map = {
     ' ': 'clean',
@@ -214,7 +215,9 @@ class Subdatasets(Interface):
             nargs=2,
             action='append',
             doc="""Name and value of one or more subdataset properties to
-            be set in the parent dataset's .gitmodules file. The value can be
+            be set in the parent dataset's .gitmodules file. The property name
+            is case-insensitive, must start with a letter, and consist only
+            of alphanumeric characters. The value can be
             a Python format() template string wrapped in '<>' (e.g.
             '<{gitmodule_name}>').
             Supported keywords are any item reported in the result properties
@@ -258,6 +261,12 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
+        if set_property:
+            for k, v in set_property:
+                if valid_key.match(k) is None:
+                    raise ValueError(
+                        "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
+                        k)
         try:
             if not (bottomup or contains or set_property or delete_property or \
                     (recursive and recursion_limit is not None)):
