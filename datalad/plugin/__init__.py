@@ -27,10 +27,10 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import build_doc
 
-lgr = logging.getLogger('datalad.export')
+lgr = logging.getLogger('datalad.plugin')
 
 
-def _get_exporter_names():
+def _get_plugin_names():
     basepath = dirname(__file__)
     return [basename(e)[:-3]
             for e in glob(opj(basepath, '*.py'))
@@ -38,7 +38,7 @@ def _get_exporter_names():
 
 
 @build_doc
-class Export(Interface):
+class Plugin(Interface):
     """Export a dataset to another representation
     """
     # XXX prevent common args from being added to the docstring
@@ -53,7 +53,7 @@ class Export(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         astype=Parameter(
             args=("astype",),
-            choices=_get_exporter_names(),
+            choices=_get_plugin_names(),
             doc="""label of the type or format the dataset shall be exported
             to."""),
         output=Parameter(
@@ -70,27 +70,27 @@ class Export(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='export')
+    @datasetmethod(name='plugin')
     def __call__(astype, dataset, getcmdhelp=False, output=None, **kwargs):
         # get a handle on the relevant plugin module
-        import datalad.export as export_mod
+        import datalad.plugin as plugin_mod
         try:
-            exmod = import_module('.%s' % (astype,), package=export_mod.__package__)
+            exmod = import_module('.%s' % (astype,), package=plugin_mod.__package__)
         except ImportError as e:
-            raise ValueError("cannot load exporter '{}': {}".format(
+            raise ValueError("cannot load plugin '{}': {}".format(
                 astype, exc_str(e)))
         if getcmdhelp:
             # no result, but return the module to make the renderer do the rest
             return (exmod, None)
 
-        ds = require_dataset(dataset, check_installed=True, purpose='exporting')
+        ds = require_dataset(dataset, check_installed=True, purpose='plugin')
         # call the plugin, either with the argv array from the cmdline call
         # or directly with the kwargs
         if 'datalad_unparsed_args' in kwargs:
-            result = exmod._datalad_export_plugin_call(
+            result = exmod._datalad_plugin_call(
                 ds, argv=kwargs['datalad_unparsed_args'], output=output)
         else:
-            result = exmod._datalad_export_plugin_call(
+            result = exmod._datalad_plugin_call(
                 ds, output=output, **kwargs)
         return (exmod, result)
 
@@ -100,7 +100,7 @@ class Export(Interface):
         if args.getcmdhelp:
             # the function that prints the help was returned as result
             if not hasattr(exmod, '_datalad_get_cmdline_help'):
-                lgr.error("export plugin '{}' does not provide help".format(exmod))
+                lgr.error("plugin '{}' does not provide help".format(exmod))
                 return
             replacement = []
             help = exmod._datalad_get_cmdline_help()

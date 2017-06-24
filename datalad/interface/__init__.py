@@ -41,7 +41,7 @@ _group_dataset = (
          'create-sibling-github'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
-        ('datalad.export', 'Export', 'export'),
+        ('datalad.plugin', 'Plugin', 'plugin'),
     ])
 
 _group_metadata = (

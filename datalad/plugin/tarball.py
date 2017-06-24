@@ -21,11 +21,11 @@ from os.path import join as opj, dirname, normpath, isabs
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import file_basename
 
-lgr = logging.getLogger('datalad.export.tarball')
+lgr = logging.getLogger('datalad.plugin.tarball')
 
 
 # PLUGIN API
-def _datalad_export_plugin_call(dataset, output, argv=None):
+def _datalad_plugin_call(dataset, output, argv=None):
     if argv:
         lgr.warn("tarball exporter ignores any additional options '{}'".format(
             argv))
