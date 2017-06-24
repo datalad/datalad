@@ -422,7 +422,8 @@ class SSHManager(object):
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
                         exists(self._connections[c].ctrl_path)]
-            lgr.debug("Closing %d SSH connections..." % len(to_close))
+            if to_close:
+                lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:
