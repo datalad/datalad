@@ -40,6 +40,7 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
+from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -291,7 +292,7 @@ class Dataset(object):
                                  self.repo is not None
 
         if not exists_now or \
-                (was_once_installed and not exists(self.repo.repo.git_dir)):
+                (was_once_installed and not GitRepo.is_valid_repo(self.path)):
             # repo gone now, reset
             self._repo = None
             return False
