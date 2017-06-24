@@ -319,10 +319,14 @@ def rmtemp(f, *args, **kwargs):
             # on windows boxes there is evidence for a latency of
             # more than a second until a file is considered no
             # longer "in-use"
+            # WindowsError is not known on Linux, and if IOError
+            # or any other exception is thrown then if except
+            # statement has WindowsError in it -- NameError
+            exceptions = (OSError, WindowsError) if on_windows else OSError
             for i in range(50):
                 try:
                     os.unlink(f)
-                except (OSError, WindowsError) as e:
+                except exceptions:
                     if i < 49:
                         sleep(0.1)
                         continue
