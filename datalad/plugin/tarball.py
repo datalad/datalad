@@ -85,5 +85,5 @@ def _datalad_plugin_call(dataset, output, argv=None):
 
 
 # PLUGIN API
-def _datalad_get_cmdline_help():
+def _datalad_get_plugin_help():
     return 'Just call it, and it will produce a tarball.'

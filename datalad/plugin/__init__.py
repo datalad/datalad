@@ -51,8 +51,8 @@ class Plugin(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
-        astype=Parameter(
-            args=("astype",),
+        plugin=Parameter(
+            args=("plugin",),
             choices=_get_plugin_names(),
             doc="""label of the type or format the dataset shall be exported
             to."""),
@@ -62,48 +62,48 @@ class Plugin(Interface):
             The particular semantics of the option value depend on the actual
             exporter. Typically, this will be a file name or a path to a
             directory."""),
-        getcmdhelp=Parameter(
-            args=('--help-type',),
-            dest='getcmdhelp',
+        showpluginhelp=Parameter(
+            args=('-H', '--show-plugin-help',),
+            dest='showpluginhelp',
             action='store_true',
-            doc="""show help for a specific export type/format"""),
+            doc="""show help for a specific plugin"""),
     )
 
     @staticmethod
     @datasetmethod(name='plugin')
-    def __call__(astype, dataset, getcmdhelp=False, output=None, **kwargs):
+    def __call__(plugin, dataset=None, showpluginhelp=False, output=None, **kwargs):
         # get a handle on the relevant plugin module
         import datalad.plugin as plugin_mod
         try:
-            exmod = import_module('.%s' % (astype,), package=plugin_mod.__package__)
+            pluginmod = import_module('.%s' % (plugin,), package=plugin_mod.__package__)
         except ImportError as e:
             raise ValueError("cannot load plugin '{}': {}".format(
-                astype, exc_str(e)))
-        if getcmdhelp:
+                plugin, exc_str(e)))
+        if showpluginhelp:
             # no result, but return the module to make the renderer do the rest
-            return (exmod, None)
+            return (pluginmod, None)
 
         ds = require_dataset(dataset, check_installed=True, purpose='plugin')
         # call the plugin, either with the argv array from the cmdline call
         # or directly with the kwargs
         if 'datalad_unparsed_args' in kwargs:
-            result = exmod._datalad_plugin_call(
+            result = pluginmod._datalad_plugin_call(
                 ds, argv=kwargs['datalad_unparsed_args'], output=output)
         else:
-            result = exmod._datalad_plugin_call(
+            result = pluginmod._datalad_plugin_call(
                 ds, output=output, **kwargs)
-        return (exmod, result)
+        return (pluginmod, result)
 
     @staticmethod
     def result_renderer_cmdline(res, args):
-        exmod, result = res
-        if args.getcmdhelp:
+        pluginmod, result = res
+        if args.showpluginhelp:
             # the function that prints the help was returned as result
-            if not hasattr(exmod, '_datalad_get_cmdline_help'):
-                lgr.error("plugin '{}' does not provide help".format(exmod))
+            if not hasattr(pluginmod, '_datalad_get_plugin_help'):
+                lgr.error("plugin '{}' does not provide help".format(pluginmod))
                 return
             replacement = []
-            help = exmod._datalad_get_cmdline_help()
+            help = pluginmod._datalad_get_plugin_help()
             if isinstance(help, tuple):
                 help, replacement = help
             if replacement:
