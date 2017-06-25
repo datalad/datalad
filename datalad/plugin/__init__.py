@@ -16,6 +16,8 @@ import logging
 from glob import glob
 import re
 from os.path import join as opj, basename, dirname
+from os import curdir
+import inspect
 
 from datalad import cfg
 from datalad.support.param import Parameter
@@ -27,6 +29,7 @@ from datalad.dochelpers import exc_str
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import build_doc
+from datalad.interface.utils import eval_results
 from datalad.ui import ui
 
 lgr = logging.getLogger('datalad.plugin')
@@ -85,7 +88,7 @@ class Plugin(Interface):
         plugin=Parameter(
             args=("plugin",),
             nargs='*',
-            metavar=('NAME', 'ARG=VAL'),
+            metavar='PLUGINSPEC',
             doc="""label of the type or format the dataset shall be exported
             to."""),
         showpluginhelp=Parameter(
@@ -93,11 +96,18 @@ class Plugin(Interface):
             dest='showpluginhelp',
             action='store_true',
             doc="""show help for a specific plugin"""),
+        showplugininfo=Parameter(
+            args=('--show-plugin-info',),
+            dest='showplugininfo',
+            action='store_true',
+            doc="""show additional information in plugin summary (e.g. plugin file
+            location"""),
     )
 
     @staticmethod
     @datasetmethod(name='plugin')
-    def __call__(plugin=None, dataset=None, showpluginhelp=False, **kwargs):
+    @eval_results
+    def __call__(plugin=None, dataset=None, showpluginhelp=False, showplugininfo=False, **kwargs):
         plugins = _get_plugins()
         if not plugin:
             for plname, plinfo in sorted(plugins.items(), key=lambda x: x[0]):
@@ -112,10 +122,14 @@ class Plugin(Interface):
                     ui.message('{} [BROKEN] {}'.format(plname, exc_str(e)))
                     continue
                 if synopsis:
-                    ui.message('{} -- {}'.format(plname, synopsis))
+                    msg = '{} -- {}'.format(plname, synopsis)
                 else:
-                    ui.message('{} [no synopsis]'.format(plname))
+                    msg = '{} [no synopsis]'.format(plname)
+                if showplugininfo:
+                    msg = '{} ({})'.format(msg, plinfo['file'])
+                ui.message(msg)
             return
+        args = None
         if isinstance(plugin, (list, tuple)):
             args = plugin[1:]
             plugin = plugin[0]
@@ -134,43 +148,29 @@ class Plugin(Interface):
         plugin_call = _load_plugin(plugins[plugin]['file'])
 
         if showpluginhelp:
+            # we don't need special docs for the cmdline, standard python ones
+            # should be comprehensible enough
             ui.message(
                 plugin_call.__doc__
                 if plugin_call.__doc__
                 else 'This plugin has no documentation')
             return
 
-        return
-        # TODO
-        # - filter kwargs by function signature?
-        ds = require_dataset(dataset, check_installed=True, purpose='plugin')
-        # call the plugin, either with the argv array from the cmdline call
-        # or directly with the kwargs
-        if 'datalad_unparsed_args' in kwargs:
-            result = pluginmod._datalad_plugin_call(
-                ds, argv=kwargs['datalad_unparsed_args'], output=output)
-        else:
-            result = pluginmod._datalad_plugin_call(
-                ds, output=output, **kwargs)
-        return (pluginmod, result)
+        #
+        # argument preprocessing
+        #
+        # now check the plugin signature and filter out all unsupported args
+        plugin_args, _, _, _ = inspect.getargspec(plugin_call)
+        # always overwrite the dataset arg if one is needed
+        if 'dataset' in plugin_args:
+            kwargs['dataset'] = require_dataset(
+                dataset if dataset else curdir,
+                check_installed=True,
+                purpose='handover to plugin')
 
-    @staticmethod
-    def result_renderer_cmdline(res, args):
-        if res is None:
-            return
-        pluginmod, result = res
-        if args.showpluginhelp:
-            # the function that prints the help was returned as result
-            if not hasattr(pluginmod, '_datalad_get_plugin_help'):
-                lgr.error("plugin '{}' does not provide help".format(pluginmod))
-                return
-            replacement = []
-            help = pluginmod._datalad_get_plugin_help()
-            if isinstance(help, tuple):
-                help, replacement = help
-            if replacement:
-                for in_s, out_s in replacement:
-                    help = help.replace(in_s, out_s + ' ' * max(0, len(in_s) - len(out_s)))
-            print(help)
-            return
-        # TODO call exporter function (if any)
+        # call as a generator
+        for res in plugin_call(**{k: v for k, v in kwargs.items() if k in plugin_args}):
+            if dataset:
+                # enforce standard regardless of what plugin did
+                res['refds'] = dataset
+            yield res
