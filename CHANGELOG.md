@@ -11,7 +11,7 @@ We would recommend to consult log of the
 
 # 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
 
-I bet we will fix some bugs and make a world even a better place.
+New features, refactorings, and bug fixes.
 
 ### Major refactoring and deprecations
 
