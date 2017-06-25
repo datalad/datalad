@@ -1,3 +1,9 @@
+datalad (0.7.0-1) unstable; urgency=medium
+
+  * Fresh uptream release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 24 Jun 2017 18:05:51 -0700
+
 datalad (0.6.0-1) unstable; urgency=medium
 
   * Fresh upstream release
