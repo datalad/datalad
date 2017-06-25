@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#PLUGINSYNOPSIS: export a dataset to a tarball
 """
 
 """

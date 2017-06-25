@@ -18,6 +18,7 @@ import re
 from os.path import join as opj, basename, dirname
 from importlib import import_module
 
+from datalad import cfg
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.distribution.dataset import EnsureDataset
@@ -32,11 +33,22 @@ lgr = logging.getLogger('datalad.plugin')
 
 argspec = re.compile(r'^([a-zA-z][a-zA-Z0-9_]*)=(.*)$')
 
-def _get_plugin_names():
-    basepath = dirname(__file__)
-    return [basename(e)[:-3]
-            for e in glob(opj(basepath, '*.py'))
-            if not e.endswith('__init__.py')]
+
+def _get_plugins():
+    # search three locations:
+    # 1. datalad installation
+    # 2. system config
+    # 3. user config
+    # plugins in a latter location replace plugins in an earlier one
+    # this allows users/admins to replace datalad's own plugins with
+    # different ones
+    locations = (
+        dirname(__file__),
+        cfg.obtain('datalad.locations.system-plugins'),
+        cfg.obtain('datalad.locations.user-plugins'))
+    return {basename(e)[9:-3]: {'file': e}
+            for plugindir in locations
+            for e in glob(opj(plugindir, 'dlplugin_*.py'))}
 
 
 @build_doc
@@ -71,7 +83,21 @@ class Plugin(Interface):
     def __call__(plugin=None, dataset=None, showpluginhelp=False, **kwargs):
         if not plugin:
             from datalad.ui import ui
-            ui.message('\n'.join(_get_plugin_names()))
+            for plname, plinfo in sorted(_get_plugins().items(), key=lambda x: x[0]):
+                synopsis = None
+                try:
+                    with open(plinfo['file']) as plf:
+                        for line in plf:
+                            if line.startswith('#PLUGINSYNOPSIS:'):
+                                synopsis = line[17:].strip()
+                                break
+                except Exception as e:
+                    ui.message('{} [BROKEN] {}'.format(plname, exc_str(e)))
+                    continue
+                if synopsis:
+                    ui.message('{} -- {}'.format(plname, synopsis))
+                else:
+                    ui.message('{} [no synopsis]'.format(plname))
             return
         if isinstance(plugin, (list, tuple)):
             args = plugin[1:]
@@ -86,7 +112,6 @@ class Plugin(Interface):
                 argname, argval = parsed.groups()
                 kwargs[argname] = argval
         # TODO
-        # - search file plugin code files in a bunch of dirs (cfg)
         # - inject PYMVPA script2obj and use for loading
         # - filter kwargs by function signature?
 
