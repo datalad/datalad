@@ -1956,26 +1956,28 @@ def test_AnnexRepo_set_remote_url(path):
 @with_tempfile(mkdir=True)
 def test_wanted(path):
     ar = AnnexRepo(path, create=True)
-    eq_(ar.get_wanted(), None)
+    eq_(ar.get_preferred_content('wanted'), None)
     # test samples with increasing "trickiness"
     for v in ("standard",
               "include=*.nii.gz or include=*.nii",
               "exclude=archive/* and (include=*.dat or smallerthan=2b)"
               ):
-        ar.set_wanted(expr=v)
-        eq_(ar.get_wanted(), v)
+        ar.set_preferred_content('wanted', expr=v)
+        eq_(ar.get_preferred_content('wanted'), v)
     # give it some file so clone/checkout works without hiccups
-    create_tree(ar.path, {'1.dat': 'content'}); ar.add('1.dat'); ar.commit(msg="blah")
+    create_tree(ar.path, {'1.dat': 'content'})
+    ar.add('1.dat')
+    ar.commit(msg="blah")
     # make a clone and see if all cool there
     # intentionally clone as pure Git and do not annex init so to see if we
     # are ignoring crummy log msgs
     ar1_path = ar.path + '_1'
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
-    eq_(ar1.get_wanted(), None)
-    eq_(ar1.get_wanted('origin'), v)
-    ar1.set_wanted(expr='standard')
-    eq_(ar1.get_wanted(), 'standard')
+    eq_(ar1.get_preferred_content('wanted'), None)
+    eq_(ar1.get_preferred_content('wanted', 'origin'), v)
+    ar1.set_preferred_content('wanted', expr='standard')
+    eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
 @with_tempfile(mkdir=True)
@@ -1996,61 +1998,61 @@ def test_AnnexRepo_metadata(path):
     # fugue
     # doesn't do anything if there is nothing to do
     ar.set_metadata('up.dat')
-    eq_({}, ar.get_metadata(None))
-    eq_({}, ar.get_metadata(''))
-    eq_({}, ar.get_metadata([]))
-    eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
+    eq_([], list(ar.get_metadata(None)))
+    eq_([], list(ar.get_metadata('')))
+    eq_([], list(ar.get_metadata([])))
+    eq_({'up.dat': {}}, dict(ar.get_metadata('up.dat')))
     # basic invocation
-    eq_(None, ar.set_metadata(
+    eq_(1, len(list(ar.set_metadata(
         'up.dat',
         reset={'mike': 'awesome'},
         add={'tag': 'awesome'},
         remove={'tag': 'awesome'},  # cancels prev, just to use it
         init={'virgin': 'true'},
-        purge=['nothere']))
+        purge=['nothere']))))
     # no timestamps by default
-    md = ar.get_metadata('up.dat')
+    md = dict(ar.get_metadata('up.dat'))
     deq_({'up.dat': {
         'virgin': ['true'],
         'mike': ['awesome']}},
         md)
     # matching timestamp entries for all keys
-    md_ts = ar.get_metadata('up.dat', timestamps=True)
+    md_ts = dict(ar.get_metadata('up.dat', timestamps=True))
     for k in md['up.dat']:
         assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
     assert_in('lastchanged', md_ts['up.dat'])
     # recursive needs a flag
-    assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
-    ar.set_metadata('.', purge=['virgin'], recursive=True)
+    assert_raises(CommandError, list, ar.set_metadata('.', purge=['virgin']))
+    list(ar.set_metadata('.', purge=['virgin'], recursive=True))
     deq_({'up.dat': {
         'mike': ['awesome']}},
-        ar.get_metadata('up.dat'))
+        dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
-    ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
+    list(ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True))
     playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
         playfile: {
             'tag': ['one and= ']}}
-    deq_(target, ar.get_metadata('.'))
+    deq_(target, dict(ar.get_metadata('.')))
     # incremental work like a set
-    ar.set_metadata(playfile, add={'tag': 'one and= '})
-    deq_(target, ar.get_metadata('.'))
-    ar.set_metadata(playfile, add={'tag': ' two'})
+    list(ar.set_metadata(playfile, add={'tag': 'one and= '}))
+    deq_(target, dict(ar.get_metadata('.')))
+    list(ar.set_metadata(playfile, add={'tag': ' two'}))
     # returned values are sorted
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
     # init honor prior values
-    ar.set_metadata(playfile, init={'tag': 'three'})
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
-    ar.set_metadata(playfile, remove={'tag': ' two'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, init={'tag': 'three'}))
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
+    list(ar.set_metadata(playfile, remove={'tag': ' two'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # remove non-existing doesn't error and doesn't change anything
-    ar.set_metadata(playfile, remove={'ether': 'best'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, remove={'ether': 'best'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # add works without prior existence
-    ar.set_metadata(playfile, add={'novel': 'best'})
-    eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
+    list(ar.set_metadata(playfile, add={'novel': 'best'}))
+    eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
 
 @with_tempfile(mkdir=True)

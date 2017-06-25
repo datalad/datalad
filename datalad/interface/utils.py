@@ -531,7 +531,7 @@ eval_params = dict(
         evaluate to False or a ValueError exception is raised. If the given
         callable supports `**kwargs` it will additionally be passed the
         keyword arguments of the original API call.""",
-        constraints=EnsureCallable()),
+        constraints=EnsureCallable() | EnsureNone()),
     result_xfm=Parameter(
         doc="""if given, each to-be-returned result
         status dictionary is passed to this callable, and its return value
@@ -541,7 +541,7 @@ eval_params = dict(
         that need to provide the results in a particular format. Instead of
         a callable, a label for a pre-crafted result transformation can be
         given.""",
-        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable()),
+        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
         constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
@@ -828,31 +828,26 @@ def build_doc(cls, **kwargs):
 
     lgr.debug("Building doc for {}".format(cls))
 
-    # get docs for eval_results parameters:
-    eval_doc = ""
-    for p in eval_params:
-        eval_doc += '{}{}'.format(
-            eval_params[p].get_autodoc(
-                p,
-                default=getattr(cls, p, eval_defaults[p]),
-                has_default=True),
-            linesep)
-
     cls_doc = cls.__doc__
     if hasattr(cls, '_docs_'):
         # expand docs
         cls_doc = cls_doc.format(**cls._docs_)
 
+    call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
-        eval_doc += cls.__call__.__doc__
+        call_doc = cls.__call__.__doc__
 
     # build standard doc and insert eval_doc
     spec = getattr(cls, '_params_', dict())
+    # get docs for eval_results parameters:
+    spec.update(eval_params)
+
     update_docstring_with_parameters(
         cls.__call__, spec,
         prefix=alter_interface_docs_for_api(cls_doc),
-        suffix=alter_interface_docs_for_api(eval_doc)
+        suffix=alter_interface_docs_for_api(call_doc),
+        add_args=eval_defaults if not hasattr(cls, '_no_eval_results') else None
     )
 
     # return original

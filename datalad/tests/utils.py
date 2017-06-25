@@ -1189,3 +1189,33 @@ def get_mtimes_and_digests(target_path):
 #
 # Context Managers
 #
+
+
+#
+# Test tags
+#
+# To be explicit, and not "loose" some tests due to typos, decided to make
+# explicit decorators for common types
+
+from nose.plugins.attrib import attr
+
+
+def integration(f):
+    """Mark test as an "integration" test which generally is not needed to be run
+    
+    Generally tend to be slower
+    """
+    return attr('integration')(f)
+
+
+def slow(f):
+    """Mark test as a slow, although not necessarily integration or usecase test
+    """
+    return attr('slow')(f)
+
+
+def usecase(f):
+    """Mark test as a usecase user ran into and which (typically) caused bug report
+    to be filed/troubleshooted
+    """
+    return attr('usecase')(f)

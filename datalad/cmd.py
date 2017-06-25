@@ -403,7 +403,8 @@ class Runner(object):
                     if isinstance(cmd, string_types)
                     else cmd)
             try:
-                proc = subprocess.Popen(cmd, stdout=outputstream,
+                proc = subprocess.Popen(cmd,
+                                        stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
@@ -420,39 +421,46 @@ class Runner(object):
                 if self.protocol.records_ext_commands:
                     self.protocol.end_section(prot_id, prot_exc)
 
-            if log_online:
-                out = self._get_output_online(proc, log_stdout, log_stderr,
-                                              expect_stderr=expect_stderr,
-                                              expect_fail=expect_fail)
-            else:
-                out = proc.communicate()
-
-            if PY3:
-                # Decoding was delayed to this point
-                def decode_if_not_None(x):
-                    return "" if x is None else binary_type.decode(x)
-                # TODO: check if we can avoid PY3 specific here
-                out = tuple(map(decode_if_not_None, out))
-
-            status = proc.poll()
-
-            # needs to be done after we know status
-            if not log_online:
-                self._log_out(out[0])
-                if status not in [0, None]:
-                    self._log_err(out[1], expected=expect_fail)
+            try:
+                if log_online:
+                    out = self._get_output_online(proc, log_stdout, log_stderr,
+                                                  expect_stderr=expect_stderr,
+                                                  expect_fail=expect_fail)
                 else:
-                    # as directed
-                    self._log_err(out[1], expected=expect_stderr)
+                    out = proc.communicate()
 
-            if status not in [0, None]:
-                msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
-                    % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
-                (lgr.debug if expect_fail else lgr.error)(msg)
-                raise CommandError(str(cmd), msg, status, out[0], out[1])
-            else:
-                self.log("Finished running %r with status %s" % (cmd, status),
-                         level=8)
+                if PY3:
+                    # Decoding was delayed to this point
+                    def decode_if_not_None(x):
+                        return "" if x is None else binary_type.decode(x)
+                    # TODO: check if we can avoid PY3 specific here
+                    out = tuple(map(decode_if_not_None, out))
+
+                status = proc.poll()
+
+                # needs to be done after we know status
+                if not log_online:
+                    self._log_out(out[0])
+                    if status not in [0, None]:
+                        self._log_err(out[1], expected=expect_fail)
+                    else:
+                        # as directed
+                        self._log_err(out[1], expected=expect_stderr)
+
+                if status not in [0, None]:
+                    msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
+                        % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
+                    (lgr.debug if expect_fail else lgr.error)(msg)
+                    raise CommandError(str(cmd), msg, status, out[0], out[1])
+                else:
+                    self.log("Finished running %r with status %s" % (cmd, status),
+                             level=8)
+            finally:
+                # Those streams are for us to close if we asked for a PIPE
+                if outputstream == subprocess.PIPE:
+                    proc.stdout.close()
+                if errstream == subprocess.PIPE:
+                    proc.stderr.close()
 
         else:
             if self.protocol.records_ext_commands:

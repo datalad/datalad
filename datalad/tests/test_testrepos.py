@@ -10,6 +10,8 @@
 import git
 import os
 
+from datalad.tests.utils import integration
+from datalad.tests.utils import usecase
 from .utils import eq_, ok_, with_testrepos, with_tempfile
 from datalad.cmd import Runner
 from .utils import local_testrepo_flavors
@@ -50,6 +52,7 @@ def test_clone(src, tempdir):
     #ok_("get test-annex.dat" in output1)
 
 
+@usecase
 @with_tempfile(mkdir=True)
 def test_make_studyforrest_mockup(path):
     # smoke test

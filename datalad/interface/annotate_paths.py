@@ -201,7 +201,9 @@ def get_modified_subpaths(aps, refds, revision):
             # before we can `diff`
             recursive=False,
             return_type='generator',
-            result_renderer=None):
+            result_renderer=None,
+            # need to be able to yield the errors
+            on_failure='ignore'):
         if r['status'] in ('impossible', 'error'):
             # something unexpected, tell daddy
             yield r
@@ -610,7 +612,9 @@ class AnnotatePaths(Interface):
                     path_props['type'] = 'dataset'
                     path_props['registered_subds'] = True
 
-            if not lexists(path):
+            if not lexists(path) or \
+                    (path_props.get('type', None) == 'dataset' and
+                     path_props.get('state', None) == 'absent'):
                 # not there (yet)
                 message = unavailable_path_msg if unavailable_path_msg else None
                 if message and '%s' in message:
@@ -620,7 +624,7 @@ class AnnotatePaths(Interface):
                 # assign given status, but only if the props don't indicate a status
                 # already
                 res['status'] = path_props.get(
-                    'unavailable_path_status', unavailable_path_status)
+                    'status', unavailable_path_status)
                 reported_paths[path] = res
                 yield res
                 continue

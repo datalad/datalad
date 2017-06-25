@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import curdir
 from .base import Interface
+from datalad.interface.utils import build_doc
 from collections import OrderedDict
 from datalad.distribution.dataset import Dataset
 
@@ -26,6 +27,7 @@ lgr = getLogger('datalad.api.crawl_init')
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 
 
+@build_doc
 class CrawlInit(Interface):
     """Initialize crawling configuration
 
@@ -41,6 +43,8 @@ class CrawlInit(Interface):
         --template fcptable \
         dataset=Baltimore tarballs=True
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         template=Parameter(

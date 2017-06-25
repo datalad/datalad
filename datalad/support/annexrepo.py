@@ -787,8 +787,24 @@ class AnnexRepo(GitRepo, RepoInterface):
         # changed, we also need to override _flyweight_invalid and explicitly
         # pass allow_noninitialized=False!
 
+        def git_file_has_annex(p):
+            """Return True if `p` contains a .git file, that points to a git
+            dir with a subdir 'annex'"""
+            _git = opj(p, '.git')
+            if not os.path.isfile(_git):
+                return False
+            with open(_git, "r") as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    return exists(opj(p, line[8:], 'annex'))
+                else:
+                    lgr.debug("Invalid .git file: %s", _git)
+                    return False
+
         initialized_annex = GitRepo.is_valid_repo(path) and \
-            exists(opj(path, '.git', 'annex'))
+            (exists(opj(path, '.git', 'annex')) or
+             git_file_has_annex(path))
+
         if allow_noninitialized:
             try:
                 return initialized_annex \
@@ -2298,59 +2314,85 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: JSON
         return out.splitlines()
 
-    def get_wanted(self, remote=None):
-        """Get `wanted` for the remote.  "" corresponds to none set
+    def get_preferred_content(self, property, remote=None):
+        """Get preferred content configuration of a repository or remote
 
         Parameters
         ----------
+        property : {'wanted', 'required', 'group'}
+          Type of property to query
         remote : str, optional
-           If not specified (None), returns `wanted` for current repository
+          If not specified (None), returns the property for the local
+          repository.
+
+        Returns
+        -------
+        str
+          Either the setting is returned, or an empty string if there
+          is none.
+
+        Raises
+        ------
+        ValueError
+          If an unknown property label is given.
+
+        CommandError
+          If the annex call errors.
         """
+        if property not in ('wanted', 'required', 'group'):
+            raise ValueError(
+                'unknown preferred content property: {}'.format(property))
         return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.']
-        )
+            property,
+            annex_options=[remote or '.'])
 
-    def set_wanted(self, remote=None, expr=None):
-        """Set `wanted` `expr` for the remote."""
-        return self._run_simple_annex_command(
-            'wanted',
-            annex_options=[remote or '.', expr]
-        )
-
-    def get_group(self, remote=None):
-        """Get `group` for the remote.  "" corresponds to none set
+    def set_preferred_content(self, property, expr, remote=None):
+        """Set preferred content configuration of a repository or remote
 
         Parameters
         ----------
+        property : {'wanted', 'required', 'group'}
+          Type of property to query
+        expr : str
+          Any expression or label supported by git-annex for the
+          given property.
         remote : str, optional
-           If not specified (None), returns `group` for current repository
+          If not specified (None), sets the property for the local
+          repository.
+
+        Returns
+        -------
+        str
+          Raw git-annex output in response to the set command.
+
+        Raises
+        ------
+        ValueError
+          If an unknown property label is given.
+
+        CommandError
+          If the annex call errors.
         """
+        if property not in ('wanted', 'required', 'group'):
+            raise ValueError(
+                'unknown preferred content property: {}'.format(property))
         return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.']
-        )
+            property,
+            annex_options=[remote or '.', expr])
 
-    def set_group(self, remote=None, group=None):
-        """Set `group` of the remote."""
-        return self._run_simple_annex_command(
-            'group',
-            annex_options=[remote or '.', group]
-        )
-
-    def get_groupwanted(self, name=None):
+    def get_groupwanted(self, name):
         """Get `groupwanted` expression for a group `name`
 
         Parameters
         ----------
-        name : str, optional
+        name : str
            Name of the groupwanted group
         """
         return self._run_simple_annex_command(
             'groupwanted', annex_options=[name]
         )
 
-    def set_groupwanted(self, name=None, expr=None):
+    def set_groupwanted(self, name, expr):
         """Set `expr` for the `name` groupwanted"""
         return self._run_simple_annex_command(
             'groupwanted', annex_options=[name, expr]
@@ -2817,23 +2859,24 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        dict
-          One item per file (could be more items than input arguments
-          when directories are given). Keys are filenames, values are
-          dictionaries with metadata key/value pairs. Note that annex
+        generator
+          One tuple per file (could be more items than input arguments
+          when directories are given). First tuple item is the filename,
+          second item is a dictionary with metadata key/value pairs. Note that annex
           metadata tags are stored under the key 'tag', which is a
           regular metadata item that can be manipulated like any other.
         """
         if not files:
-            return {}
+            return
         files = assure_list(files)
         args = ['--json']
         args.extend(files)
-        return {res['file']:
+        for res in self._run_annex_command_json('metadata', args):
+            yield (
+                res['file'],
                 res['fields'] if timestamps else \
                 {k: v for k, v in res['fields'].items()
-                 if not k.endswith('lastchanged')}
-                for res in self._run_annex_command_json('metadata', args)}
+                 if not k.endswith('lastchanged')})
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,
@@ -2871,11 +2914,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        None
+        generator
+          JSON obj per modified file
         """
 
         def _genspec(expr, d):
-            return [expr.format(k, v) for k, v in d.items()]
+            return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
 
         args = []
         spec = []
@@ -2899,10 +2943,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         # append actual file path arguments
         args.extend(assure_list(files))
 
-        # XXX do we need the return values for anything?
-        self._run_annex_command_json(
-            'metadata',
-            args)
+        for jsn in self._run_annex_command_json(
+                'metadata',
+                args):
+            yield jsn
 
 
 # TODO: Why was this commented out?
@@ -3111,6 +3155,7 @@ class BatchedAnnex(object):
             process = self._process
             lgr.debug("Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
+            process.stdout.close()
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)

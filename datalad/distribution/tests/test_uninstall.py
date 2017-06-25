@@ -36,6 +36,9 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import use_cassette
+from datalad.tests.utils import usecase
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
@@ -418,3 +421,15 @@ def test_remove_nowhining(path):
     subds_path = _path_(path, 'subds')
     install(subds_path, source=path)
     remove(subds_path)  # should remove just fine
+
+
+@usecase
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+@use_cassette('test_remove_recursive_2')
+def test_remove_recursive_2(tdir):
+    # fails in some cases https://github.com/datalad/datalad/issues/1573
+    with chpwd(tdir):
+        install('///labs')
+        install('labs/tarr/face_place')
+        remove('labs', recursive=True)

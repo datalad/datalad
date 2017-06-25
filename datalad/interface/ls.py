@@ -26,6 +26,7 @@ from six.moves.urllib.error import HTTPError
 from ..cmdline.helpers import get_repo_instance
 from ..utils import auto_repr
 from .base import Interface
+from datalad.interface.utils import build_doc
 from ..ui import ui
 from ..utils import swallow_logs
 from ..consts import METADATA_DIR
@@ -47,6 +48,7 @@ from logging import getLogger
 lgr = getLogger('datalad.api.ls')
 
 
+@build_doc
 class Ls(Interface):
     """List summary information about URLs and dataset(s)
 
@@ -58,6 +60,8 @@ class Ls(Interface):
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
       $ datalad ls                               # to list current dataset
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     # TODO: during big RF refactor this one away since it must not be instance's
     # attribute.  For now introduced to make `datalad ls` be relatively usable

@@ -212,7 +212,7 @@ def test_newthings_coming_down(originpath, destpath):
     # check that a new tag comes down
     origin.tag('first!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
-    eq_(ds.repo.repo.tags[0].name, 'first!')
+    eq_(ds.repo.get_tags(output='name')[0], 'first!')
 
     # and now we destroy the remote annex
     origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
@@ -232,7 +232,7 @@ def test_newthings_coming_down(originpath, destpath):
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
-    eq_(ds.repo.repo.tags[-1].name, 'second!')
+    eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
 @with_tempfile(mkdir=True)

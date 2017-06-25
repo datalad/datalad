@@ -316,11 +316,18 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            for i in range(10):
+            # on windows boxes there is evidence for a latency of
+            # more than a second until a file is considered no
+            # longer "in-use"
+            # WindowsError is not known on Linux, and if IOError
+            # or any other exception is thrown then if except
+            # statement has WindowsError in it -- NameError
+            exceptions = (OSError, WindowsError) if on_windows else OSError
+            for i in range(50):
                 try:
                     os.unlink(f)
-                except OSError as e:
-                    if i < 9:
+                except exceptions:
+                    if i < 49:
                         sleep(0.1)
                         continue
                     else:
@@ -1199,6 +1206,20 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
                         exc_str(exc), trial, t)
             sleep(t)
+
+
+def slash_join(base, extension):
+    """Join two strings with a '/', avoiding duplicate slashes
+
+    If any of the strings is None the other is returned as is.
+    """
+    if extension is None:
+        return base
+    if base is None:
+        return extension
+    return '/'.join(
+        (base.rstrip('/'),
+         extension.lstrip('/')))
 
 
 lgr.log(5, "Done importing datalad.utils")

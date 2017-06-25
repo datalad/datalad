@@ -58,8 +58,9 @@ def test_siblings(origin, repo_path):
         on_failure='ignore',
         result_renderer=None)
     assert_status('error', res)
-    assert_in('unknown sibling(s) specified as publication dependency',
-              res[0]['message'])
+    eq_(res[0]['message'],
+        ('unknown sibling(s) specified as publication dependency: %s',
+         set(('r1', 'r2'))))
     # prior config was not changed by failed call above
     eq_(source.config.get(depvar, None), 'stupid')
 
@@ -155,7 +156,9 @@ def test_siblings(origin, repo_path):
             url=httpurl1 + "/%NAME",
             pushurl=sshurl + "/%NAME",
             recursive=True,
-            result_renderer=None):
+            # we need to disable annex queries, as it will try to access
+            # the fake URL configured above
+            get_annex_info=False):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
@@ -174,6 +177,9 @@ def test_siblings(origin, repo_path):
             url=httpurl1,
             pushurl=sshurl,
             recursive=True,
+            # we need to disable annex queries, as it will try to access
+            # the fake URL configured above
+            get_annex_info=False,
             result_renderer=None):
         repo = GitRepo(r['path'], create=False)
         assert_in("test-remote-2", repo.get_remotes())

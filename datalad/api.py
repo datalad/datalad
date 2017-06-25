@@ -72,27 +72,9 @@ def _generate_func_api():
             # turn the interface spec into an instance
             mod = import_module(intfspec[0], package='datalad')
             intf = getattr(mod, intfspec[1])
-
-            # TODO: BEGIN to be removed, when @build_doc is applied everywhere
-            spec = getattr(intf, '_params_', dict())
             api_name = get_api_name(intfspec)
-            if api_name in (
-                    'add-archive-content', 'add-sibling', 'aggregate-metadata',
-                    'crawl-init', 'crawl', 'create-sibling',
-                    'create-sibling-github', 'create-test-dataset',
-                    'download-url', 'export', 'ls', 'move', 'publish',
-                    'search', 'sshrun', 'test'):
-                # FIXME no longer using an interface class instance
-                # convert the parameter SPEC into a docstring for the function
-                update_docstring_with_parameters(
-                    intf.__call__, spec,
-                    prefix=alter_interface_docs_for_api(
-                        intf.__doc__),
-                    suffix=alter_interface_docs_for_api(
-                        intf.__call__.__doc__)
-                )
-                # TODO: END to be removed, when @build_doc is applied everywhere
             globals()[api_name] = intf.__call__
+
 
 # Invoke above helper
 _generate_func_api()

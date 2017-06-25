@@ -57,6 +57,9 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import put_file_under_git
+from datalad.tests.utils import integration
+from datalad.tests.utils import slow
+from datalad.tests.utils import usecase
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -374,6 +377,7 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
+@slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
@@ -417,6 +421,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+@usecase  # 39.3074s
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
@@ -474,6 +479,7 @@ def test_install_known_subdataset(src, path):
         ok_(subds.is_installed())
 
 
+@slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_implicit_install(src, dst):
@@ -730,6 +736,7 @@ def test_install_source_relpath(src, dest):
         ds2 = install(dest, source=src_)
 
 
+@integration  # 41.2043s
 @with_tempfile
 @with_tempfile
 @with_tempfile

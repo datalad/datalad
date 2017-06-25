@@ -227,17 +227,10 @@ class Remove(Interface):
                         subds_relpath = relpath(ap['path'], start=ap['parentds'])
                         # remove submodule reference
                         parentds = Dataset(ap['parentds'])
-                        submodule = [sm for sm in parentds.repo.repo.submodules
-                                     if sm.path == subds_relpath]
-                        # there can only be one!
-                        # TODO have a test for #1526
-                        assert len(submodule) == 1, \
-                            "Found multiple subdatasets with registered path {}:" \
-                            "{}{}{}There should be only one." \
-                            "".format(subds_relpath, os.linesep,
-                                      submodule, os.linesep)
-                        submodule = submodule[0]
-                        submodule.remove()
+                        # play safe, will fail on dirty
+                        parentds.repo.deinit_submodule(ap['path'])
+                        # remove now empty submodule link
+                        parentds.repo.remove(ap['path'])
                         # make a record that we removed this already, should it be
                         # revisited via another path argument, because do not reannotate
                         # the paths after every removal

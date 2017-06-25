@@ -17,6 +17,7 @@ from os.path import curdir
 from os.path import sep as dirsep
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.interface.utils import filter_unmodified
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
@@ -65,7 +66,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # `refspec`
 
     def _publish_data():
-        remote_wanted = ds.repo.get_wanted(remote)
+        remote_wanted = ds.repo.get_preferred_content('wanted', remote)
         if (paths or annex_copy_options or remote_wanted) and \
               isinstance(ds.repo, AnnexRepo) and not \
               ds.config.getbool(
@@ -179,7 +180,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     knew_remote_uuid = None
     if isinstance(ds.repo, AnnexRepo):
         try:
-            ds.repo.get_wanted(remote)  # could be just checking config.remote.uuid
+            ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
             knew_remote_uuid = True
         except CommandError:
             knew_remote_uuid = False
@@ -279,6 +280,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     return published, skipped
 
 
+@build_doc
 class Publish(Interface):
     """Publish a dataset to a known :term:`sibling`.
 
@@ -307,6 +309,8 @@ class Publish(Interface):
       Git repositories, or git-annex special remotes (if their support data
       upload).
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
     #      - it is used, when no destination is given

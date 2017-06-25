@@ -23,6 +23,7 @@ from six import iteritems
 from six import reraise
 from six import PY3
 from datalad.interface.base import Interface
+from datalad.interface.utils import build_doc
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
@@ -41,6 +42,7 @@ from datalad.support import ansi_colors
 from datalad.ui import ui
 
 
+@build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
 
@@ -52,6 +54,8 @@ class Search(Interface):
         fields which were requested by `report` option
 
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
