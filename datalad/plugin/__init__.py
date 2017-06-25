@@ -38,13 +38,6 @@ argspec = re.compile(r'^([a-zA-z][a-zA-Z0-9_]*)=(.*)$')
 
 
 def _get_plugins():
-    # search three locations:
-    # 1. datalad installation
-    # 2. system config
-    # 3. user config
-    # plugins in a latter location replace plugins in an earlier one
-    # this allows users/admins to replace datalad's own plugins with
-    # different ones
     locations = (
         dirname(__file__),
         cfg.obtain('datalad.locations.system-plugins'),
@@ -73,34 +66,135 @@ def _load_plugin(filepath):
 
 @build_doc
 class Plugin(Interface):
-    """Export a dataset to another representation
-    """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
+    """Generic plugin interface
 
+    Using this command, arbitrary DataLad plugins can be executed. Plugins in
+    three different locations are available
+
+    1. official plugins that are part of the local DataLad installation
+    2. system-wide plugins, location configuration::
+
+         datalad.locations.system-plugins
+
+    3. user-supplied plugins, location configuration::
+
+         datalad.locations.user-plugins
+
+
+    Identically named plugins in latter location replace those in locations
+    searched before.
+
+
+    *Using plugins*
+
+    A list of all available plugins can be obtained by running this command
+    without arguments::
+
+      datalad plugin
+
+    To run a specific plugin, provide the plugin name as an argument::
+
+      datalad plugin export_tarball
+
+    A plugin may come with its own documentation which can be displayed upon
+    request::
+
+      datalad plugin export_tarball -H
+
+    If a plugin supports (optional) arguments, they can be passed to the plugin
+    as key=value pairs with the name and the respective value of an argument,
+    e.g.::
+
+      datalad plugin export_tarball output=myfile
+
+    Any number of arguments can be given. Only arguments with names supported
+    by the respective plugin are passed to the plugin.
+
+    Like in most commands, a dedicated ``--dataset`` option is supported that
+    can be used to identify a specific dataset to be passed to a plugin's
+    ``dataset`` argument.
+
+
+    *Writing plugins*
+
+    Plugins are written in Python. In order for DataLad to be able to find
+    them, plugins need to be placed in one of the supported locations described
+    above. Plugin file names have to match the pattern::
+
+      dlplugin_<pluginname>.py
+
+    Plugin source files must define a function named::
+
+      datalad_plugin
+
+    This function is executed as the plugin. It can have any number of
+    arguments (positional, or keyword arguments with defaults), or none at
+    all. All arguments, except ``dataset`` must expect any value to
+    be a string.
+
+    The plugin function must be self-contained, i.e. all needed imports
+    of definitions must be done within the body of the function.
+
+    The doc string of the plugin function is displayed when the plugin
+    documentation is requested. A plugin file should contain a line
+    starting with the string '#PLUGINSYNOPSIS:' anywhere in its source code.
+    The text on this line (after the prefix) is displayed as the plugin
+    synopsis in the plugin overview list.
+
+    Plugin functions must either return None or yield their results as
+    generator. Results are DataLad status dictionaries. There are no
+    constraints on the number and nature of result properties. However,
+    conventions exists and must be followed for compatibility with the
+    result evaluation and rendering performed by DataLad.
+
+    The following keys must exist:
+
+    "status"
+        {'ok', 'notneeded', 'impossible', 'error'}
+
+    "action"
+        label for the action performed by the plugin. In many cases this
+        could be the plugin's name.
+
+    The following keys should exists if possible:
+
+    "path"
+        absolute path to a result on the file system
+
+    "type"
+        label indicating the nature of a result (e.g. 'file', 'dataset',
+        'directory', etc.)
+
+    "message"
+        string message annotating the result, particularly important for
+        non-ok results. This can be a tuple with 'logging'-style string
+        expansion.
+
+    """
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to export. If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory.""",
+            doc="""specify the dataset for the plugin to operate on
+            If no dataset is given, but a plugin take a dataset as an argument,
+            an attempt is made to identify the dataset based on the current
+            working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
         plugin=Parameter(
             args=("plugin",),
             nargs='*',
             metavar='PLUGINSPEC',
-            doc="""label of the type or format the dataset shall be exported
-            to."""),
+            doc="""plugin name plus an optional list of `key=value` pairs with
+            arguments for the plugin call"""),
         showpluginhelp=Parameter(
             args=('-H', '--show-plugin-help',),
             dest='showpluginhelp',
             action='store_true',
-            doc="""show help for a specific plugin"""),
+            doc="""show help for a particular"""),
         showplugininfo=Parameter(
             args=('--show-plugin-info',),
             dest='showplugininfo',
             action='store_true',
-            doc="""show additional information in plugin summary (e.g. plugin file
+            doc="""show additional information in plugin overview (e.g. plugin file
             location"""),
     )
 
@@ -173,4 +267,7 @@ class Plugin(Interface):
             if dataset:
                 # enforce standard regardless of what plugin did
                 res['refds'] = dataset
+                if 'logger' not in res:
+                    # make sure we have a logger
+                    res['logger'] = lgr
             yield res
