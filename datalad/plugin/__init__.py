@@ -204,7 +204,9 @@ class Plugin(Interface):
     def __call__(plugin=None, dataset=None, showpluginhelp=False, showplugininfo=False, **kwargs):
         plugins = _get_plugins()
         if not plugin:
+            max_name_len = max(len(k) for k in plugins.keys())
             for plname, plinfo in sorted(plugins.items(), key=lambda x: x[0]):
+                spacer = ' ' * (max_name_len - len(plname))
                 synopsis = None
                 try:
                     with open(plinfo['file']) as plf:
@@ -213,12 +215,14 @@ class Plugin(Interface):
                                 synopsis = line[17:].strip()
                                 break
                 except Exception as e:
-                    ui.message('{} [BROKEN] {}'.format(plname, exc_str(e)))
+                    ui.message('{}{} [BROKEN] {}'.format(
+                        plname, spacer, exc_str(e)))
                     continue
                 if synopsis:
-                    msg = '{} -- {}'.format(plname, synopsis)
+                    msg = '{}{} - {}'.format(
+                        plname, spacer, synopsis)
                 else:
-                    msg = '{} [no synopsis]'.format(plname)
+                    msg = '{}{} [no synopsis]'.format(plname, spacer)
                 if showplugininfo:
                     msg = '{} ({})'.format(msg, plinfo['file'])
                 ui.message(msg)
