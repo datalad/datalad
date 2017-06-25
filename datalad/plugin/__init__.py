@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from glob import glob
+import re
 from os.path import join as opj, basename, dirname
 from importlib import import_module
 
@@ -29,6 +30,7 @@ from datalad.interface.utils import build_doc
 
 lgr = logging.getLogger('datalad.plugin')
 
+argspec = re.compile(r'^([a-zA-z][a-zA-Z0-9_]*)=(.*)$')
 
 def _get_plugin_names():
     basepath = dirname(__file__)
@@ -53,7 +55,8 @@ class Plugin(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         plugin=Parameter(
             args=("plugin",),
-            nargs='?',
+            nargs='*',
+            metavar=('NAME', 'ARG=VAL'),
             doc="""label of the type or format the dataset shall be exported
             to."""),
         showpluginhelp=Parameter(
@@ -66,10 +69,27 @@ class Plugin(Interface):
     @staticmethod
     @datasetmethod(name='plugin')
     def __call__(plugin=None, dataset=None, showpluginhelp=False, **kwargs):
-        if plugin is None:
+        if not plugin:
             from datalad.ui import ui
             ui.message('\n'.join(_get_plugin_names()))
             return
+        if isinstance(plugin, (list, tuple)):
+            args = plugin[1:]
+            plugin = plugin[0]
+        if args:
+            # we got some arguments in the plugin spec, parse them and add to
+            # kwargs
+            for arg in args:
+                parsed = argspec.match(arg)
+                if parsed is None:
+                    raise ValueError("invalid plugin argument: '{}'".format(arg))
+                argname, argval = parsed.groups()
+                kwargs[argname] = argval
+        # TODO
+        # - search file plugin code files in a bunch of dirs (cfg)
+        # - inject PYMVPA script2obj and use for loading
+        # - filter kwargs by function signature?
+
         # get a handle on the relevant plugin module
         import datalad.plugin as plugin_mod
         try:
