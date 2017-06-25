@@ -5,35 +5,38 @@
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                Change Log
 
-This is a very high level and scarce summary of the changes between releases.
-We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
-for more details ATM.
+This is a high level and scarce summary of the changes between releases.
+We would recommend to consult log of the 
+[DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-# 0.6.1 (??? ??, 2017) -- will be better than ever
+# 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
 
 I bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- `add-sibling` has been fully replaced by the `siblings` command
-- `create-sibling`, and `unlock` have been rewritting to support the
+- [add-sibling] has been fully replaced by the [siblings] command
+- [create-sibling], and [unlock] have been re-written to support the
   same common API as most other commands
 
 ## Enhancements and new features
 
-- `siblings` can now be used to query and configure a local repository by
+- [siblings] can now be used to query and configure a local repository by
   using the sibling name ``here``
-- `siblings` can now query and set annex preferred content configuration. This
+- [siblings] can now query and set annex preferred content configuration. This
   includes ``wanted`` (as previously supported in other commands), and now
   also ``required``
-- documentation for all commands is now built in a uniform fashion, leading to
-  more...guess what...uniform documentation
+- New [metadata] command to interface with datasets/files [meta-data] 
+- Documentation for all commands is now built in a uniform fashion
 - Significant parts of the documentation of been updated
+- Instantiate GitPython's Repo instances lazily
 
 ## Fixes
 
 - API documentation is now rendered properly as HTML, and is easier to browse by
   having more compact pages
+- Closed files left open on various occasions (Popen PIPEs, etc)
+- Restored basic (consumer mode of operation) compatibility with Windows OS 
 
 
 ## 0.6.0 (Jun 14, 2017) -- German perfectionism
@@ -359,6 +362,7 @@ publishing
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
+[metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
