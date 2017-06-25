@@ -268,10 +268,9 @@ class Plugin(Interface):
 
         # call as a generator
         for res in plugin_call(**{k: v for k, v in kwargs.items() if k in plugin_args}):
-            if dataset:
-                # enforce standard regardless of what plugin did
-                res['refds'] = dataset
-                if 'logger' not in res:
-                    # make sure we have a logger
-                    res['logger'] = lgr
+            # enforce standard regardless of what plugin did
+            res['refds'] = dataset
+            if 'logger' not in res:
+                # make sure we have a logger
+                res['logger'] = lgr
             yield res
