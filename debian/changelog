@@ -1,4 +1,12 @@
-datalad (0.7.0-1) unstable; urgency=medium
+datalad (0.7.0-2) neurodebian; urgency=medium
+
+  * Fixup to version.py and Changelog in rushed up "release"
+  * debian/changelog -- adjusted with neurodebian release where was not
+    uploaded to Debian proper due to outdated git-annex (ref #865889)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 25 Jun 2017 09:07:59 -0700
+
+datalad (0.7.0-1) neurodebian; urgency=medium
 
   * Fresh uptream release
 
