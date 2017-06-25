@@ -26,7 +26,7 @@ lgr = logging.getLogger('datalad.plugin.tarball')
 
 
 # PLUGIN API
-def _datalad_plugin_call(dataset, output, argv=None):
+def datalad_plugin(dataset, output, argv=None):
     if argv:
         lgr.warn("tarball exporter ignores any additional options '{}'".format(
             argv))

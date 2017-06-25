@@ -16,7 +16,6 @@ import logging
 from glob import glob
 import re
 from os.path import join as opj, basename, dirname
-from importlib import import_module
 
 from datalad import cfg
 from datalad.support.param import Parameter
@@ -28,6 +27,7 @@ from datalad.dochelpers import exc_str
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import build_doc
+from datalad.ui import ui
 
 lgr = logging.getLogger('datalad.plugin')
 
@@ -49,6 +49,23 @@ def _get_plugins():
     return {basename(e)[9:-3]: {'file': e}
             for plugindir in locations
             for e in glob(opj(plugindir, 'dlplugin_*.py'))}
+
+
+def _load_plugin(filepath):
+    locals = {}
+    globals = {}
+    exec(compile(open(filepath, "rb").read(), filepath, 'exec'), globals, locals)
+    if not len(locals):
+        raise ValueError(
+            "loading plugin '%s' did not create at least one object" % filepath)
+    elif len(locals) > 1 and 'datalad_plugin' not in locals:
+        raise ValueError(
+            "loading plugin '%s' did not yield a 'datalad_plugin' symbol, found: %s",
+            filepath, locals.keys())
+    if len(locals) == 1:
+        return locals.values()[0]
+    else:
+        return locals['datalad_plugin']
 
 
 @build_doc
@@ -81,9 +98,9 @@ class Plugin(Interface):
     @staticmethod
     @datasetmethod(name='plugin')
     def __call__(plugin=None, dataset=None, showpluginhelp=False, **kwargs):
+        plugins = _get_plugins()
         if not plugin:
-            from datalad.ui import ui
-            for plname, plinfo in sorted(_get_plugins().items(), key=lambda x: x[0]):
+            for plname, plinfo in sorted(plugins.items(), key=lambda x: x[0]):
                 synopsis = None
                 try:
                     with open(plinfo['file']) as plf:
@@ -102,6 +119,9 @@ class Plugin(Interface):
         if isinstance(plugin, (list, tuple)):
             args = plugin[1:]
             plugin = plugin[0]
+        if plugin not in plugins:
+            raise ValueError("unknown plugin '{}', available: {}".format(
+                plugin, ','.join(plugins.keys())))
         if args:
             # we got some arguments in the plugin spec, parse them and add to
             # kwargs
@@ -111,21 +131,18 @@ class Plugin(Interface):
                     raise ValueError("invalid plugin argument: '{}'".format(arg))
                 argname, argval = parsed.groups()
                 kwargs[argname] = argval
-        # TODO
-        # - inject PYMVPA script2obj and use for loading
-        # - filter kwargs by function signature?
+        plugin_call = _load_plugin(plugins[plugin]['file'])
 
-        # get a handle on the relevant plugin module
-        import datalad.plugin as plugin_mod
-        try:
-            pluginmod = import_module('.%s' % (plugin,), package=plugin_mod.__package__)
-        except ImportError as e:
-            raise ValueError("cannot load plugin '{}': {}".format(
-                plugin, exc_str(e)))
         if showpluginhelp:
-            # no result, but return the module to make the renderer do the rest
-            return (pluginmod, None)
+            ui.message(
+                plugin_call.__doc__
+                if plugin_call.__doc__
+                else 'This plugin has no documentation')
+            return
 
+        return
+        # TODO
+        # - filter kwargs by function signature?
         ds = require_dataset(dataset, check_installed=True, purpose='plugin')
         # call the plugin, either with the argv array from the cmdline call
         # or directly with the kwargs
