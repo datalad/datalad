@@ -24,6 +24,8 @@ from datalad.tests.utils import chpwd
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 
 broken_plugin = """garbage"""
@@ -132,7 +134,6 @@ def test_plugin_call(path, dspath):
             assert_raises(ValueError, plugin, ['dummy', 'noval=one'])
             # create a dataset here, fixes the error
             ds = create()
-            print(ds.path, dspath)
             res = list(plugin(['dummy', 'noval=one']))[0]
             # gives dataset instance
             eq_(ds, res['args']['dataset'])
@@ -146,3 +147,24 @@ def test_plugin_call(path, dspath):
         # but if both are given, the proper args takes precedence
         assert_raises(ValueError, plugin, ['dummy', 'dataset={}'.format(dspath), 'noval=one'],
                       dataset='rubbish')
+
+
+@with_tempfile(mkdir=True)
+def test_wtf(path):
+    # smoke test for now
+    with swallow_outputs() as cmo:
+        plugin(['wtf'], dataset=path)
+        assert_not_in('Dataset information', cmo.out)
+        assert_in('Configuration', cmo.out)
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            plugin(['wtf'])
+            assert_not_in('Dataset information', cmo.out)
+            assert_in('Configuration', cmo.out)
+    # now with a dataset
+    ds = create(path)
+    with swallow_outputs() as cmo:
+        plugin(['wtf'], dataset=ds.path)
+        assert_in('Configuration', cmo.out)
+        assert_in('Dataset information', cmo.out)
+        assert_in('path: {}'.format(ds.path), cmo.out)

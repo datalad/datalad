@@ -284,7 +284,7 @@ class Plugin(Interface):
         # argument preprocessing
         #
         # check the plugin signature and filter out all unsupported args
-        plugin_args, _, _, _ = inspect.getargspec(plugin_call)
+        plugin_args, _, _, arg_defaults = inspect.getargspec(plugin_call)
         supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
         excluded_args = user_supplied_args.difference(supported_args.keys())
         if excluded_args:
@@ -296,13 +296,21 @@ class Plugin(Interface):
                 # use dedicated arg if given, also anything the came with the plugin args
                 # or curdir as the last resort
                 dataset if dataset else kwargs.get('dataset', curdir),
-                check_installed=True,
+                # note 'dataset' arg is always first, if we have defaults for all args
+                # we have a default for 'dataset' to -> it is optional
+                check_installed=len(arg_defaults) != len(plugin_args),
                 purpose='handover to plugin')
 
         # call as a generator
         for res in plugin_call(**supported_args):
-            # enforce standard regardless of what plugin did
-            res['refds'] = dataset
+            if not res:
+                continue
+            if dataset:
+                # enforce standard regardless of what plugin did
+                res['refds'] = dataset
+            elif 'refds' in res:
+                # no base dataset, results must not have them either
+                del res['refds']
             if 'logger' not in res:
                 # make sure we have a logger
                 res['logger'] = lgr
