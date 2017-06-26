@@ -60,7 +60,8 @@ see the DataLad documentation at: http://docs.datalad.org
 
     # unlock, file could be annexed
     # TODO yield
-    dataset.unlock(filename)
+    if lexists(filename):
+        dataset.unlock(filename)
 
     with open(filename, 'a' if existing == 'append' else 'w') as fp:
         fp.write(default_content)

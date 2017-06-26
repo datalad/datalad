@@ -27,6 +27,7 @@ from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
+from datalad.interface.common_opts import with_plugin_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureKeyChoice
@@ -112,12 +113,14 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=location_description,
+        # TODO could move into cfg_annex plugin
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
         save=nosave_opt,
+        # TODO could move into cfg_annex plugin
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -125,6 +128,7 @@ class Create(Interface):
             version. This should be left untouched, unless you know what
             you are doing""",
             constraints=EnsureDType(int) | EnsureNone()),
+        # TODO could move into cfg_annex plugin
         annex_backend=Parameter(
             args=("--annex-backend",),
             constraints=EnsureStr() | EnsureNone(),
@@ -135,6 +139,7 @@ class Create(Interface):
             of datasets across platforms (especially those with limited
             path lengths)""",
             nargs=1),
+        # TODO could move into cfg_metadata plugin
         native_metadata_type=Parameter(
             args=('--native-metadata-type',),
             metavar='LABEL',
@@ -143,7 +148,9 @@ class Create(Interface):
             doc="""Metadata type label. Must match the name of the respective
             parser implementation in Datalad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
+        # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
+        with_plugin=with_plugin_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
@@ -164,6 +171,7 @@ class Create(Interface):
             native_metadata_type=None,
             shared_access=None,
             git_opts=None,
+            with_plugin=None,
             annex_opts=None,
             annex_init_opts=None):
 
@@ -332,6 +340,17 @@ class Create(Interface):
 
         path.update({'status': 'ok'})
         yield path
+
+        for pluginspec in with_plugin if with_plugin else []:
+            for r in tbds.plugin(
+                    pluginspec,
+                    return_type='generator'):
+                # ensure proper reporting
+                if dataset:
+                    r['refds'] = dataset
+                else:
+                    r.pop('refds', None)
+                yield r
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):

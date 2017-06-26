@@ -215,3 +215,16 @@ missing_sibling_opt = Parameter(
     By default it would fail the run ('fail' setting).  With 'inherit' a
     'create-sibling' with '--inherit-settings' will be used to create sibling
     on the remote. With 'skip' - it simply will be skipped.""")
+
+with_plugin_opt = Parameter(
+    args=('--with-plugin',),
+    nargs='*',
+    action='append',
+    metavar='PLUGINSPEC',
+    doc="""DataLad plugin to run in addition. PLUGINSPEC is a list
+    comprised of a plugin name plus optional `key=value` pairs with arguments
+    for the plugin call (see `plugin` command documentation for details).
+    [PY: PLUGINSPECs must be wrapped in list where each item configures
+    one plugin call. Plugins are called in the order defined by this list.
+    PY][CMD: This option can be given more than once to run multiple plugins
+    in the order in which they are given. CMD]""")
