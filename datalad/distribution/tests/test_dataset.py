@@ -207,42 +207,6 @@ def test_subdatasets(path):
     # TODO actual submodule checkout is still there
 
 
-@with_tree(tree={'test.txt': 'whatever'})
-def test_get_containing_subdataset(path):
-
-    ds = create(path, force=True)
-    ds.add(path='test.txt')
-    ds.save("Initial commit")
-    subds = ds.create("sub")
-    subsubds = subds.create("subsub")
-
-    eq_(ds.get_containing_subdataset(opj("sub", "subsub", "some")).path, subsubds.path)
-    # the top of a subdataset belongs to the subdataset
-    eq_(ds.get_containing_subdataset(opj("sub", "subsub")).path, subsubds.path)
-    eq_(get_dataset_root(opj(ds.path, "sub", "subsub")), subsubds.path)
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-    eq_(ds.get_containing_subdataset("sub").path, subds.path)
-    eq_(ds.get_containing_subdataset("some").path, ds.path)
-    # make sure the subds is found, even when it is not present, but still
-    # known
-    shutil.rmtree(subds.path)
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-    eq_(ds.get_containing_subdataset("sub").path, subds.path)
-    # # but now GitRepo disagrees...
-    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
-    # and this stays, even if we give the mount point directory back
-    os.makedirs(subds.path)
-    eq_(get_dataset_root(opj(ds.path, "sub")), ds.path)
-
-    outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
-                  outside_path)
-    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
-                  opj(os.curdir, outside_path))
-    assert_raises(PathOutsideRepositoryError, ds.get_containing_subdataset,
-                  abspath(outside_path))
-
-
 @with_tempfile(mkdir=True)
 def test_require_dataset(path):
     with chpwd(path):
