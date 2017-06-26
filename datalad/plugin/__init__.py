@@ -51,18 +51,20 @@ def _get_plugins():
 def _load_plugin(filepath):
     locals = {}
     globals = {}
-    exec(compile(open(filepath, "rb").read(), filepath, 'exec'), globals, locals)
-    if not len(locals):
-        raise ValueError(
-            "loading plugin '%s' did not create at least one object" % filepath)
-    elif len(locals) > 1 and 'datalad_plugin' not in locals:
+    try:
+        exec(compile(open(filepath, "rb").read(),
+                     filepath, 'exec'),
+             globals,
+             locals)
+    except Exception as e:
+        # any exception means full stop
+        raise ValueError('plugin at {} is broken: {}'.format(
+            filepath, exc_str(e)))
+    if not len(locals) or 'datalad_plugin' not in locals:
         raise ValueError(
             "loading plugin '%s' did not yield a 'datalad_plugin' symbol, found: %s",
-            filepath, locals.keys())
-    if len(locals) == 1:
-        return locals.values()[0]
-    else:
-        return locals['datalad_plugin']
+            filepath, locals.keys() if len(locals) else None)
+    return locals['datalad_plugin']
 
 
 @build_doc
@@ -109,11 +111,21 @@ class Plugin(Interface):
       datalad plugin export_tarball output=myfile
 
     Any number of arguments can be given. Only arguments with names supported
-    by the respective plugin are passed to the plugin.
+    by the respective plugin are passed to the plugin. If unsupported arguments
+    are given, a warning is issued.
 
-    Like in most commands, a dedicated ``--dataset`` option is supported that
+    When an argument is given multiple times, all values are passed as a list
+    to the respective argument (order of value matches the order in the
+    plugin call)::
+
+      datalad plugin fancy_plugin input=this input=that
+
+    Like in most commands, a dedicated --dataset option is supported that
     can be used to identify a specific dataset to be passed to a plugin's
-    ``dataset`` argument.
+    ``dataset`` argument. If a plugin requires such an argument, and no
+    dataset was given, and none was found in the current working directory,
+    the plugin call will fail. A dataset argument can also be passed alongside
+    all other plugin arguments without using --dataset.
 
 
     *Writing plugins*
@@ -235,15 +247,28 @@ class Plugin(Interface):
         if plugin not in plugins:
             raise ValueError("unknown plugin '{}', available: {}".format(
                 plugin, ','.join(plugins.keys())))
+        user_supplied_args = set()
         if args:
             # we got some arguments in the plugin spec, parse them and add to
             # kwargs
             for arg in args:
-                parsed = argspec.match(arg)
-                if parsed is None:
-                    raise ValueError("invalid plugin argument: '{}'".format(arg))
-                argname, argval = parsed.groups()
+                if isinstance(arg, tuple):
+                    # came from python item-style
+                    argname, argval = arg
+                else:
+                    parsed = argspec.match(arg)
+                    if parsed is None:
+                        raise ValueError("invalid plugin argument: '{}'".format(arg))
+                    argname, argval = parsed.groups()
+                if argname in kwargs:
+                    # argument was seen at least once before -> make list
+                    existing_val = kwargs[argname]
+                    if not isinstance(existing_val, list):
+                        existing_val = [existing_val]
+                    existing_val.append(argval)
+                    argval = existing_val
                 kwargs[argname] = argval
+                user_supplied_args.add(argname)
         plugin_call = _load_plugin(plugins[plugin]['file'])
 
         if showpluginhelp:
@@ -258,17 +283,24 @@ class Plugin(Interface):
         #
         # argument preprocessing
         #
-        # now check the plugin signature and filter out all unsupported args
+        # check the plugin signature and filter out all unsupported args
         plugin_args, _, _, _ = inspect.getargspec(plugin_call)
+        supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
+        excluded_args = user_supplied_args.difference(supported_args.keys())
+        if excluded_args:
+            lgr.warning('ignoring plugin argument(s) %s, not supported by plugin',
+                        excluded_args)
         # always overwrite the dataset arg if one is needed
         if 'dataset' in plugin_args:
-            kwargs['dataset'] = require_dataset(
-                dataset if dataset else curdir,
+            supported_args['dataset'] = require_dataset(
+                # use dedicated arg if given, also anything the came with the plugin args
+                # or curdir as the last resort
+                dataset if dataset else kwargs.get('dataset', curdir),
                 check_installed=True,
                 purpose='handover to plugin')
 
         # call as a generator
-        for res in plugin_call(**{k: v for k, v in kwargs.items() if k in plugin_args}):
+        for res in plugin_call(**supported_args):
             # enforce standard regardless of what plugin did
             res['refds'] = dataset
             if 'logger' not in res:
