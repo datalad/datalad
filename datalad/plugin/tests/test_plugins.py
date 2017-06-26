@@ -101,8 +101,8 @@ def test_plugin_call(path, dspath):
             res = list(plugin(['dummy', 'noval=one', 'obscure=some']))
             assert_status('ok', res)
             cml.assert_logged(
-                msg="ignoring plugin argument(s) {'obscure'}, not supported by plugin",
-                regex=False, level='WARNING')
+                msg=".*ignoring plugin argument\\(s\\).*obscure.*, not supported by plugin.*",
+                regex=True, level='WARNING')
         # fails on missing positional arg
         assert_raises(TypeError, plugin, ['dummy'])
         # positional and kwargs actually make it into the plugin
