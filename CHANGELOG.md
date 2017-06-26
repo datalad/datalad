@@ -9,7 +9,24 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-# 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
+## 0.7.1 (??? ??, 2017) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
 
 New features, refactorings, and bug fixes.
 
@@ -19,7 +36,7 @@ New features, refactorings, and bug fixes.
 - [create-sibling], and [unlock] have been re-written to support the
   same common API as most other commands
 
-## Enhancements and new features
+### Enhancements and new features
 
 - [siblings] can now be used to query and configure a local repository by
   using the sibling name ``here``
@@ -31,7 +48,7 @@ New features, refactorings, and bug fixes.
 - Significant parts of the documentation of been updated
 - Instantiate GitPython's Repo instances lazily
 
-## Fixes
+### Fixes
 
 - API documentation is now rendered properly as HTML, and is easier to browse by
   having more compact pages
