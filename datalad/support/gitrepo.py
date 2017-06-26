@@ -1419,17 +1419,6 @@ class GitRepo(RepoInterface):
             '', ['git', 'remote', 'remove', name]
         )
 
-    def show_remotes(self, name='', verbose=False):
-        """
-        """
-
-        options = ["-v"] if verbose else []
-        name = [name] if name else []
-        out, err = self._git_custom_command(
-            '', ['git', 'remote'] + options + ['show'] + name
-        )
-        return out.rstrip(linesep).splitlines()
-
     def update_remote(self, name=None, verbose=False):
         """
         """
