@@ -70,6 +70,9 @@ class Create(Interface):
     However, the result will not be a full dataset, and, consequently,
     not all features are supported (e.g. a description).
 
+    DataLad plugins can be executed on a newly created dataset via the
+    `--with-plugins` option to perform further customizations.
+
     || REFLOW >>
     To create a local version of a remote dataset use the
     :func:`~datalad.api.install` command instead.
