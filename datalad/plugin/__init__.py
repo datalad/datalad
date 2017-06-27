@@ -29,7 +29,7 @@ from datalad.dochelpers import exc_str
 
 from datalad.interface.base import Interface
 from datalad.interface.base import dedent_docstring
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
 from datalad.ui import ui
 

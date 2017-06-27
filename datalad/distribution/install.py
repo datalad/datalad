@@ -30,7 +30,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import is_result_matching_pathsource_argument
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.exceptions import InsufficientArgumentsError

@@ -19,7 +19,6 @@ import sys
 from os import curdir
 from os import pardir
 from os import listdir
-from os import linesep
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
@@ -47,16 +46,13 @@ from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
 from datalad.support.constraints import Constraint
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureCallable
-from datalad.support.param import Parameter
 
 from datalad.ui import ui
 
-from .base import Interface
-from .base import update_docstring_with_parameters
-from .base import alter_interface_docs_for_api
+from datalad.interface.base import Interface
+from datalad.interface.base import default_logchannels
+from datalad.interface.common_opts import eval_params
+from datalad.interface.common_opts import eval_defaults
 from .base import merge_allargs2kwargs
 from .results import known_result_xfms
 
@@ -508,63 +504,6 @@ def filter_unmodified(content_by_ds, refds, since):
     return keep
 
 
-# define parameters to be used by eval_results to tune behavior
-# Note: This is done outside eval_results in order to be available when building
-# docstrings for the decorated functions
-# TODO: May be we want to move them to be part of the classes _params. Depends
-# on when and how eval_results actually has to determine the class.
-# Alternatively build a callable class with these to even have a fake signature
-# that matches the parameters, so they can be evaluated and defined the exact
-# same way.
-
-eval_params = dict(
-    return_type=Parameter(
-        doc="""return value behavior switch. If 'item-or-list' a single
-        value is returned instead of a one-item return value list, or a
-        list in case of multiple return values. `None` is return in case
-        of an empty list.""",
-        constraints=EnsureChoice('generator', 'list', 'item-or-list')),
-    result_filter=Parameter(
-        doc="""if given, each to-be-returned
-        status dictionary is passed to this callable, and is only
-        returned if the callable's return value does not
-        evaluate to False or a ValueError exception is raised. If the given
-        callable supports `**kwargs` it will additionally be passed the
-        keyword arguments of the original API call.""",
-        constraints=EnsureCallable() | EnsureNone()),
-    result_xfm=Parameter(
-        doc="""if given, each to-be-returned result
-        status dictionary is passed to this callable, and its return value
-        becomes the result instead. This is different from
-        `result_filter`, as it can perform arbitrary transformation of the
-        result value. This is mostly useful for top-level command invocations
-        that need to provide the results in a particular format. Instead of
-        a callable, a label for a pre-crafted result transformation can be
-        given.""",
-        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
-    result_renderer=Parameter(
-        doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
-    on_failure=Parameter(
-        doc="""behavior to perform on failure: 'ignore' any failure is reported,
-        but does not cause an exception; 'continue' if any failure occurs an
-        exception will be raised at the end, but processing other actions will
-        continue for as long as possible; 'stop': processing will stop on first
-        failure and an exception is raised. A failure is any result with status
-        'impossible' or 'error'. Raised exception is an IncompleteResultsError
-        that carries the result dictionaries of the failures in its `failed`
-        attribute.""",
-        constraints=EnsureChoice('ignore', 'continue', 'stop')),
-)
-eval_defaults = dict(
-    return_type='list',
-    result_filter=None,
-    result_renderer=None,
-    result_xfm=None,
-    on_failure='continue',
-)
-
-
 def eval_results(func):
     """Decorator for return value evaluation of datalad commands.
 
@@ -605,14 +544,6 @@ def eval_results(func):
       __call__ method of a subclass of Interface,
       i.e. a datalad command definition
     """
-
-    default_logchannels = {
-        '': 'debug',
-        'ok': 'debug',
-        'notneeded': 'debug',
-        'impossible': 'warning',
-        'error': 'error',
-    }
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
@@ -798,57 +729,3 @@ def eval_results(func):
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
-
-
-def build_doc(cls, **kwargs):
-    """Decorator to build docstrings for datalad commands
-
-    It's intended to decorate the class, the __call__-method of which is the
-    actual command. It expects that __call__-method to be decorated by
-    eval_results.
-
-    Parameters
-    ----------
-    cls: Interface
-      class defining a datalad command
-    """
-
-    # Note, that this is a class decorator, which is executed only once when the
-    # class is imported. It builds the docstring for the class' __call__ method
-    # and returns the original class.
-    #
-    # This is because a decorator for the actual function would not be able to
-    # behave like this. To build the docstring we need to access the attribute
-    # _params of the class. From within a function decorator we cannot do this
-    # during import time, since the class is being built in this very moment and
-    # is not yet available in the module. And if we do it from within the part
-    # of a function decorator, that is executed when the function is called, we
-    # would need to actually call the command once in order to build this
-    # docstring.
-
-    lgr.debug("Building doc for {}".format(cls))
-
-    cls_doc = cls.__doc__
-    if hasattr(cls, '_docs_'):
-        # expand docs
-        cls_doc = cls_doc.format(**cls._docs_)
-
-    call_doc = None
-    # suffix for update_docstring_with_parameters:
-    if cls.__call__.__doc__:
-        call_doc = cls.__call__.__doc__
-
-    # build standard doc and insert eval_doc
-    spec = getattr(cls, '_params_', dict())
-    # get docs for eval_results parameters:
-    spec.update(eval_params)
-
-    update_docstring_with_parameters(
-        cls.__call__, spec,
-        prefix=alter_interface_docs_for_api(cls_doc),
-        suffix=alter_interface_docs_for_api(call_doc),
-        add_args=eval_defaults if not hasattr(cls, '_no_eval_results') else None
-    )
-
-    # return original
-    return cls

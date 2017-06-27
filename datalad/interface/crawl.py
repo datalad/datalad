@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import exists
 from .base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone

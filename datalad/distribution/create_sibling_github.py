@@ -29,7 +29,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import MissingExternalDependency
 from ..interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
     require_dataset, Dataset
 from datalad.distribution.siblings import Siblings

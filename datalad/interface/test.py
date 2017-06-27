@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import datalad
 from .base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 
 
 @build_doc

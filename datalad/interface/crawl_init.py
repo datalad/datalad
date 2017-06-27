@@ -12,7 +12,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import curdir
 from .base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from collections import OrderedDict
 from datalad.distribution.dataset import Dataset
 

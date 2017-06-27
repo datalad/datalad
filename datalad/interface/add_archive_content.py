@@ -28,7 +28,7 @@ from os.path import dirname
 from os.path import normpath
 
 from .base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter

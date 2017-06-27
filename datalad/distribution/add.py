@@ -38,7 +38,7 @@ from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.save import Save
 from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
