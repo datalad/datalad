@@ -611,15 +611,33 @@ def eval_results(func):
 
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
+        # TODO query cfg for defaults
+        run_before = common_params.get('run_before', None)
+        run_after = common_params.get('run_after', None)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
         # on incomplete results
         def generator_func(*_args, **_kwargs):
+            from datalad.plugin import Plugin
+
             # flag whether to raise an exception
             incomplete_results = []
             # track what actions were performed how many times
             action_summary = {}
+
+            for pluginspec in run_before or []:
+                lgr.debug('Running pre-proc plugin %s', pluginspec)
+                for r in _process_results(
+                        Plugin.__call__(
+                            pluginspec,
+                            dataset=allkwargs.get('dataset', None),
+                            return_type='generator'),
+                        _func_class, action_summary,
+                        on_failure, incomplete_results,
+                        result_renderer, result_xfm, result_filter,
+                        **_kwargs):
+                    yield r
 
             # process main results
             for r in _process_results(
@@ -628,6 +646,19 @@ def eval_results(func):
                     on_failure, incomplete_results,
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
+
+            for pluginspec in run_after or []:
+                lgr.debug('Running post-proc plugin %s', pluginspec)
+                for r in _process_results(
+                        Plugin.__call__(
+                            pluginspec,
+                            dataset=allkwargs.get('dataset', None),
+                            return_type='generator'),
+                        _func_class, action_summary,
+                        on_failure, incomplete_results,
+                        result_renderer, result_xfm, result_filter,
+                        **_kwargs):
+                    yield r
 
             # result summary before a potential exception
             if result_renderer == 'default' and action_summary and \

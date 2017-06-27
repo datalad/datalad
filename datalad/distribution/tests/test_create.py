@@ -266,8 +266,10 @@ def test_create_withplugin(path):
     assert(not lexists(ds.path))
     # now for reals...
     ds = create(
-        path,
-        with_plugin=[['add_readme', 'filename=with hole.txt']])
+        # needs to identify the dataset, otherwise post-proc
+        # plugin doesn't no what to run on
+        dataset=path,
+        run_after=[['add_readme', 'filename=with hole.txt']])
     ok_clean_git(path)
     # README wil lend up in annex by default
     # TODO implement `nice_dataset` plugin to give sensible

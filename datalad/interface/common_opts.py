@@ -278,11 +278,28 @@ eval_params = dict(
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
+    run_before=Parameter(
+        doc="""DataLad plugin to run before the command. PLUGINSPEC is a list
+        comprised of a plugin name plus optional 2-tuples of key-value pairs
+        with arguments for the plugin call (see `plugin` command documentation
+        for details).
+        PLUGINSPECs must be wrapped in list where each item configures
+        one plugin call. Plugins are called in the order defined by this list."""),
+    run_after=Parameter(
+        doc="""DataLad plugin to run after the command. PLUGINSPEC is a list
+        comprised of a plugin name plus optional 2-tuples of key-value pairs
+        with arguments for the plugin call (see `plugin` command documentation
+        for details).
+        PLUGINSPECs must be wrapped in list where each item configures
+        one plugin call. Plugins are called in the order defined by this list."""),
 )
+
 eval_defaults = dict(
     return_type='list',
     result_filter=None,
     result_renderer=None,
     result_xfm=None,
     on_failure='continue',
+    run_before=None,
+    run_after=None,
 )

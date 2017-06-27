@@ -27,7 +27,6 @@ from datalad.interface.common_opts import annex_init_opts
 from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
-from datalad.interface.common_opts import with_plugin_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureKeyChoice
@@ -69,9 +68,6 @@ class Create(Interface):
     Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
     However, the result will not be a full dataset, and, consequently,
     not all features are supported (e.g. a description).
-
-    DataLad plugins can be executed on a newly created dataset via the
-    `--with-plugins` option to perform further customizations.
 
     || REFLOW >>
     To create a local version of a remote dataset use the
@@ -153,7 +149,6 @@ class Create(Interface):
             can be given multiple times CMD]"""),
         # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
-        with_plugin=with_plugin_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
@@ -174,7 +169,6 @@ class Create(Interface):
             native_metadata_type=None,
             shared_access=None,
             git_opts=None,
-            with_plugin=None,
             annex_opts=None,
             annex_init_opts=None):
 
@@ -344,17 +338,6 @@ class Create(Interface):
 
         path.update({'status': 'ok'})
         yield path
-
-        for pluginspec in with_plugin if with_plugin else []:
-            for r in tbds.plugin(
-                    pluginspec,
-                    return_type='generator'):
-                # ensure proper reporting
-                if dataset:
-                    r['refds'] = dataset
-                else:
-                    r.pop('refds', None)
-                yield r
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
