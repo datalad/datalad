@@ -59,7 +59,6 @@ Metadata
 """
     ds_meta = None
     if ds and ds.is_installed():
-        print('DS', ds)
         ds_meta = metadata(
             dataset=ds, dataset_global=True, return_type='item-or-list',
             result_filter=lambda x: x['action'] == 'metadata')
