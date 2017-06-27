@@ -284,14 +284,13 @@ eval_params = dict(
         with arguments for the plugin call (see `plugin` command documentation
         for details).
         PLUGINSPECs must be wrapped in list where each item configures
-        one plugin call. Plugins are called in the order defined by this list."""),
+        one plugin call. Plugins are called in the order defined by this list.
+        For running plugins that require a `dataset` argument it is important
+        to provide the respective dataset as the `dataset` argument of the main
+        command, if it is not in the list of plugin arguments."""),
     run_after=Parameter(
-        doc="""DataLad plugin to run after the command. PLUGINSPEC is a list
-        comprised of a plugin name plus optional 2-tuples of key-value pairs
-        with arguments for the plugin call (see `plugin` command documentation
-        for details).
-        PLUGINSPECs must be wrapped in list where each item configures
-        one plugin call. Plugins are called in the order defined by this list."""),
+        doc="""Like `run_before`, but plugins are executed after the main command
+        has finished."""),
 )
 
 eval_defaults = dict(
