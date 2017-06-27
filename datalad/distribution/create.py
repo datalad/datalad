@@ -218,7 +218,8 @@ class Create(Interface):
             unavailable_path_msg=None,
             # if we have a dataset given that actually exists, we want to
             # fail if the requested path is not in it
-            nondataset_path_status='error' if dataset and dataset.is_installed() else '',
+            nondataset_path_status='error' \
+                if isinstance(dataset, Dataset) and dataset.is_installed() else '',
             on_failure='ignore')
         path = None
         for r in annotated_paths:
@@ -263,7 +264,7 @@ class Create(Interface):
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
-        tbds = dataset if dataset is not None and dataset.path == path['path'] \
+        tbds = dataset if isinstance(dataset, Dataset) and dataset.path == path['path'] \
             else Dataset(path['path'])
 
         # don't create in non-empty directory without `force`:
@@ -329,7 +330,7 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if save and dataset is not None and dataset.path != tbds.path:
+        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(
