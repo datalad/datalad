@@ -548,8 +548,13 @@ class Interface(object):
         return content_by_ds, unavailable_paths
 
 
-def merge_allargs2kwargs(call, args, kwargs):
-    """Generate a kwargs dict from a call signature and *args, **kwargs"""
+def get_allargs_as_kwargs(call, args, kwargs):
+    """Generate a kwargs dict from a call signature and *args, **kwargs
+
+    Basically resolving the argnames for all positional arguments, and
+    resolvin the defaults for all kwargs that are not given in a kwargs
+    dict
+    """
     from inspect import getargspec
     argspec = getargspec(call)
     defaults = argspec.defaults
@@ -564,5 +569,8 @@ def merge_allargs2kwargs(call, args, kwargs):
             kwargs_[k] = v
     # update with provided kwarg args
     kwargs_.update(kwargs)
-    assert (nargs == len(kwargs_))
+    # XXX we cannot assert the following, because our own highlevel
+    # API commands support more kwargs than what is discoverable
+    # from their signature...
+    #assert (nargs == len(kwargs_))
     return kwargs_

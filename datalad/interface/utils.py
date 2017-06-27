@@ -51,9 +51,9 @@ from datalad.ui import ui
 
 from datalad.interface.base import Interface
 from datalad.interface.base import default_logchannels
+from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from .base import merge_allargs2kwargs
 from .results import known_result_xfms
 
 
@@ -547,6 +547,10 @@ def eval_results(func):
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
+        # for result filters and pre/post plugins
+        # we need to produce a dict with argname/argvalue pairs for all args
+        # incl. defaults and args given as positionals
+        allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
         # determine class, the __call__ method of which we are decorating:
         # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
         # when and how to use eval_results as well as on how to name a command's
@@ -604,12 +608,9 @@ def eval_results(func):
                 _result_filter = result_filter.__call__
             if (PY2 and inspect.getargspec(_result_filter).keywords) or \
                     (not PY2 and inspect.getfullargspec(_result_filter).varkw):
-                # we need to produce a dict with argname/argvalue pairs for all args
-                # incl. defaults and args given as positionals
-                fullkwargs_ = merge_allargs2kwargs(wrapped, args, kwargs)
 
                 def _result_filter(res):
-                    return result_filter(res, **fullkwargs_)
+                    return result_filter(res, **allkwargs)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -657,7 +658,6 @@ def eval_results(func):
                     # any processing
                     results = list(results)
                 # render summaries
-                # TODO why not do that with action summary in the generator?
                 if not result_xfm and result_renderer == 'tailored':
                     # cannot render transformed results
                     if hasattr(_func_class, 'custom_result_summary_renderer'):
