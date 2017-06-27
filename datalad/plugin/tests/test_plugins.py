@@ -31,7 +31,7 @@ from datalad.tests.utils import eq_
 broken_plugin = """garbage"""
 
 nodocs_plugin = """\
-def datalad_plugin():
+def dlplugin():
     pass
 """
 
@@ -39,7 +39,7 @@ def datalad_plugin():
 dummy_plugin = """\
 #PLUGINSYNOPSIS: real dummy
 
-def datalad_plugin(dataset, noval, withval='test'):
+def dlplugin(dataset, noval, withval='test'):
     "mydocstring"
     yield dict(
         status='ok',

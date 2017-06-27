@@ -60,11 +60,11 @@ def _load_plugin(filepath):
         # any exception means full stop
         raise ValueError('plugin at {} is broken: {}'.format(
             filepath, exc_str(e)))
-    if not len(locals) or 'datalad_plugin' not in locals:
+    if not len(locals) or 'dlplugin' not in locals:
         raise ValueError(
-            "loading plugin '%s' did not yield a 'datalad_plugin' symbol, found: %s",
+            "loading plugin '%s' did not yield a 'dlplugin' symbol, found: %s",
             filepath, locals.keys() if len(locals) else None)
-    return locals['datalad_plugin']
+    return locals['dlplugin']
 
 
 @build_doc
@@ -138,7 +138,7 @@ class Plugin(Interface):
 
     Plugin source files must define a function named::
 
-      datalad_plugin
+      dlplugin
 
     This function is executed as the plugin. It can have any number of
     arguments (positional, or keyword arguments with defaults), or none at

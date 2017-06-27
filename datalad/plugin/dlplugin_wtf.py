@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def datalad_plugin(dataset=None):
+def dlplugin(dataset=None):
     """Generate a report about the DataLad installation and configuration
 
     IMPORTANT: Sharing this report with untrusted parties (e.g. on the web)

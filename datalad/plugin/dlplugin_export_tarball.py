@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def datalad_plugin(dataset, output=None):
+def dlplugin(dataset, output=None):
     import os
     import tarfile
     from mock import patch

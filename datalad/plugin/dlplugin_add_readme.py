@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def datalad_plugin(dataset, filename='README.rst', existing='skip'):
+def dlplugin(dataset, filename='README.rst', existing='skip'):
     """Add basic information about DataLad datasets to a README file
 
     The README file is added to the dataset and the addition is saved
