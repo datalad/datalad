@@ -172,7 +172,9 @@ class EnsureBool(Constraint):
                 return False
             elif value in ('1', 'yes', 'on', 'enable', 'true'):
                 return True
-        raise ValueError("value must be converted to boolean")
+        raise ValueError(
+            "value '{}' must be convertible to boolean".format(
+                value))
 
     def long_description(self):
         return 'value must be convertible to type bool'
