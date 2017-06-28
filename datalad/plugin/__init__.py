@@ -43,9 +43,9 @@ def _get_plugins():
         dirname(__file__),
         cfg.obtain('datalad.locations.system-plugins'),
         cfg.obtain('datalad.locations.user-plugins'))
-    return {basename(e)[9:-3]: {'file': e}
+    return {basename(e)[:-3]: {'file': e}
             for plugindir in locations
-            for e in glob(opj(plugindir, 'dlplugin_*.py'))}
+            for e in glob(opj(plugindir, '[!_]*.py'))}
 
 
 def _load_plugin(filepath):
@@ -132,9 +132,8 @@ class Plugin(Interface):
 
     Plugins are written in Python. In order for DataLad to be able to find
     them, plugins need to be placed in one of the supported locations described
-    above. Plugin file names have to match the pattern::
-
-      dlplugin_<pluginname>.py
+    above. Plugin file names have to have a '.py' extensions and must not start
+    with an underscore ('_').
 
     Plugin source files must define a function named::
 
@@ -149,16 +148,17 @@ class Plugin(Interface):
     of definitions must be done within the body of the function.
 
     The doc string of the plugin function is displayed when the plugin
-    documentation is requested. A plugin file should contain a line
-    starting with the string '#PLUGINSYNOPSIS:' anywhere in its source code.
-    The text on this line (after the prefix) is displayed as the plugin
-    synopsis in the plugin overview list.
+    documentation is requested. The first line in a plugin file that starts
+    with triple double-quotes will be used as the plugin short description
+    (this will typically be the docstring of the module file). This short
+    description is displayed as the plugin synopsis in the plugin overview
+    list.
 
-    Plugin functions must either return None or yield their results as
-    generator. Results are DataLad status dictionaries. There are no
-    constraints on the number and nature of result properties. However,
-    conventions exists and must be followed for compatibility with the
-    result evaluation and rendering performed by DataLad.
+    Plugin functions must yield their results as generator. Results are DataLad
+    status dictionaries. There are no constraints on the number and nature of
+    result properties. However, conventions exists and must be followed for
+    compatibility with the result evaluation and rendering performed by
+    DataLad.
 
     The following keys must exist:
 
@@ -224,8 +224,8 @@ class Plugin(Interface):
                 try:
                     with open(plinfo['file']) as plf:
                         for line in plf:
-                            if line.startswith('#PLUGINSYNOPSIS:'):
-                                synopsis = line[17:].strip()
+                            if line.startswith('"""'):
+                                synopsis = line.strip().strip('"').strip()
                                 break
                 except Exception as e:
                     ui.message('{}{} [BROKEN] {}'.format(

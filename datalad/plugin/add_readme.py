@@ -6,10 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-#PLUGINSYNOPSIS: add a README file to a dataset
-"""
-
-"""
+"""add a README file to a dataset"""
 
 __docformat__ = 'restructuredtext'
 
@@ -21,8 +18,8 @@ def dlplugin(dataset, filename='README.rst', existing='skip'):
     The README file is added to the dataset and the addition is saved
     in the dataset.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     dataset : Dataset
       dataset to add information to
     filename : str, optional

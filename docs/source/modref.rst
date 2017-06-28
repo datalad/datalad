@@ -78,6 +78,21 @@ Miscellaneous commands
    api.crawl_init
    api.test
 
+Plugins
+-------
+
+DataLad can be customized by plugins. The following plugins are shipped
+with DataLad.
+
+.. currentmodule:: datalad.plugin
+.. autosummary::
+   :toctree: generated
+
+   add_readme
+   export_tarball
+   no_annex
+   wtf
+
 
 Support functionality
 =====================

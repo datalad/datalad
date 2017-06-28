@@ -39,8 +39,8 @@ def dlplugin():
 """
 
 # functioning plugin dummy
-dummy_plugin = """\
-#PLUGINSYNOPSIS: real dummy
+dummy_plugin = '''\
+"""real dummy"""
 
 def dlplugin(dataset, noval, withval='test'):
     "mydocstring"
@@ -51,7 +51,7 @@ def dlplugin(dataset, noval, withval='test'):
             dataset=dataset,
             noval=noval,
             withval=withval))
-"""
+'''
 
 
 @with_tempfile()

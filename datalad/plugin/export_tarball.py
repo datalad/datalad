@@ -6,10 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-#PLUGINSYNOPSIS: export a dataset to a tarball
-"""
-
-"""
+"""export a dataset to a tarball"""
 
 __docformat__ = 'restructuredtext'
 

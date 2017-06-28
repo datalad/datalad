@@ -6,10 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-#PLUGINSYNOPSIS: provide information about this DataLad installation
-"""
-
-"""
+"""provide information about this DataLad installation"""
 
 __docformat__ = 'restructuredtext'
 
