@@ -83,10 +83,8 @@ class Plugin(Interface):
 
          datalad.locations.user-plugins
 
-
     Identically named plugins in latter location replace those in locations
     searched before.
-
 
     *Using plugins*
 
@@ -126,62 +124,6 @@ class Plugin(Interface):
     dataset was given, and none was found in the current working directory,
     the plugin call will fail. A dataset argument can also be passed alongside
     all other plugin arguments without using --dataset.
-
-
-    *Writing plugins*
-
-    Plugins are written in Python. In order for DataLad to be able to find
-    them, plugins need to be placed in one of the supported locations described
-    above. Plugin file names have to have a '.py' extensions and must not start
-    with an underscore ('_').
-
-    Plugin source files must define a function named::
-
-      dlplugin
-
-    This function is executed as the plugin. It can have any number of
-    arguments (positional, or keyword arguments with defaults), or none at
-    all. All arguments, except ``dataset`` must expect any value to
-    be a string.
-
-    The plugin function must be self-contained, i.e. all needed imports
-    of definitions must be done within the body of the function.
-
-    The doc string of the plugin function is displayed when the plugin
-    documentation is requested. The first line in a plugin file that starts
-    with triple double-quotes will be used as the plugin short description
-    (this will typically be the docstring of the module file). This short
-    description is displayed as the plugin synopsis in the plugin overview
-    list.
-
-    Plugin functions must yield their results as generator. Results are DataLad
-    status dictionaries. There are no constraints on the number and nature of
-    result properties. However, conventions exists and must be followed for
-    compatibility with the result evaluation and rendering performed by
-    DataLad.
-
-    The following keys must exist:
-
-    "status"
-        {'ok', 'notneeded', 'impossible', 'error'}
-
-    "action"
-        label for the action performed by the plugin. In many cases this
-        could be the plugin's name.
-
-    The following keys should exists if possible:
-
-    "path"
-        absolute path to a result on the file system
-
-    "type"
-        label indicating the nature of a result (e.g. 'file', 'dataset',
-        'directory', etc.)
-
-    "message"
-        string message annotating the result, particularly important for
-        non-ok results. This can be a tuple with 'logging'-style string
-        expansion.
 
     """
     _params_ = dict(

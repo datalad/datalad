@@ -19,6 +19,7 @@ Concepts and technologies
    basics
    usecases/index
    metadata
+   customization
    faq
    glossary
 
