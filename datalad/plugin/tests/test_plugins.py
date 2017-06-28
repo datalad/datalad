@@ -206,3 +206,23 @@ def test_wtf(path):
         assert_in('Configuration', cmo.out)
         assert_in('Dataset information', cmo.out)
         assert_in('path: {}'.format(ds.path), cmo.out)
+
+
+@with_tempfile(mkdir=True)
+def test_no_annex(path):
+    ds = create(path)
+    ok_clean_git(ds.path)
+    create_tree(
+        ds.path,
+        {'code': {
+            'inannex': 'content',
+            'notinannex': 'othercontent'}})
+    # add two files, pre and post configuration
+    ds.add(opj('code', 'inannex'))
+    plugin(['no_annex', 'pattern=code/**'], dataset=ds)
+    ds.add(opj('code', 'notinannex'))
+    ok_clean_git(ds.path)
+    # one is annex'ed, the other is not, despite no change in add call
+    # importantly, also .gitattribute is not annexed
+    eq_([opj('code', 'inannex')],
+        ds.repo.get_annexed_files())
