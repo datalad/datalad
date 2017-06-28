@@ -56,7 +56,7 @@ def dlplugin(dataset, pattern, ref_dir='.', makedirs='no'):
     from os.path import join as opj
     from os.path import isabs
     from os.path import exists
-    from os import makedirs
+    from os import makedirs as makedirsfx
     from datalad.distribution.dataset import require_dataset
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.constraints import EnsureBool
@@ -98,7 +98,7 @@ def dlplugin(dataset, pattern, ref_dir='.', makedirs='no'):
     gitattr_dir = opj(ds.path, ref_dir)
     if not exists(gitattr_dir):
         if makedirs:
-            makedirs(gitattr_dir)
+            makedirsfx(gitattr_dir)
         else:
             yield dict(
                 res_kwargs,
