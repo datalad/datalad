@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def dlplugin(dataset, pattern, ref_dir='.', makedirs=False):
+def dlplugin(dataset, pattern, ref_dir='.', makedirs='no'):
     # could be extended to accept actual largefile expressions
     """Configure a dataset to never put some content into the dataset's annex
 
@@ -59,8 +59,10 @@ def dlplugin(dataset, pattern, ref_dir='.', makedirs=False):
     from os import makedirs
     from datalad.distribution.dataset import require_dataset
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.constraints import EnsureBool
     from datalad.utils import assure_list
 
+    makedirs = EnsureBool()(makedirs)
     pattern = assure_list(pattern)
     ds = require_dataset(dataset, check_installed=True,
                          purpose='no_annex configuration')
