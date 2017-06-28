@@ -307,7 +307,7 @@ class Plugin(Interface):
                 continue
             if dataset:
                 # enforce standard regardless of what plugin did
-                res['refds'] = dataset
+                res['refds'] = getattr(dataset, 'path', dataset)
             elif 'refds' in res:
                 # no base dataset, results must not have them either
                 del res['refds']

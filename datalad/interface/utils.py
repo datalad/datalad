@@ -16,6 +16,8 @@ import inspect
 import logging
 import wrapt
 import sys
+import re
+import shlex
 from os import curdir
 from os import pardir
 from os import listdir
@@ -58,6 +60,12 @@ from .results import known_result_xfms
 
 
 lgr = logging.getLogger('datalad.interface.utils')
+
+
+def cls2cmdlinename(cls):
+    "Return the cmdline command name from an Interface class"
+    r = re.compile(r'([a-z0-9])([A-Z])')
+    return r.sub('\\1-\\2', cls.__name__).lower()
 
 
 def handle_dirty_dataset(ds, mode, msg=None):
@@ -611,9 +619,28 @@ def eval_results(func):
 
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
-        # TODO query cfg for defaults
-        run_before = common_params.get('run_before', None)
-        run_after = common_params.get('run_after', None)
+
+        def _get_plugin_specs(param_key=None, cfg_key=None):
+            spec = common_params.get(param_key, None)
+            if spec is not None:
+                # this is already a list of lists
+                return spec
+
+            spec = dlcfg.get(cfg_key, None)
+            if spec is None:
+                return
+            elif not isinstance(spec, tuple):
+                spec = [spec]
+            return [shlex.split(s) for s in spec]
+
+        # query cfg for defaults
+        cmdline_name = cls2cmdlinename(_func_class)
+        run_before = _get_plugin_specs(
+            'run_before',
+            'datalad.{}.run-before'.format(cmdline_name))
+        run_after = _get_plugin_specs(
+            'run_after',
+            'datalad.{}.run-after'.format(cmdline_name))
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
