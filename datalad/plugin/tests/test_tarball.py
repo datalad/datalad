@@ -55,7 +55,7 @@ def test_tarball(path):
         res = list(ds.plugin('export_tarball'))
         assert_status('ok', res)
         assert_result_count(res, 1)
-        assert_result_count(res, 1, path=default_outname)
+        assert(isabs(res[0]['path']))
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension

@@ -16,7 +16,7 @@ def dlplugin(dataset, output=None):
     import os
     import tarfile
     from mock import patch
-    from os.path import join as opj, dirname, normpath, isabs, abspath
+    from os.path import join as opj, dirname, normpath, isabs
     from datalad.utils import file_basename
     from datalad.support.annexrepo import AnnexRepo
 
@@ -73,9 +73,12 @@ def dlplugin(dataset, output=None):
                 recursive=False,
                 filter=_filter_tarinfo)
 
+    if not isabs(output):
+        output = opj(os.getcwd(), output)
+
     yield dict(
         status='ok',
-        path=abspath(output),
+        path=output,
         type='file',
         action='export_tarball',
         logger=lgr)
