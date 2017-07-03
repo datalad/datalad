@@ -35,6 +35,20 @@ if not on_windows:
 else:
     ssh_manager = None
 
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError:
+    if on_windows:
+        lgr.warning(
+            "'colorama' Python module missing, terminal output may look garbled")
+    pass
+
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
