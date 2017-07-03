@@ -129,17 +129,15 @@ class Drop(Interface):
     before file content is dropped. As these checks could lead to slow
     operation (network latencies, etc), they can be disabled.
 
+    Examples:
 
-    Examples
-    --------
+      Drop all file content in a dataset::
 
-    Drop all file content in a dataset::
+        ~/some/dataset$ datalad drop
 
-      ~/some/dataset$ datalad drop
+      Drop all file content in a dataset and all its subdatasets::
 
-    Drop all file content in a dataset and all its subdatasets::
-
-      ~/some/dataset$ datalad drop --recursive
+        ~/some/dataset$ datalad drop --recursive
 
     """
     _action = 'drop'

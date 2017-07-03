@@ -75,6 +75,7 @@ class Plugin(Interface):
     three different locations are available
 
     1. official plugins that are part of the local DataLad installation
+
     2. system-wide plugins, location configuration::
 
          datalad.locations.system-plugins

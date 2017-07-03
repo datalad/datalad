@@ -21,12 +21,8 @@ def _generate_func_api():
     from collections import namedtuple
     from functools import wraps
 
-    from datalad import cfg
-
-    from .interface.base import update_docstring_with_parameters
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
-    from .interface.base import alter_interface_docs_for_api
     from .interface.base import get_allargs_as_kwargs
 
     def _kwargs_to_namespace(call, args, kwargs):

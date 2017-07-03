@@ -54,8 +54,7 @@ class Ls(Interface):
 
     ATM only s3:// URLs and datasets are supported
 
-    Examples
-    --------
+    Examples:
 
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
       $ datalad ls                               # to list current dataset
