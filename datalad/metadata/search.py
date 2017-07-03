@@ -45,14 +45,6 @@ from datalad.ui import ui
 @build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
-
-    Yields
-    ------
-    location : str
-        (relative) path to the dataset
-    report : dict
-        fields which were requested by `report` option
-
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -123,6 +115,14 @@ class Search(Interface):
                  report_matched=False,
                  format='custom',
                  regex=False):
+        """
+        Yields
+        ------
+        location : str
+            (relative) path to the dataset
+        report : dict
+            fields which were requested by `report` option
+        """
 
         lgr.debug("Initiating search for match=%r and dataset %r",
                   match, dataset)

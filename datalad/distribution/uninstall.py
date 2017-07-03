@@ -94,12 +94,11 @@ class Uninstall(Interface):
     subdirectories within a dataset as always done automatically. An optional
     recursion limit is applied relative to each given input path.
 
-    Examples
-    --------
+    Examples:
 
-    Uninstall a subdataset (undo installation)::
+      Uninstall a subdataset (undo installation)::
 
-      ~/some/dataset$ datalad uninstall somesubdataset1
+        ~/some/dataset$ datalad uninstall somesubdataset1
 
     """
     _action = 'uninstall'
