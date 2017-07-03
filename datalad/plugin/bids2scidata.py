@@ -1,16 +1,21 @@
-#!/usr/bin/env python
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""generate metadata for submission to Scientific Data from a BIDS dataset"""
 
-# import modules used here -- sys is a very standard one
-from __future__ import print_function
-import argparse
+__docformat__ = 'restructuredtext'
+
+
 import logging
 from collections import OrderedDict
 from glob import glob
 import os
 from os.path import exists, join as opj, split as psplit
-import sys
-
 
 import nibabel
 import json
@@ -220,7 +225,7 @@ def _get_study_df(bids_directory):
     participants_df = pd.read_csv(participants_file, sep="\t")
     rename_rule = sample_property_name_map.copy()
     # remove all mapping that do not match the columns at hand
-    for r in rename_rule.keys():
+    for r in list(rename_rule.keys()):
         if not r in participants_df.keys():
             del rename_rule[r]
     # turn all unknown properties into comment columns
@@ -392,9 +397,11 @@ def _get_assay_df(bids_directory, modality, protocol_ref, files, file_descr):
 def _get_investigation_template(bids_directory, mri_par_names):
     this_path = os.path.realpath(
         __file__[:-1] if __file__.endswith('.pyc') else __file__)
-    template_path = opj(
-        *(psplit(this_path)[:-1] + ("i_investigation_template.txt", )))
-    investigation_template = open(template_path).read()
+    # TODO expose parameter with path to read from
+    #template_path = opj(
+    #    *(psplit(this_path)[:-1] + ("i_investigation_template.txt", )))
+    #investigation_template = open(template_path).read()
+    investigation_template = default_i_investigation_template
 
     title = psplit(bids_directory)[-1]
 
@@ -624,105 +631,178 @@ def extract(
         fp.write(investigation_template)
 
 
-def _get_cmdline_parser():
-    class MyParser(argparse.ArgumentParser):
-        def error(self, message):
-            sys.stderr.write('error: %s\n' % message)
-            self.print_help()
-            sys.exit(2)
-
-    parser = MyParser(
-        description="BIDS to ISA-Tab converter.",
-        fromfile_prefix_chars='@')
-    # TODO Specify your real parameters here.
-    parser.add_argument(
-        "bids_directory",
-        help="Location of the root of your BIDS compatible directory",
-        metavar="BIDS_DIRECTORY")
-    parser.add_argument(
-        "output_directory",
-        help="Directory where ISA-TAB files will be stored",
-        metavar="OUTPUT_DIRECTORY")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        help="increase output verbosity",
-        action="store_true")
-    parser.add_argument(
-        "--keep-unknown",
-        help="""by default only explicitely white-listed parameters and
-        characteristics are considered. This option will force inclusion of
-        any discovered information. See --drop-parameter for additional
-        tuning.""",
-        action='store_true')
-    parser.add_argument(
-        "-d",
-        "--drop-parameter",
-        help="""list of parameters to ignore when composing the assay table. See
-        the generated table for column IDs to ignore. For example, to remove
-        column 'Parameter Value[time:samples:ContentTime]', specify
-        `--drop-parameter time:samples:ContentTime`. Only considered together
-        with --keep-unknown.""")
-    parser.add_argument(
-        "--repository-info",
-        metavar=('NAME', 'ACCESSION#', 'URL'),
-        help="""data repository information to be used in assay tables.
-        Example: 'OpenfMRI ds000113d https://openfmri.org/dataset/ds000113d'""",
-        nargs=3)
-    return parser
-
-
-def main(argv=None):
-    parser = _get_cmdline_parser()
-    args = parser.parse_args(argv)
-
-    # Setup logging
-    if args.verbose:
-        loglevel = logging.DEBUG
-    else:
-        loglevel = logging.INFO
-
-    logging.basicConfig(format="%(levelname)s: %(message)s", level=loglevel)
-
-    extract(
-        args.bids_directory,
-        args.output_directory,
-        args.drop_parameter if args.keep_unknown else 'unknown',
-        args.repository_info
-    )
-    print("Metadata extraction complete.")
-
-
-if __name__ == '__main__':
-    main()
-
 
 #
 # Make it work seamlessly as a datalad export plugin
 #
-def _datalad_export_plugin_call(
-        ds,
-        argv=None,
+def dlplugin(
+        dataset,
+        repo_name,
+        repo_accession,
+        repo_url,
         output=None,
-        drop_parameter=None,
-        repository_info=None):
-    if argv is not None:
-        # from cmdline -> go through std entrypoint
-        return main(argv + [ds.path, output])
+        keep_unknown=None,
+        drop_parameter=None):
+    """BIDS to ISA-Tab converter
 
-    # from Python API
-    return extract(
-        ds.path,
+    Parameters
+    ----------
+    ds : Dataset
+      dataset in BIDS-compatible format
+    repo_name : str
+        data repository name to be used in assay tables.
+        Example: OpenfMRI
+    repo_accession : str
+        data repository accession number to be used in assay tables.
+        Example: ds000113d
+    repo_url : str
+        data repository URL to be used in assay tables.
+        Example: https://openfmri.org/dataset/ds000113d
+    output : str, optional
+      directory where ISA-TAB files will be stored
+    keep_unknown : bool, optional
+      by default only explicitely white-listed parameters and
+      characteristics are considered. This option will force inclusion of
+      any discovered information. See `drop_parameter` for additional
+      tuning.
+    drop_parameter : list, optional
+      parameter to ignore when composing the assay table. See the generated
+      table for column IDs to ignore. For example, to remove column
+      'Parameter Value[time:samples:ContentTime]', specify
+      `drop_parameter=time:samples:ContentTime`. Only considered together
+      `keep_unknown`.
+    i_investigation_template : str
+      path to a file with the template content
+    """
+    import logging
+    lgr = logging.getLogger('datalad.plugin.bids2scidata')
+    from datalad.plugin.bids2scidata import extract
+
+    # TODO yield something meaningful
+    extract(
+        dataset.path,
         output_directory=output,
         drop_parameter=drop_parameter,
-        repository_info=repository_info)
+        repository_info=[repo_name, repo_accession, repo_url])
+        # TODO
+        #keep_unknown
+        #drop_parameter
+        #i_investigation_template
+    yield dict(
+        status='ok',
+        path=output,
+        # TODO add switch to make tarball
+        #type='file',
+        type='directory',
+        action='bids2scidata',
+        logger=lgr)
 
 
-def _datalad_get_cmdline_help():
-    parser = _get_cmdline_parser()
-    # return help text and info on what to replace in it to still make
-    # sense when delivered through datalad
-    return \
-        parser.format_help(), \
-        (('BIDS_DIRECTORY', 'SETBYDATALAD'),
-         ('OUTPUT_DIRECTORY', 'SETBYDATALAD'))
+default_i_investigation_template = """\
+# Investigation File template generated by BIDS2ISATab. This metadata file is CC0
+ONTOLOGY SOURCE REFERENCE
+Term Source Name	NCBITAXON	UBERON	PATO	UO	NCIT	OBI	ERO
+Term Source File	http://data.bioontology.org/ontologies/NCBITAXON	http://data.bioontology.org/ontologies/UBERON	http://data.bioontology.org/ontologies/PATO	http://data.bioontology.org/ontologies/UO	http://data.bioontology.org/ontologies/NCIT	http://data.bioontology.org/ontologies/OBI	http://data.bioontology.org/ontologies/ERO
+Term Source Version	2015AA	releases/2014-06-15	unknown	unknown	15.05d	2014-08-18	2013-08-02
+Term Source Description	National Center for Biotechnology Information (NCBI) Organismal Classification	Uber Anatomy Ontology	Phenotypic Quality Ontology	Units of Measurement Ontology	National Cancer Institute Thesaurus	Ontology for Biomedical Investigations	Eagle-I Research Resource Ontology
+INVESTIGATION
+Investigation Identifier
+Investigation Title
+Investigation Description
+Investigation Submission Date
+Investigation Public Release Date
+INVESTIGATION PUBLICATIONS
+Investigation PubMed ID
+Investigation Publication DOI
+Investigation Publication Author List
+Investigation Publication Title
+Investigation Publication Status
+Investigation Publication Status Term Accession Number
+Investigation Publication Status Term Source REF
+INVESTIGATION CONTACTS
+Investigation Person Last Name
+Investigation Person Mid Initials
+Investigation Person First Name
+Investigation Person Address
+Investigation Person Phone
+Investigation Person Fax
+Investigation Person Email
+Investigation Person Affiliation
+Investigation Person Roles
+Investigation Person Roles Term Accession Number
+Investigation Person Roles Term Source REF
+STUDY
+Study Identifier	[TODO: IDENTIFIER]
+Study Title	[TODO: TITLE]
+Study Submission Date
+Study Public Release Date
+Study Description
+Study File Name	s_study.txt
+Comment[Subject Keywords]
+Comment[Manuscript Licence]
+Comment[Experimental Metadata Licence]
+Comment[Supplementary Information File Name]
+Comment[Supplementary Information File Type]
+Comment[Supplementary Information File URL]
+Comment[Data Repository]
+Comment[Data Record Accession]
+Comment[Data Record URI]
+STUDY DESIGN DESCRIPTORS
+Study Design Type
+Study Design Type Term Accession Number
+Study Design Type Term Source
+STUDY PUBLICATIONS
+Study PubMed ID
+Study Publication DOI
+Study Publication Author List
+Study Publication Title
+Study Publication Status
+Study Publication Status Term Accession Number
+Study Publication Status Term Source REF
+STUDY FACTORS
+Study Factor Name
+Study Factor Type
+Study Factor Type Term Accession Number
+Study Factor Type Term Source REF
+STUDY ASSAYS
+Study Assay Measurement Type	nuclear magnetic resonance assay
+Study Assay Measurement Type Term Accession Number	OBI:0000182
+Study Assay Measurement Type Term Source REF	OBI
+Study Assay Technology Type	MRI Scanner
+Study Assay Technology Type Term Accession Number	ERO:MRI_Scanner
+Study Assay Technology Type Term Source REF	ERO
+Study Assay Technology Platform	
+Study Assay File Name	a_assay.txt
+STUDY PROTOCOLS
+Study Protocol Name	Participant recruitment	Magnetic Resonance Imaging
+Study Protocol Type	selection	nuclear magnetic resonance assay
+Study Protocol Type Term Accession Number	OBI:0001928	OBI:0000182
+Study Protocol Type Term Source REF	OBI	OBI
+Study Protocol Description	""	""
+Study Protocol URI	""	""
+Study Protocol Version	""	""
+Study Protocol Parameters Name	""	[TODO: MRI_PAR_NAMES]
+Study Protocol Parameters Name Term Accession Number	""	""
+Study Protocol Parameters Name Term Source REF	""	""
+Study Protocol Components Name	""	""
+Study Protocol Components Type	""	""
+Study Protocol Components Type Term Accession Number	""	""
+Study Protocol Components Type Term Source REF	""	""
+STUDY CONTACTS
+Study Person Last Name
+Study Person First Name
+Study Person Mid Initials
+Study Person Email
+Study Person Phone
+Study Person Fax
+Study Person Address
+Study Person Affiliation
+Study Person Roles
+Study Person Roles Term Accession Number
+Study Person Roles Term Source REF
+Comment[Study Person ORCID]
+Comment[Funder]
+Comment[FundRef ID]
+Comment[Funder Term Source REF]
+Comment[Grant Identifier]
+"""
