@@ -17,7 +17,7 @@ from os.path import curdir
 from os.path import sep as dirsep
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import filter_unmodified
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts

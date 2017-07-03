@@ -11,6 +11,7 @@
 
 import os
 from os.path import join as opj
+from os.path import lexists
 
 from ..dataset import Dataset
 from datalad.api import create
@@ -254,3 +255,23 @@ def test_saving_prior(topdir):
     # is committed -- ds2 is already known to git and it just pukes with a bit
     # confusing    'ds2' already exists in the index
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
+
+
+@with_tempfile(mkdir=True)
+def test_create_withplugin(path):
+    # first without
+    ds = create(path)
+    assert(not lexists(opj(ds.path, 'README.rst')))
+    ds.remove()
+    assert(not lexists(ds.path))
+    # now for reals...
+    ds = create(
+        # needs to identify the dataset, otherwise post-proc
+        # plugin doesn't no what to run on
+        dataset=path,
+        run_after=[['add_readme', 'filename=with hole.txt']])
+    ok_clean_git(path)
+    # README wil lend up in annex by default
+    # TODO implement `nice_dataset` plugin to give sensible
+    # default and avoid that
+    assert(lexists(opj(ds.path, 'with hole.txt')))

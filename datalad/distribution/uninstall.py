@@ -30,7 +30,7 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.results import get_status_dict
 from datalad.utils import rmtree

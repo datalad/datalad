@@ -30,7 +30,8 @@ from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
+from datalad.interface.utils import eval_results
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
@@ -39,8 +40,6 @@ from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
-from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice

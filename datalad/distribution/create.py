@@ -20,7 +20,7 @@ from os.path import join as opj
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
@@ -112,12 +112,14 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=location_description,
+        # TODO could move into cfg_annex plugin
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
         save=nosave_opt,
+        # TODO could move into cfg_annex plugin
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -125,6 +127,7 @@ class Create(Interface):
             version. This should be left untouched, unless you know what
             you are doing""",
             constraints=EnsureDType(int) | EnsureNone()),
+        # TODO could move into cfg_annex plugin
         annex_backend=Parameter(
             args=("--annex-backend",),
             constraints=EnsureStr() | EnsureNone(),
@@ -135,6 +138,7 @@ class Create(Interface):
             of datasets across platforms (especially those with limited
             path lengths)""",
             nargs=1),
+        # TODO could move into cfg_metadata plugin
         native_metadata_type=Parameter(
             args=('--native-metadata-type',),
             metavar='LABEL',
@@ -143,6 +147,7 @@ class Create(Interface):
             doc="""Metadata type label. Must match the name of the respective
             parser implementation in Datalad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
+        # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
@@ -207,7 +212,8 @@ class Create(Interface):
             unavailable_path_msg=None,
             # if we have a dataset given that actually exists, we want to
             # fail if the requested path is not in it
-            nondataset_path_status='error' if dataset and dataset.is_installed() else '',
+            nondataset_path_status='error' \
+                if isinstance(dataset, Dataset) and dataset.is_installed() else '',
             on_failure='ignore')
         path = None
         for r in annotated_paths:
@@ -252,7 +258,7 @@ class Create(Interface):
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
-        tbds = dataset if dataset is not None and dataset.path == path['path'] \
+        tbds = dataset if isinstance(dataset, Dataset) and dataset.path == path['path'] \
             else Dataset(path['path'])
 
         # don't create in non-empty directory without `force`:
@@ -318,7 +324,7 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if save and dataset is not None and dataset.path != tbds.path:
+        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(

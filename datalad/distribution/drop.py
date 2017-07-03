@@ -37,7 +37,7 @@ from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 
 lgr = logging.getLogger('datalad.distribution.drop')
 

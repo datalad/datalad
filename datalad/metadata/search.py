@@ -23,7 +23,7 @@ from six import iteritems
 from six import reraise
 from six import PY3
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset

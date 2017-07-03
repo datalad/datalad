@@ -27,7 +27,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 
 from logging import getLogger
 lgr = getLogger('datalad.api.clean')

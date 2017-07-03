@@ -18,7 +18,7 @@ from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone

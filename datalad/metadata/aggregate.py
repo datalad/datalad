@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj, exists, relpath, dirname
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt

@@ -26,7 +26,7 @@ from datalad.interface.base import Interface
 from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.gitrepo import GitRepo

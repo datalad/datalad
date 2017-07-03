@@ -24,11 +24,22 @@ from collections import OrderedDict
 from ..ui import ui
 from ..dochelpers import exc_str
 
+from datalad.interface.common_opts import eval_params
+from datalad.interface.common_opts import eval_defaults
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+
+
+default_logchannels = {
+    '': 'debug',
+    'ok': 'debug',
+    'notneeded': 'debug',
+    'impossible': 'warning',
+    'error': 'error',
+}
 
 
 def get_api_name(intfspec):
@@ -242,6 +253,60 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     # assign the amended docs
     func.__doc__ = doc
     return func
+
+
+def build_doc(cls, **kwargs):
+    """Decorator to build docstrings for datalad commands
+
+    It's intended to decorate the class, the __call__-method of which is the
+    actual command. It expects that __call__-method to be decorated by
+    eval_results.
+
+    Parameters
+    ----------
+    cls: Interface
+      class defining a datalad command
+    """
+
+    # Note, that this is a class decorator, which is executed only once when the
+    # class is imported. It builds the docstring for the class' __call__ method
+    # and returns the original class.
+    #
+    # This is because a decorator for the actual function would not be able to
+    # behave like this. To build the docstring we need to access the attribute
+    # _params of the class. From within a function decorator we cannot do this
+    # during import time, since the class is being built in this very moment and
+    # is not yet available in the module. And if we do it from within the part
+    # of a function decorator, that is executed when the function is called, we
+    # would need to actually call the command once in order to build this
+    # docstring.
+
+    lgr.debug("Building doc for {}".format(cls))
+
+    cls_doc = cls.__doc__
+    if hasattr(cls, '_docs_'):
+        # expand docs
+        cls_doc = cls_doc.format(**cls._docs_)
+
+    call_doc = None
+    # suffix for update_docstring_with_parameters:
+    if cls.__call__.__doc__:
+        call_doc = cls.__call__.__doc__
+
+    # build standard doc and insert eval_doc
+    spec = getattr(cls, '_params_', dict())
+    # get docs for eval_results parameters:
+    spec.update(eval_params)
+
+    update_docstring_with_parameters(
+        cls.__call__, spec,
+        prefix=alter_interface_docs_for_api(cls_doc),
+        suffix=alter_interface_docs_for_api(call_doc),
+        add_args=eval_defaults if not hasattr(cls, '_no_eval_results') else None
+    )
+
+    # return original
+    return cls
 
 
 class Interface(object):
@@ -483,8 +548,13 @@ class Interface(object):
         return content_by_ds, unavailable_paths
 
 
-def merge_allargs2kwargs(call, args, kwargs):
-    """Generate a kwargs dict from a call signature and *args, **kwargs"""
+def get_allargs_as_kwargs(call, args, kwargs):
+    """Generate a kwargs dict from a call signature and *args, **kwargs
+
+    Basically resolving the argnames for all positional arguments, and
+    resolvin the defaults for all kwargs that are not given in a kwargs
+    dict
+    """
     from inspect import getargspec
     argspec = getargspec(call)
     defaults = argspec.defaults
@@ -499,5 +569,8 @@ def merge_allargs2kwargs(call, args, kwargs):
             kwargs_[k] = v
     # update with provided kwarg args
     kwargs_.update(kwargs)
-    assert (nargs == len(kwargs_))
+    # XXX we cannot assert the following, because our own highlevel
+    # API commands support more kwargs than what is discoverable
+    # from their signature...
+    #assert (nargs == len(kwargs_))
     return kwargs_
