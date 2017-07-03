@@ -136,8 +136,7 @@ class Create(Interface):
             For a list of supported backends see the git-annex
             documentation. The default is optimized for maximum compatibility
             of datasets across platforms (especially those with limited
-            path lengths)""",
-            nargs=1),
+            path lengths)"""),
         # TODO could move into cfg_metadata plugin
         native_metadata_type=Parameter(
             args=('--native-metadata-type',),
