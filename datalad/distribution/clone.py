@@ -102,6 +102,7 @@ class Clone(Interface):
         reckless=reckless_opt,
         alt_sources=Parameter(
             args=('--alternative-sources',),
+            dest='alt_sources',
             metavar='SOURCE',
             nargs='+',
             doc="""Alternative sources to be tried if a dataset cannot
