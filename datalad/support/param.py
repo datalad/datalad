@@ -118,15 +118,6 @@ class Parameter(object):
         doc.strip()
         if len(doc) and not doc.endswith('.'):
             doc += '.'
-        if self.constraints is not None:
-            cdoc = self.constraints.long_description()
-            if cdoc[0] == '(' and cdoc[-1] == ')':
-                cdoc = cdoc[1:-1]
-            addinfo = ''
-            if self.cmd_kwargs.get('nargs', None) == '?' \
-                    or self.cmd_kwargs.get('action', None) == 'append':
-                addinfo = 'list expected, each '
-            doc += ' Constraints: %s%s.' % (addinfo, cdoc)
         if has_default:
             doc += " [Default: %r]" % (default,)
         # Explicitly deal with multiple spaces, for some reason
