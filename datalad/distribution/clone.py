@@ -10,6 +10,7 @@
 
 
 import logging
+import re
 from os import listdir
 from os.path import relpath
 from os.path import pardir
@@ -236,6 +237,15 @@ class Clone(Interface):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
                     rmtree(dest_path)
+                if 'could not create work tree' in e.stderr.lower():
+                    # this cannot be fixed by trying another URL
+                    yield get_status_dict(
+                        status='error',
+                        message=re.match(r".*fatal: (.*)\n",
+                                         e.stderr,
+                                         flags=re.MULTILINE | re.DOTALL).group(1),
+                        **status_kwargs)
+                    return
 
         if not destination_dataset.is_installed():
             yield get_status_dict(

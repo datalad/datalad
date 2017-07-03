@@ -45,6 +45,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import skip_if_on_windows
 
 from ..dataset import Dataset
 
@@ -309,3 +310,13 @@ def test_clone_isnt_a_smartass(origin_path, path):
     assert clonedsub.path.startswith(path)
     # no subdataset relation
     eq_(cloned.subdatasets(), [])
+
+
+@skip_if_on_windows
+def test_clone_report_permission_issue():
+    with chpwd('/'):
+        res = clone('///', result_xfm=None, return_type='list', on_failure='ignore')
+        assert_status('error', res)
+        assert_result_count(
+            res, 1, status='error',
+            message="could not create work tree dir '/datasets.datalad.org': Permission denied")
