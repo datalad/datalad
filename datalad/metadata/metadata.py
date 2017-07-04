@@ -429,7 +429,6 @@ class Metadata(Interface):
                         key_error = True
             if key_error:
                 return
-
             #
             # generic metadata manipulation
             #
@@ -458,7 +457,8 @@ class Metadata(Interface):
                         del db[k]
 
                 # store, if there is anything
-                if db:
+                if db and (added_def or init or add or remove or reset or purge):
+                    # if anything happended or could have happended
                     if not exists(dirname(db_path)):
                         makedirs(dirname(db_path))
                     db_fp = open(db_path, 'w')
@@ -477,19 +477,17 @@ class Metadata(Interface):
                         path=db_path,
                         parentds=ds.path,
                         type='file'))
-                elif exists(db_path):
+                elif not db and exists(db_path):
                     # no metadata left, kill file
                     ds.remove(db_path)
                     to_save.append(dict(
                         path=ds.path,
                         type='dataset'))
-                if added_def or init or add or remove or reset or purge:
-                    # if anything happended or could have happended
-                    yield get_status_dict(
-                        status='ok',
-                        ds=ds,
-                        metadata=db,
-                        **res_kwargs)
+                yield get_status_dict(
+                    status='ok',
+                    ds=ds,
+                    metadata=db,
+                    **res_kwargs)
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:

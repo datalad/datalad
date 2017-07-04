@@ -212,11 +212,14 @@ def test_basic_dsmeta(path):
     res = ds.metadata(define_key=dict(otherkey='altfact'),)
     eq_(res[0]['metadata']['definition']['otherkey'], 'altfact')
     # 'definition' is a regular key, we can remove items
-    res = ds.metadata(remove=dict(definition=['mykey', 'dtype', 'readme']), dataset_global=True)
+    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True)
     assert_dict_equal(
         res[0]['metadata']['definition'],
-        {'otherkey': u'altfact'})
-    res = ds.metadata(remove=dict(definition=['otherkey']), dataset_global=True)
+        {'otherkey': u'altfact',
+         'readme': u'is_readme_content',
+         'dtype': u'is_a_datatype'})
+    res = ds.metadata(remove=dict(definition=['otherkey', 'readme', 'dtype']),
+                      dataset_global=True)
     # when there are no items left, the key vanishes too
     assert('definition' not in res[0]['metadata'])
     # we still have metadata, so there is a DB file
