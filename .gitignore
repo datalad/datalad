@@ -10,6 +10,7 @@ datalad.build/
 /build
 /docs/build
 /docs/source/generated
+/docs/source/_extras/schema.json
 /.tox
 /repos
 tmp

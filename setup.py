@@ -16,6 +16,7 @@ from setuptools import findall
 from setuptools import setup, find_packages
 
 from setup_support import BuildConfigInfo
+from setup_support import BuildSchema
 from setup_support import BuildManPage, setup_entry_points
 from setup_support import BuildRSTExamplesFromScripts
 from setup_support import get_version
@@ -133,6 +134,7 @@ cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
+    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 

@@ -209,6 +209,55 @@ class BuildConfigInfo(Command):
                     rst.write(_indent(desc_tmpl.format(**v), '    '))
 
 
+class BuildSchema(Command):
+    description = 'Generate DataLad JSON-LD schema.'
+
+    user_options = [
+        ('path=', None, 'output path for schema file'),
+    ]
+
+    def initialize_options(self):
+        self.path = opj('docs', 'source', '_extras', 'schema.json')
+
+    def finalize_options(self):
+        if self.path is None:
+            raise DistutilsOptionError('\'path\' option is required')
+        self.path = _path_rel2file(self.path)
+        self.announce('Generating JSON-LD schema file')
+
+    def run(self):
+        opath = self.path
+        odir = dirname(opath)
+        if not os.path.exists(odir):
+            os.makedirs(odir)
+
+        from datalad.metadata.definitions import common_key_defs
+        import json
+
+        # to become DataLad's own JSON-LD context
+        context = {}
+        schema = {"@context": context}
+        for key, val in common_key_defs.items():
+            if not (val.startswith('http://') or val.startswith('https://')):
+                # this is not a URL, hence an @id definitions that points
+                # to another schema
+                val = {'@id': val}
+            # git-annex doesn't allow ':', but in JSON-LD we need it for
+            # namespace separation -- let's make '.' in git-annex mean
+            # ':' in JSON-LD
+            key = key.replace('.', ':')
+            context[key] = val
+
+        with open(opath, 'w') as fp:
+            json.dump(
+                schema,
+                fp,
+                ensure_ascii=True,
+                indent=None,
+                separators=(',\n', ': '),
+                sort_keys=True)
+
+
 def setup_entry_points(entry_points):
     """Sneaky monkey patching could be fixed only via even sneakier monkey patching
 
