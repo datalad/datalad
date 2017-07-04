@@ -104,6 +104,42 @@ def _get_key(k):
     return k
 
 
+def _init(db, spec):
+    for k, v in spec.items() if spec else []:
+        if k not in db:
+            db[k] = v
+
+
+def _purge(db, spec):
+    for k in spec:
+        if k in db:
+            del db[k]
+
+
+def _reset(db, spec):
+    for k, v in spec.items():
+        db[k] = v
+
+
+def _add(db, spec):
+    for k, v in spec.items():
+        db[k] = sorted(unique(
+            db.get(k, []) + assure_list(v)))
+
+
+def _remove(db, spec):
+    for k, v in spec.items():
+        existing_data = db.get(k, [])
+        if isinstance(existing_data, dict):
+            db[k] = {dk: existing_data[dk]
+                     for dk in set(existing_data).difference(v)}
+        else:
+            db[k] = list(set(existing_data).difference(v))
+        # wipe out if empty
+        if not db[k]:
+            del db[k]
+
+
 @build_doc
 class Metadata(Interface):
     """Metadata manipulation for files and whole datasets
@@ -439,27 +475,11 @@ class Metadata(Interface):
             #
             if dataset_global or define_key:
                 # TODO make manipulation order identical to what git-annex does
-                for k, v in init.items() if init else []:
-                    if k not in db:
-                        db[k] = v
-                for k in purge:
-                    if k in db:
-                        del db[k]
-                for k, v in reset.items():
-                    db[k] = v
-                for k, v in add.items():
-                    db[k] = sorted(unique(
-                        db.get(k, []) + assure_list(v)))
-                for k, v in remove.items():
-                    existing_data = db.get(k, [])
-                    if isinstance(existing_data, dict):
-                        db[k] = {dk: existing_data[dk]
-                                 for dk in set(existing_data).difference(v)}
-                    else:
-                        db[k] = list(set(existing_data).difference(v))
-                    # wipe out if empty
-                    if not db[k]:
-                        del db[k]
+                _init(db, init)
+                _purge(db, purge)
+                _reset(db, reset)
+                _add(db, add)
+                _remove(db, remove)
 
                 # store, if there is anything
                 if db and (added_def or init or add or remove or reset or purge):
