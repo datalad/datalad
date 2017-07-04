@@ -47,9 +47,11 @@ from datalad.distribution.dataset import resolve_path
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
+
 from datalad.support.constraints import Constraint
 
 from datalad.ui import ui
+import datalad.support.ansi_colors as ac
 
 from datalad.interface.base import Interface
 from datalad.interface.base import default_logchannels
@@ -787,11 +789,13 @@ def _process_results(
         if result_renderer == 'default':
             # TODO have a helper that can expand a result message
             ui.message('{action}({status}): {path}{type}{msg}'.format(
-                action=res['action'],
-                status=res['status'],
+                action=ac.color_word(res['action'], ac.BOLD),
+                status=ac.color_status(res['status']),
                 path=relpath(res['path'],
                              res['refds']) if res.get('refds', None) else res['path'],
-                type=' ({})'.format(res['type']) if 'type' in res else '',
+                type=' ({})'.format(
+                    ac.color_word(res['type'], ac.MAGENTA)
+                    ) if 'type' in res else '',
                 msg=' [{}]'.format(
                     res['message'][0] % res['message'][1:]
                     if isinstance(res['message'], tuple) else res['message'])
