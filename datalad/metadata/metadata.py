@@ -27,17 +27,20 @@ from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
+from datalad.metadata.definitions import common_key_defs
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
+import datalad.support.ansi_colors as ac
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.utils import unique
+from datalad.ui import ui
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -240,6 +243,12 @@ class Metadata(Interface):
             key label. This option does not need --dataset-global to
             be set to be in effect.""",
             constraints=EnsureStr() | EnsureNone()),
+        show_keys=Parameter(
+            args=('--show-keys',),
+            action='store_true',
+            doc="""if set, a list of known metadata keys (including the
+            origin of their definition) is shown. No other action is
+            performed, even if other arguments are given."""),
         dataset_global=Parameter(
             args=('-g', '--dataset-global'),
             action='store_true',
@@ -264,9 +273,11 @@ class Metadata(Interface):
             remove=None,
             reset=None,
             define_key=None,
+            show_keys=False,
             dataset_global=False,
             recursive=False,
             recursion_limit=None):
+        # TODO validate against known key list
         # bring metadataset setter args in shape first
         untag, remove = _parse_argspec(remove)
         purge, reset = _parse_argspec(reset)
@@ -292,6 +303,17 @@ class Metadata(Interface):
 
         refds_path = Interface.get_refds_path(dataset)
         res_kwargs = dict(action='metadata', logger=lgr, refds=refds_path)
+
+        if show_keys:
+            # to get into the ds meta branches below
+            dataset_global = True
+            for k in sorted(common_key_defs):
+                if k.startswith('@'):
+                    continue
+                ui.message('{}: {} ({})'.format(
+                    ac.color_word(k, ac.BOLD),
+                    common_key_defs[k],
+                    ac.color_word('builtin', ac.MAGENTA)))
 
         to_process = []
         for ap in AnnotatePaths.__call__(
@@ -346,6 +368,16 @@ class Metadata(Interface):
                     db_fp.close()
                     if db_content:
                         db = json.loads(db_content)
+                if show_keys:
+                    defs = db.get('definition', {})
+                    for k in sorted(defs):
+                        ui.message('{}: {} ({}: {})'.format(
+                            ac.color_word(k, ac.BOLD),
+                            defs[k],
+                            ac.color_word('dataset', ac.MAGENTA),
+                            ds.path))
+                    # no other processing
+                    continue
                 # TODO make manipulation order identical to what git-annex does
                 for k, v in init.items() if init else []:
                     if k not in db:

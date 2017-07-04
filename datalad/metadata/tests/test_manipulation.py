@@ -32,6 +32,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import swallow_outputs
 
 
 @with_tempfile(mkdir=True)
@@ -180,9 +181,16 @@ def test_basic_dsmeta(path):
     eq_(res[0]['metadata']['dtype'], ['heavy'])
     # sorted!
     eq_(res[0]['metadata']['readme'], ['long', 'short'])
+    # check it reports common keys
+    with swallow_outputs() as cmo:
+        ds.metadata(show_keys=True)
+        assert_in('license', cmo.out)
     # supply key definitions, no need for dataset_global
     res = ds.metadata(define_key=dict(mykey='truth'))
     eq_(res[0]['metadata']['definition'], {'mykey': u'truth'})
+    with swallow_outputs() as cmo:
+        ds.metadata(show_keys=True)
+        assert_in('mykey: truth (dataset: {})'.format(ds.path), cmo.out)
     # re-supply different key definitions -> error
     res = ds.metadata(define_key=dict(mykey='lie'), on_failure='ignore')
     assert_result_count(
