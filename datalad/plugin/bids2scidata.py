@@ -12,14 +12,22 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+import json
 from collections import OrderedDict
 from glob import glob
 import os
 from os.path import exists, join as opj, split as psplit
 
-import nibabel
-import json
-import pandas as pd
+# non-standard deps
+try:
+    import nibabel
+except ImportError:
+    nibabel = None
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 
 # map column titles to ontology specs
@@ -277,7 +285,7 @@ def _describe_file(fpath, bids_directory):
 def _describe_mri_file(fpath, bids_directory):
     info = _describe_file(fpath, bids_directory)
 
-    if not exists(fpath):
+    if nibabel is None or not exists(fpath):
         # this could happen in the case of a dead symlink in,
         # e.g., a git-annex repo
         logging.warn(
@@ -567,6 +575,12 @@ def extract(
         output_directory,
         drop_parameter=None,
         repository_info=None):
+    if pd is None:
+        logging.error(
+            "This plugin requires Pandas to be available (error follows)")
+        import pandas
+        return
+
     if not exists(output_directory):
         logging.info(
             "creating output directory at '{}'".format(output_directory))
@@ -629,7 +643,6 @@ def extract(
         bids_directory, mri_par_names)
     with open(opj(output_directory, "i_investigation.txt"), "w") as fp:
         fp.write(investigation_template)
-
 
 
 #
