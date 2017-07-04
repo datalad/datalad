@@ -27,6 +27,7 @@ cfg = ConfigManager()
 from .log import lgr
 import atexit
 from datalad.utils import on_windows
+
 if not on_windows:
     lgr.log(5, "Instantiating ssh manager")
     from .support.sshconnector import SSHManager
@@ -43,10 +44,12 @@ try:
     import colorama
     colorama.init()
     atexit.register(colorama.deinit)
-except ImportError:
+except ImportError as e:
     if on_windows:
+        from datalad.dochelpers import exc_str
         lgr.warning(
-            "'colorama' Python module missing, terminal output may look garbled")
+            "'colorama' Python module missing, terminal output may look garbled [%s]",
+            exc_str(e))
     pass
 
 atexit.register(lgr.log, 5, "Exiting")
