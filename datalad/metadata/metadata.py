@@ -327,7 +327,7 @@ class Metadata(Interface):
         if not dataset and not path and not show_keys:
             # makes no sense to have no dataset, go with "here"
             # error generation happens during annotation
-            dataset = curdir
+            path = curdir
 
         to_process = []
         for ap in AnnotatePaths.__call__(
