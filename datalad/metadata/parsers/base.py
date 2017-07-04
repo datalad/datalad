@@ -66,5 +66,18 @@ class BaseMetadataParser(object):
             meta = self._get_metadata(dsid, meta, full)
         return meta
 
+    def get_global_metadata(self):
+        """Returns dataset global metadata
+
+        Returns
+        -------
+        dict
+          Keys should be a subset of the those commoly defined
+          by DataLad
+        """
+        # XXX for now this is reusing the old methods
+        meta = self._get_metadata(None, {}, False)
+        return meta if meta else None
+
     def _get_metadata(self, dsid, basemeta, full):
         raise NotImplementedError
