@@ -17,6 +17,7 @@ from datalad.metadata.parsers.base import BaseMetadataParser
 import logging
 lgr = logging.getLogger('datalad.meta.bids')
 
+
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = ['dataset_description.json']
 
@@ -30,7 +31,7 @@ class MetadataParser(BaseMetadataParser):
                                       ('License', 'license'),
                                       ('Authors', 'author'),
                                       ('ReferencesAndLinks', 'citation'),
-                                      ('Funding', 'foaf:fundedBy'),
+                                      ('Funding', 'fundedby'),
                                       ('Description', 'description')):
             if bidsterm in bids:
                 meta[dataladterm] = bids[bidsterm]
@@ -52,14 +53,11 @@ class MetadataParser(BaseMetadataParser):
 
             meta['description'] = desc.strip()
 
-        compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
-
         # special case
         if bids.get('BIDSVersion'):
-            compliance.append(
+            meta['conformsto'] = \
                 'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
-                    bids['BIDSVersion'].strip()))
+                    bids['BIDSVersion'].strip())
         else:
-            compliance.append('http://bids.neuroimaging.io')
-        meta['dcterms:conformsTo'] = compliance
+            meta['conformsto'] = 'http://bids.neuroimaging.io'
         return meta
