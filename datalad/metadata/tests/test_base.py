@@ -76,11 +76,11 @@ def test_get_metadata_type(path):
     assert_equal(get_metadata_type(Dataset(path)), [])
     os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
-    open(opj(path, '.datalad', 'config'), 'w').write('[metadata]\n')
+    open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
     assert_equal(get_metadata_type(Dataset(path)), [])
     # minimal setting
-    open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
+    open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata"]\nnativetype = mamboschwambo\n')
+    assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
 
 
 @with_tree(tree={

@@ -33,7 +33,7 @@ metadata_filename = 'meta.json'
 metadata_basepath = opj('.datalad', 'meta')
 
 
-# XXX Could become dataset method
+# TODO into metadata command code
 def get_metadata_type(ds, guess=False):
     """Return the metadata type(s)/scheme(s) of a dataset
 
@@ -51,11 +51,10 @@ def get_metadata_type(ds, guess=False):
       Metadata type labels or an empty list if no type setting is found and
       optional auto-detection yielded no results
     """
-    cfg_ = ds.config
-    # TODO give cfg name datalad prefix
-    if cfg_ and cfg_.has_section('metadata'):
-        if cfg_.has_option('metadata', 'nativetype'):
-            return cfg_.get_value('metadata', 'nativetype').split()
+    cfg_key = 'datalad.metadata.nativetype'
+    if cfg_key in ds.config:
+        return ds.config[cfg_key]
+
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in

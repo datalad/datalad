@@ -28,6 +28,8 @@ from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
+# TODO move next one in here when possible after RF
+from datalad.metadata import get_metadata_type
 from datalad.metadata.definitions import common_key_defs
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
@@ -483,11 +485,17 @@ class Metadata(Interface):
                     to_save.append(dict(
                         path=ds.path,
                         type='dataset'))
-                yield get_status_dict(
+                res = get_status_dict(
                     status='ok',
                     ds=ds,
                     metadata=db,
                     **res_kwargs)
+                # guessing would be expensive, and if the maintainer
+                # didn't advertise it we better not brag about it either
+                native_types = get_metadata_type(ds, guess=False)
+                if native_types:
+                    res['metadata_nativetype'] = native_types
+                yield res
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:

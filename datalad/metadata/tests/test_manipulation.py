@@ -276,3 +276,29 @@ def test_mod_hierarchy(path):
     os.remove(opj(base.path, 'probe'))
     os.remove(opj(sub.path, 'probe'))
     ok_clean_git(base.path)
+
+
+@with_tempfile(mkdir=True)
+def test_report_native_type(path):
+    ds = Dataset(path).create()
+    assert_not_in(
+        'native_metadata_types',
+        ds.metadata(dataset_global=True, return_type='item-or-list'))
+    # add a type config
+    ds.config.add(
+        'datalad.metadata.nativetype',
+        'schwupp',
+        where='dataset')
+    eq_('schwupp',
+        ds.metadata(
+            dataset_global=True,
+            return_type='item-or-list')['metadata_nativetype'])
+    # add another type config
+    ds.config.add(
+        'datalad.metadata.nativetype',
+        'schwapp',
+        where='dataset')
+    eq_(('schwupp', 'schwapp'),
+        ds.metadata(
+            dataset_global=True,
+            return_type='item-or-list')['metadata_nativetype'])
