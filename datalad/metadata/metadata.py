@@ -17,6 +17,7 @@ import json
 from os import makedirs
 from os.path import dirname
 from os.path import relpath
+from os.path import curdir
 from os.path import exists
 from os.path import join as opj
 
@@ -249,6 +250,14 @@ class Metadata(Interface):
             doc="""if set, a list of known metadata keys (including the
             origin of their definition) is shown. No other action is
             performed, even if other arguments are given."""),
+        permit_undefined_keys=Parameter(
+            args=('--permit-undefined-keys',),
+            action='store_true',
+            doc="""if set, adding (to) undefined metadata keys is
+            permitted. By default such an attempt will result in an
+            error. It is better to use --define-key to provide
+            a definition for a metadata key, or to use pre-defined
+            keys (see --show-keys)."""),
         dataset_global=Parameter(
             args=('-g', '--dataset-global'),
             action='store_true',
@@ -274,10 +283,10 @@ class Metadata(Interface):
             reset=None,
             define_key=None,
             show_keys=False,
+            permit_undefined_keys=False,
             dataset_global=False,
             recursive=False,
             recursion_limit=None):
-        # TODO validate against known key list
         # bring metadataset setter args in shape first
         untag, remove = _parse_argspec(remove)
         purge, reset = _parse_argspec(reset)
@@ -314,6 +323,11 @@ class Metadata(Interface):
                     ac.color_word(k, ac.BOLD),
                     common_key_defs[k],
                     ac.color_word('builtin', ac.MAGENTA)))
+
+        if not dataset and not path and not show_keys:
+            # makes no sense to have no dataset, go with "here"
+            # error generation happens during annotation
+            dataset = curdir
 
         to_process = []
         for ap in AnnotatePaths.__call__(
@@ -352,32 +366,74 @@ class Metadata(Interface):
             # ignore submodule entries
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
-            if not content:
+            if not content and not show_keys:
                 # nothing other than subdatasets were given or discovered in
                 # this dataset, ignore
                 continue
             ds = Dataset(ds_path)
+            db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
+            db = {}
+            if exists(db_path):
+                db_fp = open(db_path)
+                # need to read manually, load() would puke on an empty file
+                db_content = db_fp.read()
+                # minimize time for collision
+                db_fp.close()
+                if db_content:
+                    db = json.loads(db_content)
+            #
+            # dedicated key handling
+            #
+            defs = db.get('definition', {})
+            if show_keys:
+                for k in sorted(defs):
+                    ui.message('{}: {} ({}: {})'.format(
+                        ac.color_word(k, ac.BOLD),
+                        defs[k],
+                        ac.color_word('dataset', ac.MAGENTA),
+                        ds.path))
+                # no other processing
+                continue
+            added_def = False
+            if define_key:
+                for k, v in define_key.items():
+                    if k in defs:
+                        if not defs[k] == v:
+                            yield get_status_dict(
+                                status='error',
+                                ds=ds,
+                                message=(
+                                    "conflicting definition for key '%s': '%s' != '%s'",
+                                    k, v, defs[k]),
+                                **res_kwargs)
+                            continue
+                    else:
+                        defs[k] = v
+                        added_def = True
+                db['definition'] = defs
+            #
+            # validate keys (only possible when dataset-defined keys are known
+            #
+            known_keys = set(common_key_defs.keys()).union(set(defs.keys()))
+            key_error = False
+            for cat in (init, add, reset) if not permit_undefined_keys else []:
+                for k in cat if cat else []:
+                    if k not in known_keys:
+                        yield get_status_dict(
+                            status='error',
+                            ds=ds,
+                            message=(
+                                "undefined key '%s', check spelling or use --define-key",
+                                k),
+                            **res_kwargs)
+                        key_error = True
+            if key_error:
+                return
+
+            #
+            # generic metadata manipulation
+            #
             if dataset_global or define_key:
-                db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
-                db = {}
-                if exists(db_path):
-                    db_fp = open(db_path)
-                    # need to read manually, load() would puke on an empty file
-                    db_content = db_fp.read()
-                    # minimize time for collision
-                    db_fp.close()
-                    if db_content:
-                        db = json.loads(db_content)
-                if show_keys:
-                    defs = db.get('definition', {})
-                    for k in sorted(defs):
-                        ui.message('{}: {} ({}: {})'.format(
-                            ac.color_word(k, ac.BOLD),
-                            defs[k],
-                            ac.color_word('dataset', ac.MAGENTA),
-                            ds.path))
-                    # no other processing
-                    continue
                 # TODO make manipulation order identical to what git-annex does
                 for k, v in init.items() if init else []:
                     if k not in db:
@@ -389,7 +445,7 @@ class Metadata(Interface):
                     db[k] = v
                 for k, v in add.items():
                     db[k] = sorted(unique(
-                        db.get(k, []) + v))
+                        db.get(k, []) + list(v)))
                 for k, v in remove.items():
                     existing_data = db.get(k, [])
                     if isinstance(existing_data, dict):
@@ -401,24 +457,6 @@ class Metadata(Interface):
                     if not db[k]:
                         del db[k]
 
-                added_def = False
-                if define_key:
-                    defs = db.get('definition', {})
-                    for k, v in define_key.items():
-                        if k in defs:
-                            if not defs[k] == v:
-                                yield get_status_dict(
-                                    status='error',
-                                    ds=ds,
-                                    message=(
-                                        "conflicting definition for key '%s': '%s' != '%s'",
-                                        k, v, defs[k]),
-                                    **res_kwargs)
-                                continue
-                        else:
-                            defs[k] = v
-                            added_def = True
-                    db['definition'] = defs
                 # store, if there is anything
                 if db:
                     if not exists(dirname(db_path)):
@@ -434,7 +472,7 @@ class Metadata(Interface):
                     # minimize time for collision
                     db_fp.close()
                     # use add not save to also cover case of a fresh file
-                    ds.add(db_path, save=False)
+                    ds.add(db_path, save=False, to_git=True)
                     to_save.append(dict(
                         path=db_path,
                         parentds=ds.path,

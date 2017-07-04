@@ -129,7 +129,11 @@ def test_basic_filemeta(path):
     #
     # key: value mapping
     #
-    res = ds.metadata('somefile', add=dict(new=('v1', 'v2')))
+    res = ds.metadata('somefile', add=dict(new=('v1', 'v2')),
+                      on_failure='ignore')
+    assert_status('error', res)
+    res = ds.metadata('somefile', add=dict(new=('v1', 'v2')),
+                      define_key=dict(new="something fresh"))
     assert_result_count(res, 1, metadata={'new': ['v1', 'v2']})
     # same as this, which exits to support the way things come
     # in from the cmdline
@@ -142,13 +146,15 @@ def test_basic_filemeta(path):
     res = ds.metadata(target_file, reset=['new'])
     assert_result_count(res, 1, metadata={})
     # reset with a mapping, overrides the old one
-    res = ds.metadata('somefile', reset=dict(new='george', more='yeah'))
+    res = ds.metadata('somefile', reset=dict(new='george', more='yeah'),
+                      permit_undefined_keys=True)
     assert_result_count(res, 1, metadata=dict(new=['george'], more=['yeah']))
     # remove single value from mapping, last value to go removes the key
     res = ds.metadata('somefile', remove=dict(more='yeah'))
     assert_result_count(res, 1, metadata=dict(new=['george']))
     # and finally init keys
-    res = ds.metadata(init=dict(new=['two', 'three'], super='fresh'))
+    res = ds.metadata(init=dict(new=['two', 'three'], super='fresh'),
+                      permit_undefined_keys=True)
     assert_result_count(res, 2)
     assert_result_count(
         res, 1, path=opj(ds.path, target_file),
@@ -177,7 +183,13 @@ def test_basic_dsmeta(path):
     assert_result_count(ds.metadata(), 0)
     # add something arbitrary
     res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
+                      dataset_global=True, on_failure='ignore')
+    # fails due to unknown keys
+    assert_status('error', res)
+    res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
+                      define_key=dict(dtype='is_a_datatype', readme='is_readme_content'),
                       dataset_global=True)
+
     eq_(res[0]['metadata']['dtype'], ['heavy'])
     # sorted!
     eq_(res[0]['metadata']['readme'], ['long', 'short'])
@@ -187,7 +199,7 @@ def test_basic_dsmeta(path):
         assert_in('license', cmo.out)
     # supply key definitions, no need for dataset_global
     res = ds.metadata(define_key=dict(mykey='truth'))
-    eq_(res[0]['metadata']['definition'], {'mykey': u'truth'})
+    eq_(res[0]['metadata']['definition']['mykey'], u'truth')
     with swallow_outputs() as cmo:
         ds.metadata(show_keys=True)
         assert_in('mykey: truth (dataset: {})'.format(ds.path), cmo.out)
@@ -197,12 +209,10 @@ def test_basic_dsmeta(path):
         res, 1, status='error',
         message=("conflicting definition for key '%s': '%s' != '%s'",
                  "mykey", "lie", "truth"))
-    res = ds.metadata(define_key=dict(otherkey='altfact'))
-    assert_dict_equal(
-        res[0]['metadata']['definition'],
-        {'mykey': u'truth', 'otherkey': 'altfact'})
+    res = ds.metadata(define_key=dict(otherkey='altfact'),)
+    eq_(res[0]['metadata']['definition']['otherkey'], 'altfact')
     # 'definition' is a regular key, we can remove items
-    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True)
+    res = ds.metadata(remove=dict(definition=['mykey', 'dtype', 'readme']), dataset_global=True)
     assert_dict_equal(
         res[0]['metadata']['definition'],
         {'otherkey': u'altfact'})
