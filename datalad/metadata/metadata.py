@@ -43,6 +43,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.utils import unique
+from datalad.utils import assure_list
 from datalad.ui import ui
 
 lgr = logging.getLogger('datalad.metadata.metadata')
@@ -425,7 +426,9 @@ class Metadata(Interface):
                             status='error',
                             ds=ds,
                             message=(
-                                "undefined key '%s', check spelling or use --define-key",
+                                "undefined key '%s', check spelling or use --define-key "
+                                "and consider suggesting a new pre-configured key "
+                                "at https://github.com/datalad/datalad/issues/new",
                                 k),
                             **res_kwargs)
                         key_error = True
@@ -446,7 +449,7 @@ class Metadata(Interface):
                     db[k] = v
                 for k, v in add.items():
                     db[k] = sorted(unique(
-                        db.get(k, []) + list(v)))
+                        db.get(k, []) + assure_list(v)))
                 for k, v in remove.items():
                     existing_data = db.get(k, [])
                     if isinstance(existing_data, dict):

@@ -415,6 +415,7 @@ class ConfigManager(object):
         """Returns list of configuration item names"""
         return self._store.keys()
 
+    # XXX should this be *args?
     def get(self, key, default=None):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
         return self._store.get(key, default)
