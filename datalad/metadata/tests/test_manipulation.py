@@ -23,6 +23,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import chpwd
 
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
@@ -289,6 +290,8 @@ def test_report_native_type(path):
         'datalad.metadata.nativetype',
         'schwupp',
         where='dataset')
+    # as the metadata type is fictional there will be no parser
+    # this leads to a warning, but not to failure
     eq_('schwupp',
         ds.metadata(
             dataset_global=True,
@@ -302,3 +305,83 @@ def test_report_native_type(path):
         ds.metadata(
             dataset_global=True,
             return_type='item-or-list')['metadata_nativetype'])
+
+
+def _clean_meta(meta):
+    # we don't want to worry about anything else in such a test
+    [meta.pop(k, None) for k in list(meta.keys())
+     if k not in ('name', 'author', 'homepage')]
+
+
+@with_tree(tree={
+    'dataset_description.json': '{"Name": "myds", "Authors": ["one", "two"]}',
+    'datapackage.json': '{"name": "someother"}'
+})
+def test_custom_native_merge(path):
+    ds = Dataset(path).create(force=True)
+    # no metadata, because no native type is configured
+    assert_dict_equal(
+        {},
+        ds.metadata(
+            dataset_global=True,
+            result_xfm='metadata', return_type='item-or-list'))
+    # enable BIDS metadata, BIDS metadata should become THE metadata
+    ds.config.add(
+        'datalad.metadata.nativetype',
+        'bids',
+        where='dataset')
+    meta = ds.metadata(
+        dataset_global=True,
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal(
+        {'name': 'myds', 'author': ['one', 'two']},
+        meta)
+    # now give the ds a custom name, must override the native one
+    # but authors still come from BIDS
+    ds.metadata(dataset_global=True, add=dict(name='mycustom'))
+    meta = ds.metadata(
+        dataset_global=True,
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal(
+        {'name': 'mycustom', 'author': ['one', 'two']},
+        meta)
+    # we can disable the merge
+    meta = ds.metadata(
+        dataset_global=True, merge_native='none',
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal({'name': 'mycustom'}, meta)
+    # we can accumulate values
+    meta = ds.metadata(
+        dataset_global=True, merge_native='add',
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal(
+        {'name': ['mycustom', 'myds'], 'author': ['one', 'two']},
+        meta)
+    # we can have native override custom (not sure when needed, though)
+    # add one more custom to make visible
+    ds.metadata(dataset_global=True, init=dict(homepage='fresh'))
+    meta = ds.metadata(
+        dataset_global=True, merge_native='reset',
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal(
+        {'name': 'myds', 'author': ['one', 'two'], 'homepage': 'fresh'},
+        meta)
+    # enable an additional metadata source
+    ds.config.add(
+        'datalad.metadata.nativetype',
+        'frictionless_datapackage',
+        where='dataset')
+    meta = ds.metadata(
+        dataset_global=True, merge_native='add',
+        result_xfm='metadata', return_type='item-or-list')
+    _clean_meta(meta)
+    assert_dict_equal(
+        {'name': ['mycustom', 'myds', 'someother'],
+         'author': ['one', 'two'],
+         'homepage': 'fresh'},
+        meta)

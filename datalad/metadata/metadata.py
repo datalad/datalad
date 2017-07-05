@@ -20,6 +20,7 @@ from os.path import relpath
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
+from importlib import import_module
 
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -32,6 +33,7 @@ from datalad.interface.base import build_doc
 from datalad.metadata import get_metadata_type
 from datalad.metadata.definitions import common_key_defs
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -45,6 +47,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.utils import unique
 from datalad.utils import assure_list
 from datalad.ui import ui
+from datalad.dochelpers import exc_str
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -141,6 +144,57 @@ def _remove(db, spec):
         # wipe out if empty
         if not db[k]:
             del db[k]
+
+
+# TODO generalize to also work with file metadata
+def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
+    """Parse a dataset to gather its native metadata
+
+    In-place modification of `db`. Merge multiple native types
+    in the order in which they were given.
+
+    Parameters
+    ----------
+    db : dict
+    ds : Dataset
+    nativetypes : list
+    mode : {'init', 'add', 'reset'}
+    """
+    mergers = dict(
+        init=_init,
+        add=_add,
+        reset=_reset)
+
+    # keep local, who knows what some parsers might pull in
+    from . import parsers
+    for nativetype in nativetypes:
+        try:
+            pmod = import_module('.{}'.format(nativetype),
+                                 package=parsers.__package__)
+        except ImportError as e:
+            lgr.warning(
+                "Failed to import metadata parser for '%s', "
+                "broken dataset configuration (%s)? "
+                "This type of native metadata will be ignored: %s",
+                nativetype, ds, exc_str(e))
+            continue
+        try:
+            native_meta = pmod.MetadataParser(ds).get_global_metadata()
+        except Exception as e:
+            lgr.error('Failed to get native metadata ({}): {}'.format(
+                nativetype, exc_str(e)))
+            continue
+        if not native_meta:
+            continue
+        if not isinstance(native_meta, dict):
+            lgr.error(
+                "Metadata parser '%s' yielded something other than a dictionary "
+                "for dataset %s -- this is likely a bug, please consider "
+                "reporting it. "
+                "This type of native metadata will be ignored.",
+                nativetype, ds)
+            continue
+        mergers[mode](db, native_meta)
 
 
 @build_doc
@@ -310,6 +364,22 @@ class Metadata(Interface):
             given metadata for all files in a dataset, whereas with
             this flag only the metadata record of the dataset itself
             will be altered."""),
+        merge_native=Parameter(
+            args=('--merge-native',),
+            metavar='MODE',
+            doc="""merge procedure to use when a dataset provides
+            native metadata in some format. Such a dataset has to
+            indicate the type of native metadata via its
+            configuration setting ``datalad.metadata.nativetype``.
+            Multiple different types of metadata are supported. Merging
+            is performed in the order in which they are configured.
+            Custom DataLad metadata always takes precedence over
+            native metadata. Merge procedure modes are semantically
+            identical to the corresponding manipulation arguments.
+            Setting the mode to 'none' disables merging of native
+            metadata.""",
+            constraints=EnsureChoice('init', 'add', 'reset', 'none')),
+
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
 
@@ -327,6 +397,7 @@ class Metadata(Interface):
             show_keys=False,
             permit_undefined_keys=False,
             dataset_global=False,
+            merge_native='init',
             recursive=False,
             recursion_limit=None):
         # bring metadataset setter args in shape first
@@ -518,9 +589,13 @@ class Metadata(Interface):
                     **res_kwargs)
                 # guessing would be expensive, and if the maintainer
                 # didn't advertise it we better not brag about it either
-                native_types = get_metadata_type(ds, guess=False)
-                if native_types:
-                    res['metadata_nativetype'] = native_types
+                nativetypes = get_metadata_type(ds, guess=False)
+                if nativetypes and merge_native != 'none':
+                    res['metadata_nativetype'] = nativetypes
+                    _merge_global_with_native_metadata(
+                        # TODO expose arg, include `None` to disable
+                        db, ds, assure_list(nativetypes),
+                        mode=merge_native)
                 yield res
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
