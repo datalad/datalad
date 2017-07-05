@@ -190,7 +190,7 @@ def test_basic_dsmeta(path):
                       define_key=dict(dtype='is_a_datatype', readme='is_readme_content'),
                       dataset_global=True)
 
-    eq_(res[0]['metadata']['dtype'], ['heavy'])
+    eq_(res[0]['metadata']['dtype'], 'heavy')
     # sorted!
     eq_(res[0]['metadata']['readme'], ['long', 'short'])
     # check it reports common keys

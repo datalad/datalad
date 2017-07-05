@@ -15,7 +15,7 @@ import os
 
 from mock import patch
 from operator import itemgetter
-from os.path import join as opj, exists
+from os.path import join as opj
 
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
@@ -28,7 +28,6 @@ from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import slow
@@ -37,7 +36,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose import SkipTest
-from nose.tools import assert_true, assert_equal, assert_raises, assert_false
+from nose.tools import assert_true, assert_equal, assert_raises
 
 try:
     import pyld

@@ -123,8 +123,11 @@ def _reset(db, spec):
 
 def _add(db, spec):
     for k, v in spec.items():
-        db[k] = sorted(unique(
-            db.get(k, []) + assure_list(v)))
+        vals = sorted(unique(
+            assure_list(db.get(k, [])) + assure_list(v)))
+        if len(vals) == 1:
+            vals = vals[0]
+        db[k] = vals
 
 
 def _remove(db, spec):
