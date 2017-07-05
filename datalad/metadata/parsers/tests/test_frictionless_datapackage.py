@@ -60,34 +60,26 @@ def test_get_metadata(path):
 
     ds = Dataset(path)
     p = MetadataParser(ds)
-    meta = p.get_metadata('ID')
+    meta = p.get_global_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
-  "@id": "ID",
   "author": "Jane Doe <noemail@example.com>",
+  "conformsto": "http://specs.frictionlessdata.io/data-packages",
   "contributors": [
     "Joe Bloggs <joe@example.com> (http://www.example.com)"
   ],
-  "dcterms:conformsTo": [
-    "http://specs.frictionlessdata.io/data-packages",
-    "http://docs.datalad.org/metadata.html#v0-1"
-  ],
   "description": "Annual Consumer Price Index (CPI) for most countries in the world. Reference year is 2005.",
-  "keywords": [
+  "license": "http://opendatacommons.org/licenses/pddl/",
+  "name": "cpi",
+  "shortdescription": "Annual Consumer Price Index (CPI)",
+  "tag": [
     "CPI",
     "World",
     "Consumer Price Index",
     "Annual Data",
     "The World Bank"
   ],
-  "license": "http://opendatacommons.org/licenses/pddl/",
-  "name": "cpi",
-  "title": "Annual Consumer Price Index (CPI)",
   "version": "2.0.0"
 }""")

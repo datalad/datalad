@@ -24,12 +24,15 @@ common_key_defs = {
     "homepage": "doap:homepage",
     "issuetracker": "doap:bug-database",
     "tag": "schema:keywords",
-    "keywords": "schema:keywords",
     "license": "http://www.w3.org/1999/xhtml/vocab#license",
     "location": "schema:location",
     "maintainer": "doap:maintainer",
     "name": "schema:name",
     "shortdescription": "doap:shortdesc",
+    # wondering why there is no title, eh?
+    # MIH: we have name and short description
+    #      adding title seems superfluous
+    #"title": "dcterms:title",
     "type": "schema:type",
     "version": "doap:Version",
     "conformsto": "dcterms:conformsTo",

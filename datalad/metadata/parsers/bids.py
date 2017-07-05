@@ -21,20 +21,24 @@ lgr = logging.getLogger('datalad.meta.bids')
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = ['dataset_description.json']
 
+    _key2stdkey = {
+        'Name': 'name',
+        'License': 'license',
+        'Authors': 'author',
+        'ReferencesAndLinks': 'citation',
+        'Funding': 'fundedby',
+        'Description': 'description',
+    }
+
     def _get_metadata(self, ds_identifier, meta, full):
         bids = jsonload(
             self.get_core_metadata_filenames()[0])
 
         # TODO maybe normalize labels of standard licenses to definition URIs
         # perform mapping
-        for bidsterm, dataladterm in (('Name', 'name'),
-                                      ('License', 'license'),
-                                      ('Authors', 'author'),
-                                      ('ReferencesAndLinks', 'citation'),
-                                      ('Funding', 'fundedby'),
-                                      ('Description', 'description')):
-            if bidsterm in bids:
-                meta[dataladterm] = bids[bidsterm]
+        for term in self._key2stdkey:
+            if term in bids:
+                meta[self.get_homogenized_key(term)] = bids[term]
 
         README_fname = opj(self.ds.path, 'README')
         if not meta.get('description') and exists(README_fname):

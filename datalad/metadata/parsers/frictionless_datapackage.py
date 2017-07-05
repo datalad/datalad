@@ -39,15 +39,22 @@ def _compact_license(obj):
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = ['datapackage.json']
 
+    _key2stdkey = {
+        'name': 'name',
+        'title': 'shortdescription',
+        'description': 'description',
+        'keywords': 'tag',
+        'version': 'version',
+        'homepage': 'homepage',
+    }
+
     def _get_metadata(self, ds_identifier, meta, full):
         foreign = jsonload(
             self.get_core_metadata_filenames()[0])
 
-        for term in (
-                'name', 'title', 'description', 'keywords', 'version',
-                'homepage'):
+        for term in self._key2stdkey:
             if term in foreign:
-                meta[term] = foreign[term]
+                meta[self.get_homogenized_key(term)] = foreign[term]
         if 'author' in foreign:
             meta['author'] = _compact_author(foreign['author'])
         if 'contributors' in foreign:
@@ -59,8 +66,6 @@ class MetadataParser(BaseMetadataParser):
         if 'licenses' in foreign:
             meta['license'] = [_compact_license(l) for l in foreign['licenses']]
 
-        meta['dcterms:conformsTo'] = [
-            'http://specs.frictionlessdata.io/data-packages',
-            'http://docs.datalad.org/metadata.html#v0-1']
+        meta['conformsto'] = 'http://specs.frictionlessdata.io/data-packages'
 
         return meta

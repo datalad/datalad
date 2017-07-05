@@ -49,45 +49,48 @@ class MetadataParser(BaseMetadataParser):
     _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
     _core_metadata_filenames = [opj('.datalad', 'meta.rfc822')]
 
+    _key2stdkey = {
+        'name': 'name',
+        'license': 'license',
+        'author': 'author',
+        'maintainer': 'maintainer',
+        'audience': 'audience',
+        'homepage': 'homepage',
+        'version': 'version',
+        'funding': 'fundedby',
+        'issue-tracker': 'issuetracker',
+        'cite-as': 'citation',
+        'doi': 'sameas',
+        'description': None,
+    }
+
     def _get_metadata(self, ds_identifier, meta, full):
         spec = email.parser.Parser().parse(
             open(self.get_core_metadata_filenames()[0]),
             headersonly=True)
 
-        # loop over all recognized headers and translate them
-        for header, dataladterm in \
-                (('name', 'name'),
-                 ('license', 'license'),
-                 ('author', 'author'),
-                 ('maintainer', 'doap:maintainer'),
-                 ('audience', 'doap:audience'),
-                 ('homepage', 'doap:homepage'),
-                 ('version', 'doap:Version'),
-                 ('funding', 'foaf:fundedBy'),
-                 ('issue-tracker', 'bug-database'),
-                 ('cite-as', 'citation'),
-                 ('doi', 'sameAs'),
-                 ('description', None)):
-            if not header in spec:
+        for term in self._key2stdkey:
+            if term not in spec:
                 continue
-            content = spec[header]
-            if header == 'description':
+            hkey = self.get_homogenized_key(term)
+            content = spec[term]
+            if term == 'description':
                 short, long = _beautify_multiline_field(content)
-                meta['doap:shortdesc'] = short
+                meta['shortdescription'] = short
                 meta['description'] = long
-            elif header == 'license':
+            elif term == 'license':
                 # TODO if title looks like a URL, use it as @id
                 label, desc = _beautify_multiline_field(content)
                 if label:
-                    meta[dataladterm] = [label, desc]
+                    meta[hkey] = [label, desc]
                 else:
-                    meta[dataladterm] = desc
-            elif header in ('maintainer', 'author'):
-                meta[dataladterm] = _split_list_field(content)
-            elif header == 'doi':
-                meta[dataladterm] = 'http://dx.doi.org/{}'.format(content)
+                    meta[hkey] = desc
+            elif term in ('maintainer', 'author'):
+                meta[hkey] = _split_list_field(content)
+            elif term == 'doi':
+                meta[hkey] = 'http://dx.doi.org/{}'.format(content)
             else:
-                meta[dataladterm] = content
+                meta[hkey] = content
 
-        meta['dcterms:conformsTo'] = self._metadata_compliance
+        meta['conformsto'] = self._metadata_compliance
         return meta

@@ -81,3 +81,7 @@ class BaseMetadataParser(object):
 
     def _get_metadata(self, dsid, basemeta, full):
         raise NotImplementedError
+
+    def get_homogenized_key(self, key):
+        # TODO decide on how to error
+        return self._key2stdkey.get(key)

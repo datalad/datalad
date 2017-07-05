@@ -61,17 +61,17 @@ def _process_tree(tree, nstag):
     for key, tag_, getall, trans1_, transall_ in [
         ('author', 'creatorName', True, None, None),
         ('name', "title[@titleType='AlternativeTitle']", False, None, None),
-        ('title', "title", False, _unwrap, None),
         # actually it seems we have no title but "ShortDescription"!!! TODO
-        ('doap:shortdesc', "title", False, _unwrap, None),  # duplicate for now
+        #('title', "title", False, _unwrap, None),
+        ('shortdescription', "title", False, _unwrap, None),
         ('description', 'description', True, _unwrap, _merge),
-        ('doap:Version', 'version', False, None, None),
-        ('sameAs', "identifier[@identifierType='DOI']", False, None, None),
+        ('version', 'version', False, None, None),
+        ('sameas', "identifier[@identifierType='DOI']", False, None, None),
 		# conflicts with our notion for having a "type" to be internal and to demarkate a Dataset
 		# here might include the field e.g. Dataset/Neurophysiology, so skipping for now
         # ('type', "resourceType[@resourceTypeGeneral='Dataset']", False, None, None),
         ('citation', "relatedIdentifier", True, None, None),
-        ('keywords', "subject", True, None, None),
+        ('tag', "subject", True, None, None),
         ('formats', "format", True, None, None),
     ]:
         trans1 = trans1_ or (lambda x: x)
@@ -113,5 +113,4 @@ class MetadataParser(BaseMetadataParser):
 
         tree = ET.ElementTree(file=fname)
         meta.update(_process_tree(tree, nstag))
-        meta['dcterms:conformsTo'] = self._metadata_compliance
         return meta
