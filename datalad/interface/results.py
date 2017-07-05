@@ -176,6 +176,7 @@ known_result_xfms = {
     'successdatasets-or-none': YieldDatasets(success_only=True),
     'paths': YieldField('path'),
     'relpaths': YieldRelativePaths(),
+    'metadata': YieldField('metadata'),
 }
 
 translate_annex_notes = {
