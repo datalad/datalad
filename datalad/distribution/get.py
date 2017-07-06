@@ -264,6 +264,11 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
     for sub in ds.subdatasets(
             return_type='generator', result_renderer='disabled'):
         subds = Dataset(sub['path'])
+        if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
+            lgr.debug(
+                "subdataset %s is configured to be skipped on recursive installation",
+                sub['path'])
+            continue
         if start is not None and not subds.path.startswith(_with_sep(start)):
             # this one we can ignore, not underneath the start path
             continue
