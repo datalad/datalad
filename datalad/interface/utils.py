@@ -22,9 +22,7 @@ from os import curdir
 from os import pardir
 from os import listdir
 from os.path import join as opj
-from os.path import lexists
 from os.path import isdir
-from os.path import dirname
 from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
@@ -35,15 +33,8 @@ import json
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
-from datalad.utils import assure_list
-from datalad.utils import get_dataset_root
-from datalad.utils import unique
-from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import resolve_path
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
@@ -227,63 +218,6 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
         # we need to call this even for non-directories, to be able to match
         # file target paths
         discover_dataset_trace_to_targets(p, targetpaths, current_trace, spec)
-
-
-# define parameters to be used by eval_results to tune behavior
-# Note: This is done outside eval_results in order to be available when building
-# docstrings for the decorated functions
-# TODO: May be we want to move them to be part of the classes _params. Depends
-# on when and how eval_results actually has to determine the class.
-# Alternatively build a callable class with these to even have a fake signature
-# that matches the parameters, so they can be evaluated and defined the exact
-# same way.
-
-eval_params = dict(
-    return_type=Parameter(
-        doc="""return value behavior switch. If 'item-or-list' a single
-        value is returned instead of a one-item return value list, or a
-        list in case of multiple return values. `None` is return in case
-        of an empty list.""",
-        constraints=EnsureChoice('generator', 'list', 'item-or-list')),
-    result_filter=Parameter(
-        doc="""if given, each to-be-returned
-        status dictionary is passed to this callable, and is only
-        returned if the callable's return value does not
-        evaluate to False or a ValueError exception is raised. If the given
-        callable supports `**kwargs` it will additionally be passed the
-        keyword arguments of the original API call.""",
-        constraints=EnsureCallable() | EnsureNone()),
-    result_xfm=Parameter(
-        doc="""if given, each to-be-returned result
-        status dictionary is passed to this callable, and its return value
-        becomes the result instead. This is different from
-        `result_filter`, as it can perform arbitrary transformation of the
-        result value. This is mostly useful for top-level command invocations
-        that need to provide the results in a particular format. Instead of
-        a callable, a label for a pre-crafted result transformation can be
-        given.""",
-        constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
-    result_renderer=Parameter(
-        doc="""format of return value rendering on stdout""",
-        constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
-    on_failure=Parameter(
-        doc="""behavior to perform on failure: 'ignore' any failure is reported,
-        but does not cause an exception; 'continue' if any failure occurs an
-        exception will be raised at the end, but processing other actions will
-        continue for as long as possible; 'stop': processing will stop on first
-        failure and an exception is raised. A failure is any result with status
-        'impossible' or 'error'. Raised exception is an IncompleteResultsError
-        that carries the result dictionaries of the failures in its `failed`
-        attribute.""",
-        constraints=EnsureChoice('ignore', 'continue', 'stop')),
-)
-eval_defaults = dict(
-    return_type='list',
-    result_filter=None,
-    result_renderer=None,
-    result_xfm=None,
-    on_failure='continue',
-)
 
 
 def eval_results(func):

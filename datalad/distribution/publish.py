@@ -20,8 +20,8 @@ from git.remote import PushInfo as PI
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts
