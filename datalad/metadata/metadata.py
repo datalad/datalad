@@ -199,6 +199,33 @@ def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
         mergers[mode](db, native_meta)
 
 
+def _prep_manipulation_spec(init, add, remove, reset):
+    """Process manipulation args and bring in form needed by git-annex"""
+    # bring metadataset setter args in shape first
+    untag, remove = _parse_argspec(remove)
+    purge, reset = _parse_argspec(reset)
+    tag_add, add = _parse_argspec(add)
+    tag_init, init = _parse_argspec(init)
+    # merge all potential sources of tag specifications
+    all_untag = remove.get('tag', []) + untag
+    if all_untag:
+        remove['tag'] = all_untag
+    all_addtag = add.get('tag', []) + tag_add
+    if all_addtag:
+        add['tag'] = all_addtag
+    all_inittag = init.get('tag', []) + tag_init
+    if all_inittag:
+        init['tag'] = all_inittag
+
+    for label, arg in (('init', init),
+                       ('add', add),
+                       ('remove', remove),
+                       ('reset', reset),
+                       ('purge', purge)):
+        lgr.debug("Will '%s' metadata items: %s", label, arg)
+    return init, add, remove, reset, purge
+
+
 @build_doc
 class Metadata(Interface):
     """Metadata manipulation for files and whole datasets
@@ -413,29 +440,12 @@ class Metadata(Interface):
             merge_native='init',
             recursive=False,
             recursion_limit=None):
-        # bring metadataset setter args in shape first
-        untag, remove = _parse_argspec(remove)
-        purge, reset = _parse_argspec(reset)
-        tag_add, add = _parse_argspec(add)
-        tag_init, init = _parse_argspec(init)
+        # prep args
+        init, add, remove, reset, purge = \
+            _prep_manipulation_spec(init, add, remove, reset)
         define_key = dict(define_key) if define_key else None
-        # merge all potential sources of tag specifications
-        all_untag = remove.get('tag', []) + untag
-        if all_untag:
-            remove['tag'] = all_untag
-        all_addtag = add.get('tag', []) + tag_add
-        if all_addtag:
-            add['tag'] = all_addtag
-        all_inittag = init.get('tag', []) + tag_init
-        if all_inittag:
-            init['tag'] = all_inittag
 
-        lgr.debug("Will 'init' metadata items: %s", init)
-        lgr.debug("Will 'add' metadata items: %s", add)
-        lgr.debug("Will 'remove' metadata items: %s", remove)
-        lgr.debug("Will 'reset' metadata items: %s", reset)
-        lgr.debug("Will 'purge' metadata items: %s", purge)
-
+        # prep results
         refds_path = Interface.get_refds_path(dataset)
         res_kwargs = dict(action='metadata', logger=lgr, refds=refds_path)
 
