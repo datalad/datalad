@@ -35,6 +35,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_set_equal
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
@@ -440,12 +441,21 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     # since we do not have yet/thus have not used an option to record to publish
     # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
     # -- should fail
-    assert_raises(InsufficientArgumentsError, ds.publish)
+    assert_result_count(
+        ds.publish(on_failure='ignore'),
+        1,
+        status='impossible',
+        message='No target sibling configured for default publication, please specific via --to')
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     ok_(not target_sub.is_installed())  # still not there
-    with swallow_logs():  # so no warnings etc
-        assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
+    res = ds.publish(to=remote, recursive=True, on_failure='ignore')
+    assert_result_count(res, 2)
+    assert_status(('error', 'notneeded'), res)
+    assert_result_count(
+        res, 1,
+        status='error',
+        message=("Unknown target sibling '%s' for publication", 'magical'))
     ds.publish(to=remote, recursive=True, missing='inherit')
     # we added the remote and set all the
     eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
