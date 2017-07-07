@@ -661,9 +661,6 @@ class Metadata(Interface):
                             path=opj(ds.path, mp[0]),
                             type='file',
                             **res_kwargs)
-                # query the actually modified paths only
-                # TODO I don't think we want that
-                ds_paths = mod_paths
 
             #
             # report on this dataset
