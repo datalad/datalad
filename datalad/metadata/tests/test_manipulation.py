@@ -335,7 +335,7 @@ def test_custom_native_merge(path):
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
-        {'name': 'myds', 'author': ['one', 'two']},
+        {'name': u'myds', 'author': ['one', 'two']},
         meta)
     # now give the ds a custom name, must override the native one
     # but authors still come from BIDS
@@ -345,14 +345,14 @@ def test_custom_native_merge(path):
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
-        {'name': 'mycustom', 'author': ['one', 'two']},
+        {'name': u'mycustom', 'author': ['one', 'two']},
         meta)
     # we can disable the merge
     meta = ds.metadata(
         dataset_global=True, merge_native='none',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
-    assert_dict_equal({'name': 'mycustom'}, meta)
+    assert_dict_equal({'name': u'mycustom'}, meta)
     # we can accumulate values
     meta = ds.metadata(
         dataset_global=True, merge_native='add',
@@ -369,7 +369,7 @@ def test_custom_native_merge(path):
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
-        {'name': 'myds', 'author': ['one', 'two'], 'homepage': 'fresh'},
+        {'name': u'myds', 'author': ['one', 'two'], 'homepage': u'fresh'},
         meta)
     # enable an additional metadata source
     ds.config.add(
@@ -383,5 +383,5 @@ def test_custom_native_merge(path):
     assert_dict_equal(
         {'name': ['mycustom', 'myds', 'someother'],
          'author': ['one', 'two'],
-         'homepage': 'fresh'},
+         'homepage': u'fresh'},
         meta)
