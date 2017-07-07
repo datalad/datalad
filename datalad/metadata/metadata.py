@@ -228,6 +228,7 @@ def _prep_manipulation_spec(init, add, remove, reset):
 
 @build_doc
 class Metadata(Interface):
+    # TODO work in idea that we also access "foreign" metadata, if there is a parser
     """Metadata manipulation for files and whole datasets
 
     Two types of metadata are supported:
@@ -237,9 +238,6 @@ class Metadata(Interface):
     2. metadata for individual files in a dataset.
 
     Both types can be accessed and modified with this command.
-    Note, however, that this only refers to DataLad's native metadata,
-    and not to any other metadata that is possibly stored in files of a
-    dataset.
 
     DataLad's native metadata capability is primarily targeting data
     description via arbitrary tags and other (brief) key-value attributes
