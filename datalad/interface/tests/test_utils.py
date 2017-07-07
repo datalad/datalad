@@ -12,7 +12,6 @@
 
 import os
 import logging
-from collections import OrderedDict
 from os.path import join as opj
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
@@ -20,7 +19,6 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_
 from datalad.tests.utils import slow
@@ -37,9 +35,6 @@ from ..base import Interface
 from ..utils import eval_results
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
-from ..utils import get_paths_by_dataset
-from ..utils import filter_unmodified
-from ..save import Save
 from datalad.api import create
 
 
@@ -98,33 +93,6 @@ def test_dirty(path):
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
-
-
-@with_tempfile(mkdir=True)
-def test_paths_by_dataset(path):
-    ds = Dataset(path).create()
-    subds = ds.create('one')
-    subsubds = subds.create('two')
-    d, ua, ne = get_paths_by_dataset([path])
-    for t in (ua, ne):
-        assert_equal(t, [])
-    assert_equal(d, {ds.path: [ds.path]})
-
-    d, ua, ne = get_paths_by_dataset(
-        [path], recursive=True)
-    for t in (ua, ne):
-        assert_equal(t, [])
-
-    os.makedirs(opj(ds.path, 'one', 'some'))
-    hidden = subds.create(opj('some', 'deep'))
-    testpath = opj(subds.path, 'some')
-    d, ua, ne = get_paths_by_dataset([testpath], recursive=True)
-    for t in (ua, ne):
-        assert_equal(t, [])
-    # must contain the containing dataset, and the testpath exactly
-    assert_equal(d[subds.path], [testpath])
-    # and also the subdataset underneath
-    assert_equal(d[hidden.path], [hidden.path])
 
 
 demo_hierarchy = {
@@ -221,80 +189,6 @@ def test_save_hierarchy(path):
         files=[opj(p, '')
                for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
         super_datasets=True)
-
-
-def test_interface_prep():
-    # verify sanity if nothing was given, as it would look like from the
-    # cmdline
-    assert_equal(Save._prep(path=[], dataset=None), ({}, []))
-
-
-@with_tree(demo_hierarchy['b'])
-def test_filter_unmodified(path):
-    ds = Dataset(path).create(force=True)
-    suba = ds.create('ba', force=True)
-    subb = ds.create('bb', force=True)
-    subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
-    ds.add('.', recursive=True)
-    ok_clean_git(path)
-
-    spec, unavail = Save._prep('.', ds, recursive=True)
-    # just to be sure -- find all datasets, and just datasets
-    assert_equal(len(spec), 4)
-    for r, p in spec.items():
-        assert_equal([r], p)
-
-    orig_base_commit = ds.repo.repo.commit()
-    # nothing was modified compared to the status quo, output must be empty
-    assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
-    # and if we pass OrderedDict we should get OrderedDict out
-    spec_o = OrderedDict(spec)
-    res_spec_o = filter_unmodified(spec_o, ds, orig_base_commit)
-    assert_equal({}, res_spec_o)
-    assert isinstance(res_spec_o, OrderedDict)
-
-    # modify one subdataset
-    added_path = opj(subb.path, 'added')
-    create_tree(subb.path, {'added': 'test'})
-    subb.add('added')
-
-    # still nothing was modified compared to orig commit, because the base
-    # dataset does not have the recent change saved
-    assert_equal({}, filter_unmodified(spec, ds, orig_base_commit))
-
-    ds.save()
-
-    modspec, unavail = Save._prep('.', ds, recursive=True)
-    # arg sorting is not affected
-    assert_equal(spec, modspec)
-
-    # only the actually modified components per dataset are kept
-    res = filter_unmodified(spec_o, ds, orig_base_commit)
-    assert_equal(
-        {
-            ds.path: [subb.path],
-            subb.path: [added_path]
-        },
-        res
-    )
-    assert isinstance(res_spec_o, OrderedDict)
-
-    # deal with removal (force insufiicient copies error)
-    ds.remove(opj(subsub.path, 'file_bbaa'), check=False)
-    # saves all the way up
-    ok_clean_git(path)
-
-    modspec, unavail = Save._prep('.', ds, recursive=True)
-    # arg sorting is again not affected
-    assert_equal(spec, modspec)
-    # only the actually modified components per dataset are kept
-    assert_equal(
-        {
-            ds.path: [subb.path],
-            subb.path: [added_path, subsub.path],
-            subsub.path: []
-        },
-        {d: sorted(p) for d, p in filter_unmodified(spec, ds, orig_base_commit).items()})
 
 
 # Note: class name needs to match module's name
