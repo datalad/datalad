@@ -106,7 +106,9 @@ def _get_key(k):
                 k, valid_key.pattern))
     return k
 
-
+#
+# common manipulator functions
+#
 def _init(db, spec):
     for k, v in spec.items() if spec else []:
         if k not in db:
@@ -354,16 +356,26 @@ class Metadata(Interface):
             error. It is better to use --define-key to provide
             a definition for a metadata key, or to use pre-defined
             keys (see --show-keys)."""),
-        dataset_global=Parameter(
-            args=('-g', '--dataset-global'),
+        apply2global=Parameter(
+            args=('-g', '--apply2global'),
             action='store_true',
-            doc="""Whether to perform metadata query or modification
+            doc="""Whether to perform metadata modification
             on the global dataset metadata, or on individual dataset
             components. For example, without this switch setting
             metadata using the root path of a dataset, will set the
             given metadata for all files in a dataset, whereas with
             this flag only the metadata record of the dataset itself
             will be altered."""),
+        reporton=Parameter(
+            args=('--report',),
+            metavar='TYPE',
+            doc="""choose on what type metadata will be reported for
+            the requested paths: dataset-global metadata ('datasets'),
+            file-based metadata ('files'), any available metadata
+            ('all'), or no metadata ('none'; useful when metadata
+            is modified, but the resulting state does not need to be
+            reported).""",
+            constraints=EnsureChoice('all', 'datasets', 'files', 'none')),
         merge_native=Parameter(
             args=('--merge-native',),
             metavar='MODE',
@@ -396,7 +408,8 @@ class Metadata(Interface):
             define_key=None,
             show_keys=False,
             permit_undefined_keys=False,
-            dataset_global=False,
+            apply2global=False,
+            reporton='all',
             merge_native='init',
             recursive=False,
             recursion_limit=None):
@@ -428,7 +441,7 @@ class Metadata(Interface):
 
         if show_keys:
             # to get into the ds meta branches below
-            dataset_global = True
+            apply2global = True
             for k in sorted(common_key_defs):
                 if k.startswith('@'):
                     continue
@@ -547,7 +560,7 @@ class Metadata(Interface):
             #
             # generic metadata manipulation
             #
-            if dataset_global or define_key:
+            if apply2global or define_key:
                 # TODO make manipulation order identical to what git-annex does
                 _init(db, init)
                 _purge(db, purge)
@@ -582,21 +595,6 @@ class Metadata(Interface):
                     to_save.append(dict(
                         path=ds.path,
                         type='dataset'))
-                res = get_status_dict(
-                    status='ok',
-                    ds=ds,
-                    metadata=db,
-                    **res_kwargs)
-                # guessing would be expensive, and if the maintainer
-                # didn't advertise it we better not brag about it either
-                nativetypes = get_metadata_type(ds, guess=False)
-                if nativetypes and merge_native != 'none':
-                    res['metadata_nativetype'] = nativetypes
-                    _merge_global_with_native_metadata(
-                        # TODO expose arg, include `None` to disable
-                        db, ds, assure_list(nativetypes),
-                        mode=merge_native)
-                yield res
             elif not isinstance(ds.repo, AnnexRepo):
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:
@@ -608,7 +606,7 @@ class Metadata(Interface):
                         **res_kwargs)
                 continue
             ds_paths = [p['path'] for p in content]
-            if not dataset_global:
+            if not apply2global:
                 if reset or purge or add or init or remove:
                     # file metadata manipulation
                     mod_paths = []
@@ -636,6 +634,29 @@ class Metadata(Interface):
                     # query the actually modified paths only
                     ds_paths = mod_paths
 
+            #
+            # report on this dataset
+            #
+            if reporton in ('all', 'datasets'):
+                res = get_status_dict(
+                    status='ok',
+                    ds=ds,
+                    metadata=db,
+                    **res_kwargs)
+                # guessing would be expensive, and if the maintainer
+                # didn't advertise it we better not brag about it either
+                nativetypes = get_metadata_type(ds, guess=False)
+                if nativetypes and merge_native != 'none':
+                    res['metadata_nativetype'] = nativetypes
+                    _merge_global_with_native_metadata(
+                        # TODO expose arg, include `None` to disable
+                        db, ds, assure_list(nativetypes),
+                        mode=merge_native)
+                yield res
+            #
+            # report on this dataset's files
+            #
+            if reporton in ('all', 'files'):
                 # and lastly, query -- even if we set before -- there could
                 # be side-effect from multiple set paths on an individual
                 # path, hence we need to query to get the final result
@@ -647,7 +668,10 @@ class Metadata(Interface):
                         metadata=meta,
                         **res_kwargs)
                     yield r
+
+        #
         # save potential modifications to dataset global metadata
+        #
         if not to_save:
             return
         for res in Save.__call__(

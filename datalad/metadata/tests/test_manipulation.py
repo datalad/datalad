@@ -48,8 +48,8 @@ def test_basic_filemeta(path):
         assert_status('impossible', metadata('.', on_failure='ignore'))
         # fine with annex
         AnnexRepo('.', create=True)
-        eq_([], metadata())
-        eq_([], metadata('.'))
+        eq_({}, metadata()[0]['metadata'])
+        eq_({}, metadata('.')[0]['metadata'])
 
     # create playing field
     create_tree(path, {'somefile': 'content', 'dir': {'deepfile': 'othercontent'}})
@@ -57,7 +57,7 @@ def test_basic_filemeta(path):
     ds.add('.')
     ok_clean_git(path)
     # full query -> 2 files
-    res = ds.metadata()
+    res = ds.metadata(reporton='files')
     assert_result_count(res, 2)
     assert_result_count(res, 2, type='file', metadata={})
 
@@ -69,13 +69,13 @@ def test_basic_filemeta(path):
     # needs a sequence or dict
     assert_raises(ValueError, ds.metadata, target_file, add='mytag')
     # like this
-    res = ds.metadata(target_file, add=['mytag'])
+    res = ds.metadata(target_file, add=['mytag'], reporton='files')
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, target_file),
         metadata={'tag': ['mytag']})
     # now init tag for all files that don't have one yet
-    res = ds.metadata(init=['rest'])
+    res = ds.metadata(init=['rest'], reporton='files')
     assert_result_count(res, 2)
     # from before
     assert_result_count(
@@ -86,7 +86,7 @@ def test_basic_filemeta(path):
         res, 1, type='file', path=opj(ds.path, 'somefile'),
         metadata={'tag': ['rest']})
     # add two more different tags
-    res = ds.metadata(add=['other1', 'other2', 'other3'])
+    res = ds.metadata(add=['other1', 'other2', 'other3'], reporton='files')
     assert_result_count(res, 2)
     for r in res:
         assert_in('other1', r['metadata']['tag'])
@@ -94,14 +94,14 @@ def test_basic_filemeta(path):
         assert_in('other3', r['metadata']['tag'])
 
     # now remove two specifics tag from all files that exists in all files
-    res = ds.metadata(remove=['other1', 'other3'])
+    res = ds.metadata(remove=['other1', 'other3'], reporton='files')
     assert_result_count(res, 2)
     for r in res:
         assert_not_in('other1', r['metadata']['tag'])
         assert_in('other2', r['metadata']['tag'])
 
     # and now one that only exists in one file
-    res = ds.metadata(remove=['rest'])
+    res = ds.metadata(remove=['rest'], reporton='files')
     # we still get 2 results, because we still touch all files
     assert_result_count(res, 2)
     # however there is no modification to files that don't have the tag
@@ -113,7 +113,7 @@ def test_basic_filemeta(path):
         metadata={'tag': ['mytag', 'other2']})
 
     # and finally kill the tags
-    res = ds.metadata(target_file, reset=['tag'])
+    res = ds.metadata(target_file, reset=['tag'], reporton='files')
     assert_result_count(res, 1)
     assert_result_count(res, 1, type='file', metadata={},
                         path=opj(ds.path, target_file))
@@ -123,7 +123,7 @@ def test_basic_filemeta(path):
         type='file', path=opj(ds.path, 'somefile'),
         metadata={'tag': ['other2']})
     # kill all tags everywhere
-    res = ds.metadata(reset=['tag'])
+    res = ds.metadata(reset=['tag'], reporton='files')
     assert_result_count(res, 2)
     assert_result_count(res, 2, type='file', metadata={})
 
@@ -155,7 +155,7 @@ def test_basic_filemeta(path):
     assert_result_count(res, 1, metadata=dict(new=['george']))
     # and finally init keys
     res = ds.metadata(init=dict(new=['two', 'three'], super='fresh'),
-                      permit_undefined_keys=True)
+                      permit_undefined_keys=True, reporton='files')
     assert_result_count(res, 2)
     assert_result_count(
         res, 1, path=opj(ds.path, target_file),
@@ -172,24 +172,28 @@ def test_basic_dsmeta(path):
     ds = Dataset(path).create()
     ok_clean_git(path)
     # ensure clean slate
-    assert_result_count(ds.metadata(), 0)
+    res = ds.metadata(reporton='datasets')
+    assert_result_count(res, 1)
+    eq_(res[0]['metadata'], {})
     # init
-    res = ds.metadata(init=['tag1', 'tag2'], dataset_global=True)
+    res = ds.metadata(init=['tag1', 'tag2'], apply2global=True)
     eq_(res[0]['metadata']['tag'], ['tag1', 'tag2'])
     # init again does nothing
-    res = ds.metadata(init=['tag3'], dataset_global=True)
+    res = ds.metadata(init=['tag3'], apply2global=True)
     eq_(res[0]['metadata']['tag'], ['tag1', 'tag2'])
     # reset whole key
-    res = ds.metadata(reset=['tag'], dataset_global=True)
-    assert_result_count(ds.metadata(), 0)
+    ds.metadata(reset=['tag'], apply2global=True)
+    res = ds.metadata(reporton='datasets')
+    assert_result_count(res, 1)
+    eq_(res[0]['metadata'], {})
     # add something arbitrary
     res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
-                      dataset_global=True, on_failure='ignore')
+                      apply2global=True, on_failure='ignore')
     # fails due to unknown keys
     assert_status('error', res)
     res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
                       define_key=dict(dtype='is_a_datatype', readme='is_readme_content'),
-                      dataset_global=True)
+                      apply2global=True)
 
     eq_(res[0]['metadata']['dtype'], 'heavy')
     # sorted!
@@ -198,7 +202,7 @@ def test_basic_dsmeta(path):
     with swallow_outputs() as cmo:
         ds.metadata(show_keys=True)
         assert_in('license', cmo.out)
-    # supply key definitions, no need for dataset_global
+    # supply key definitions, no need for apply2global
     res = ds.metadata(define_key=dict(mykey='truth'))
     eq_(res[0]['metadata']['definition']['mykey'], u'truth')
     with swallow_outputs() as cmo:
@@ -213,14 +217,14 @@ def test_basic_dsmeta(path):
     res = ds.metadata(define_key=dict(otherkey='altfact'),)
     eq_(res[0]['metadata']['definition']['otherkey'], 'altfact')
     # 'definition' is a regular key, we can remove items
-    res = ds.metadata(remove=dict(definition=['mykey']), dataset_global=True)
+    res = ds.metadata(remove=dict(definition=['mykey']), apply2global=True)
     assert_dict_equal(
         res[0]['metadata']['definition'],
         {'otherkey': u'altfact',
          'readme': u'is_readme_content',
          'dtype': u'is_a_datatype'})
     res = ds.metadata(remove=dict(definition=['otherkey', 'readme', 'dtype']),
-                      dataset_global=True)
+                      apply2global=True)
     # when there are no items left, the key vanishes too
     assert('definition' not in res[0]['metadata'])
     # we still have metadata, so there is a DB file
@@ -229,7 +233,7 @@ def test_basic_dsmeta(path):
     assert(exists(db_path))
     ok_clean_git(ds.path)
     # but if we remove it, the file is gone
-    res = ds.metadata(reset=['readme', 'dtype'], dataset_global=True)
+    res = ds.metadata(reset=['readme', 'dtype'], apply2global=True)
     eq_(res[0]['metadata'], {})
     assert(not exists(db_path))
     ok_clean_git(ds.path)
@@ -245,7 +249,7 @@ def test_mod_hierarchy(path):
     assert(not exists(basedb_path))
     assert(not exists(subdb_path))
     # modify sub through base
-    res = base.metadata('sub', init=['tag1'], dataset_global=True)
+    res = base.metadata('sub', init=['tag1'], apply2global=True)
     # only sub modified
     assert_result_count(res, 3)
     assert_result_count(res, 1, status='ok', action='metadata',
@@ -256,7 +260,7 @@ def test_mod_hierarchy(path):
     # saved all the way up
     ok_clean_git(base.path)
     # now again, different init, sub has tag already, should be spared
-    res = base.metadata(init=['tag2'], dataset_global=True)
+    res = base.metadata(init=['tag2'], apply2global=True)
     assert_result_count(res, 2)
     assert_result_count(res, 1, status='ok', action='metadata',
                         metadata={'tag': ['tag2']}, path=base.path)
@@ -266,7 +270,7 @@ def test_mod_hierarchy(path):
     ok_clean_git(base.path)
     # put to probe files so we see that nothing unrelated gets saved
     create_tree(base.path, {'probe': 'content', 'sub': {'probe': 'othercontent'}})
-    res = base.metadata('sub', reset=['tag'], dataset_global=True)
+    res = base.metadata('sub', reset=['tag'], apply2global=True)
     assert_result_count(res, 3)
     assert_result_count(res, 1, status='ok', action='metadata',
                         metadata={})
@@ -284,7 +288,7 @@ def test_report_native_type(path):
     ds = Dataset(path).create()
     assert_not_in(
         'native_metadata_types',
-        ds.metadata(dataset_global=True, return_type='item-or-list'))
+        ds.metadata(reporton='datasets', return_type='item-or-list'))
     # add a type config
     ds.config.add(
         'datalad.metadata.nativetype',
@@ -294,7 +298,7 @@ def test_report_native_type(path):
     # this leads to a warning, but not to failure
     eq_('schwupp',
         ds.metadata(
-            dataset_global=True,
+            reporton='datasets',
             return_type='item-or-list')['metadata_nativetype'])
     # add another type config
     ds.config.add(
@@ -303,7 +307,7 @@ def test_report_native_type(path):
         where='dataset')
     eq_(('schwupp', 'schwapp'),
         ds.metadata(
-            dataset_global=True,
+            reporton='datasets',
             return_type='item-or-list')['metadata_nativetype'])
 
 
@@ -323,7 +327,7 @@ def test_custom_native_merge(path):
     assert_dict_equal(
         {},
         ds.metadata(
-            dataset_global=True,
+            reporton='datasets',
             result_xfm='metadata', return_type='item-or-list'))
     # enable BIDS metadata, BIDS metadata should become THE metadata
     ds.config.add(
@@ -331,7 +335,7 @@ def test_custom_native_merge(path):
         'bids',
         where='dataset')
     meta = ds.metadata(
-        dataset_global=True,
+        reporton='datasets',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
@@ -339,9 +343,9 @@ def test_custom_native_merge(path):
         meta)
     # now give the ds a custom name, must override the native one
     # but authors still come from BIDS
-    ds.metadata(dataset_global=True, add=dict(name='mycustom'))
+    ds.metadata(apply2global=True, add=dict(name='mycustom'))
     meta = ds.metadata(
-        dataset_global=True,
+        reporton='datasets',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
@@ -349,13 +353,13 @@ def test_custom_native_merge(path):
         meta)
     # we can disable the merge
     meta = ds.metadata(
-        dataset_global=True, merge_native='none',
+        reporton='datasets', merge_native='none',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal({'name': u'mycustom'}, meta)
     # we can accumulate values
     meta = ds.metadata(
-        dataset_global=True, merge_native='add',
+        reporton='datasets', merge_native='add',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
@@ -363,9 +367,9 @@ def test_custom_native_merge(path):
         meta)
     # we can have native override custom (not sure when needed, though)
     # add one more custom to make visible
-    ds.metadata(dataset_global=True, init=dict(homepage='fresh'))
+    ds.metadata(apply2global=True, init=dict(homepage='fresh'))
     meta = ds.metadata(
-        dataset_global=True, merge_native='reset',
+        reporton='datasets', merge_native='reset',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
@@ -377,7 +381,7 @@ def test_custom_native_merge(path):
         'frictionless_datapackage',
         where='dataset')
     meta = ds.metadata(
-        dataset_global=True, merge_native='add',
+        reporton='datasets', merge_native='add',
         result_xfm='metadata', return_type='item-or-list')
     _clean_meta(meta)
     assert_dict_equal(
