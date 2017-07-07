@@ -459,6 +459,8 @@ class Metadata(Interface):
                     ac.color_word(k, ac.BOLD),
                     common_key_defs[k],
                     ac.color_word('builtin', ac.MAGENTA)))
+            # we need to go on with the command, because further definitions
+            # could be provided in each dataset
 
         if not dataset and not path and not show_keys:
             # makes no sense to have no dataset, go with "here"
@@ -472,6 +474,8 @@ class Metadata(Interface):
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 action='metadata',
+                # TODO later we will be able to report on uninstalled subdatasets via
+                # metadata aggregation -> no longer 'error'
                 unavailable_path_status='error',
                 nondataset_path_status='error',
                 force_subds_discovery=False,
@@ -484,11 +488,13 @@ class Metadata(Interface):
             if ap.get('type', None) == 'dataset':
                 if ap.get('state', None) == 'absent':
                     # just discovered via recursion, but not relevant here
+                    # TODO will no longer be true with aggregated metadata in place
                     continue
                 if GitRepo.is_valid_repo(ap['path']):
                     ap['process_content'] = True
             to_process.append(ap)
 
+        # sort paths into datasets
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_process,
@@ -500,6 +506,9 @@ class Metadata(Interface):
         to_save = []
         for ds_path in content_by_ds:
             # ignore submodule entries
+            # TODO with aggregated metadata this will change, we would only ignore
+            # when a subdataset is actually installed and we would visit it later
+            # otherwise we would reports it aggregated metadata
             content = [ap for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
             if not content and not show_keys:
@@ -507,6 +516,11 @@ class Metadata(Interface):
                 # this dataset, ignore
                 continue
             ds = Dataset(ds_path)
+            #
+            # read dataset metadata, needed in most cases
+            # TODO could be made optional, when no global metadata is supposed to be
+            # reported, and no key definitions have to be checked
+            #
             db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
             db = {}
             if exists(db_path):
@@ -528,8 +542,14 @@ class Metadata(Interface):
                         defs[k],
                         ac.color_word('dataset', ac.MAGENTA),
                         ds.path))
-                # no other processing
+                # no other processing, next dataset
                 continue
+            #
+            # store new key defintions in the dataset
+            # we have to do this in every dataset and cannot inherit definitions
+            # from a parent, because the metadata in each dataset need to be
+            # consistent and self contained, as it may be part of multiple parents
+            #
             added_def = False
             if define_key:
                 for k, v in define_key.items():
@@ -548,7 +568,7 @@ class Metadata(Interface):
                         added_def = True
                 db['definition'] = defs
             #
-            # validate keys (only possible when dataset-defined keys are known
+            # validate keys (only possible once dataset-defined keys are known)
             #
             known_keys = set(common_key_defs.keys()).union(set(defs.keys()))
             key_error = False
@@ -568,7 +588,7 @@ class Metadata(Interface):
             if key_error:
                 return
             #
-            # generic metadata manipulation
+            # generic global metadata manipulation
             #
             if apply2global or define_key:
                 # TODO make manipulation order identical to what git-annex does
@@ -578,9 +598,8 @@ class Metadata(Interface):
                 _add(db, add)
                 _remove(db, remove)
 
-                # store, if there is anything
+                # store, if there is anything, and we could have touched it
                 if db and (added_def or init or add or remove or reset or purge):
-                    # if anything happended or could have happended
                     if not exists(dirname(db_path)):
                         makedirs(dirname(db_path))
                     db_fp = open(db_path, 'w')
@@ -615,34 +634,36 @@ class Metadata(Interface):
                             'non-annex dataset %s has no file metadata support', ds),
                         **res_kwargs)
                 continue
+            #
+            # file metadata manipulation
+            #
             ds_paths = [p['path'] for p in content]
-            if not apply2global:
-                if reset or purge or add or init or remove:
-                    # file metadata manipulation
-                    mod_paths = []
-                    for mp in ds.repo.set_metadata(
-                            ds_paths,
-                            reset=reset,
-                            add=add,
-                            init=init,
-                            remove=remove,
-                            purge=purge,
-                            # we always go recursive
-                            # TODO is that a good thing? But how to otherwise distinuish
-                            # this kind of recursive from the one across datasets in
-                            # the API?
-                            recursive=True):
-                        if mp.get('success', False):
-                            mod_paths.append(mp['file'])
-                        else:
-                            yield get_status_dict(
-                                status='error',
-                                message='setting metadata failed',
-                                path=opj(ds.path, mp[0]),
-                                type='file',
-                                **res_kwargs)
-                    # query the actually modified paths only
-                    ds_paths = mod_paths
+            if not apply2global and (reset or purge or add or init or remove):
+                mod_paths = []
+                for mp in ds.repo.set_metadata(
+                        ds_paths,
+                        reset=reset,
+                        add=add,
+                        init=init,
+                        remove=remove,
+                        purge=purge,
+                        # we always go recursive
+                        # XXX is that a good thing? But how to otherwise distinuish
+                        # this kind of recursive from the one across datasets in
+                        # the API?
+                        recursive=True):
+                    if mp.get('success', False):
+                        mod_paths.append(mp['file'])
+                    else:
+                        yield get_status_dict(
+                            status='error',
+                            message='setting metadata failed',
+                            path=opj(ds.path, mp[0]),
+                            type='file',
+                            **res_kwargs)
+                # query the actually modified paths only
+                # TODO I don't think we want that
+                ds_paths = mod_paths
 
             #
             # report on this dataset
