@@ -429,7 +429,7 @@ def test_aggregate_query(path):
     eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
     # and the command will report the aggregated metadata as it is recorded
     # in the dataset that is the closest parent on disk
-    sub = ds.create('sub', force=True)
+    ds.create('sub', force=True)
     # same call as above, different result!
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)

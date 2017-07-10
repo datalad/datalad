@@ -631,17 +631,27 @@ class Metadata(Interface):
             # potential problems before any processing starts
             content = []
             for ap in content_by_ds[ds_path]:
-                if ap.get('type', None) == 'dataset' and ap.get('state', None) == 'absent':
-                    # this is a missing dataset, could be an error or not installed
-                    # either way we cannot edit its metadata
-                    if ap.get('raw_input', False):
-                        yield get_status_dict(
-                            ap,
-                            status='error',
-                            message='cannot edit metadata if unavailable dataset',
-                            **res_kwargs)
-                    continue
+                if ap.get('type', None) == 'dataset':
+                    if ap.get('state', None) == 'absent':
+                        # this is a missing dataset, could be an error or not installed
+                        # either way we cannot edit its metadata
+                        if ap.get('raw_input', False):
+                            yield get_status_dict(
+                                ap,
+                                status='error',
+                                message='cannot edit metadata if unavailable dataset',
+                                **res_kwargs)
+                        continue
+                    elif ap['path'] != ds_path:
+                        # some kind of subdataset that actually exists
+                        # -> some other iteration
+                        continue
                 content.append(ap)
+            if not content:
+                # any originally given content in this dataset will either be processed
+                # in some other context or should not be processed at all.
+                # error were yielded before, hence stop here
+                continue
             #
             # read dataset metadata, needed in most cases
             # TODO could be made optional, when no global metadata is supposed to be
