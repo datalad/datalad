@@ -40,6 +40,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
 from datalad.support.json_py import dump as jsondump
+from datalad.support.json_py import load as jsonload
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
@@ -233,13 +234,7 @@ def _prep_manipulation_spec(init, add, remove, reset):
 def _load_json_object(fpath):
     obj = {}
     if exists(fpath):
-        obj_fp = open(fpath)
-        # need to read manually, load() would puke on an empty file
-        obj_content = obj_fp.read()
-        # minimize time for collision
-        obj_fp.close()
-        if obj_content:
-            obj = json.loads(obj_content)
+        return jsonload(fpath, fixup=True)
     return obj
 
 
