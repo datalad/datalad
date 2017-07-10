@@ -289,18 +289,18 @@ def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
     for ap in aps:
         metadata = {}
         rpath = relpath(ap['path'], start=ds.path)
-        agginfo = agginfos.get(rpath, None)
-        res = get_status_dict(
-            ds=ds,
-            metadata=metadata,
-            **kwargs)
-        if agginfo:
+        agginfos = agginfos.get(rpath, [])
+        for agginfo in agginfos:
+            res = get_status_dict(
+                ds=ds,
+                metadata=metadata,
+                **kwargs)
             # TODO exclude by type
             res['type'] = agginfo['type']
             # TODO annex-get the respective object files
             metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
-        res['status'] = 'ok'
-        yield res
+            res['status'] = 'ok'
+            yield res
 
 
 @build_doc

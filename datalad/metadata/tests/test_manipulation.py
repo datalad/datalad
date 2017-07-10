@@ -394,11 +394,11 @@ def test_custom_native_merge(path):
                 'someshasum': '{"homepage": "http://top.example.com"}'},
             'aggregate.json': """\
 {
-    "sub/deep/some": {
+    "sub/deep/some": [{
         "location": "objects/someshasum",
         "origin": "datalad",
         "type": "dataset"
-    }
+    }]
 }
 """}},
     'sub': {
@@ -408,11 +408,11 @@ def test_custom_native_merge(path):
                     'someotherhash': '{"homepage": "http://sub.example.com"}'},
                 'aggregate.json': """\
 {
-    "deep/some": {
+    "deep/some": [{
         "location": "objects/someotherhash",
         "origin": "datalad",
         "type": "dataset"
-    }
+    }]
 }
 """}}},
 })
