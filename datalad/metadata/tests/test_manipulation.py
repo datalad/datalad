@@ -41,11 +41,6 @@ def test_basic_filemeta(path):
     with chpwd(path):
         # no repo -> error
         assert_status('error', metadata(on_failure='ignore'))
-        # some repo, no error on query of pwd
-        GitRepo('.', create=True)
-        eq_([], Dataset('.').metadata())
-        # impossible when making explicit query
-        assert_status('impossible', metadata('.', on_failure='ignore'))
         # fine with annex
         AnnexRepo('.', create=True)
         eq_({}, metadata()[0]['metadata'])

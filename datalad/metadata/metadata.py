@@ -53,6 +53,8 @@ lgr = logging.getLogger('datalad.metadata.metadata')
 
 valid_key = re.compile(r'^[0-9a-z._-]+$')
 
+db_relpath = opj('.datalad', 'metadata', 'dataset.json')
+
 
 def _parse_argspec(args):
     """Little helper to get cmdline and python args into a uniform
@@ -224,6 +226,57 @@ def _prep_manipulation_spec(init, add, remove, reset):
                        ('purge', purge)):
         lgr.debug("Will '%s' metadata items: %s", label, arg)
     return init, add, remove, reset, purge
+
+
+def _load_global_dsmeta(db_path):
+    db = {}
+    if exists(db_path):
+        db_fp = open(db_path)
+        # need to read manually, load() would puke on an empty file
+        db_content = db_fp.read()
+        # minimize time for collision
+        db_fp.close()
+        if db_content:
+            db = json.loads(db_content)
+    return db
+
+
+def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
+    if db is None:
+        db_path = opj(ds.path, db_relpath)
+        db = _load_global_dsmeta(db_path)
+
+    if reporton in ('all', 'datasets'):
+        res = get_status_dict(
+            status='ok',
+            ds=ds,
+            metadata=db,
+            **kwargs)
+        # guessing would be expensive, and if the maintainer
+        # didn't advertise it we better not brag about it either
+        nativetypes = get_metadata_type(ds, guess=False)
+        if nativetypes and merge_native != 'none':
+            res['metadata_nativetype'] = nativetypes
+            _merge_global_with_native_metadata(
+                # TODO expose arg, include `None` to disable
+                db, ds, assure_list(nativetypes),
+                mode=merge_native)
+        yield res
+    #
+    # report on this dataset's files
+    #
+    if reporton in ('all', 'files') and isinstance(ds.repo, AnnexRepo):
+        # and lastly, query -- even if we set before -- there could
+        # be side-effect from multiple set paths on an individual
+        # path, hence we need to query to get the final result
+        for file, meta in ds.repo.get_metadata(paths):
+            r = get_status_dict(
+                status='ok',
+                path=opj(ds.path, file),
+                type='file',
+                metadata=meta,
+                **kwargs)
+            yield r
 
 
 @build_doc
@@ -500,48 +553,48 @@ class Metadata(Interface):
                 path_only=False)
         assert(not completed)
 
-        # iterate over all datasets, order doesn't matter
-        to_save = []
-        for ds_path in content_by_ds:
-            # ignore submodule entries
-            # TODO with aggregated metadata this will change, we would only ignore
-            # when a subdataset is actually installed and we would visit it later
-            # otherwise we would reports it aggregated metadata
-            content = [ap for ap in content_by_ds[ds_path]
-                       if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
-            if not content and not show_keys:
-                # nothing other than subdatasets were given or discovered in
-                # this dataset, ignore
-                continue
-            ds = Dataset(ds_path)
-            #
-            # read dataset metadata, needed in most cases
-            # TODO could be made optional, when no global metadata is supposed to be
-            # reported, and no key definitions have to be checked
-            #
-            db_path = opj(ds.path, '.datalad', 'metadata', 'dataset.json')
-            db = {}
-            if exists(db_path):
-                db_fp = open(db_path)
-                # need to read manually, load() would puke on an empty file
-                db_content = db_fp.read()
-                # minimize time for collision
-                db_fp.close()
-                if db_content:
-                    db = json.loads(db_content)
-            #
-            # dedicated key handling
-            #
-            defs = db.get('definition', {})
-            if show_keys:
+        # first deal with the two simple cases
+        if show_keys:
+            # report any dataset-defined keys and exit
+            for ds_path in content_by_ds:
+                db_path = opj(ds_path, db_relpath)
+                db = _load_global_dsmeta(db_path)
+                defs = db.get('definition', {})
                 for k in sorted(defs):
                     ui.message('{}: {} ({}: {})'.format(
                         ac.color_word(k, ac.BOLD),
                         defs[k],
                         ac.color_word('dataset', ac.MAGENTA),
-                        ds.path))
-                # no other processing, next dataset
-                continue
+                        ds_path))
+            return
+        elif not (init or purge or reset or add or remove or define_key):
+            # query metadata
+            for ds_path in content_by_ds:
+                ds = Dataset(ds_path)
+                ds_paths = [ap['path'] for ap in content_by_ds[ds_path]
+                            if ap.get('type', None) != 'dataset' or
+                            ap['path'] == ds_path]
+                for r in _query_metadata(reporton, ds, ds_paths, merge_native,
+                                         **res_kwargs):
+                    yield r
+            return
+        #
+        # all the rest is about modification of metadata
+        #
+        # iterate over all datasets, order doesn't matter
+        to_save = []
+        for ds_path in content_by_ds:
+            #
+            # read dataset metadata, needed in most cases
+            # TODO could be made optional, when no global metadata is supposed to be
+            # reported, and no key definitions have to be checked
+            #
+            db_path = opj(ds_path, db_relpath)
+            db = _load_global_dsmeta(db_path)
+            #
+            # key handling
+            #
+            defs = db.get('definition', {})
             #
             # store new key defintions in the dataset
             # we have to do this in every dataset and cannot inherit definitions
@@ -551,19 +604,18 @@ class Metadata(Interface):
             added_def = False
             if define_key:
                 for k, v in define_key.items():
-                    if k in defs:
-                        if not defs[k] == v:
-                            yield get_status_dict(
-                                status='error',
-                                ds=ds,
-                                message=(
-                                    "conflicting definition for key '%s': '%s' != '%s'",
-                                    k, v, defs[k]),
-                                **res_kwargs)
-                            continue
-                    else:
+                    if k not in defs:
                         defs[k] = v
                         added_def = True
+                    elif not defs[k] == v:
+                        yield get_status_dict(
+                            status='error',
+                            path=ds_path,
+                            message=(
+                                "conflicting definition for key '%s': '%s' != '%s'",
+                                k, v, defs[k]),
+                            **res_kwargs)
+                        continue
                 db['definition'] = defs
             #
             # validate keys (only possible once dataset-defined keys are known)
@@ -575,7 +627,8 @@ class Metadata(Interface):
                     if k not in known_keys:
                         yield get_status_dict(
                             status='error',
-                            ds=ds,
+                            path=ds_path,
+                            type='dataset',
                             message=(
                                 "undefined key '%s', check spelling or use --define-key "
                                 "and consider suggesting a new pre-configured key "
@@ -588,41 +641,16 @@ class Metadata(Interface):
             #
             # generic global metadata manipulation
             #
-            if apply2global or define_key:
-                # TODO make manipulation order identical to what git-annex does
-                _init(db, init)
-                _purge(db, purge)
-                _reset(db, reset)
-                _add(db, add)
-                _remove(db, remove)
-
-                # store, if there is anything, and we could have touched it
-                if db and (added_def or init or add or remove or reset or purge):
-                    if not exists(dirname(db_path)):
-                        makedirs(dirname(db_path))
-                    db_fp = open(db_path, 'w')
-                    # produce relatively compact, but also diff-friendly format
-                    json.dump(
-                        db,
-                        db_fp,
-                        indent=0,
-                        separators=(',', ':\n'),
-                        sort_keys=True)
-                    # minimize time for collision
-                    db_fp.close()
-                    # use add not save to also cover case of a fresh file
-                    ds.add(db_path, save=False, to_git=True)
-                    to_save.append(dict(
-                        path=db_path,
-                        parentds=ds.path,
-                        type='file'))
-                elif not db and exists(db_path):
-                    # no metadata left, kill file
-                    ds.remove(db_path)
-                    to_save.append(dict(
-                        path=ds.path,
-                        type='dataset'))
-            elif not isinstance(ds.repo, AnnexRepo):
+            ds = Dataset(ds_path)
+            # ignore submodule entries
+            # TODO with aggregated metadata this will change, we would only ignore
+            # when a subdataset is actually installed and we would visit it later
+            # otherwise we would reports it aggregated metadata
+            content = [ap for ap in content_by_ds[ds_path]
+                       if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
+            if not apply2global and not isinstance(ds.repo, AnnexRepo) and \
+                    (init or purge or reset or add or remove):
+                # not file metadata without annex
                 # report on all explicitly requested paths only
                 for ap in [c for c in content if ap.get('raw_input', False)]:
                     yield dict(
@@ -632,6 +660,42 @@ class Metadata(Interface):
                             'non-annex dataset %s has no file metadata support', ds),
                         **res_kwargs)
                 continue
+            if apply2global and \
+                    (init or purge or reset or add or remove or define_key):
+                # TODO make manipulation order identical to what git-annex does
+                _init(db, init)
+                _purge(db, purge)
+                _reset(db, reset)
+                _add(db, add)
+                _remove(db, remove)
+
+            if db and (added_def or (apply2global and
+                       (init or purge or reset or add or remove))):
+                # store, if there is anything, and we could have touched it
+                if not exists(dirname(db_path)):
+                    makedirs(dirname(db_path))
+                db_fp = open(db_path, 'w')
+                # produce relatively compact, but also diff-friendly format
+                json.dump(
+                    db,
+                    db_fp,
+                    indent=0,
+                    separators=(',', ':\n'),
+                    sort_keys=True)
+                # minimize time for collision
+                db_fp.close()
+                # use add not save to also cover case of a fresh file
+                ds.add(db_path, save=False, to_git=True)
+                to_save.append(dict(
+                    path=db_path,
+                    parentds=ds.path,
+                    type='file'))
+            if not db and exists(db_path):
+                # no global metadata left, kill file
+                ds.remove(db_path)
+                to_save.append(dict(
+                    path=ds.path,
+                    type='dataset'))
             #
             # file metadata manipulation
             #
@@ -659,42 +723,10 @@ class Metadata(Interface):
                             path=opj(ds.path, mp[0]),
                             type='file',
                             **res_kwargs)
-
-            #
-            # report on this dataset
-            #
-            if reporton in ('all', 'datasets'):
-                res = get_status_dict(
-                    status='ok',
-                    ds=ds,
-                    metadata=db,
-                    **res_kwargs)
-                # guessing would be expensive, and if the maintainer
-                # didn't advertise it we better not brag about it either
-                nativetypes = get_metadata_type(ds, guess=False)
-                if nativetypes and merge_native != 'none':
-                    res['metadata_nativetype'] = nativetypes
-                    _merge_global_with_native_metadata(
-                        # TODO expose arg, include `None` to disable
-                        db, ds, assure_list(nativetypes),
-                        mode=merge_native)
-                yield res
-            #
-            # report on this dataset's files
-            #
-            if reporton in ('all', 'files'):
-                # and lastly, query -- even if we set before -- there could
-                # be side-effect from multiple set paths on an individual
-                # path, hence we need to query to get the final result
-                for file, meta in ds.repo.get_metadata(ds_paths):
-                    r = get_status_dict(
-                        status='ok',
-                        path=opj(ds.path, file),
-                        type='file',
-                        metadata=meta,
-                        **res_kwargs)
-                    yield r
-
+            # report metadata after modification
+            for r in _query_metadata(reporton, ds, ds_paths, merge_native,
+                                     db=db, **res_kwargs):
+                yield r
         #
         # save potential modifications to dataset global metadata
         #
