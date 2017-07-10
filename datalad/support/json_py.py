@@ -21,8 +21,13 @@ from simplejson import loads
 from simplejson import JSONDecodeError
 
 
-# TODO think about minimizing the JSON output by default
-json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False, encoding='utf-8')
+# produce relatively compact, but also diff-friendly format
+json_dump_kwargs = dict(
+    indent=0,
+    separators=(',', ':\n'),
+    sort_keys=True,
+    ensure_ascii=False,
+    encoding='utf-8', )
 
 # Let's just reuse top level one for now
 from ..log import lgr

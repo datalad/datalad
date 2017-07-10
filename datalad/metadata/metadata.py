@@ -39,6 +39,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
+from datalad.support.json_py import dump as jsondump
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
@@ -301,6 +302,7 @@ def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
         if agginfo:
             # TODO exclude by type
             res['type'] = agginfo['type']
+            # TODO annex-get the respective object files
             metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
         res['status'] = 'ok'
         yield res
@@ -736,16 +738,7 @@ class Metadata(Interface):
                 # store, if there is anything, and we could have touched it
                 if not exists(dirname(db_path)):
                     makedirs(dirname(db_path))
-                db_fp = open(db_path, 'w')
-                # produce relatively compact, but also diff-friendly format
-                json.dump(
-                    db,
-                    db_fp,
-                    indent=0,
-                    separators=(',', ':\n'),
-                    sort_keys=True)
-                # minimize time for collision
-                db_fp.close()
+                jsondump(db, db_path)
                 # use add not save to also cover case of a fresh file
                 ds.add(db_path, save=False, to_git=True)
                 to_save.append(dict(
