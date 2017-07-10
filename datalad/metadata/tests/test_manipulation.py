@@ -384,3 +384,53 @@ def test_custom_native_merge(path):
          'author': ['one', 'two'],
          'homepage': u'fresh'},
         meta)
+
+
+# tree puts aggregate metadata structures on two levels inside a dataset
+@with_tree(tree={
+    '.datalad': {
+        'metadata': {
+            'objects': {
+                'someshasum': '{"homepage": "http://top.example.com"}'},
+            'aggregate.json': """\
+{
+    "sub/deep/some": {
+        "location": "objects/someshasum",
+        "origin": "datalad",
+        "type": "dataset"
+    }
+}
+"""}},
+    'sub': {
+        '.datalad': {
+            'metadata': {
+                'objects': {
+                    'someotherhash': '{"homepage": "http://sub.example.com"}'},
+                'aggregate.json': """\
+{
+    "deep/some": {
+        "location": "objects/someotherhash",
+        "origin": "datalad",
+        "type": "dataset"
+    }
+}
+"""}}},
+})
+def test_aggregate_query(path):
+    ds = Dataset(path).create(force=True)
+    # no magic change to actual dataset metadata due to presence of
+    # aggregated metadata
+    res = ds.metadata(reporton='datasets')
+    assert_result_count(res, 1)
+    eq_({}, res[0]['metadata'])
+    # but we can now ask for metadata of stuff that is unknown on disk
+    res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
+    assert_result_count(res, 1)
+    eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
+    # and the command will report the aggregated metadata as it is recorded
+    # in the dataset that is the closest parent on disk
+    sub = ds.create('sub', force=True)
+    # same call as above, different result!
+    res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
+    assert_result_count(res, 1)
+    eq_({'homepage': 'http://sub.example.com'}, res[0]['metadata'])

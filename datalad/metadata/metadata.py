@@ -54,6 +54,7 @@ lgr = logging.getLogger('datalad.metadata.metadata')
 valid_key = re.compile(r'^[0-9a-z._-]+$')
 
 db_relpath = opj('.datalad', 'metadata', 'dataset.json')
+agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
 
 
 def _parse_argspec(args):
@@ -228,23 +229,23 @@ def _prep_manipulation_spec(init, add, remove, reset):
     return init, add, remove, reset, purge
 
 
-def _load_global_dsmeta(db_path):
-    db = {}
-    if exists(db_path):
-        db_fp = open(db_path)
+def _load_json_object(fpath):
+    obj = {}
+    if exists(fpath):
+        obj_fp = open(fpath)
         # need to read manually, load() would puke on an empty file
-        db_content = db_fp.read()
+        obj_content = obj_fp.read()
         # minimize time for collision
-        db_fp.close()
-        if db_content:
-            db = json.loads(db_content)
-    return db
+        obj_fp.close()
+        if obj_content:
+            obj = json.loads(obj_content)
+    return obj
 
 
 def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
     if db is None:
         db_path = opj(ds.path, db_relpath)
-        db = _load_global_dsmeta(db_path)
+        db = _load_json_object(db_path)
 
     if reporton in ('all', 'datasets'):
         res = get_status_dict(
@@ -277,6 +278,32 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
                 metadata=meta,
                 **kwargs)
             yield r
+
+
+def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
+    # TODO recursive! TODO recursion_limit (will be trickier)
+    # TODO filter by origin
+    info_fpath = opj(ds.path, agginfo_relpath)
+    agg_base_path = dirname(info_fpath)
+    agginfos = _load_json_object(info_fpath)
+
+    if reporton == 'files':
+        lgr.warning(
+            'Look-up of file-based information in aggregated metadata is not yet supported')
+    for ap in aps:
+        metadata = {}
+        rpath = relpath(ap['path'], start=ds.path)
+        agginfo = agginfos.get(rpath, None)
+        res = get_status_dict(
+            ds=ds,
+            metadata=metadata,
+            **kwargs)
+        if agginfo:
+            # TODO exclude by type
+            res['type'] = agginfo['type']
+            metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
+        res['status'] = 'ok'
+        yield res
 
 
 @build_doc
@@ -525,9 +552,9 @@ class Metadata(Interface):
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 action='metadata',
-                # TODO later we will be able to report on uninstalled subdatasets via
-                # metadata aggregation -> no longer 'error'
-                unavailable_path_status='error',
+                # uninstalled subdatasets could be queried via aggregated metadata
+                # -> no 'error'
+                unavailable_path_status='',
                 nondataset_path_status='error',
                 force_subds_discovery=False,
                 return_type='generator',
@@ -536,13 +563,8 @@ class Metadata(Interface):
                 # this is done
                 yield ap
                 continue
-            if ap.get('type', None) == 'dataset':
-                if ap.get('state', None) == 'absent':
-                    # just discovered via recursion, but not relevant here
-                    # TODO will no longer be true with aggregated metadata in place
-                    continue
-                if GitRepo.is_valid_repo(ap['path']):
-                    ap['process_content'] = True
+            if ap.get('type', None) == 'dataset' and GitRepo.is_valid_repo(ap['path']):
+                ap['process_content'] = True
             to_process.append(ap)
 
         # sort paths into datasets
@@ -558,7 +580,7 @@ class Metadata(Interface):
             # report any dataset-defined keys and exit
             for ds_path in content_by_ds:
                 db_path = opj(ds_path, db_relpath)
-                db = _load_global_dsmeta(db_path)
+                db = _load_json_object(db_path)
                 defs = db.get('definition', {})
                 for k in sorted(defs):
                     ui.message('{}: {} ({}: {})'.format(
@@ -568,15 +590,36 @@ class Metadata(Interface):
                         ds_path))
             return
         elif not (init or purge or reset or add or remove or define_key):
-            # query metadata
+            # just a query of metadata, no modification
             for ds_path in content_by_ds:
                 ds = Dataset(ds_path)
-                ds_paths = [ap['path'] for ap in content_by_ds[ds_path]
-                            if ap.get('type', None) != 'dataset' or
-                            ap['path'] == ds_path]
-                for r in _query_metadata(reporton, ds, ds_paths, merge_native,
-                                         **res_kwargs):
-                    yield r
+                # sort requested paths into available components of this dataset
+                # and into things that might be available in aggregated metadata
+                query_agg = []
+                query_ds = []
+                for ap in content_by_ds[ds_path]:
+                    if ap.get('state', None) == 'absent':
+                        query_agg.append(ap)
+                    elif ap.get('type', None) == 'dataset' and not ap['path'] == ds_path:
+                        # this is an available subdataset, will be processed in another
+                        # iteration
+                        continue
+                    else:
+                        query_ds.append(ap)
+                # report directly available metadata
+                if query_ds:
+                    for r in _query_metadata(
+                            reporton,
+                            ds,
+                            [ap['path'] for ap in query_ds],
+                            merge_native,
+                            **res_kwargs):
+                        yield r
+                if query_agg:
+                    # report from aggregated metadata
+                    for r in _query_aggregated_metadata(
+                            reporton, ds, query_agg, **res_kwargs):
+                        yield r
             return
         #
         # all the rest is about modification of metadata
@@ -584,13 +627,28 @@ class Metadata(Interface):
         # iterate over all datasets, order doesn't matter
         to_save = []
         for ds_path in content_by_ds:
+            # check the each path assigned to this dataset to anticipate and intercept
+            # potential problems before any processing starts
+            content = []
+            for ap in content_by_ds[ds_path]:
+                if ap.get('type', None) == 'dataset' and ap.get('state', None) == 'absent':
+                    # this is a missing dataset, could be an error or not installed
+                    # either way we cannot edit its metadata
+                    if ap.get('raw_input', False):
+                        yield get_status_dict(
+                            ap,
+                            status='error',
+                            message='cannot edit metadata if unavailable dataset',
+                            **res_kwargs)
+                    continue
+                content.append(ap)
             #
             # read dataset metadata, needed in most cases
             # TODO could be made optional, when no global metadata is supposed to be
             # reported, and no key definitions have to be checked
             #
             db_path = opj(ds_path, db_relpath)
-            db = _load_global_dsmeta(db_path)
+            db = _load_json_object(db_path)
             #
             # key handling
             #
@@ -642,12 +700,6 @@ class Metadata(Interface):
             # generic global metadata manipulation
             #
             ds = Dataset(ds_path)
-            # ignore submodule entries
-            # TODO with aggregated metadata this will change, we would only ignore
-            # when a subdataset is actually installed and we would visit it later
-            # otherwise we would reports it aggregated metadata
-            content = [ap for ap in content_by_ds[ds_path]
-                       if ap.get('type', None) != 'dataset' or ap['path'] == ds_path]
             if not apply2global and not isinstance(ds.repo, AnnexRepo) and \
                     (init or purge or reset or add or remove):
                 # not file metadata without annex
