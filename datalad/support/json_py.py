@@ -12,6 +12,9 @@
 
 from io import open
 import codecs
+from os.path import dirname
+from os.path import exists
+from os import makedirs
 
 # wrapped below
 from simplejson import load as jsonload
@@ -35,6 +38,9 @@ from ..dochelpers import exc_str
 
 
 def dump(obj, fname):
+    indir = dirname(fname)
+    if not exists(indir):
+        makedirs(indir)
     with open(fname, 'wb') as f:
         return jsondump(
             obj,
