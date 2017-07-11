@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
-import json
 from os import makedirs
 from os.path import dirname
 from os.path import relpath
@@ -249,6 +248,9 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
             ds=ds,
             metadata=db,
             **kwargs)
+        if ds.id:
+            res['id'] = ds.id
+        res['shasum'] = ds.repo.get_hexsha()
         # guessing would be expensive, and if the maintainer
         # didn't advertise it we better not brag about it either
         nativetypes = get_metadata_type(ds, guess=False)
@@ -292,13 +294,18 @@ def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
         agginfos = agginfos.get(rpath, [])
         for agginfo in agginfos:
             res = get_status_dict(
-                ds=ds,
+                path=ap['path'],
                 metadata=metadata,
                 **kwargs)
             # TODO exclude by type
             res['type'] = agginfo['type']
             # TODO annex-get the respective object files
-            metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
+            if agginfo['location']:
+                metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
+            if 'id' in agginfo:
+                res['id'] = agginfo['id']
+            if 'shasum' in agginfo:
+                res['shasum'] = agginfo['shasum']
             res['status'] = 'ok'
             yield res
 
@@ -553,7 +560,8 @@ class Metadata(Interface):
                 # -> no 'error'
                 unavailable_path_status='',
                 nondataset_path_status='error',
-                force_subds_discovery=False,
+                # we need to know when to look into aggregated data
+                force_subds_discovery=True,
                 return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
