@@ -31,8 +31,10 @@ class MetadataParser(BaseMetadataParser):
     }
 
     def _get_metadata(self, ds_identifier, meta, full):
-        bids = jsonload(
-            self.get_core_metadata_filenames()[0])
+        core_meta_files = self.get_core_metadata_filenames()
+        if not core_meta_files:
+            return meta
+        bids = jsonload(core_meta_files[0])
 
         # TODO maybe normalize labels of standard licenses to definition URIs
         # perform mapping
