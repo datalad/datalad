@@ -1176,10 +1176,10 @@ class GitRepo(RepoInterface):
 
         # Note: This still uses GitPython and therefore might cause a gitpy.Repo
         # instance to be created.
+        remotes = []
         if with_refs_only:
             # older versions of GitPython might not tolerate remotes without
             # any references at all, so we need to catch
-            remotes = []
             for remote in self.repo.remotes:
                 try:
                     if len(remote.refs):
@@ -1197,7 +1197,7 @@ class GitRepo(RepoInterface):
 
         self.config.reload()
         remotes = unique([x[7:] for x in self.config.sections()
-                          if x.startswith("remote.")])
+                          if x.startswith("remote.")] + remotes)
 
         if with_urls_only:
             remotes = [
