@@ -110,6 +110,7 @@ def _get_key(k):
                 k, valid_key.pattern))
     return k
 
+
 #
 # common manipulator functions
 #

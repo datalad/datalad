@@ -56,6 +56,83 @@ def _get_obj_location(meta_res):
         meta_res['type'], meta_res['id']))
 
 
+def _update_ds_agginfo(dsmeta, filemeta, agg_base_path, to_save):
+    """Update the aggregate metadata (info) of a single dataset"""
+    agginfo = []
+    for cmeta in dsmeta:
+        ci = {k: cmeta[k]
+              for k in ('type', 'id', 'shasum', 'metadata')
+              if k in cmeta}
+        ci['location'] = _get_obj_location(ci)
+        agginfo.append(ci)
+    # write obj files
+    for ci in dsmeta:
+        loc = _get_obj_location(ci)
+        if not loc:
+            # no point in empty files
+            continue
+        opath = opj(agg_base_path, loc)
+        # TODO unlock object file
+        jsondump(ci['metadata'], opath)
+        to_save.append(dict(path=opath, type='file'))
+    # TODO dump file metadata objects and build info dict
+
+    return agginfo
+
+
+def _aggregate_dataset(parentds, subds_paths, dsmeta_db, filemeta_db, to_save):
+    """Perform metadata aggregation for ds and a given list of subdataset paths"""
+    parentds = Dataset(parentds)
+    # location info of aggregate metadata
+    agginfo_fpath = opj(parentds.path, agginfo_relpath)
+    agg_base_path = dirname(agginfo_fpath)
+    # load existing aggregate info dict
+    agginfos = _load_json_object(agginfo_fpath)
+    # make list of object files we no longer reference
+    objs2remove = set()
+    # and new ones
+    objs2add = set()
+    # for each subdataset (any depth level)
+    for subds_path in subds_paths:
+        subds_relpath = relpath(subds_path, start=parentds.path)
+        # set of metadata objects currently referenced for this subdataset
+        objlocs_was = set([ci['location'] for ci in agginfos.get(subds_relpath, [])])
+        # build aggregate info for the current subdataset
+        agginfo = _update_ds_agginfo(
+            dsmeta_db[subds_path],
+            # file metadata could be absent
+            filemeta_db.get(subds_path, None),
+            agg_base_path,
+            to_save)
+        agginfos[subds_relpath] = agginfo
+
+        # track changes in object files
+        objlocs_is = [ci['location'] for ci in agginfo if ci['location']]
+        objs2remove = objs2remove.union(objlocs_was.difference(objlocs_is))
+        objs2add = objs2add.union(objlocs_is)
+    # secretly remove obsolete object files, not really a result from a
+    # user's perspective
+    if objs2remove:
+        parentds.remove(objs2remove, result_renderer=None, return_type=list)
+        if not objs2add and not parentds.path == parentds.path:
+            # this is not the base dataset, make sure to save removal in the
+            # parentds -- not needed when objects get added, as removal itself
+            # is already committed
+            to_save(dict(path=parentds.path, type='dataset', staged=True))
+    if objs2add:
+        # they are added standard way, depending on the repo type
+        parentds.add(
+            [opj(agg_base_path, p) for p in objs2add],
+            save=False, result_renderer=None, return_type=list)
+    # write aggregate info file
+    jsondump(agginfos, agginfo_fpath)
+    parentds.add(agginfo_fpath, save=False, to_git=True,
+                 result_renderer=None, return_type=list)
+    # queue for save, and mark as staged
+    to_save.append(
+        dict(path=agginfo_fpath, type='file', staged=True))
+
+
 @build_doc
 class AggregateMetaData(Interface):
     """Aggregate meta data of a dataset for later query.
@@ -102,6 +179,18 @@ class AggregateMetaData(Interface):
             recursive=False,
             recursion_limit=None,
             save=True):
+        # basic idea:
+        # - use `metadata` to get homogenized metadata for any path
+        # - sort into dataset metadata and file metadata
+        # - store in form that allows fast access for `metadata`, so
+        #   it get use it transparently for metadata reporting of
+        #   unavailable dataset components without the need of a dedicated
+        #   parser
+        # - the point is: `metadata` does the access and homogenization,
+        #   while `aggregate` merely composed a joint structure and stores
+        #   it in a dataset
+
+        # note to self
         # am : does nothing
         # am -d . : does nothing
         # am -d . sub: aggregates sub metadata into .
@@ -117,8 +206,18 @@ class AggregateMetaData(Interface):
         # exact same paths that we were given, so everything will be
         # nice and consistent
 
-        # metadata by dataset
-        meta_db = {}
+        # metadata for each discovered dataset, keys are dataset paths,
+        # each value is a result dict from a `metadata` query call on the path
+        dsmeta_db = {}
+        # metadata for each file, keys are paths of the parent datasets,
+        # each value is a dict with file path keys and value with result dicts
+        # from a `metadata` query call on the file path
+        filemeta_db = {}
+        # TODO at the moment this will grab any metadata for any given path
+        # whether it is installed or not (goes to aggregate data if needed
+        # however, ATM there is no way of saying grab ANY metadata that you can
+        # get a hold of, without the need to specific paths that are not even
+        # discoverable on the file system
         for res in Metadata.__call__(
                 dataset=refds_path,
                 path=path,
@@ -132,88 +231,66 @@ class AggregateMetaData(Interface):
             if not res['action'] == 'metadata' and res['status'] == 'ok':
                 # deflect anything that is not a clean result
                 yield res
+            restype = res.get('type', None)
+            if not restype:
+                res['status'] = 'impossible'
+                res['message'] = "metadata report has no 'type' property, this is likely a bug"
+                yield res
+                continue
             assert('parentds' in res or res.get('type', None) == 'dataset')
-            # please metadata result into DB under the path of the associated dataset
-            for_ds = res['path'] if res.get('type', None) == 'dataset' else res['parentds']
-            ds_db = meta_db.get(for_ds, [])
-            ds_db.append(res)
-            meta_db[for_ds] = ds_db
+            if restype == 'dataset':
+                # put in DB with dataset metadata under its own path as key
+                # wrap in a list to enable future extension with multiple
+                # metadata set for one dataset without having to change the flow
+                ds_key = res['path']
+                # mark as coming from our own command
+                res['origin'] = 'datalad'
+                ds_db = dsmeta_db.get(ds_key, [])
+                ds_db.append(res)
+                dsmeta_db[ds_key] = ds_db
+            elif restype == 'file':
+                ds_key = res['parentds']
+                ds_db = filemeta_db.get(ds_key, {})
+                # again wrap in a list to enable future extension with multiple
+                # metadata set for one file without having to change the flow
+                file_db = ds_db.get(res['path'], [])
+                # mark as coming from our own command
+                res['origin'] = 'datalad'
+                file_db.append(res)
+                ds_db[ds_key] = file_db
+                filemeta_db[ds_key] = ds_db
+            else:
+                res['status'] = 'impossible'
+                res['message'] = (
+                    "unknown metadata type '%s', this is likely a bug", restype)
+                yield res
+                continue
 
         # TODO make sure to not create an aggregated copy of a datasets own metadata
         # adjencency info of the dataset tree spanning the base to all leave dataset
         # associated with the path arguments
         ds_adj = {}
-        discover_dataset_trace_to_targets(ds.path, meta_db.keys(), [], ds_adj)
+        discover_dataset_trace_to_targets(ds.path, dsmeta_db.keys(), [], ds_adj)
+        # get a dict that has the list of subdatasets of any depth for any given
+        # parent dataset
         subbranches = _adj2subbranches(ds.path, ds_adj)
         to_save = []
-        # go over dataset in bottom-up fashion
-        for parent in sorted(subbranches, reverse=True):
-            children = subbranches[parent]
-            parent = Dataset(parent)
-            # load existing aggregate info dict
-            agginfo_fpath = opj(parent.path, agginfo_relpath)
-            agg_base_path = dirname(agginfo_fpath)
-            agginfos = _load_json_object(agginfo_fpath)
-            # make list of object files we no longer reference
-            objs2remove = set()
-            # and new ones
-            objs2add = set()
-            for child in children:
-                child_relpath = relpath(child, start=parent.path)
-                prev_objs = set([ci['location'] for ci in agginfos.get(child_relpath, [])])
-                # build aggregate info file content
-                child_info = [{
-                    'type': ci['type'],
-                    'id': ci['id'],
-                    'shasum': ci['shasum'],
-                    'origin': 'datalad',
-                    'location': _get_obj_location(ci)}
-                    for ci in meta_db[child]]
-                agginfos[child_relpath] = child_info
-                # write obj files
-                objs_current = []
-                for ci in meta_db[child]:
-                    loc = _get_obj_location(ci)
-                    if not loc:
-                        # no point in empty files
-                        continue
-                    opath = opj(agg_base_path, loc)
-                    # TODO unlock object file
-                    jsondump(ci['metadata'], opj(agg_base_path, loc))
-                    to_save.append(dict(path=opath, type='file'))
-                    objs_current.append(loc)
-
-                # track changes in object files
-                objs_current = [ci['location'] for ci in child_info if ci['location']]
-                objs2remove = objs2remove.union(prev_objs.difference(objs_current))
-                objs2add = objs2add.union(objs_current)
-            # secretly remove obsolete object files, not really a result from a
-            # user's perspective
-            if objs2remove:
-                parent.remove(objs2remove, result_renderer=None, return_type=list)
-                if not objs2add and not parent.path == ds.path:
-                    # this is not the base dataset, make sure to save removal in the
-                    # parent -- not needed when objects get added, as removal itself
-                    # is already committed
-                    to_save(dict(path=parent.path, type='dataset', staged=True))
-            if objs2add:
-                # they are added standard way, depending on the repo type
-                parent.add(
-                    [opj(agg_base_path, p) for p in objs2add],
-                    save=False, result_renderer=None, return_type=list)
-            # write aggregate info file
-            jsondump(agginfos, agginfo_fpath)
-            parent.add(agginfo_fpath, save=False, to_git=True,
-                       result_renderer=None, return_type=list)
-            # queue for save, and mark as staged
-            to_save.append(
-                dict(path=agginfo_fpath, type='file', staged=True))
-
+        # go over datasets in bottom-up fashion
+        # TODO for now effectively just loop over datasets in dsmeta_db, this should be
+        # good enough, assuming we always get dataset metadata, which is the case ATM
+        for parentds_path in sorted(subbranches, reverse=True):
+            _aggregate_dataset(
+                parentds_path,
+                subbranches[parentds_path],
+                dsmeta_db,
+                filemeta_db,
+                to_save)
             # update complete
             yield get_status_dict(
                 status='ok',
                 action='aggregate_metadata',
-                ds=parent,
+                path=parentds_path,
+                type='dataset',
                 logger=lgr)
         #
         # save potential modifications to dataset global metadata

@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata handling (parsing, storing, querying)"""
 
+# TODO except for a few things this entire file is obsolete
 
 import os
 import re
@@ -60,9 +61,6 @@ def get_metadata_type(ds, guess=False):
         # keep local, who knows what some parsers might pull in
         from . import parsers
         for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
-            if mtype == 'aggregate':
-                # skip, runs anyway, but later
-                continue
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
             if pmod.MetadataParser(ds).has_metadata():
                 lgr.debug('Predicted presence of "%s" meta data', mtype)

@@ -45,8 +45,12 @@ def test_basic_aggregate(path):
     # grep metadata for sub prior aggregation (which will change shasum due to
     # injections of metadata from sub/subsub
     direct_meta = base.metadata(sub.path, return_type='item-or-list')
-    # no aggregate, coes out clean
+    eq_(direct_meta['metadata']['homepage'], 'this')
+    # no aggregate, comes out clean
     base.aggregate_metadata('.', recursive=True)
+    # the fact that aggregation happened doesnt change metadata
+    eq_(base.metadata(sub.path, return_type='item-or-list')['metadata']['homepage'],
+        'this')
     ok_clean_git(base.path)
     # no we can throw away the subdataset tree, and loose no metadata
     base.uninstall('sub', recursive=True)
