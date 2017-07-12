@@ -483,6 +483,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo.clone(src, dst, backend='MD5')
+    eq_(ar.default_backends, ['MD5'])
     # GitPython has a bug which causes .git/config being wiped out
     # under Python3, triggered by collecting its config instance I guess
     gc.collect()
