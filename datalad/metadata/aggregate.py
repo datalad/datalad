@@ -55,7 +55,7 @@ def _get_obj_location(info):
         info['type'], info['id']))
 
 
-def _update_ds_agginfo(dsmeta, filemeta, agg_base_path, to_save):
+def _update_ds_agginfo(baseds, dsmeta, filemeta, agg_base_path, to_save):
     """Update the aggregate metadata (info) of a single dataset"""
     dsid = None
     agginfo = []
@@ -81,7 +81,7 @@ def _update_ds_agginfo(dsmeta, filemeta, agg_base_path, to_save):
         to_save.append(dict(path=opath, type='file'))
     # reduce file metadata, for now limit to our own data sources only, later this would need to be
     # wrapped in a loop across sources
-    fm = {r['path']: r['metadata']
+    fm = {relpath(r['path'], start=baseds.path): r['metadata']
           for r in filemeta or []
           if r.get('metadata', None) and r.get('origin', None) == 'datalad'}
     if fm:
@@ -118,6 +118,7 @@ def _aggregate_dataset(parentds, subds_paths, dsmeta_db, filemeta_db, to_save):
         objlocs_was = set([ci['location'] for ci in agginfos.get(subds_relpath, []) if ci['location']])
         # build aggregate info for the current subdataset
         agginfo = _update_ds_agginfo(
+            parentds,
             dsmeta_db[subds_path],
             # file metadata could be absent
             filemeta_db.get(subds_path, None),
