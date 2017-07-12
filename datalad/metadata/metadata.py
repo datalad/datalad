@@ -274,6 +274,7 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
                 path=opj(ds.path, file),
                 type='file',
                 metadata=meta,
+                parentds=ds.path,
                 **kwargs)
             yield r
 
@@ -476,7 +477,7 @@ class Metadata(Interface):
             this flag only the metadata record of the dataset itself
             will be altered."""),
         reporton=Parameter(
-            args=('--report',),
+            args=('--reporton',),
             metavar='TYPE',
             doc="""choose on what type metadata will be reported for
             the requested paths: dataset-global metadata ('datasets'),
