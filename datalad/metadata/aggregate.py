@@ -48,35 +48,54 @@ def _adj2subbranches(base, adj):
     return branches
 
 
-def _get_obj_location(meta_res):
-    # TODO support other metadata result then those for datasets
-    if not meta_res.get('metadata', None):
-        return None
+def _get_obj_location(info):
+    # TODO add 'origin' info into file name, do when needed, code is
+    # forward compatible
     return opj('objects', '{}-{}'.format(
-        meta_res['type'], meta_res['id']))
+        info['type'], info['id']))
 
 
 def _update_ds_agginfo(dsmeta, filemeta, agg_base_path, to_save):
     """Update the aggregate metadata (info) of a single dataset"""
+    dsid = None
     agginfo = []
     for cmeta in dsmeta:
         ci = {k: cmeta[k]
-              for k in ('type', 'id', 'shasum', 'metadata')
+              for k in ('type', 'id', 'shasum', 'origin')
               if k in cmeta}
-        ci['location'] = _get_obj_location(ci)
+        loc = _get_obj_location(cmeta) if cmeta.get('metadata', None) else None
+        ci['location'] = loc
+        ci_id = ci.get('id', None)
         agginfo.append(ci)
-    # write obj files
-    for ci in dsmeta:
-        loc = _get_obj_location(ci)
+        if dsid is None and ci_id is not None:
+            dsid = ci_id
+        if dsid != ci_id:
+            lgr.warning("internal consistency error: multiple dataset ID for a single dataset")
+        # write obj files
         if not loc:
             # no point in empty files
             continue
         opath = opj(agg_base_path, loc)
         # TODO unlock object file
-        jsondump(ci['metadata'], opath)
+        jsondump(cmeta['metadata'], opath)
         to_save.append(dict(path=opath, type='file'))
-    # TODO dump file metadata objects and build info dict
-
+    # reduce file metadata, for now limit to our own data sources only, later this would need to be
+    # wrapped in a loop across sources
+    fm = {r['path']: r['metadata']
+          for r in filemeta or []
+          if r.get('metadata', None) and r.get('origin', None) == 'datalad'}
+    if fm:
+        if dsid is None:
+            lgr.warning("internal consistency error: file-based metadata, but no dataset ID present")
+        # only if there is anything, build agginfo item
+        finfo = dict(type='files', id=dsid)
+        loc = _get_obj_location(finfo)
+        finfo['location'] = loc
+        agginfo.append(finfo)
+        opath = opj(agg_base_path, loc)
+        # TODO unlock object file
+        jsondump(fm, opath)
+        to_save.append(dict(path=opath, type='file'))
     return agginfo
 
 
@@ -96,7 +115,7 @@ def _aggregate_dataset(parentds, subds_paths, dsmeta_db, filemeta_db, to_save):
     for subds_path in subds_paths:
         subds_relpath = relpath(subds_path, start=parentds.path)
         # set of metadata objects currently referenced for this subdataset
-        objlocs_was = set([ci['location'] for ci in agginfos.get(subds_relpath, [])])
+        objlocs_was = set([ci['location'] for ci in agginfos.get(subds_relpath, []) if ci['location']])
         # build aggregate info for the current subdataset
         agginfo = _update_ds_agginfo(
             dsmeta_db[subds_path],
@@ -239,6 +258,7 @@ class AggregateMetaData(Interface):
                 continue
             assert('parentds' in res or res.get('type', None) == 'dataset')
             if restype == 'dataset':
+                lgr.info('Extracted metadata for dataset at: %s', res['path'])
                 # put in DB with dataset metadata under its own path as key
                 # wrap in a list to enable future extension with multiple
                 # metadata set for one dataset without having to change the flow
@@ -250,14 +270,10 @@ class AggregateMetaData(Interface):
                 dsmeta_db[ds_key] = ds_db
             elif restype == 'file':
                 ds_key = res['parentds']
-                ds_db = filemeta_db.get(ds_key, {})
-                # again wrap in a list to enable future extension with multiple
-                # metadata set for one file without having to change the flow
-                file_db = ds_db.get(res['path'], [])
+                ds_db = filemeta_db.get(ds_key, [])
                 # mark as coming from our own command
                 res['origin'] = 'datalad'
-                file_db.append(res)
-                ds_db[ds_key] = file_db
+                ds_db.append(res)
                 filemeta_db[ds_key] = ds_db
             else:
                 res['status'] = 'impossible'
@@ -279,6 +295,7 @@ class AggregateMetaData(Interface):
         # TODO for now effectively just loop over datasets in dsmeta_db, this should be
         # good enough, assuming we always get dataset metadata, which is the case ATM
         for parentds_path in sorted(subbranches, reverse=True):
+            lgr.info('Update aggregated metadata in dataset at: %s', parentds_path)
             _aggregate_dataset(
                 parentds_path,
                 subbranches[parentds_path],
