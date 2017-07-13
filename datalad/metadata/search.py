@@ -12,12 +12,12 @@
 __docformat__ = 'restructuredtext'
 
 import os
-import sys
-
 from os.path import join as opj, exists
 from os.path import dirname
 from os.path import relpath
+import sys
 from six import reraise
+
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
@@ -25,12 +25,11 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from datalad.distribution.utils import get_git_dir
-from ..support.param import Parameter
-from ..support.constraints import EnsureNone
-from ..log import lgr
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureNone
+from datalad.log import lgr
 from datalad.metadata.definitions import common_key_defs
 from datalad.metadata.metadata import agginfo_relpath
-from datalad.metadata.metadata import Metadata
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
@@ -55,6 +54,9 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
 
     if not force_reindex and exists(index_dir):
         try:
+            # TODO check that the index schema is the same
+            # as the one we would have used for reindexing
+            # TODO support incremental re-indexing, whoosh can do it
             return widx.open_dir(index_dir)
         except widx.LockError as e:
             raise e
@@ -85,9 +87,7 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
     if not exists(index_dir):
         os.makedirs(index_dir)
 
-    # TODO support incremental re-indexing, whoosh can do it
     idx_obj = widx.create_in(index_dir, schema)
-
     idx = idx_obj.writer()
     # load aggregate metadata
     for ds_relpath, ds_info in jsonload(agginfo_fpath).items():
@@ -152,7 +152,6 @@ class Search(Interface):
     def __call__(query,
                  dataset=None,
                  force_reindex=False):
-        from whoosh import index as widx
         from whoosh import fields as wf
         from whoosh.qparser import QueryParser
 
