@@ -1162,6 +1162,11 @@ def test_annex_copy_to(origin, clone):
     # Test that if we pass a list of items and annex processes them nicely,
     # we would obtain a list back. To not stress our tests even more -- let's mock
     def ok_copy(command, **kwargs):
+        # Check that we do pass to annex call only the list of files which we
+        #  asked to be copied
+        assert_in('copied1', kwargs['annex_options'])
+        assert_in('copied2', kwargs['annex_options'])
+        assert_in('existed', kwargs['annex_options'])
         return """
 {"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
