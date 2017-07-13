@@ -49,6 +49,80 @@ whoosh_field_types = {
 }
 
 
+def _get_search_index(index_dir, ds, schema, force_reindex,
+                      agginfo_fpath, agg_base_path):
+    from whoosh import index as widx
+
+    if not force_reindex and exists(index_dir):
+        try:
+            return widx.open_dir(index_dir)
+        except widx.LockError as e:
+            raise e
+        except widx.IndexError as e:
+            # Generic index error.
+            # we try to regenerate
+            # TODO log this
+            pass
+        except widx.IndexVersionError as e:  # (msg, version, release=None)
+            # Raised when you try to open an index using a format that the
+            # current version of Whoosh cannot read. That is, when the index
+            # you’re trying to open is either not backward or forward
+            # compatible with this version of Whoosh.
+            # we try to regenerate
+            # TODO log this
+            pass
+        except widx.OutOfDateError as e:
+            # Raised when you try to commit changes to an index which is not
+            # the latest generation.
+            # this should not happen here, but if it does ... KABOOM
+            raise e
+        except widx.EmptyIndexError as e:
+            # Raised when you try to work with an index that has no indexed
+            # terms.
+            # we can just continue with generating an index
+            pass
+
+    if not exists(index_dir):
+        os.makedirs(index_dir)
+
+    # TODO support incremental re-indexing, whoosh can do it
+    idx_obj = widx.create_in(index_dir, schema)
+
+    idx = idx_obj.writer()
+    # load aggregate metadata
+    for ds_relpath, ds_info in jsonload(agginfo_fpath).items():
+        for item in ds_info:
+            # load the stored data, if there is any
+            if item.get('location', None):
+                agg_obj_path = opj(agg_base_path, item['location'])
+                md = jsonload(agg_obj_path)
+            else:
+                agg_obj_path = None
+                md = {}
+            agg_obj = relpath(agg_obj_path, start=agg_base_path) \
+                if agg_obj_path else None
+            if item['type'] == 'dataset':
+                idx.add_document(
+                    datalad__agg_obj=agg_obj,
+                    id=item['id'],
+                    path=ds_relpath,
+                    type=item['type'],
+                    # and anything else we know about, and is known to the schema
+                    **{k: v for k, v in md.items()
+                       if k in schema.names()})
+            elif item['type'] == 'files':
+                for f in md:
+                    idx.add_document(
+                        datalad__agg_obj=agg_obj,
+                        path=f,
+                        type='file',
+                        # and anything else we know about, and is known to the schema
+                        **{k: v for k, v in md[f].items()
+                           if k in schema.names()})
+    idx.commit()
+    return idx_obj
+
+
 @build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
@@ -65,14 +139,19 @@ class Search(Interface):
             metavar='QUERY',
             nargs="+",
             doc="tell me"),
-        # TODO --reindex
+        force_reindex=Parameter(
+            args=("--reindex",),
+            dest='force_reindex',
+            action='store_true',
+            doc="tell me"),
     )
 
     @staticmethod
     @datasetmethod(name='search')
     @eval_results
     def __call__(query,
-                 dataset=None):
+                 dataset=None,
+                 force_reindex=False):
         from whoosh import index as widx
         from whoosh import fields as wf
         from whoosh.qparser import QueryParser
@@ -140,9 +219,11 @@ class Search(Interface):
             else:
                 raise
 
+        # where does the bunny have the eggs?
+        agginfo_fpath = opj(ds.path, agginfo_relpath)
+        agg_base_path = dirname(agginfo_fpath)
+
         index_dir = opj(ds.path, get_git_dir(ds.path), 'datalad', 'search_index')
-        if not exists(index_dir):
-            os.makedirs(index_dir)
 
         # auto-builds search schema from common metadata keys
         # the idea is to only store what we need to pull up the full metadata
@@ -156,44 +237,9 @@ class Search(Interface):
                for k in common_key_defs
                if not k.startswith('@') and not k == 'type'})
 
-        # TODO switch to load instead of generating a new index
-        idx_obj = widx.create_in(index_dir, datalad_schema)
-
-        idx = idx_obj.writer()
-        # load aggregate metadata
-        agginfo_fpath = opj(ds.path, agginfo_relpath)
-        agg_base_path = dirname(agginfo_fpath)
-        for ds_relpath, ds_info in jsonload(agginfo_fpath).items():
-            for item in ds_info:
-                # load the stored data, if there is any
-                if item.get('location', None):
-                    agg_obj_path = opj(agg_base_path, item['location'])
-                    md = jsonload(agg_obj_path)
-                else:
-                    agg_obj_path = None
-                    md = {}
-                agg_obj = relpath(agg_obj_path, start=agg_base_path) \
-                    if agg_obj_path else None
-                if item['type'] == 'dataset':
-                    idx.add_document(
-                        datalad__agg_obj=agg_obj,
-                        id=item['id'],
-                        path=ds_relpath,
-                        type=item['type'],
-                        # and anything else we know about, and is known to the schema
-                        **{k: v for k, v in md.items()
-                           if k in datalad_schema.names()})
-                elif item['type'] == 'files':
-                    for f in md:
-                        idx.add_document(
-                            datalad__agg_obj=agg_obj,
-                            path=f,
-                            type='file',
-                            # and anything else we know about, and is known to the schema
-                            **{k: v for k, v in md[f].items()
-                               if k in datalad_schema.names()})
-
-        idx.commit()
+        idx_obj = _get_search_index(
+            index_dir, ds, datalad_schema, force_reindex,
+            agginfo_fpath, agg_base_path)
 
         with idx_obj.searcher() as searcher:
             # parse the query string, default whoosh parser ATM, could be
