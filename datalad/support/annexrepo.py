@@ -250,7 +250,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
-    def set_default_backend(self, backend, persistent=True):
+    def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend
 
         Parameters
@@ -282,11 +282,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                         f.write(os.linesep)
                     f.write('* annex.backend=%s%s' % (backend, os.linesep))
                 self.add(git_attributes_file, git=True)
-                self.commit(
-                    "Set default backend for all files to be %s" % backend,
-                    _datalad_msg=True,
-                    files=[git_attributes_file]
-                )
+                if commit:
+                    self.commit(
+                        "Set default backend for all files to be %s" % backend,
+                        _datalad_msg=True,
+                        files=[git_attributes_file]
+                    )
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')

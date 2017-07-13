@@ -851,7 +851,7 @@ class Annexificator(object):
         if self.repo.dirty and not exists(opj(path, '.gitattributes')) and isinstance(self.repo, AnnexRepo):
             backends = self.repo.default_backends
             if backends:
-                self.repo.set_default_backend(backends[0])
+                self.repo.set_default_backend(backends[0], commit=False)
 
     # at least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
