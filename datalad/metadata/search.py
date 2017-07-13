@@ -293,14 +293,16 @@ class Search(Interface):
             #      way to maintain the order of hits during processing -- and
             #      only this allows for using whoosh features such as boosting
             #      results and all the other fancy stuff
+            aggobj_cache = {}
             for r in hits:
                 rtype = r.get('type', None)
                 rpath = r['path']
                 aggobj_path = r.get('datalad__agg_obj', None)
                 if aggobj_path:
                     aggobj_path = opj(agg_base_path, aggobj_path)
-                    # TODO cache the JSON content, we might hit another file in here
-                    md = jsonload(aggobj_path)
+                    # cache the JSON content, we might hit another file in here
+                    md = aggobj_cache.get(aggobj_path, jsonload(aggobj_path))
+                    aggobj_cache[aggobj_path] = md
                     if rtype == 'file':
                         md = md[r['path']]
                 # TODO report matched terms in the result
