@@ -57,10 +57,10 @@ Metadata
     ds_meta = None
     if ds and ds.is_installed():
         ds_meta = metadata(
-            dataset=ds, dataset_global=True, return_type='item-or-list',
+            dataset=ds, reporton='datasets', return_type='list',
             result_filter=lambda x: x['action'] == 'metadata')
     if ds_meta:
-        ds_meta = ds_meta['metadata']
+        ds_meta = [dm['metadata'] for dm in ds_meta]
 
     ui.message(report_template.format(
         dataset='' if not ds else dataset_template.format(
@@ -70,11 +70,13 @@ Metadata
                     ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
                 )),
             meta='\n'.join(
-                '{}: {}'.format(k, v) for k, v in ds_meta)
+                '{}: {}'.format(k, v) for dm in ds_meta for k, v in dm.items())
             if ds_meta else '[no metadata]'
         ),
         cfg='\n'.join(
-            '{}: {}'.format(k, '<HIDDEN>' if k.startswith('user.') or 'token' in k else v)
+            '{}: {}'.format(
+                k,
+                '<HIDDEN>' if 'user' in k or 'token' in k or 'passwd' in k else v)
             for k, v in sorted(cfg.items(), key=lambda x: x[0])),
     ))
     yield
