@@ -266,10 +266,9 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
     # report on this dataset's files
     #
     if reporton in ('all', 'files') and isinstance(ds.repo, AnnexRepo):
-        # and lastly, query -- even if we set before -- there could
-        # be side-effect from multiple set paths on an individual
-        # path, hence we need to query to get the final result
         for file, meta in ds.repo.get_metadata(paths):
+            meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
+                    for k, v in meta.items()}
             r = get_status_dict(
                 status='ok',
                 path=opj(ds.path, file),
@@ -819,4 +818,4 @@ class Metadata(Interface):
             meta=','.join(k for k in sorted(meta.keys()) if not k == 'tag')
                  if meta else ' -',
             tags='' if 'tag' not in meta else ' [{}]'.format(
-                 ','.join(meta['tag']))))
+                 ','.join(assure_list(meta['tag'])))))

@@ -68,18 +68,18 @@ def test_basic_filemeta(path):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, target_file),
-        metadata={'tag': ['mytag']})
+        metadata={'tag': 'mytag'})
     # now init tag for all files that don't have one yet
     res = ds.metadata(init=['rest'], reporton='files')
     assert_result_count(res, 2)
     # from before
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, target_file),
-        metadata={'tag': ['mytag']})
+        metadata={'tag': 'mytag'})
     # and the other one
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, 'somefile'),
-        metadata={'tag': ['rest']})
+        metadata={'tag': 'rest'})
     # add two more different tags
     res = ds.metadata(add=['other1', 'other2', 'other3'], reporton='files')
     assert_result_count(res, 2)
@@ -102,7 +102,7 @@ def test_basic_filemeta(path):
     # however there is no modification to files that don't have the tag
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, 'somefile'),
-        metadata={'tag': ['other2']})
+        metadata={'tag': 'other2'})
     assert_result_count(
         res, 1, type='file', path=opj(ds.path, target_file),
         metadata={'tag': ['mytag', 'other2']})
@@ -116,7 +116,7 @@ def test_basic_filemeta(path):
     assert_result_count(
         ds.metadata('somefile'), 1,
         type='file', path=opj(ds.path, 'somefile'),
-        metadata={'tag': ['other2']})
+        metadata={'tag': 'other2'})
     # kill all tags everywhere
     res = ds.metadata(reset=['tag'], reporton='files')
     assert_result_count(res, 2)
@@ -144,10 +144,10 @@ def test_basic_filemeta(path):
     # reset with a mapping, overrides the old one
     res = ds.metadata('somefile', reset=dict(new='george', more='yeah'),
                       permit_undefined_keys=True)
-    assert_result_count(res, 1, metadata=dict(new=['george'], more=['yeah']))
+    assert_result_count(res, 1, metadata=dict(new='george', more='yeah'))
     # remove single value from mapping, last value to go removes the key
     res = ds.metadata('somefile', remove=dict(more='yeah'))
-    assert_result_count(res, 1, metadata=dict(new=['george']))
+    assert_result_count(res, 1, metadata=dict(new='george'))
     # and finally init keys
     res = ds.metadata(init=dict(new=['two', 'three'], super='fresh'),
                       permit_undefined_keys=True, reporton='files')
@@ -155,11 +155,11 @@ def test_basic_filemeta(path):
     assert_result_count(
         res, 1, path=opj(ds.path, target_file),
         # order of values is not maintained
-        metadata=dict(new=['three', 'two'], super=['fresh']))
+        metadata=dict(new=['three', 'two'], super='fresh'))
     assert_result_count(
         res, 1, path=opj(ds.path, 'somefile'),
         # order of values is not maintained
-        metadata=dict(new=['george'], super=['fresh']))
+        metadata=dict(new='george', super='fresh'))
 
 
 @with_tempfile(mkdir=True)
