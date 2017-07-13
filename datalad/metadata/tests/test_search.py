@@ -43,7 +43,7 @@ def test_search_outside1(tdir, newhome):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
         with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
-            gen = search("bu")
+            gen = search("bu", return_type='generator')
             assert_is_generator(gen)
             assert_raises(NoDatasetArgumentFound, next, gen)
 
@@ -89,6 +89,9 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
             with assert_raises(NoDatasetArgumentFound):
                 list(search(".", regex=True))
 
+
+# MIH: I have no idea how this test is supposed to work
+#      it is out of touch with the new reality
 _mocked_search_results = [
     ('ds1', {'f': 'v'}),
     ('d2/ds2', {'f1': 'v1'})
@@ -102,7 +105,7 @@ class _mock_search(object):
 
 
 def _check_mocked_install(central_dspath, mock_install):
-    gen = search(".", regex=True)
+    gen = search(".", return_type='generator')
     assert_is_generator(gen)
     # we no longer do any custom path tune up from the one returned by search
     # so should match what search returns
@@ -110,39 +113,6 @@ def _check_mocked_install(central_dspath, mock_install):
         list(gen), [(loc, report)
                     for loc, report in _mocked_search_results])
     mock_install.assert_called_once_with(central_dspath, source='///')
-
-
-@skip_if_no_network
-@with_tempfile
-def test_our_metadataset_search(tdir):
-    # smoke test for basic search operations on our super-megadataset
-    # expensive operation but ok
-    ds = install(
-        path=tdir, source="///",
-        result_xfm='datasets', return_type='item-or-list')
-    assert list(ds.search('.', report='*', regex=True))
-    assert list(ds.search('.', report='*'))
-    assert list(ds.search('.', report_matched=True))
-
-    # TODO generator
-    # bring this back when `search` is a new-style command
-    raise SkipTest
-    #import simplejson
-    #from datalad.utils import swallow_outputs
-    #with swallow_outputs() as cmo:
-    #    assert list(search_('.', report='*', regex=True, format='json', dataset=ds))
-    #    out = cmo.out
-    ## since this one is just absorbs all first, we can't go one by one
-    #assert simplejson.loads(out)
-
-    #try:
-    #    import yaml
-    #except ImportError:
-    #    raise SkipTest("no yaml module")
-    #with swallow_outputs() as cmo:
-    #    assert list(search_('.', report='*', regex=True, format='yaml', dataset=ds))
-    #    out = cmo.out
-    #assert yaml.load(out)
 
 
 @with_tempfile
