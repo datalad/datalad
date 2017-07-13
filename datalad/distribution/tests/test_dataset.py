@@ -11,7 +11,7 @@
 
 import os
 import shutil
-from os.path import join as opj, abspath, normpath, relpath
+from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
@@ -25,6 +25,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
+from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
@@ -79,61 +80,6 @@ def test_resolve_path(somedir):
 
 
 # TODO: test remember/recall more extensive?
-
-@with_testrepos(flavors=['local', 'local-url'])
-@with_tempfile(mkdir=True)
-def test_register_sibling(remote, path):
-    AnnexRepo(path)
-    ds = Dataset(path)
-    ds.register_sibling('my_sibling', remote)
-    assert_in('my_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_sibling'), remote)
-
-    ds.register_sibling('my_other_sibling', remote,
-                        publish_url='http://fake.pushurl.com')
-    assert_in('my_other_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_other_sibling'), remote)
-    # TODO: GitRepo method for push-url!
-
-    # TODO: Validation!
-
-
-@with_testrepos('.*nested_submodule.*', flavors=['local'])
-def test_get_subdatasets(path):
-    ds = Dataset(path)
-    eq_(ds.get_subdatasets(), ['sub dataset1'])
-    eq_(ds.get_subdatasets(edges=True), [(os.curdir, 'sub dataset1')])
-    eq_(ds.get_subdatasets(recursive=True),
-        [
-            'sub dataset1/sub sub dataset1/subm 1',
-            'sub dataset1/sub sub dataset1/subm 2',
-            'sub dataset1/sub sub dataset1',
-            'sub dataset1/subm 1',
-            'sub dataset1/subm 2',
-            'sub dataset1'
-        ])
-    eq_(ds.get_subdatasets(recursive=True, edges=True),
-        [
-            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
-            ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 2'),
-            ('sub dataset1', 'sub dataset1/sub sub dataset1'),
-            ('sub dataset1', 'sub dataset1/subm 1'),
-            ('sub dataset1', 'sub dataset1/subm 2'),
-            (os.curdir, 'sub dataset1'),
-        ])
-    eq_(ds.get_subdatasets(recursive=True, recursion_limit=0),
-        [])
-    eq_(ds.get_subdatasets(recursive=True, recursion_limit=1),
-        ['sub dataset1'])
-    eq_(ds.get_subdatasets(recursive=True, recursion_limit=2),
-        [
-            'sub dataset1/sub sub dataset1',
-            'sub dataset1/subm 1',
-            'sub dataset1/subm 2',
-            'sub dataset1',
-        ])
-
-    # TODO:  More Flavors!
 
 
 # TODO: There's something wrong with the nested testrepo!
@@ -208,10 +154,10 @@ def test_subdatasets(path):
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
     ds = ds.create()
     assert_true(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
     ds.add(path='test')
@@ -222,26 +168,26 @@ def test_subdatasets(path):
     eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
-    subds = ds.install('subds', source=path)
+    subds = ds.install('subds', source=path,
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subds.is_installed())
     eq_(subds.get_superdataset(), ds)
     eq_(subds.get_superdataset(topmost=True), ds)
 
-    subdss = ds.get_subdatasets()
+    subdss = ds.subdatasets()
     eq_(len(subdss), 1)
-    eq_(os.path.join(path, subdss[0]), subds.path)
-    eq_(subds.path, ds.get_subdatasets(absolute=True)[0])
-    eq_(subdss, ds.get_subdatasets(recursive=True))
-    eq_(subdss, ds.get_subdatasets(fulfilled=True))
-    # don't have that right now
-    assert_raises(NotImplementedError, ds.get_subdatasets, pattern='sub*')
+    eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
+    eq_(subdss, ds.subdatasets(recursive=True))
+    eq_(subdss, ds.subdatasets(fulfilled=True))
     ds.save("with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
 
     # very nested subdataset to test topmost
-    subsubds = subds.install(_path_('d1/subds'), source=path)
+    subsubds = subds.install(
+        _path_('d1/subds'), source=path,
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subsubds.is_installed())
     eq_(subsubds.get_superdataset(), subds)
     eq_(subsubds.get_superdataset(topmost=True), ds)

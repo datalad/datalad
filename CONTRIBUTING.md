@@ -92,6 +92,7 @@ we outline the workflow used by the developers:
     - `bf-` for bug fixes
     - `rf-` for refactoring
     - `doc-` for documentation contributions (including in the code docstrings).
+    - `bm-` for changes to benchmarks
     We recommend to not work in the ``master`` branch!
 
 4. Work on this copy on your computer using Git to do the version control. When
@@ -101,7 +102,7 @@ we outline the workflow used by the developers:
           git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could
+   `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
    also use `TST` for commits concerned solely with tests, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
@@ -245,6 +246,35 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
+### CI setup
+
+We are using Travis-CI and have [buildbot setup](https://github.com/datalad/buildbot) which also
+exercises our tests battery for every PR and on the master.  Note that buildbot runs tests only submitted
+by datalad developers, or if a PR acquires 'buildbot' label.
+
+In case if you want to enter buildbot's environment
+
+1. Login to our development server (`smaug`)
+
+2. Find container ID associated with the environment you are interested in, e.g.
+
+       ```docker ps | grep nd16.04```
+
+3. Enter that docker container environment using
+
+       ```docker exec -it <CONTAINER ID> /bin/bash```
+
+4. Become buildbot user
+
+       ```su - buildbot```
+
+5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
+   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+
+And now you should be in the same environment as the very last tested PR.
+Note that the same path/venv is reused for all the PRs, so you might want
+first to check using `git show` under the `build/` directory if it corresponds
+to the commit you are interested to troubleshoot.
 
 ### Coverage
 
@@ -328,11 +358,23 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_OUTPUTS*: 
+- *DATALAD_LOG_CMD_OUTPUTS*:
   Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
+- *DATALAD_LOG_CMD_ENV*:
+  If contains a digit (e.g. 1), would log entire environment passed into
+  the Runner.run's popen call.  Otherwise could be a comma separated list
+  of environment variables to log
+- *DATALAD_LOG_CMD_STDIN*:
+  Either to log stdin for the command
+- *DATALAD_LOG_CMD_CWD*:
+  Either to log cwd where command to be executed
+- *DATALAD_LOG_PID*
+  To instruct datalad to log PID of the process
+- *DATALAD_LOG_TARGET*
+  Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
   Used to add timestamp to datalad logs
-- *DATALAD_LOG_TRACEBACK*: 
+- *DATALAD_LOG_TRACEBACK*:
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_EXC_STR_TBLIMIT*: 

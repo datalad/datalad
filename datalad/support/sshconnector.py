@@ -26,7 +26,7 @@ try:
     # from Python 3.3 onwards
     from shlex import quote as sh_quote
 except ImportError:
-    # deprecated since Pythonn 2.7
+    # deprecated since Python 2.7
     from pipes import quote as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
@@ -51,12 +51,18 @@ def get_connection_hash(hostname, port='', username=''):
     port and login username). The hash also contains the local
     host name.
     """
+    # returning only first 8 characters to minimize our chance
+    # of hitting a limit on the max path length for the Unix socket.
+    # Collisions would be very unlikely even if we used less than 8.
+    # References:
+    #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
+    #  https://github.com/datalad/datalad/pull/1377
     return md5(
         '{lhost}{rhost}{port}{username}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
-            username=username).encode('utf-8')).hexdigest()
+            username=username).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
@@ -87,12 +93,13 @@ class SSHConnection(object):
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
         self.ctrl_path = ctrl_path
-        self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
+        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
-            self.ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+            self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
         # essential properties of the remote system
-        self.remote_props = {}
+        self._remote_props = {}
+        self._opened_by_us = False
 
     def __call__(self, cmd, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -112,30 +119,37 @@ class SSHConnection(object):
           stdout, stderr of the command run.
         """
 
+        # TODO:  do not do all those checks for every invocation!!
+        # TODO: check for annex location once, check for open socket once
+        #       and provide roll back if fails to run and was not explicitly
+        #       checked first
         if not self.is_open():
             if not self.open():
                 raise RuntimeError(
                     'Cannot open SSH connection to {}'.format(
                         self.sshri))
-            # locate annex and set the bundled vs. system Git machinery in motion
+
+        # locate annex and set the bundled vs. system Git machinery in motion
         remote_annex_installdir = self.get_annex_installdir()
         if remote_annex_installdir:
             # make sure to use the bundled git version if any exists
             cmd = '{}; {}'.format(
                 'export "PATH={}:$PATH"'.format(remote_annex_installdir),
                 cmd)
+
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
-        ssh_cmd = ["ssh"] + self.ctrl_options
+        ssh_cmd = ["ssh"] + self._ctrl_options
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
-        if log_output:
-            kwargs = dict(log_stdout=True, log_stderr=True, log_online=False)
-        else:
-            kwargs = dict(log_stdout=False, log_stderr=False, log_online=True)
+        kwargs = dict(
+            log_stdout=log_output, log_stderr=log_output,
+            log_online=not log_output
+        )
+
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(
@@ -153,19 +167,30 @@ class SSHConnection(object):
 
     def is_open(self):
         if not exists(self.ctrl_path):
+            lgr.log(
+                5,
+                "Not opening %s for checking since %s does not exist",
+                self, self.ctrl_path
+            )
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self.ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
+        lgr.debug("Checking %s by calling %s" % (self, cmd))
+        null = open('/dev/null')
         try:
-            out, err = self.runner.run(cmd)
+            out, err = self.runner.run(cmd, stdin=null)
+            res = True
         except CommandError as e:
             if e.code != 255:
                 # this is not a normal SSH error, whine ...
                 raise e
             # SSH died and left socket behind, or server closed connection
             self.close()
-            return False
-        return True
+            res = False
+        finally:
+            null.close()
+        lgr.debug("Check of %s has %s", self, {True: 'succeeded', False: 'failed'}[res])
+        return res
 
     def open(self):
         """Opens the connection.
@@ -178,36 +203,50 @@ class SSHConnection(object):
         bool
           Whether SSH reports success opening the connection
         """
-
         if self.is_open():
             return
 
         # set control options
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
-                        "-o", "ControlPersist=15m"] + self.ctrl_options
+                        "-o", "ControlPersist=15m"] + self._ctrl_options
         # create ssh control master command
         cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
 
         # start control master:
-        lgr.debug("Try starting control master by calling:\n%s" % cmd)
+        lgr.debug("Opening %s by calling %s" % (self, cmd))
         proc = Popen(cmd)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
+        stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
         # open or not at this point
-        return proc.wait() == 0
+        exit_code = proc.wait()
+        ret = exit_code == 0
+
+        if not ret:
+            lgr.warning(
+                "Failed to run cmd %s. Exit code=%s\nstdout: %s\nstderr: %s",
+                cmd, exit_code, stdout, stderr
+            )
+        else:
+            self._opened_by_us = True
+        return ret
 
     def close(self):
         """Closes the connection.
         """
-
+        if not self._opened_by_us:
+            lgr.debug("Not closing %s since was not opened by itself", self)
+            return
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self.ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "stop"] + self._ctrl_options + [self.sshri.as_str()]
+        lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
+            lgr.debug("Failed to run close command")
             if exists(self.ctrl_path):
+                lgr.debug("Removing existing control path %s", self.ctrl_path)
                 # socket need to go in any case
                 remove(self.ctrl_path)
             if e.code != 255:
@@ -231,7 +270,7 @@ class SSHConnection(object):
         """
 
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options = self.ctrl_options + ["-r"] if recursive else self.ctrl_options
+        scp_options = self._ctrl_options + ["-r"] if recursive else self._ctrl_options
         scp_options += ["-p"] if preserve_attrs else []
         scp_cmd = ["scp"] + scp_options
 
@@ -245,26 +284,29 @@ class SSHConnection(object):
 
     def get_annex_installdir(self):
         key = 'installdir:annex'
-        if key in self.remote_props:
-            return self.remote_props[key]
+        if key in self._remote_props:
+            return self._remote_props[key]
         annex_install_dir = None
         # already set here to avoid any sort of recursion until we know
         # more
-        self.remote_props[key] = annex_install_dir
+        self._remote_props[key] = annex_install_dir
         try:
-            annex_install_dir = self(
-                # use sh -e to be able to fail at each stage of the process
-                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'")[0].strip()
+            with open('/dev/null') as null:
+                annex_install_dir = self(
+                    # use sh -e to be able to fail at each stage of the process
+                    "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
+                    , stdin=null
+                )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
                       exc_str(e))
-        self.remote_props[key] = annex_install_dir
+        self._remote_props[key] = annex_install_dir
         return annex_install_dir
 
     def get_annex_version(self):
         key = 'cmd:annex'
-        if key in self.remote_props:
-            return self.remote_props[key]
+        if key in self._remote_props:
+            return self._remote_props[key]
         try:
             # modern annex versions
             version = self('git annex version --raw')[0]
@@ -278,20 +320,20 @@ class SSHConnection(object):
                 lgr.debug('Failed to determine remote git-annex version: %s',
                           exc_str(e))
                 version = None
-        self.remote_props[key] = version
+        self._remote_props[key] = version
         return version
 
     def get_git_version(self):
         key = 'cmd:git'
-        if key in self.remote_props:
-            return self.remote_props[key]
+        if key in self._remote_props:
+            return self._remote_props[key]
         git_version = None
         try:
             git_version = self('git version')[0].split()[2]
         except CommandError as e:
             lgr.debug('Failed to determine Git version: %s',
                       exc_str(e))
-        self.remote_props[key] = git_version
+        self._remote_props[key] = git_version
         return git_version
 
 
@@ -313,6 +355,9 @@ class SSHManager(object):
         self._prev_connections = [opj(self.socket_dir, p)
                                   for p in listdir(self.socket_dir)
                                   if not isdir(opj(self.socket_dir, p))]
+        lgr.log(5,
+                "Found %d previous connections",
+                len(self._prev_connections))
 
     @property
     def socket_dir(self):
@@ -377,7 +422,8 @@ class SSHManager(object):
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
                         exists(self._connections[c].ctrl_path)]
-            lgr.debug("Closing %d SSH connections..." % len(to_close))
+            if to_close:
+                lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:

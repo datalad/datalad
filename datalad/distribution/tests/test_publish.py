@@ -12,18 +12,22 @@
 import logging
 from os.path import join as opj
 from os.path import exists
+from os.path import lexists
 from ..dataset import Dataset
 from datalad.api import publish, install
 from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.utils import chpwd
 
-from nose.tools import eq_, assert_is_instance
+from nose.tools import eq_, ok_, assert_is_instance
+from nose.tools import assert_false as nok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import create_tree
@@ -32,15 +36,37 @@ from datalad.tests.utils import skip_ssh
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
-def test_invalid_call(origin):
+@with_tempfile(mkdir=True)
+def test_invalid_call(origin, tdir):
     ds = Dataset(origin)
     ds.uninstall('subm 1', check=False)
     # nothing
     assert_raises(ValueError, publish, '/notthere')
     # known, but not present
     assert_raises(ValueError, publish, opj(ds.path, 'subm 1'))
-    # --since without dataset is not supported
-    assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # --since without dataset is now supported as long as it
+    # could be identified
+    # assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # but if it couldn't be, then should indeed crash
+    with chpwd(tdir):
+        assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_smth_about_not_supported(p1, p2):
+    source = Dataset(p1).create()
+    source.create_sibling(
+        'ssh://localhost' + p2,
+        name='target1')
+    # source.publish(to='target1')
+    with chpwd(p1):
+        # since we have only a single commit -- there is no HEAD^
+        assert_raises(ValueError, publish, to='target1', since='HEAD^')
+        # but now let's add one more commit, we should be able to pusblish
+        source.repo.commit("msg", options=['--allow-empty'])
+        publish(to='target1', since='HEAD^')  # must not fail now
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -49,7 +75,7 @@ def test_invalid_call(origin):
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
@@ -81,6 +107,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
+    # MIH: Nope, we don't automatically add this anymore
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -89,14 +116,19 @@ def test_publish_simple(origin, src_path, dst_path):
                     commit=True, msg="Modified.")
     ok_clean_git(source.repo, annex=None)
 
-    res = publish(dataset=source)
+    res = publish(dataset=source, to='target')
     eq_(res, ([source], []))
 
     ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    # Since git-annex 6.20170220, post-receive hook gets triggered
+    # which results in entry being added for that repo into uuid.log on remote
+    # end since then finally git-annex senses that it needs to init that remote,
+    # so it might have 1 more commit than local.
+    # see https://github.com/datalad/datalad/issues/1319
+    ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
+        set(target.get_branch_commits("git-annex"))))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -107,7 +139,7 @@ def test_publish_simple(origin, src_path, dst_path):
 def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -123,7 +155,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub1_target = GitRepo(sub1_pub, create=True)
     sub1_target.checkout("TMP", ["-b"])
     sub2_target = AnnexRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", ["-b"])
+    # we will be testing presence of the file content, so let's make it progress
+    sub2_target.config.set('receive.denyCurrentBranch', 'updateInstead', where='local')
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
     sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
@@ -165,9 +198,14 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     res_ = publish(dataset=source, recursive=True)
     eq_(set(r.path for r in res_[0]), set())
 
-    # still nothing gets pushed, because orgin is up to date
+    # still nothing gets pushed, because origin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
     eq_(set(r.path for r in res_[0]), set([]))
+
+    # and we should not fail if we run it from within the dataset
+    with chpwd(source.path):
+        res_ = publish(recursive=True, since='HEAD^')
+        eq_(set(r.path for r in res_[0]), set([]))
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:
@@ -177,10 +215,40 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # and explicit `GitRepo.add` -- keeping this for now
     Dataset(sub2.path).add('file.txt', to_git=True)
 
-    res_ = publish(dataset=source, recursive=True)
-    # only updates published, i.e. just the subdataset
-    # super wasn't altered and there was no new annexed content
-    eq_(set(r.path for r in res_[0]), {sub2.path})
+    # Let's now update one subm
+    create_tree(sub2.path, {'file.dat': 'content'})
+    # add to subdataset, without reflecting the change in its super(s)
+    Dataset(sub2.path).add('file.dat')
+
+    # note: will publish to origin here since that is what it tracks
+    res_published, res_skipped = publish(dataset=source, recursive=True)
+    # only updates published, i.e. just the subdataset, super wasn't altered
+    # nothing copied!
+    eq_(res_published, [Dataset(sub2.path)])
+    eq_(res_skipped, [])
+
+    # since published to origin -- destination should not get that file
+    nok_(lexists(opj(sub2_target.path, 'file.dat')))
+    res_published, res_skipped = publish(dataset=source, to='target', recursive=True)
+    eq_(res_published, [Dataset(sub2.path)])
+    # Note: with updateInstead only in target2 and not saving change in
+    # super-dataset we would have made remote dataset, if we had entire
+    # hierarchy, to be somewhat inconsistent.
+    # But here, since target datasets are independent -- it is ok
+
+    # and the file itself was not transferred but now exists
+    ok_(lexists(opj(sub2_target.path, 'file.dat')))
+    nok_(sub2_target.file_has_content('file.dat'))
+
+    # but now we can redo publish recursively, at least stating to consider
+    # explicitly to copy .
+    res_published, res_skipped = publish(
+        '.',
+        dataset=source, to='target',
+        recursive=True
+    )
+    ok_(sub2_target.file_has_content('file.dat'))
+    eq_(res_published, ['file.dat'])  # note that this report makes little sense without path to the repository
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -188,10 +256,11 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
+@with_tempfile
+def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
@@ -216,18 +285,34 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # Is there an option for push, that prevents GitPython from failing?
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
-    eq_(res, ([source, 'test-annex.dat'], []))
+    # first it would publish data and then push
+    eq_(res, (['test-annex.dat', source], []))
+    # XXX master was not checked out in dst!
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
     # TODO: last commit in git-annex branch differs. Probably fine,
     # but figure out, when exactly to expect this for proper testing:
+    # yoh: they differ because local annex records information about now
+    # file being available in that remote, and remote one does it via a call in
+    # the hook I guess.  So they both get the same information but in two
+    # different commits.  I do not observe such behavior of remote having git-annex
+    # automagically updated in older clones
+    # which do not have post-receive hook on remote side
     eq_(list(target.get_branch_commits("git-annex"))[1:],
         list(source.repo.get_branch_commits("git-annex"))[1:])
 
     # we need compare target/master:
     target.checkout("master")
-    eq_(target.file_has_content(['test-annex.dat']), [True])
+    ok_(target.file_has_content('test-annex.dat'))
+
+    # make sure that whatever we published is actually consumable
+    dst_clone = install(
+        dst_clone_path, source=dst_path,
+        result_xfm='datasets', return_type='item-or-list')
+    nok_(dst_clone.repo.file_has_content('test-annex.dat'))
+    res = dst_clone.get('test-annex.dat')
+    ok_(dst_clone.repo.file_has_content('test-annex.dat'))
 
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['.'])
@@ -244,10 +329,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # collect result paths:
     result_paths = []
     for item in res[0]:
-        if isinstance(item, Dataset):
-            result_paths.append(item.path)
-        else:
-            result_paths.append(item)
+        result_paths.append(item.path if isinstance(item, Dataset) else item)
+
     # only the subdatasets, targets are plain git repos, hence
     # no file content is pushed, all content in super was pushed
     # before
@@ -268,7 +351,7 @@ def test_publish_depends(
         target2_path,
         target3_path):
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
     source.repo.get('test-annex.dat')
     # pollute config
     depvar = 'remote.target2.datalad-publish-depends'
@@ -280,20 +363,29 @@ def test_publish_depends(
     # two remote sibling on two "different" hosts
     source.create_sibling(
         'ssh://localhost' + target1_path,
+        annex_wanted='standard',
+        annex_group='backup',
         name='target1')
     # fails with unknown remote
-    assert_raises(
-        ValueError,
-        source.create_sibling,
+    res = source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
-        publish_depends='bogus')
-    # for reals
+        publish_depends='bogus',
+        on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error',
+        message=(
+            'unknown sibling(s) specified as publication dependency: %s',
+            set(['bogus'])))
+    # for real
     source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
+        annex_wanted='standard',
+        annex_group='backup',
         publish_depends='target1')
     # wiped out previous dependencies
     eq_(source.config.get(depvar, None), 'target1')
@@ -309,13 +401,22 @@ def test_publish_depends(
     # only the source has the probe
     ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
     for p in (target1_path, target2_path, target3_path):
-        assert_false(exists(opj(p, 'probe1')))
+        assert_false(lexists(opj(p, 'probe1')))
     # publish to a standalone remote
     source.publish(to='target3')
-    # no others are affected
+    ok_(lexists(opj(target3_path, 'probe1')))
+    # but it has no data copied
+    target3 = Dataset(target3_path)
+    nok_(target3.repo.file_has_content('probe1'))
+
+    # but if we publish specifying its path, it gets copied
+    source.publish('probe1', to='target3')
     ok_file_has_content(opj(target3_path, 'probe1'), 'probe1')
+
+    # no others are affected in either case
     for p in (target1_path, target2_path):
-        assert_false(exists(opj(p, 'probe1')))
+        assert_false(lexists(opj(p, 'probe1')))
+
     # publish to all remaining, but via a dependency
     source.publish(to='target2')
     for p in (target1_path, target2_path, target3_path):

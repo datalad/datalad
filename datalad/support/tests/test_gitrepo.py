@@ -24,6 +24,7 @@ from datalad.support.sshconnector import get_connection_hash
 from ..gitrepo import *
 from ..gitrepo import _normalize_path
 from ..exceptions import FileNotInRepositoryError
+from .utils import check_repo_deals_with_inode_change
 
 
 @with_tempfile(mkdir=True)
@@ -128,7 +129,7 @@ def test_GitRepo_add(src, path):
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty)
 
     filename = "another.txt"
     with open(opj(path, filename), 'w') as f:
@@ -178,7 +179,9 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(path, annex=False, untracked=[])
+    ok_clean_git(gr)
+    eq_("Testing GitRepo.commit().{}".format(linesep),
+        gr.repo.head.commit.message)
 
     with open(opj(path, filename), 'w') as f:
         f.write("changed content")
@@ -186,7 +189,23 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("commit with options", options=to_options(dry_run=True))
     # wasn't actually committed:
-    ok_(gr.repo.is_dirty())
+    ok_(gr.dirty)
+
+    # commit with empty message:
+    gr.commit()
+    ok_clean_git(gr)
+
+    # nothing to commit doesn't raise by default:
+    gr.commit()
+    # but does with careless=False:
+    assert_raises(CommandError, gr.commit, careless=False)
+
+    # committing untracked file raises:
+    with open(opj(path, "untracked"), "w") as f:
+        f.write("some")
+    assert_raises(FileNotInRepositoryError, gr.commit, files="untracked")
+    # not existing file as well:
+    assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -329,16 +348,15 @@ def test_GitRepo_files_decorator():
 def test_GitRepo_remote_add(orig_path, path):
 
     gr = GitRepo.clone(orig_path, path)
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     assert_in('origin', out)
     eq_(len(out), 1)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     assert_in('origin', out)
     assert_in('github', out)
     eq_(len(out), 2)
-    out = gr.show_remotes('github')
-    assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
+    eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -348,27 +366,9 @@ def test_GitRepo_remote_remove(orig_path, path):
     gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     gr.remove_remote('github')
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     eq_(len(out), 1)
     assert_in('origin', out)
-
-
-@with_testrepos(flavors=local_testrepo_flavors)
-@with_tempfile
-def test_GitRepo_remote_show(orig_path, path):
-
-    gr = GitRepo.clone(orig_path, path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.show_remotes(verbose=True)
-    eq_(len(out), 4)
-    assert_in('origin\t%s (fetch)' % orig_path, out)
-    assert_in('origin\t%s (push)' % orig_path, out)
-    # Some fellas might have some fancy rewrite rules for pushes, so we can't
-    # just check for specific protocol
-    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(fetch\)',
-              out)
-    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(push\)',
-              out)
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -855,7 +855,10 @@ def test_submodule_deinit(path):
 
     top_repo = GitRepo(path, create=False)
     eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
-    top_repo.update_submodule('subm 1', init=True)
+    # note: here init=True is ok, since we are using it just for testing
+    with swallow_logs(new_level=logging.WARN) as cml:
+        top_repo.update_submodule('subm 1', init=True)
+        assert_in('Do not use update_submodule with init=True', cml.out)
     top_repo.update_submodule('subm 2', init=True)
     ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
 
@@ -956,7 +959,7 @@ def test_GitRepo_count_objects(repo_path):
 
 
 @with_tempfile
-def test_get_deleted(path):
+def test_get_missing(path):
     repo = GitRepo(path, create=True)
     os.makedirs(opj(path, 'deep'))
     with open(opj(path, 'test1'), 'w') as f:
@@ -966,9 +969,17 @@ def test_get_deleted(path):
     repo.add('.', commit=True)
     ok_clean_git(path, annex=False)
     os.unlink(opj(path, 'test1'))
-    eq_(repo.get_deleted_files(), ['test1'])
+    eq_(repo.get_missing_files(), ['test1'])
     rmtree(opj(path, 'deep'))
-    eq_(sorted(repo.get_deleted_files()), [opj('deep', 'test2'), 'test1'])
+    eq_(sorted(repo.get_missing_files()), [opj('deep', 'test2'), 'test1'])
+    # nothing is actually known to be deleted
+    eq_(repo.get_deleted_files(), [])
+    # do proper removal
+    repo.remove(opj(path, 'test1'))
+    # no longer missing
+    eq_(repo.get_missing_files(), [opj('deep', 'test2')])
+    # but deleted
+    eq_(repo.get_deleted_files(), ['test1'])
 
 
 @with_tempfile
@@ -1052,6 +1063,13 @@ def test_GitRepo_flyweight(path1, path2):
     ok_(repo1 == repo3)
 
 
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_GitRepo_flyweight_monitoring_inode(path, store):
+    # testing for issue #1512
+    check_repo_deals_with_inode_change(GitRepo, path, store)
+
+
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
                  'ignore.me': 'ignored content',
                  'dontigno.re': 'other content'})
@@ -1094,3 +1112,14 @@ def test_GitRepo_set_remote_url(path):
     gr.set_remote_url('some', 'ssh://whatever.ru', push=True)
     assert_equal(gr.config['remote.some.pushurl'],
                  'ssh://whatever.ru')
+
+    # add remote without url
+    url2 = 'http://repo2.example.com/.git'
+    gr.add_remote('some-without-url', url2)
+    assert_equal(gr.config['remote.some-without-url.url'], url2)
+    # "remove" it
+    gr.config.unset('remote.some-without-url.url', where='local')
+    with assert_raises(KeyError):
+        gr.config['remote.some-without-url.url']
+    eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
+    eq_(set(gr.get_remotes(with_urls_only=True)), {'some'})

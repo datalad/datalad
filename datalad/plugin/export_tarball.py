@@ -6,29 +6,22 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""
-
-"""
+"""export a dataset to a tarball"""
 
 __docformat__ = 'restructuredtext'
 
-import logging
-import tarfile
-import os
-
-from mock import patch
-from os.path import join as opj, dirname, normpath, isabs
-from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import file_basename
-
-lgr = logging.getLogger('datalad.export.tarball')
-
 
 # PLUGIN API
-def _datalad_export_plugin_call(dataset, output, argv=None):
-    if argv:
-        lgr.warn("tarball exporter ignores any additional options '{}'".format(
-            argv))
+def dlplugin(dataset, output=None):
+    import os
+    import tarfile
+    from mock import patch
+    from os.path import join as opj, dirname, normpath, isabs
+    from datalad.utils import file_basename
+    from datalad.support.annexrepo import AnnexRepo
+
+    import logging
+    lgr = logging.getLogger('datalad.plugin.tarball')
 
     repo = dataset.repo
     committed_date = repo.get_committed_date()
@@ -80,10 +73,12 @@ def _datalad_export_plugin_call(dataset, output, argv=None):
                 recursive=False,
                 filter=_filter_tarinfo)
 
-    # I think it might better return "final" filename where stuff was saved
-    return output
+    if not isabs(output):
+        output = opj(os.getcwd(), output)
 
-
-# PLUGIN API
-def _datalad_get_cmdline_help():
-    return 'Just call it, and it will produce a tarball.'
+    yield dict(
+        status='ok',
+        path=output,
+        type='file',
+        action='export_tarball',
+        logger=lgr)

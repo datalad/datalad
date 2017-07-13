@@ -22,19 +22,22 @@ import shutil
 from importlib import import_module
 import os
 
+from six import text_type
+
 import datalad
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
+from .helpers import strip_arg_from_argv
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
 
 def _license_info():
     return """\
-Copyright (c) 2013-2016 DataLad developers
+Copyright (c) 2013-2017 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -88,6 +91,7 @@ def setup_parser(
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
     helpers.parser_add_common_opt(parser, 'pbs_runner')
+    helpers.parser_add_common_opt(parser, 'change_path')
     helpers.parser_add_common_opt(
         parser,
         'version',
@@ -100,13 +104,71 @@ def setup_parser(
             '--idbg', action='store_true', dest='common_idebug',
             help="enter IPython debugger when uncaught exception happens")
     parser.add_argument(
-        '-C', action='append', dest='change_path', metavar='PATH',
-        help="""run as if datalad was started in <path> instead
-        of the current working directory.  When multiple -C options are given,
-        each subsequent non-absolute -C <path> is interpreted relative to the
-        preceding -C <path>.  This option affects the interpretations of the
-        path names in that they are made relative to the working directory
-        caused by the -C option""")
+        '-c', action='append', dest='cfg_overrides', metavar='KEY=VALUE',
+        help="""configuration variable setting. Overrides any configuration
+        read from a file, but is potentially overridden itself by configuration
+        variables in the process environment.""")
+    parser.add_argument(
+        '--output-format', dest='common_output_format',
+        default='default',
+        metavar="{default,json,json_pp,tailored,'<template>'",
+        help="""select format for returned command results. 'default' give one line
+        per result reporting action, status, path and an optional message;
+        'json' renders a JSON object with all properties for each result (one per 
+        line); 'json_pp' pretty-prints JSON spanning multiple lines; 'tailored'
+        enables a command-specific rendering style that is typically
+        tailored to human consumption (no result output otherwise),
+        '<template>' reports any value(s) of any result properties in any format
+        indicated by the template (e.g. '{path}', compare with JSON
+        output for all key-value choices).""")
+    parser.add_argument(
+        '--report-status', dest='common_report_status',
+        choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
+        help="""constrain command result report to records matching the given
+        status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands
+        for 'impossible' OR 'error'.""")
+    parser.add_argument(
+        '--report-type', dest='common_report_type',
+        choices=['dataset', 'file'],
+        action='append',
+        help="""constrain command result report to records matching the given
+        type. Can be given more than once to match multiple types.""")
+    parser.add_argument(
+        '--on-failure', dest='common_on_failure',
+        choices=['ignore', 'continue', 'stop'],
+        # no default: better be configure per-command
+        help="""when an operation fails: 'ignore' and continue with remaining
+        operations, the error is logged but does not lead to a non-zero exit code
+        of the command; 'continue' works like 'ignore', but an error causes a
+        non-zero exit code; 'stop' halts on first failure and yields non-zero exit
+        code. A failure is any result with status 'impossible' or 'error'.""")
+    parser.add_argument(
+        '--run-before', dest='common_run_before',
+        nargs='+',
+        action='append',
+        metavar='PLUGINSPEC',
+        help="""DataLad plugin to run after the command. PLUGINSPEC is a list
+        comprised of a plugin name plus optional `key=value` pairs with arguments
+        for the plugin call (see `plugin` command documentation for details).
+        This option can be given more than once to run multiple plugins
+        in the order in which they were given.
+        For running plugins that require a --dataset argument it is important
+        to provide the respective dataset as the --dataset argument of the main
+        command, if it is not in the list of plugin arguments."""),
+    parser.add_argument(
+        '--run-after', dest='common_run_after',
+        nargs='+',
+        action='append',
+        metavar='PLUGINSPEC',
+        help="""Like --run-before, but plugins are executed after the main command
+        has finished."""),
+    parser.add_argument(
+        '--cmd', dest='_', action='store_true',
+        help="""syntactical helper that can be used to end the list of global
+        command line options before the subcommand label. Options like
+        --run-before can take an arbitray number of arguments and may require
+        to be followed by a single --cmd in order to enable identification
+        of the subcommand.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -146,8 +208,12 @@ def setup_parser(
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
+                intf_doc = _intf.__doc__.strip()
+                if hasattr(_intf, '_docs_'):
+                    # expand docs
+                    intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
-                    _intf.__doc__.strip())
+                    intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -250,16 +316,29 @@ def main(args=None):
             # store all unparsed arguments
             cmdlineargs.datalad_unparsed_args = unparsed_args
 
+    # to possibly be passed into PBS scheduled call
+    args_ = args or sys.argv
+
+    # enable overrides
+    datalad.cfg.reload()
+
+    if cmdlineargs.cfg_overrides is not None:
+        overrides = dict([
+            (o.split('=')[0], '='.join(o.split('=')[1:]))
+            for o in cmdlineargs.cfg_overrides])
+        datalad.cfg.overrides.update(overrides)
+
     if cmdlineargs.change_path is not None:
+        from .common_args import change_path as change_path_opt
         for path in cmdlineargs.change_path:
             chpwd(path)
+            args_ = strip_arg_from_argv(args_, path, change_path_opt[1])
 
     ret = None
     if cmdlineargs.pbs_runner:
         from .helpers import run_via_pbs
-        from .helpers import strip_arg_from_argv
         from .common_args import pbs_runner as pbs_runner_opt
-        args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
+        args_ = strip_arg_from_argv(args_, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
     elif has_func:
@@ -278,26 +357,32 @@ def main(args=None):
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
-                # we didn't get everything we wanted: still try to present what
-                # we got as usual, but exit with an error
-                try:
-                    if hasattr(cmdlineargs, 'result_renderer'):
-                        cmdlineargs.result_renderer(exc.results, cmdlineargs)
-                except Exception as exc2:
-                    # could be anything really, but we do not want to blow
-                    #  loud in exception handler
-                    lgr.warning("Failed to render partial results: %s", exc_str(exc2))
-                lgr.error('could not perform all requested actions: %s',
+                # rendering for almost all commands now happens 'online'
+                # hence we are no longer attempting to render the actual
+                # results in an IncompleteResultsError, ubt rather trust that
+                # this happened before
+
+                # in general we do not want to see the error again, but
+                # present in debug output
+                lgr.debug('could not perform all requested actions: %s',
                           exc_str(exc))
                 sys.exit(1)
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
+                if exc.msg:
+                    os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
-                    os.write(1, exc.stdout)
+                    os.write(1, exc.stdout.encode()) \
+                        if hasattr(exc.stdout, 'encode')  \
+                        else os.write(1, exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr)
-                sys.exit(exc.code)
+                    os.write(2, exc.stderr.encode()) \
+                        if hasattr(exc.stderr, 'encode')  \
+                        else os.write(2, exc.stderr)
+                # We must not exit with 0 code if any exception got here but
+                # had no code defined
+                sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)

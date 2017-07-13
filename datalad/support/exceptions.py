@@ -75,7 +75,7 @@ class DeprecatedError(RuntimeError):
     def __str__(self):
         s = self.msg if self.msg else ''
         if self.version:
-            s += " Deprecated since version %s." % self.version
+            s += (" is deprecated" if s else "Deprecated") + " since version %s." % self.version
         if self.new:
             s += " Use %s instead." % self.new
         return s
@@ -265,11 +265,21 @@ class IncompleteResultsError(RuntimeError):
     Any results produced nevertheless are to be passed as `results`,
     and become available via the `results` attribute.
     """
+    # TODO passing completed results doesn't fit in a generator paradigm
+    # such results have been yielded already at the time this exception is
+    # raised, little point in collecting them just for the sake of a possible
+    # exception
+    # MIH: AnnexRepo is the last remaining user of this functionality, in a
+    # single context
     def __init__(self, results=None, failed=None, msg=None):
         super(IncompleteResultsError, self).__init__(msg)
         self.results = results
         self.failed = failed
 
+    def __str__(self):
+        super_str = super(IncompleteResultsError, self).__str__()
+        return "{} {}" \
+               "".format(super_str, self.failed)
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""

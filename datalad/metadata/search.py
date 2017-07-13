@@ -23,6 +23,7 @@ from six import iteritems
 from six import reraise
 from six import PY3
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
@@ -41,17 +42,12 @@ from datalad.support import ansi_colors
 from datalad.ui import ui
 
 
+@build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
-
-    Yields
-    ------
-    location : str
-        (relative) path to the dataset
-    report : dict
-        fields which were requested by `report` option
-
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
@@ -119,6 +115,14 @@ class Search(Interface):
                  report_matched=False,
                  format='custom',
                  regex=False):
+        """
+        Yields
+        ------
+        location : str
+            (relative) path to the dataset
+        report : dict
+            fields which were requested by `report` option
+        """
 
         lgr.debug("Initiating search for match=%r and dataset %r",
                   match, dataset)
@@ -217,7 +221,8 @@ class Search(Interface):
 
             # sort entries by location (if present)
             sort_keys = ('location', 'description', 'id')
-            meta = sorted(meta, key=lambda m: tuple(m.get(x, "") for x in sort_keys))
+            # note with str() instead of '%' getting encoding issues...
+            meta = sorted(meta, key=lambda m: tuple("%s" % (m.get(x, ""),) for x in sort_keys))
 
             # use pickle to store the optimized graph in the cache
             pickle.dump(

@@ -10,7 +10,6 @@
 """
 
 import logging
-from functools import wraps
 from os.path import abspath
 from os.path import commonprefix
 from os.path import curdir
@@ -25,6 +24,7 @@ from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
 from six import add_metaclass
+import wrapt
 
 from datalad.config import ConfigManager
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -44,7 +44,7 @@ from datalad.utils import optional_args, expandpath, is_explicit_path, \
     with_pathsep
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
-from datalad.utils import knows_annex
+from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -171,36 +171,37 @@ class Dataset(object):
         -------
         GitRepo
         """
-        if self._repo is None:
-            with swallow_logs():
-                for cls, ckw, kw in (
-                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                        (GitRepo, {}, {})
-                ):
-                    if cls.is_valid_repo(self._path, **ckw):
-                        try:
-                            lgr.debug("Detected %s at %s", cls, self._path)
-                            self._repo = cls(self._path, create=False, **kw)
-                            break
-                        except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                            lgr.debug(
-                                "Oops -- guess on repo type was wrong?: %s",
-                                exc_str(exc))
-                            pass
-                        # version problems come as RuntimeError: DO NOT CATCH!
-            if self._repo is None:
-                # Often .repo is requested to 'sense' if anything is installed
-                # under, and if so -- to proceed forward. Thus log here only
-                # at DEBUG level and if necessary "complaint upstairs"
-                lgr.debug("Failed to detect a valid repo at %s" % self.path)
 
-        elif not isinstance(self._repo, AnnexRepo):
-            # repo was initially set to be self._repo but might become AnnexRepo
-            # at a later moment, so check if it didn't happen
-            if knows_annex(self.path):
-                # we acquired git-annex branch
-                lgr.info("Init new annex at '%s'.", self.path)
-                self._repo = AnnexRepo(self._repo.path, create=False)
+        # Note: lazy loading was disabled, since this is provided by the
+        # flyweight pattern already and a possible invalidation of an existing
+        # instance has to be done therein.
+        # TODO: Still this is somewhat problematic. We can't invalidate strong
+        # references
+
+        with swallow_logs():
+            for cls, ckw, kw in (
+                    # TODO: Do we really want allow_noninitialized=True here?
+                    # And if so, leave a proper comment!
+                    (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                    (GitRepo, {}, {})
+            ):
+                if cls.is_valid_repo(self._path, **ckw):
+                    try:
+                        lgr.debug("Detected %s at %s", cls, self._path)
+                        self._repo = cls(self._path, create=False, **kw)
+                        break
+                    except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                        lgr.debug(
+                            "Oops -- guess on repo type was wrong?: %s",
+                            exc_str(exc))
+                        pass
+                    # version problems come as RuntimeError: DO NOT CATCH!
+        if self._repo is None:
+            # Often .repo is requested to 'sense' if anything is installed
+            # under, and if so -- to proceed forward. Thus log here only
+            # at DEBUG level and if necessary "complaint upstairs"
+            lgr.debug("Failed to detect a valid repo at %s" % self.path)
+
         return self._repo
 
     @property
@@ -238,157 +239,30 @@ class Dataset(object):
                 self._cfg = self.repo.config
         return self._cfg
 
-    def register_sibling(self, name, url, publish_url=None, verify=None):
-        """Register the location of a sibling dataset under a given name.
-
-        Optionally, different URLs can be given for retrieving information from
-        the sibling and for publishing information to it.
-        This is a cheap operation that does not confirm that at the given
-        location an actual sibling dataset is available, unless verify is set.
-        The value "dataset" verifies, that at the given URL an accessible
-        dataset is available and the value "sibling" furthermore verifies, that
-        this dataset shares at least one commit with self.
-
-        Parameters
-        ----------
-        name
-        url
-        publish_url
-        verify
-          None | "dataset" | "sibling"
-        """
-        repo = self.repo
-
-        if verify is not None:
-            raise NotImplementedError("TODO: verify not implemented yet")
-
-        if name not in repo.get_remotes():
-            # Add remote
-            repo.add_remote(name, url)
-            if publish_url is not None:
-                # set push url:
-                repo._git_custom_command('', ["git", "remote",
-                                              "set-url",
-                                              "--push", name,
-                                              publish_url])
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-                     (name, url, publish_url if publish_url else url))
-        else:
-            lgr.warning("Remote '%s' already exists. Ignore.")
-            raise ValueError("'%s' already exists. Couldn't register sibling.")
-
-    # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
-    # weakref
-    # singleton
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
-
-        """Get names/paths of all known subdatasets (sorted depth-first)
-        optionally matching a specific name pattern.
-
-
-        Parameters
-        ----------
-        pattern : None
-          Not implemented
-        fulfilled : None or bool
-          If not None, return either only present or absent datasets.
-        absolute : bool
-          If True, absolute paths will be returned.
-        recursive : bool
-          If True, recurse into all subdatasets and report them too.
-        recursion_limit: int or None
-          If not None, set the number of subdataset levels to recurse into.
-        edges : bool
-          If True, return a list of tuples with superdataset and subdataset
-          path pairs that define the edges of the dataset hierarchy tree.
-
-        Returns
-        -------
-        list(Dataset paths) or list(tuple(parent path, child path)) or None
-          None is return if there is not repository instance yet. For an
-          existing repository with no subdatasets an empty list is returned.
-        """
-
-        if isinstance(recursion_limit, int) and (recursion_limit <= 0):
-            return []
-
-        if pattern is not None:
-            raise NotImplementedError
-
-        repo = self.repo
-        if repo is None:
-            return []
-
-        # check whether we have anything in the repo. if not go home early
-        if not repo.repo.head.is_valid():
-            return []
-
-        try:
-            submodules = repo.get_submodules()
-        except InvalidGitRepositoryError:
-            # this happens when we access a repository with a submodule that
-            # has no commits, hence doesn't appear in the index and
-            # 'git submodule status' also doesn't list it
-            return []
-
-        # filter if desired
-        if fulfilled is None:
-            submodules = [sm.path for sm in submodules]
+        # TODO wipe this function out completely once we are comfortable
+        # with it. Internally we don't need or use it anymore.
+        import inspect
+        lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
+        from datalad.api import subdatasets
+        if edges:
+            return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
+                     r['path'] if absolute else relpath(r['path'], start=self.path))
+                    for r in subdatasets(
+                        dataset=self,
+                        fulfilled=fulfilled,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        bottomup=True)]
         else:
-            submodules = [sm.path for sm in submodules
-                          if sm.module_exists() == fulfilled]
-
-        # expand list with child submodules. keep all paths relative to parent
-        # and convert jointly at the end
-        if recursive \
-                and (recursion_limit in (None, 'existing')
-                     or (isinstance(recursion_limit, int)
-                         and recursion_limit > 1)):
-            rsm = []
-            for sm in submodules:
-                sdspath = opj(self._path, sm)
-                rsm.extend(
-                    [(normpath(opj(sm, sdsh[0])), opj(sm, sdsh[1])) if isinstance(sdsh, tuple) else opj(sm, sdsh)
-                     for sdsh in Dataset(sdspath).get_subdatasets(
-                         pattern=pattern, fulfilled=fulfilled, absolute=False,
-                         recursive=recursive,
-                         recursion_limit=(recursion_limit - 1)
-                         if isinstance(recursion_limit, int) else recursion_limit,
-                         edges=edges)])
-                rsm.append((curdir, sm) if edges else sm)
-            submodules = rsm
-        elif edges:
-            submodules = [(curdir, sm) for sm in submodules]
-
-        if absolute:
-            if edges:
-                return [(self._path if ds == curdir else opj(self._path, ds),
-                         opj(self._path, sm))
-                        for ds, sm in submodules]
-            else:
-                return [opj(self._path, sm) for sm in submodules]
-        else:
-            return submodules
-
-#    def get_file_handles(self, pattern=None, fulfilled=None):
-#        """Get paths to all known file_handles, optionally matching a specific
-#        name pattern.
-#
-#        If fulfilled is True, only paths to fullfiled handles are returned,
-#        if False, only paths to unfulfilled handles are returned.
-#
-#        Parameters
-#        ----------
-#        pattern: str
-#        fulfilled: bool
-#
-#        Returns
-#        -------
-#        list of str
-#          (paths)
-#        """
-#        raise NotImplementedError("TODO")
+            return subdatasets(
+                dataset=self,
+                fulfilled=fulfilled,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                bottomup=True,
+                result_xfm='{}paths'.format('' if absolute else 'rel'))
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
@@ -422,7 +296,7 @@ class Dataset(object):
                                  self.repo is not None
 
         if not exists_now or \
-                (was_once_installed and not exists(self.repo.repo.git_dir)):
+                (was_once_installed and not GitRepo.is_valid_repo(self.path)):
             # repo gone now, reset
             self._repo = None
             return False
@@ -482,11 +356,20 @@ class Dataset(object):
 
         return Dataset(sds_path)
 
+    # TODO this function is obselete and replaced by a faster
+    # `subdatasets --contains` -- remove once `aggregate` is RF'ed to no
+    # longer use it
     def get_containing_subdataset(self, path, recursion_limit=None):
         """Get the (sub-)dataset containing `path`
 
         Note: The "mount point" of a subdataset is classified as belonging to
         that respective subdataset.
+
+        WARNING: This function is rather expensive, because it queries for all
+        subdatasets recursively, and repeatedly -- which can take a substantial
+        amount of time for datasets with many (sub-)subdatasets.  In Many cases
+        the `subdatasets` command can be used with its `contains` parameter to
+        achieve the desired result in a less expensive way.
 
         Parameters
         ----------
@@ -517,10 +400,10 @@ class Dataset(object):
         # be inefficient if e.g. there is lots of other sub-datasets already
         # installed but under another sub-dataset.  There is a TODO 'pattern'
         # option which we could use I guess eventually
-        for subds in self.get_subdatasets(recursive=True,
-                                          #pattern=
-                                          recursion_limit=recursion_limit,
-                                          absolute=False):
+        for subds in self.subdatasets(recursive=True,
+                                      #pattern=
+                                      recursion_limit=recursion_limit,
+                                      result_xfm='relpaths'):
             common = commonprefix((with_pathsep(subds), with_pathsep(path)))
             if common.endswith(sep) and common == with_pathsep(subds):
                 candidates.append(common)
@@ -545,16 +428,16 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     if not name:
         name = f.func_name if PY2 else f.__name__
 
-    @wraps(f)
-    def apply_func(*args, **kwargs):
-        """Wrapper function to assign arguments of the bound function to
-        original function.
+    @wrapt.decorator
+    def apply_func(wrapped, instance, args, kwargs):
+        # Wrapper function to assign arguments of the bound function to
+        # original function.
+        #
+        # Note
+        # ----
+        # This wrapper is NOT returned by the decorator, but only used to bind
+        # the function `f` to the Dataset class.
 
-        Note
-        ----
-        This wrapper is NOT returned by the decorator, but only used to bind
-        the function `f` to the Dataset class.
-        """
         kwargs = kwargs.copy()
         from inspect import getargspec
         orig_pos = getargspec(f).args
@@ -562,28 +445,28 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or dataset_argname in kwargs:
+        if len(args) >= len(orig_pos):
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
                                                       if a != dataset_argname]))
-        kwargs[dataset_argname] = args[0]
+        if dataset_argname in kwargs:
+            raise TypeError("{}() got an unexpected keyword argument {}"
+                            "".format(name, dataset_argname))
+        kwargs[dataset_argname] = instance
         ds_index = orig_pos.index(dataset_argname)
-        for i in range(1, len(args)):
-            if i <= ds_index:
-                kwargs[orig_pos[i-1]] = args[i]
-            elif i > ds_index:
+        for i in range(0, len(args)):
+            if i < ds_index:
                 kwargs[orig_pos[i]] = args[i]
+            elif i >= ds_index:
+                kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func)
-    # So we could post-hoc later adjust the documentation string which is assigned
-    # within .api
-    apply_func.__orig_func__ = f
+    setattr(Dataset, name, apply_func(f))
     return f
 
 
-# Note: Cannot be defined with constraints.py, since then dataset.py needs to
+# Note: Cannot be defined within constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
@@ -596,8 +479,6 @@ class EnsureDataset(Constraint):
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
-    # commandline doc!
     def short_description(self):
         return "Dataset"
 

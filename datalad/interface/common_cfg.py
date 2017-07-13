@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from os.path import join as opj
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 
@@ -68,6 +69,20 @@ definitions = {
         'destination': 'global',
         'default': dirs.user_cache_dir,
     },
+    'datalad.locations.system-plugins': {
+        'ui': ('question', {
+               'title': 'System plugin directory',
+               'text': 'Where should datalad search for system plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'plugins'),
+    },
+    'datalad.locations.user-plugins': {
+        'ui': ('question', {
+               'title': 'User plugin directory',
+               'text': 'Where should datalad search for user plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'plugins'),
+    },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
@@ -88,7 +103,13 @@ definitions = {
     },
     'datalad.tests.protocolremote': {
         'ui': ('yesno', {
-               'title': 'Binary flag to specify whether to test protocol interactions of custom remote with annex'}),
+            'title': 'Binary flag to specify whether to test protocol '
+                     'interactions of custom remote with annex'}),
+        'type': EnsureBool(),
+    },
+    'datalad.tests.dataladremote': {
+        'ui': ('yesno', {
+               'title': 'Binary flag to specify whether each annex repository should get datalad special remote in every test repository'}),
         'type': EnsureBool(),
     },
     'datalad.tests.runcmdline': {
@@ -118,21 +139,33 @@ definitions = {
         'ui': ('question', {
                'title': 'Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation'}),
     },
+    'datalad.tests.ui.backend': {
+        'ui': ('question', {
+            'title': 'Tests UI backend',
+            # XXX we could add choices...
+            'text': 'Which UI backend to use'}),
+        'default': 'tests-noninteractive',
+    },
     'datalad.tests.usecassette': {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
-    },
-    'datalad.api.alwaysrender': {
-        'ui': ('yesno', {
-               'title': 'Python API output rendering',
-               'text': 'Should the high-level API functions be altered to render output like the command line interface would do, in order to make interactive use less cumbersome?'}),
-        'default': False,
-        'type': EnsureBool(),
     },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
                      'stdout while running datalad commands/debugging'}),
+    },
+    'datalad.log.name': {
+        'ui': ('question', {
+            'title': 'Include name of the log target in the log line'}),
+    },
+    'datalad.log.names': {
+        'ui': ('question', {
+            'title': 'Which names (,-separated) to print log lines for'}),
+    },
+    'datalad.log.namesre': {
+        'ui': ('question', {
+            'title': 'Regular expression for which names to print log lines for'}),
     },
     'datalad.log.outputs': {
         'ui': ('question', {

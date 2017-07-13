@@ -26,6 +26,13 @@ LOG_LEVEL_COLORS = {
     'ERROR': RED
 }
 
+RESULT_STATUS_COLORS = {
+    'ok': GREEN,
+    'notneeded': GREEN,
+    'impossible': YELLOW,
+    'error': RED
+}
+
 # Aliases for uniform presentation
 
 DATASET = UNDERLINE
@@ -44,3 +51,8 @@ def color_word(s, color):
     return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ) \
         if ui.is_interactive \
         else s
+
+
+def color_status(status):
+    col = RESULT_STATUS_COLORS.get(status, None)
+    return color_word(status, col) if col else status

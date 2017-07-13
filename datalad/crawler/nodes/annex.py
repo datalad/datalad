@@ -38,6 +38,7 @@ from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
 from ...utils import getpwd
+from ...utils import try_multiple
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
@@ -49,6 +50,7 @@ from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.exceptions import AnnexBatchCommandError
+from ...support.external_versions import external_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -58,6 +60,7 @@ from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
+from datalad.customremotes.base import init_datalad_remote
 from datalad.dochelpers import exc_str
 
 from logging import getLogger
@@ -166,11 +169,8 @@ class initiate_dataset(object):
             # place hack from 'add-to-super' times here
             sds = ds.get_superdataset()
             if sds is not None:
-                from datalad.distribution.utils import _install_subds_inplace
-                subdsrelpath = relpath(realpath(ds.path), realpath(sds.path))  # realpath OK
-                lgr.debug("Adding %s as a subdataset to %s", subdsrelpath, sds)
-                _install_subds_inplace(ds=sds, path=ds.path,
-                                       relativepath=subdsrelpath)
+                lgr.debug("Adding %s as a subdataset to %s", ds, sds)
+                sds.add(ds.path, save=False)
                 # this leaves the subdataset staged in the parent
             elif str(self.add_to_super) != 'auto':
                 raise ValueError(
@@ -322,11 +322,7 @@ class Annexificator(object):
                         lgr.info("Enabling existing special remote %s" % remote)
                         self.repo.enable_remote(remote)
                     else:
-                        lgr.info("Initiating special remote %s" % remote)
-                        self.repo.init_remote(
-                            remote,
-                            ['encryption=none', 'type=external', 'autoenable=true',
-                             'externaltype=%s' % remote])
+                        init_datalad_remote(self.repo, remote, autoenable=True)
 
         self.mode = mode
         self.options = options or []
@@ -521,7 +517,11 @@ class Annexificator(object):
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(url_status.size), url))
             try:
-                out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
+                out_json = try_multiple(
+                    6, AnnexBatchCommandError, 3,  # up to 3**5=243 sec sleep
+                    _call,
+                    self.repo.add_url_to_file, fpath, url,
+                    options=annex_options, batch=True)
             except AnnexBatchCommandError as exc:
                 if self.skip_problematic:
                     lgr.warning("Skipping %s due to %s", url, exc_str(exc))
@@ -851,7 +851,7 @@ class Annexificator(object):
             self._statusdb.save()
         # there is something to commit and backends was set but no .gitattributes yet
         path = self.repo.path
-        if self.repo.dirty and not exists(opj(path, '.gitattributes')):
+        if self.repo.dirty and not exists(opj(path, '.gitattributes')) and isinstance(self.repo, AnnexRepo):
             backends = self.repo.default_backends
             if backends:
                 # then record default backend into the .gitattributes
@@ -899,7 +899,11 @@ class Annexificator(object):
             'A ': staged,
             'M ': staged,
             ' M': notstaged,
-            ' D': deleted
+            ' D': deleted,  #     rm-ed  smth committed before
+            'D ': deleted,  # git rm-ed  smth committed before
+            'AD': (staged, deleted)  # so we added, but then removed before committing
+                                     # generaly shouldn't happen but in some tricky S3 cases crawling did happen :-/
+                                     # TODO: handle "properly" by committing before D happens
         }
 
         if isinstance(self.repo, AnnexRepo) and self.repo.is_direct_mode():
@@ -915,7 +919,12 @@ class Annexificator(object):
             act = l[:2]  # first two characters is what is happening to the file
             fname = l[3:]
             try:
-                statuses[act].append(fname)
+                act_list = statuses[act]
+                if isinstance(act_list, tuple):  # like in case of AD
+                    for l in act_list:
+                        l.append(fname)
+                else:
+                    act_list.append(fname)
                 # for the purpose of this use, we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)
@@ -1318,7 +1327,7 @@ class Annexificator(object):
                         tag_ = last_version
                     # TODO: config.tag.sign
                     stats_str = "\n\n" + total_stats.as_str(mode='full')
-                    tags = self.repo.repo.tags
+                    tags = self.repo.get_tags(output='name')
                     if tag_ in tags:
                         # TODO: config.tag.allow_override
                         if existing_tag == '+suffix':

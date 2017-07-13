@@ -11,14 +11,12 @@
 
 import os
 from os.path import join as opj
+from os.path import lexists
 
 from ..dataset import Dataset
 from datalad.api import create
-from datalad.api import uninstall
 from datalad.utils import chpwd
-from datalad.utils import rmtree
 from datalad.cmd import Runner
-from datalad.support.exceptions import CommandError
 
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import eq_
@@ -27,6 +25,8 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tree
 
@@ -39,11 +39,12 @@ _dataset_hierarchy_template = {
             'subsub': {
                 'file3': 'file3'}}}}
 
+raw = dict(return_type='list', result_filter=None, result_xfm=None, on_failure='ignore')
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_create_raises(path, outside_path):
-
     ds = Dataset(path)
     # incompatible arguments (annex only):
     assert_raises(ValueError, ds.create, no_annex=True, description='some')
@@ -53,16 +54,34 @@ def test_create_raises(path, outside_path):
     with open(opj(path, "somefile.tst"), 'w') as f:
         f.write("some")
     # non-empty without `force`:
-    assert_raises(ValueError, ds.create, force=False)
+    assert_in_results(
+        ds.create(force=False, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
-    assert_raises(ValueError, ds.create, outside_path)
+    assert_in_results(
+        ds.create(outside_path, **raw),
+        status='error',
+        message='path not associated with any dataset')
 
     # create a sub:
     ds.create('sub')
-    # fail when doing it again without `force`:
-    assert_raises(ValueError, ds.create, 'sub')
+    # fail when doing it again
+    assert_in_results(
+        ds.create('sub', **raw),
+        status='error',
+        message=('collision with known subdataset in dataset %s', ds.path))
+
+    # now deinstall the sub and fail trying to create a new one at the
+    # same location
+    ds.uninstall('sub', check=False)
+    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in_results(
+        ds.create('sub', **raw),
+        status='error',
+        message=('collision with known subdataset in dataset %s', ds.path))
 
 
 @with_tempfile
@@ -118,7 +137,7 @@ def test_create_sub(path):
     ok_clean_git(subds.path, annex=True)
 
     # subdataset is known to superdataset:
-    assert_in("some/what/deeper", ds.get_subdatasets())
+    assert_in("some/what/deeper", ds.subdatasets(result_xfm='relpaths'))
     # and was committed:
     ok_clean_git(ds.path)
 
@@ -132,14 +151,14 @@ def test_create_sub(path):
     ok_clean_git(subds2.path, annex=True)
 
     # unknown to superdataset:
-    assert_not_in("someother", ds.get_subdatasets())
+    assert_not_in("someother", ds.subdatasets(result_xfm='relpaths'))
 
     # 3. create sub via super:
     subds3 = ds.create("third", no_annex=True)
     ok_(isinstance(subds3, Dataset))
     ok_(subds3.is_installed())
     ok_clean_git(subds3.path, annex=False)
-    assert_in("third", ds.get_subdatasets())
+    assert_in("third", ds.subdatasets(result_xfm='relpaths'))
 
 
 @with_tree(tree=_dataset_hierarchy_template)
@@ -157,7 +176,15 @@ def test_create_subdataset_hierarchy_from_top(path):
     subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
-    ds.save(recursive=True, all_changes=True)
+    ok_(ds.id != subds.id != subsubds.id)
+    ds.save(recursive=True)
+    # 'file*' in each repo was untracked before and should remain as such
+    # (we don't want a #1419 resurrection
+    ok_(ds.repo.dirty)
+    ok_(subds.repo.dirty)
+    ok_(subsubds.repo.dirty)
+    # if we add these three, we should get clean
+    ds.add(['file1', opj(subds.path, 'file2'), opj(subsubds.path, 'file3')])
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 
@@ -173,31 +200,41 @@ def test_nested_create(path):
     os.makedirs(opj(ds.path, 'lvl1', 'empty'))
     with open(opj(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.save(all_changes=True))
+    ok_(ds.add('.'))
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)
-    eq_(ds.get_subdatasets(), [opj('lvl1', 'subds')])
+    eq_(ds.subdatasets(result_xfm='relpaths'), [opj('lvl1', 'subds')])
     # later create subdataset in an existing empty dir
     subds2 = ds.create(opj('lvl1', 'empty'))
     ok_clean_git(ds.path)
     # later try to wrap existing content into a new subdataset
     # but that won't work
-    assert_raises(ValueError, ds.create, lvl2relpath)
+    assert_in_results(
+        ds.create(lvl2relpath, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # even with force, as to do this properly complicated surgery would need to
     # take place
-    assert_raises(CommandError, ds.create, lvl2relpath, force=True)
+    assert_in_results(
+        ds.create(lvl2relpath, force=True,
+                  on_failure='ignore', result_xfm=None, result_filter=None,
+                  return_type='generator'),
+        status='error', action='add')
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself
-    ok_(not ds.save())
+    assert_status('notneeded', ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
-    assert_raises(ValueError, ds.create, lvl2relpath)
+    assert_in_results(
+        ds.create(lvl2relpath, **raw),
+        status='error',
+        message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
     ds.create(lvl2relpath, force=True)
-    assert_in(lvl2relpath, ds.get_subdatasets())
+    assert_in(lvl2relpath, ds.subdatasets(result_xfm='relpaths'))
 
 
 # Imported from #1016
@@ -217,4 +254,24 @@ def test_saving_prior(topdir):
     # ds1, and then the whole procedure actually crashes since because ds2/file1.txt
     # is committed -- ds2 is already known to git and it just pukes with a bit
     # confusing    'ds2' already exists in the index
-    assert_in('ds2', ds1.get_subdatasets())
+    assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
+
+
+@with_tempfile(mkdir=True)
+def test_create_withplugin(path):
+    # first without
+    ds = create(path)
+    assert(not lexists(opj(ds.path, 'README.rst')))
+    ds.remove()
+    assert(not lexists(ds.path))
+    # now for reals...
+    ds = create(
+        # needs to identify the dataset, otherwise post-proc
+        # plugin doesn't no what to run on
+        dataset=path,
+        run_after=[['add_readme', 'filename=with hole.txt']])
+    ok_clean_git(path)
+    # README wil lend up in annex by default
+    # TODO implement `nice_dataset` plugin to give sensible
+    # default and avoid that
+    assert(lexists(opj(ds.path, 'with hole.txt')))

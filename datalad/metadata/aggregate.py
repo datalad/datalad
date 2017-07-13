@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj, exists, relpath, dirname
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt
@@ -38,6 +39,7 @@ def _store_json(ds, path, meta):
     ds.repo.add(fname, git=True)
 
 
+@build_doc
 class AggregateMetaData(Interface):
     """Aggregate meta data of a dataset for later query.
 
@@ -46,12 +48,9 @@ class AggregateMetaData(Interface):
     types are configures. Moreover, it is possible to aggregate meta data from
     any subdatasets into the superdataset, in order to facilitate data
     discovery without having to obtain any subdataset.
-
-    Returns
-    -------
-    List
-      Any datasets where (updated) aggregated meta data was saved.
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
@@ -81,6 +80,12 @@ class AggregateMetaData(Interface):
             recursion_limit=None,
             save=True,
             if_dirty='save-before'):
+        """
+        Returns
+        -------
+        List
+          Any datasets where (updated) aggregated meta data was saved.
+        """
         ds = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
         modified_ds = []
@@ -93,12 +98,13 @@ class AggregateMetaData(Interface):
         # if you want to modify the behavior of get_subdataset() make sure
         # there is a way to return the subdatasets DEPTH FIRST!
         ds_meta = {}
-        for subds_path in ds.get_subdatasets(
+        for subds in ds.subdatasets(
                 fulfilled=True,
-                absolute=False,
                 recursive=recursive,
-                recursion_limit=recursion_limit):
-            subds = Dataset(opj(ds.path, subds_path))
+                recursion_limit=recursion_limit,
+                bottomup=True,
+                result_xfm='datasets'):
+            subds_relpath = relpath(subds.path, start=ds.path)
             if subds.id is None:
                 # nothing to worry about, any meta data from below this will be
                 # injected upstairs
@@ -121,7 +127,7 @@ class AggregateMetaData(Interface):
             # Phase 2: store everything that is in the look up and belongs into
             #          this dataset
             #
-            _dump_submeta(subds, ds_meta, subds_path, save, modified_ds)
+            _dump_submeta(subds, ds_meta, subds_relpath, save, modified_ds)
             # save state of modified dataset, all we modified has been staged
             # already
             # we need to save before extracting to full metadata for upstairs
@@ -131,7 +137,7 @@ class AggregateMetaData(Interface):
             # Phase 3: obtain all aggregated meta data from this dataset, and
             #          keep in lookup to escalate it upstairs
             #
-            ds_meta[subds_path] = get_metadata(
+            ds_meta[subds_relpath] = get_metadata(
                 subds,
                 guess_type=False,
                 ignore_subdatasets=False,
@@ -172,7 +178,7 @@ def _within_metadata_store(ds, guess_native_type, metapath):
 
 def _save_helper(ds, save, modified_ds):
     old_state = ds.repo.get_hexsha()
-    if save and ds.repo.repo.is_dirty(
+    if save and ds.repo.is_dirty(
             index=True,
             working_tree=False,
             submodules=True):
@@ -207,6 +213,8 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
             # save then bottom-up
             testpath = dirname(subds_relpath)
             while testpath:
+                # TODO this is a slow call that implies pretty bad repeated traversal
+                # of dataset trees -- RF to use `subdatasets --contains`
                 repo = ds.get_containing_subdataset(testpath)
                 repo.repo.add(relpath(subds_relpath, testpath), git=True)
                 modified_ds = _save_helper(repo, save, modified_ds)

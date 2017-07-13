@@ -65,6 +65,8 @@ echo "I: top git dir $topgitdir"
 docker_id=`docker ps | awk "/\\<$tag\\>/{print \\$1}"`
 echo "D: looking for a docker with tag '$tag': $docker_id"
 if [ -z "$docker_id" ]; then
+  stopped_docker_id=`docker ps -a | awk "/\\<$tag\\>/{print \\$1}"`
+  if [ -z "$stopped_docker_id" ]; then
     echo "I: Starting new container with apache running"
     docker_id=`docker run -d \
      -v $topgitdir:/home/$USER/datalad \
@@ -85,6 +87,11 @@ if [ -z "$docker_id" ]; then
     # yoh@8c3178bd7ea7:~/datalad$ echo $?
     # 139
     docker exec $docker_id bash -c "cd datalad; pip install -e ."
+  else
+    echo "I: starting previous docker container $stopped_docker_id"
+    docker_id=`docker start $stopped_docker_id`
+    echo "Started container $docker_id"
+  fi
 else
     echo "Using running container $docker_id"
 fi

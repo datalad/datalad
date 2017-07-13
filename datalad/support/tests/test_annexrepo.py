@@ -78,6 +78,7 @@ from datalad.tests.utils import find_files
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import FileNotInAnnexError
 from datalad.support.exceptions import FileInGitError
 from datalad.support.exceptions import OutOfSpaceError
@@ -86,13 +87,14 @@ from datalad.support.exceptions import OutdatedExternalDependency
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.exceptions import IncompleteResultsError
 
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import ProcessAnnexProgressIndicators
-
+from .utils import check_repo_deals_with_inode_change
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -190,6 +192,12 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
 def test_AnnexRepo_set_direct_mode(src, dst):
 
     ar = AnnexRepo.clone(src, dst)
+
+    if ar.config.getint("annex", "version") >= 6:
+        # there's no direct mode available:
+        assert_raises(CommandError, ar.set_direct_mode, True)
+        raise SkipTest("Test not applicable in repository version >= 6")
+
     ar.set_direct_mode(True)
     ok_(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
@@ -207,8 +215,11 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
+    if ar.config.getint("annex", "version") >= 6:
+        # there's no direct mode available and therefore no 'annex proxy':
+        assert_raises(CommandError, ar.proxy, ['git', 'status'])
+        raise SkipTest("Test not applicable in repository version >= 6")
     ar.set_direct_mode(True)
-    ok_clean_git(path=annex_path, annex=True)
 
     # annex proxy raises in indirect mode:
     try:
@@ -394,18 +405,10 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    try:
-        with swallow_logs() as cml:
-            ar.drop(testfile)
-            assert_in('ERROR', cml.out)
-            assert_in('drop: 1 failed', cml.out)
-    except CommandError as e:
-        eq_(e.code, 1)
-        assert_in('Could only verify the '
-                  'existence of 0 out of 1 necessary copies', e.stdout)
-        failed = True
-
-    ok_(failed)
+    res = ar.drop(testfile)
+    eq_(res['command'], 'drop')
+    eq_(res['success'], False)
+    assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
@@ -675,11 +678,10 @@ def test_AnnexRepo_on_uninited_annex(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-def test_AnnexRepo_commit(src, path):
+def test_AnnexRepo_commit(path):
 
-    ds = AnnexRepo.clone(src, path)
+    ds = AnnexRepo(path, create=True)
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
@@ -690,6 +692,18 @@ def test_AnnexRepo_commit(src, path):
     ds.commit("test _commit")
     ok_clean_git(path, annex=True)
 
+    # nothing to commit doesn't raise by default:
+    ds.commit()
+    # but does with careless=False:
+    assert_raises(CommandError, ds.commit, careless=False)
+
+    # committing untracked file raises:
+    with open(opj(path, "untracked"), "w") as f:
+        f.write("some")
+    assert_raises(FileNotInRepositoryError, ds.commit, files="untracked")
+    # not existing file as well:
+    assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
+
 
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
@@ -697,11 +711,10 @@ def test_AnnexRepo_add_to_annex(path):
     # Note: Some test repos appears to not be initialized.
     #       Therefore: 'init=True'
     # TODO: Fix these repos finally!
-
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
     filename = get_most_obscure_supported_name()
     filename_abs = opj(repo.path, filename)
     with open(filename_abs, "w") as f:
@@ -724,12 +737,12 @@ def test_AnnexRepo_add_to_annex(path):
     # uncommitted:
     # but not in direct mode branch
     if repo.is_direct_mode():
-        ok_(not repo.dirty)
+        ok_(not repo.is_dirty(submodules=False))
     else:
-        ok_(repo.dirty)
+        ok_(repo.is_dirty(submodules=False))
 
     repo.commit("Added file to annex.")
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -742,7 +755,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # and committed:
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -755,7 +768,7 @@ def test_AnnexRepo_add_to_git(path):
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
     filename = get_most_obscure_supported_name()
     with open(opj(repo.path, filename), "w") as f:
         f.write("some")
@@ -764,9 +777,9 @@ def test_AnnexRepo_add_to_git(path):
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
     # uncommitted:
-    ok_(repo.repo.is_dirty())
+    ok_(repo.is_dirty(submodules=False))
     repo.commit("Added file to annex.")
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -779,7 +792,7 @@ def test_AnnexRepo_add_to_git(path):
     assert_raises(FileInGitError, repo.get_file_key, filename)
 
     # and committed:
-    ok_clean_git(repo.path, annex=True)
+    ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
 @ignore_nose_capturing_stdout
@@ -1017,15 +1030,25 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
+    from datalad import lgr
+    lgr.debug("HERE")
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
         # TODO: Figure out what's going on
-        ar._run_annex_command('sync',
-                              expect_stderr=True,
-                              log_stdout=False,
-                              log_stderr=False,
-                              expect_fail=True)
+        #  yoh: I think it is because of what is "TODOed" within cmd.py --
+        #       trying to log/obtain both through PIPE could lead to lock
+        #       downs.
+        # here we use our swallow_logs to overcome a problem of running under
+        # nosetests without -s, when nose then tries to swallow stdout by
+        # mocking it with StringIO, which is not fully compatible with Popen
+        # which needs its .fileno()
+        with swallow_outputs():
+            ar._run_annex_command('sync',
+                                  expect_stderr=True,
+                                  log_stdout=False,
+                                  log_stderr=False,
+                                  expect_fail=True)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
@@ -1047,13 +1070,12 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # sync with the new remote:
     try:
-        # Note: For some reason, it hangs if log_stdout/err True
-        # TODO: Figure out what's going on
-        ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
-                              expect_stderr=True,
-                              log_stdout=False,
-                              log_stderr=False,
-                              expect_fail=True)
+        with swallow_outputs():
+            ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
+                                  expect_stderr=True,
+                                  log_stdout=False,
+                                  log_stderr=False,
+                                  expect_fail=True)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
@@ -1134,7 +1156,46 @@ def test_annex_copy_to(origin, clone):
     repo.get("test-annex.dat")
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
-    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
+    # and will not be copied again since it was already copied
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
+
+    # Test that if we pass a list of items and annex processes them nicely,
+    # we would obtain a list back. To not stress our tests even more -- let's mock
+    def ok_copy(command, **kwargs):
+        return """
+{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
+{"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
+{"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
+""", ""
+    with patch.object(repo, '_run_annex_command', ok_copy):
+        eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
+            ["copied1", "copied2"])
+
+    # now let's test that we are correctly raising the exception in case if
+    # git-annex execution fails
+    orig_run = repo._run_annex_command
+    def fail_to_copy(command, **kwargs):
+        if command == 'copy':
+            # That is not how annex behaves
+            # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
+            # for non-existing files output goes into stderr
+            raise CommandError(
+                "Failed to run ...",
+                stdout=
+                    '{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied"}\n'
+                    '{"command":"copy","note":"checking target ...", "success":true, "key":"akey2", "file":"existed"}\n',
+                stderr=
+                    'git-annex: nonex1 not found\n'
+                    'git-annex: nonex2 not found\n'
+            )
+        else:
+            return orig_run(command, **kwargs)
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy):
+        with assert_raises(IncompleteResultsError) as cme:
+            repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
+    eq_(cme.exception.results, ["copied"])
+    eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
@@ -1150,8 +1211,10 @@ def test_annex_drop(src, dst):
     result = ar.drop([testfile])
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
-    eq_(result[0], testfile)
     eq_(len(result), 1)
+    eq_(result[0]['command'], 'drop')
+    eq_(result[0]['success'], True)
+    eq_(result[0]['file'], testfile)
 
     ar.get(testfile)
 
@@ -1160,8 +1223,10 @@ def test_annex_drop(src, dst):
     result = ar.drop([testkey], key=True)
     assert_false(ar.file_has_content(testfile))
     ok_(isinstance(result, list))
-    eq_(result[0], testkey)
     eq_(len(result), 1)
+    eq_(result[0]['command'], 'drop')
+    eq_(result[0]['success'], True)
+    eq_(result[0]['key'], testkey)
 
     # insufficient arguments:
     assert_raises(TypeError, ar.drop)
@@ -1173,36 +1238,30 @@ def test_annex_drop(src, dst):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_remove(path1, path2):
-    ar1 = AnnexRepo(path1, create=False)
-    ar2 = AnnexRepo.clone(path1, path2, create=True, direct=True)
+def test_annex_remove(path):
+    repo = AnnexRepo(path, create=False)
 
-    for repo in (ar1, ar2):
-        file_list = repo.get_annexed_files()
-        assert len(file_list) >= 1
-        # remove a single file
-        out = repo.remove(file_list[0])
-        assert_not_in(file_list[0], repo.get_annexed_files())
-        eq_(out[0], file_list[0])
+    file_list = repo.get_annexed_files()
+    assert len(file_list) >= 1
+    # remove a single file
+    out = repo.remove(file_list[0])
+    assert_not_in(file_list[0], repo.get_annexed_files())
+    eq_(out[0], file_list[0])
 
-        with open(opj(repo.path, "rm-test.dat"), "w") as f:
-            f.write("whatever")
+    with open(opj(repo.path, "rm-test.dat"), "w") as f:
+        f.write("whatever")
 
-        # add it
-        repo.add("rm-test.dat")
+    # add it
+    repo.add("rm-test.dat")
 
-        # remove without '--force' should fail, due to staged changes:
-        if repo.is_direct_mode():
-            assert_raises(CommandError, repo.remove, "rm-test.dat")
-        else:
-            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
-        assert_in("rm-test.dat", repo.get_annexed_files())
+    # remove without '--force' should fail, due to staged changes:
+    assert_raises(CommandError, repo.remove, "rm-test.dat")
+    assert_in("rm-test.dat", repo.get_annexed_files())
 
-        # now force:
-        out = repo.remove("rm-test.dat", force=True)
-        assert_not_in("rm-test.dat", repo.get_annexed_files())
-        eq_(out[0], "rm-test.dat")
+    # now force:
+    out = repo.remove("rm-test.dat", force=True)
+    assert_not_in("rm-test.dat", repo.get_annexed_files())
+    eq_(out[0], "rm-test.dat")
 
 
 @with_batch_direct
@@ -1375,7 +1434,8 @@ def test_ProcessAnnexProgressIndicators():
     proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
     # when without any target downloads, there is no total_pbar
     assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar._pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
+    eq_(proc.total_pbar.current, 0)
     # for regular lines -- should still just return them without side-effects
     for l in irrelevant_lines:
         with swallow_outputs() as cmo:
@@ -1392,7 +1452,12 @@ def test_ProcessAnnexProgressIndicators():
         eq_(proc(success_lines[0]), success_lines[0])
         eq_(proc.pbars, {})
         out = cmo.out
-    assert out  # just assert that something was output
+
+    from datalad.ui import ui
+    from datalad.ui.dialog import SilentConsoleLog
+
+    assert out \
+        if not isinstance(ui.ui, SilentConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:
@@ -1489,7 +1554,7 @@ def test_AnnexRepo_add_submodule(source, path):
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
 
-    ok_clean_git(path, annex=True)
+    ok_clean_git(top_repo, annex=True)
     ok_clean_git(opj(path, 'sub'), annex=False)
 
 
@@ -1551,6 +1616,320 @@ def test_AnnexRepo_dirty(path):
     # TODO: submodules
 
 
+def _test_status(ar):
+    # TODO: plain git submodule and even deeper hierarchy?
+    #       => complete recursion to work if started from within plain git;
+    #       But this is then relevant for Dataset.status() - not herein
+
+    def sync_wrapper(push=False, pull=False, commit=False):
+        # wraps common annex-sync call, since it currently fails under
+        # mysterious circumstances in V6 adjusted branch setups
+        try:
+            ar.sync(push=push, pull=pull, commit=commit)
+        except CommandError as e:
+            if "fatal: entry 'submod' object type (blob) doesn't match mode type " \
+               "(commit)" in e.stderr:
+                # some bug in adjusted branch(?) + submodule
+                # TODO: figure out and probably report
+                # stdout:
+                # commit
+                # [adjusted/master(unlocked) ae3e9a7] git-annex in ben@tree:/tmp/datalad_temp_test_AnnexRepo_status7qKhRQ
+                #  4 files changed, 4 insertions(+), 2 deletions(-)
+                #  create mode 100644 fifth
+                #  create mode 100644 sub/third
+                # ok
+                #
+                # failed
+                # stderr:
+                # fatal: entry 'submod' object type (blob) doesn't match mode type (commit)
+                # git-annex: user error (git ["--git-dir=.git","--work-tree=.","--literal-pathspecs","mktree","--batch","-z"] exited 128)
+                # git-annex: sync: 1 failed
+
+                # But it almost works - so apperently nothing to do
+                import logging
+                lgr = logging.getLogger("datalad.support.tests.test-status")
+                lgr.warning("DEBUG: v6 sync failure")
+
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+    eq_(stat, ar.get_status())
+
+    # untracked files:
+    with open(opj(ar.path, 'first'), 'w') as f:
+        f.write("it's huge!")
+    with open(opj(ar.path, 'second'), 'w') as f:
+        f.write("looser")
+
+    stat['untracked'].append('first')
+    stat['untracked'].append('second')
+    eq_(stat, ar.get_status())
+
+    # add a file to git
+    ar.add('first', git=True)
+    sync_wrapper()
+    stat['untracked'].remove('first')
+    stat['added'].append('first')
+    eq_(stat, ar.get_status())
+
+    # add a file to annex
+    ar.add('second')
+    sync_wrapper()
+    stat['untracked'].remove('second')
+    if not ar.is_direct_mode():
+        # in direct mode annex-status doesn't report an added file 'added'
+        stat['added'].append('second')
+    eq_(stat, ar.get_status())
+
+    # commit to be clean again:
+    ar.commit("added first and second")
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+    eq_(stat, ar.get_status())
+    # create a file to be unannexed:
+    with open(opj(ar.path, 'fifth'), 'w') as f:
+        f.write("total disaster")
+
+    ar.add('fifth')
+    sync_wrapper()
+    # TODO:
+    # Note: For some reason this seems to be the only place, where we actually
+    # need to call commit via annex-proxy. If called via '-c core.bare=False'
+    # and/or '--work-tree=.' the file ends up in git instead of annex.
+    # Note 2: This is only if we explicitly pass a path. Otherwise it works
+    # without annex-proxy.
+    ar.commit(msg="fifth to be unannexed", files='fifth',
+              proxy=ar.is_direct_mode())
+    eq_(stat, ar.get_status())
+
+    ar.unannex('fifth')
+
+    sync_wrapper(pull=False, push=False, commit=True)
+    stat['untracked'].append('fifth')
+    eq_(stat, ar.get_status())
+
+    # modify a file in git:
+    with open(opj(ar.path, 'first'), 'w') as f:
+        f.write("increased tremendousness")
+    stat['modified'].append('first')
+    eq_(stat, ar.get_status())
+
+    # modify an annexed file:
+    if not ar.is_direct_mode():
+        # actually: if 'second' isn't locked, which is the case in direct mode
+        ar.unlock('second')
+        if not ar.get_active_branch().endswith('(unlocked)'):
+            stat['type_changed'].append('second')
+        eq_(stat, ar.get_status())
+    with open(opj(ar.path, 'second'), 'w') as f:
+        f.write("Needed to unlock first. Sad!")
+    if not ar.is_direct_mode():
+        ar.add('second')  # => modified
+        if not ar.get_active_branch().endswith('(unlocked)'):
+            stat['type_changed'].remove('second')
+    stat['modified'].append('second')
+    sync_wrapper()
+    eq_(stat, ar.get_status())
+
+    # create something in a subdir
+    os.mkdir(opj(ar.path, 'sub'))
+    with open(opj(ar.path, 'sub', 'third'), 'w') as f:
+        f.write("tired of winning")
+
+    # Note, that this is different from 'git status',
+    # which would just say 'sub/':
+    stat['untracked'].append(opj('sub', 'third'))
+    eq_(stat, ar.get_status())
+
+    # test parameters for status to restrict results:
+    # limit requested states:
+    limited_status = ar.get_status(untracked=True, deleted=False, modified=True,
+                                   added=True, type_changed=False)
+    eq_(len(limited_status), 3)
+    ok_(all([k in ('untracked', 'modified', 'added') for k in limited_status]))
+    eq_(stat['untracked'], limited_status['untracked'])
+    eq_(stat['modified'], limited_status['modified'])
+    eq_(stat['added'], limited_status['added'])
+    # limit requested files:
+    limited_status = ar.get_status(path=opj('sub', 'third'))
+    eq_(limited_status['untracked'], [opj('sub', 'third')])
+    ok_(all([len(limited_status[l]) == 0 for l in ('modified', 'added',
+                                                   'deleted', 'type_changed')]))
+    # again, with a list:
+    limited_status = ar.get_status(path=[opj('sub', 'third'), 'second'])
+    eq_(limited_status['untracked'], [opj('sub', 'third')])
+    eq_(limited_status['modified'], ['second'])
+    ok_(all([len(limited_status[l]) == 0 for l in ('added', 'deleted',
+                                                   'type_changed')]))
+
+    # create a subrepo:
+    sub = AnnexRepo(opj(ar.path, 'submod'), create=True)
+    # nothing changed, it's empty besides .git, which is ignored
+    eq_(stat, ar.get_status())
+
+    # file in subrepo
+    with open(opj(ar.path, 'submod', 'fourth'), 'w') as f:
+        f.write("this is a birth certificate")
+    stat['untracked'].append(opj('submod', 'fourth'))
+    eq_(stat, ar.get_status())
+
+    # add to subrepo
+    sub.add('fourth', commit=True, msg="birther mod init'ed")
+    stat['untracked'].remove(opj('submod', 'fourth'))
+
+    if ar.get_active_branch().endswith('(unlocked)') and \
+       'adjusted' in ar.get_active_branch():
+        # we are running on adjusted branch => do it in submodule, too
+        sub.adjust()
+
+    # Note, that now the non-empty repo is untracked
+    stat['untracked'].append('submod/')
+    eq_(stat, ar.get_status())
+
+    # add the submodule
+    ar.add_submodule('submod', url=opj(curdir, 'submod'))
+
+    stat['untracked'].remove('submod/')
+    stat['added'].append('.gitmodules')
+
+    # 'submod/' might either be reported as 'added' or 'modified'.
+    # Therefore more complex assertions at this point:
+    reported_stat = ar.get_status()
+    eq_(stat['untracked'], reported_stat['untracked'])
+    eq_(stat['deleted'], reported_stat['deleted'])
+    eq_(stat['type_changed'], reported_stat['type_changed'])
+    ok_(stat['added'] == reported_stat['added'] or
+        stat['added'] + ['submod/'] == reported_stat['added'])
+    ok_(stat['modified'] == reported_stat['modified'] or
+        stat['modified'] + ['submod/'] == reported_stat['modified'])
+
+    # simpler assertion if we ignore submodules:
+    eq_(stat, ar.get_status(submodules=False))
+
+    # commit the submodule
+    # in direct mode, commit of a removed submodule fails with:
+    #  error: unable to index file submod
+    #  fatal: updating files failed
+    #
+    # - this happens, when commit is called with -c core.bare=False
+    # - it works when called via annex proxy
+    # - if we add a submodule instead of removing one, it's vice versa with
+    #   the very same error message
+
+    ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
+
+    stat['added'].remove('.gitmodules')
+    eq_(stat, ar.get_status())
+
+    # add another file to submodule
+    with open(opj(ar.path, 'submod', 'not_tracked'), 'w') as f:
+        f.write("#LastNightInSweden")
+    stat['modified'].append('submod/')
+    eq_(stat, ar.get_status())
+
+    # add the untracked file:
+    sub.add('not_tracked')
+    if sub.is_direct_mode():
+        # 'sub' is now considered to be clean; therefore it's not reported as
+        # modified upwards
+        # This is consistent in a way, but surprising in another ...
+        pass
+    else:
+        eq_(stat, ar.get_status())
+    sub.commit(msg="added file not_tracked")
+    # 'submod/' still modified when looked at from above:
+    eq_(stat, ar.get_status())
+
+    ar.add('submod', git=True)
+    ar.commit(msg="submodule modified", files='submod')
+    stat['modified'].remove('submod/')
+    eq_(stat, ar.get_status())
+
+    # clean again:
+    stat = {'untracked': [],
+            'deleted': [],
+            'modified': [],
+            'added': [],
+            'type_changed': []}
+
+    ar.add('first', git=True)
+    ar.add(opj('sub', 'third'))
+    ar.add('fifth')
+    sync_wrapper()
+
+    if ar.config.getint("annex", "version") == 6:
+        # mixed annexed/not-annexed files ATm can't be committed with explicitly
+        # given paths in v6
+        # See:
+        # http://git-annex.branchable.com/bugs/committing_files_into_git_doesn__39__t_work_with_explicitly_given_paths_in_V6
+        ar.commit()
+    else:
+        super(AnnexRepo, ar).commit(files=['first', 'fifth', opj('sub', 'third'), 'second'])
+    eq_(stat, ar.get_status())
+
+    # remove a file in annex:
+    ar.remove('fifth')
+    stat['deleted'].append('fifth')
+    eq_(stat, ar.get_status())
+
+    # remove a file in git:
+    ar.remove('first')
+    stat['deleted'].append('first')
+    eq_(stat, ar.get_status())
+
+    # remove a submodule:
+    # rm; git rm; git commit
+    from datalad.utils import rmtree
+    rmtree(opj(ar.path, 'submod'))
+    stat['deleted'].append('submod')
+    eq_(stat, ar.get_status())
+    # recreate an empty mountpoint, since we currently do it in uninstall:
+    os.makedirs(opj(ar.path, 'submod'))
+    stat['deleted'].remove('submod')
+    eq_(stat, ar.get_status())
+
+    ar.remove('submod')
+    # TODO: Why the difference?
+    stat['deleted'].append('submod')
+    stat['modified'].append('.gitmodules')
+    eq_(stat, ar.get_status())
+
+    # Note: Here again we need to use annex-proxy; This contradicts the addition
+    # of the very same submodule, which we needed to commit via
+    # -c core.bare=False instead. Otherwise the very same failure happens.
+    # Just vice versa. See above where 'submod' is added.
+    ar.commit("submod removed", files=['submod', '.gitmodules'])
+    stat['modified'].remove('.gitmodules')
+    stat['deleted'].remove('submod')
+    eq_(stat, ar.get_status())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_AnnexRepo_status(path, path2):
+
+    ar = AnnexRepo(path, create=True)
+    _test_status(ar)
+    if ar.config.getint("annex", "version") == 6:
+        # in case of v6 have a second run with adjusted branch feature:
+        ar2 = AnnexRepo(path2, create=True)
+        ar2.commit(msg="empty commit to create branch 'master'",
+                   options=['--allow-empty'])
+        ar2._run_annex_command('adjust', annex_options=['--unlock'])
+        _test_status(ar2)
+
+
+
+# TODO: test dirty
+# TODO: GitRep.dirty
+# TODO: test/utils ok_clean_git
+
+
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
 
@@ -1577,26 +1956,28 @@ def test_AnnexRepo_set_remote_url(path):
 @with_tempfile(mkdir=True)
 def test_wanted(path):
     ar = AnnexRepo(path, create=True)
-    eq_(ar.get_wanted(), '')
+    eq_(ar.get_preferred_content('wanted'), None)
     # test samples with increasing "trickiness"
     for v in ("standard",
               "include=*.nii.gz or include=*.nii",
               "exclude=archive/* and (include=*.dat or smallerthan=2b)"
               ):
-        ar.set_wanted(expr=v)
-        eq_(ar.get_wanted(), v)
+        ar.set_preferred_content('wanted', expr=v)
+        eq_(ar.get_preferred_content('wanted'), v)
     # give it some file so clone/checkout works without hiccups
-    create_tree(ar.path, {'1.dat': 'content'}); ar.add('1.dat'); ar.commit(msg="blah")
+    create_tree(ar.path, {'1.dat': 'content'})
+    ar.add('1.dat')
+    ar.commit(msg="blah")
     # make a clone and see if all cool there
     # intentionally clone as pure Git and do not annex init so to see if we
     # are ignoring crummy log msgs
     ar1_path = ar.path + '_1'
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
-    eq_(ar1.get_wanted(), '')
-    eq_(ar1.get_wanted('origin'), v)
-    ar1.set_wanted(expr='standard')
-    eq_(ar1.get_wanted(), 'standard')
+    eq_(ar1.get_preferred_content('wanted'), None)
+    eq_(ar1.get_preferred_content('wanted', 'origin'), v)
+    ar1.set_preferred_content('wanted', expr='standard')
+    eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
 @with_tempfile(mkdir=True)
@@ -1617,59 +1998,125 @@ def test_AnnexRepo_metadata(path):
     # fugue
     # doesn't do anything if there is nothing to do
     ar.set_metadata('up.dat')
-    eq_({}, ar.get_metadata(None))
-    eq_({}, ar.get_metadata(''))
-    eq_({}, ar.get_metadata([]))
-    eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
+    eq_([], list(ar.get_metadata(None)))
+    eq_([], list(ar.get_metadata('')))
+    eq_([], list(ar.get_metadata([])))
+    eq_({'up.dat': {}}, dict(ar.get_metadata('up.dat')))
     # basic invocation
-    eq_(None, ar.set_metadata(
+    eq_(1, len(list(ar.set_metadata(
         'up.dat',
         reset={'mike': 'awesome'},
         add={'tag': 'awesome'},
         remove={'tag': 'awesome'},  # cancels prev, just to use it
         init={'virgin': 'true'},
-        purge=['nothere']))
+        purge=['nothere']))))
     # no timestamps by default
-    md = ar.get_metadata('up.dat')
+    md = dict(ar.get_metadata('up.dat'))
     deq_({'up.dat': {
         'virgin': ['true'],
         'mike': ['awesome']}},
         md)
     # matching timestamp entries for all keys
-    md_ts = ar.get_metadata('up.dat', timestamps=True)
+    md_ts = dict(ar.get_metadata('up.dat', timestamps=True))
     for k in md['up.dat']:
         assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
     assert_in('lastchanged', md_ts['up.dat'])
     # recursive needs a flag
-    assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
-    ar.set_metadata('.', purge=['virgin'], recursive=True)
+    assert_raises(CommandError, list, ar.set_metadata('.', purge=['virgin']))
+    list(ar.set_metadata('.', purge=['virgin'], recursive=True))
     deq_({'up.dat': {
         'mike': ['awesome']}},
-        ar.get_metadata('up.dat'))
+        dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
-    ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
+    list(ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True))
     playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
         playfile: {
             'tag': ['one and= ']}}
-    deq_(target, ar.get_metadata('.'))
+    deq_(target, dict(ar.get_metadata('.')))
     # incremental work like a set
-    ar.set_metadata(playfile, add={'tag': 'one and= '})
-    deq_(target, ar.get_metadata('.'))
-    ar.set_metadata(playfile, add={'tag': ' two'})
+    list(ar.set_metadata(playfile, add={'tag': 'one and= '}))
+    deq_(target, dict(ar.get_metadata('.')))
+    list(ar.set_metadata(playfile, add={'tag': ' two'}))
     # returned values are sorted
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
     # init honor prior values
-    ar.set_metadata(playfile, init={'tag': 'three'})
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
-    ar.set_metadata(playfile, remove={'tag': ' two'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, init={'tag': 'three'}))
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
+    list(ar.set_metadata(playfile, remove={'tag': ' two'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # remove non-existing doesn't error and doesn't change anything
-    ar.set_metadata(playfile, remove={'ether': 'best'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, remove={'ether': 'best'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # add works without prior existence
-    ar.set_metadata(playfile, add={'novel': 'best'})
-    eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
+    list(ar.set_metadata(playfile, add={'novel': 'best'}))
+    eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
+
+@with_tempfile(mkdir=True)
+def test_change_description(path):
+    # prelude
+    ar = AnnexRepo(path, create=True, description='some')
+    eq_(ar.get_description(), 'some')
+    # try change it
+    ar = AnnexRepo(path, create=False, init=True, description='someother')
+    # this doesn't cut the mustard, still old
+    eq_(ar.get_description(), 'some')
+    # need to resort to "internal" helper
+    ar._init(description='someother')
+    eq_(ar.get_description(), 'someother')
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_get_corresponding_branch(path):
+
+    ar = AnnexRepo(path)
+
+    # we should be on master or a corresponding branch like annex/direct/master
+    # respectively if ran in direct mode build.
+    # We want to get 'master' in any case
+    eq_('master', ar.get_corresponding_branch())
+
+    # special case v6 adjusted branch is not provided by a dedicated build:
+    if ar.config.getint("annex", "version") == 6:
+        ar.adjust()
+        # as above, we still want to get 'master', while being on
+        # 'adjusted/master(unlocked)'
+        eq_('adjusted/master(unlocked)', ar.get_active_branch())
+        eq_('master', ar.get_corresponding_branch())
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_get_tracking_branch(path):
+
+    ar = AnnexRepo(path)
+
+    # we want the relation to original branch, especially in direct mode
+    # or even in v6 adjusted branch
+    eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_is_managed_branch(path):
+
+    ar = AnnexRepo(path)
+
+    if ar.is_direct_mode():
+        ok_(ar.is_managed_branch())
+    else:
+        # ATM only direct mode and v6 adjusted branches should return True.
+        # Adjusted branch requires a call of git-annex-adjust and shouldn't
+        # be the state of a fresh clone
+        ok_(not ar.is_managed_branch())
+    if ar.config.getint("annex", "version") == 6:
+        ar.adjust()
+        ok_(ar.is_managed_branch())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_AnnexRepo_flyweight_monitoring_inode(path, store):
+    # testing for issue #1512
+    check_repo_deals_with_inode_change(AnnexRepo, path, store)

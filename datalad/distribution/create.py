@@ -14,29 +14,32 @@ import logging
 import uuid
 
 from os import listdir
-from os.path import isdir, realpath, relpath, join as opj
+from os.path import isdir
+from os.path import join as opj
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import save_dataset
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.utils import eval_results
+from datalad.interface.base import build_doc
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import dataset_description
+from datalad.interface.common_opts import location_description
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import shared_access_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureKeyChoice
 from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
-from datalad.utils import with_pathsep
 
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
-from .dataset import resolve_path
+from .subdatasets import Subdatasets
 
 
 __docformat__ = 'restructuredtext'
@@ -44,6 +47,7 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.create')
 
 
+@build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
 
@@ -77,6 +81,14 @@ class Create(Interface):
       in the discovered superdataset.
     """
 
+    # in general this command will yield exactly one result
+    return_type = 'item-or-list'
+    # in general users expect to get an instance of the created dataset
+    result_xfm = 'datasets'
+    # result filter
+    result_filter = EnsureKeyChoice('action', ('create',)) & \
+                    EnsureKeyChoice('status', ('ok', 'notneeded'))
+
     _params_ = dict(
         path=Parameter(
             args=("path",),
@@ -99,13 +111,15 @@ class Create(Interface):
             args=("-f", "--force",),
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
-        description=dataset_description,
+        description=location_description,
+        # TODO could move into cfg_annex plugin
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
         save=nosave_opt,
+        # TODO could move into cfg_annex plugin
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -113,6 +127,7 @@ class Create(Interface):
             version. This should be left untouched, unless you know what
             you are doing""",
             constraints=EnsureDType(int) | EnsureNone()),
+        # TODO could move into cfg_annex plugin
         annex_backend=Parameter(
             args=("--annex-backend",),
             constraints=EnsureStr() | EnsureNone(),
@@ -121,8 +136,8 @@ class Create(Interface):
             For a list of supported backends see the git-annex
             documentation. The default is optimized for maximum compatibility
             of datasets across platforms (especially those with limited
-            path lengths)""",
-            nargs=1),
+            path lengths)"""),
+        # TODO could move into cfg_metadata plugin
         native_metadata_type=Parameter(
             args=('--native-metadata-type',),
             metavar='LABEL',
@@ -131,6 +146,7 @@ class Create(Interface):
             doc="""Metadata type label. Must match the name of the respective
             parser implementation in Datalad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
+        # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
@@ -139,6 +155,7 @@ class Create(Interface):
 
     @staticmethod
     @datasetmethod(name='create')
+    @eval_results
     def __call__(
             path=None,
             force=False,
@@ -180,21 +197,57 @@ class Create(Interface):
 
         if not isinstance(force, bool):
             raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
+        annotated_paths = AnnotatePaths.__call__(
+            # nothing given explicitly, assume create fresh right here
+            path=path if path else getpwd() if dataset is None else None,
+            dataset=dataset,
+            recursive=False,
+            action='create',
+            # we need to know whether we have to check for potential
+            # subdataset collision
+            force_parentds_discovery=True,
+            # it is absolutely OK to have something that does not exist
+            unavailable_path_status='',
+            unavailable_path_msg=None,
+            # if we have a dataset given that actually exists, we want to
+            # fail if the requested path is not in it
+            nondataset_path_status='error' \
+                if isinstance(dataset, Dataset) and dataset.is_installed() else '',
+            on_failure='ignore')
+        path = None
+        for r in annotated_paths:
+            if r['status']:
+                # this is dealt with already
+                yield r
+                continue
+            if path is not None:
+                raise ValueError("`create` can only handle single target path or dataset")
+            path = r
 
-        # straight from input arg, no messing around before this
-        if path is None:
-            if dataset is None:
-                # nothing given explicity, assume create fresh right here
-                path = getpwd()
-            else:
-                # no path, but dataset -> create that dataset
-                path = dataset.path
-        else:
-            # resolve the path against a potential dataset
-            path = resolve_path(path, ds=dataset)
+        if len(annotated_paths) and path is None:
+            # we got something, we complained already, done
+            return
 
         # we know that we need to create a dataset at `path`
         assert(path is not None)
+
+        # prep for yield
+        path.update({'logger': lgr, 'type': 'dataset'})
+        # just discard, we have a new story to tell
+        path.pop('message', None)
+
+        if 'parentds' in path and path['path'] in Subdatasets.__call__(
+                dataset=path['parentds'],
+                # any known
+                fulfilled=None,
+                recursive=False,
+                result_xfm='paths'):
+            path.update({
+                'status': 'error',
+                'message': ('collision with known subdataset in dataset %s',
+                            path['parentds'])})
+            yield path
+            return
 
         if git_opts is None:
             git_opts = {}
@@ -202,23 +255,20 @@ class Create(Interface):
             # configure `git --shared` value
             git_opts['shared'] = shared_access
 
-        # check for sane subdataset path
-        real_targetpath = with_pathsep(realpath(path))  # realpath OK
-        if dataset is not None:
-            # make sure we get to an expected state
-            if not real_targetpath.startswith(  # realpath OK
-                    with_pathsep(realpath(dataset.path))):  # realpath OK
-                raise ValueError("path {} outside {}".format(path, dataset))
-
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
-        tbds = dataset if dataset is not None and dataset.path == path else Dataset(path)
+        tbds = dataset if isinstance(dataset, Dataset) and dataset.path == path['path'] \
+            else Dataset(path['path'])
 
         # don't create in non-empty directory without `force`:
         if isdir(tbds.path) and listdir(tbds.path) != [] and not force:
-            raise ValueError("Cannot create dataset in directory %s "
-                             "(not empty). Use option 'force' in order to "
-                             "ignore this and enforce creation." % tbds.path)
+            path.update({
+                'status': 'error',
+                'message':
+                    'will not create a dataset in a non-empty directory, use '
+                    '`force` option to ignore'})
+            yield path
+            return
 
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
@@ -264,29 +314,36 @@ class Create(Interface):
             # comes around
             gitattr.write('** annex.largefiles=nothing\n')
 
-        # save everthing
-        tbds.add('.datalad', to_git=True, save=False)
+        # save everything, we need to do this now and cannot merge with the
+        # call below, because we may need to add this subdataset to a parent
+        # but cannot until we have a first commit
+        tbds.add('.datalad', to_git=True, save=save,
+                 message='[DATALAD] new dataset')
 
-        if save:
-            save_dataset(
-                tbds,
-                paths=['.datalad'],
-                message='[DATALAD] new dataset')
+        # the next only makes sense if we saved the created dataset,
+        # otherwise we have no committed state to be registered
+        # in the parent
+        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
+            # we created a dataset in another dataset
+            # -> make submodule
+            for r in dataset.add(
+                    tbds.path,
+                    save=True,
+                    return_type='generator',
+                    result_filter=None,
+                    result_xfm=None,
+                    on_failure='ignore'):
+                yield r
 
-            # the next only makes sense if we saved the created dataset,
-            # otherwise we have no committed state to be registered
-            # in the parent
-            if dataset is not None and dataset.path != tbds.path:
-                # we created a dataset in another dataset
-                # -> make submodule
-                dataset.add(tbds.path, save=save, ds2super=True)
-
-        return tbds
+        path.update({'status': 'ok'})
+        yield path
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if res is None:
+        if res.get('action', None) == 'create' and \
+               res.get('status', None) == 'ok' and \
+               res.get('type', None) == 'dataset':
+            ui.message("Created dataset at {}.".format(res['path']))
+        else:
             ui.message("Nothing was created")
-        elif isinstance(res, Dataset):
-            ui.message("Created dataset at %s." % res.path)

@@ -1,5 +1,10 @@
+.. _chap_metadata:
+
 Meta data
 *********
+
+Overview
+========
 
 Datalad has built-in, modular, and extensible support for meta data in various
 formats. The core concept is that meta data is accessed via dedicated parsers
@@ -14,10 +19,44 @@ actually install them.
 .. _JSON-LD: http://json-ld.org/
 .. _linked data: https://en.wikipedia.org/wiki/Linked_data
 
+Sample datasets with meta data
+==============================
+
+http://datasets.datalad.org superdataset contains a collection of datasets
+which we have prepared primarily from available online data resources such
+as OpenfMRI_, CRCNS_, etc.  Many of those datasets came with meta data in
+their native formats, such as `Brain Imaging Data Structure (BIDS)`_.  DataLad has
+:ref:`aggregated <man_datalad-aggregate-metadata>` metadata where it was available
+to enable basic :ref:`search <man_datalad-search>` queries.  If you
+run :ref:`search <man_datalad-search>` command outside of any datalad dataset,
+it will offer to install our http://datasets.datalad.org superdataset at
+`~/datalad` and then search through its metadata.  If that superdataset is already
+installed (by :ref:`datalad search <man_datalad-search>` or manually via
+`datalad install -s /// ~/datalad`), you can refer to it in the search command
+using `-d ///` option, e.g.::
+
+    $> datalad search -d /// bids
+    /home/yoh/datalad/openfmri/ds000017A
+    /home/yoh/datalad/openfmri/ds000017
+    /home/yoh/datalad/dicoms/dartmouth-phantoms/bids_test3
+    /home/yoh/datalad/labs
+    /home/yoh/datalad/labs/haxby
+    /home/yoh/datalad/labs/haxby/raiders
+    /home/yoh/datalad/openfmri
+    /home/yoh/datalad/openfmri/ds000001
+    ..    .
+
+.. _OpenfMRI: http://openfmri.org
+.. _CRCNS: http://crcns.org
+
+Supported meta data formats
+===========================
+
 This following sections provide an overview of supported meta data formats.
 
+
 RFC822-compliant meta data
-==========================
+--------------------------
 
 This is a custom meta data format, inspired by the standard used for Debian
 software packages that is particularly suited for manual entry. This format is
@@ -94,20 +133,20 @@ The following fields are supported:
 
 
 Brain Imaging Data Structure (BIDS)
-===================================
+-----------------------------------
 
 Datalad has basic support for extraction of meta data from the `BIDS
 <http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
 
 Friction-less data packages
-===========================
+---------------------------
 
 Datalad has basic support for extraction of meta data from `friction-less data
 packages <http://specs.frictionlessdata.io/data-packages>`_
 (``datapackage.json``).  file.
 
 JSON-LD meta data format
-========================
+------------------------
 
 Datalad uses JSON-LD_ as its primary meta data format. By default, the
 following context (available from `here <schema.json>`_

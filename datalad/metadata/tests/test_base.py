@@ -20,15 +20,18 @@ from os.path import join as opj, exists
 from datalad.api import Dataset, aggregate_metadata, install
 from datalad.metadata import get_metadata_type, get_metadata
 from datalad.metadata import _cached_load_document
+from datalad.metadata import _sanitize_annex_description
 from datalad.utils import swallow_logs
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
+from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import slow
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -43,7 +46,6 @@ except ImportError as exc:
     raise SkipTest(exc_str(exc))
 
 from datalad.api import search
-from datalad.api import search_
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -118,7 +120,9 @@ def test_basic_metadata(path):
          'dcterms:modified', 'type', 'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
-    sibling = install(opj(path, 'sibling'), source=opj(path, 'origin'))
+    sibling = install(
+        opj(path, 'sibling'), source=opj(path, 'origin'),
+        result_xfm='datasets', return_type='item-or-list')
     sibling_meta = get_metadata(sibling)
     assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
@@ -131,6 +135,7 @@ def test_basic_metadata(path):
     assert_not_in('dcterms:hasPart', meta[0])
 
 
+@slow  # 37.1036s
 @skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
@@ -172,10 +177,12 @@ def test_aggregation(path):
     assert_true(success)
 
     # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data', all_changes=True)
+    ds.save('with aggregated meta data')
 
     # now clone the beast to simulate a new user installing an empty dataset
-    clone = install(opj(path, 'clone'), source=ds.path)
+    clone = install(
+        opj(path, 'clone'), source=ds.path,
+        result_xfm='datasets', return_type='item-or-list')
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
@@ -183,6 +190,13 @@ def test_aggregation(path):
     # differ, but the rest not
     clonemeta = get_metadata(
         clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+
+    for m in clonemeta:
+        # could be a list or a single entry
+        for r in assure_list(m.get('availableFrom', []), iterate=False):
+            # if there is a description, it shouldn't have any [ in it
+            # (enabled state should have been pruned, local remote name pruned)
+            assert_not_in('[', r.get('description', ''))
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
@@ -223,18 +237,6 @@ def test_aggregation(path):
     # should yield (location, report) tuples
     assert_names(child_res, ['sub', 'sub/subsub'])
 
-    # result should be identical to invoking search from api
-    # and search_ should spit out locations out
-    with swallow_outputs() as cmo:
-        res = list(search_('child', dataset=clone))
-        assert_equal(res, child_res)
-        assert_in(res[0][0], cmo.out)
-    # and overarching search_ just for smoke testing of processing outputs
-    # and not puking (e.g. under PY3)
-    with swallow_outputs() as cmo:
-        assert list(search_('.', regex=True, dataset=clone))
-        assert cmo.out
-
     # test searching among specified properties only
     assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
     assert_names(clone.search('i', search='keywords'), ['.'])
@@ -273,7 +275,9 @@ def test_aggregation(path):
     # more tests on returned paths:
     assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
     # if we clone subdataset and query for value present in it and its kid
-    clone_sub = clone.install('sub')
+    clone_sub = clone.install(
+        'sub',
+        result_xfm='datasets', return_type='item-or-list')
     assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
 
     # Test 'and' for multiple search entries
@@ -302,9 +306,7 @@ def test_aggregate_with_missing_or_duplicate_id(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = ds.create('sub', force=True)
-    subds.remove(opj('.datalad', 'config'), if_dirty='ignore')
-    assert_false(exists(opj(subds.path, '.datalad', 'config')))
-    subsubds = subds.create('subsub', force=True)
+    subds.create('subsub', force=True)
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second native set for the topmost dataset
@@ -318,14 +320,16 @@ def test_aggregate_with_missing_or_duplicate_id(path):
 
     # but search should not fail
     with swallow_outputs():
-        res1 = list(search_('.', regex=True, dataset=ds))
+        res1 = list(search('.', regex=True, dataset=ds))
     assert res1
 
     # and let's see now if we wouldn't fail if dataset is duplicate if we
     # install the same dataset twice
-    subds_clone = ds.install(source=subds.path, path="subds2")
+    subds_clone = ds.install(
+        source=subds.path, path="subds2",
+        result_xfm='datasets', return_type='item-or-list')
     with swallow_outputs():
-        res2 = list(search_('.', regex=True, dataset=ds))
+        res2 = list(search('.', regex=True, dataset=ds))
     # TODO: bring back when meta data RF is complete with aggregate
     #assert_equal(len(res1) + 1, len(res2))
     #assert_equal(
@@ -386,6 +390,13 @@ def test_ignore_nondatasets(path):
         assert_equal(meta, _kill_time(get_metadata(ds)))
         # making it a submodule has no effect either
         ds.add(subpath)
-        assert_equal(len(ds.get_subdatasets()), n_subm + 1)
+        assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(get_metadata(ds)))
         n_subm += 1
+
+
+def test_sanitize_annex_description():
+    assert_equal(_sanitize_annex_description("[d-a]"), "d-a")
+    assert_equal(_sanitize_annex_description("d-a"), "d-a")
+    assert_equal(_sanitize_annex_description("lo c [d-a]"), "lo c")
+    assert_equal(_sanitize_annex_description("lo c"), "lo c")

@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+
 from os import makedirs
 from os.path import join as opj
 from ...api import clean
@@ -22,40 +24,40 @@ from ...support.annexrepo import AnnexRepo
 from ...tests.utils import with_tempfile
 from ...utils import swallow_outputs
 from ...utils import chpwd
-from ...tests.utils import assert_equal, assert_in
-from ...tests.utils import use_cassette
+from ...tests.utils import assert_equal
+from ...tests.utils import assert_status
+
 
 @with_tempfile(mkdir=True)
 def test_clean(d):
-    repo = AnnexRepo(d, create=True)
+    AnnexRepo(d, create=True)
     ds = Dataset(d)
-    with swallow_outputs() as cmo:
-        assert_equal(clean(dataset=ds), None)  # no output ATM
-        assert_equal(cmo.out, '')  # no output ATM
+    assert_status('notneeded', clean(dataset=ds))
 
     # if we create some temp archives directory
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
-    with swallow_outputs() as cmo:
-        assert_equal(clean(dataset=ds), None)  # no output ATM
-        assert_equal("Removing 1 temporary archive directory under %s: somebogus"
-                  % opj(d, ARCHIVES_TEMP_DIR), cmo.out.rstrip())
+    res = clean(dataset=ds, return_type='item-or-list',
+                result_filter=lambda x: x['status'] == 'ok')
+    assert_equal(res['path'], opj(d, ARCHIVES_TEMP_DIR))
+    assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                 "Removed 1 temporary archive directory: somebogus")
 
     # relative path
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus2'))
-    with chpwd(d), \
-         swallow_outputs() as cmo:
-        assert_equal(clean(), None)  # no output ATM
-        assert_equal("Removing 2 temporary archive directories under %s: somebogus, somebogus2"
-                  % ARCHIVES_TEMP_DIR, cmo.out.rstrip())
+    with chpwd(d), swallow_outputs() as cmo:
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed 2 temporary archive directories: somebogus, somebogus2")
 
     # and what about git annex temporary files?
     makedirs(opj(d, ANNEX_TEMP_DIR))
     open(opj(d, ANNEX_TEMP_DIR, "somebogus"), "w").write("load")
 
-    with chpwd(d), \
-         swallow_outputs() as cmo:
-        assert_equal(clean(), None)  # no output ATM
-        assert_equal(
-            "Removing 1 temporary annex file under %s: somebogus"
-            % ANNEX_TEMP_DIR, cmo.out.rstrip())
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], opj(d, ANNEX_TEMP_DIR))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed 1 temporary annex file: somebogus")

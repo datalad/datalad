@@ -19,6 +19,7 @@ __docformat__ = 'restructuredtext'
 from os.path import isdir, curdir
 
 from .base import Interface
+from datalad.interface.base import build_doc
 from ..ui import ui
 from ..utils import assure_list_from_str
 from ..dochelpers import exc_str
@@ -29,6 +30,7 @@ from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
 
 
+@build_doc
 class DownloadURL(Interface):
     """Download content
 
@@ -40,6 +42,8 @@ class DownloadURL(Interface):
 
       $ datalad download http://example.com/file.dat s3://bucket/file2.dat
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         urls=Parameter(

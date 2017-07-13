@@ -54,6 +54,8 @@ def pipeline(bucket,
              backend='MD5E',
              drop=False,
              drop_force=False,
+             strategy='commit-versions',
+             exclude=None,
              **kwargs):
     """Pipeline to crawl/annex an arbitrary bucket
 
@@ -72,8 +74,14 @@ def pipeline(bucket,
     directory : {subdataset}, optional
       What to do when encountering a directory.  'subdataset' would initiate a new sub-dataset
       at that directory
+    strategy : {'commit-versions', 'naive'}, optional
+      What strategy to use whenever processing "delete" event, See `crawl_s3` node for more information.
     drop : bool, optional
       Drop all the files whenever done crawling
+    exclude : str, optional
+      Regular expression to be passed to s3_crawl to exclude some files
+    **kwargs:
+      passed into simple_with_archives.pipeline
     """
 
     lgr.info("Creating a pipeline for the %s bucket", bucket)
@@ -139,7 +147,8 @@ def pipeline(bucket,
         s3_actions['remove'] = annex.remove
 
     incoming_pipeline = [
-        crawl_s3(bucket, prefix=prefix, strategy='commit-versions', repo=annex.repo, recursive=recursive),
+        crawl_s3(bucket, prefix=prefix, strategy=strategy, repo=annex.repo, recursive=recursive,
+                 exclude=exclude),
     ]
 
     from ..nodes.misc import debug

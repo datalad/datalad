@@ -25,12 +25,33 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
-
 import atexit
-atexit.register(ssh_manager.close, allow_fail=False)
+from datalad.utils import on_windows
+
+if not on_windows:
+    lgr.log(5, "Instantiating ssh manager")
+    from .support.sshconnector import SSHManager
+    ssh_manager = SSHManager()
+    atexit.register(ssh_manager.close, allow_fail=False)
+else:
+    ssh_manager = None
+
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError as e:
+    if on_windows:
+        from datalad.dochelpers import exc_str
+        lgr.warning(
+            "'colorama' Python module missing, terminal output may look garbled [%s]",
+            exc_str(e))
+    pass
+
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
@@ -95,7 +116,8 @@ def setup_package():
     # Set to non-interactive UI
     from datalad.ui import ui
     _test_states['ui_backend'] = ui.backend
-    ui.set_backend('tests-noninteractive')
+    # obtain() since that one consults for the default value
+    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
 
 def teardown_package():
@@ -123,6 +145,12 @@ def teardown_package():
 
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
+    # request versioning for few others which we do not check at runtime
+    for m in ('git', 'system-ssh'):
+        try:  # Let's make sure to not blow up when we are almost done
+            ev[m]
+        except Exception:
+            pass
     print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")

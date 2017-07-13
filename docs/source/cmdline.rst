@@ -22,17 +22,15 @@ Dataset operations
    :maxdepth: 1
 
    generated/man/datalad-add
-   generated/man/datalad-add-sibling
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
    generated/man/datalad-drop
-   generated/man/datalad-export
+   generated/man/datalad-plugin
    generated/man/datalad-get
    generated/man/datalad-install
    generated/man/datalad-publish
    generated/man/datalad-remove
-   generated/man/datalad-rewrite-urls
    generated/man/datalad-save
    generated/man/datalad-update
    generated/man/datalad-uninstall
@@ -45,6 +43,7 @@ Meta data handling
    :maxdepth: 1
 
    generated/man/datalad-search
+   generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
 
 Miscellaneous commands
@@ -67,5 +66,10 @@ Plumbing commands
 .. toctree::
    :maxdepth: 1
 
+   generated/man/datalad-annotate-paths
+   generated/man/datalad-clone
    generated/man/datalad-create-test-dataset
+   generated/man/datalad-diff
    generated/man/datalad-sshrun
+   generated/man/datalad-siblings
+   generated/man/datalad-subdatasets

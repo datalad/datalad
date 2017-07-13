@@ -196,8 +196,10 @@ class RSTManPageFormatter(ManPageFormatter):
         return usage
 
     def _mk_title(self, prog):
-        title = "{0}".format(prog)
-        title += '\n{0}\n\n'.format('=' * len(title))
+        # and an easy to use reference point
+        title = ".. _man_%s:\n\n" % prog
+        title += "{0}".format(prog)
+        title += '\n{0}\n\n'.format('=' * len(prog))
         return title
 
     def _make_name(self, parser):
@@ -297,7 +299,8 @@ def cmdline_example_to_rst(src, out=None, ref=None):
             out.write(line[(min(2, len(line) - 1)):])
             continue
         if incodeblock:
-            out.write('  %s' % line)
+            if not line.rstrip().endswith('#% SKIP'):
+                out.write('  %s' % line)
             continue
         if not len(line.strip()):
             continue

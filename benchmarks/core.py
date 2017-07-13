@@ -10,23 +10,35 @@
 import os
 import sys
 import os.path as osp
-
+from os.path import join as opj
+import tarfile
 import timeit
 
 from subprocess import call
 
-import time
-class SuprocBenchmarks(object):
-    # manually set a number since otherwise takes way too long!
-    # see https://github.com/spacetelescope/asv/issues/497
-    #number = 3
-    # although seems to work ok with a timer which accounts for subprocesses
+from datalad.api import add
+from datalad.api import create
+from datalad.api import create_test_dataset
+from datalad.api import Dataset
+from datalad.api import install
+from datalad.api import ls
+from datalad.api import remove
+from datalad.api import uninstall
 
-    # custom timer so we account for subprocess times
-    timer = timeit.default_timer
-    pass
+from datalad.utils import rmtree
+from datalad.utils import getpwd
 
-class StartupSuite(SuprocBenchmarks):
+# Some tracking example -- may be we should track # of datasets.datalad.org
+#import gc
+#def track_num_objects():
+#    return len(gc.get_objects())
+#track_num_objects.unit = "objects"
+
+
+from .common import SuprocBenchmarks
+
+
+class startup(SuprocBenchmarks):
     """
     Benchmarks for datalad commands startup
     """
@@ -48,7 +60,7 @@ class StartupSuite(SuprocBenchmarks):
         call([sys.executable, "-c", "import datalad.api"])
 
 
-class RunnerSuite(SuprocBenchmarks):
+class runner(SuprocBenchmarks):
     """Some rudimentary tests to see if there is no major slowdowns from Runner
     """
 
@@ -67,3 +79,5 @@ class RunnerSuite(SuprocBenchmarks):
 
     def time_echo_gitrunner(self):
         self.git_runner.run("echo")
+
+

@@ -34,12 +34,14 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_set_equal
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import slow
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
@@ -70,9 +72,14 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
     for path in not_paths:
         assert_false(exists(opj(target_path, path)))
 
-    # correct ls_json command in hook content (path wrapped in quotes)
-    ok_file_has_content(_path_(target_path, '.git/hooks/post-update'),
-                        '.*datalad ls -a --json file \'%s\'.*' % target_path,
+    hook_path = _path_(target_path, '.git/hooks/post-update')
+    ok_file_has_content(hook_path,
+                        '.*\ndsdir="%s"\n.*' % target_path,
+                        re_=True,
+                        flags=re.DOTALL)
+    # correct ls_json command in hook content (path wrapped in "quotes)
+    ok_file_has_content(hook_path,
+                        '.*datalad ls -a --json file "\$dsdir".*',
                         re_=True,
                         flags=re.DOTALL)
 
@@ -103,11 +110,15 @@ def test_invalid_call(path):
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
     # fails to reconfigure by default with generated
-    assert_raises(ValueError, ds.create_sibling, 'bogus:/tmp/somewhere')
     # and also when given an existing name
-    assert_raises(
-        ValueError,
-        ds.create_sibling, 'localhost:/tmp/somewhere', name='bogus')
+    for res in (ds.create_sibling('bogus:/tmp/somewhere', on_failure='ignore'),
+                ds.create_sibling('localhost:/tmp/somewhere', name='bogus', on_failure='ignore')):
+        assert_result_count(
+            res, 1,
+            status='error',
+            message=(
+                "sibling '%s' already configured (specify alternative name, or force reconfiguration via --existing",
+                'bogus'))
 
 
 @skip_ssh
@@ -117,7 +128,9 @@ def test_invalid_call(path):
 def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
-    source = install(src_path, source=origin)
+    source = install(
+        src_path, source=origin,
+        result_xfm='datasets', return_type='item-or-list')
 
     target_path = opj(target_rootpath, "basic")
     with swallow_logs(new_level=logging.ERROR) as cml:
@@ -263,9 +276,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # on elderly git we don't change receive setting
         ok_modified_files.add(_path_('.git/config'))
         ok_modified_files.update({f for f in digests if f.startswith(_path_('.git/datalad/web'))})
+        # it seems that with some recent git behavior has changed a bit
+        # and index might get touched
+        if _path_('.git/index') in modified_files:
+            ok_modified_files.add(_path_('.git/index'))
         assert_set_equal(modified_files, ok_modified_files)
 
 
+@slow  # 53.8496s
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -273,7 +291,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
+    source = install(src_path, source=origin, recursive=True)
 
     sub1 = Dataset(opj(src_path, "subm 1"))
     sub2 = Dataset(opj(src_path, "subm 2"))
@@ -317,7 +335,11 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         # since is an empty value to force it to consider all changes since we published
         # already
         with chpwd(source.path):
-            publish(to=remote_name)  # no recursion
+            # as we discussed in gh-1495 we use the last-published state of the base
+            # dataset as the indicator for modification detection with since=''
+            # hence we must not publish the base dataset on its own without recursion,
+            # if we want to have this mechanism do its job
+            #publish(to=remote_name)  # no recursion
             assert_create_sshwebserver(
                 name=remote_name,
                 sshurl="ssh://localhost" + target_path_,
@@ -338,11 +360,11 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
-    source = install(src_path, source=origin, recursive=True)[0]
-    eq_(len(source.get_subdatasets()), 2)
+    source = install(src_path, source=origin, recursive=True)
+    eq_(len(source.subdatasets()), 2)
     # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
-    eq_(len(source.get_subdatasets()), 3)
+    eq_(len(source.subdatasets()), 3)
     ok_clean_git(source.path)
 
     # and now we create a sibling for the new subdataset only
@@ -404,8 +426,8 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     remote = "magical"
     ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
     if standardgroup:
-        ds.repo.set_wanted(remote, 'standard')
-        ds.repo.set_group(remote, standardgroup)
+        ds.repo.set_preferred_content('wanted', 'standard', remote)
+        ds.repo.set_preferred_content('group', standardgroup, remote)
     ds.publish(to=remote)
 
     # now a month later we created a new subdataset
@@ -415,15 +437,19 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ok_file_under_git(subds.path, 'sub.dat', annexed=True)
 
     target_sub = Dataset(opj(target_path, 'sub'))
-    ds.publish()  # should be ok, non recursive; BUT it (git or us?) would
+    # since we do not have yet/thus have not used an option to record to publish
+    # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
+    # -- should fail
+    assert_raises(InsufficientArgumentsError, ds.publish)
+    ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     ok_(not target_sub.is_installed())  # still not there
     with swallow_logs():  # so no warnings etc
         assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
-    ds.publish(to=remote, recursive=True, inherit_settings=True)
+    ds.publish(to=remote, recursive=True, missing='inherit')
     # we added the remote and set all the
-    eq_(subds.repo.get_wanted(remote), 'standard' if standardgroup else '')
-    eq_(subds.repo.get_group(remote), standardgroup or '')
+    eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
+    eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
 
     ok_(target_sub.is_installed())  # it is there now
     eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
