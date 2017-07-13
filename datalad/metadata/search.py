@@ -12,43 +12,47 @@
 __docformat__ = 'restructuredtext'
 
 import os
-import re
 import sys
 
-from operator import itemgetter
 from os.path import join as opj, exists
-from six import string_types
-from six import text_type
-from six import iteritems
+from os.path import dirname
+from os.path import relpath
 from six import reraise
-from six import PY3
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
 from datalad.distribution.utils import get_git_dir
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
-from ..support.constraints import EnsureChoice
 from ..log import lgr
-from . import get_metadata, flatten_metadata_graph, pickle
+from datalad.metadata.definitions import common_key_defs
+from datalad.metadata.metadata import agginfo_relpath
+from datalad.metadata.metadata import Metadata
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
-from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support import ansi_colors
+from datalad.support.json_py import load as jsonload
 from datalad.ui import ui
+
+
+# this ammends the metadata key definitions (common_key_defs)
+# default will be TEXT, hence we only need to specific the differences
+# using string identifiers to not have to import whoosh at global scope
+whoosh_field_types = {
+    "id": "ID",
+    "modified": "DATETIME",
+    "tag": "KEYWORD",
+}
 
 
 @build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
-
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -56,76 +60,23 @@ class Search(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
-        match=Parameter(
-            args=("match",),
-            metavar='STRING',
+        query=Parameter(
+            args=("query",),
+            metavar='QUERY',
             nargs="+",
-            doc="a string (or a regular expression if "
-                "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
-                "in all meta data values. If multiple provided, all must have "
-                "a match among some fields of a dataset"),
-        #match=Parameter(
-        #    args=('-m', '--match',),
-        #    metavar='REGEX',
-        #    action='append',
-        #    nargs=2,
-        #    doc="""Pair of two regular expressions to match a property and its
-        #    value.[CMD:  This option can be given multiple times CMD]"""),
-        search=Parameter(
-            args=('-s', '--search'),
-            metavar='PROPERTY',
-            action='append',
-            # could also be regex
-            doc="""name of the property to search for any match.[CMD:  This
-            option can be given multiple times. CMD] By default, all properties
-            are searched."""),
-        report=Parameter(
-            args=('-r', '--report'),
-            metavar='PROPERTY',
-            action='append',
-            # could also be regex
-            doc="""name of the property to report for any match.[CMD:  This
-            option can be given multiple times. CMD] If '*' is given, all
-            properties are reported."""),
-        report_matched=Parameter(
-            args=('-R', '--report-matched',),
-            action="store_true",
-            doc="""flag to report those fields which have matches. If `report`
-             option values are provided, union of matched and those in `report`
-             will be output"""),
-        # Theoretically they should be CMDLINE specific I guess?
-        format=Parameter(
-            args=('-f', '--format'),
-            constraints=EnsureChoice('custom', 'json', 'yaml'),
-            doc="""format for output."""
-        ),
-        regex=Parameter(
-            args=("--regex",),
-            action="store_true",
-            doc="flag for STRING to be used as a (Python) regular expression "
-                "which should match the value"),
+            doc="tell me"),
+        # TODO --reindex
     )
 
     @staticmethod
     @datasetmethod(name='search')
-    def __call__(match,
-                 dataset=None,
-                 search=None,
-                 report=None,
-                 report_matched=False,
-                 format='custom',
-                 regex=False):
-        """
-        Yields
-        ------
-        location : str
-            (relative) path to the dataset
-        report : dict
-            fields which were requested by `report` option
-        """
+    @eval_results
+    def __call__(query,
+                 dataset=None):
+        from whoosh import index as widx
+        from whoosh import fields as wf
+        from whoosh.qparser import QueryParser
 
-        lgr.debug("Initiating search for match=%r and dataset %r",
-                  match, dataset)
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
@@ -134,6 +85,9 @@ class Search(Interface):
                     "found). 'datalad create --force %s' can initialize "
                     "this repository as a DataLad dataset" % ds.path)
         except NoDatasetArgumentFound:
+            #
+            # this is to be nice to newbies
+            #
             exc_info = sys.exc_info()
             if dataset is None:
                 if not ui.is_interactive:
@@ -180,242 +134,125 @@ class Search(Interface):
                     "Performing search using DataLad superdataset %r",
                     central_ds.path
                 )
-                for res in central_ds.search(
-                        match,
-                        search=search, report=report,
-                        report_matched=report_matched,
-                        format=format, regex=regex):
+                for res in central_ds.search(query):
                     yield res
                 return
             else:
                 raise
 
-        cache_dir = opj(opj(ds.path, get_git_dir(ds.path)), 'datalad', 'cache')
-        mcache_fname = opj(cache_dir, 'metadata.p%d' % pickle.HIGHEST_PROTOCOL)
+        index_dir = opj(ds.path, get_git_dir(ds.path), 'datalad', 'search_index')
+        if not exists(index_dir):
+            os.makedirs(index_dir)
 
-        meta = None
-        if os.path.exists(mcache_fname):
-            lgr.debug("use cached metadata of '{}' from {}".format(ds, mcache_fname))
-            meta, checksum = pickle.load(open(mcache_fname, 'rb'))
-            # TODO add more sophisticated tests to decide when the cache is no longer valid
-            if checksum != ds.repo.get_hexsha():
-                # errrr, try again below
-                meta = None
+        # auto-builds search schema from common metadata keys
+        # the idea is to only store what we need to pull up the full metadata
+        # for a search hit
+        datalad_schema = wf.Schema(
+            datalad__agg_obj=wf.STORED,
+            id=wf.ID(stored=True),
+            path=wf.ID(stored=True),
+            type=wf.ID(stored=True),
+            **{k: getattr(wf, whoosh_field_types.get(k, 'TEXT'))
+               for k in common_key_defs
+               if not k.startswith('@') and not k == 'type'})
 
-        # don't put in 'else', as yet to be written tests above might fail and require
-        # regenerating meta data
-        if meta is None:
-            lgr.info("Loading and caching local meta-data... might take a few seconds")
-            if not exists(cache_dir):
-                os.makedirs(cache_dir)
+        # TODO switch to load instead of generating a new index
+        idx_obj = widx.create_in(index_dir, datalad_schema)
 
-            meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                                ignore_cache=False)
-            # merge all info on datasets into a single dict per dataset
-            meta = flatten_metadata_graph(meta)
-            # extract graph, if any
-            meta = meta.get('@graph', meta)
-            # build simple queriable representation
-            if not isinstance(meta, list):
-                meta = [meta]
-
-            # sort entries by location (if present)
-            sort_keys = ('location', 'description', 'id')
-            # note with str() instead of '%' getting encoding issues...
-            meta = sorted(meta, key=lambda m: tuple("%s" % (m.get(x, ""),) for x in sort_keys))
-
-            # use pickle to store the optimized graph in the cache
-            pickle.dump(
-                # graph plus checksum from what it was built
-                (meta, ds.repo.get_hexsha()),
-                open(mcache_fname, 'wb'))
-            lgr.debug("cached meta data graph of '{}' in {}".format(ds, mcache_fname))
-
-        if report in ('', ['']):
-            report = []
-        elif report and not isinstance(report, list):
-            report = [report]
-
-        match = assure_list(match)
-        search = assure_list(search)
-        # convert all to lower case for case insensitive matching
-        search = {x.lower() for x in search}
-
-        def get_in_matcher(m):
-            """Function generator to provide closure for a specific value of m"""
-            mlower = m.lower()
-
-            def matcher(s):
-                return mlower in s.lower()
-            return matcher
-
-        matchers = [
-            re.compile(match_).search
-            if regex
-            else get_in_matcher(match_)
-            for match_ in match
-        ]
-
-        # location should be reported relative to current location
-        # We will assume that noone chpwd while we are yielding
-        ds_path_prefix = get_path_prefix(ds.path)
-
-        # So we could provide a useful message whenever there were not a single
-        # dataset with specified `--search` properties
-        observed_properties = set()
-
-        # for every meta data set
-        for mds in meta:
-            hit = False
-            hits = [False] * len(matchers)
-            matched_fields = set()
-            if not mds.get('type', mds.get('schema:type', None)) == 'Dataset':
-                # we are presently only dealing with datasets
-                continue
-            # TODO consider the possibility of nested and context/graph dicts
-            # but so far we were trying to build simple lists of dicts, as much
-            # as possible
-            if not isinstance(mds, dict):
-                raise NotImplementedError("nested meta data is not yet supported")
-
-            # manual loop for now
-            for k, v in iteritems(mds):
-                if search:
-                    k_lower = k.lower()
-                    if k_lower not in search:
-                        if observed_properties is not None:
-                            # record for providing a hint later
-                            observed_properties.add(k_lower)
-                        continue
-                    # so we have a hit, no need to track
-                    observed_properties = None
-                if isinstance(v, dict) or isinstance(v, list):
-                    v = text_type(v)
-                for imatcher, matcher in enumerate(matchers):
-                    if matcher(v):
-                        hits[imatcher] = True
-                        matched_fields.add(k)
-                if all(hits):
-                    hit = True
-                    # no need to do it longer than necessary
-                    if not report_matched:
-                        break
-
-            if hit:
-                location = mds.get('location', '.')
-                report_ = matched_fields.union(report if report else {}) \
-                    if report_matched else report
-                if report_ == ['*']:
-                    report_dict = mds
-                elif report_:
-                    report_dict = {k: mds[k] for k in report_ if k in mds}
-                    if report_ and not report_dict:
-                        lgr.debug(
-                            'meta data match for %s, but no to-be-reported '
-                            'properties (%s) found. Present properties: %s',
-                            location, ", ".join(report_), ", ".join(sorted(mds))
-                        )
+        idx = idx_obj.writer()
+        # load aggregate metadata
+        agginfo_fpath = opj(ds.path, agginfo_relpath)
+        agg_base_path = dirname(agginfo_fpath)
+        for ds_relpath, ds_info in jsonload(agginfo_fpath).items():
+            for item in ds_info:
+                # load the stored data, if there is any
+                if item.get('location', None):
+                    agg_obj_path = opj(agg_base_path, item['location'])
+                    md = jsonload(agg_obj_path)
                 else:
-                    report_dict = {}  # it was empty but not None -- asked to
-                    # not report any specific field
-                if isinstance(location, (list, tuple)):
-                    # could be that the same dataset installed into multiple
-                    # locations. For now report them separately
-                    for l in location:
-                        yield opj(ds_path_prefix, l), report_dict
-                else:
-                    yield opj(ds_path_prefix, location), report_dict
+                    agg_obj_path = None
+                    md = {}
+                agg_obj = relpath(agg_obj_path, start=agg_base_path) \
+                    if agg_obj_path else None
+                if item['type'] == 'dataset':
+                    idx.add_document(
+                        datalad__agg_obj=agg_obj,
+                        id=item['id'],
+                        path=ds_relpath,
+                        type=item['type'],
+                        # and anything else we know about, and is known to the schema
+                        **{k: v for k, v in md.items()
+                           if k in datalad_schema.names()})
+                elif item['type'] == 'files':
+                    for f in md:
+                        idx.add_document(
+                            datalad__agg_obj=agg_obj,
+                            path=f,
+                            type='file',
+                            # and anything else we know about, and is known to the schema
+                            **{k: v for k, v in md[f].items()
+                               if k in datalad_schema.names()})
 
-        if search and observed_properties is not None:
-            import difflib
-            suggestions = {
-                s: difflib.get_close_matches(s, observed_properties)
-                for s in search
-            }
-            suggestions_str = "\n ".join(
-                "%s for %s" % (", ".join(choices), s)
-                for s, choices in iteritems(suggestions) if choices
-            )
-            lgr.warning(
-                "Found no properties which matched one of the one you "
-                "specified (%s).  May be you meant one among: %s.\n"
-                "Suggestions:\n"
-                " %s",
-                ", ".join(search),
-                ", ".join(observed_properties),
-                suggestions_str if suggestions_str.strip() else "none"
-            )
+        idx.commit()
 
-    @staticmethod
-    def result_renderer_cmdline(res, cmdlineargs):
-        from datalad.ui import ui
-        if res is None:
-            res = []
-
-        format = cmdlineargs.format or 'custom'
-        if format == 'custom':
-
-            if cmdlineargs.report in ('*', ['*']) \
-                    or cmdlineargs.report_matched \
-                    or (cmdlineargs.report is not None
-                        and len(cmdlineargs.report) > 1):
-                # multiline if multiple were requested and we need to disambiguate
-                ichr = jchr = '\n'
-                fmt = ' {k}: {v}'
-            else:
-                jchr = ', '
-                ichr = ' '
-                fmt = '{v}'
-
-            anything = False
-            for location, r in res:
-                # XXX Yarik thinks that Match should be replaced with actual path to the dataset
-                ui.message('{}{}{}{}'.format(
-                    ansi_colors.color_word(location, ansi_colors.DATASET),
-                    ':' if r else '',
-                    ichr,
-                    jchr.join(
-                        [
-                            fmt.format(
-                                k=ansi_colors.color_word(k, ansi_colors.FIELD),
-                                v=pretty_bytes(r[k]))
-                            for k in sorted(r)
-                        ])))
-                anything = True
-            if not anything:
-                ui.message("Nothing to report")
-        elif format == 'json':
-            import json
-            ui.message(json.dumps(list(map(itemgetter(1), res)), indent=2))
-        elif format == 'yaml':
-            import yaml
-            lgr.warning("yaml output support is not yet polished")
-            ui.message(yaml.safe_dump(list(map(itemgetter(1), res)),
-                                      allow_unicode=True))
-
-
-_lines_regex = re.compile('[\n\r]')
-
-
-def pretty_bytes(s):
-    """Helper to provide sensible rendering for lists, dicts, and unicode
-
-    encoded into byte-stream (why really???)
-    """
-    if isinstance(s, list):
-        return ", ".join(map(pretty_bytes, s))
-    elif isinstance(s, dict):
-        return pretty_bytes(["%s=%s" % (pretty_bytes(k), pretty_bytes(v))
-                             for k, v in s.items()])
-    elif isinstance(s, text_type):
-        s_ = (os.linesep + "  ").join(_lines_regex.split(s))
-        try:
-            if PY3:
-                return s_
-            return s_.encode('utf-8')
-        except UnicodeEncodeError:
-            lgr.warning("Failed to encode value correctly. Ignoring errors in encoding")
-            # TODO: get current encoding
-            return s_.encode('utf-8', 'ignore') if isinstance(s_, string_types) else "ERROR"
-    else:
-        return str(s).encode()
+        with idx_obj.searcher() as searcher:
+            # parse the query string, default whoosh parser ATM, could be
+            # tailored with plugins
+            parser = QueryParser("description", datalad_schema)
+            # for convenience we accept any number of args-words from the
+            # shell and put them together to a single string here
+            querystr = ' '.join(assure_list(query))
+            # this gives a formal whoosh query
+            wquery = parser.parse(querystr)
+            # perform the actual search
+            # TODO I believe the hits objects also has performance stats
+            # -- we could show them ...
+            hits = searcher.search(wquery)
+            # XXX now there are to principle ways to continue.
+            # 1. we ignore everything, just takes the path of any hits
+            #    and pass it to `metadata`, which will then do whatever is
+            #    necessary and state of the art to report metadata
+            #    This is great, because it minimizes the code, but it is likely
+            #    a little slower, because annex might be called again to report
+            #    file metadata, and we also loose some specificity (e.g. the
+            #    `metadata` won't know whether we query a specific path to
+            #    get all metadata for anything underneath it, or to just get
+            #    dataset metadata, code bits:
+            #    for res in Metadata.__call__(
+            #            dataset=ds.path,
+            #            path=[r['path'] for r in hits if r.get('type', None) == 'dataset'],
+            #            # limit queries (not just results) to datasets
+            #            reporton='datasets',
+            #            recursive=False,
+            #            return_type='generator',
+            #            on_failure='ignore',
+            #            result_renderer=None):
+            #        res['action'] = 'search'
+            #        yield res
+            # 2. we pull only form aggregated metadata. No calls, fast, but
+            #    increased chances of yielding outdated results, and duplication
+            #    in code base.
+            # MIH: going with two, as only this approach offers an easy and fast
+            #      way to maintain the order of hits during processing -- and
+            #      only this allows for using whoosh features such as boosting
+            #      results and all the other fancy stuff
+            for r in hits:
+                rtype = r.get('type', None)
+                rpath = r['path']
+                aggobj_path = r.get('datalad__agg_obj', None)
+                if aggobj_path:
+                    aggobj_path = opj(agg_base_path, aggobj_path)
+                    # TODO cache the JSON content, we might hit another file in here
+                    md = jsonload(aggobj_path)
+                    if rtype == 'file':
+                        md = md[r['path']]
+                # assemble result
+                res = dict(
+                    action='search',
+                    status='ok',
+                    path=opj(ds.path, rpath),
+                    type=rtype,
+                    metadata=md,
+                    logger=lgr,
+                    refds=ds.path)
+                yield res
