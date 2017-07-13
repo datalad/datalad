@@ -14,32 +14,80 @@
 # '_', '-', and '.' -- except for JSON-LD keywords (which start with '@' and
 # will be ignored in the context of git-annex metadata
 common_key_defs = {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#",
-    "author": "schema:author",
-    "audience": "doap:audience",
-    "citation": "schema:citation",
-    "contributors": "schema:contributor",
-    "description": "schema:description",
-    "homepage": "doap:homepage",
-    "issuetracker": "doap:bug-database",
-    "tag": "schema:keywords",
-    "license": "http://www.w3.org/1999/xhtml/vocab#license",
-    "location": "schema:location",
-    "maintainer": "doap:maintainer",
-    "name": "schema:name",
-    "shortdescription": "doap:shortdesc",
+    "@vocab": {
+        'def': "http://schema.org/",
+        'descr': 'base vocabulary'},
+    "doap": {
+        'def': "http://usefulinc.com/ns/doap#",
+        'descr': 'ontology for the description of a project'},
+    "author": {
+        'def': "schema:author",
+        'descr': 'author of some resource'},
+    "audience": {
+        'def': "doap:audience",
+        'descr': 'target audience description'},
+    "citation": {
+        'def': "schema:citation",
+        'descr': 'reference to another creative work, such as a scholarly article'},
+    "contributors": {
+        'def': "schema:contributor",
+        'descr': 'secondary author of a resource'},
+    "description": {
+        'def': "schema:description",
+        'descr': 'description of a resource'},
+    "homepage": {
+        'def': "doap:homepage",
+        'descr': 'homepage associated with a resource'},
+    "issuetracker": {
+        'def': "doap:bug-database",
+        'descr': 'location of an issue tracker for a resource'},
+    "tag": {
+        'def': "schema:keywords",
+        'descr': 'tag or keyword (often multiple) for a resource'},
+    "license": {
+        'def': "http://www.w3.org/1999/xhtml/vocab#license",
+        'descr': 'licence or usage terms for a resource'},
+    "location": {
+        'def': "schema:location",
+        'descr': 'location where a resource is available'},
+    "maintainer": {
+        'def': "doap:maintainer",
+        'descr': 'maintainer of a resource'},
+    "name": {
+        'def': "schema:name",
+        'descr': 'name of a resource'},
+    "shortdescription": {
+        'def': "doap:shortdesc",
+        'descr': 'sort description or summary or title of a resource'},
     # wondering why there is no title, eh?
     # MIH: we have name and short description
     #      adding title seems superfluous
     #"title": "dcterms:title",
-    "type": "schema:type",
-    "version": "doap:Version",
-    "conformsto": "dcterms:conformsTo",
-    "fundedby": "foaf:fundedBy",
-    "haspart": "dcterms:hasPart",
-    "ispartof": "dcterms:isPartOf",
-    "isversionof": "dcterms:isVersionOf",
-    "modified": "dcterms:modified",
-    "sameas": "schema:sameAs",
+    "type": {
+        'def': "schema:type",
+        'descr': 'type or category of a resource (e.g. file, dataset)'},
+    "version": {
+        'def': "doap:Version",
+        'descr': 'version of a resource'},
+    "conformsto": {
+        'def': "dcterms:conformsTo",
+        'descr': 'reference to a standard to which the described resource conforms'},
+    "fundedby": {
+        'def': "foaf:fundedBy",
+        'descr': 'reference to an entity that provided funding for a resource'},
+    "haspart": {
+        'def': "dcterms:hasPart",
+        'descr': 'related resource that is physically/logically included in a resource'},
+    "ispartof": {
+        'def': "dcterms:isPartOf",
+        'descr': 'related resource in which a resource is physically/logically included'},
+    "isversionof": {
+        'def': "dcterms:isVersionOf",
+        'descr': 'related resource of which the a resource is a version, edition, or adaptation'},
+    "modified": {
+        'def': "dcterms:modified",
+        'descr': 'date on which the resource was changed'},
+    "sameas": {
+        'def': "schema:sameAs",
+        'descr': "URL of a web page that unambiguously indicates a resource's identity"},
 }

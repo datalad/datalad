@@ -69,7 +69,7 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
         except widx.IndexVersionError as e:  # (msg, version, release=None)
             # Raised when you try to open an index using a format that the
             # current version of Whoosh cannot read. That is, when the index
-            # you’re trying to open is either not backward or forward
+            # you're trying to open is either not backward or forward
             # compatible with this version of Whoosh.
             # we try to regenerate
             # TODO log this

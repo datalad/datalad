@@ -571,10 +571,11 @@ class Metadata(Interface):
             for k in sorted(common_key_defs):
                 if k.startswith('@'):
                     continue
-                ui.message('{}: {} ({})'.format(
+                ui.message('{}: {} ({})\n  {}'.format(
                     ac.color_word(k, ac.BOLD),
-                    common_key_defs[k],
-                    ac.color_word('builtin', ac.MAGENTA)))
+                    common_key_defs[k]['def'],
+                    ac.color_word('builtin', ac.MAGENTA),
+                    common_key_defs[k]['descr']))
             # we need to go on with the command, because further definitions
             # could be provided in each dataset
 

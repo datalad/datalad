@@ -238,6 +238,7 @@ class BuildSchema(Command):
         context = {}
         schema = {"@context": context}
         for key, val in common_key_defs.items():
+            val = val['def']
             if not (val.startswith('http://') or val.startswith('https://')):
                 # this is not a URL, hence an @id definitions that points
                 # to another schema
