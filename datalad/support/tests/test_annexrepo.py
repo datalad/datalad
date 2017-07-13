@@ -285,6 +285,11 @@ def test_AnnexRepo_get_remote_na(path):
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
     eq_(cme.exception.remote, "NotExistingRemote")
 
+    # and similar one whenever invoking with remote parameter
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', remote="NotExistingRemote")
+    eq_(cme.exception.remote, "NotExistingRemote")
+
 
 # 1 is enough to test file_has_content
 @with_batch_direct

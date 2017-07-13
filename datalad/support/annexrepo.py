@@ -97,6 +97,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
+    # 6.20160923 -- --json-progress for get
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
     GIT_ANNEX_MIN_VERSION = '6.20170220'
@@ -1120,13 +1121,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
 
     @normalize_paths
-    def get(self, files, options=None, jobs=None):
+    def get(self, files, remote=None, options=None, jobs=None):
         """Get the actual content of files
 
         Parameters
         ----------
         files : list of str
             paths to get
+        remote : str, optional
+            from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
         jobs : int, optional
@@ -1137,6 +1140,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         files : list of dict
         """
         options = options[:] if options else []
+
+        if remote:
+            if remote not in self.get_remotes():
+                raise RemoteNotAvailableError(
+                    remote=remote,
+                    cmd="get",
+                    msg="Remote is not known. Known are: %s"
+                    % (self.get_remotes(),)
+                )
+            options += ['--from', remote]
 
         # analyze provided files to decide which actually are needed to be
         # fetched
@@ -1175,12 +1188,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         #  from annex failed ones
         with cm:
             results = self._run_annex_command_json(
-                'get', args=options + fetch_files,
+                'get',
+                args=options + fetch_files,
                 jobs=jobs,
                 expected_entries=expected_downloads)
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
-        # and womit an exception of incomplete download????
+        # and vomit an exception of incomplete download????
         return results_list
 
     def _get_expected_files(self, files, expr):
@@ -2693,7 +2707,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
-    def copy_to(self, files, remote, options=None, log_online=True):
+    def copy_to(self, files, remote, options=None, jobs=None):
         """Copy the actual content of `files` to `remote`
 
         Parameters
@@ -2702,8 +2716,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             path(s) to copy
         remote: str
             name of remote to copy `files` to
-        log_online: bool
-            see get()
 
         Returns
         -------
@@ -2720,6 +2732,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if remote not in self.get_remotes():
             raise ValueError("Unknown remote '{0}'.".format(remote))
 
+        options = options[:] if options else []
+
+        # Note:
         # In case of single path, 'annex copy' will fail, if it cannot copy it.
         # With multiple files, annex will just skip the ones, it cannot deal
         # with. We'll do the same and report back what was successful
@@ -2729,39 +2744,50 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not isdir(files[0]):
                 self.get_file_key(files[0])
 
-        # Note:
-        # - annex copy fails, if `files` was a single item, that doesn't exist
-        # - files not in annex or not even in git don't yield a non-zero exit,
-        #   but are ignored
-        # - in case of multiple items, annex would silently skip those files
+        # TODO: RF -- logic is duplicated with get() -- the only difference
+        # is the verb (copy, copy) or (get, put) and remote ('here', remote)?
+        if '--key' not in options:
+            expected_copys, copy_files = self._get_expected_files(
+                files, ['--not', '--in', remote])
+        else:
+            copy_files = files
+            assert(len(files) == 1)
+            expected_copys = {files[0]: AnnexRepo.get_size_from_key(files[0])}
+
+        if not copy_files:
+            lgr.debug("No files found needing copying.")
+            return []
+
+        if len(copy_files) != len(files):
+            lgr.info("Actually getting %d files", len(copy_files))
 
         annex_options = ['--to=%s' % remote, '--json-progress']
         if options:
             annex_options.extend(shlex.split(options))
 
-        results = self._run_annex_command_json(
-            'copy',
-            # My not finished in enh-copy-progress version
-            #     args=annex_options + files,
-            #     # jobs TODO
-            #     #log_stdout=True, log_stderr=not log_online,
-            #     #log_online=log_online, expect_stderr=True
-            # )
-            # #results_list = list(results)
-            #
-            # return [e['file'] for e in results if e['success']]
-            args=annex_options,
-            #log_stdout=True, log_stderr=not log_online,
-            #log_online=log_online, expect_stderr=True
-        )
-        results = list(results)
+        cm = swallow_logs() \
+            if lgr.getEffectiveLevel() > logging.DEBUG \
+            else nothing_cm()
+        # TODO: provide more meaningful message (possibly aggregating 'note'
+        #  from annex failed ones
+        with cm:
+            results = self._run_annex_command_json(
+                'copy',
+                args=annex_options + copy_files,
+                jobs=jobs,
+                expected_entries=expected_copys
+                #log_stdout=True, log_stderr=not log_online,
+                #log_online=log_online, expect_stderr=True
+            )
+        results_list = list(results)
+        # XXX this is the only logic different ATM from get
         # check if any transfer failed since then we should just raise an Exception
         # for now to guarantee consistent behavior with non--json output
         # see https://github.com/datalad/datalad/pull/1349#discussion_r103639456
         from operator import itemgetter
-        failed_copies = [e['file'] for e in results if not e['success']]
+        failed_copies = [e['file'] for e in results_list if not e['success']]
         good_copies = [
-            e['file'] for e in results
+            e['file'] for e in results_list
             if e['success'] and
                e.get('note', '').startswith('to ')  # transfer did happen
         ]
