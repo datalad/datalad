@@ -260,7 +260,11 @@ class Search(Interface):
             # perform the actual search
             # TODO I believe the hits objects also has performance stats
             # -- we could show them ...
-            hits = searcher.search(wquery, limit=max_nresults if max_nresults > 0 else None)
+            hits = searcher.search(
+                wquery,
+                # TODO terms that actually matched could be reported
+                #terms=True,
+                limit=max_nresults if max_nresults > 0 else None)
             # XXX now there are to principle ways to continue.
             # 1. we ignore everything, just takes the path of any hits
             #    and pass it to `metadata`, which will then do whatever is
@@ -299,6 +303,8 @@ class Search(Interface):
                     md = jsonload(aggobj_path)
                     if rtype == 'file':
                         md = md[r['path']]
+                # TODO report matched terms in the result
+                #matched = r.matched_terms()
                 # assemble result
                 res = dict(
                     action='search',
@@ -306,6 +312,7 @@ class Search(Interface):
                     path=opj(ds.path, rpath),
                     type=rtype,
                     metadata=md,
+                    #matched=matched,
                     logger=lgr,
                     refds=ds.path)
                 yield res
