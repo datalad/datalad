@@ -250,7 +250,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
 
 @with_tree(tree={
-
     'study': {
         'show': {
             'WG33': {
@@ -259,7 +258,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/RIBX">dir1 / file2.nii</a>
                                     <a href="/file/show/GSRD">file1b.nii</a>
-
                                     %s
                                   </body></html>""" % _PLUG_HERE,
             },
@@ -273,7 +271,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
         }
     },
-
     'file': {
         'show': {
             'JX5V': {
@@ -293,7 +290,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
 
         },
-
         'download': {
             'file1.nii': "content of file1.nii is different",
             'file1b.nii': "content of file1b.nii",
