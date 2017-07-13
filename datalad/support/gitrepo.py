@@ -1159,35 +1159,19 @@ class GitRepo(RepoInterface):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self, with_refs_only=False, with_urls_only=False):
+    def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
 
         Parameters
         ----------
-        with_refs_only : bool, optional
-          return only remotes with any refs.  E.g. annex special remotes
-          would not have any refs
+        with_urls_only : bool, optional
+          return only remotes which have urls
 
         Returns
         -------
         remotes : list of str
           List of names of the remotes
         """
-
-        # Note: This still uses GitPython and therefore might cause a gitpy.Repo
-        # instance to be created.
-        remotes = []
-        if with_refs_only:
-            # older versions of GitPython might not tolerate remotes without
-            # any references at all, so we need to catch
-            for remote in self.repo.remotes:
-                try:
-                    if len(remote.refs):
-                        remotes.append(remote.name)
-                except AssertionError as exc:
-                    if "not have any references" not in str(exc):
-                        # was some other reason
-                        raise
 
         # Note: read directly from config and spare instantiation of gitpy.Repo
         # since we need this in AnnexRepo constructor. Furthermore gitpy does it
@@ -1197,7 +1181,7 @@ class GitRepo(RepoInterface):
 
         self.config.reload()
         remotes = unique([x[7:] for x in self.config.sections()
-                          if x.startswith("remote.")] + remotes)
+                          if x.startswith("remote.")])
 
         if with_urls_only:
             remotes = [
