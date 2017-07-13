@@ -27,6 +27,7 @@ from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
 from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_key_defs
 from datalad.metadata.metadata import agginfo_relpath
@@ -144,6 +145,12 @@ class Search(Interface):
             dest='force_reindex',
             action='store_true',
             doc="tell me"),
+        max_nresults=Parameter(
+            args=("--max-nresults",),
+            doc="""maxmimum number of search results to report. Setting this
+            to 0 will report any search matches, and make searching substantially
+            slower on large metadata sets.""",
+            constraints=EnsureInt()),
     )
 
     @staticmethod
@@ -151,7 +158,8 @@ class Search(Interface):
     @eval_results
     def __call__(query,
                  dataset=None,
-                 force_reindex=False):
+                 force_reindex=False,
+                 max_nresults=20):
         from whoosh import fields as wf
         from whoosh.qparser import QueryParser
 
@@ -252,7 +260,7 @@ class Search(Interface):
             # perform the actual search
             # TODO I believe the hits objects also has performance stats
             # -- we could show them ...
-            hits = searcher.search(wquery)
+            hits = searcher.search(wquery, limit=max_nresults if max_nresults > 0 else None)
             # XXX now there are to principle ways to continue.
             # 1. we ignore everything, just takes the path of any hits
             #    and pass it to `metadata`, which will then do whatever is
