@@ -28,8 +28,6 @@ from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-# TODO move next one in here when possible after RF
-from datalad.metadata import get_metadata_type
 from datalad.metadata.definitions import common_key_defs
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
@@ -56,6 +54,41 @@ valid_key = re.compile(r'^[0-9a-z._-]+$')
 
 db_relpath = opj('.datalad', 'metadata', 'dataset.json')
 agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
+
+
+def get_metadata_type(ds, guess=False):
+    """Return the metadata type(s)/scheme(s) of a dataset
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to be inspected
+    guess : bool
+      Whether to try to auto-detect the type if no metadata type setting is
+      found. All supported metadata schemes are tested in alphanumeric order.
+
+    Returns
+    -------
+    list(str)
+      Metadata type labels or an empty list if no type setting is found and
+      optional auto-detection yielded no results
+    """
+    cfg_key = 'datalad.metadata.nativetype'
+    if cfg_key in ds.config:
+        return ds.config[cfg_key]
+
+    mtypes = []
+    if guess:
+        # keep local, who knows what some parsers might pull in
+        from . import parsers
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
+            pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
+            if pmod.MetadataParser(ds).has_metadata():
+                lgr.debug('Predicted presence of "%s" meta data', mtype)
+                mtypes.append(mtype)
+            else:
+                lgr.debug('No evidence for "%s" meta data', mtype)
+    return mtypes
 
 
 def _parse_argspec(args):

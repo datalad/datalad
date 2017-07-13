@@ -9,26 +9,22 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
-import logging
-import pickle
 import os
 
-from mock import patch
 from operator import itemgetter
 from os.path import join as opj
 
-from datalad.api import Dataset, aggregate_metadata, install
-from datalad.metadata import get_metadata_type, get_metadata
-from datalad.metadata import _cached_load_document
-from datalad.metadata import _sanitize_annex_description
-from datalad.utils import swallow_logs
+from datalad.api import Dataset
+from datalad.api import aggregate_metadata
+from datalad.api import install
+from datalad.api import search
+from datalad.api import metadata
+from datalad.metadata.metadata import get_metadata_type
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.utils import assure_list
-from datalad.dochelpers import exc_str
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import slow
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -38,13 +34,6 @@ from datalad.support.annexrepo import AnnexRepo
 from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises
 
-try:
-    import pyld
-    # do here to prevent pyld from being needed
-except ImportError as exc:
-    raise SkipTest(exc_str(exc))
-
-from datalad.api import search
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -92,48 +81,7 @@ def test_get_multiple_metadata_types(path):
         ['bids', 'frictionless_datapackage'])
 
 
-@with_tree(tree={
-    'origin': {
-        'dataset_description.json': """
-{
-    "Name": "the mother"
-}""",
-    'sub': {
-        'dataset_description.json': """
-{
-    "Name": "child"
-}"""}}})
-def test_basic_metadata(path):
-    ds = Dataset(opj(path, 'origin'))
-    meta = get_metadata(ds)
-    assert_equal(sorted(meta[0].keys()),
-                 ['@context', 'dcterms:conformsTo'])
-    ds.create(force=True, save=False)
-    # with subdataset
-    sub = ds.create('sub', force=True)
-    ds.save()
-    meta = get_metadata(ds)
-    assert_equal(
-        sorted(meta[0].keys()),
-        ['@context', '@id', 'availableFrom', 'dcterms:conformsTo',
-         'dcterms:modified', 'type', 'version'])
-    assert_equal(meta[0]['type'], 'Dataset')
-    # clone and get relationship info in metadata
-    sibling = install(
-        opj(path, 'sibling'), source=opj(path, 'origin'),
-        result_xfm='datasets', return_type='item-or-list')
-    sibling_meta = get_metadata(sibling)
-    assert_equal(sibling_meta[0]['@id'], ds.id)
-    # origin should learn about the clone
-    sibling.repo.push(remote='origin', refspec='git-annex')
-    meta = get_metadata(ds)
-    assert_equal([m['@id'] for m in meta[0]['availableFrom']],
-                 [m['@id'] for m in sibling_meta[0]['availableFrom']])
-    meta = get_metadata(ds, guess_type=True)
-    # without aggregation there is not trace of subdatasets in the metadata
-    assert_not_in('dcterms:hasPart', meta[0])
-
-
+# TODO see what can be kept from this one
 @slow  # 37.1036s
 @skip_if_no_network
 @with_tree(tree=_dataset_hierarchy_template)
@@ -299,83 +247,18 @@ def test_aggregation(path):
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
 
-@skip_if_no_network
-@with_tree(tree=_dataset_hierarchy_template)
-def test_aggregate_with_missing_or_duplicate_id(path):
-    # a hierarchy of three (super/sub)datasets, each with some native metadata
-    ds = Dataset(opj(path, 'origin')).create(force=True)
-    subds = ds.create('sub', force=True)
-    subds.create('subsub', force=True)
-    # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second native set for the topmost dataset
-    aggregate_metadata(ds, guess_native_type=True, recursive=True)
-    # no only ask the top superdataset, no recursion, just reading from the cache
-    meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
-    # and we know nothing subsub
-    for name in ('grandchild_äöü東',):
-        assert_true(sum([s.get('name', '') == assure_unicode(name) for s in meta]))
-
-    # but search should not fail
-    with swallow_outputs():
-        res1 = list(search('.', regex=True, dataset=ds))
-    assert res1
-
-    # and let's see now if we wouldn't fail if dataset is duplicate if we
-    # install the same dataset twice
-    subds_clone = ds.install(
-        source=subds.path, path="subds2",
-        result_xfm='datasets', return_type='item-or-list')
-    with swallow_outputs():
-        res2 = list(search('.', regex=True, dataset=ds))
-    # TODO: bring back when meta data RF is complete with aggregate
-    #assert_equal(len(res1) + 1, len(res2))
-    #assert_equal(
-    #    set(map(itemgetter(0), res1)).union({subds_clone.path}),
-    #    set(map(itemgetter(0), res2)))
-
-
-@with_tempfile(mkdir=True)
-def test_cached_load_document(tdir):
-
-    target_schema = {'buga': 'duga'}
-    cache_filename = opj(tdir, "crap")
-
-    with open(cache_filename, 'wb') as f:
-        f.write("CRAPNOTPICKLED".encode())
-
-    with patch('datalad.support.network.get_url_cache_filename',
-               return_value=cache_filename):
-        with patch('pyld.jsonld.load_document', return_value=target_schema), \
-            swallow_logs(new_level=logging.WARNING) as cml:
-            schema = _cached_load_document("http://schema.org/")
-            assert_equal(schema, target_schema)
-            cml.assert_logged("cannot load cache from", level="WARNING")
-
-        # but now pickled one should have been saved
-        assert_equal(pickle.load(open(cache_filename, 'rb')), target_schema)
-
-        # and if we reload it -- it should be all fine without warnings
-        # should come from cache so no need to overload load_document
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            schema = _cached_load_document("http://schema.org/")
-            assert_equal(schema, target_schema)
-            assert_not_in("cannot load cache from", cml.out)
-
-
 @with_tempfile(mkdir=True)
 def test_ignore_nondatasets(path):
     # we want to ignore the version/commits for this test
     def _kill_time(meta):
         for m in meta:
-            for k in ('version', 'dcterms:modified'):
+            for k in ('version', 'shasum'):
                 if k in m:
                     del m[k]
         return meta
 
     ds = Dataset(path).create()
-    meta = _kill_time(get_metadata(ds))
+    meta = _kill_time(ds.metadata(reporton='datasets'))
     n_subm = 0
     # placing another repo in the dataset has no effect on metadata
     for cls, subpath in ((GitRepo, 'subm'), (AnnexRepo, 'annex_subm')):
@@ -386,16 +269,9 @@ def test_ignore_nondatasets(path):
         r.add('test')
         r.commit('some')
         assert_true(Dataset(subm_path).is_installed())
-        assert_equal(meta, _kill_time(get_metadata(ds)))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
         # making it a submodule has no effect either
         ds.add(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
-        assert_equal(meta, _kill_time(get_metadata(ds)))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
         n_subm += 1
-
-
-def test_sanitize_annex_description():
-    assert_equal(_sanitize_annex_description("[d-a]"), "d-a")
-    assert_equal(_sanitize_annex_description("d-a"), "d-a")
-    assert_equal(_sanitize_annex_description("lo c [d-a]"), "lo c")
-    assert_equal(_sanitize_annex_description("lo c"), "lo c")
