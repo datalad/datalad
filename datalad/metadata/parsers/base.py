@@ -11,6 +11,7 @@
 from os.path import lexists
 from os.path import join as opj
 from datalad.metadata import _get_base_dataset_metadata
+# needed to guarantee that this method is bound to the Dataset class
 from datalad.api import get
 
 
@@ -40,7 +41,6 @@ class BaseMetadataParser(object):
         the core meta data source"""
         # default implementation, override if _core_metadata_filenames is not
         # used
-        dspath = self.ds.path
         for r in self.ds.get(self._core_metadata_filenames):
             if r['status'] in ('ok', 'notneeded'):
                 yield r['path']
