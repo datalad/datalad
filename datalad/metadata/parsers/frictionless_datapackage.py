@@ -49,8 +49,10 @@ class MetadataParser(BaseMetadataParser):
     }
 
     def _get_metadata(self, ds_identifier, meta, full):
-        foreign = jsonload(
-            self.get_core_metadata_filenames()[0])
+        core_meta_files = list(self.get_core_metadata_files())
+        if not core_meta_files:
+            return meta
+        foreign = jsonload(core_meta_files[0])
 
         for term in self._key2stdkey:
             if term in foreign:

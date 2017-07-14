@@ -14,23 +14,25 @@ from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
+from datalad.tests.utils import assert_raises
+from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'dataset_description.json': '{}'})
 def test_has_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(),
+    assert_equal(list(p.get_core_metadata_files()),
                  [opj(path, 'dataset_description.json')])
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_false(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(), [])
+    assert_raises(IncompleteResultsError, list, p.get_core_metadata_files())
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -51,7 +53,7 @@ def test_has_no_metadata(path):
 """})
 def test_get_metadata(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_global_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
@@ -84,7 +86,7 @@ description
 """})
 def test_get_metadata_with_description_and_README(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_global_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
@@ -108,7 +110,7 @@ A very detailed
 description с юникодом
 """})
 def test_get_metadata_with_README(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_global_metadata()
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(

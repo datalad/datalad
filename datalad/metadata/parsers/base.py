@@ -8,8 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parser base class"""
 
-from os.path import exists, join as opj
+from os.path import lexists
+from os.path import join as opj
 from datalad.metadata import _get_base_dataset_metadata
+from datalad.api import get
 
 
 class BaseMetadataParser(object):
@@ -30,20 +32,24 @@ class BaseMetadataParser(object):
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
         # default implementation, override with more efficient, if possible
-        return len(self.get_core_metadata_filenames()) > 0
+        fnames = [opj(self.ds.path, f) for f in self._core_metadata_filenames]
+        return len([f for f in fnames if lexists(f)]) > 0
 
-    def get_core_metadata_filenames(self):
-        """List of absolute filenames making up the core meta data source"""
+    def get_core_metadata_files(self):
+        """Obtain (if needed) and return list of absolute filenames making up
+        the core meta data source"""
         # default implementation, override if _core_metadata_filenames is not
         # used
         dspath = self.ds.path
-        fnames = [opj(dspath, f) for f in self._core_metadata_filenames]
-        return [f for f in fnames if exists(f)]
+        for r in self.ds.get(self._core_metadata_filenames):
+            if r['status'] in ('ok', 'notneeded'):
+                yield r['path']
 
-    def get_metadata_filenames(self):
-        """List of absolute filenames making up the full meta data source"""
+    def get_metadata_files(self):
+        """Obtain (if needed) and return list of absolute filenames making up
+        the full meta data source"""
         # default implementation: core == full
-        return self.get_core_metadata_filenames()
+        return self.get_core_metadata_files()
 
     def get_metadata(self, dsid=None, full=False):
         """Returns JSON-LD compliant meta data structure

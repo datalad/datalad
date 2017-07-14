@@ -13,6 +13,8 @@ from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.datacite import MetadataParser
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import assert_raises
+from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'.datalad': {'meta.datacite.xml': """\
@@ -60,7 +62,7 @@ from datalad.tests.utils import with_tree
 </resource>
 """}})
 def test_get_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_global_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

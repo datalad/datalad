@@ -97,8 +97,11 @@ class MetadataParser(BaseMetadataParser):
     _core_metadata_filenames = [opj('.datalad', 'meta.datacite.xml')]
 
     def _get_metadata(self, ds_identifier, meta, full):
+        core_meta_files = list(self.get_core_metadata_files())
+        if not core_meta_files:
+            return meta
 
-        fname = self.get_core_metadata_filenames()[0]
+        fname = core_meta_files[0]
         # those namespaces are a b.ch
         # TODO: avoid reading file twice
         namespaces = dict([

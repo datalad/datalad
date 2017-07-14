@@ -65,8 +65,11 @@ class MetadataParser(BaseMetadataParser):
     }
 
     def _get_metadata(self, ds_identifier, meta, full):
+        core_meta_files = list(self.get_core_metadata_files())
+        if not core_meta_files:
+            return meta
         spec = email.parser.Parser().parse(
-            open(self.get_core_metadata_filenames()[0]),
+            open(core_meta_files[0]),
             headersonly=True)
 
         for term in self._key2stdkey:

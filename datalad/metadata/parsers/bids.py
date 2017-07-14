@@ -31,7 +31,7 @@ class MetadataParser(BaseMetadataParser):
     }
 
     def _get_metadata(self, ds_identifier, meta, full):
-        core_meta_files = self.get_core_metadata_filenames()
+        core_meta_files = list(self.get_core_metadata_files())
         if not core_meta_files:
             return meta
         bids = jsonload(core_meta_files[0])

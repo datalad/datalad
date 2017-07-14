@@ -14,14 +14,16 @@ from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.datalad_rfc822 import MetadataParser
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
+from datalad.tests.utils import assert_raises
+from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'.datalad': {'meta.rfc822': ''}})
 def test_has_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(),
+    assert_equal(list(p.get_core_metadata_files()),
                  [opj(path, '.datalad', 'meta.rfc822')])
 
 
@@ -30,7 +32,7 @@ def test_has_no_metadata(path):
     ds = Dataset(path)
     p = MetadataParser(ds)
     assert_false(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(), [])
+    assert_raises(IncompleteResultsError, list, p.get_core_metadata_files())
 
 
 @with_tree(tree={'.datalad': {'meta.rfc822': """\
@@ -59,7 +61,8 @@ DOI: 10.5281/zenodo.48421
 """}})
 def test_get_metadata(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
     meta = MetadataParser(ds).get_global_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

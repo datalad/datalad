@@ -14,23 +14,25 @@ from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.frictionless_datapackage import MetadataParser
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
+from datalad.tests.utils import assert_raises
+from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'datapackage.json': '{"name": "some"}'})
 def test_has_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
-    assert_equal(p.get_metadata_filenames(),
+    assert_equal(list(p.get_metadata_files()),
                  [opj(path, 'datapackage.json')])
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_false(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(), [])
+    assert_raises(IncompleteResultsError, list, p.get_core_metadata_files())
 
 
 # bits from examples and the specs
@@ -58,7 +60,7 @@ def test_has_no_metadata(path):
 """})
 def test_get_metadata(path):
 
-    ds = Dataset(path)
+    ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     meta = p.get_global_metadata()
     assert_equal(
