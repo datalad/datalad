@@ -13,10 +13,12 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj, exists
+from os.path import normpath
 from os.path import dirname
 from os.path import relpath
 import sys
 from six import reraise
+from six import string_types
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -31,9 +33,11 @@ from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_key_defs
 from datalad.metadata.metadata import agginfo_relpath
+from datalad.metadata.metadata import Metadata
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
+from datalad.utils import assure_unicode
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.json_py import load as jsonload
 from datalad.ui import ui
@@ -45,8 +49,24 @@ from datalad.ui import ui
 whoosh_field_types = {
     "id": "ID",
     "modified": "DATETIME",
-    "tag": "KEYWORD",
 }
+
+
+def _add_document(idx, datalad__agg_obj, **kwargs):
+    idx.add_document(
+        datalad__agg_obj=datalad__agg_obj,
+        **{assure_unicode(k):
+           assure_unicode(v) if isinstance(v, string_types) else v
+           for k, v in kwargs.items()})
+
+
+def _meta2index_dict(meta, schema):
+    return {
+        k: ', '.join(assure_unicode(i) for i in v)
+        if isinstance(v, list) else assure_unicode(v)
+        for k, v in (meta or {}).items()
+        if k in schema.names()
+    }
 
 
 def _get_search_index(index_dir, ds, schema, force_reindex,
@@ -90,6 +110,26 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
 
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer()
+    # load metadata of the base dataset
+    # TODO think about when to obtained files without content
+    # via `get`
+    for res in Metadata.__call__(
+            dataset=ds,
+            reporton='all',
+            recursive=False,
+            return_type='generator',
+            on_failure='ignore',
+            result_renderer=None):
+        _add_document(
+            idx,
+            # make result generation realize that we got this from the real
+            # dataset
+            datalad__agg_obj=False,
+            id=ds.id if res['type'] == 'dataset' else None,
+            path=relpath(res['path'], start=ds.path),
+            type=res['type'],
+            # and anything else we know about, and is known to the schema
+            **_meta2index_dict(res.get('metadata', None), schema))
     # load aggregate metadata
     for ds_relpath, ds_info in jsonload(agginfo_fpath).items():
         for item in ds_info:
@@ -103,23 +143,23 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
             agg_obj = relpath(agg_obj_path, start=agg_base_path) \
                 if agg_obj_path else None
             if item['type'] == 'dataset':
-                idx.add_document(
+                _add_document(
+                    idx,
                     datalad__agg_obj=agg_obj,
                     id=item['id'],
                     path=ds_relpath,
                     type=item['type'],
                     # and anything else we know about, and is known to the schema
-                    **{k: v for k, v in md.items()
-                       if k in schema.names()})
+                    **_meta2index_dict(md, schema))
             elif item['type'] == 'files':
                 for f in md:
-                    idx.add_document(
+                    _add_document(
+                        idx,
                         datalad__agg_obj=agg_obj,
                         path=f,
                         type='file',
                         # and anything else we know about, and is known to the schema
-                        **{k: v for k, v in md[f].items()
-                           if k in schema.names()})
+                        **_meta2index_dict(md[f], schema))
     idx.commit()
     return idx_obj
 
@@ -161,7 +201,7 @@ class Search(Interface):
                  force_reindex=False,
                  max_nresults=20):
         from whoosh import fields as wf
-        from whoosh.qparser import QueryParser
+        from whoosh import qparser as qparse
 
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
@@ -251,7 +291,14 @@ class Search(Interface):
         with idx_obj.searcher() as searcher:
             # parse the query string, default whoosh parser ATM, could be
             # tailored with plugins
-            parser = QueryParser("description", datalad_schema)
+            parser = qparse.MultifieldParser(
+                [k for k in common_key_defs if not k.startswith('@')] +
+                ['id', 'path', 'type'],
+                datalad_schema)
+            # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
+            # upstream
+            parser.add_plugin(qparse.FuzzyTermPlugin())
+            parser.add_plugin(qparse.GtLtPlugin())
             # for convenience we accept any number of args-words from the
             # shell and put them together to a single string here
             querystr = ' '.join(assure_list(query))
@@ -262,8 +309,7 @@ class Search(Interface):
             # -- we could show them ...
             hits = searcher.search(
                 wquery,
-                # TODO terms that actually matched could be reported
-                #terms=True,
+                terms=True,
                 limit=max_nresults if max_nresults > 0 else None)
             # XXX now there are to principle ways to continue.
             # 1. we ignore everything, just takes the path of any hits
@@ -293,11 +339,28 @@ class Search(Interface):
             #      way to maintain the order of hits during processing -- and
             #      only this allows for using whoosh features such as boosting
             #      results and all the other fancy stuff
+            # check for which hits we need to query for metadata from the base dataset
+            # (nothing is aggregated for it)
+            qpaths = [r['path'] for r in hits
+                      if r.get('datalad__agg_obj', None) is False and
+                      r['type'] == 'file']
+            file_results = {
+                r['path']: r
+                for r in Metadata.__call__(
+                    dataset=ds,
+                    reporton='files',
+                    recursive=False,
+                    return_type='generator',
+                    on_failure='ignore',
+                    result_renderer=None)}
             aggobj_cache = {}
             for r in hits:
                 rtype = r.get('type', None)
                 rpath = r['path']
+                rabspath = normpath(opj(ds.path, rpath))
                 aggobj_path = r.get('datalad__agg_obj', None)
+                # terms that actually matched the query
+                matched = {k: assure_unicode(v) for k, v in r.matched_terms()}
                 if aggobj_path:
                     aggobj_path = opj(agg_base_path, aggobj_path)
                     # cache the JSON content, we might hit another file in here
@@ -305,16 +368,37 @@ class Search(Interface):
                     aggobj_cache[aggobj_path] = md
                     if rtype == 'file':
                         md = md[r['path']]
-                # TODO report matched terms in the result
-                #matched = r.matched_terms()
+                elif aggobj_path is False:
+                    # this is either the base dataset or a file in it
+                    if rtype == 'dataset':
+                        assert rabspath == ds.path
+                        res = Metadata.__call__(
+                            dataset=ds,
+                            reporton='datasets',
+                            recursive=False,
+                            return_type='item-or-list',
+                            on_failure='ignore',
+                            result_renderer=None)
+                        assert not isinstance(res, list)
+                        res.update(dict(
+                            action='search',
+                            status='ok',
+                            matched=matched,
+                            logger=lgr))
+                        yield res
+                        continue
+                    else:
+                        md = file_results.get(rabspath, {}).get('metadata', None)
+                else:
+                    md = None
                 # assemble result
                 res = dict(
                     action='search',
                     status='ok',
-                    path=opj(ds.path, rpath),
+                    path=rabspath,
                     type=rtype,
                     metadata=md,
-                    #matched=matched,
+                    matched=matched,
                     logger=lgr,
                     refds=ds.path)
                 yield res

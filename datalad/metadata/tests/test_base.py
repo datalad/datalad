@@ -11,8 +11,8 @@
 
 import os
 
-from operator import itemgetter
 from os.path import join as opj
+from os.path import relpath
 
 from datalad.api import Dataset
 from datalad.api import aggregate_metadata
@@ -22,16 +22,18 @@ from datalad.api import metadata
 from datalad.metadata.metadata import get_metadata_type
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
-from datalad.utils import assure_list
 from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import slow
+from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import eq_
+from datalad.tests.utils import ok_clean_git
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose import SkipTest
 from nose.tools import assert_true, assert_equal, assert_raises
 
 
@@ -81,50 +83,62 @@ def test_get_multiple_metadata_types(path):
         ['bids', 'frictionless_datapackage'])
 
 
-# TODO see what can be kept from this one
-@slow  # 37.1036s
-@skip_if_no_network
+def _compare_metadata_helper(origres, compds):
+    for ores in origres:
+        rpath = relpath(ores['path'], ores['refds'])
+        print(rpath)
+        cres = compds.metadata(
+            rpath,
+            reporton='{}s'.format(ores['type']))
+        if ores['type'] == 'file':
+            # TODO implement file based lookup
+            continue
+        assert_result_count(cres, 1)
+        cres = cres[0]
+        assert_dict_equal(ores['metadata'], cres['metadata'])
+        if ores['type'] == 'dataset':
+            for i in ('id', ):
+                eq_(ores[i], cres[i])
+
+
+@slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
+    ds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
+                  where='dataset')
     subds = ds.create('sub', force=True)
+    subds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
     subsubds = subds.create('subsub', force=True)
-    # aggregate from bottom to top, guess native data, no compacting of graph
-    # should yield 6 meta data sets, one implicit, and one native per dataset
-    # and a second natiev set for the topmost dataset
-    aggregate_metadata(ds, guess_native_type=True, recursive=True)
-    # no only ask the top superdataset, no recursion, just reading from the cache
-    meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
-    assert_equal(len(meta), 10)
-    # same schema
-    assert_equal(
-        10,
-        sum([s.get('@context', {'@vocab': None})['@vocab'] == 'http://schema.org/'
-             for s in meta]))
+    subsubds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
+    ds.add('.', recursive=True)
+    ok_clean_git(ds.path)
+    # aggregate metadata from all subdatasets into any superdataset, including
+    # intermediate ones
+    res = aggregate_metadata(ds, recursive=True)
+    # we get success report for both superdatasets, and they get saved
+    assert_result_count(res, 4)
+    assert_result_count(res, 2, status='ok', action='aggregate_metadata')
+    assert_result_count(res, 2, status='ok', action='save')
+    # nice and tidy
+    ok_clean_git(ds.path)
+    # store clean direct result
+    origres = ds.metadata(recursive=True)
+    # basic sanity check
+    assert_result_count(origres, 7)
+    assert_result_count(origres, 3, type='dataset')
+    assert_result_count(origres, 4, type='file')
     # three different IDs
-    assert_equal(3, len(set([s.get('@id') for s in meta])))
+    assert_equal(3, len(set([s['id'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
-        assert_true(sum([s.get('name', None) == assure_unicode(name) for s in meta]))
-    #print(meta)
-    assert_equal(
-        # first implicit, then two natives, then aggregate
-        meta[3]['dcterms:hasPart']['@id'],
-        subds.id)
-    success = False
-    for m in meta:
-        p = m.get('dcterms:hasPart', {})
-        if p.get('@id', None) == subsubds.id:
-            assert_equal(opj('sub', 'subsub'), p.get('location', None))
-            success = True
-    assert_true(success)
-
-    # save the toplevel dataset only (see below)
-    ds.save('with aggregated meta data')
+        assert_true(
+            sum([s['metadata']['name'] == assure_unicode(name) for s in origres
+                 if s['type'] == 'dataset']))
 
     # now clone the beast to simulate a new user installing an empty dataset
     clone = install(
@@ -133,116 +147,37 @@ def test_aggregation(path):
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
-    # get fresh meta data, the implicit one for the top-most datasets should
-    # differ, but the rest not
-    clonemeta = get_metadata(
-        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
+    # get fresh meta data
+    cloneres = clone.metadata()
+    # basic sanity check
+    assert_result_count(cloneres, 3)
+    assert_result_count(cloneres, 1, type='dataset')
+    assert_result_count(cloneres, 2, type='file')
 
-    for m in clonemeta:
-        # could be a list or a single entry
-        for r in assure_list(m.get('availableFrom', []), iterate=False):
-            # if there is a description, it shouldn't have any [ in it
-            # (enabled state should have been pruned, local remote name pruned)
-            assert_not_in('[', r.get('description', ''))
+    # now loop over the previous results from the direct metadata query of
+    # origin and make sure we get the extact same stuff from the clone
+    _compare_metadata_helper(origres, clone)
 
-    # make sure the implicit md for the topmost come first
-    assert_equal(clonemeta[0]['@id'], clone.id)
-    assert_equal(clonemeta[0]['@id'], ds.id)
-    assert_equal(clone.repo.get_hexsha(), ds.repo.get_hexsha())
-    assert_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
-    # all but the implicit is identical
-    assert_equal(clonemeta[1:], meta[1:])
-    # the implicit md of the clone should list a dataset ID for its subds,
-    # although it has not been obtained!
-    assert_equal(
-        clonemeta[3]['dcterms:hasPart']['@id'],
-        subds.id)
-
-    # now obtain a subdataset in the clone and the IDs should be updated
-    clone.install('sub')
-    partial = get_metadata(clone, guess_type=False, ignore_cache=True)
-    # ids don't change
-    assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
-    # datasets are properly connected
-    assert_equal(partial[1]['dcterms:hasPart']['@id'],
-                 partial[2]['@id'])
+    # now obtain a subdataset in the clone, should make no difference
+    assert_status('ok', clone.install('sub', result_xfm=None, return_type='list'))
+    _compare_metadata_helper(origres, clone)
 
     # query smoke test
-    if os.environ.get('DATALAD_TESTS_NONETWORK'):
-        raise SkipTest
+    assert_result_count(clone.search('mother*'), 1)
+    assert_result_count(clone.search('MoTHER*'), 1)  # case insensitive
 
-    assert_equal(len(list(clone.search('mother'))), 1)
-    assert_equal(len(list(clone.search('MoTHER'))), 1)  # case insensitive
-
-    child_res = list(clone.search('child'))
-    assert_equal(len(child_res), 2)
-
-    # little helper to match names
-    def assert_names(res, names, path=clone.path):
-        assert_equal(list(map(itemgetter(0), res)),
-                     [opj(path, n) for n in names])
-    # should yield (location, report) tuples
-    assert_names(child_res, ['sub', 'sub/subsub'])
-
-    # test searching among specified properties only
-    assert_names(clone.search('i', search='name'), ['sub', 'sub/subsub'])
-    assert_names(clone.search('i', search='keywords'), ['.'])
-    # case shouldn't matter
-    assert_names(clone.search('i', search='Keywords'), ['.'])
-    assert_names(clone.search('i', search=['name', 'keywords']),
-                 ['.', 'sub', 'sub/subsub'])
-
-    # without report_matched, we are getting none of the fields
-    assert(all([not x for x in map(itemgetter(1), child_res)]))
-    # but we would get all if asking for '*'
-    assert(all([len(x) >= 9
-                for x in map(itemgetter(1),
-                             list(clone.search('child', report='*')))]))
-    # but we would get only the matching name if we ask for report_matched
-    assert_equal(
-        set(map(lambda x: tuple(x[1].keys()),
-                clone.search('child', report_matched=True))),
-        set([('name',)])
-    )
-    # and the additional field we might have asked with report
-    assert_equal(
-        set(map(lambda x: tuple(sorted(x[1].keys())),
-                clone.search('child', report_matched=True,
-                             report=['schema:type']))),
-        set([('name', 'schema:type')])
-    )
-    # and if we ask report to be 'empty', we should get no fields
-    child_res_empty = list(clone.search('child', report=''))
-    assert_equal(len(child_res_empty), 2)
-    assert_equal(
-        set(map(lambda x: tuple(x[1].keys()), child_res_empty)),
-        set([tuple()])
-    )
-
-    # more tests on returned paths:
-    assert_names(clone.search('datalad'), ['.', 'sub', 'sub/subsub'])
-    # if we clone subdataset and query for value present in it and its kid
-    clone_sub = clone.install(
-        'sub',
-        result_xfm='datasets', return_type='item-or-list')
-    assert_names(clone_sub.search('datalad'), ['.', 'subsub'], clone_sub.path)
+    child_res = clone.search('*child*')
+    assert_result_count(child_res, 2)
+    for r in child_res:
+        eq_(r['matched']['name'], r['metadata']['name'])
+        print(r)
 
     # Test 'and' for multiple search entries
-    assert_equal(len(list(clone.search(['child', 'bids']))), 2)
-    assert_equal(len(list(clone.search(['child', 'subsub']))), 1)
-    assert_equal(len(list(clone.search(['bids', 'sub']))), 2)
+    assert_result_count(clone.search(['*child*', '*bids*']), 2)
+    assert_result_count(clone.search(['*child*', '*subsub*']), 1)
+    assert_result_count(clone.search(['*bids*', '*sub*']), 2)
 
-    res = list(clone.search('.*', regex=True))  # with regex
-    assert_equal(len(res), 3)  # one per dataset
-
-    # we do search, not match
-    assert_equal(len(list(clone.search('randchild', regex=True))), 1)
-    assert_equal(len(list(clone.search(['gr.nd', 'ch.ld'], regex=True))), 1)
-    assert_equal(len(list(clone.search('randchil.', regex=True))), 1)
-    assert_equal(len(list(clone.search('^randchild.*', regex=True))), 0)
-    assert_equal(len(list(clone.search('^grandchild.*', regex=True))), 1)
-    assert_equal(len(list(clone.search('grandchild'))), 1)
-
+    assert_result_count(clone.search(['*', 'type:dataset']), 3)
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 
