@@ -10,7 +10,6 @@
 
 from os.path import lexists
 from os.path import join as opj
-from datalad.metadata import _get_base_dataset_metadata
 # needed to guarantee that this method is bound to the Dataset class
 from datalad.api import get
 
@@ -52,7 +51,7 @@ class BaseMetadataParser(object):
         return self.get_core_metadata_files()
 
     def get_metadata(self, dsid=None, full=False):
-        """Returns JSON-LD compliant meta data structure
+        """Returns meta data structure
 
         Parameter
         ---------
@@ -63,11 +62,10 @@ class BaseMetadataParser(object):
         Returns
         -------
         dict
-          JSON-LD compliant
         """
         if dsid is None:
             dsid = self.ds.id
-        meta = _get_base_dataset_metadata(dsid)
+        meta = {}
         if self.has_metadata():
             meta = self._get_metadata(dsid, meta, full)
         return meta

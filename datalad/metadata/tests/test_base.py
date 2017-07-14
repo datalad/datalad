@@ -86,7 +86,6 @@ def test_get_multiple_metadata_types(path):
 def _compare_metadata_helper(origres, compds):
     for ores in origres:
         rpath = relpath(ores['path'], ores['refds'])
-        print(rpath)
         cres = compds.metadata(
             rpath,
             reporton='{}s'.format(ores['type']))
@@ -170,7 +169,6 @@ def test_aggregation(path):
     assert_result_count(child_res, 2)
     for r in child_res:
         eq_(r['matched']['name'], r['metadata']['name'])
-        print(r)
 
     # Test 'and' for multiple search entries
     assert_result_count(clone.search(['*child*', '*bids*']), 2)
