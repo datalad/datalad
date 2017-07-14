@@ -23,6 +23,7 @@ import random
 import socket
 from six import PY2, text_type, iteritems
 from six import binary_type
+from six import string_types
 from fnmatch import fnmatch
 import time
 from mock import patch
@@ -979,7 +980,13 @@ def assert_dict_equal(d1, d2):
     for k in set(d1).intersection(d2):
         same = True
         try:
-            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+            if isinstance(d1[k], string_types):
+                # do not compare types for string types to avoid all the hassle
+                # with the distinction of str and unicode in PY3, and simple
+                # test for equality
+                same = bool(d1[k] == d2[k])
+            else:
+                same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
         except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
             same = False
 
