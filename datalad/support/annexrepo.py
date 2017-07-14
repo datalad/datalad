@@ -51,6 +51,7 @@ from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
+from datalad.utils import _path_
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -241,21 +242,55 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # to use 'git annex unlock' instead.
                 lgr.warning("direct mode not available for %s. Ignored." % self)
 
+        self._batched = BatchedAnnexes(batch_size=batch_size)
+
         # set default backend for future annex commands:
         # TODO: Should the backend option of __init__() also migrate
         # the annex, in case there are annexed files already?
         if backend:
-            lgr.debug("Setting annex backend to %s", backend)
-            # Must be done with explicit release, otherwise on Python3 would end up
-            # with .git/config wiped out
-            # see https://github.com/gitpython-developers/GitPython/issues/333#issuecomment-126633757
+            self.set_default_backend(backend, persistent=True)
 
-            # TODO: 'annex.backends' actually is a space separated list.
-            # Figure out, whether we want to allow for a list here or what to
-            # do, if there is sth in that setting already
+    def set_default_backend(self, backend, persistent=True, commit=True):
+        """Set default backend
+
+        Parameters
+        ----------
+        backend : str
+        persistent : bool, optional
+          If persistent, would add/commit to .gitattributes. If not -- would
+          set within .git/config
+        """
+        # TODO: 'annex.backends' actually is a space separated list.
+        # Figure out, whether we want to allow for a list here or what to
+        # do, if there is sth in that setting already
+        if persistent:
+            git_attributes_file = _path_(self.path, '.gitattributes')
+            git_attributes = ''
+            if exists(git_attributes_file):
+                with open(git_attributes_file) as f:
+                    git_attributes = f.read()
+            if ' annex.backend=' in git_attributes:
+                lgr.debug(
+                    "Not (re)setting backend since seems already set in %s"
+                    % git_attributes_file
+                )
+            else:
+                lgr.debug("Setting annex backend to %s (persistently)", backend)
+                self.config.set('annex.backends', backend, where='local')
+                with open(git_attributes_file, 'a') as f:
+                    if git_attributes and not git_attributes.endswith(os.linesep):
+                        f.write(os.linesep)
+                    f.write('* annex.backend=%s%s' % (backend, os.linesep))
+                self.add(git_attributes_file, git=True)
+                if commit:
+                    self.commit(
+                        "Set default backend for all files to be %s" % backend,
+                        _datalad_msg=True,
+                        files=[git_attributes_file]
+                    )
+        else:
+            lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')
-
-        self._batched = BatchedAnnexes(batch_size=batch_size)
 
     def __del__(self):
         try:
