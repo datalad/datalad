@@ -1326,7 +1326,7 @@ class Annexificator(object):
 
             if aggregate:
                 from datalad.api import aggregate_metadata
-                aggregate_metadata(dataset=self.repo.path, guess_native_type=True)
+                aggregate_metadata(dataset='^', path=self.repo.path)
 
             if tag and stats:
                 # versions survive only in total_stats
