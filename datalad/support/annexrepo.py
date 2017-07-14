@@ -862,8 +862,24 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
         self._set_shared_connection(name, url)
 
+    def is_special_annex_remote(self, remote, check_if_known=True):
+        """Return either remote is a special annex remote
+
+        Decides based on the presence of diagnostic annex- options
+        for the remote
+        """
+        if check_if_known:
+            if remote not in self.get_remotes():
+                raise RemoteNotAvailableError(remote)
+        sec = 'remote.{}'.format(remote)
+        for opt in ('annex-externaltype', 'annex-webdav'):
+            if self.config.has_option(sec, opt):
+                return True
+        return False
+
     @borrowkwargs(GitRepo)
-    def get_remotes(self, with_refs_only=False, with_urls_only=False,
+    def get_remotes(self,
+                    with_urls_only=False,
                     exclude_special_remotes=False):
         """Get known (special-) remotes of the repository
 
@@ -877,13 +893,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         remotes : list of str
           List of names of the remotes
         """
-        remotes = super(AnnexRepo, self).get_remotes(
-            with_refs_only=with_refs_only, with_urls_only=with_urls_only)
+        remotes = super(AnnexRepo, self).get_remotes(with_urls_only=with_urls_only)
 
         if exclude_special_remotes:
-            return [remote for remote in remotes
-                    if not self.config.has_option('remote.{}'.format(remote),
-                                                  'annex-externaltype')]
+            return [
+                remote for remote in remotes
+                if not self.is_special_annex_remote(remote, check_if_known=False)
+            ]
         else:
             return remotes
 

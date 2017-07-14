@@ -2121,3 +2121,11 @@ def test_AnnexRepo_is_managed_branch(path):
 def test_AnnexRepo_flyweight_monitoring_inode(path, store):
     # testing for issue #1512
     check_repo_deals_with_inode_change(AnnexRepo, path, store)
+
+
+@with_tempfile(mkdir=True)
+def test_fake_is_not_special(path):
+    ar = AnnexRepo(path, create=True)
+    # doesn't exist -- we fail by default
+    assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
+    assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
