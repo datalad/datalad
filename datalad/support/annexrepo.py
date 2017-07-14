@@ -1223,6 +1223,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         for j in self._run_annex_command_json(
                 'find', args=['--json'] + expr + files
         ):
+            # TODO: some files might not even be here.  So in current fancy
+            # output reporting scheme we should then theoretically handle
+            # those cases here and say 'impossible' or something like that
+            if not j.get('success', True):
+                # TODO: I guess do something with yielding and filtering for
+                # what need to be done and what not
+                continue
             key = j['key']
             size = j.get('bytesize')
             if key in keys_seen:
@@ -2171,7 +2178,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         json_objects = (json.loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         # protect against progress leakage
-        json_objects = [j for j in json_objects if not 'byte-progress' in j]
+        json_objects = [j for j in json_objects if 'byte-progress' not in j]
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
@@ -2792,6 +2799,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                e.get('note', '').startswith('to ')  # transfer did happen
         ]
         if failed_copies:
+            # TODO: RF for new fancy scheme of outputs reporting
             raise IncompleteResultsError(
                 results=good_copies, failed=failed_copies,
                 msg="Failed to copy %d file(s)" % len(failed_copies))

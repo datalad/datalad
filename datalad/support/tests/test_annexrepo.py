@@ -1184,6 +1184,9 @@ def test_annex_copy_to(origin, clone):
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
     orig_run = repo._run_annex_command
+
+    # Kinda a bit off the reality since no nonex* would not be returned/handled
+    # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
         if command == 'copy':
             # That is not how annex behaves
@@ -1201,7 +1204,12 @@ def test_annex_copy_to(origin, clone):
         else:
             return orig_run(command, **kwargs)
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy):
+    def fail_to_copy_get_expected(files, expr):
+        assert files == ["copied", "existed", "nonex1", "nonex2"]
+        return {'akey1': 10}, ["copied"]
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+            patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
     eq_(cme.exception.results, ["copied"])
