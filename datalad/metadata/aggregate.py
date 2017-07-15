@@ -14,6 +14,9 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 from os.path import dirname
 from os.path import relpath
+
+from hashlib import md5
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import discover_dataset_trace_to_targets
@@ -48,29 +51,37 @@ def _adj2subbranches(base, adj):
     return branches
 
 
-def _get_obj_location(info):
+def _get_obj_location(parentds, ref_path, ref_type):
     # TODO add 'origin' info into file name, do when needed, code is
     # forward compatible
-    return opj('objects', '{}-{}'.format(
-        info['type'], info['id']))
+    # build object signature string to generate a hash ID that is unique for
+    # the combination of parent dataset ID and object's relpath to it
+    signature = '{}{}'.format(
+        parentds.id,
+        relpath(ref_path, parentds.path))
+    objid = md5(signature.encode()).hexdigest()
+    return opj(
+        'objects',
+        objid[:3],
+        '{}-{}'.format(
+            ref_type,
+            objid[3:]))
 
 
 def _update_ds_agginfo(baseds, dsmeta, filemeta, agg_base_path, to_save):
     """Update the aggregate metadata (info) of a single dataset"""
-    dsid = None
+    ds_path = None
     agginfo = []
     for cmeta in dsmeta:
         ci = {k: cmeta[k]
               for k in ('type', 'id', 'shasum', 'origin')
               if k in cmeta}
-        loc = _get_obj_location(cmeta) if cmeta.get('metadata', None) else None
+        loc = _get_obj_location(baseds, cmeta['path'], 'ds') \
+            if cmeta.get('metadata', None) else None
         ci['location'] = loc
-        ci_id = ci.get('id', None)
         agginfo.append(ci)
-        if dsid is None and ci_id is not None:
-            dsid = ci_id
-        if dsid != ci_id:
-            lgr.warning("internal consistency error: multiple dataset ID for a single dataset")
+        if ds_path is None:
+            ds_path = cmeta['path']
         # write obj files
         if not loc:
             # no point in empty files
@@ -85,11 +96,11 @@ def _update_ds_agginfo(baseds, dsmeta, filemeta, agg_base_path, to_save):
           for r in filemeta or []
           if r.get('metadata', None) and r.get('origin', None) == 'datalad'}
     if fm:
-        if dsid is None:
-            lgr.warning("internal consistency error: file-based metadata, but no dataset ID present")
+        if ds_path is None:
+            lgr.warning("internal consistency error: file-based metadata, but no dataset path known")
         # only if there is anything, build agginfo item
-        finfo = dict(type='files', id=dsid)
-        loc = _get_obj_location(finfo)
+        finfo = dict(type='files')
+        loc = _get_obj_location(baseds, ds_path, 'files')
         finfo['location'] = loc
         agginfo.append(finfo)
         opath = opj(agg_base_path, loc)
