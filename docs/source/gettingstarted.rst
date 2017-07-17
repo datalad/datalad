@@ -12,19 +12,19 @@ Installation
 
 Datalad is a Python package and can be installed via pip_, which is the
 preferred method unless system packages are available for the target platform
-(see below)::
+(see below). To automatically install datalad and all its software dependencies
+type::
 
   pip install datalad
 
 .. _pip: https://pip.pypa.io
 
-This will automatically install all software dependencies necessary to provide
-core functionality. Several additional installation schemes are supported
-(e.g., ``publish``, ``metadata``, ``tests``, ``crawl``)::
+Several additional installation schemes are supported (``[SCHEME]`` can be e.g.
+``publish``, ``metadata``, ``tests`` or ``crawl``)::
 
-  pip install datalad[SCHEME]
-
-where ``SCHEME`` can be any supported scheme, such as the ones listed above.
+  pip install datalad [SCHEME]
+  
+.. cool, but why should I (or a first-time reader) even bother about the schemes?
 
 In addition, it is necessary to have a working installation of git-annex_,
 which is not set up automatically at this point.
@@ -39,6 +39,11 @@ is to enable the NeuroDebian_ repository, and to install datalad as a system
 package::
 
   sudo apt-get install datalad
+  
+A current version of git-annex (as also provided by the NeuroDebian_ 
+repository) can be installed by typing::
+
+  sudo apt-get install git-annex
 
 .. _neurodebian: http://neuro.debian.net
 
@@ -60,9 +65,11 @@ above. ``pip`` comes with Python distributions like anaconda_.
 First steps
 ===========
 
-After datalad is installed it can be queried for information about known
-datasets. For example, we might want to look for dataset thats were funded by,
-or acknowledge the US National Science Foundation (NSF)::
+Datalad can be queried for information about known datasets. Doing a first search 
+query, datalad automatically offers assistence to obtain a :term:`superdataset` first.
+The superdataset is a lightweight container that contains meta information about known datasets but does not contain actual data itself. 
+
+For example, we might want to look for dataset thats were funded by, or acknowledge the US National Science Foundation (NSF)::
 
   ~ % datalad search NSF
   No DataLad dataset found at current location
@@ -75,11 +82,6 @@ or acknowledge the US National Science Foundation (NSF)::
   ~/datalad/openfmri/ds000002
   ~/datalad/openfmri/ds000003
   ...
-
-On first attempt, datalad offers assistence to obtain a :term:`superdataset`
-with information on all datasets it knows about. This is a lightweight
-container that does not actually contain data, but meta information only. Once
-downloaded queries can be made offline.
 
 Any known dataset can now be installed inside the local superdataset with a
 command like this::
