@@ -919,6 +919,41 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return remotes
 
+    def get_special_remotes(self):
+        """Get info about all known (not just enabled) special remotes.
+
+        Returns
+        -------
+        dict
+          Keys are special remore UUIDs, values are dicts with arguments
+          for `git-annex enableremote`. This includes at least the 'type'
+          and 'name' of a special remote. Each type of special remote
+          may require addition arguments that will be available in the
+          respective dictionary.
+        """
+        try:
+            stdout, stderr = self._git_custom_command(
+                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
+                expect_fail=True)
+        except CommandError as e:
+            if 'Not a valid object name git-annex:remote.log' in e.stderr:
+                # no special remotes configures
+                return {}
+            else:
+                # some unforseen error
+                raise e
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
+        for line in stdout.splitlines():
+            # be precise and split by spaces
+            fields = line.split(' ')
+            # special remote UUID
+            sr_id = fields[0]
+            # the rest are config args for enableremote
+            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            srs[sr_id] = sr_info
+        return srs
+
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
