@@ -58,17 +58,18 @@ live on different servers all around the world.
 API principles
 ==============
 
-URLs and shortcuts
+You can use Datalad's ``install`` command to download datasets. The command accepts
+URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
+to obtain a first dataset is downloading the canonical :term:`superdataset` from
+http://datasets.datalad.org/ using a shortcut.
+
+Downloading Datalad's canonical superdataset
 ------------------
 
-In most places where DataLad accepts URLs as arguments these URLs can be
-regular ``http`` or ``https`` protocol URLs (e.g. https://www.example.com/path),
-but also SSH URLs, such as ``ssh://me@localhost/path``. Additionally, DataLad
-supports SSH login style resource identifiers, such as ``me@localhost:/path``.
-Besides these, the symbol ``///`` can be used to point to DataLad's canonical
-:term:`superdataset` at http://datasets.datalad.org/ , which provides an
-automated collection of datasets from various portals and sites (see
-:ref:`chap_crawler`).  Here are some common examples in command line notation:
+DataLad's canonical :term:`superdataset` provides an automated collection of datasets
+from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
+as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
+Here are some common examples in command line notation:
 
 ``datalad install ///``
     install canonical superdataset (alone, without subdatasets) in a
@@ -80,7 +81,24 @@ automated collection of datasets from various portals and sites (see
     install the superdataset of the collection of datasets released by the
     lab of Dr. James V. Haxby with all subdatasets, while
     fetching all data files using 3 parallel download processes.
+    
+Downloading datasets via http
+------------------
 
+In most places where DataLad accepts URLs as arguments these URLs can be
+regular ``http`` or ``https`` protocol URLs (e.g. https://www.example.com/path),
+
+``datalad install ###BEISPIEL####``
+
+Downloading datasets via ssh
+------------------
+Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
+
+``datalad install ###BEISPIEL####``
+
+Finally, DataLad supports SSH login style resource identifiers, such as ``me@localhost:/path``.
+
+``datalad install ###BEISPIEL####``
 
 `--dataset` argument
 --------------------
