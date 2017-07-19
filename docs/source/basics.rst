@@ -69,37 +69,37 @@ Downloading Datalad's canonical superdataset
 DataLad's canonical :term:`superdataset` provides an automated collection of datasets
 from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
 as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
-Here are some common examples in command line notation:
+Here are three common examples in command line notation:
 
 ``datalad install ///``
-    install canonical superdataset (alone, without subdatasets) in a
+    installs the canonical superdataset (metadata without subdatasets) in a
     `datasets.datalad.org/` subdirectory under the current directory
 ``datalad install -r ///openfmri``
     installs the openfmri superdataset into an `openfmri/` subdirectory.
-    Additionally, the ``-r`` flag recursively downloads all datasets available from
-    http://openfmri.org as subdatasets into the `openfmri/` subdirectory
+    Additionally, the ``-r`` flag recursively downloads all metadata of datasets 
+    available from http://openfmri.org as subdatasets into the `openfmri/` subdirectory
 ``datalad install -g -J3 -r ///labs/haxby``
-    installs the superdataset of the collection of datasets released by the
-    lab of Dr. James V. Haxby with all subdatasets, while
-    fetching all data files using 3 parallel download processes.
-    
+    installs the superdataset of datasets released by the lab of Dr. James V. Haxby
+    and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data
+    and not just the metadata. It does so by using 3 parallel download processes (``-J3`` flag).
+
 Downloading datasets via http
 ------------------
 
 In most places where DataLad accepts URLs as arguments these URLs can be
-regular ``http`` or ``https`` protocol URLs (e.g. https://www.example.com/path),
+regular ``http`` or ``https`` protocol URLs. For example:
 
-``datalad install ###BEISPIEL####``
+``datalad install ###example####``
 
 Downloading datasets via ssh
 ------------------
 Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
 
-``datalad install ###BEISPIEL####``
+``datalad install ###example####``
 
 Finally, DataLad supports SSH login style resource identifiers, such as ``me@localhost:/path``.
 
-``datalad install ###BEISPIEL####``
+``datalad install ###example####``
 
 `--dataset` argument
 --------------------
@@ -124,7 +124,6 @@ There are also some useful pre-defined "shortcut" values for dataset arguments:
    For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
    to search metadata of the entire superdataset you are under (in this case
    ``///``), run ``datalad search -d^ [something to search]``.
-
 
 Commands `install` vs `get`
 ---------------------------
@@ -167,7 +166,3 @@ corresponding Dataset object to operate on, and be able to use it even if you
 rerun the script.
 If you would like to fetch data (possibly while installing any necessary to be
 installed sub-dataset to get to the file) -- use ``get``.
-
-
-
-
