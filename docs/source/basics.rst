@@ -80,8 +80,8 @@ Here are three common examples in command line notation:
     available from http://openfmri.org as subdatasets into the `openfmri/` subdirectory
 ``datalad install -g -J3 -r ///labs/haxby``
     installs the superdataset of datasets released by the lab of Dr. James V. Haxby
-    and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data
-    and not just the metadata. It does so by using 3 parallel download processes (``-J3`` flag).
+    and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data, too.
+    It does so by using 3 parallel download processes (``-J3`` flag).
 
 Downloading datasets via http
 ------------------
