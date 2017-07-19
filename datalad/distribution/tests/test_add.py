@@ -90,7 +90,8 @@ def test_add_files(path):
         if arg[0] == test_list_4:
             result = ds.add('dir', to_git=arg[1], save=False)
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False, result_xfm='relpaths',
+            result = ds.add(arg[0], to_git=arg[1], save=False,
+                            result_xfm='relpaths',
                             return_type='item-or-list')
             # order depends on how annex processes it, so let's sort
             eq_(sorted(result), sorted(arg[0]))
@@ -103,6 +104,7 @@ def test_add_files(path):
         # ignore the initial config file in index:
         indexed.remove(opj('.datalad', 'config'))
         indexed.remove(opj('.datalad', '.gitattributes'))
+        indexed.remove('.gitattributes')
         if isinstance(arg[0], list):
             for x in arg[0]:
                 unstaged.remove(x)

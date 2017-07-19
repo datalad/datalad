@@ -488,6 +488,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo.clone(src, dst, backend='MD5')
+    eq_(ar.default_backends, ['MD5'])
     # GitPython has a bug which causes .git/config being wiped out
     # under Python3, triggered by collecting its config instance I guess
     gc.collect()
@@ -2138,3 +2139,11 @@ def test_AnnexRepo_is_managed_branch(path):
 def test_AnnexRepo_flyweight_monitoring_inode(path, store):
     # testing for issue #1512
     check_repo_deals_with_inode_change(AnnexRepo, path, store)
+
+
+@with_tempfile(mkdir=True)
+def test_fake_is_not_special(path):
+    ar = AnnexRepo(path, create=True)
+    # doesn't exist -- we fail by default
+    assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
+    assert_false(ar.is_special_annex_remote("fake", check_if_known=False))

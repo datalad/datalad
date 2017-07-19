@@ -214,6 +214,14 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             published.extend(pblsh)
             skipped.extend(skp)
 
+        if isinstance(ds.repo, AnnexRepo) and \
+                ds.repo.is_special_annex_remote(remote):
+            # There is nothing else to "publish"
+            lgr.debug(
+                "{0} is a special annex remote, no git push is needed".format(remote)
+            )
+            return published, skipped
+
         lgr.info("Publishing {0} to {1}".format(ds, remote))
 
         # in order to be able to use git's config to determine what to push,
