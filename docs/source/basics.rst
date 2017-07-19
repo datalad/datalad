@@ -75,10 +75,11 @@ Here are some common examples in command line notation:
     install canonical superdataset (alone, without subdatasets) in a
     `datasets.datalad.org/` subdirectory under the current directory
 ``datalad install -r ///openfmri``
-    install openfmri superdataset with a collection of all datasets available
-    from http://openfmri.org as subdatasets in the `openfmri/` subdirectory
+    installs the openfmri superdataset into an `openfmri/` subdirectory.
+    Additionally, the ``-r`` flag recursively downloads all datasets available from
+    http://openfmri.org as subdatasets into the `openfmri/` subdirectory
 ``datalad install -g -J3 -r ///labs/haxby``
-    install the superdataset of the collection of datasets released by the
+    installs the superdataset of the collection of datasets released by the
     lab of Dr. James V. Haxby with all subdatasets, while
     fetching all data files using 3 parallel download processes.
     
