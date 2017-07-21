@@ -3,6 +3,6 @@
 # we need to figure out/complaint to pip folks
 # For now, until https://github.com/GrahamDumpleton/wrapt/issues/98 resolved
 # we should use our version which allows to disable extension(s)
-https://github.com/yarikoptic/wrapt@develop
+git+https://github.com/yarikoptic/wrapt@develop
 -e .[devel]
 
