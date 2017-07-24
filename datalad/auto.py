@@ -178,7 +178,7 @@ class AutomagicIO(object):
         # For now, as long as it is a symlink pointing to under .git/annex
         if exists(path):
             return True
-        return lexists(path) and 'annex/objects' in realpath(path)
+        return lexists(path) and 'annex/objects' in str(realpath(path))
 
     def _proxy_isfile(self, path):
         return self._proxy_open_name_mode(
