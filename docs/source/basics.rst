@@ -64,7 +64,7 @@ to obtain a first dataset is downloading the canonical :term:`superdataset` from
 http://datasets.datalad.org/ using a shortcut.
 
 Downloading Datalad's canonical superdataset
-------------------
+--------------------------------------------
 
 DataLad's canonical :term:`superdataset` provides an automated collection of datasets
 from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
@@ -84,7 +84,7 @@ Here are three common examples in command line notation:
     It does so by using 3 parallel download processes (``-J3`` flag).
 
 Downloading datasets via http
-------------------
+-----------------------------
 
 In most places where DataLad accepts URLs as arguments these URLs can be
 regular ``http`` or ``https`` protocol URLs. For example:
@@ -92,7 +92,7 @@ regular ``http`` or ``https`` protocol URLs. For example:
 ``datalad install ###example####``
 
 Downloading datasets via ssh
-------------------
+----------------------------
 Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
 
 ``datalad install ###example####``
