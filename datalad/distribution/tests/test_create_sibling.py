@@ -453,8 +453,17 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
     ds.add('sub2.dat')
-    published3 = ds.publish('.', to='localhost')
-    assert_in('sub2.dat', published3[0])
+    published3 = ds.publish(to='localhost')  # we publish just git
+    assert_not_in('sub2.dat', published3[0])
+    # now publish "with" data, which should also trigger the hook!
+    # https://github.com/datalad/datalad/issues/1658
+    from glob import glob
+    from datalad.consts import WEB_META_LOG
+    logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
+    published4 = ds.publish('.', to='localhost')
+    assert_in('sub2.dat', published4[0])
+    logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
+    eq_(len(logs_post), len(logs_prior) + 1)
 
 
 @skip_ssh
