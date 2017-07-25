@@ -305,31 +305,9 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         )
         ds.repo.fetch(remote=remote)
         ds.repo.merge_annex(remote)
-        # this will trigger
+        # this will trigger post-update hook if present
         _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
-        # Alternative suboptimal and incomplete solution on how to trigger
-        # post-update -- remove upon committing ;)
-        # # so there were no diff but we published something - data or subdatasets,
-        # # or we published data AFTER pushing,
-        # # we should then trigger post-update somehow, which might update
-        # # web ui meta-data.  And there is no good way to trigger post-update
-        # # besides actually pushing some reference and then removing it
-        #
-        # ref = '_datalad_force_post-update_%s' % ds.repo.get_active_branch()
-        # lgr.info(
-        #     "Some data was published: temporarily pushing fake branch %s to "
-        #     "possibly trigger post-update", ref
-        # )
-        # # forcing it just in case if previously we have tried to publish
-        # # but it failed and it is not fast-forward.  This branch should not
-        # # be used for anything else -- "internal" name
-        # # XXX post-update (unlike post-receive) obtains only the name of the
-        # # reference which is pushed but not original value, so we can't prevent
-        # # it from not running possibly a lengthy update of the meta on remote
-        # # end twice ATM besides introducing some tracing of git-annex/branch
-        # # state. TODO
-        # ds.repo.push(remote=remote, refspec='HEAD:%s' % ref, force=True)
-        # ds.repo.push(remote=remote, refspec=':%s' % ref)
+
     return published, skipped
 
 
