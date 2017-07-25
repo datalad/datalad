@@ -182,7 +182,8 @@ def _create_dataset_sibling(
                         "Announcing existing remote %s dead to annex and removing",
                         name
                     )
-                    ds.repo.set_remote_dead(name)
+                    if isinstance(ds.repo, AnnexRepo):
+                        ds.repo.set_remote_dead(name)
                     ds.repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
