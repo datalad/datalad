@@ -17,6 +17,7 @@ from os.path import join as opj, exists
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
+from datalad.cmd import Runner
 from datalad.utils import chpwd
 from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
@@ -33,6 +34,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_set_equal
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_equal
@@ -415,6 +417,44 @@ def test_failon_no_permissions(src_path, target_path):
         name='goodperm',
         dataset=ds,
         sshurl="ssh://localhost" + opj(target_path, 'ds'))
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_replace_and_relative_sshpath(src_path, dst_path):
+    # We need to come up with the path relative to our current home directory
+    # https://github.com/datalad/datalad/issues/1653
+    dst_relpath = os.path.relpath(dst_path, os.path.expanduser('~'))
+    url = 'localhost:%s' % dst_relpath
+    ds = Dataset(src_path).create()
+    create_tree(ds.path, {'sub.dat': 'lots of data'})
+    ds.add('sub.dat')
+
+    ds.create_sibling(url)
+    published = ds.publish('.', to='localhost')
+    assert_in('sub.dat', published[0])
+    # verify that hook runs and there is nothing in stderr
+    # since it exits with 0 exit even if there was a problem
+    out, err = Runner(cwd=opj(dst_path, '.git'))(_path_('hooks/post-update'))
+    assert_false(out)
+    assert_false(err)
+
+    # Verify that we could replace and publish no problem
+    # https://github.com/datalad/datalad/issues/1656
+    # Strangely it spits outs IncompleteResultsError exception atm... so just
+    # checking that it fails somehow
+    assert_raises(Exception, ds.create_sibling, url)
+    ds.create_sibling(url, existing='replace')
+    published2 = ds.publish('.', to='localhost')
+    assert_in('sub.dat', published2[0])
+
+    # and one more test since in above test it would not puke ATM but just
+    # not even try to copy since it assumes that file is already there
+    create_tree(ds.path, {'sub2.dat': 'more data'})
+    ds.add('sub2.dat')
+    published3 = ds.publish('.', to='localhost')
+    assert_in('sub2.dat', published3[0])
 
 
 @skip_ssh
