@@ -285,9 +285,29 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
 
         published.append(ds)
 
+    late_published_data = None
     if knew_remote_uuid is False:
         # publish only after we tried to sync/push and if it was annex repo
-        published += _publish_data()
+        late_published_data = _publish_data()
+        published += late_published_data
+
+    # if we published something (data, subdatasets) even though there were no
+    # diff (thus no push), or there was an additional data published later
+    if ((not diff and published) or late_published_data) \
+            and isinstance(ds.repo, AnnexRepo):
+        # we need to do the same annex merge dance and push updated git-annex
+        # and this way also trigger post-update hook which might update
+        # web UI meta-data
+        # https://github.com/datalad/datalad/issues/1658
+        lgr.info(
+            "Obtaining remote annex info from '%s' and pushing updated",
+            remote
+        )
+        ds.repo.fetch(remote=remote)
+        ds.repo.merge_annex(remote)
+        # this will trigger post-update hook if present
+        _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
+
     return published, skipped
 
 
