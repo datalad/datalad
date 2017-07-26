@@ -1298,7 +1298,7 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
-                _call(self.repo.add, '.', options=self.options)  # so everything is committed
+                _call(self.repo.add, '.', git_options=self.options)  # so everything is committed
 
                 stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
                 _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])
@@ -1390,7 +1390,7 @@ class Annexificator(object):
 
         return _remove_obsolete()
 
-    def remove(self, data):
+    def remove(self, data, recursive=False):
         """Removed passed along file name from git/annex"""
         stats = data.get('datalad_stats', None)
         self._states.add("Removed files")
@@ -1398,8 +1398,15 @@ class Annexificator(object):
         # TODO: not sure if we should may be check if exists, and skip/just complain if not
         if stats:
             _call(stats.increment, 'removed')
-        if lexists(opj(self.repo.path, filename)):
-            _call(self.repo.remove, filename)
+        filepath = opj(self.repo.path, filename)
+        if lexists(filepath):
+            if os.path.isdir(filepath):
+                if recursive:
+                    _call(self.repo.remove, filename, recursive=True)
+                else:
+                    lgr.warning("Do not removing %s recursively, skipping", filepath)
+            else:
+                _call(self.repo.remove, filename)
         else:
             lgr.warning("Was asked to remove non-existing path %s", filename)
         yield data
