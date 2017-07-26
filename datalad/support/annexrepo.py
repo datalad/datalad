@@ -108,7 +108,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
-                 repo=None, text_to_git=None):
+                 repo=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -150,12 +150,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         description: str, optional
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
-        text_to_git: bool, optional
-          If True, add `* annex.largefiles=(not(mimetype=text/*))` to 
-          .gitattributes thus making annex by default add all text files to git
-          while the rest to annex. See  http://git-annex.branchable.com/tips/largefiles/
-          for more detailed control over which files would be added to git or annex
-          upon `git annex add` or `datalad add` commands 
         """
         if self.git_annex_version is None:
             self._check_git_annex_version()
@@ -257,14 +251,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
-        if text_to_git:
-            git_attributes_file = _path_(self.path, '.gitattributes')
-            with open(git_attributes_file, 'a') as f:
-                f.write('* annex.largefiles=(not(mimetype=text/*))\n')
-            self.add(git_attributes_file, git=True)
-            self.commit("Instructed annex to add text files to git",
-                        _datalad_msg=True,
-                        files=[git_attributes_file])
 
     def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend

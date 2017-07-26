@@ -282,8 +282,8 @@ def test_create_withplugin(path):
 
 
 @with_tempfile(mkdir=True)
-def test_create_text_to_git(path):
-    ds = create(path, text_to_git=True)
+def test_create_text_no_annex(path):
+    ds = create(path, text_no_annex=True)
     ok_clean_git(path)
     import re
     ok_file_has_content(

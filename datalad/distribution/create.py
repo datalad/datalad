@@ -118,13 +118,13 @@ class Create(Interface):
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
-        text_to_git=Parameter(
-            args=("--text-to-git",),
+        text_no_annex=Parameter(
+            args=("--text-no-annex",),
             doc="""if set, all text files in the future would be added to Git,
-            not annex. Achieved by adding an entry to .gitattributes file. See
+            not annex. Achieved by adding an entry to `.gitattributes` file. See
             http://git-annex.branchable.com/tips/largefiles/ and `no_annex`
             DataLad plugin to establish even more detailed control over which
-            files are added to git and which to annex.""",
+            files are placed under annex control.""",
             action='store_true'),
         save=nosave_opt,
         # TODO could move into cfg_annex plugin
@@ -178,7 +178,7 @@ class Create(Interface):
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None,
-            text_to_git=None
+            text_no_annex=None
     ):
 
         # two major cases
@@ -290,7 +290,7 @@ class Create(Interface):
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", tbds.path)
-            AnnexRepo(
+            tbrepo = AnnexRepo(
                 tbds.path,
                 url=None,
                 create=True,
@@ -299,9 +299,19 @@ class Create(Interface):
                 description=description,
                 git_opts=git_opts,
                 annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts,
-                text_to_git=text_to_git
+                annex_init_opts=annex_init_opts
             )
+
+            if text_no_annex:
+                git_attributes_file = opj(tbds.path, '.gitattributes')
+                with open(git_attributes_file, 'a') as f:
+                    f.write('* annex.largefiles=(not(mimetype=text/*))\n')
+                tbrepo.add(git_attributes_file, git=True)
+                tbrepo.commit(
+                    "Instructed annex to add text files to git",
+                    _datalad_msg=True,
+                    files=[git_attributes_file]
+                )
 
         if native_metadata_type is not None:
             if not isinstance(native_metadata_type, list):
