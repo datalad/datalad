@@ -306,7 +306,7 @@ class Create(Interface):
                 git_attributes_file = opj(tbds.path, '.gitattributes')
                 with open(git_attributes_file, 'a') as f:
                     f.write('* annex.largefiles=(not(mimetype=text/*))\n')
-                tbrepo.add(git_attributes_file, git=True)
+                tbrepo.add([git_attributes_file], git=True)
                 tbrepo.commit(
                     "Instructed annex to add text files to git",
                     _datalad_msg=True,
