@@ -71,7 +71,9 @@ def test(verbose=False, nocapture=False, pdb=False, stop=False):
     if stop:
         argv.append('--stop')
     from datalad.support.third.nosetester import NoseTester
-    NoseTester('datalad').test(extra_argv=argv)
+    tester = NoseTester('datalad')
+    tester.package_name = 'datalad'  # butt plug
+    tester.test(extra_argv=argv)
 
 test.__test__ = False
 
