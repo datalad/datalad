@@ -56,20 +56,47 @@ atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
+# Class allows us to save the results of the tests in runTests - see runTests
+# method docstring for details
+import nose
+class NumpyTestProgram(nose.core.TestProgram):
+    def runTests(self):
+        """Run Tests. Returns true on success, false on failure, and
+        sets self.success to the same value.
 
-def test(package='datalad', **kwargs):
-    """A helper to run datalad's tests.  Requires numpy and nose
+        Because nose currently discards the test result object, but we need
+        to return it to the user, override TestProgram.runTests to retain
+        the result
+        """
+        if self.testRunner is None:
+            self.testRunner = nose.core.TextTestRunner(stream=self.config.stream,
+                                                       verbosity=self.config.verbosity,
+                                                       config=self.config)
+        plug_runner = self.config.plugins.prepareTestRunner(self.testRunner)
+        if plug_runner is not None:
+            self.testRunner = plug_runner
+        self.result = self.testRunner.run(self.test)
+        self.success = self.result.wasSuccessful()
+        return self.success
 
-    See numpy.testing.Tester -- **kwargs are passed into the
-    Tester().test call
+def test(verbose=False, nocapture=False, pdb=False, stop=False):
+    """A helper to run datalad's tests.  Requires nose
     """
-    try:
-        from numpy.testing import Tester
-        Tester(package=package).test(**kwargs)
-        # we don't have any benchmarks atm
-        # bench = Tester().bench
-    except ImportError:
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+    import nose
+    argv = ['datalad']
+    # could make it 'smarter' but decided to be explicit so later we could
+    # easily migrate to another runner without changing any API here
+    if verbose:
+        argv.append('-v')
+    if nocapture:
+        argv.append('-s')
+    if pdb:
+        argv.append('--pdb')
+    if stop:
+        argv.append('--stop')
+    #return nose.main('datalad', argv=argv, exit=False)
+    NumpyTestProgram(argv=argv, exit=False)
+
 test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
