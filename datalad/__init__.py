@@ -56,10 +56,11 @@ atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
-def test(verbose=False, nocapture=False, pdb=False, stop=False):
+
+def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
     """A helper to run datalad's tests.  Requires nose
     """
-    argv = ['datalad']
+    argv = [] #module]
     # could make it 'smarter' but decided to be explicit so later we could
     # easily migrate to another runner without changing any API here
     if verbose:
@@ -71,8 +72,8 @@ def test(verbose=False, nocapture=False, pdb=False, stop=False):
     if stop:
         argv.append('--stop')
     from datalad.support.third.nosetester import NoseTester
-    tester = NoseTester('datalad')
-    tester.package_name = 'datalad'  # butt plug
+    tester = NoseTester(module)
+    tester.package_name = module.split('.', 1)[0]
     tester.test(extra_argv=argv)
 
 test.__test__ = False
