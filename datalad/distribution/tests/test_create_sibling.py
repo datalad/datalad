@@ -75,13 +75,18 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
         assert_false(exists(opj(target_path, path)))
 
     hook_path = _path_(target_path, '.git/hooks/post-update')
-    ok_file_has_content(hook_path,
-                        '.*\ndsdir="%s"\n.*' % target_path,
-                        re_=True,
-                        flags=re.DOTALL)
+    # No longer the case -- we are no longer using absolute path in the
+    # script
+    # ok_file_has_content(hook_path,
+    #                     '.*\ndsdir="%s"\n.*' % target_path,
+    #                     re_=True,
+    #                     flags=re.DOTALL)
+    # No absolute path (so dataset could be moved) in the hook
+    with open(hook_path) as f:
+        assert_not_in(target_path, f.read())
     # correct ls_json command in hook content (path wrapped in "quotes)
     ok_file_has_content(hook_path,
-                        '.*datalad ls -a --json file "\$dsdir".*',
+                        '.*datalad ls -a --json file \..*',
                         re_=True,
                         flags=re.DOTALL)
 

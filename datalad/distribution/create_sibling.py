@@ -741,7 +741,7 @@ fi
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
-  && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file "$dsdir"; ) \
+  && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
 
