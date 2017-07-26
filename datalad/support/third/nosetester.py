@@ -9,15 +9,12 @@ from __future__ import division, absolute_import, print_function
 import os
 import sys
 import warnings
-from numpy.compat import basestring
-import numpy as np
-
-from .utils import import_nose, suppress_warnings
+from six import string_types as basestring
+#from numpy.compat import basestring
 
 
 __all__ = ['get_package_name', 'run_module_suite', 'NoseTester',
-           '_numpy_tester', 'get_package_name', 'import_nose',
-           'suppress_warnings']
+           'get_package_name']
 
 
 def get_package_name(filepath):
@@ -28,11 +25,6 @@ def get_package_name(filepath):
     ----------
     filepath : str
         Path to a file. If the determination fails, "numpy" is returned.
-
-    Examples
-    --------
-    >>> np.testing.nosetester.get_package_name('nonsense')
-    'numpy'
 
     """
 
@@ -107,9 +99,8 @@ def run_module_suite(file_to_run=None, argv=None):
     else:
         argv = argv + [file_to_run]
 
-    nose = import_nose()
-    from .noseclasses import KnownFailurePlugin
-    nose.run(argv=argv, addplugins=[KnownFailurePlugin()])
+    import nose
+    nose.run(argv=argv, addplugins=[])
 
 
 class NoseTester(object):
@@ -229,21 +220,7 @@ class NoseTester(object):
         return argv
 
     def _show_system_info(self):
-        nose = import_nose()
-
-        import numpy
-        print("NumPy version %s" % numpy.__version__)
-        relaxed_strides = numpy.ones((10, 1), order="C").flags.f_contiguous
-        print("NumPy relaxed strides checking option:", relaxed_strides)
-        npdir = os.path.dirname(numpy.__file__)
-        print("NumPy is installed in %s" % npdir)
-
-        if 'scipy' in self.package_name:
-            import scipy
-            print("SciPy version %s" % scipy.__version__)
-            spdir = os.path.dirname(scipy.__file__)
-            print("SciPy is installed in %s" % spdir)
-
+        import nose
         pyversion = sys.version.replace('\n', '')
         print("Python version %s" % pyversion)
         print("nose version %d.%d.%d" % nose.__versioninfo__)
@@ -272,7 +249,7 @@ class NoseTester(object):
 
         """
         # fail with nice error message if nose is not present
-        import_nose()
+        import nose
         # compile argv
         argv = self._test_argv(label, verbose, extra_argv)
         # our way of doing coverage
@@ -289,8 +266,8 @@ class NoseTester(object):
         # construct list of plugins
         import nose.plugins.builtin
         from nose.plugins import EntryPointPluginManager
-        from .noseclasses import KnownFailurePlugin, Unplugger
-        plugins = [KnownFailurePlugin()]
+        from .noseclasses import Unplugger
+        plugins = []# KnownFailurePlugin()]
         plugins += [p() for p in nose.plugins.builtin.plugins]
         try:
             # External plugins (like nose-timer)
@@ -371,17 +348,6 @@ class NoseTester(object):
         Each NumPy module exposes `test` in its namespace to run all tests for it.
         For example, to run all tests for numpy.lib:
 
-        >>> np.lib.test() #doctest: +SKIP
-
-        Examples
-        --------
-        >>> result = np.lib.test() #doctest: +SKIP
-        Running unit tests for numpy.lib
-        ...
-        Ran 976 tests in 3.933s
-
-        OK
-
         >>> result.errors #doctest: +SKIP
         []
         >>> result.knownfail #doctest: +SKIP
@@ -390,9 +356,6 @@ class NoseTester(object):
 
         # cap verbosity at 3 because nose becomes *very* verbose beyond that
         verbose = min(verbose, 3)
-
-        from . import utils
-        utils.verbose = verbose
 
         argv, plugins = self.prepare_test_args(
                 label, verbose, extra_argv, doctests, coverage, timer)
@@ -416,58 +379,18 @@ class NoseTester(object):
         if isinstance(raise_warnings, basestring):
             raise_warnings = _warn_opts[raise_warnings]
 
-        with suppress_warnings("location") as sup:
-            # Reset the warning filters to the default state,
-            # so that running the tests is more repeatable.
-            warnings.resetwarnings()
-            # Set all warnings to 'warn', this is because the default 'once'
-            # has the bad property of possibly shadowing later warnings.
-            warnings.filterwarnings('always')
-            # Force the requested warnings to raise
-            for warningtype in raise_warnings:
-                warnings.filterwarnings('error', category=warningtype)
-            # Filter out annoying import messages.
-            sup.filter(message='Not importing directory')
-            sup.filter(message="numpy.dtype size changed")
-            sup.filter(message="numpy.ufunc size changed")
-            sup.filter(category=np.ModuleDeprecationWarning)
-            # Filter out boolean '-' deprecation messages. This allows
-            # older versions of scipy to test without a flood of messages.
-            sup.filter(message=".*boolean negative.*")
-            sup.filter(message=".*boolean subtract.*")
-            # Filter out distutils cpu warnings (could be localized to
-            # distutils tests). ASV has problems with top level import,
-            # so fetch module for suppression here.
-            with warnings.catch_warnings():
-                warnings.simplefilter("always")
-                from ...distutils import cpuinfo
-            sup.filter(category=UserWarning, module=cpuinfo)
-            # See #7949: Filter out deprecation warnings due to the -3 flag to
-            # python 2
-            if sys.version_info.major == 2 and sys.py3kwarning:
-                # This is very specific, so using the fragile module filter
-                # is fine
-                import threading
-                sup.filter(DeprecationWarning,
-                           r"sys\.exc_clear\(\) not supported in 3\.x",
-                           module=threading)
-                sup.filter(DeprecationWarning, message=r"in 3\.x, __setslice__")
-                sup.filter(DeprecationWarning, message=r"in 3\.x, __getslice__")
-                sup.filter(DeprecationWarning, message=r"buffer\(\) not supported in 3\.x")
-                sup.filter(DeprecationWarning, message=r"CObject type is not supported in 3\.x")
-                sup.filter(DeprecationWarning, message=r"comparing unequal types not supported in 3\.x")
-            # Filter out some deprecation warnings inside nose 1.3.7 when run
-            # on python 3.5b2. See
-            #     https://github.com/nose-devs/nose/issues/929
-            # Note: it is hard to filter based on module for sup (lineno could
-            #       be implemented).
-            warnings.filterwarnings("ignore", message=".*getargspec.*",
-                                    category=DeprecationWarning,
-                                    module=r"nose\.")
+        # Filter out some deprecation warnings inside nose 1.3.7 when run
+        # on python 3.5b2. See
+        #     https://github.com/nose-devs/nose/issues/929
+        # Note: it is hard to filter based on module for sup (lineno could
+        #       be implemented).
+        warnings.filterwarnings("ignore", message=".*getargspec.*",
+                                category=DeprecationWarning,
+                                module=r"nose\.")
 
-            from .noseclasses import NumpyTestProgram
+        from .noseclasses import NumpyTestProgram
 
-            t = NumpyTestProgram(argv=argv, exit=False, plugins=plugins)
+        t = NumpyTestProgram(argv=argv, exit=False, plugins=plugins)
 
         return t.result
 
@@ -509,22 +432,6 @@ class NoseTester(object):
 
         Examples
         --------
-        >>> success = np.lib.bench() #doctest: +SKIP
-        Running benchmarks for numpy.lib
-        ...
-        using 562341 items:
-        unique:
-        0.11
-        unique1d:
-        0.11
-        ratio: 1.0
-        nUnique: 56230 == 56230
-        ...
-        OK
-
-        >>> success #doctest: +SKIP
-        True
-
         """
 
         print("Running benchmarks for %s" % self.package_name)
@@ -534,18 +441,10 @@ class NoseTester(object):
         argv += ['--match', r'(?:^|[\\b_\\.%s-])[Bb]ench' % os.sep]
 
         # import nose or make informative error
-        nose = import_nose()
+        import nose
 
         # get plugin to disable doctests
         from .noseclasses import Unplugger
         add_plugins = [Unplugger('doctest')]
 
         return nose.run(argv=argv, addplugins=add_plugins)
-
-
-def _numpy_tester():
-    if hasattr(np, "__version__") and ".dev0" in np.__version__:
-        mode = "develop"
-    else:
-        mode = "release"
-    return NoseTester(raise_warnings=mode, depth=1)

@@ -56,33 +56,9 @@ atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
-# Class allows us to save the results of the tests in runTests - see runTests
-# method docstring for details
-import nose
-class NumpyTestProgram(nose.core.TestProgram):
-    def runTests(self):
-        """Run Tests. Returns true on success, false on failure, and
-        sets self.success to the same value.
-
-        Because nose currently discards the test result object, but we need
-        to return it to the user, override TestProgram.runTests to retain
-        the result
-        """
-        if self.testRunner is None:
-            self.testRunner = nose.core.TextTestRunner(stream=self.config.stream,
-                                                       verbosity=self.config.verbosity,
-                                                       config=self.config)
-        plug_runner = self.config.plugins.prepareTestRunner(self.testRunner)
-        if plug_runner is not None:
-            self.testRunner = plug_runner
-        self.result = self.testRunner.run(self.test)
-        self.success = self.result.wasSuccessful()
-        return self.success
-
 def test(verbose=False, nocapture=False, pdb=False, stop=False):
     """A helper to run datalad's tests.  Requires nose
     """
-    import nose
     argv = ['datalad']
     # could make it 'smarter' but decided to be explicit so later we could
     # easily migrate to another runner without changing any API here
@@ -94,8 +70,8 @@ def test(verbose=False, nocapture=False, pdb=False, stop=False):
         argv.append('--pdb')
     if stop:
         argv.append('--stop')
-    #return nose.main('datalad', argv=argv, exit=False)
-    NumpyTestProgram(argv=argv, exit=False)
+    from datalad.support.third.nosetester import NoseTester
+    NoseTester('datalad').test(extra_argv=argv)
 
 test.__test__ = False
 

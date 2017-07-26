@@ -10,14 +10,13 @@ import os
 import doctest
 import inspect
 
-import numpy
 import nose
 from nose.plugins import doctests as npd
 from nose.plugins.errorclass import ErrorClass, ErrorClassPlugin
 from nose.plugins.base import Plugin
 from nose.util import src
 from .nosetester import get_package_name
-from .utils import KnownFailureException, KnownFailureTest
+#from .utils import KnownFailureException, KnownFailureTest
 
 
 # Some of the classes in this module begin with 'Numpy' to clearly distinguish
@@ -145,8 +144,6 @@ class NumpyDocTestCase(npd.DocTestCase):
                                      checker=checker)
 
 
-print_state = numpy.get_printoptions()
-
 class NumpyDoctest(npd.Doctest):
     name = 'numpydoctest'   # call nosetests with --with-numpydoctest
     score = 1000  # load late, after doctest builtin
@@ -215,10 +212,11 @@ class NumpyDoctest(npd.Doctest):
         #
         # Note: __file__ allows the doctest in NoseTester to run
         # without producing an error
-        test.globs = {'__builtins__':__builtins__,
+        test.globs = {#'__builtins__':__builtins__,
                       '__file__':'__main__',
                       '__name__':'__main__',
-                      'np':numpy}
+                      #'np':numpy
+        }
         # add appropriate scipy import for SciPy tests
         if 'scipy' in pkg_name:
             p = pkg_name.split('.')
@@ -257,7 +255,8 @@ class NumpyDoctest(npd.Doctest):
     # Add an afterContext method to nose.plugins.doctests.Doctest in order
     # to restore print options to the original state after each doctest
     def afterContext(self):
-        numpy.set_printoptions(**print_state)
+        # numpy.set_printoptions(**print_state)
+        pass
 
     # Ignore NumPy-specific build files that shouldn't be searched for tests
     def wantFile(self, file):
@@ -288,33 +287,33 @@ class Unplugger(object):
                                   if p.name != self.to_unplug]
 
 
-class KnownFailurePlugin(ErrorClassPlugin):
-    '''Plugin that installs a KNOWNFAIL error class for the
-    KnownFailureClass exception.  When KnownFailure is raised,
-    the exception will be logged in the knownfail attribute of the
-    result, 'K' or 'KNOWNFAIL' (verbose) will be output, and the
-    exception will not be counted as an error or failure.'''
-    enabled = True
-    knownfail = ErrorClass(KnownFailureException,
-                           label='KNOWNFAIL',
-                           isfailure=False)
-
-    def options(self, parser, env=os.environ):
-        env_opt = 'NOSE_WITHOUT_KNOWNFAIL'
-        parser.add_option('--no-knownfail', action='store_true',
-                          dest='noKnownFail', default=env.get(env_opt, False),
-                          help='Disable special handling of KnownFailure '
-                               'exceptions')
-
-    def configure(self, options, conf):
-        if not self.can_configure:
-            return
-        self.conf = conf
-        disable = getattr(options, 'noKnownFail', False)
-        if disable:
-            self.enabled = False
-
-KnownFailure = KnownFailurePlugin   # backwards compat
+# class KnownFailurePlugin(ErrorClassPlugin):
+#     '''Plugin that installs a KNOWNFAIL error class for the
+#     KnownFailureClass exception.  When KnownFailure is raised,
+#     the exception will be logged in the knownfail attribute of the
+#     result, 'K' or 'KNOWNFAIL' (verbose) will be output, and the
+#     exception will not be counted as an error or failure.'''
+#     enabled = True
+#     knownfail = ErrorClass(KnownFailureException,
+#                            label='KNOWNFAIL',
+#                            isfailure=False)
+#
+#     def options(self, parser, env=os.environ):
+#         env_opt = 'NOSE_WITHOUT_KNOWNFAIL'
+#         parser.add_option('--no-knownfail', action='store_true',
+#                           dest='noKnownFail', default=env.get(env_opt, False),
+#                           help='Disable special handling of KnownFailure '
+#                                'exceptions')
+#
+#     def configure(self, options, conf):
+#         if not self.can_configure:
+#             return
+#         self.conf = conf
+#         disable = getattr(options, 'noKnownFail', False)
+#         if disable:
+#             self.enabled = False
+#
+# KnownFailure = KnownFailurePlugin   # backwards compat
 
 
 # Class allows us to save the results of the tests in runTests - see runTests
