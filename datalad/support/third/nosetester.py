@@ -199,7 +199,7 @@ class NoseTester(object):
         argv : list
             command line arguments that will be passed to nose
         '''
-        argv = [__file__, self.package_path, '-s']
+        argv = [__file__, self.package_path]
         if label and label != 'full':
             if not isinstance(label, basestring):
                 raise TypeError('Selection label should be a string')
