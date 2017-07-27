@@ -8,4 +8,4 @@ curdir=$(dirname $0)
 #export PATH=$curdir/../git-annex.linux/:$PATH
 export PATH=$curdir:$PATH
 
-$curdir/datalad.exe "$@"
+$curdir/../datalad.exe "$@"
