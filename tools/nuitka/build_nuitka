@@ -27,7 +27,7 @@ echo "I: building with nuitka $nuitka_version under $python_version"
 mode="--exe --standalone `which datalad`"
 #mode="--module datalad"
 nuitka -j 8 --recurse-all --recurse-stdlib --python-flag=no_site --recurse-directory=datalad \
-   --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} \
+   --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,scipy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} \
    $mode
 # mkdir -p datalad.dist
  
