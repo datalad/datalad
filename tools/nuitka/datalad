@@ -1,0 +1,11 @@
+#!/bin/bash
+# Nuitka build wrapper
+
+set -eu
+curdir=$(dirname $0)
+
+# if we want to make all of git-annex stuff available
+#export PATH=$curdir/../git-annex.linux/:$PATH
+export PATH=$curdir:$PATH
+
+$curdir/datalad.exe "$@"
