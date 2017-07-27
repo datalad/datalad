@@ -45,9 +45,13 @@ class Test(Interface):
         stop=Parameter(
             args=("-x", "--stop"),
             action="store_true",
-            doc="stop running tests after the first error or failure")
+            doc="stop running tests after the first error or failure"),
+        module=Parameter(
+            args=("module",),
+            nargs="?",
+            doc="be verbose - list test names"),
     )
 
     @staticmethod
-    def __call__(verbose=False, nocapture=False, pdb=False, stop=False):
-        datalad.test(verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)
+    def __call__(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
+        datalad.test(module=module, verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)
