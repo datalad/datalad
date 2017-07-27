@@ -44,11 +44,12 @@ mkdir datalad.dist/bin
 cp -p $thisdir/datalad datalad.dist/bin
 rsync -a /usr/lib/git-annex.${os} datalad.dist/
 
-cd datalad.dist/bin
+cd datalad.dist
 # for silly nose
 mkdir -p nose
 echo "Bundled nose came without docs" > nose/usage.txt
 
+cd bin
 # symlinks to git/git-annex we use
 find ../git-annex.${os} -maxdepth 1 -type f -perm /o+x | while read f; do
   ln -s $f .
