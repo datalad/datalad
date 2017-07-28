@@ -251,6 +251,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
+
     def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend
 
