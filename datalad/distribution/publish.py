@@ -69,13 +69,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
     def _publish_data():
-        if ds.is_remote_annex_ignored(remote):
+        if ds.repo.is_remote_annex_ignored(remote):
             return [], []  # Cannot publish any data
         try:
             remote_wanted = ds.repo.get_preferred_content('wanted', remote)
         except CommandError as exc:
             if "cannot determine uuid" in str(exc):
-                if not ds.is_remote_annex_ignored(remote):
+                if not ds.repo.is_remote_annex_ignored(remote):
                     lgr.warning(
                         "Annex failed to determine UUID, skipping publishing data for now: %s",
                         exc_str(exc)
@@ -181,7 +181,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
     knew_remote_uuid = None
-    if is_annex_repo and not ds.is_remote_annex_ignored(remote):
+    if is_annex_repo and not ds.repo.is_remote_annex_ignored(remote):
         try:
             ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
             knew_remote_uuid = True
