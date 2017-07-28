@@ -28,6 +28,7 @@ from datalad.tests.utils import with_tempfile, assert_in, \
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import neq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import create_tree
@@ -133,14 +134,18 @@ def test_publish_simple(origin, src_path, dst_path):
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
+def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
+    # we will be publishing back to origin, so to not alter testrepo
+    # we will first clone it
+    origin = install(origin_path, source=pristine_origin, recursive=True)
     # prepare src
-    source = install(src_path, source=origin, recursive=True)
+    source = install(src_path, source=origin_path, recursive=True)
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -194,6 +199,19 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         list(sub2.get_branch_commits("master")))
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
+
+    # we are tracking origin but origin has different git-annex, since we
+    # cloned from it, so it is not aware of our git-annex
+    neq_(list(origin.repo.get_branch_commits("git-annex")),
+         list(source.repo.get_branch_commits("git-annex")))
+    # So if we first publish to it recursively, we would update
+    # all sub-datasets since git-annex branch would need to be pushed
+    res_ = publish(dataset=source, recursive=True)
+    eq_(set(r.path for r in res_[0]),
+        set(opj(*([source.path] + x)) for x in ([], ['subm 1'], ['subm 2'])))
+    # and now should carry the same state for git-annex
+    eq_(list(origin.repo.get_branch_commits("git-annex")),
+        list(source.repo.get_branch_commits("git-annex")))
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
@@ -337,6 +355,14 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     # before
     eq_({sub1.path, sub2.path},
         set(result_paths))
+
+    # if we publish again -- nothing to be published
+    eq_(source.publish(to="target"), ([], []))
+    # if we drop a file and publish again -- dataset should be published
+    # since git-annex branch was updated
+    source.drop('test-annex.dat')
+    eq_(source.publish(to="target"), ([source], []))
+    eq_(source.publish(to="target"), ([], []))  # and empty again if we try again
 
 
 @skip_ssh
