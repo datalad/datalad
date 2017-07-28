@@ -239,6 +239,13 @@ class Dataset(object):
                 self._cfg = self.repo.config
         return self._cfg
 
+    def is_remote_annex_ignored(self, remote):
+        """Return True if remote is explicitly ignored"""
+        return self.config.getbool(
+            'remote.{}'.format(remote), 'annex-ignore',
+            default=False
+        )
+
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
         # TODO wipe this function out completely once we are comfortable

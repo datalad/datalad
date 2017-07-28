@@ -338,6 +338,14 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     eq_({sub1.path, sub2.path},
         set(result_paths))
 
+    # if we publish again -- nothing to be published
+    eq_(source.publish(to="target"), ([], []))
+    # if we drop a file and publish again -- dataset should be published
+    # since git-annex branch was updated
+    source.drop('test-annex.dat')
+    eq_(source.publish(to="target"), ([source], []))
+    eq_(source.publish(to="target"), ([], []))  # and empty again if we try again
+
 
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])

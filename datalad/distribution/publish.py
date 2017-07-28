@@ -30,6 +30,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import CommandError
 
 from datalad.utils import assure_list
+from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
@@ -65,14 +66,24 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
 
+    is_annex_repo = isinstance(ds.repo, AnnexRepo)
+
     def _publish_data():
-        remote_wanted = ds.repo.get_preferred_content('wanted', remote)
-        if (paths or annex_copy_options or remote_wanted) and \
-              isinstance(ds.repo, AnnexRepo) and not \
-              ds.config.getbool(
-                  'remote.{}'.format(remote),
-                  'annex-ignore',
-                  False):
+        if ds.is_remote_annex_ignored(remote):
+            return [], []  # Cannot publish any data
+        try:
+            remote_wanted = ds.repo.get_preferred_content('wanted', remote)
+        except CommandError as exc:
+            if "cannot determine uuid" in str(exc):
+                if not ds.is_remote_annex_ignored(remote):
+                    lgr.warning(
+                        "Annex failed to determine UUID, skipping publishing data for now: %s",
+                        exc_str(exc)
+                    )
+                return [], []
+            raise
+
+        if (paths or annex_copy_options or remote_wanted) and is_annex_repo:
             lgr.info("Publishing {0} data to {1}".format(ds, remote))
             # overwrite URL with pushurl if any, reason:
             # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
@@ -150,27 +161,18 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # there was no tracking branch, check the push target
             remote_branch_name = ds.repo.get_active_branch()
 
-        if remote_branch_name in ds.repo.repo.remotes[remote].refs:
-            lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
-                      remote_branch_name, remote)
-            current_commit = ds.repo.repo.commit()
-            remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
-            if paths:
-                # if there were custom paths, we will look at the diff
-                lgr.debug("Since paths provided, looking at diff")
-                diff = current_commit.diff(
-                    remote_ref,
-                    paths=paths
-                )
-            else:
-                # if commits differ at all
-                lgr.debug("Since no paths provided, comparing commits")
-                diff = current_commit != remote_ref.commit
-        else:
-            lgr.debug("Remote '%s' has no branch matching %r. Will publish",
-                      remote, remote_branch_name)
-            # we don't have any remote state, need to push for sure
-            diff = True
+        diff = _get_remote_diff(ds, paths, None, remote, remote_branch_name)
+
+    # We might have got new information in git-annex branch although no other
+    # changes
+    if not diff and is_annex_repo:
+        try:
+            git_annex_commit = next(ds.repo.get_branch_commits('git-annex'))
+        except StopIteration:
+            git_annex_commit = None
+        diff = _get_remote_diff(ds, [], git_annex_commit, remote, 'git-annex')
+        if diff:
+            lgr.info("Will publish updated git-annex")
 
     # # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # annex_ignore = ds.config.getbool('remote.{}.annex-ignore'.format(remote), None)
@@ -179,12 +181,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
     knew_remote_uuid = None
-    if isinstance(ds.repo, AnnexRepo):
+    if is_annex_repo and not ds.is_remote_annex_ignored(remote):
         try:
             ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
             knew_remote_uuid = True
         except CommandError:
             knew_remote_uuid = False
+
     if knew_remote_uuid:
         # we can try publishing right away
         published += _publish_data()
@@ -214,7 +217,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             published.extend(pblsh)
             skipped.extend(skp)
 
-        if isinstance(ds.repo, AnnexRepo) and \
+        if is_annex_repo and \
                 ds.repo.is_special_annex_remote(remote):
             # There is nothing else to "publish"
             lgr.debug(
@@ -228,7 +231,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # we need to annex merge first. Otherwise a git push might be
         # rejected if involving all matching branches for example.
         # Once at it, also push the annex branch right here.
-        if isinstance(ds.repo, AnnexRepo):
+        if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
             ds.repo.fetch(remote=remote)
             ds.repo.merge_annex(remote)
@@ -246,7 +249,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         current_branch = ds.repo.get_active_branch()
         if current_branch:  # possibly make this conditional on a switch
             # TODO: this should become it own helper
-            if isinstance(ds.repo, AnnexRepo):
+            if is_annex_repo:
                 # annex could manage this branch
                 if current_branch.startswith('annex/direct') \
                         and ds.config.getbool('annex', 'direct', default=False):
@@ -263,7 +266,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                     # and thus probably broken -- test me!
                     current_branch = match_adjusted.group(1)
             things2push.append(current_branch)
-        if isinstance(ds.repo, AnnexRepo):
+        if is_annex_repo:
             things2push.append('git-annex')
         # check that all our magic found valid branches
         things2push = [t for t in things2push if t in ds.repo.get_branches()]
@@ -286,7 +289,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         published.append(ds)
 
     late_published_data = None
-    if knew_remote_uuid is False:
+    if knew_remote_uuid is False and is_annex_repo:
         # publish only after we tried to sync/push and if it was annex repo
         late_published_data = _publish_data()
         published += late_published_data
@@ -294,7 +297,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # if we published something (data, subdatasets) even though there were no
     # diff (thus no push), or there was an additional data published later
     if ((not diff and published) or late_published_data) \
-            and isinstance(ds.repo, AnnexRepo):
+            and is_annex_repo:
         # we need to do the same annex merge dance and push updated git-annex
         # and this way also trigger post-update hook which might update
         # web UI meta-data
@@ -309,6 +312,34 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
 
     return published, skipped
+
+
+def _get_remote_diff(ds, paths, current_commit, remote, remote_branch_name):
+    """Helper to check if remote has different state of the branch"""
+    if remote_branch_name in ds.repo.repo.remotes[remote].refs:
+        lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
+                  remote_branch_name, remote)
+        if current_commit is None:
+            current_commit = ds.repo.repo.commit()
+        remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
+        if paths:
+            # if there were custom paths, we will look at the diff
+            lgr.debug("Since paths provided, looking at diff")
+            diff = current_commit.diff(
+                remote_ref,
+                paths=paths
+            )
+        else:
+            # if commits differ at all
+            lgr.debug("Since no paths provided, comparing commits")
+            diff = current_commit != remote_ref.commit
+    else:
+        lgr.debug("Remote '%s' has no branch matching %r. Will publish",
+                  remote, remote_branch_name)
+        # we don't have any remote state, need to push for sure
+        diff = True
+
+    return diff
 
 
 @build_doc

@@ -615,14 +615,17 @@ def _query_remotes(
             if annex_description is not None:
                 info['annex-description'] = annex_description
         if get_annex_info and isinstance(ds.repo, AnnexRepo):
-            for prop in ('wanted', 'required', 'group'):
-                var = ds.repo.get_preferred_content(
-                    prop, '.' if remote == 'here' else remote)
-                if var:
-                    info['annex-{}'.format(prop)] = var
-            groupwanted = ds.repo.get_groupwanted(remote)
-            if groupwanted:
-                info['annex-groupwanted'] = groupwanted
+            if not ds.is_remote_annex_ignored(remote):
+                for prop in ('wanted', 'required', 'group'):
+                    var = ds.repo.get_preferred_content(
+                        prop, '.' if remote == 'here' else remote)
+                    if var:
+                        info['annex-{}'.format(prop)] = var
+                groupwanted = ds.repo.get_groupwanted(remote)
+                if groupwanted:
+                    info['annex-groupwanted'] = groupwanted
+            else:
+                info['annex-ignore'] = True
 
         info['status'] = 'ok'
         yield info
