@@ -639,8 +639,14 @@ def fs_render(fs_metadata, json=None, **kwargs):
         print(js.dumps(fs_metadata) + '\n')
 
 
-def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None, basepath=None):
-    """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
+def fs_traverse(path, repo, parent=None,
+                subdatasets=None,
+                render=True,
+                recurse_datasets=False,
+                recurse_directories=False,
+                json=None, basepath=None):
+    """Traverse path through its nodes and returns a dictionary of relevant 
+    attributes attached to each node
 
     Parameters
     ----------
@@ -650,10 +656,11 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
       Repo object the directory belongs too
     parent: dict
       Extracted info about parent directory
-    recursive: bool
+    recurse_directories: bool
       Recurse into subdirectories (note that subdatasets are not traversed)
     render: bool
-       To render from within function or not. Set to false if results to be manipulated before final render
+       To render from within function or not. Set to false if results to be 
+       manipulated before final render
 
     Returns
     -------
@@ -661,6 +668,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
       extracts and returns a (recursive) list of directory info at path
       does not traverse into annex, git or hidden directories
     """
+    subdatasets = subdatasets or []
     fs = fs_extract(path, repo, basepath=basepath or path)
     if isdir(path):                     # if node is a directory
         children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
@@ -669,15 +677,40 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
         for node in listdir(path):
             nodepath = opj(path, node)
 
+            # Might contain subdatasets, so we should analyze and prepare entries
+            # to pass down... in theory we could just pass full paths may be? strip
+            node_subdatasets = []
+            is_subdataset = False
+            if isdir(nodepath):
+                for subds in subdatasets:
+                    if subds == node:
+                        # it is the subdataset
+                        is_subdataset = True
+                    else:
+                        subds_split = split(subds)
+                        if subds_split[0] == node:
+                            node_subdatasets.append(opj(*subds_split[1:]))
+
             # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
-            if not ignored(nodepath):
+            if is_subdataset:
+                subds = _traverse_handle_subds(
+                    relpath(nodepath, repo.path),
+                    Dataset(repo.path),
+                    recurse_datasets=recurse_directories,
+                    recurse_directories=recurse_directories,
+                    json=json
+                )
+                children.append(subds)
+            elif not ignored(nodepath):
                 # if recursive, create info dictionary (within) each child node too
-                if recursive:
+                if recurse_directories:
                     subdir = fs_traverse(nodepath,
                                          repo,
+                                         subdatasets=node_subdatasets,
                                          parent=None,  # children[0],
-                                         recursive=recursive,
+                                         recurse_datasets=recurse_datasets,
+                                         recurse_directories=recurse_directories,
                                          json=json,
                                          basepath=basepath or path)
                     subdir.pop('nodes', None)
@@ -721,7 +754,10 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     return fs
 
 
-def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
+# TODO: recursive and all_ seems to be incongruent with datalad's
+# recursive to be for subdatasets
+def ds_traverse(rootds, parent=None, json=None,
+                recurse_datasets=False, recurse_directories=False,
                 long_=False):
     """Hierarchical dataset traverser
 
@@ -731,10 +767,12 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
       Root dataset to be traversed
     parent: Dataset
       Parent dataset of the current rootds
-    recursive: bool
-       Recurse into subdirectories of the current dataset
-    all_: bool
-       Recurse into subdatasets of the root dataset
+    recurse_datasets: bool
+      Recurse into subdatasets of the root dataset
+    recurse_directories: bool
+      Recurse into subdirectories of the current dataset
+      In both of above cases, if False, they will not be explicitly
+      recursed but data would be loaded from their meta-data files
 
     Returns
     -------
@@ -745,70 +783,44 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     fsparent = fs_extract(parent.path, parent.repo, basepath=rootds.path) if parent else None
 
     # (recursively) traverse file tree of current dataset
-    fs = fs_traverse(rootds.path, rootds.repo,
-                     render=False, parent=fsparent, recursive=all_,
-                     json=json)
-    size_list = [fs['size']]
+    fs = fs_traverse(
+        rootds.path, rootds.repo,
+        subdatasets=list(rootds.subdatasets(result_xfm='relpaths')),
+        render=False,
+        parent=fsparent,
+        # XXX note that here I kinda flipped the notions!
+        recurse_datasets=recurse_datasets,
+        recurse_directories=recurse_directories,
+        json=json
+    )
 
-    # (recursively) traverse each subdataset
-    children = []
-    # yoh: was in return results branch returning full datasets:
-    # for subds in rootds.subdatasets(result_xfm='datasets'):
-    # but since rpath is needed/used, decided to return relpaths
-    for subds_rpath in rootds.subdatasets(result_xfm='relpaths'):
+    # BUT if we are recurse_datasets but not recurse_directories
+    #     we need to handle those subdatasets then somehow since
+    #     otherwise we might not even get to them?!
+    # XXX
 
-        subds_path = opj(rootds.path, subds_rpath)
-        subds = Dataset(subds_path)
-        subds_json = metadata_locator(path='.', ds_path=subds_path)
-
-        def handle_not_installed():
-            # for now just traverse as fs
-            lgr.warning("%s is either not installed or lacks meta-data", subds)
-            subfs = fs_extract(subds_path, rootds, basepath=rootds.path)
-            # but add a custom type that it is a not installed subds
-            subfs['type'] = 'uninitialized'
-            # we need to kick it out from 'children'
-            # TODO:  this is inefficient and cruel -- "ignored" should be made
-            # smarted to ignore submodules for the repo
-            if fs['nodes']:
-                fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_rpath]
-            return subfs
-
-        if not subds.is_installed():
-            subfs = handle_not_installed()
-        elif recursive:
-            subfs = ds_traverse(subds,
-                                json=json,
-                                recursive=recursive,
-                                all_=all_,
-                                parent=rootds)
-            subfs.pop('nodes', None)
-            size_list.append(subfs['size'])
-        # else just pick the data from metadata_file of each subdataset
-        else:
-            lgr.info(subds.path)
-            if exists(subds_json):
-                with open(subds_json) as data_file:
-                    subfs = js.load(data_file)
-                    subfs.pop('nodes', None)    # remove children
-                    subfs['path'] = subds_rpath # reassign the path
-                    size_list.append(subfs['size'])
-            else:
-                # the same drill as if not installed
-                lgr.warning("%s is installed but no meta-data yet", subds)
-                subfs = handle_not_installed()
-
-        children.extend([subfs])
-
-    # sum sizes of all 1st level children dataset
-    children_size = {}
-    for subdataset_size in size_list:
-        for size_type, subds_size in subdataset_size.items():
-            children_size[size_type] = children_size.get(size_type, 0) + machinesize(subds_size)
-
-    # update current dataset sizes to the humanized aggregate subdataset sizes
-    fs['size'] = {size_type: humanize.naturalsize(size)
-                  for size_type, size in children_size.items()}
+    # size_list = [fs['size']]
+    #
+    # # (recursively) traverse each subdataset
+    # children = []
+    # # yoh: was in return results branch returning full datasets:
+    # # for subds in rootds.subdatasets(result_xfm='datasets'):
+    # # but since rpath is needed/used, decided to return relpaths
+    # for subds_rpath in rootds.subdatasets(result_xfm='relpaths'):
+    #
+    #     subfs = _traverse_handle_subds(subds_rpath, rootds, recursive, all_, json)
+    #
+    #     children.extend([subfs])
+    #
+    # # sum sizes of all 1st level children dataset
+    # children_size = {}
+    # for subdataset_size in size_list:
+    #     for size_type, subds_size in subdataset_size.items():
+    #         children_size[size_type] = children_size.get(size_type, 0) + machinesize(subds_size)
+    #
+    # # update current dataset sizes to the humanized aggregate subdataset sizes
+    # fs['size'] = {size_type: humanize.naturalsize(size)
+    #               for size_type, size in children_size.items()}
     fs['nodes'][0]['size'] = fs['size']  # update self's updated size in nodes sublist too!
 
     # add dataset specific entries to its dict
@@ -821,7 +833,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
         time.localtime(getmtime(index_file))) if exists(index_file) else ''
 
     # append children datasets info to current dataset
-    fs['nodes'].extend(children)
+    #fs['nodes'].extend(children)
 
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
@@ -829,9 +841,63 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all_=False,
     return fs
 
 
+def _traverse_handle_subds(subds_rpath, rootds,
+                    recurse_datasets, recurse_directories, json):
+
+    subds_path = opj(rootds.path, subds_rpath)
+    subds = Dataset(subds_path)
+    subds_json = metadata_locator(path='.', ds_path=subds_path)
+
+    def handle_not_installed():
+        # for now just traverse as fs
+        lgr.warning("%s is either not installed or lacks meta-data", subds)
+        subfs = fs_extract(subds_path, rootds, basepath=rootds.path)
+        # but add a custom type that it is a not installed subds
+        subfs['type'] = 'uninitialized'
+        # we need to kick it out from 'children'
+        # TODO:  this is inefficient and cruel -- "ignored" should be made
+        # smarted to ignore submodules for the repo
+        #if fs['nodes']:
+        #    fs['nodes'] = [c for c in fs['nodes'] if c['path'] != subds_rpath]
+        return subfs
+
+    if not subds.is_installed():
+        subfs = handle_not_installed()
+    elif recurse_datasets:
+        subfs = ds_traverse(subds,
+                            json=json,
+                            recurse_datasets=recurse_datasets,
+                            recurse_directories=recurse_directories,
+                            parent=rootds)
+        subfs.pop('nodes', None)
+        #size_list.append(subfs['size'])
+    # else just pick the data from metadata_file of each subdataset
+    else:
+        subfs = None
+        lgr.info(subds.path)
+        if exists(subds_json):
+            with open(subds_json) as data_file:
+                subfs = js.load(data_file)
+                subfs.pop('nodes', None)  # remove children
+                subfs['path'] = subds_rpath  # reassign the path
+                #size_list.append(subfs['size'])
+        else:
+            # the same drill as if not installed
+            lgr.warning("%s is installed but no meta-data yet", subds)
+            subfs = handle_not_installed()
+    return subfs
+
+
 def _ls_json(loc, fast=False, **kwargs):
-    # hierarchically traverse file tree of (sub-)dataset(s) under path passed(loc)
-    return ds_traverse(Dataset(loc), parent=None, **kwargs)
+    # hierarchically traverse file tree of (sub-)dataset(s) under path
+    # passed(loc)
+    recurse_datasets = kwargs.pop('recursive', False)
+    recurse_directories = kwargs.pop('all_', False)
+    return ds_traverse(
+        Dataset(loc), parent=None,
+        recurse_directories=recurse_directories,
+        recurse_datasets=recurse_datasets,
+        **kwargs)
 
 
 #
