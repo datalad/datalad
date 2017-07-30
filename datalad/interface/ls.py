@@ -592,7 +592,8 @@ def fs_extract(nodepath, repo, basepath='/'):
     metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
     if exists(metadata_path):
         # might need flattening!  TODO: flatten when aggregating?  why wasn't done?
-        metadata = js.load(open(metadata_path))
+        with open(metadata_path) as t:
+            metadata = js.load(t)
         # might be too heavy to carry around, so will do basic flattening manually
         # and in a basic fashion
         # import jsonld

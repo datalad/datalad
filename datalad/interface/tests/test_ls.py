@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import hashlib
+import json as js
 
 from glob import glob
 from collections import Counter
@@ -22,8 +23,10 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from ...api import ls
-from ...utils import swallow_outputs, swallow_logs, chpwd
-from ...tests.utils import assert_equal, assert_in, assert_raises, assert_not_equal
+from ...utils import swallow_outputs, swallow_logs, chpwd, _path_
+from ...tests.utils import assert_equal, assert_in, assert_raises, assert_false
+from ...tests.utils import assert_in
+from ...tests.utils import assert_not_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
@@ -180,18 +183,24 @@ def test_fs_traverse(topdir):
 
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
-                  'subdir': {'file1.txt': '123', 'file2.txt': '123'},
-                  'subgit': {'fgit.txt': '123'}},
+                  'subdir': {'file1.txt': '123',
+                             'file2.txt': '123',
+                             },
+                  'subgit': {'fgit.txt': '123'},
+                  'subds2': {'file': '124'}},
           '.hidden': {'.hidden_file': '123'}})
 def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
-    ds = Dataset(topdir)
+    dsj = Dataset(topdir)
     # create some file and commit it
-    open(opj(ds.path, 'subdsfile.txt'), 'w').write('123')
-    ds.add(path='subdsfile.txt')
-    ds.save("Hello!", version_tag=1)
+    open(opj(dsj.path, 'subdsfile.txt'), 'w').write('123')
+    dsj.add(path='subdsfile.txt')
+    dsj.save("Hello!", version_tag=1)
     # add a subdataset
-    ds.install('subds', source=topdir)
+    dsj.install('subds', source=topdir)
+
+    subdirds = dsj.create(_path_('dir/subds2'), force=True)
+    subdirds.add('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
     git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)              # commit to git to init git repo
@@ -203,46 +212,74 @@ def test_ls_json(topdir):
     meta_path = opj(topdir, meta_dir)
 
     def get_metahash(*path):
+        if not path:
+            path = ['/']
         return hashlib.md5(opj(*path).encode('utf-8')).hexdigest()
+
+    def get_metapath(dspath, *path):
+        return _path_(dspath, meta_dir, get_metahash(*path))
+
+    def get_meta(dspath, *path):
+        with open(get_metapath(dspath, *path)) as f:
+            return js.load(f)
 
     for all_ in [True, False]:
         for recursive in [True, False]:
             for state in ['file', 'delete']:
                 with swallow_logs(), swallow_outputs():
-                    ds = _ls_json(topdir, json=state, all_=all_, recursive=recursive)
+                    dsj = _ls_json(topdir, json=state, all_=all_, recursive=recursive)
 
                 # subdataset should have its json created and deleted when all=True else not
-                subds_metahash = get_metahash('/')
-                subds_metapath = opj(topdir, 'subds', meta_dir, subds_metahash)
+                subds_metapath = get_metapath(opj(topdir, 'subds'))
                 assert_equal(exists(subds_metapath), (state == 'file' and recursive))
 
                 # root should have its json file created and deleted in all cases
-                ds_metahash = get_metahash('/')
-                ds_metapath = opj(meta_path, ds_metahash)
+                ds_metapath = get_metapath(topdir)
                 assert_equal(exists(ds_metapath), state == 'file')
 
                 # children should have their metadata json's created and deleted only when recursive=True
-                child_metahash = get_metahash('dir', 'subdir')
-                child_metapath = opj(meta_path, child_metahash)
+                child_metapath = get_metapath(topdir, 'dir', 'subdir')
                 assert_equal(exists(child_metapath), (state == 'file' and all_))
 
                 # ignored directories should not have json files created in any case
-                for subdir in [('.hidden'), ('dir', 'subgit')]:
-                    child_metahash = get_metahash(*subdir)
-                    assert_equal(exists(opj(meta_path, child_metahash)), False)
+                for subdir in [('.hidden',), ('dir', 'subgit')]:
+                    assert_false(exists(get_metapath(topdir, *subdir)))
 
                 # check if its updated in its nodes sublist too. used by web-ui json. regression test
-                assert_equal(ds['nodes'][0]['size']['total'], ds['size']['total'])
+                assert_equal(dsj['nodes'][0]['size']['total'], dsj['size']['total'])
 
                 # check size of subdataset
-                subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
+                subds = [item for item in dsj['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
                 assert_equal(subds['size']['total'], '3 Bytes')
+
+                # dir/subds2 must not be listed among nodes of the top dataset:
+                topds_nodes = {x['name']: x for x in dsj['nodes']}
+
+                assert_in('subds', topds_nodes)
+                # condition here is a bit a guesswork by yoh later on
+                # TODO: here and below clear destiny/interaction of all_ and recursive
+                assert_equal(dsj['size']['total'],
+                             '15 Bytes' if (recursive and all_) else
+                             ('9 Bytes' if (recursive or all_) else '3 Bytes')
+                )
+
+                # https://github.com/datalad/datalad/issues/1674
+                if state == 'file' and all_:
+                    dirj = get_meta(topdir, 'dir')
+                    dir_nodes = {x['name']: x for x in dirj['nodes']}
+                    # it should be present in the subdir meta
+                    #assert_in('subds2', dir_nodes)
+                # and not in topds
+                #assert_not_in('subds2', topds_nodes)
 
                 # run non-recursive dataset traversal after subdataset metadata already created
                 # to verify sub-dataset metadata being picked up from its metadata file in such cases
                 if state == 'file' and recursive and not all_:
-                    ds = _ls_json(topdir, json='file', all_=False)
-                    subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
+                    dsj = _ls_json(topdir, json='file', all_=False)
+                    subds = [
+                        item for item in dsj['nodes']
+                        if item['name'] == ('subdsfile.txt' or 'subds')
+                    ][0]
                     assert_equal(subds['size']['total'], '3 Bytes')
 
 
