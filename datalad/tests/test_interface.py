@@ -64,8 +64,6 @@ def test_param():
     # constraints
     p = Parameter(doc=doc, constraints=cnstr.EnsureInt() | cnstr.EnsureStr())
     autodoc = p.get_autodoc('testname')
-    assert_true("convertible to type 'int'" in autodoc)
-    assert_true('must be a string' in autodoc)
     assert_true('int or str' in autodoc)
 
     with assert_raises(ValueError) as cmr:

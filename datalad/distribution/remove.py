@@ -32,7 +32,7 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.save import Save
 from datalad.distribution.drop import _drop_files
@@ -64,13 +64,12 @@ class Remove(Interface):
     subdirectories within a dataset as always done automatically. An optional
     recursion limit is applied relative to each given input path.
 
-    Examples
-    --------
+    Examples:
 
-    Permanently remove a subdataset from a dataset and wipe out the subdataset
-    association too::
+      Permanently remove a subdataset from a dataset and wipe out the subdataset
+      association too::
 
-      ~/some/dataset$ datalad remove somesubdataset1
+        ~/some/dataset$ datalad remove somesubdataset1
     """
     _action = 'remove'
 

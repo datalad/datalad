@@ -18,7 +18,7 @@ from os.path import relpath
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
@@ -289,7 +289,8 @@ class Siblings(Interface):
             **dict(
                 res,
                 path=path,
-                with_annex='+' if 'annex-uuid' in res else '-',
+                with_annex='+' if 'annex-uuid' in res \
+                    else ('-' if res.get('annex-ignore', None) else '?'),
                 spec=spec)))
 
 
@@ -615,14 +616,31 @@ def _query_remotes(
             if annex_description is not None:
                 info['annex-description'] = annex_description
         if get_annex_info and isinstance(ds.repo, AnnexRepo):
-            for prop in ('wanted', 'required', 'group'):
-                var = ds.repo.get_preferred_content(
-                    prop, '.' if remote == 'here' else remote)
-                if var:
-                    info['annex-{}'.format(prop)] = var
-            groupwanted = ds.repo.get_groupwanted(remote)
-            if groupwanted:
-                info['annex-groupwanted'] = groupwanted
+            if not ds.repo.is_remote_annex_ignored(remote):
+                try:
+                    for prop in ('wanted', 'required', 'group'):
+                        var = ds.repo.get_preferred_content(
+                            prop, '.' if remote == 'here' else remote)
+                        if var:
+                            info['annex-{}'.format(prop)] = var
+                    groupwanted = ds.repo.get_groupwanted(remote)
+                    if groupwanted:
+                        info['annex-groupwanted'] = groupwanted
+                except CommandError as exc:
+                    if 'cannot determine uuid' in str(exc):
+                        # not an annex (or no connection), would be marked as
+                        #  annex-ignore
+                        msg = "Failed to determine if %s carries annex." % remote
+                        ds.repo.config.reload()
+                        if ds.repo.is_remote_annex_ignored(remote):
+                            msg += " Remote was marked by annex as annex-ignore.  " \
+                                   "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
+                        lgr.warning(msg)
+                        info['annex-ignore'] = True
+                    else:
+                        raise
+            else:
+                info['annex-ignore'] = True
 
         info['status'] = 'ok'
         yield info

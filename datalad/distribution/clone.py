@@ -10,6 +10,7 @@
 
 
 import logging
+import re
 from os import listdir
 from os.path import relpath
 from os.path import pardir
@@ -17,7 +18,7 @@ from os.path import exists
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import location_description
 # from datalad.interface.common_opts import git_opts
@@ -101,6 +102,7 @@ class Clone(Interface):
         reckless=reckless_opt,
         alt_sources=Parameter(
             args=('--alternative-sources',),
+            dest='alt_sources',
             metavar='SOURCE',
             nargs='+',
             doc="""Alternative sources to be tried if a dataset cannot
@@ -236,6 +238,15 @@ class Clone(Interface):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
                     rmtree(dest_path)
+                if 'could not create work tree' in e.stderr.lower():
+                    # this cannot be fixed by trying another URL
+                    yield get_status_dict(
+                        status='error',
+                        message=re.match(r".*fatal: (.*)\n",
+                                         e.stderr,
+                                         flags=re.MULTILINE | re.DOTALL).group(1),
+                        **status_kwargs)
+                    return
 
         if not destination_dataset.is_installed():
             yield get_status_dict(

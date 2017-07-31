@@ -34,7 +34,7 @@ from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import get_tree_roots
 from datalad.interface.utils import discover_dataset_trace_to_targets
 

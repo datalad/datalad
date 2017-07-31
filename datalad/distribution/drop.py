@@ -37,7 +37,7 @@ from datalad.interface.results import success_status_map
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 
 lgr = logging.getLogger('datalad.distribution.drop')
 
@@ -129,17 +129,15 @@ class Drop(Interface):
     before file content is dropped. As these checks could lead to slow
     operation (network latencies, etc), they can be disabled.
 
+    Examples:
 
-    Examples
-    --------
+      Drop all file content in a dataset::
 
-    Drop all file content in a dataset::
+        ~/some/dataset$ datalad drop
 
-      ~/some/dataset$ datalad drop
+      Drop all file content in a dataset and all its subdatasets::
 
-    Drop all file content in a dataset and all its subdatasets::
-
-      ~/some/dataset$ datalad drop --recursive
+        ~/some/dataset$ datalad drop --recursive
 
     """
     _action = 'drop'

@@ -893,7 +893,7 @@ class GitRepo(RepoInterface):
                 for f in re.findall("'(.*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
-    def remove(self, files, **kwargs):
+    def remove(self, files, recursive=False, **kwargs):
         """Remove files.
 
         Calls git-rm.
@@ -902,6 +902,8 @@ class GitRepo(RepoInterface):
         ----------
         files: str
           list of paths to remove
+        recursive: False
+          either to allow recursive removal from subdirectories
         kwargs:
           see `__init__`
 
@@ -913,6 +915,8 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
 
+        if recursive:
+            kwargs['r'] = True
         stdout, stderr = self._git_custom_command(
             files, ['git', 'rm'] + to_options(**kwargs))
 
@@ -1159,35 +1163,19 @@ class GitRepo(RepoInterface):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self, with_refs_only=False, with_urls_only=False):
+    def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
 
         Parameters
         ----------
-        with_refs_only : bool, optional
-          return only remotes with any refs.  E.g. annex special remotes
-          would not have any refs
+        with_urls_only : bool, optional
+          return only remotes which have urls
 
         Returns
         -------
         remotes : list of str
           List of names of the remotes
         """
-
-        # Note: This still uses GitPython and therefore might cause a gitpy.Repo
-        # instance to be created.
-        if with_refs_only:
-            # older versions of GitPython might not tolerate remotes without
-            # any references at all, so we need to catch
-            remotes = []
-            for remote in self.repo.remotes:
-                try:
-                    if len(remote.refs):
-                        remotes.append(remote.name)
-                except AssertionError as exc:
-                    if "not have any references" not in str(exc):
-                        # was some other reason
-                        raise
 
         # Note: read directly from config and spare instantiation of gitpy.Repo
         # since we need this in AnnexRepo constructor. Furthermore gitpy does it
@@ -1418,17 +1406,6 @@ class GitRepo(RepoInterface):
         return self._git_custom_command(
             '', ['git', 'remote', 'remove', name]
         )
-
-    def show_remotes(self, name='', verbose=False):
-        """
-        """
-
-        options = ["-v"] if verbose else []
-        name = [name] if name else []
-        out, err = self._git_custom_command(
-            '', ['git', 'remote'] + options + ['show'] + name
-        )
-        return out.rstrip(linesep).splitlines()
 
     def update_remote(self, name=None, verbose=False):
         """

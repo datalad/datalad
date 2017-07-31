@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj, exists, relpath, dirname
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt
@@ -48,11 +48,6 @@ class AggregateMetaData(Interface):
     types are configures. Moreover, it is possible to aggregate meta data from
     any subdatasets into the superdataset, in order to facilitate data
     discovery without having to obtain any subdataset.
-
-    Returns
-    -------
-    List
-      Any datasets where (updated) aggregated meta data was saved.
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -85,6 +80,12 @@ class AggregateMetaData(Interface):
             recursion_limit=None,
             save=True,
             if_dirty='save-before'):
+        """
+        Returns
+        -------
+        List
+          Any datasets where (updated) aggregated meta data was saved.
+        """
         ds = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
         modified_ds = []

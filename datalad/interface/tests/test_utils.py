@@ -35,7 +35,7 @@ from datalad.support.constraints import EnsureKeyChoice
 
 from ..base import Interface
 from ..utils import eval_results
-from ..utils import build_doc
+from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
 from ..utils import get_paths_by_dataset
 from ..utils import filter_unmodified

@@ -26,7 +26,7 @@ from six.moves.urllib.error import HTTPError
 from ..cmdline.helpers import get_repo_instance
 from ..utils import auto_repr
 from .base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from ..ui import ui
 from ..utils import swallow_logs
 from ..consts import METADATA_DIR
@@ -54,8 +54,7 @@ class Ls(Interface):
 
     ATM only s3:// URLs and datasets are supported
 
-    Examples
-    --------
+    Examples:
 
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
       $ datalad ls                               # to list current dataset

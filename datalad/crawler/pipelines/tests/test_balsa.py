@@ -220,7 +220,7 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     commits = {b: list(repo.get_branch_commits(b)) for b in branches}
     eq_(len(commits['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
-    eq_(len(commits['master']), 5)  # all commits out there -- init ds + init crawler + 1*(incoming, processed, merge)
+    eq_(len(commits['master']), 6)  # all commits out there -- init ds + init crawler + 1*(incoming, processed, merge)
 
     with chpwd(outd):
         eq_(set(glob('*')), {'dir1', 'file1.nii'})
@@ -250,7 +250,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
 
 @with_tree(tree={
-
     'study': {
         'show': {
             'WG33': {
@@ -259,7 +258,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/RIBX">dir1 / file2.nii</a>
                                     <a href="/file/show/GSRD">file1b.nii</a>
-
                                     %s
                                   </body></html>""" % _PLUG_HERE,
             },
@@ -273,7 +271,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
         }
     },
-
     'file': {
         'show': {
             'JX5V': {
@@ -293,7 +290,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
 
         },
-
         'download': {
             'file1.nii': "content of file1.nii is different",
             'file1b.nii': "content of file1b.nii",
@@ -343,7 +339,8 @@ def test_balsa_pipeline2(ind, topurl, outd, clonedir):
         './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/meta/balsa.json',
-        './file1.nii', './dir1/file2.nii',
+        './file1.nii',
+        './dir1/file2.nii',
     }
 
     eq_(set(all_files), target_files)

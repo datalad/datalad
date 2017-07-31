@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from os.path import join as opj
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 
@@ -67,6 +68,20 @@ definitions = {
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
         'default': dirs.user_cache_dir,
+    },
+    'datalad.locations.system-plugins': {
+        'ui': ('question', {
+               'title': 'System plugin directory',
+               'text': 'Where should datalad search for system plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'plugins'),
+    },
+    'datalad.locations.user-plugins': {
+        'ui': ('question', {
+               'title': 'User plugin directory',
+               'text': 'Where should datalad search for user plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'plugins'),
     },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {

@@ -30,7 +30,8 @@ from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
+from datalad.interface.utils import eval_results
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
@@ -39,8 +40,6 @@ from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
-from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -172,6 +171,20 @@ def _create_dataset_sibling(
                 ssh("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
                 path_exists = False
+                # Since it is gone now, git-annex also should forget about it
+                remotes = ds.repo.get_remotes()
+                if name in remotes:
+                    # so we had this remote already, we should announce it dead
+                    # XXX what if there was some kind of mismatch and this name
+                    # isn't matching the actual remote UUID?  should have we
+                    # checked more carefully?
+                    lgr.info(
+                        "Announcing existing remote %s dead to annex and removing",
+                        name
+                    )
+                    if isinstance(ds.repo, AnnexRepo):
+                        ds.repo.set_remote_dead(name)
+                    ds.repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
@@ -717,18 +730,23 @@ git update-server-info
 # DataLad
 #
 # (Re)generate meta-data for DataLad Web UI and possibly init new submodules
-dsdir="{path}"
+dsdir="$(dirname $0)/../.."
 logfile="$dsdir/{WEB_META_LOG}/{log_filename}"
+
+if [ ! -e "$dsdir/.git" ]; then
+  echo Assumption of being under .git has failed >&2
+  exit 1
+fi
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR="$PWD/.git" datalad ls -a --json file "$dsdir"; ) \
+  && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
 
 # Some submodules might have been added and thus we better init them
-( cd ..; git submodule update --init >> "$logfile" 2>&1 || : ; )
+( cd "$dsdir"; git submodule update --init || : ; ) >> "$logfile" 2>&1
 '''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:

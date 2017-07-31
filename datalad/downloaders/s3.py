@@ -188,7 +188,7 @@ class S3Downloader(BaseDownloader):
         try:
             key = self._bucket.get_key(url_filepath, version_id=params.get('versionId', None))
         except S3ResponseError as e:
-            raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
+            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         if key is None:
             raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))

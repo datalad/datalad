@@ -348,16 +348,15 @@ def test_GitRepo_files_decorator():
 def test_GitRepo_remote_add(orig_path, path):
 
     gr = GitRepo.clone(orig_path, path)
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     assert_in('origin', out)
     eq_(len(out), 1)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     assert_in('origin', out)
     assert_in('github', out)
     eq_(len(out), 2)
-    out = gr.show_remotes('github')
-    assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
+    eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
@@ -367,27 +366,9 @@ def test_GitRepo_remote_remove(orig_path, path):
     gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     gr.remove_remote('github')
-    out = gr.show_remotes()
+    out = gr.get_remotes()
     eq_(len(out), 1)
     assert_in('origin', out)
-
-
-@with_testrepos(flavors=local_testrepo_flavors)
-@with_tempfile
-def test_GitRepo_remote_show(orig_path, path):
-
-    gr = GitRepo.clone(orig_path, path)
-    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.show_remotes(verbose=True)
-    eq_(len(out), 4)
-    assert_in('origin\t%s (fetch)' % orig_path, out)
-    assert_in('origin\t%s (push)' % orig_path, out)
-    # Some fellas might have some fancy rewrite rules for pushes, so we can't
-    # just check for specific protocol
-    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(fetch\)',
-              out)
-    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(push\)',
-              out)
 
 
 @with_testrepos(flavors=local_testrepo_flavors)

@@ -21,20 +21,16 @@ def _generate_func_api():
     from collections import namedtuple
     from functools import wraps
 
-    from datalad import cfg
-
-    from .interface.base import update_docstring_with_parameters
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
-    from .interface.base import alter_interface_docs_for_api
-    from .interface.base import merge_allargs2kwargs
+    from .interface.base import get_allargs_as_kwargs
 
     def _kwargs_to_namespace(call, args, kwargs):
         """
         Given a __call__, args and kwargs passed, prepare a cmdlineargs-like
         thing
         """
-        kwargs_ = merge_allargs2kwargs(call, args, kwargs)
+        kwargs_ = get_allargs_as_kwargs(call, args, kwargs)
         # Get all arguments removing those possible ones used internally and
         # which shouldn't be exposed outside anyways
         [kwargs_.pop(k) for k in kwargs_ if k.startswith('_')]
