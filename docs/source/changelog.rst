@@ -11,39 +11,108 @@ Change log
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                Change Log
 
-This is a very high level and scarce summary of the changes between
-releases. We would recommend to consult log of the `DataLad git
-repository <http://github.com/datalad/datalad>`__ for more details ATM.
+This is a high level and scarce summary of the changes between releases.
+We would recommend to consult log of the `DataLad git
+repository <http://github.com/datalad/datalad>`__ for more details.
 
-0.6.1 (??? ??, 2017) -- will be better than ever
-================================================
+0.8.1 (??? ??, 2017) -- will be better than ever
+------------------------------------------------
 
-I bet we will fix some bugs and make a world even a better place.
+bet we will fix some bugs and make a world even a better place.
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``add-sibling`` has been fully replaced by the ``siblings`` command
--  ``create-sibling``, and ``unlock`` have been rewritting to support
-   the same common API as most other commands
-
-Enhancements and new features
------------------------------
-
--  ``siblings`` can now be used to query and configure a local
-   repository by using the sibling name ``here``
--  ``siblings`` can now query and set annex preferred content
-   configuration. This includes ``wanted`` (as previously supported in
-   other commands), and now also ``required``
--  documentation for all commands is now built in a uniform fashion,
-   leading to more...guess what...uniform documentation
--  Significant parts of the documentation of been updated
+-  hopefully none
 
 Fixes
------
+~~~~~
+
+?
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+?
+
+0.8.0 (Jul 31, 2017) -- it is better than ever
+----------------------------------------------
+
+A variety of fixes and enhancements
+
+Fixes
+~~~~~
+
+-  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
+   would now push merged ``git-annex`` branch even if no other changes
+   were done
+-  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
+   should be able to publish using relative path within SSH URI (git
+   hook would use relative paths)
+-  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
+   should better tollerate publishing to pure git and ``git-annex``
+   special remotes
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  `plugin <http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html>`__
+   mechanism came to replace
+   `export <http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html>`__.
+   See
+   `export\_tarball <http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html>`__
+   for the replacement of
+   `export <http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html>`__.
+   Now it should be easy to extend datalad's interface with custom
+   functionality to be invoked along with other commands.
+-  Minimalistic coloring of the results rendering
+-  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__/``copy_to``
+   got progress bar report now and support of ``--jobs``
+-  minor fixes and enhancements to crawler (e.g. support of recursive
+   removes)
+
+0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
+------------------------------------------------------------
+
+New features, refactorings, and bug fixes.
+
+Major refactoring and deprecations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  `add-sibling <http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html>`__
+   has been fully replaced by the
+   `siblings <http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html>`__
+   command
+-  `create-sibling <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html>`__,
+   and [unlock] have been re-written to support the same common API as
+   most other commands
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  `siblings <http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html>`__
+   can now be used to query and configure a local repository by using
+   the sibling name ``here``
+-  `siblings <http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html>`__
+   can now query and set annex preferred content configuration. This
+   includes ``wanted`` (as previously supported in other commands), and
+   now also ``required``
+-  New
+   `metadata <http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html>`__
+   command to interface with datasets/files
+   `meta-data <http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling>`__
+-  Documentation for all commands is now built in a uniform fashion
+-  Significant parts of the documentation of been updated
+-  Instantiate GitPython's Repo instances lazily
+
+Fixes
+~~~~~
 
 -  API documentation is now rendered properly as HTML, and is easier to
    browse by having more compact pages
+-  Closed files left open on various occasions (Popen PIPEs, etc)
+-  Restored basic (consumer mode of operation) compatibility with
+   Windows OS
 
 0.6.0 (Jun 14, 2017) -- German perfectionism
 --------------------------------------------

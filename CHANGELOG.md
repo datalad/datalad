@@ -408,12 +408,11 @@ publishing
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 
-[add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
+[add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
-[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
@@ -424,8 +423,8 @@ publishing
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
 [metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
-[publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
+[publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
