@@ -19,7 +19,7 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Do not attempt to [update] a not installed sub-dataset
 
 ### Enhancements and new features
 
