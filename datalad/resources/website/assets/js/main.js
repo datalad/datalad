@@ -439,8 +439,9 @@ function directory(jQuery, md5) {
         '<div id="installation">' +
         '<P>To install this dataset in your current directory use</P>' +
         '<span class="command">datalad install ' + ri + '</span>' +
-        '<P>To install with all subdatasets and all data</P>' +
-        '<span class="command">datalad install -r -g ' + ri + '</span>' +
+        '<P style="font-size: 90%;">To install with all sub-datasets add <span class="command-option">-r</span>.' +
+        '    To get all the data add <span class="command-option">-g</span>.' +
+        '    To get data in parallel add <span class="command-option">-JN</span>, where <span class="command-option">N</span> would be the number of parallel downloads. ' +
         '<P style="font-size: 90%;">For more information about DataLad and installation instructions visit <a href="http://datalad.org">datalad.org</a></P>' +
         '</div>');
   }
