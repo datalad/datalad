@@ -692,13 +692,18 @@ class GitRepo(RepoInterface):
         self._cfg = None
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
-        if hasattr(self, 'repo') and self.repo is not None \
-                and exists(self.path):  # gc might be late, so the (temporary)
-                                        # repo doesn't exist on FS anymore
+        try:
+            if hasattr(self, 'repo') and exists(self.path) \
+                    and self.repo is not None:
+                # gc might be late, so the (temporary)
+                # repo doesn't exist on FS anymore
 
-            self.repo.git.clear_cache()
-            if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                self.repo.index.write()
+                self.repo.git.clear_cache()
+                if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                    self.repo.index.write()
+        except InvalidGitRepositoryError:
+            # might have being removed and no longer valid
+            pass
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
