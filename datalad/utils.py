@@ -1237,7 +1237,7 @@ def safe_print(s):
     except UnicodeEncodeError:
         # failed to encode so let's do encoding while ignoring errors
         # to print at least something
-        s = s.encode(sys.stdout.encoding, errors='ignore') \
+        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii'), errors='ignore') \
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
