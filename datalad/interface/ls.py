@@ -381,15 +381,25 @@ class LsFormatter(string.Formatter):
     # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
     # unicode then
     # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
-    if sys.getdefaultencoding() == 'ascii':
-        OK = 'OK'   # u"✓"
-        NOK = 'X'  # u"✗"
-        NONE = '-'  # u"✗"
-    else:
-        # unicode versions which look better but which blow during tests etc
-        OK = u"✓"
-        NOK = u"✗"
-        NONE = u"✗"
+    # unicode versions which look better but which blow during tests etc
+    # Those might be reset by the constructor
+    OK = u"✓"
+    NOK = u"✗"
+    NONE = u"✗"
+
+    def __init__(self, *args, **kwargs):
+        super(LsFormatter, self).__init__(*args, **kwargs)
+        for setting_encoding in (sys.getdefaultencoding(),
+                                 sys.stdout.encoding):
+            try:
+                u"✓".encode(setting_encoding)
+            except UnicodeEncodeError:
+                lgr.debug("encoding %s found to not support unicode, resetting to safe alternatives", setting_encoding)
+                self.OK = 'OK'   # u"✓"
+                self.NOK = 'X'  # u"✗"
+                self.NONE = '-'  # u"✗"
+                break
+
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
@@ -494,7 +504,14 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     for dsm in dsms:
         fmt = fmts[dsm.__class__]
         ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
-        print(ds_str)
+        try:
+            print(ds_str)
+        except UnicodeEncodeError:
+            # failed to encode so let's do encoding while ignoring errors
+            # to print at least something
+            print(
+                ds_str.encode(sys.stdout.encoding, errors='ignore').encode()
+            )
 
 
 def machinesize(humansize):
