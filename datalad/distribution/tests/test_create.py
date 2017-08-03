@@ -76,16 +76,22 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create('sub', **raw),
         status='error',
-        message=('collision with known subdataset in dataset %s', ds.path))
+        message=('collision with known subdataset %s/ in dataset %s',
+                 'sub', ds.path)
+    )
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
     ds.uninstall('sub', check=False)
     assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_in_results(
-        ds.create('sub', **raw),
-        status='error',
-        message=('collision with known subdataset in dataset %s', ds.path))
+    # and now should fail to also create inplace or under
+    for s in 'sub', _path_('sub/subsub'):
+        assert_in_results(
+            ds.create(s, **raw),
+            status='error',
+            message=('collision with known subdataset %s/ in dataset %s',
+                     'sub', ds.path)
+        )
 
 
 @with_tempfile
