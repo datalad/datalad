@@ -29,6 +29,7 @@ from .base import Interface
 from datalad.interface.base import build_doc
 from ..ui import ui
 from ..utils import swallow_logs
+from ..utils import safe_print
 from ..consts import METADATA_DIR
 from ..consts import METADATA_FILENAME
 from ..dochelpers import exc_str
@@ -504,14 +505,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
     for dsm in dsms:
         fmt = fmts[dsm.__class__]
         ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
-        try:
-            print(ds_str)
-        except UnicodeEncodeError:
-            # failed to encode so let's do encoding while ignoring errors
-            # to print at least something
-            print(
-                ds_str.encode(sys.stdout.encoding, errors='ignore').encode()
-            )
+        safe_print(ds_str)
 
 
 def machinesize(humansize):
@@ -652,7 +646,7 @@ def fs_render(fs_metadata, json=None, **kwargs):
 
     # else dump json to stdout
     elif json == 'display':
-        print(js.dumps(fs_metadata) + '\n')
+        safe_print(js.dumps(fs_metadata) + '\n')
 
 
 def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None, basepath=None):

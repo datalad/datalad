@@ -190,7 +190,8 @@ def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
     ds = Dataset(topdir)
     # create some file and commit it
-    open(opj(ds.path, 'subdsfile.txt'), 'w').write('123')
+    with open(opj(ds.path, 'subdsfile.txt'), 'w') as f:
+        f.write('123')
     ds.add(path='subdsfile.txt')
     ds.save("Hello!", version_tag=1)
     # add a subdataset
