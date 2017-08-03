@@ -48,10 +48,12 @@ from ..utils import get_timestamp_suffix
 from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
+from ..utils import path_startswith
 
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from datalad.tests.utils import nok_
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
@@ -637,3 +639,12 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
         # non-dir paths are no issue
         eq_(get_dataset_root(fname), os.curdir)
+
+
+def test_path_startswith():
+    ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/'))
+    ok_(path_startswith('/aaa/b/c', '/aaa'))
+    nok_(path_startswith('/aaa/b/c', '/aa'))
+    nok_(path_startswith('/a/b', '/a/c'))
+    nok_(path_startswith('/a/b/c', '/a/c'))

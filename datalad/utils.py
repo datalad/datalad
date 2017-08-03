@@ -988,6 +988,12 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def path_startswith(path, prefix):
+    """Return True if path starts with prefix path"""
+    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
+           == with_pathsep(prefix)
+
+
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
