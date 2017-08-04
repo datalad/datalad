@@ -1237,7 +1237,8 @@ def safe_print(s):
     except UnicodeEncodeError:
         # failed to encode so let's do encoding while ignoring errors
         # to print at least something
-        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii'), errors='ignore') \
+        # explicit `or ascii` since somehow on buildbot it seemed to return None
+        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
