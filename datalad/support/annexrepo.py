@@ -1261,7 +1261,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'get',
                 args=options,
                 # TODO: eventually make use of --batch mode
-                files=fetch_files,
+                files=files,  # fetch_files
                 jobs=jobs,
                 expected_entries=expected_downloads)
         results_list = list(results)
@@ -2868,7 +2868,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             results = self._run_annex_command_json(
                 'copy',
                 args=annex_options,
-                files=copy_files,
+                files=files,  # copy_files,
                 jobs=jobs,
                 expected_entries=expected_copys
                 #log_stdout=True, log_stderr=not log_online,
