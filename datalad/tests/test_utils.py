@@ -51,6 +51,7 @@ from ..utils import get_dataset_root
 from ..utils import better_wraps
 from ..utils import path_startswith
 from ..utils import safe_print
+from ..utils import generate_chunks
 
 from ..support.annexrepo import AnnexRepo
 
@@ -376,6 +377,18 @@ def test_assure_bool():
         for v in values:
             eq_(assure_bool(v), t)
     assert_raises(ValueError, assure_bool, "unknown")
+
+
+def test_generate_chunks():
+    ok_generator(generate_chunks([1], 1))
+    eq_(list(generate_chunks([1], 1)), [[1]])
+    eq_(list(generate_chunks([1], 2)), [[1]])
+    eq_(list(generate_chunks([1, 2, 3], 2)), [[1, 2], [3]])
+    # type is preserved
+    eq_(list(generate_chunks((1, 2, 3), 2)), [(1, 2), (3,)])
+    # no hangers
+    eq_(list(generate_chunks((1, 2, 3, 4), 2)), [(1, 2), (3, 4)])
+    assert_raises(AssertionError, list, generate_chunks([1], 0))
 
 
 def test_any_re_search():

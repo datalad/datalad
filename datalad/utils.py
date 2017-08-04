@@ -66,6 +66,12 @@ except:  # pragma: no cover
     on_debian_wheezy = False
     linux_distribution_name = linux_distribution_release = None
 
+# Maximal length of cmdline string
+# Did not find anything in Python which could tell at run time and
+# probably   getconf ARG_MAX   might not be available
+# The last one would be the most conservative/Windows
+CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+
 #
 # Little helpers
 #
@@ -522,6 +528,15 @@ def unique(seq, key=None):
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
+
+def generate_chunks(container, size):
+    """Given a container, generate chunks from it with size up to `size`
+    """
+    # There could be a "smarter" solution but I think this would suffice
+    assert size > 0,  "Size should be non-0 positive"
+    while container:
+        yield container[:size]
+        container = container[size:]
 
 #
 # Generators helpers
