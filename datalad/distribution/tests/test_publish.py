@@ -465,3 +465,31 @@ def test_gh1426(origin_path, target_path):
     assert_result_count(res, 1)
     assert_result_count(res, 1, status='ok', type='dataset', path=origin.path)
     eq_(origin.repo.get_hexsha(), target.get_hexsha())
+
+
+@with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_publish_gh1691(origin, src_path, dst_path):
+
+    # prepare src; no subdatasets installed, but mount points present
+    source = install(src_path, source=origin, recursive=False)
+    ok_(exists(opj(src_path, "subm 1")))
+    assert_false(Dataset(opj(src_path, "subm 1")).is_installed())
+
+    # some content modification of the superdataset
+    create_tree(src_path, {'probe1': 'probe1'})
+    source.add('probe1')
+    ok_clean_git(src_path)
+
+    # create the target(s):
+    source.create_sibling(
+        'ssh://localhost:' + dst_path,
+        name='target', recursive=True)
+
+    # publish recursively:
+    results = source.publish(to='target', recursive=True)
+    # Note: ATM we get an IncompleteResultsError!
+    assert_result_count(results, 1)
+    assert_result_count(results, 1, status='ok', type='dataset', path=source.path)
+
