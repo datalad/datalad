@@ -2807,7 +2807,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # is the verb (copy, copy) or (get, put) and remote ('here', remote)?
         if '--key' not in options:
             expected_copys, copy_files = self._get_expected_files(
-                files, ['--not', '--in', remote])
+                files, ['--in', 'here', '--not', '--in', remote])
         else:
             copy_files = files
             assert(len(files) == 1)
@@ -2818,7 +2818,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(copy_files) != len(files):
-            lgr.info("Actually getting %d files", len(copy_files))
+            lgr.info("Actually copying %d files", len(copy_files))
 
         annex_options = ['--to=%s' % remote, '--json-progress']
         if options:

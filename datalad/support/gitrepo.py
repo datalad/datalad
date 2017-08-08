@@ -893,7 +893,7 @@ class GitRepo(RepoInterface):
                 for f in re.findall("'(.*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
-    def remove(self, files, **kwargs):
+    def remove(self, files, recursive=False, **kwargs):
         """Remove files.
 
         Calls git-rm.
@@ -902,6 +902,8 @@ class GitRepo(RepoInterface):
         ----------
         files: str
           list of paths to remove
+        recursive: False
+          either to allow recursive removal from subdirectories
         kwargs:
           see `__init__`
 
@@ -913,6 +915,8 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
 
+        if recursive:
+            kwargs['r'] = True
         stdout, stderr = self._git_custom_command(
             files, ['git', 'rm'] + to_options(**kwargs))
 

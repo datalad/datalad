@@ -389,7 +389,7 @@ class Interface(object):
                 'AddArchiveContent', 'AggregateMetaData',
                 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
                 'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
-                'Publish', 'SSHRun', 'Search'):
+                'Publish', 'SSHRun', 'Search', 'Test'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
