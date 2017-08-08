@@ -83,7 +83,8 @@ def test_tarball(path):
                     # ignore any files in .datalad for this test to not be
                     # susceptible to changes in how much we generate a meta info
                     nfiles += 1
-            # we have exactly three files, and expect no content for any directory
-            assert_equal(nfiles, 3)
+            # we have exactly four files (includes .gitattributes for default
+            # MD5E backend), and expect no content for any directory
+            assert_equal(nfiles, 4)
     check_contents(default_outname, 'datalad_%s' % ds.id)
     check_contents(custom_outname, 'myexport')

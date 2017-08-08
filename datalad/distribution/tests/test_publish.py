@@ -67,12 +67,13 @@ def test_smth_about_not_supported(p1, p2):
         name='target1')
     # source.publish(to='target1')
     with chpwd(p1):
-        # since we have only a single commit -- there is no HEAD^
+        # since we have only two commits (set backend, init dataset)
+        # -- there is no HEAD^^
         assert_result_count(
-            publish(to='target1', since='HEAD^', on_failure='ignore'),
+            publish(to='target1', since='HEAD^^', on_failure='ignore'),
             1,
             status='impossible',
-            message="fatal: bad revision 'HEAD^'")
+            message="fatal: bad revision 'HEAD^^'")
         # but now let's add one more commit, we should be able to pusblish
         source.repo.commit("msg", options=['--allow-empty'])
         publish(to='target1', since='HEAD^')  # must not fail now

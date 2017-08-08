@@ -37,6 +37,7 @@ from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
+from ...utils import _path_
 from ...utils import getpwd
 from ...utils import try_multiple
 from ...tests.utils import put_file_under_git
@@ -177,10 +178,6 @@ class initiate_dataset(object):
                     "Was instructed to add to super dataset but no super dataset "
                     "was found for %s" % ds
                 )
-
-        # create/AnnexRepo specification of backend does it non-persistently in .git/config
-        if backend:
-            put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
 
         return ds
 
@@ -854,9 +851,7 @@ class Annexificator(object):
         if self.repo.dirty and not exists(opj(path, '.gitattributes')) and isinstance(self.repo, AnnexRepo):
             backends = self.repo.default_backends
             if backends:
-                # then record default backend into the .gitattributes
-                put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backends[0],
-                                   annexed=False)
+                self.repo.set_default_backend(backends[0], commit=False)
 
     # at least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
