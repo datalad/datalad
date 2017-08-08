@@ -285,6 +285,11 @@ def test_AnnexRepo_get_remote_na(path):
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
     eq_(cme.exception.remote, "NotExistingRemote")
 
+    # and similar one whenever invoking with remote parameter
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', remote="NotExistingRemote")
+    eq_(cme.exception.remote, "NotExistingRemote")
+
 
 # 1 is enough to test file_has_content
 @with_batch_direct
@@ -1163,6 +1168,11 @@ def test_annex_copy_to(origin, clone):
     # Test that if we pass a list of items and annex processes them nicely,
     # we would obtain a list back. To not stress our tests even more -- let's mock
     def ok_copy(command, **kwargs):
+        # Check that we do pass to annex call only the list of files which we
+        #  asked to be copied
+        assert_in('copied1', kwargs['annex_options'])
+        assert_in('copied2', kwargs['annex_options'])
+        assert_in('existed', kwargs['annex_options'])
         return """
 {"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
@@ -1175,6 +1185,9 @@ def test_annex_copy_to(origin, clone):
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
     orig_run = repo._run_annex_command
+
+    # Kinda a bit off the reality since no nonex* would not be returned/handled
+    # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
         if command == 'copy':
             # That is not how annex behaves
@@ -1192,7 +1205,12 @@ def test_annex_copy_to(origin, clone):
         else:
             return orig_run(command, **kwargs)
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy):
+    def fail_to_copy_get_expected(files, expr):
+        assert files == ["copied", "existed", "nonex1", "nonex2"]
+        return {'akey1': 10}, ["copied"]
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+            patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
     eq_(cme.exception.results, ["copied"])
@@ -2121,3 +2139,11 @@ def test_AnnexRepo_is_managed_branch(path):
 def test_AnnexRepo_flyweight_monitoring_inode(path, store):
     # testing for issue #1512
     check_repo_deals_with_inode_change(AnnexRepo, path, store)
+
+
+@with_tempfile(mkdir=True)
+def test_fake_is_not_special(path):
+    ar = AnnexRepo(path, create=True)
+    # doesn't exist -- we fail by default
+    assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
+    assert_false(ar.is_special_annex_remote("fake", check_if_known=False))

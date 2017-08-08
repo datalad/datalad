@@ -24,7 +24,7 @@ from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
-    recursion_limit, git_opts, annex_opts
+    recursion_limit, git_opts, annex_opts, jobs_opt
 from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
@@ -181,7 +181,7 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
     #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
 
 
-def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False,
+def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
@@ -282,8 +282,17 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                     paths,
                     annex_copy_options,
                     force=force,
+                    jobs=jobs,
                     **kwargs):
                 yield r
+
+        if isinstance(ds.repo, AnnexRepo) and \
+                ds.repo.is_special_annex_remote(remote):
+            # There is nothing else to "publish"
+            lgr.debug(
+                "{0} is a special annex remote, no git push is needed".format(remote)
+            )
+            return
 
         lgr.info("Publishing {0} to {1}".format(ds, remote))
 
@@ -495,6 +504,7 @@ class Publish(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_copy_opts=annex_copy_opts,
+        jobs=jobs_opt,
     )
 
     @staticmethod
@@ -513,6 +523,7 @@ class Publish(Interface):
             git_opts=None,
             annex_opts=None,
             annex_copy_opts=None,
+            jobs=None
     ):
 
         # if ever we get a mode, for "with-data" we would need this
@@ -647,6 +658,7 @@ class Publish(Interface):
                            if p.get('type', None) != 'dataset'],
                     annex_copy_options=annex_copy_opts,
                     force=force,
+                    jobs=jobs,
                     transfer_data=transfer_data,
                     **res_kwargs):
                 yield r
