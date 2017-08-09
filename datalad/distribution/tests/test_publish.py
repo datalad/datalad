@@ -487,9 +487,12 @@ def test_publish_gh1691(origin, src_path, dst_path):
         'ssh://localhost:' + dst_path,
         name='target', recursive=True)
 
-    # publish recursively:
+    # publish recursively, which silently ignores non-installed datasets
     results = source.publish(to='target', recursive=True)
-    # Note: ATM we get an IncompleteResultsError!
     assert_result_count(results, 1)
     assert_result_count(results, 1, status='ok', type='dataset', path=source.path)
+
+    # if however, a non-installed subdataset is requsted explicitly, it'll fail
+    results = source.publish(path='subm 1', to='target', on_failure='ignore')
+    assert_result_count(results, 1, status='impossible', type='dataset', action='publish')
 
