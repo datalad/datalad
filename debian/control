@@ -71,7 +71,7 @@ Architecture: all
 Section: python
 Provides: ${python:Provides}
 Depends:
- git-annex (>= 6.20160808~) | git-annex-standalone (>= 6.20160808~),
+ git-annex (>= 6.20170525~) | git-annex-standalone (>= 6.20170525~),
  patool,
  python-appdirs,
  python-git (>= 2.1~),
