@@ -467,6 +467,7 @@ def test_gh1426(origin_path, target_path):
     eq_(origin.repo.get_hexsha(), target.get_hexsha())
 
 
+@skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
