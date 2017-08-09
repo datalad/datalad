@@ -17,6 +17,7 @@ from os.path import join as opj, exists
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
+from datalad.cmd import Runner
 from datalad.utils import chpwd
 from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
@@ -33,6 +34,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_set_equal
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
@@ -74,13 +76,18 @@ def _test_correct_publish(target_path, rootds=False, flat=True):
         assert_false(exists(opj(target_path, path)))
 
     hook_path = _path_(target_path, '.git/hooks/post-update')
-    ok_file_has_content(hook_path,
-                        '.*\ndsdir="%s"\n.*' % target_path,
-                        re_=True,
-                        flags=re.DOTALL)
+    # No longer the case -- we are no longer using absolute path in the
+    # script
+    # ok_file_has_content(hook_path,
+    #                     '.*\ndsdir="%s"\n.*' % target_path,
+    #                     re_=True,
+    #                     flags=re.DOTALL)
+    # No absolute path (so dataset could be moved) in the hook
+    with open(hook_path) as f:
+        assert_not_in(target_path, f.read())
     # correct ls_json command in hook content (path wrapped in "quotes)
     ok_file_has_content(hook_path,
-                        '.*datalad ls -a --json file "\$dsdir".*',
+                        '.*datalad ls -a --json file \..*',
                         re_=True,
                         flags=re.DOTALL)
 
@@ -416,6 +423,55 @@ def test_failon_no_permissions(src_path, target_path):
         name='goodperm',
         dataset=ds,
         sshurl="ssh://localhost" + opj(target_path, 'ds'))
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_replace_and_relative_sshpath(src_path, dst_path):
+    # We need to come up with the path relative to our current home directory
+    # https://github.com/datalad/datalad/issues/1653
+    dst_relpath = os.path.relpath(dst_path, os.path.expanduser('~'))
+    url = 'localhost:%s' % dst_relpath
+    ds = Dataset(src_path).create()
+    create_tree(ds.path, {'sub.dat': 'lots of data'})
+    ds.add('sub.dat')
+
+    ds.create_sibling(url)
+    published = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
+    # verify that hook runs and there is nothing in stderr
+    # since it exits with 0 exit even if there was a problem
+    out, err = Runner(cwd=opj(dst_path, '.git'))(_path_('hooks/post-update'))
+    assert_false(out)
+    assert_false(err)
+
+    # Verify that we could replace and publish no problem
+    # https://github.com/datalad/datalad/issues/1656
+    # Strangely it spits outs IncompleteResultsError exception atm... so just
+    # checking that it fails somehow
+    res = ds.create_sibling(url, on_failure='ignore')
+    assert_status('error', res)
+    assert_in('already configured', res[0]['message'][0])
+    ds.create_sibling(url, existing='replace')
+    published2 = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
+
+    # and one more test since in above test it would not puke ATM but just
+    # not even try to copy since it assumes that file is already there
+    create_tree(ds.path, {'sub2.dat': 'more data'})
+    ds.add('sub2.dat')
+    published3 = ds.publish(to='localhost', transfer_data='none')  # we publish just git
+    assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
+    # now publish "with" data, which should also trigger the hook!
+    # https://github.com/datalad/datalad/issues/1658
+    from glob import glob
+    from datalad.consts import WEB_META_LOG
+    logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
+    published4 = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published4, 1, path=opj(ds.path, 'sub2.dat'))
+    logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
+    eq_(len(logs_post), len(logs_prior) + 1)
 
 
 @skip_ssh

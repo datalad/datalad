@@ -215,6 +215,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
 
+    copied_data = False
     # skip right away if data transfer is not desired
     if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
         # remote might be set to be ignored by annex, or we might not even know yet its uuid
@@ -245,6 +246,10 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                     annex_copy_options,
                     force,
                     **kwargs):
+                # note if we published any data, no to sync annex branch below in this case
+                if r['status'] == 'ok' and r['action'] == 'publish' and \
+                        r.get('type', None) == 'file':
+                    copied_data = True
                 yield r
         else:
             # this remote either isn't an annex, or hasn't been properly initialized
@@ -261,11 +266,11 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     #
     # publish dataset (git push)
     #
-    if not diff:
+    if not diff and not copied_data:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
         yield get_status_dict(ds=ds, status='notneeded', **kwargs)
-        # there could still be paths to be copied
     else:
+        # there could still be paths to be copied
         # publishing of `remote` might depend on publishing other
         # remote(s) first:
         # define config var name for potential publication dependencies
@@ -410,6 +415,7 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
     else:
         # all good: remote given and is known
         ds_remote_info[ds_path] = {'remote': to}
+
 
 
 @build_doc

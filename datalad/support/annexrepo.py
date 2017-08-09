@@ -863,6 +863,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self).set_remote_url(name, url, push=push)
         self._set_shared_connection(name, url)
 
+    def set_remote_dead(self, name):
+        """Announce to annex that remote is "dead"
+        """
+        return self._annex_custom_command([], ["git", "annex", "dead", name])
+
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return either remote is a special annex remote
 
