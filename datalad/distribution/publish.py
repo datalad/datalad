@@ -594,9 +594,12 @@ class Publish(Interface):
             else:
                 # this is a dataset
                 if ap.get('state', None) == 'absent':
-                    ap['status'] = 'impossible'
-                    ap['message'] = 'subdataset is not installed'
-                    yield ap
+                    if ap.get('raw_input', False):
+                        # if this was requested, it is a problem, otherwise it can
+                        # be ignored
+                        ap['status'] = 'impossible'
+                        ap['message'] = 'subdataset is not installed'
+                        yield ap
                     continue
                 # if this is a dataset, get the remote info for itself
                 remote_info_result = _get_remote_info(
