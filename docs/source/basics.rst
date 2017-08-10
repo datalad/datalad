@@ -89,17 +89,17 @@ Downloading datasets via http
 In most places where DataLad accepts URLs as arguments these URLs can be
 regular ``http`` or ``https`` protocol URLs. For example:
 
-``datalad install ###example####``
+``datalad install https://github.com/psychoinformatics-de/studyforrest-data-phase2.git``
 
 Downloading datasets via ssh
 ----------------------------
 Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
 
-``datalad install ###example####``
+``datalad install ssh://me@localhost/path``
 
 Finally, DataLad supports SSH login style resource identifiers, such as ``me@localhost:/path``.
 
-``datalad install ###example####``
+``datalad install me@localhost:/path``
 
 `--dataset` argument
 --------------------
