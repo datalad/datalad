@@ -52,6 +52,8 @@ from datalad.utils import on_windows
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import _path_
+from datalad.utils import generate_chunks
+from datalad.utils import CMD_MAX_ARG
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -1251,9 +1253,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
         with cm:
+            # TODO: reproduce DK's bug on OSX, and either switch to
+            #  --batch mode (I don't think we have --progress support in long
+            #  alive batch processes ATM),
+            #
             results = self._run_annex_command_json(
                 'get',
-                args=options + fetch_files,
+                args=options,
+                # TODO: eventually make use of --batch mode
+                files=files,  # fetch_files
                 jobs=jobs,
                 expected_entries=expected_downloads)
         results_list = list(results)
@@ -2122,7 +2130,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
-    def _run_annex_command_json(self, command, args=None, jobs=None,
+    def _run_annex_command_json(self, command, args=None,
+                                jobs=None,
+                                files=[],
                                 expected_entries=None, **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
 
@@ -2150,10 +2160,23 @@ class AnnexRepo(GitRepo, RepoInterface):
                 annex_options += ['-J%d' % jobs]
             if args:
                 annex_options += args
-            out, err = self._run_annex_command(
-                command,
-                annex_options=annex_options,
-                **kwargs)
+
+            # TODO: RF to use --batch where possible instead of splitting
+            # into multiple invocations
+            if not files:
+                file_chunks = [[]]
+            else:
+                maxl = max(map(len, files))
+                chunk_size = CMD_MAX_ARG // maxl
+                file_chunks = generate_chunks(files, chunk_size)
+            out, err = "", ""
+            for file_chunk in file_chunks:
+                out_, err_ = self._run_annex_command(
+                    command,
+                    annex_options=annex_options + file_chunk,
+                    **kwargs)
+                out += out_
+                err += err_
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2845,7 +2868,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         with cm:
             results = self._run_annex_command_json(
                 'copy',
-                args=annex_options + copy_files,
+                args=annex_options,
+                files=files,  # copy_files,
                 jobs=jobs,
                 expected_entries=expected_copys
                 #log_stdout=True, log_stderr=not log_online,
@@ -3198,8 +3222,6 @@ class BatchedAnnex(object):
         Parameters
         ----------
         cmds : str or tuple or list of (str or tuple)
-        output_proc : callable
-          To provide handling
 
         Returns
         -------

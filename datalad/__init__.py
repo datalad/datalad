@@ -57,19 +57,25 @@ atexit.register(lgr.log, 5, "Exiting")
 from .version import __version__
 
 
-def test(package='datalad', **kwargs):
-    """A helper to run datalad's tests.  Requires numpy and nose
-
-    See numpy.testing.Tester -- **kwargs are passed into the
-    Tester().test call
+def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
+    """A helper to run datalad's tests.  Requires nose
     """
-    try:
-        from numpy.testing import Tester
-        Tester(package=package).test(**kwargs)
-        # we don't have any benchmarks atm
-        # bench = Tester().bench
-    except ImportError:
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+    argv = [] #module]
+    # could make it 'smarter' but decided to be explicit so later we could
+    # easily migrate to another runner without changing any API here
+    if verbose:
+        argv.append('-v')
+    if nocapture:
+        argv.append('-s')
+    if pdb:
+        argv.append('--pdb')
+    if stop:
+        argv.append('--stop')
+    from datalad.support.third.nosetester import NoseTester
+    tester = NoseTester(module)
+    tester.package_name = module.split('.', 1)[0]
+    tester.test(extra_argv=argv)
+
 test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
