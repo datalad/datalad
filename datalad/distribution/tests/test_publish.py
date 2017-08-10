@@ -32,6 +32,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import neq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import create_tree
@@ -142,21 +143,25 @@ def test_publish_simple(origin, src_path, dst_path):
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
+def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
+    # we will be publishing back to origin, so to not alter testrepo
+    # we will first clone it
+    origin = install(origin_path, source=pristine_origin, recursive=True)
     # prepare src
-    source = install(src_path, source=origin, recursive=True)
+    source = install(src_path, source=origin.path, recursive=True)
     # we will be trying to push into this later on, need to give permissions...
-    origin_sub2 = Dataset(opj(origin, 'subm 2'))
+    origin_sub2 = Dataset(opj(origin_path, 'subm 2'))
     origin_sub2.config.set(
         'receive.denyCurrentBranch', 'updateInstead', where='local')
-    # TODO this manual fixup is needed due to gh-1548 -- needs proper solution
-    os.remove(opj(origin_sub2.path, '.git'))
-    os.rename(opj(origin, '.git', 'modules', 'subm 2'), opj(origin_sub2.path, '.git'))
+    ## TODO this manual fixup is needed due to gh-1548 -- needs proper solution
+    #os.remove(opj(origin_sub2.path, '.git'))
+    #os.rename(opj(origin_path, '.git', 'modules', 'subm 2'), opj(origin_sub2.path, '.git'))
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -211,6 +216,20 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         list(sub2.get_branch_commits("master")))
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
+
+    # we are tracking origin but origin has different git-annex, since we
+    # cloned from it, so it is not aware of our git-annex
+    neq_(list(origin.repo.get_branch_commits("git-annex")),
+         list(source.repo.get_branch_commits("git-annex")))
+    # So if we first publish to it recursively, we would update
+    # all sub-datasets since git-annex branch would need to be pushed
+    res_ = publish(dataset=source, recursive=True)
+    assert_result_count(res_, 1, status='ok', path=source.path)
+    assert_result_count(res_, 1, status='ok', path=sub1.path)
+    assert_result_count(res_, 1, status='ok', path=sub2.path)
+    # and now should carry the same state for git-annex
+    eq_(list(origin.repo.get_branch_commits("git-annex")),
+        list(source.repo.get_branch_commits("git-annex")))
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
@@ -353,6 +372,18 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     assert_result_count(res, 3)
     assert_result_count(res, 1, status='ok', path=sub1.path)
     assert_result_count(res, 1, status='ok', path=sub2.path)
+    assert_result_count(res, 1, status='notneeded', path=source.path)
+
+    # if we publish again -- nothing to be published
+    res = source.publish(to="target")
+    assert_result_count(res, 1, status='notneeded', path=source.path)
+    # if we drop a file and publish again -- dataset should be published
+    # since git-annex branch was updated
+    source.drop('test-annex.dat')
+    res = source.publish(to="target")
+    assert_result_count(res, 1, status='ok', path=source.path)
+    # and empty again if we try again
+    res = source.publish(to="target")
     assert_result_count(res, 1, status='notneeded', path=source.path)
 
 

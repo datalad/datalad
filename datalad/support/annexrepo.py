@@ -868,6 +868,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         return self._annex_custom_command([], ["git", "annex", "dead", name])
 
+    def is_remote_annex_ignored(self, remote):
+        """Return True if remote is explicitly ignored"""
+        return self.config.getbool(
+            'remote.{}'.format(remote), 'annex-ignore',
+            default=False
+        )
+
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return either remote is a special annex remote
 
