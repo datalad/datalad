@@ -99,7 +99,10 @@ def test_plugin_call(path, dspath):
     # specs
     assert_raises(ValueError, plugin, ['dummy', '1245'])
 
-    with patch('datalad.plugin._get_plugins', return_value=fake_dummy_spec):
+    def fake_is_installed(*args, **kwargs):
+        return True
+    with patch('datalad.plugin._get_plugins', return_value=fake_dummy_spec), \
+        patch('datalad.distribution.dataset.Dataset.is_installed', return_value=True):
         # does not trip over unsupported argument, they get filtered out, because
         # we carry all kinds of stuff
         with swallow_logs(new_level=logging.WARNING) as cml:

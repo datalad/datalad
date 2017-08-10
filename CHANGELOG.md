@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.7.1 (??? ??, 2017) -- will be better than ever
+## 0.8.1 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -19,11 +19,34 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Do not attempt to [update] a not installed sub-dataset
 
 ### Enhancements and new features
 
 ?
+
+
+## 0.8.0 (Jul 31, 2017) -- it is better than ever
+
+A variety of fixes and enhancements
+
+### Fixes
+
+- [publish] would now push merged `git-annex` branch even if no other changes
+  were done
+- [publish] should be able to publish using relative path within SSH URI
+  (git hook would use relative paths)
+- [publish] should better tollerate publishing to pure git and `git-annex` 
+  special remotes 
+
+### Enhancements and new features
+
+- [plugin] mechanism came to replace [export]. See [export_tarball] for the
+  replacement of [export].  Now it should be easy to extend datalad's interface
+  with custom functionality to be invoked along with other commands.
+- Minimalistic coloring of the results rendering
+- [publish]/`copy_to` got progress bar report now and support of `--jobs`
+- minor fixes and enhancements to crawler (e.g. support of recursive removes)
 
 
 ## 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
@@ -376,11 +399,13 @@ publishing
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
+[export_tarball]: http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
 [metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
+[plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html

@@ -141,6 +141,16 @@ class Add(Interface):
             as it inflates dataset sizes and impacts flexibility of data
             transport. If not specified - it will be up to git-annex to
             decide, possibly on .gitattributes options."""),
+        to_annex=Parameter(
+            args=("--to-annex",),
+            action='store_false',
+            dest='to_git',
+            doc="""flag whether to force adding data to Annex, instead of
+        git.  It might be that .gitattributes instructs for a file to be
+        added to git, but for some particular files it is desired to be
+        added to annex (e.g. sensitive files etc).
+        If not specified - it will be up to git-annex to
+        decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         # TODO not functional anymore
@@ -178,7 +188,6 @@ class Add(Interface):
             annex_opts=None,
             annex_add_opts=None,
             jobs=None):
-
         # parameter constraints:
         if not path:
             raise InsufficientArgumentsError(
