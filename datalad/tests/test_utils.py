@@ -19,6 +19,7 @@ import logging
 from mock import patch
 from six import PY3
 from six import text_type
+import six.moves.builtins as __builtin__
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -48,11 +49,14 @@ from ..utils import get_timestamp_suffix
 from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
+from ..utils import path_startswith
+from ..utils import safe_print
 from ..utils import generate_chunks
 
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from datalad.tests.utils import nok_
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
@@ -650,3 +654,27 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
         # non-dir paths are no issue
         eq_(get_dataset_root(fname), os.curdir)
+
+
+def test_path_startswith():
+    ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/'))
+    ok_(path_startswith('/aaa/b/c', '/aaa'))
+    nok_(path_startswith('/aaa/b/c', '/aa'))
+    nok_(path_startswith('/a/b', '/a/c'))
+    nok_(path_startswith('/a/b/c', '/a/c'))
+
+
+def test_safe_print():
+    """Just to test that we are getting two attempts to print"""
+
+    called = [0]
+    def _print(s):
+        assert_equal(s, "bua")
+        called[0] += 1
+        if called[0] == 1:
+            raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
+
+    with patch.object(__builtin__, 'print', _print):
+        safe_print("bua")
+    assert_equal(called[0], 2)

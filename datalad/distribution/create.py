@@ -15,6 +15,7 @@ import uuid
 
 from os import listdir
 from os.path import isdir
+from os.path import relpath
 from os.path import join as opj
 
 from datalad.interface.base import Interface
@@ -35,6 +36,8 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
+from datalad.utils import get_dataset_root
+from datalad.utils import path_startswith
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -186,6 +189,18 @@ class Create(Interface):
         #    or another dataset in it (path is not None)
         # 2. we got no dataset -> we want to create a fresh dataset at the
         #    desired location, either at `path` or PWD
+        if path and dataset:
+            # Given a path and a dataset (path) not pointing to installed
+            # dataset
+            if not dataset.is_installed():
+                msg = "No installed dataset at %s found." % dataset.path
+                dsroot = get_dataset_root(dataset.path)
+                if dsroot:
+                    msg += " If you meant to add to the %s dataset, use that path " \
+                           "instead but remember that if dataset is provided, " \
+                           "relative paths are relative to the top of the " \
+                           "dataset." % dsroot
+                raise ValueError(msg)
 
         # sanity check first
         if git_opts:
@@ -245,19 +260,27 @@ class Create(Interface):
         path.update({'logger': lgr, 'type': 'dataset'})
         # just discard, we have a new story to tell
         path.pop('message', None)
-
-        if 'parentds' in path and path['path'] in Subdatasets.__call__(
-                dataset=path['parentds'],
-                # any known
-                fulfilled=None,
-                recursive=False,
-                result_xfm='paths'):
-            path.update({
-                'status': 'error',
-                'message': ('collision with known subdataset in dataset %s',
-                            path['parentds'])})
-            yield path
-            return
+        if 'parentds' in path:
+            try:
+                subds = next(
+                    sds
+                    for sds in Subdatasets.__call__(
+                        dataset=path['parentds'],
+                        # any known
+                        fulfilled=None,
+                        recursive=False,
+                        result_xfm='paths')
+                    if path_startswith(path['path'], sds)
+                )
+                path.update({
+                    'status': 'error',
+                    'message': ('collision with known subdataset %s/ in dataset %s',
+                                relpath(subds, path['parentds']), path['parentds'])})
+                yield path
+                return
+            except StopIteration:
+                # all good
+                pass
 
         if git_opts is None:
             git_opts = {}

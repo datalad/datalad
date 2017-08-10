@@ -1293,7 +1293,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         unknown_sizes = []  # unused atm
         # for now just record total size, and
         for j in self._run_annex_command_json(
-                'find', args=['--json'] + expr + files
+                'find', args=expr + files
         ):
             # TODO: some files might not even be here.  So in current fancy
             # output reporting scheme we should then theoretically handle
