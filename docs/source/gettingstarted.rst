@@ -10,36 +10,39 @@ Getting started
 Installation
 ============
 
-Datalad is a Python package and can be installed via pip_, which is the
-preferred method unless system packages are available for the target platform
-(see below)::
+Unless system packages are available for your operating system (see below), Datalad 
+can be installed via pip_ (**P**\ip **I**\nstalls **P**\ython). To automatically install 
+datalad and all its software dependencies type::
 
   pip install datalad
 
 .. _pip: https://pip.pypa.io
 
-This will automatically install all software dependencies necessary to provide
-core functionality. Several additional installation schemes are supported
-(e.g., ``publish``, ``metadata``, ``tests``, ``crawl``)::
-
-  pip install datalad[SCHEME]
-
-where ``SCHEME`` can be any supported scheme, such as the ones listed above.
-
-In addition, it is necessary to have a working installation of git-annex_,
-which is not set up automatically at this point.
+In addition, it is necessary to have a current version of git-annex_ installed
+which is not set up automatically by using the pip method.
 
 .. _git-annex: http://git-annex.branchable.com
+
+Advanced users can chose from several installation schemes (e.g.
+``publish``, ``metadata``, ``tests`` or ``crawl``)::
+
+  pip install datalad [SCHEME]
+  
+where ``SCHEME`` could be
+
+- ``crawl`` to also install `scrapy` which is used in some crawling constructs
+- ``tests`` to also install dependencies used by unit-tests battery of the datalad
+- ``full`` to install all dependencies
 
 (Neuro)Debian, Ubuntu, and similar systems
 ------------------------------------------
 
 For Debian-based operating systems the most convenient installation method
-is to enable the NeuroDebian_ repository, and to install datalad as a system
-package::
+is to enable the NeuroDebian_ repository. The following command installs datalad
+and all its software dependencies (including the git-annex-standalone package)::
 
   sudo apt-get install datalad
-
+  
 .. _neurodebian: http://neuro.debian.net
 
 MacOSX
@@ -60,9 +63,11 @@ above. ``pip`` comes with Python distributions like anaconda_.
 First steps
 ===========
 
-After datalad is installed it can be queried for information about known
-datasets. For example, we might want to look for dataset thats were funded by,
-or acknowledge the US National Science Foundation (NSF)::
+Datalad can be queried for information about known datasets. Doing a first search 
+query, datalad automatically offers assistence to obtain a :term:`superdataset` first.
+The superdataset is a lightweight container that contains meta information about known datasets but does not contain actual data itself. 
+
+For example, we might want to look for dataset thats were funded by, or acknowledge the US National Science Foundation (NSF)::
 
   ~ % datalad search NSF
   No DataLad dataset found at current location
@@ -75,11 +80,6 @@ or acknowledge the US National Science Foundation (NSF)::
   ~/datalad/openfmri/ds000002
   ~/datalad/openfmri/ds000003
   ...
-
-On first attempt, datalad offers assistence to obtain a :term:`superdataset`
-with information on all datasets it knows about. This is a lightweight
-container that does not actually contain data, but meta information only. Once
-downloaded queries can be made offline.
 
 Any known dataset can now be installed inside the local superdataset with a
 command like this::

@@ -43,6 +43,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
+    assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
     annex.add(fn_archive, commit=True, msg="Added tarball")

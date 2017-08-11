@@ -34,7 +34,7 @@ from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import get_tree_roots
 from datalad.interface.utils import discover_dataset_trace_to_targets
 
@@ -134,8 +134,9 @@ def save_dataset(
     if version_tag:
         ds.repo.tag(version_tag)
 
-    _was_modified = ds.repo.get_hexsha() != orig_hexsha
-    return ds.repo.repo.head.commit if _was_modified else None
+    current_hexsha = ds.repo.get_hexsha()
+    _was_modified = current_hexsha != orig_hexsha
+    return current_hexsha if _was_modified else None
 
 
 @build_doc
@@ -243,7 +244,8 @@ class Save(Interface):
             # or recursively discovered datasets
             if ap['path'] == refds_path or \
                     (ap.get('type', None) == 'dataset' and
-                     not ap.get('raw_input', False)):
+                     not ap.get('raw_input', False) and
+                     not ap.get('state', None) == 'absent'):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
@@ -362,7 +364,7 @@ class Save(Interface):
         if not res or res.get('type', None) != 'dataset' or 'path' not in res:
             return
         ds = Dataset(res['path'])
-        commit = ds.repo.repo.head.commit
+        commit = ds.repo.get_hexsha()
         ui.message('Saved state: {0} for {1}'.format(
-            commit.hexsha,
+            commit,
             ds))

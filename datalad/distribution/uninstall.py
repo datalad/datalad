@@ -30,7 +30,7 @@ from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.utils import handle_dirty_dataset
 from datalad.interface.results import get_status_dict
 from datalad.utils import rmtree
@@ -94,12 +94,11 @@ class Uninstall(Interface):
     subdirectories within a dataset as always done automatically. An optional
     recursion limit is applied relative to each given input path.
 
-    Examples
-    --------
+    Examples:
 
-    Uninstall a subdataset (undo installation)::
+      Uninstall a subdataset (undo installation)::
 
-      ~/some/dataset$ datalad uninstall somesubdataset1
+        ~/some/dataset$ datalad uninstall somesubdataset1
 
     """
     _action = 'uninstall'
@@ -156,7 +155,7 @@ class Uninstall(Interface):
             # check that we have no top-level datasets and not files to process
             if ap.get('type') == 'dataset' and \
                     not ap.get('state', None) == 'absent' and \
-                    path_is_under(ap['path']):
+                    path_is_under([ap['path']]):  # wants a sequence!
                 ap.update(
                     status='error',
                     message="refusing to uninstall current or parent directory")
@@ -182,6 +181,9 @@ class Uninstall(Interface):
         # iterate over all datasets, starting at the bottom
         # to deinit contained submodules first
         for ap in sorted(to_uninstall, key=lambda x: x['path'], reverse=True):
+            if ap.get('state', None) == 'absent':
+                # already gone
+                continue
             ds = Dataset(ap['path'])
             # TODO generator
             # this should yield what it did

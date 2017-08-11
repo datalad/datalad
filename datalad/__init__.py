@@ -25,30 +25,57 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
-
 import atexit
-atexit.register(ssh_manager.close, allow_fail=False)
+from datalad.utils import on_windows
+
+if not on_windows:
+    lgr.log(5, "Instantiating ssh manager")
+    from .support.sshconnector import SSHManager
+    ssh_manager = SSHManager()
+    atexit.register(ssh_manager.close, allow_fail=False)
+else:
+    ssh_manager = None
+
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError as e:
+    if on_windows:
+        from datalad.dochelpers import exc_str
+        lgr.warning(
+            "'colorama' Python module missing, terminal output may look garbled [%s]",
+            exc_str(e))
+    pass
+
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
 
-def test(package='datalad', **kwargs):
-    """A helper to run datalad's tests.  Requires numpy and nose
-
-    See numpy.testing.Tester -- **kwargs are passed into the
-    Tester().test call
+def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
+    """A helper to run datalad's tests.  Requires nose
     """
-    try:
-        from numpy.testing import Tester
-        Tester(package=package).test(**kwargs)
-        # we don't have any benchmarks atm
-        # bench = Tester().bench
-    except ImportError:
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+    argv = [] #module]
+    # could make it 'smarter' but decided to be explicit so later we could
+    # easily migrate to another runner without changing any API here
+    if verbose:
+        argv.append('-v')
+    if nocapture:
+        argv.append('-s')
+    if pdb:
+        argv.append('--pdb')
+    if stop:
+        argv.append('--stop')
+    from datalad.support.third.nosetester import NoseTester
+    tester = NoseTester(module)
+    tester.package_name = module.split('.', 1)[0]
+    tester.test(extra_argv=argv)
+
 test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which

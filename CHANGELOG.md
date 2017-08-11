@@ -5,22 +5,134 @@
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                Change Log
 
-This is a very high level and scarce summary of the changes between releases.
-We would recommend to consult log of the [DataLad git repository](http://github.com/datalad/datalad)
-for more details ATM.
+This is a high level and scarce summary of the changes between releases.
+We would recommend to consult log of the 
+[DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.5.2 (??? ??, 2017) -- will be better than ever
+## 0.8.1 (??? ??, 2017) -- will be better than ever
 
-???
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
 
 ### Fixes
 
-???
+- Do not attempt to [update] a not installed sub-dataset
 
 ### Enhancements and new features
 
-???
+?
 
+
+## 0.8.0 (Jul 31, 2017) -- it is better than ever
+
+A variety of fixes and enhancements
+
+### Fixes
+
+- [publish] would now push merged `git-annex` branch even if no other changes
+  were done
+- [publish] should be able to publish using relative path within SSH URI
+  (git hook would use relative paths)
+- [publish] should better tollerate publishing to pure git and `git-annex` 
+  special remotes 
+
+### Enhancements and new features
+
+- [plugin] mechanism came to replace [export]. See [export_tarball] for the
+  replacement of [export].  Now it should be easy to extend datalad's interface
+  with custom functionality to be invoked along with other commands.
+- Minimalistic coloring of the results rendering
+- [publish]/`copy_to` got progress bar report now and support of `--jobs`
+- minor fixes and enhancements to crawler (e.g. support of recursive removes)
+
+
+## 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
+
+New features, refactorings, and bug fixes.
+
+### Major refactoring and deprecations
+
+- [add-sibling] has been fully replaced by the [siblings] command
+- [create-sibling], and [unlock] have been re-written to support the
+  same common API as most other commands
+
+### Enhancements and new features
+
+- [siblings] can now be used to query and configure a local repository by
+  using the sibling name ``here``
+- [siblings] can now query and set annex preferred content configuration. This
+  includes ``wanted`` (as previously supported in other commands), and now
+  also ``required``
+- New [metadata] command to interface with datasets/files [meta-data] 
+- Documentation for all commands is now built in a uniform fashion
+- Significant parts of the documentation of been updated
+- Instantiate GitPython's Repo instances lazily
+
+### Fixes
+
+- API documentation is now rendered properly as HTML, and is easier to browse by
+  having more compact pages
+- Closed files left open on various occasions (Popen PIPEs, etc)
+- Restored basic (consumer mode of operation) compatibility with Windows OS 
+
+
+## 0.6.0 (Jun 14, 2017) -- German perfectionism
+
+This release includes a **huge** refactoring to make code base and functionality
+more robust and flexible
+
+- outputs from API commands could now be highly customized.  See
+  `--output-format`, `--report-status`, `--report-type`, and `--report-type`
+  options for [datalad] command.
+- effort was made to refactor code base so that underlying functions behave as
+  generators where possible
+- input paths/arguments analysis was redone for majority of the commands to provide
+  unified behavior
+
+### Major refactoring and deprecations
+
+- `add-sibling` and `rewrite-urls` were refactored in favor of new [siblings]
+  command which should be used for siblings manipulations
+- 'datalad.api.alwaysrender' config setting/support is removed in favor of new
+  outputs processing
+
+### Fixes
+
+- Do not flush manually git index in pre-commit to avoid "Death by the Lock" issue
+- Deployed by [publish] `post-update` hook script now should be more robust
+  (tolerate directory names with spaces, etc.)
+- A variety of fixes, see
+  [list of pull requests and issues closed](https://github.com/datalad/datalad/milestone/41?closed=1)
+  for more information
+
+### Enhancements and new features
+
+- new [annotate-paths] plumbing command to inspect and annotate provided
+  paths.  Use `--modified` to summarize changes between different points in
+  the history
+- new [clone] plumbing command to provide a subset (install a single dataset
+  from a URL) functionality of [install]
+- new [diff] plumbing command
+- new [siblings] command to list or manipulate siblings
+- new [subdatasets] command to list subdatasets and their properties
+- [drop] and [remove] commands were refactored
+- `benchmarks/` collection of [Airspeed velocity](https://github.com/spacetelescope/asv/)
+  benchmarks initiated.  See reports at http://datalad.github.io/datalad/
+- crawler would try to download a new url multiple times increasing delay between
+  attempts.  Helps to resolve problems with extended crawls of Amazon S3
+- [CRCNS] crawler pipeline now also fetches and aggregates meta-data for the
+  datasets from datacite
+- overall optimisations to benefit from the aforementioned refactoring and
+  improve user-experience
+- a few stub and not (yet) implemented commands (e.g. `move`) were removed from
+  the interface
+- Web frontend got proper coloring for the breadcrumbs and some additional
+  caching to speed up interactions.  See http://datasets.datalad.org
+- Small improvements to the online documentation.  See e.g.
+  [summary of differences between git/git-annex/datalad](http://docs.datalad.org/en/latest/related.html#git-git-annex-datalad)
 
 ## 0.5.1 (Mar 25, 2017) -- cannot stop the progress
 
@@ -270,25 +382,34 @@ publishing
 [Configuration documentation]: http://docs.datalad.org/config.html
 
 [Dataset]: http://docs.datalad.org/en/latest/generated/datalad.api.html#dataset
+[Sibling]: http://docs.datalad.org/en/latest/glossary.html
 
 [rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 
-[add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
 [add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
+[add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
+[annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
+[clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
+[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
+[datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
+[export_tarball]: http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
+[metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
+[plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
+[siblings]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html
 [sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
 [update]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html
 

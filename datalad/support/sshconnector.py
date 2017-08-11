@@ -176,8 +176,9 @@ class SSHConnection(object):
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
+        null = open('/dev/null')
         try:
-            out, err = self.runner.run(cmd, stdin=open('/dev/null'))
+            out, err = self.runner.run(cmd, stdin=null)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -186,6 +187,8 @@ class SSHConnection(object):
             # SSH died and left socket behind, or server closed connection
             self.close()
             res = False
+        finally:
+            null.close()
         lgr.debug("Check of %s has %s", self, {True: 'succeeded', False: 'failed'}[res])
         return res
 
@@ -288,11 +291,12 @@ class SSHConnection(object):
         # more
         self._remote_props[key] = annex_install_dir
         try:
-            annex_install_dir = self(
-                # use sh -e to be able to fail at each stage of the process
-                "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
-                , stdin=open('/dev/null')
-            )[0].strip()
+            with open('/dev/null') as null:
+                annex_install_dir = self(
+                    # use sh -e to be able to fail at each stage of the process
+                    "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
+                    , stdin=null
+                )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
                       exc_str(e))
@@ -418,7 +422,8 @@ class SSHManager(object):
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
                         exists(self._connections[c].ctrl_path)]
-            lgr.debug("Closing %d SSH connections..." % len(to_close))
+            if to_close:
+                lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:

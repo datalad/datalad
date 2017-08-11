@@ -90,7 +90,8 @@ def test_add_files(path):
         if arg[0] == test_list_4:
             result = ds.add('dir', to_git=arg[1], save=False)
         else:
-            result = ds.add(arg[0], to_git=arg[1], save=False, result_xfm='relpaths',
+            result = ds.add(arg[0], to_git=arg[1], save=False,
+                            result_xfm='relpaths',
                             return_type='item-or-list')
             # order depends on how annex processes it, so let's sort
             eq_(sorted(result), sorted(arg[0]))
@@ -103,6 +104,7 @@ def test_add_files(path):
         # ignore the initial config file in index:
         indexed.remove(opj('.datalad', 'config'))
         indexed.remove(opj('.datalad', '.gitattributes'))
+        indexed.remove('.gitattributes')
         if isinstance(arg[0], list):
             for x in arg[0]:
                 unstaged.remove(x)
@@ -307,6 +309,7 @@ def test_add_subdataset(path, other):
 @with_tree(tree={
     'file.txt': 'some text',
     'empty': '',
+    'file2.txt': 'some text to go to annex',
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
 def test_add_mimetypes(path):
@@ -319,7 +322,11 @@ def test_add_mimetypes(path):
     ds.repo.commit('added attributes to git explicitly')
     # now test that those files will go into git/annex correspondingly
     __not_tested__ = ds.add(['file.txt', 'empty'])
-    ok_clean_git(path)
+    ok_clean_git(path, untracked=['file2.txt'])
     # Empty one considered to be  application/octet-stream  i.e. non-text
     ok_file_under_git(path, 'empty', annexed=True)
     ok_file_under_git(path, 'file.txt', annexed=False)
+
+    # But we should be able to force adding file to annex when desired
+    ds.add('file2.txt', to_git=False)
+    ok_file_under_git(path, 'file2.txt', annexed=True)

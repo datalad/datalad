@@ -37,6 +37,7 @@ from os.path import relpath
 from os.path import stat
 from os.path import dirname
 from os.path import split as psplit
+import posixpath
 
 
 from six import text_type, binary_type, string_types
@@ -64,6 +65,12 @@ except:  # pragma: no cover
     # MIH: IndexError?
     on_debian_wheezy = False
     linux_distribution_name = linux_distribution_release = None
+
+# Maximal length of cmdline string
+# Did not find anything in Python which could tell at run time and
+# probably   getconf ARG_MAX   might not be available
+# The last one would be the most conservative/Windows
+CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
 
 #
 # Little helpers
@@ -224,6 +231,18 @@ def expandpath(path, force_absolute=True):
     return path
 
 
+def posix_relpath(path, start=None):
+    """Behave like os.path.relpath, but always return POSIX paths...
+
+    on any platform."""
+    # join POSIX style
+    return posixpath.join(
+        # split and relpath native style
+        # python2.7 ntpath implementation of relpath cannot handle start=None
+        *psplit(
+            relpath(path, start=start if start is not None else '')))
+
+
 def is_explicit_path(path):
     """Return whether a path explicitly points to a location
 
@@ -303,11 +322,18 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            for i in range(10):
+            # on windows boxes there is evidence for a latency of
+            # more than a second until a file is considered no
+            # longer "in-use"
+            # WindowsError is not known on Linux, and if IOError
+            # or any other exception is thrown then if except
+            # statement has WindowsError in it -- NameError
+            exceptions = (OSError, WindowsError) if on_windows else OSError
+            for i in range(50):
                 try:
                     os.unlink(f)
-                except OSError as e:
-                    if i < 9:
+                except exceptions:
+                    if i < 49:
                         sleep(0.1)
                         continue
                     else:
@@ -502,6 +528,15 @@ def unique(seq, key=None):
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
+
+def generate_chunks(container, size):
+    """Given a container, generate chunks from it with size up to `size`
+    """
+    # There could be a "smarter" solution but I think this would suffice
+    assert size > 0,  "Size should be non-0 positive"
+    while container:
+        yield container[:size]
+        container = container[size:]
 
 #
 # Generators helpers
@@ -968,6 +1003,12 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def path_startswith(path, prefix):
+    """Return True if path starts with prefix path"""
+    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
+           == with_pathsep(prefix)
+
+
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
@@ -1187,6 +1228,34 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
                         exc_str(exc), trial, t)
             sleep(t)
 
+
+def slash_join(base, extension):
+    """Join two strings with a '/', avoiding duplicate slashes
+
+    If any of the strings is None the other is returned as is.
+    """
+    if extension is None:
+        return base
+    if base is None:
+        return extension
+    return '/'.join(
+        (base.rstrip('/'),
+         extension.lstrip('/')))
+
+
+def safe_print(s):
+    """Print with protection against UTF-8 encoding errors"""
+    # A little bit of dance to be able to test this code
+    print_f = getattr(__builtin__, "print")
+    try:
+        print_f(s)
+    except UnicodeEncodeError:
+        # failed to encode so let's do encoding while ignoring errors
+        # to print at least something
+        # explicit `or ascii` since somehow on buildbot it seemed to return None
+        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
+            if hasattr(s, 'encode') else s
+        print_f(s.decode())
 
 lgr.log(5, "Done importing datalad.utils")
 

@@ -39,10 +39,9 @@ _group_dataset = (
         ('datalad.distribution.create_sibling_github',
          'CreateSiblingGithub',
          'create-sibling-github'),
-        ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
-        ('datalad.export', 'Export', 'export'),
+        ('datalad.plugin', 'Plugin', 'plugin'),
     ])
 
 _group_metadata = (
@@ -50,6 +49,8 @@ _group_metadata = (
     [
         ('datalad.metadata.search', 'Search',
          'search', 'search'),
+        ('datalad.metadata.metadata', 'Metadata',
+         'metadata'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
     ])

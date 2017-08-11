@@ -11,13 +11,16 @@
 
 import os
 from os.path import join as opj
+from os.path import lexists
 
 from ..dataset import Dataset
 from datalad.api import create
 from datalad.utils import chpwd
+from datalad.utils import _path_
 from datalad.cmd import Runner
 
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_not_in
@@ -28,6 +31,8 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import ok_file_under_git
 
 
 _dataset_hierarchy_template = {
@@ -71,16 +76,22 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create('sub', **raw),
         status='error',
-        message=('collision with known subdataset in dataset %s', ds.path))
+        message=('collision with known subdataset %s/ in dataset %s',
+                 'sub', ds.path)
+    )
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
     ds.uninstall('sub', check=False)
     assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_in_results(
-        ds.create('sub', **raw),
-        status='error',
-        message=('collision with known subdataset in dataset %s', ds.path))
+    # and now should fail to also create inplace or under
+    for s in 'sub', _path_('sub/subsub'):
+        assert_in_results(
+            ds.create(s, **raw),
+            status='error',
+            message=('collision with known subdataset %s/ in dataset %s',
+                     'sub', ds.path)
+        )
 
 
 @with_tempfile
@@ -254,3 +265,49 @@ def test_saving_prior(topdir):
     # is committed -- ds2 is already known to git and it just pukes with a bit
     # confusing    'ds2' already exists in the index
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
+
+
+@with_tempfile(mkdir=True)
+def test_create_withplugin(path):
+    # first without
+    ds = create(path)
+    assert(not lexists(opj(ds.path, 'README.rst')))
+    ds.remove()
+    assert(not lexists(ds.path))
+    # now for reals...
+    ds = create(
+        # needs to identify the dataset, otherwise post-proc
+        # plugin doesn't no what to run on
+        dataset=path,
+        run_after=[['add_readme', 'filename=with hole.txt']])
+    ok_clean_git(path)
+    # README wil lend up in annex by default
+    # TODO implement `nice_dataset` plugin to give sensible
+    # default and avoid that
+    assert(lexists(opj(ds.path, 'with hole.txt')))
+
+
+@with_tempfile(mkdir=True)
+def test_create_text_no_annex(path):
+    ds = create(path, text_no_annex=True)
+    ok_clean_git(path)
+    import re
+    ok_file_has_content(
+        _path_(path, '.gitattributes'),
+        content='\* annex\.largefiles=\(not\(mimetype=text/\*\)\)',
+        re_=True,
+        match=False,
+        flags=re.MULTILINE
+    )
+    # and check that it is really committing text files to git and binaries
+    # to annex
+    create_tree(path,
+        {
+            't': 'some text',
+            'b': ''  # empty file is not considered to be a text file
+                     # should we adjust the rule to consider only non empty files?
+        }
+    )
+    ds.add(['t', 'b'])
+    ok_file_under_git(path, 't', annexed=False)
+    ok_file_under_git(path, 'b', annexed=True)

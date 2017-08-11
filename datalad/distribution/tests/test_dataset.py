@@ -11,7 +11,7 @@
 
 import os
 import shutil
-from os.path import join as opj, abspath, normpath, relpath
+from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
@@ -25,6 +25,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
+from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises

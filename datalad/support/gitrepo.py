@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 import logging
 import re
 import shlex
+import os
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -28,6 +29,7 @@ from os.path import basename
 from os.path import curdir
 from os.path import pardir
 from os.path import sep
+import posixpath
 from weakref import WeakValueDictionary
 
 
@@ -51,6 +53,8 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import swallow_logs
 from datalad.utils import updated
+from datalad.utils import posix_relpath
+
 
 # imports from same module:
 from .external_versions import external_versions
@@ -514,10 +518,11 @@ class GitRepo(RepoInterface):
 
         self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self.repo = repo
+        self._repo = repo
         self._cfg = None
 
-        if create and not GitRepo.is_valid_repo(path):
+        _valid_repo = GitRepo.is_valid_repo(path)
+        if create and not _valid_repo:
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
@@ -527,7 +532,7 @@ class GitRepo(RepoInterface):
                     "Initialize empty Git repository at '%s'%s",
                     path,
                     ' %s' % git_opts if git_opts else '')
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
                                                   mkdir=True,
                                                   odbt=default_git_odbt,
                                                   **git_opts)
@@ -535,21 +540,55 @@ class GitRepo(RepoInterface):
                 lgr.error(exc_str(e))
                 raise
         else:
-            if self.repo is None:
-                try:
-                    self.repo = self.cmd_call_wrapper(Repo, path)
-                    lgr.debug("Using existing Git repository at {0}".format(path))
-                except (GitCommandError,
-                        NoSuchPathError,
-                        InvalidGitRepositoryError) as e:
-                    lgr.error("%s: %s" % (type(e), str(e)))
-                    raise
+            # Note: We used to call gitpy.Repo(path) here, which potentially
+            # raised NoSuchPathError or InvalidGitRepositoryError. This is
+            # used by callers of GitRepo.__init__() to detect whether we have a
+            # valid repo at `path`. Now, with switching to lazy loading property
+            # `repo`, we detect those cases without instantiating a
+            # gitpy.Repo().
+
+            if not exists(path):
+                raise NoSuchPathError(path)
+            if not _valid_repo:
+                raise InvalidGitRepositoryError(path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
         # calls above from being actually executed (DryRunProtocol)
-        if self.repo is not None:
-            self.repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+        if self._repo is not None:
+            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
+        # with DryRunProtocol path might still not exist
+        if exists(self.realpath):
+            self.inode = os.stat(self.realpath).st_ino
+        else:
+            self.inode = None
+
+    @property
+    def repo(self):
+        # with DryRunProtocol path not exist
+        if exists(self.realpath):
+            inode = os.stat(self.realpath).st_ino
+        else:
+            inode = None
+        if self.inode != inode:
+            # reset background processes invoked by GitPython:
+            self._repo.git.clear_cache()
+            self.inode = inode
+
+        if self._repo is None:
+            # Note, that this may raise GitCommandError, NoSuchPathError,
+            # InvalidGitRepositoryError:
+            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            lgr.debug("Using existing Git repository at {0}".format(self.path))
+
+        # inject git options into GitPython's git call wrapper:
+        # Note: `None` currently can happen, when Runner's protocol prevents
+        # call of Repo(path) above from being actually executed (DryRunProtocol)
+        if self._repo is not None:
+            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+
+        return self._repo
 
     @classmethod
     def clone(cls, url, path, *args, **kwargs):
@@ -653,13 +692,18 @@ class GitRepo(RepoInterface):
         self._cfg = None
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
-        if hasattr(self, 'repo') and self.repo is not None \
-                and exists(self.path):  # gc might be late, so the (temporary)
-                                        # repo doesn't exist on FS anymore
+        try:
+            if hasattr(self, 'repo') and exists(self.path) \
+                    and self.repo is not None:
+                # gc might be late, so the (temporary)
+                # repo doesn't exist on FS anymore
 
-            self.repo.git.clear_cache()
-            if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                self.repo.index.write()
+                self.repo.git.clear_cache()
+                if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                    self.repo.index.write()
+        except InvalidGitRepositoryError:
+            # might have being removed and no longer valid
+            pass
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -674,7 +718,7 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return exists(opj(path, '.git', 'objects'))
+        return exists(opj(path, '.git'))
 
     @property
     def config(self):
@@ -854,7 +898,7 @@ class GitRepo(RepoInterface):
                 for f in re.findall("'(.*)'[\n$]", stdout)]
 
     @normalize_paths(match_return_type=False)
-    def remove(self, files, **kwargs):
+    def remove(self, files, recursive=False, **kwargs):
         """Remove files.
 
         Calls git-rm.
@@ -863,6 +907,8 @@ class GitRepo(RepoInterface):
         ----------
         files: str
           list of paths to remove
+        recursive: False
+          either to allow recursive removal from subdirectories
         kwargs:
           see `__init__`
 
@@ -874,6 +920,8 @@ class GitRepo(RepoInterface):
 
         files = _remove_empty_items(files)
 
+        if recursive:
+            kwargs['r'] = True
         stdout, stderr = self._git_custom_command(
             files, ['git', 'rm'] + to_options(**kwargs))
 
@@ -1120,34 +1168,30 @@ class GitRepo(RepoInterface):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def get_remotes(self, with_refs_only=False, with_urls_only=False):
+    def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
 
         Parameters
         ----------
-        with_refs_only : bool, optional
-          return only remotes with any refs.  E.g. annex special remotes
-          would not have any refs
+        with_urls_only : bool, optional
+          return only remotes which have urls
 
         Returns
         -------
         remotes : list of str
           List of names of the remotes
         """
-        if with_refs_only:
-            # older versions of GitPython might not tolerate remotes without
-            # any references at all, so we need to catch
-            remotes = []
-            for remote in self.repo.remotes:
-                try:
-                    if len(remote.refs):
-                        remotes.append(remote.name)
-                except AssertionError as exc:
-                    if "not have any references" not in str(exc):
-                        # was some other reason
-                        raise
-        else:
-            remotes = [remote.name for remote in self.repo.remotes]
+
+        # Note: read directly from config and spare instantiation of gitpy.Repo
+        # since we need this in AnnexRepo constructor. Furthermore gitpy does it
+        # pretty much the same way and the use of a Repo instance seems to have
+        # no reason other than a nice object oriented look.
+        from datalad.utils import unique
+
+        self.config.reload()
+        remotes = unique([x[7:] for x in self.config.sections()
+                          if x.startswith("remote.")])
+
         if with_urls_only:
             remotes = [
                 r for r in remotes
@@ -1367,17 +1411,6 @@ class GitRepo(RepoInterface):
         return self._git_custom_command(
             '', ['git', 'remote', 'remove', name]
         )
-
-    def show_remotes(self, name='', verbose=False):
-        """
-        """
-
-        options = ["-v"] if verbose else []
-        name = [name] if name else []
-        out, err = self._git_custom_command(
-            '', ['git', 'remote'] + options + ['show'] + name
-        )
-        return out.rstrip(linesep).splitlines()
 
     def update_remote(self, name=None, verbose=False):
         """
@@ -1841,8 +1874,11 @@ class GitRepo(RepoInterface):
             cmd += ['-b', branch]
         if url is None:
             if not isabs(path):
-                path = opj(curdir, path)
-            url = path
+                # need to recode into a relative path "URL" in POSIX
+                # style, even on windows
+                url = posixpath.join(curdir, posix_relpath(path))
+            else:
+                url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
         # TODO: return value
@@ -1945,6 +1981,37 @@ class GitRepo(RepoInterface):
             '', ['git', 'tag', str(tag)]
         )
 
+    def get_tags(self, output=None):
+        """Get list of tags
+
+        Parameters
+        ----------
+        output : str, optional
+          If given, limit the return value to a list of values matching that
+          particular key of the tag properties.
+
+        Returns
+        -------
+        list
+          Each item is a dictionary with information on a tag. At present
+          this includes 'hexsha', and 'name', where the latter is the string
+          label of the tag, and the format the hexsha of the object the tag
+          is attched to. The list is sorted by commit date, with the most
+          recent commit being the last element.
+        """
+        # TODO it would be straightforward to add more info and tweak the
+        # sorting
+        stdout, stderr = self._git_custom_command(
+            '',
+            ['git', 'tag', '--format=%(refname:strip=2)%00%(object)',
+             '--sort=*committerdate'])
+        fields = ('name', 'hexsha')
+        tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
+        if output:
+            return [t[output] for t in tags]
+        else:
+            return tags
+
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
 
@@ -1994,5 +2061,5 @@ class GitRepo(RepoInterface):
 
 
 # TODO
-# remove submodule
+# remove submodule: nope, this is just deinit_submodule + remove
 # status?

@@ -94,7 +94,7 @@ from datalad.support.gitrepo import GitRepo
 # imports from same module:
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import ProcessAnnexProgressIndicators
-
+from .utils import check_repo_deals_with_inode_change
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -283,6 +283,11 @@ def test_AnnexRepo_get_remote_na(path):
 
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
+    eq_(cme.exception.remote, "NotExistingRemote")
+
+    # and similar one whenever invoking with remote parameter
+    with assert_raises(RemoteNotAvailableError) as cme:
+        ar.get('test-annex.dat', remote="NotExistingRemote")
     eq_(cme.exception.remote, "NotExistingRemote")
 
 
@@ -483,6 +488,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo.clone(src, dst, backend='MD5')
+    eq_(ar.default_backends, ['MD5'])
     # GitPython has a bug which causes .git/config being wiped out
     # under Python3, triggered by collecting its config instance I guess
     gc.collect()
@@ -1162,6 +1168,11 @@ def test_annex_copy_to(origin, clone):
     # Test that if we pass a list of items and annex processes them nicely,
     # we would obtain a list back. To not stress our tests even more -- let's mock
     def ok_copy(command, **kwargs):
+        # Check that we do pass to annex call only the list of files which we
+        #  asked to be copied
+        assert_in('copied1', kwargs['annex_options'])
+        assert_in('copied2', kwargs['annex_options'])
+        assert_in('existed', kwargs['annex_options'])
         return """
 {"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
@@ -1174,6 +1185,9 @@ def test_annex_copy_to(origin, clone):
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
     orig_run = repo._run_annex_command
+
+    # Kinda a bit off the reality since no nonex* would not be returned/handled
+    # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
         if command == 'copy':
             # That is not how annex behaves
@@ -1191,7 +1205,12 @@ def test_annex_copy_to(origin, clone):
         else:
             return orig_run(command, **kwargs)
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy):
+    def fail_to_copy_get_expected(files, expr):
+        assert files == ["copied", "existed", "nonex1", "nonex2"]
+        return {'akey1': 10}, ["copied"]
+
+    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+            patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
     eq_(cme.exception.results, ["copied"])
@@ -1956,26 +1975,28 @@ def test_AnnexRepo_set_remote_url(path):
 @with_tempfile(mkdir=True)
 def test_wanted(path):
     ar = AnnexRepo(path, create=True)
-    eq_(ar.get_wanted(), None)
+    eq_(ar.get_preferred_content('wanted'), None)
     # test samples with increasing "trickiness"
     for v in ("standard",
               "include=*.nii.gz or include=*.nii",
               "exclude=archive/* and (include=*.dat or smallerthan=2b)"
               ):
-        ar.set_wanted(expr=v)
-        eq_(ar.get_wanted(), v)
+        ar.set_preferred_content('wanted', expr=v)
+        eq_(ar.get_preferred_content('wanted'), v)
     # give it some file so clone/checkout works without hiccups
-    create_tree(ar.path, {'1.dat': 'content'}); ar.add('1.dat'); ar.commit(msg="blah")
+    create_tree(ar.path, {'1.dat': 'content'})
+    ar.add('1.dat')
+    ar.commit(msg="blah")
     # make a clone and see if all cool there
     # intentionally clone as pure Git and do not annex init so to see if we
     # are ignoring crummy log msgs
     ar1_path = ar.path + '_1'
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
-    eq_(ar1.get_wanted(), None)
-    eq_(ar1.get_wanted('origin'), v)
-    ar1.set_wanted(expr='standard')
-    eq_(ar1.get_wanted(), 'standard')
+    eq_(ar1.get_preferred_content('wanted'), None)
+    eq_(ar1.get_preferred_content('wanted', 'origin'), v)
+    ar1.set_preferred_content('wanted', expr='standard')
+    eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
 @with_tempfile(mkdir=True)
@@ -1996,61 +2017,61 @@ def test_AnnexRepo_metadata(path):
     # fugue
     # doesn't do anything if there is nothing to do
     ar.set_metadata('up.dat')
-    eq_({}, ar.get_metadata(None))
-    eq_({}, ar.get_metadata(''))
-    eq_({}, ar.get_metadata([]))
-    eq_({'up.dat': {}}, ar.get_metadata('up.dat'))
+    eq_([], list(ar.get_metadata(None)))
+    eq_([], list(ar.get_metadata('')))
+    eq_([], list(ar.get_metadata([])))
+    eq_({'up.dat': {}}, dict(ar.get_metadata('up.dat')))
     # basic invocation
-    eq_(None, ar.set_metadata(
+    eq_(1, len(list(ar.set_metadata(
         'up.dat',
         reset={'mike': 'awesome'},
         add={'tag': 'awesome'},
         remove={'tag': 'awesome'},  # cancels prev, just to use it
         init={'virgin': 'true'},
-        purge=['nothere']))
+        purge=['nothere']))))
     # no timestamps by default
-    md = ar.get_metadata('up.dat')
+    md = dict(ar.get_metadata('up.dat'))
     deq_({'up.dat': {
         'virgin': ['true'],
         'mike': ['awesome']}},
         md)
     # matching timestamp entries for all keys
-    md_ts = ar.get_metadata('up.dat', timestamps=True)
+    md_ts = dict(ar.get_metadata('up.dat', timestamps=True))
     for k in md['up.dat']:
         assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
     assert_in('lastchanged', md_ts['up.dat'])
     # recursive needs a flag
-    assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
-    ar.set_metadata('.', purge=['virgin'], recursive=True)
+    assert_raises(CommandError, list, ar.set_metadata('.', purge=['virgin']))
+    list(ar.set_metadata('.', purge=['virgin'], recursive=True))
     deq_({'up.dat': {
         'mike': ['awesome']}},
-        ar.get_metadata('up.dat'))
+        dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
-    ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
+    list(ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True))
     playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
         playfile: {
             'tag': ['one and= ']}}
-    deq_(target, ar.get_metadata('.'))
+    deq_(target, dict(ar.get_metadata('.')))
     # incremental work like a set
-    ar.set_metadata(playfile, add={'tag': 'one and= '})
-    deq_(target, ar.get_metadata('.'))
-    ar.set_metadata(playfile, add={'tag': ' two'})
+    list(ar.set_metadata(playfile, add={'tag': 'one and= '}))
+    deq_(target, dict(ar.get_metadata('.')))
+    list(ar.set_metadata(playfile, add={'tag': ' two'}))
     # returned values are sorted
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
     # init honor prior values
-    ar.set_metadata(playfile, init={'tag': 'three'})
-    eq_([' two', 'one and= '], ar.get_metadata(playfile)[playfile]['tag'])
-    ar.set_metadata(playfile, remove={'tag': ' two'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, init={'tag': 'three'}))
+    eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
+    list(ar.set_metadata(playfile, remove={'tag': ' two'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # remove non-existing doesn't error and doesn't change anything
-    ar.set_metadata(playfile, remove={'ether': 'best'})
-    deq_(target, ar.get_metadata('.'))
+    list(ar.set_metadata(playfile, remove={'ether': 'best'}))
+    deq_(target, dict(ar.get_metadata('.')))
     # add works without prior existence
-    ar.set_metadata(playfile, add={'novel': 'best'})
-    eq_(['best'], ar.get_metadata(playfile)[playfile]['novel'])
+    list(ar.set_metadata(playfile, add={'novel': 'best'}))
+    eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
 
 @with_tempfile(mkdir=True)
@@ -2111,3 +2132,18 @@ def test_AnnexRepo_is_managed_branch(path):
     if ar.config.getint("annex", "version") == 6:
         ar.adjust()
         ok_(ar.is_managed_branch())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_AnnexRepo_flyweight_monitoring_inode(path, store):
+    # testing for issue #1512
+    check_repo_deals_with_inode_change(AnnexRepo, path, store)
+
+
+@with_tempfile(mkdir=True)
+def test_fake_is_not_special(path):
+    ar = AnnexRepo(path, create=True)
+    # doesn't exist -- we fail by default
+    assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
+    assert_false(ar.is_special_annex_remote("fake", check_if_known=False))

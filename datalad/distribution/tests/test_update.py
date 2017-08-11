@@ -212,7 +212,7 @@ def test_newthings_coming_down(originpath, destpath):
     # check that a new tag comes down
     origin.tag('first!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
-    eq_(ds.repo.repo.tags[0].name, 'first!')
+    eq_(ds.repo.get_tags(output='name')[0], 'first!')
 
     # and now we destroy the remote annex
     origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
@@ -232,7 +232,7 @@ def test_newthings_coming_down(originpath, destpath):
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
-    eq_(ds.repo.repo.tags[-1].name, 'second!')
+    eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
 @with_tempfile(mkdir=True)
@@ -249,6 +249,8 @@ def test_update_volatile_subds(originpath, destpath):
     # nothing without a merge, no inappropriate magic
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
+    # and we should be able to do update with recursive invocation
+    assert_result_count(ds.update(merge=True, recursive=True), 1, status='ok', type='dataset')
     # known, and placeholder exists
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_(exists(opj(ds.path, sname)))
@@ -275,7 +277,7 @@ def test_update_volatile_subds(originpath, destpath):
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
-    assert_result_count(ds.update(merge=True), 1, type='dataset')
+    assert_result_count(ds.update(merge=True, recursive=True), 1, type='dataset')
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())

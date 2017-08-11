@@ -92,6 +92,7 @@ we outline the workflow used by the developers:
     - `bf-` for bug fixes
     - `rf-` for refactoring
     - `doc-` for documentation contributions (including in the code docstrings).
+    - `bm-` for changes to benchmarks
     We recommend to not work in the ``master`` branch!
 
 4. Work on this copy on your computer using Git to do the version control. When
@@ -101,7 +102,7 @@ we outline the workflow used by the developers:
           git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could
+   `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
    also use `TST` for commits concerned solely with tests, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
@@ -413,3 +414,25 @@ Refer datalad/config.py for information on how to add these environment variable
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+
+
+# Changelog section
+
+For the upcoming release use this template
+
+## 0.8.2 (??? ??, 2017) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+

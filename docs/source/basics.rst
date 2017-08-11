@@ -7,31 +7,133 @@
 Basic principles
 ****************
 
-DataLad was designed so it could be used both as a command-line tool, and as
-a Python module. Sections following this one (:ref:`chap_cmdline` and :ref:`chap_modref`)
-provide detailed description of the commands and functions of the two interfaces.  This section
-presents common concepts.  Although examples will be presented using command line
-interface commands, all functionality with identically named functions and options
-are available through Python API.
+DataLad is designed to be used both as a command-line tool, and as a Python
+module. The sections :ref:`chap_cmdline` and :ref:`chap_modref` provide
+detailed description of the commands and functions of the two interfaces.  This
+section presents common concepts.  Although examples will frequently be
+presented using command line interface commands, all functionality with
+identically named functions and options are available through Python API as
+well.
 
-Distribution
-============
+Datasets
+========
 
-Organization
-------------
+A Datalad :term:`dataset` is a Git repository that may or may not have a data
+:term:`annex` that is used to manage data referenced in a dataset. In practice,
+most DataLad datasets will come with an annex.
 
-DataLad "distribution" is just a :term:`superdataset` which organizes multiple
-:term:`dataset`'s using standard git mechanism of sub-modules.
+Datasets can contain other datasets (:term:`subdataset`\s), which can in turn
+contain subdatasets, and so on. There is no limit to the depth of nesting
+datasets. Each dataset in such a hierarchy has its own annex and its own
+history. The parent or :term:`superdataset` only tracks the specific state of a
+subdataset, and information on where it can be obtained. This is a powerful yet
+lightweight mechanism for combining multiple individual datasets for a specific
+purpose, such as the combination of source code repositories with other
+resources for a tailored application. In many cases DataLad can work with a
+hierarchy of datasets just as if it were a single dataset.
 
-install vs get
---------------
+A superdataset can also be seen as a curated collection of datasets, for example,
+for a certain data modality, a field of science, a certain author, or some
+all from one project (maybe the resource for a movie production). The lightweight
+coupling between super and subdatasets enables scenarios where individual datasets
+are maintained by a disjoint set of people, and the dataset collection itself can
+be curated by a completely independent entity. Any individual dataset can be
+part of any number of such collections.
 
-``install`` and ``get`` commands, both in Python and command line interfaces, might
-seem confusingly similar at first. Both of them could be used to install
-any number of subdatasets, and fetch content of the data files.  Differences lie
-primarily in their default behaviour and outputs, and thus intended use.
-Both ``install`` and ``get`` take local paths as their arguments, but their
-default behavior and output might differ;
+Benefitting from Git's support for workflows based on decentralized "clones" of
+a repository, DataLad's datasets can be (re-)published to a new location
+without loosing the connection between the "original" and the new "copy". This
+is extremely useful for collaborative work, but also in more mundane scenarios
+such as data backup, or temporary deployment fo a dataset on a compute cluster,
+or in the cloud.  Using git-annex, data can also get synchronized across
+different location of a dataset (:term:`sibling`\s in DataLad terminology).
+Using metadata tags, it is even possible to configure different levels of
+desired data redundancy across the network of dataset, or to prevent
+publication of sensitive data to publicly accessible repositories. Individual
+datasets in a hierarchy of (sub)datasets need not be stored at the same location.
+Continuing with an earlier example, it is possible to post a curated
+collection of datasets, as a superdataset, on Github, while the actual datasets
+live on different servers all around the world.
+
+API principles
+==============
+
+You can use Datalad's ``install`` command to download datasets. The command accepts
+URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
+to obtain a first dataset is downloading the canonical :term:`superdataset` from
+http://datasets.datalad.org/ using a shortcut.
+
+Downloading Datalad's canonical superdataset
+--------------------------------------------
+
+DataLad's canonical :term:`superdataset` provides an automated collection of datasets
+from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
+as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
+Here are three common examples in command line notation:
+
+``datalad install ///``
+    installs the canonical superdataset (metadata without subdatasets) in a
+    `datasets.datalad.org/` subdirectory under the current directory
+``datalad install -r ///openfmri``
+    installs the openfmri superdataset into an `openfmri/` subdirectory.
+    Additionally, the ``-r`` flag recursively downloads all metadata of datasets 
+    available from http://openfmri.org as subdatasets into the `openfmri/` subdirectory
+``datalad install -g -J3 -r ///labs/haxby``
+    installs the superdataset of datasets released by the lab of Dr. James V. Haxby
+    and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data, too.
+    It does so by using 3 parallel download processes (``-J3`` flag).
+
+Downloading datasets via http
+-----------------------------
+
+In most places where DataLad accepts URLs as arguments these URLs can be
+regular ``http`` or ``https`` protocol URLs. For example:
+
+``datalad install https://github.com/psychoinformatics-de/studyforrest-data-phase2.git``
+
+Downloading datasets via ssh
+----------------------------
+Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
+
+``datalad install ssh://me@localhost/path``
+
+Finally, DataLad supports SSH login style resource identifiers, such as ``me@localhost:/path``.
+
+``datalad install me@localhost:/path``
+
+`--dataset` argument
+--------------------
+
+All commands which operate with/on datasets (practically all commands) have a
+``dataset`` argument (``-d`` or ``--dataset`` in command line) which takes a
+path to the dataset that the command should operate on. If a dataset is
+identified this way then any relative path that is provided as an argument to
+the command will be interpreted as being relative to the topmost directory of that
+dataset.  If no dataset argument is provided, relative paths are considered to be
+relative to the current directory.
+
+There are also some useful pre-defined "shortcut" values for dataset arguments:
+
+``///``
+   refers to the "canonical" dataset located under `$HOME/datalad/`.
+   So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
+   under ``$HOME/datalad/crcns``.  This is the same as running
+   ``datalad install $HOME/datalad/crcns``.
+``^``
+   topmost superdataset containing the dataset the current directory is part of.
+   For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
+   to search metadata of the entire superdataset you are under (in this case
+   ``///``), run ``datalad search -d^ [something to search]``.
+
+Commands `install` vs `get`
+---------------------------
+
+The ``install`` and ``get`` commands might seem confusingly similar at first.
+Both of them could be used to install any number of subdatasets, and fetch
+content of the data files.  Differences lie primarily in their default
+behaviour and outputs, and thus intended use.  Both ``install`` and ``get``
+take local paths as their arguments, but their default behavior and output
+might differ;
 
 - **install** primarily operates and reports at the level of **datasets**, and
   returns as a result dataset(s)
@@ -64,49 +166,3 @@ corresponding Dataset object to operate on, and be able to use it even if you
 rerun the script.
 If you would like to fetch data (possibly while installing any necessary to be
 installed sub-dataset to get to the file) -- use ``get``.
-
-
-URL shortcuts
--------------
-
-``///`` could be used to point to our canonical :term:`superdataset` at
-http://datasets.datalad.org/ , which is largely generated through automated
-crawling (see :ref:`chap_crawler`) of data portals.  Some common examples in command line
-interface:
-
-``datalad install ///``
-    install our canonical super-dataset (alone, no sub-datasets installed during
-    this command) under `datasets.datalad.org/` directory in your current directory
-``datalad install -r ///openfmri``
-    install openfmri super-dataset from our website, with all sub-datasets
-    under `openfmri/` directory in your current directory
-``datalad install -g -J3 -r ///labs/haxby``
-    install Dr. James V. Haxby lab's super-dataset with all sub-datasets, while
-    fetching all data files (present in current version) in 3 parallel processes.
-
-
-Dataset argument
-----------------
-
-All commands which operate with/on datasets (e.g., `install`, `uninstall`, etc.)
-have `dataset` argument (`-d` or `--dataset` in command line) which takes path
-to the dataset you want to operate on. If you specify a dataset explicitly,
-then any relative path you provide as an argument to the command will be taken
-relative to the top directory of that dataset.  If no dataset argument is
-provided, relative paths are taken relative to the current directory.
-
-There are also some "shortcut" values for dataset argument you might find useful:
-
-``///``
-   "central" dataset located under `$HOME/datalad/`.  You could install it by running
-   ```datalad install -s /// $HOME/datalad``` or simply by running
-   ```datalad search smth``` in interactive shell session outside of any dataset,
-   which will present you with a choice to install it for you.
-   So running ``datalad install -d/// crcns`` will install crcns subdataset
-   under your `$HOME/datalad/crcns`.  It is analogous to running
-   ```datalad install $HOME/datalad/crcns```.
-``^``
-   top-most super-dataset containing dataset of your current location.  E.g., if
-   you are under `$HOME/datalad/openfmri/ds000001/sub-01` directory and want to
-   search meta-data of the entire super-dataset you are under (in this case `///`), run
-   ``datalad search -d^ [something to search]``.

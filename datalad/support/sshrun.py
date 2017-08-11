@@ -21,12 +21,14 @@ import sys
 
 from datalad.support.param import Parameter
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 
 from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.sshrun')
 
 
+@build_doc
 class SSHRun(Interface):
     """Run command on remote machines via SSH.
 
@@ -35,6 +37,8 @@ class SSHRun(Interface):
     connection management. Its primary use case is to be used with Git
     as 'core.sshCommand' or via "GIT_SSH_COMMAND".
     """
+    # prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         login=Parameter(
@@ -78,10 +82,11 @@ class SSHRun(Interface):
             ':{}'.format(port) if port else '')
         ssh = ssh_manager.get_connection(sshurl)
         # TODO: /dev/null on windows ;)  or may be could be just None?
-        out, err = ssh(
-            cmd,
-            stdin=open('/dev/null', 'r') if no_stdin else sys.stdin,
-            log_output=False
-        )
+        stdin_ = open('/dev/null', 'r') if no_stdin else sys.stdin
+        try:
+            out, err = ssh(cmd, stdin=stdin_, log_output=False)
+        finally:
+            if no_stdin:
+                stdin_.close()
         os.write(1, out.encode('UTF-8'))
         os.write(2, err.encode('UTF-8'))

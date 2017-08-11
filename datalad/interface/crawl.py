@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import exists
 from .base import Interface
+from datalad.interface.base import build_doc
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -26,6 +27,7 @@ lgr = getLogger('datalad.api.crawl')
 from .. import cfg
 
 
+@build_doc
 class Crawl(Interface):
     """Crawl online resource to create or update a dataset.
 
@@ -33,6 +35,8 @@ class Crawl(Interface):
 
       $ datalad crawl  # within a dataset having .datalad/crawl/crawl.cfg
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     _params_ = dict(
         # Dry run is untested and largely probably not working in this implementation
         # so let's not expose it for now at all

@@ -18,7 +18,7 @@ from os.path import lexists, join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
-from datalad.interface.utils import build_doc
+from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -123,6 +123,9 @@ class Update(Interface):
                 continue
             # this is definitely as dataset from here on
             ds = Dataset(ap['path'])
+            if not ds.is_installed():
+                lgr.debug("Skipping update since not installed %s", ds)
+                continue
             repo = ds.repo
             # prepare return value
             # TODO reuse AP for return props
