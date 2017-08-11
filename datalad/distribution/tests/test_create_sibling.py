@@ -14,6 +14,7 @@ from os import chmod
 import stat
 import re
 from os.path import join as opj, exists
+from six import text_type
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
@@ -170,7 +171,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target_alt",
             sshurl="ssh://localhost",
             target_dir=target_path)
-    ok_(str(cm.exception).startswith(
+    ok_(text_type(cm.exception).startswith(
         "Target path %s already exists. And it fails to rmdir" % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
