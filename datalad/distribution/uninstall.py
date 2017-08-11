@@ -41,9 +41,20 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 def _uninstall_dataset(ds, check, has_super, **kwargs):
     if check and ds.is_installed():
+        # if the checks are on we need to make sure to exit this function
+        # whenever any drop failed, because we cannot rely on the error
+        # to actually cause a stop in upstairs code
+        bad_things_happened = False
         for r in _drop_files(
                 ds, curdir, check=True, noannex_iserror=False, **kwargs):
             yield r
+            if r['action'] == 'drop' and \
+                    not r.get('status', None) in ('ok', 'notneeded'):
+                bad_things_happened = True
+        if bad_things_happened:
+            # error reporting already happened, we can just stop here
+            return
+
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
