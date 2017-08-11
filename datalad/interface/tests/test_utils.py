@@ -147,7 +147,7 @@ def test_save_hierarchy(path):
         ok_(d.repo.dirty)
     # need to give file specifically, otherwise it will simply just preserve
     # staged changes
-    ds_bb.save(files=opj(ds_bbaa.path, 'file_bbaa'))
+    ds_bb.save(path=opj(ds_bbaa.path, 'file_bbaa'))
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -186,7 +186,7 @@ def test_save_hierarchy(path):
         # type {'path': dspath, 'process_content': True} for each dataset
         # in question, but here we want to test how this would most likely
         # by used from cmdline
-        files=[opj(p, '')
+        path=[opj(p, '')
                for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
         super_datasets=True)
 

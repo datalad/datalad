@@ -168,7 +168,7 @@ def test_recursive_save(path):
     assert_status('notneeded', ds.save())
     # an explicit target saves only the corresponding dataset
     assert_result_values_equal(
-        save(files=[testfname]),
+        save(path=[testfname]),
         'path',
         [subsubds.path])
     # plain recursive without any files given will save the beast
@@ -214,7 +214,7 @@ def test_recursive_save(path):
                                      for d in (ds, subds, subsubds)]):
         assert_equal(old, new)
     # but now we are saving this untracked bit specifically
-    subsubds.save(message="savingtestmessage", files=['testnew2'],
+    subsubds.save(message="savingtestmessage", path=['testnew2'],
                   super_datasets=True)
     ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
@@ -240,7 +240,7 @@ def test_recursive_save(path):
     subsubds.save(message="saving new changes", all_updated=True)  # no super
     with chpwd(subds.path):
         # no explicit dataset is provided by path is provided
-        save(files=['subsub'], message='saving sub', super_datasets=True)
+        save(path=['subsub'], message='saving sub', super_datasets=True)
     # super should get it saved too
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'saving sub')
@@ -262,7 +262,7 @@ def test_subdataset_save(path):
 
     # `save sub` does not save the parent!!
     with chpwd(parent.path):
-        assert_status('notneeded', save(files=sub.path))
+        assert_status('notneeded', save(path=sub.path))
     ok_clean_git(parent.path, untracked=['untracked'], index_modified=['sub'])
     # `save -d .` saves the state change in the subdataset, but leaves any untracked
     # content alone
@@ -283,6 +283,6 @@ def test_subdataset_save(path):
             ['ok', 'notneeded'],
             # the key condition of this test is that no reference dataset is
             # given!
-            save(files='sub', super_datasets=True))
+            save(path='sub', super_datasets=True))
     # save super must not cause untracked content to be commited!
     ok_clean_git(parent.path, untracked=['untracked'])

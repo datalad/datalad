@@ -163,11 +163,11 @@ class Save(Interface):
             doc=""""specify the dataset to save. If a dataset is given, but
             no `files`, the entire dataset will be saved.""",
             constraints=EnsureDataset() | EnsureNone()),
-        files=Parameter(
-            args=("files",),
-            metavar='FILES',
-            doc="""list of files to consider. If given, only changes made
-            to those files are recorded in the new state.""",
+        path=Parameter(
+            args=("path",),
+            metavar='PATH',
+            doc="""path/name of the dataset component to save. If given, only
+            changes made to those components are recorded in the new state.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
@@ -194,8 +194,7 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
-    # TODO files -> path
-    def __call__(message=None, files=None, dataset=None,
+    def __call__(message=None, path=None, dataset=None,
                  all_updated=True, all_changes=None, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False
                  ):
@@ -206,7 +205,7 @@ class Save(Interface):
                 version="0.5.0",
                 msg="RF: all_changes option passed to the save"
             )
-        if not dataset and not files:
+        if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
             dataset = abspath(curdir)
@@ -214,7 +213,7 @@ class Save(Interface):
 
         to_process = []
         for ap in AnnotatePaths.__call__(
-                path=files,
+                path=path,
                 dataset=refds_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
