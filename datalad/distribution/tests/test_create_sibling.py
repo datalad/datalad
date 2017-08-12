@@ -52,7 +52,7 @@ from datalad.utils import on_windows
 from datalad.utils import _path_
 
 import logging
-
+lgr = logging.getLogger('datalad.tests')
 
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
@@ -100,7 +100,8 @@ from datalad.support.external_versions import external_versions
 # used on remote, so we will compare against system-git
 assert_create_sshwebserver = (
     assert_no_errors_logged(create_sibling)
-    if external_versions['cmd:system-git'] >= '2.4'
+    if (external_versions['cmd:system-git'] >= '2.4' and
+        lgr.getEffectiveLevel() > logging.DEBUG)
     else create_sibling
 )
 
