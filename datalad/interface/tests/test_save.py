@@ -29,6 +29,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 
@@ -149,7 +150,11 @@ def test_recursive_save(path):
     # now we introduce new files all the way down
     create_tree(subsubds.path, {"mike1": 'mike1'})
     # now we save recursively, nothing should happen
-    assert_status('notneeded', ds.save(recursive=True))
+    res = ds.save(recursive=True)
+    # we do not get any report from a subdataset, because we detect at the
+    # very top that the entire tree is clean
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, status='notneeded', action='save', path=ds.path)
     subsubds_indexed = subsubds.repo.get_indexed_files()
     assert_not_in('mike1', subsubds_indexed)
     assert_equal(states, [d.repo.get_hexsha() for d in (ds, subds, subsubds)])
