@@ -82,11 +82,6 @@ def run_module_suite(file_to_run=None, argv=None):
     at the end of a test module will run the tests when that module is
     called in the python interpreter.
 
-    Alternatively, calling::
-
-    >>> run_module_suite(file_to_run="numpy/tests/test_matlib.py")
-
-    from an interpreter will run all the test routine in 'test_matlib.py'.
     """
     if file_to_run is None:
         f = sys._getframe(1)
