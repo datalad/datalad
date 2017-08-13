@@ -1,3 +1,9 @@
+datalad (0.8.1-1) neurodebian; urgency=medium
+
+  * Fresh upstream bugfix to be release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 12 Aug 2017 22:18:16 -0400
+
 datalad (0.8.0-1) neurodebian; urgency=medium
 
   * Fresh release
