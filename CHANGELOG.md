@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.8.1 (??? ??, 2017) -- will be better than ever
+## 0.8.2 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -19,11 +19,31 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-- Do not attempt to [update] a not installed sub-dataset
+?
 
 ### Enhancements and new features
 
 ?
+
+
+## 0.8.1 (Aug 13, 2017) -- the best birthday gift
+
+Bugfixes
+
+### Fixes
+
+- Do not attempt to [update] a not installed sub-dataset
+- In case of too many files to be specified for [get] or [copy_to], we
+  will make multiple invocations of underlying git-annex command to not
+  overfill command line
+- More robust handling of unicode output in terminals which might not support it
+
+### Enhancements and new features
+
+- Ship a copy of numpy.testing to facilitate [test] without requiring numpy
+  as dependency. Also allow to pass to command which test(s) to run
+- In [get] and [copy_to] provide actual original requested paths, not the
+  ones we deduced need to be transferred, solely for knowing the total
 
 
 ## 0.8.0 (Jul 31, 2017) -- it is better than ever

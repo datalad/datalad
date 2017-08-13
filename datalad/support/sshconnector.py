@@ -178,7 +178,10 @@ class SSHConnection(object):
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         null = open('/dev/null')
         try:
-            out, err = self.runner.run(cmd, stdin=null)
+            # expect_stderr since ssh would announce to stderr
+            # "Master is running" and that is normal, not worthy warning about
+            # etc -- we are doing the check here for successful operation
+            out, err = self.runner.run(cmd, stdin=null, expect_stderr=True)
             res = True
         except CommandError as e:
             if e.code != 255:
