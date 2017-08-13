@@ -10,41 +10,39 @@ Getting started
 Installation
 ============
 
-Datalad is a Python package and can be installed via pip_, which is the
-preferred method unless system packages are available for the target platform
-(see below). To automatically install datalad and all its software dependencies
-type::
+Unless system packages are available for your operating system (see below), Datalad 
+can be installed via pip_ (**P**\ip **I**\nstalls **P**\ython). To automatically install 
+datalad and all its software dependencies type::
 
   pip install datalad
 
 .. _pip: https://pip.pypa.io
 
-Several additional installation schemes are supported (``[SCHEME]`` can be e.g.
+In addition, it is necessary to have a current version of git-annex_ installed
+which is not set up automatically by using the pip method.
+
+.. _git-annex: http://git-annex.branchable.com
+
+Advanced users can chose from several installation schemes (e.g.
 ``publish``, ``metadata``, ``tests`` or ``crawl``)::
 
   pip install datalad [SCHEME]
   
-.. cool, but why should I (or a first-time reader) even bother about the schemes?
+where ``SCHEME`` could be
 
-In addition, it is necessary to have a working installation of git-annex_,
-which is not set up automatically at this point.
-
-.. _git-annex: http://git-annex.branchable.com
+- ``crawl`` to also install `scrapy` which is used in some crawling constructs
+- ``tests`` to also install dependencies used by unit-tests battery of the datalad
+- ``full`` to install all dependencies
 
 (Neuro)Debian, Ubuntu, and similar systems
 ------------------------------------------
 
 For Debian-based operating systems the most convenient installation method
-is to enable the NeuroDebian_ repository, and to install datalad as a system
-package::
+is to enable the NeuroDebian_ repository. The following command installs datalad
+and all its software dependencies (including the git-annex-standalone package)::
 
   sudo apt-get install datalad
   
-A current version of git-annex (as also provided by the NeuroDebian_ 
-repository) can be installed by typing::
-
-  sudo apt-get install git-annex
-
 .. _neurodebian: http://neuro.debian.net
 
 MacOSX

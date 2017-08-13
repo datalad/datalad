@@ -12,6 +12,7 @@ import glob
 import inspect
 import shutil
 import stat
+from json import dumps
 import os
 import re
 import tempfile
@@ -967,8 +968,13 @@ def assert_status(label, results):
     """
     label = assure_list(label)
     for r in assure_list(results):
-        assert_in('status', r)
-        assert_in(r['status'], label)
+        try:
+            assert_in('status', r)
+            assert_in(r['status'], label)
+        except AssertionError:
+            raise AssertionError('Expected status {} not found in:\n{}'.format(
+                label,
+                dumps(r, indent=1)))
 
 
 def assert_message(message, results):
@@ -986,12 +992,19 @@ def assert_message(message, results):
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
-    for r in assure_list(results):
+    results = assure_list(results)
+    for r in results:
         if not len(kwargs):
             count += 1
         elif all(k in r and r[k] == v for k, v in kwargs.items()):
             count += 1
-    assert_equal(n, count)
+    if not n == count:
+        raise AssertionError(
+            'Did not find the {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+                n,
+                kwargs,
+                len(results),
+                dumps(results, indent=1)))
 
 
 def assert_in_results(results, **kwargs):
@@ -1001,7 +1014,7 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found
+    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
 
 
 def assert_not_in_results(results, **kwargs):
@@ -1074,7 +1087,6 @@ def with_batch_direct(t):
 
 
 def dump_graph(graph, flatten=False):
-    from json import dumps
     if flatten:
         from datalad.metadata import flatten_metadata_graph
         graph = flatten_metadata_graph(graph)
