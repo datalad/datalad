@@ -187,7 +187,10 @@ class Uninstall(Interface):
                 # when there really isn't
                 parentds = Dataset(ap['path']).get_superdataset(
                     datalad_only=False,
-                    topmost=False)
+                    topmost=False,
+                    # unless it is properly registered we have no way of
+                    # reinstalling it
+                    registered_only=True)
                 if parentds is None:
                     ap.update(
                         status='error',
