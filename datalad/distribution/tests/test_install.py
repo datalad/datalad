@@ -46,6 +46,7 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
@@ -268,6 +269,20 @@ def test_install_dataset_from_just_source(url, path):
     ok_(GitRepo.is_valid_repo(ds.path))
     ok_clean_git(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
+
+
+@with_testrepos(flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_dataset_from_instance(src, dst):
+    origin = Dataset(src)
+    clone = install(source=origin, path=dst)
+
+    assert_is_instance(clone, Dataset)
+    ok_startswith(clone.path, dst)
+    ok_(clone.is_installed())
+    ok_(GitRepo.is_valid_repo(clone.path))
+    ok_clean_git(clone.path, annex=None)
+    assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
 @with_testrepos(flavors=['network'])
