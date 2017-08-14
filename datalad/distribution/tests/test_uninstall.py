@@ -480,3 +480,8 @@ def test_uninstall_without_super(path):
     assert_result_count(subreport, 1)
     assert_result_count(subreport, 1, path=sub.path, state='absent')
     assert_result_count(subreport, 0, path=nosub.path)
+    # but we should fail on an attempt to uninstall the non-subdataset
+    res = uninstall(nosub.path, on_failure='ignore')
+    assert_result_count(
+        res, 1, path=nosub.path, status='error',
+        message="will not uninstall top-level dataset (consider `remove` command)")
