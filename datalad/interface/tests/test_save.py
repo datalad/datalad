@@ -20,7 +20,7 @@ from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import DeprecatedError
-from datalad.tests.utils import ok_, assert_false, assert_true, assert_not_equal
+from datalad.tests.utils import ok_
 from datalad.api import save
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
@@ -244,3 +244,45 @@ def test_recursive_save(path):
     # super should get it saved too
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'saving sub')
+
+
+@with_tempfile(mkdir=True)
+def test_subdataset_save(path):
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    ok_clean_git(parent.path)
+    create_tree(parent.path, {
+        "untracked": 'ignore',
+        'sub': {
+            "new": "wanted"}})
+    sub.add('new')
+    # defined state: one untracked, modified (but clean in itself) subdataset
+    ok_clean_git(sub.path)
+    ok_clean_git(parent.path, untracked=['untracked'], index_modified=['sub'])
+
+    # `save sub` does not save the parent!!
+    with chpwd(parent.path):
+        assert_status('notneeded', save(files=sub.path))
+    ok_clean_git(parent.path, untracked=['untracked'], index_modified=['sub'])
+    # `save -d .` saves the state change in the subdataset, but leaves any untracked
+    # content alone
+    with chpwd(parent.path):
+        assert_status('ok', parent.save())
+    ok_clean_git(parent.path, untracked=['untracked'])
+
+    # get back to the original modified state and check that -S behaves in
+    # exactly the same way
+    create_tree(parent.path, {
+        'sub': {
+            "new2": "wanted2"}})
+    sub.add('new2')
+    ok_clean_git(parent.path, untracked=['untracked'], index_modified=['sub'])
+    with chpwd(parent.path):
+        assert_status(
+            # notneeded to save sub, but need to save parent
+            ['ok', 'notneeded'],
+            # the key condition of this test is that no reference dataset is
+            # given!
+            save(files='sub', super_datasets=True))
+    # save super must not cause untracked content to be commited!
+    ok_clean_git(parent.path, untracked=['untracked'])

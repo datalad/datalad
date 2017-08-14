@@ -313,7 +313,10 @@ class Save(Interface):
                     path=parentds,
                     type='dataset',
                     # make sure we save content of superds later on
-                    process_content=True))
+                    process_content=True,
+                    # but not do nasty things, like adding untracked content
+                    # just because we discovered this dataset
+                    process_updated_only=True))
 
         # now re-annotate all paths, this will be fast for already annotated ones
         # and will amend the annotation for others, deduplication happens here too
