@@ -180,11 +180,24 @@ class Uninstall(Interface):
                 continue
             # we only have dataset from here
             if not ap.get('parentds', None):
-                ap.update(
-                    status='error',
-                    message="will not uninstall top-level dataset (consider `remove` command)")
-                yield ap
-                continue
+                # this could be a side-effect of the specific call semantics.
+                # As stated in #1714, we are not really interested in whether
+                # a superdataset was obvious in the call, but only whether there
+                # is a superdataset at all. So let's look for one, and only barf
+                # when there really isn't
+                parentds = Dataset(ap['path']).get_superdataset(
+                    datalad_only=False,
+                    topmost=False,
+                    # unless it is properly registered we have no way of
+                    # reinstalling it
+                    registered_only=True)
+                if parentds is None:
+                    ap.update(
+                        status='error',
+                        message="will not uninstall top-level dataset (consider `remove` command)")
+                    yield ap
+                    continue
+                ap['parentds'] = parentds.path
             if not ap['path'] == refds_path:
                 ap['process_content'] = True
             to_uninstall.append(ap)
