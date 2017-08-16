@@ -29,6 +29,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 
@@ -146,10 +147,20 @@ def test_recursive_save(path):
     # at this point the entire tree is clean
     ok_clean_git(ds.path)
     states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
+    # now we save recursively, nothing should happen
+    res = ds.save(recursive=True)
+    # we do not get any report from a subdataset, because we detect at the
+    # very top that the entire tree is clean
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, status='notneeded', action='save', path=ds.path)
     # now we introduce new files all the way down
     create_tree(subsubds.path, {"mike1": 'mike1'})
-    # now we save recursively, nothing should happen
-    assert_status('notneeded', ds.save(recursive=True))
+    # because we cannot say from the top if there is anything to do down below,
+    # we have to traverse and we will get reports for all dataset, but there is
+    # nothing actually saved
+    res = ds.save(recursive=True)
+    assert_result_count(res, 3)
+    assert_status('notneeded', res)
     subsubds_indexed = subsubds.repo.get_indexed_files()
     assert_not_in('mike1', subsubds_indexed)
     assert_equal(states, [d.repo.get_hexsha() for d in (ds, subds, subsubds)])
@@ -168,7 +179,7 @@ def test_recursive_save(path):
     assert_status('notneeded', ds.save())
     # an explicit target saves only the corresponding dataset
     assert_result_values_equal(
-        save(files=[testfname]),
+        save(path=[testfname]),
         'path',
         [subsubds.path])
     # plain recursive without any files given will save the beast
@@ -214,7 +225,7 @@ def test_recursive_save(path):
                                      for d in (ds, subds, subsubds)]):
         assert_equal(old, new)
     # but now we are saving this untracked bit specifically
-    subsubds.save(message="savingtestmessage", files=['testnew2'],
+    subsubds.save(message="savingtestmessage", path=['testnew2'],
                   super_datasets=True)
     ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
@@ -240,7 +251,7 @@ def test_recursive_save(path):
     subsubds.save(message="saving new changes", all_updated=True)  # no super
     with chpwd(subds.path):
         # no explicit dataset is provided by path is provided
-        save(files=['subsub'], message='saving sub', super_datasets=True)
+        save(path=['subsub'], message='saving sub', super_datasets=True)
     # super should get it saved too
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'saving sub')
@@ -262,7 +273,7 @@ def test_subdataset_save(path):
 
     # `save sub` does not save the parent!!
     with chpwd(parent.path):
-        assert_status('notneeded', save(files=sub.path))
+        assert_status('notneeded', save(path=sub.path))
     ok_clean_git(parent.path, untracked=['untracked'], index_modified=['sub'])
     # `save -d .` saves the state change in the subdataset, but leaves any untracked
     # content alone
@@ -283,6 +294,6 @@ def test_subdataset_save(path):
             ['ok', 'notneeded'],
             # the key condition of this test is that no reference dataset is
             # given!
-            save(files='sub', super_datasets=True))
+            save(path='sub', super_datasets=True))
     # save super must not cause untracked content to be commited!
     ok_clean_git(parent.path, untracked=['untracked'])

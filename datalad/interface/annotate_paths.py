@@ -193,6 +193,8 @@ def get_modified_subpaths(aps, refds, revision):
             # `revision` can be anything that Git support for `diff`
             # `True` is code for diff without revision
             revision=revision if revision is not True else None,
+            # it is important that staged is False, otherwise we would miss unstaged
+            # changes when e.g. diffing against HEAD (save does that)
             staged=False,
             # we might want to consider putting 'untracked' here
             # maybe that is a little faster, not tested yet
@@ -250,6 +252,14 @@ def get_modified_subpaths(aps, refds, revision):
         diff_range = '{}..{}'.format(
             sub['revision_src'] if sub['revision_src'] else '',
             sub['revision'] if sub['revision'] else '')
+        if sub['revision_src'] and sub['revision_src'] == sub['revision']:
+            # this is a special case, where subdataset reported changes without
+            # a change in state/commit -- this is code for uncommited changes
+            # in the subdataset (including staged ones). In such a case, we
+            # must not provide a diff range, but only the source commit we want
+            # to diff against
+            diff_range = sub['revision_src']
+
         for r in get_modified_subpaths(
                 sub_aps,
                 Dataset(sub['path']),
@@ -401,9 +411,9 @@ class AnnotatePaths(Interface):
             for details. Unmodified paths will not be annotated. If a requested
             path was not modified but some content underneath it was, then the
             request is replaced by the modified paths and those are annotated
-            instead. This option can be used without an argument to test against
-            changes that have been made, but have not yet been staged for a
-            commit."""))
+            instead. This option can be used [PY: with `True` as PY][CMD: without CMD]
+            an argument to test against changes that have been made, but have not
+            yet been staged for a commit."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
