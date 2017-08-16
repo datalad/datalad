@@ -147,14 +147,20 @@ def test_recursive_save(path):
     # at this point the entire tree is clean
     ok_clean_git(ds.path)
     states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
-    # now we introduce new files all the way down
-    create_tree(subsubds.path, {"mike1": 'mike1'})
     # now we save recursively, nothing should happen
     res = ds.save(recursive=True)
     # we do not get any report from a subdataset, because we detect at the
     # very top that the entire tree is clean
     assert_result_count(res, 1)
     assert_result_count(res, 1, status='notneeded', action='save', path=ds.path)
+    # now we introduce new files all the way down
+    create_tree(subsubds.path, {"mike1": 'mike1'})
+    # because we cannot say from the top if there is anything to do down below,
+    # we have to traverse and we will get reports for all dataset, but there is
+    # nothing actually saved
+    res = ds.save(recursive=True)
+    assert_result_count(res, 3)
+    assert_status('notneeded', res)
     subsubds_indexed = subsubds.repo.get_indexed_files()
     assert_not_in('mike1', subsubds_indexed)
     assert_equal(states, [d.repo.get_hexsha() for d in (ds, subds, subsubds)])

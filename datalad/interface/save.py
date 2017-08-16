@@ -212,6 +212,7 @@ class Save(Interface):
         refds_path = Interface.get_refds_path(dataset)
 
         to_process = []
+        got_nothing = True
         for ap in AnnotatePaths.__call__(
                 path=path,
                 dataset=refds_path,
@@ -221,8 +222,10 @@ class Save(Interface):
                 unavailable_path_status='impossible',
                 unavailable_path_msg="path does not exist: %s",
                 nondataset_path_status='impossible',
+                modified='HEAD' if not path and recursive else None,
                 return_type='generator',
                 on_failure='ignore'):
+            got_nothing = False
             # next check should not be done during annotation, as it is possibly expensive
             # and not generally useful
             if ap.get('status', None) == 'impossible' and \
@@ -248,6 +251,18 @@ class Save(Interface):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
+
+        if got_nothing and recursive and refds_path:
+            # path annotation yielded nothing, most likely cause is that nothing
+            # was found modified, we need to say something about the reference
+            # dataset
+            yield get_status_dict(
+                'save',
+                status='notneeded',
+                path=refds_path,
+                type='dataset',
+                logger=lgr)
+            return
 
         if not to_process:
             # nothing left to do, potentially all errored before

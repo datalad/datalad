@@ -967,12 +967,15 @@ def assert_status(label, results):
     in this sequence.
     """
     label = assure_list(label)
-    for r in assure_list(results):
+    results = assure_list(results)
+    for i, r in enumerate(results):
         try:
             assert_in('status', r)
             assert_in(r['status'], label)
         except AssertionError:
-            raise AssertionError('Expected status {} not found in:\n{}'.format(
+            raise AssertionError('Test {}/{}: expected status {} not found in:\n{}'.format(
+                i + 1,
+                len(results),
                 label,
                 dumps(r, indent=1)))
 
