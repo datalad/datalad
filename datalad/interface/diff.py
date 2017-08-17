@@ -203,7 +203,7 @@ class Diff(Interface):
     def __call__(
             path=None,
             dataset=None,
-            revision='HEAD',
+            revision=None,
             staged=False,
             ignore_subdatasets='none',
             recursive=False,
@@ -212,9 +212,6 @@ class Diff(Interface):
             # act on the whole dataset if nothing else was specified
             dataset = curdir
         refds_path = Interface.get_refds_path(dataset)
-        if not (refds_path or path):
-            raise InsufficientArgumentsError(
-                "Neither dataset nor target path(s) provided")
 
         to_process = []
         for ap in AnnotatePaths.__call__(
