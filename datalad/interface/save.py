@@ -163,11 +163,11 @@ class Save(Interface):
             doc=""""specify the dataset to save. If a dataset is given, but
             no `files`, the entire dataset will be saved.""",
             constraints=EnsureDataset() | EnsureNone()),
-        files=Parameter(
-            args=("files",),
-            metavar='FILES',
-            doc="""list of files to consider. If given, only changes made
-            to those files are recorded in the new state.""",
+        path=Parameter(
+            args=("path",),
+            metavar='PATH',
+            doc="""path/name of the dataset component to save. If given, only
+            changes made to those components are recorded in the new state.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
@@ -194,8 +194,7 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
-    # TODO files -> path
-    def __call__(message=None, files=None, dataset=None,
+    def __call__(message=None, path=None, dataset=None,
                  all_updated=True, all_changes=None, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False
                  ):
@@ -206,15 +205,16 @@ class Save(Interface):
                 version="0.5.0",
                 msg="RF: all_changes option passed to the save"
             )
-        if not dataset and not files:
+        if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
             dataset = abspath(curdir)
         refds_path = Interface.get_refds_path(dataset)
 
         to_process = []
+        got_nothing = True
         for ap in AnnotatePaths.__call__(
-                path=files,
+                path=path,
                 dataset=refds_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
@@ -222,8 +222,10 @@ class Save(Interface):
                 unavailable_path_status='impossible',
                 unavailable_path_msg="path does not exist: %s",
                 nondataset_path_status='impossible',
+                modified='HEAD' if not path and recursive else None,
                 return_type='generator',
                 on_failure='ignore'):
+            got_nothing = False
             # next check should not be done during annotation, as it is possibly expensive
             # and not generally useful
             if ap.get('status', None) == 'impossible' and \
@@ -249,6 +251,18 @@ class Save(Interface):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
+
+        if got_nothing and recursive and refds_path:
+            # path annotation yielded nothing, most likely cause is that nothing
+            # was found modified, we need to say something about the reference
+            # dataset
+            yield get_status_dict(
+                'save',
+                status='notneeded',
+                path=refds_path,
+                type='dataset',
+                logger=lgr)
+            return
 
         if not to_process:
             # nothing left to do, potentially all errored before
@@ -313,7 +327,10 @@ class Save(Interface):
                     path=parentds,
                     type='dataset',
                     # make sure we save content of superds later on
-                    process_content=True))
+                    process_content=True,
+                    # but not do nasty things, like adding untracked content
+                    # just because we discovered this dataset
+                    process_updated_only=True))
 
         # now re-annotate all paths, this will be fast for already annotated ones
         # and will amend the annotation for others, deduplication happens here too

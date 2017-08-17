@@ -474,7 +474,7 @@ class Add(Interface):
         # more comprehensible
         for res in Save.__call__(
                 # hand-selected annotated paths
-                files=to_save,
+                path=to_save,
                 dataset=refds_path,
                 message=message if message else '[DATALAD] added content',
                 return_type='generator',

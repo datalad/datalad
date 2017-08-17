@@ -433,3 +433,55 @@ def test_remove_recursive_2(tdir):
         install('///labs')
         install('labs/tarr/face_place')
         remove('labs', recursive=True)
+
+
+@with_tempfile(mkdir=True)
+def test_failon_nodrop(path):
+    # test to make sure that we do not wipe out data when checks are enabled
+    # despite the general error behavior mode
+    ds = Dataset(path).create()
+    # we play with a subdataset to bypass the tests that prevent the removal
+    # of top-level datasets
+    sub = ds.create('sub')
+    create_tree(sub.path, {'test': 'content'})
+    ds.add(opj('sub', 'test'))
+    ok_clean_git(ds.path)
+    eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
+    # we put one file into the dataset's annex, no redundant copies
+    # neither uninstall nor remove should work
+    res = ds.uninstall('sub', check=True, on_failure='ignore')
+    assert_status(['error', 'impossible'], res)
+    eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
+    # same with remove
+    res = ds.remove('sub', check=True, on_failure='ignore')
+    assert_status(['error', 'impossible'], res)
+    eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
+
+
+@with_tempfile(mkdir=True)
+def test_uninstall_without_super(path):
+    # a parent dataset with a proper subdataset, and another dataset that
+    # is just placed underneath the parent, but not an actual subdataset
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    ok_clean_git(parent.path)
+    nosub = create(opj(parent.path, 'nosub'))
+    ok_clean_git(nosub.path)
+    subreport = parent.subdatasets()
+    assert_result_count(subreport, 1, path=sub.path)
+    assert_result_count(subreport, 0, path=nosub.path)
+    # it should be possible to uninstall the proper subdataset, even without
+    # explicitly calling the uninstall methods of the parent -- things should
+    # be figured out by datalad
+    uninstall(sub.path)
+    assert not sub.is_installed()
+    # no present subdatasets anymore
+    subreport = parent.subdatasets()
+    assert_result_count(subreport, 1)
+    assert_result_count(subreport, 1, path=sub.path, state='absent')
+    assert_result_count(subreport, 0, path=nosub.path)
+    # but we should fail on an attempt to uninstall the non-subdataset
+    res = uninstall(nosub.path, on_failure='ignore')
+    assert_result_count(
+        res, 1, path=nosub.path, status='error',
+        message="will not uninstall top-level dataset (consider `remove` command)")
