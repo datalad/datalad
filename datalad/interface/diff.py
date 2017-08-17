@@ -15,7 +15,9 @@ import logging
 import stat
 from os.path import join as opj
 from os.path import curdir
+from os.path import isdir
 from os.path import relpath
+from os.path import normpath
 
 
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -27,7 +29,6 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -65,10 +66,59 @@ def _translate_type(mode, ap, prop):
     elif mode == stat.S_IFDIR | stat.S_IFLNK:
         ap[prop] = 'dataset'
     elif stat.S_ISDIR(mode):
-        # not sure if this can happen at all
+        # not sure if this can happen at all, at least not in the tests...
         ap[prop] = 'directory'
     else:
         ap[prop] = 'file'
+
+
+def _get_untracked_content(dspath, paths=None):
+    cmd = ['git', '--work-tree=.', 'status', '--porcelain',
+           # file names NULL terminated
+           '-z',
+           # we never want to touch submodules, they cannot be untracked
+           '--ignore-submodules=all',
+           # fully untracked dirs as such, the rest as files
+           '--untracked=normal']
+    try:
+        stdout, stderr = GitRunner(cwd=dspath).run(
+            cmd,
+            log_stderr=True,
+            log_stdout=True,
+            log_online=False,
+            expect_stderr=False,
+            shell=False,
+            expect_fail=True)
+    except CommandError as e:
+        # TODO should we catch any and handle them in here?
+        raise e
+
+    if paths:
+        paths = [r['path'] for r in paths]
+        if len(paths) == 1 and paths[0] == dspath:
+            # nothing to filter
+            paths = None
+
+    for line in stdout.split('\0'):
+        if not line:
+            continue
+        if not line.startswith('?? '):
+            # nothing untracked, ignore, task of `diff`
+            continue
+        apath = opj(
+            dspath,
+            # strip state marker
+            line[3:])
+        norm_apath = normpath(apath)
+        if paths and not any([norm_apath == p or p.startswith(apath) for p in paths]):
+            # we got a whitelist for paths, don't report any other
+            continue
+        ap = dict(
+            path=norm_apath,
+            parentds=dspath,
+            state='untracked',
+            type='directory' if isdir(apath) else 'file')
+        yield ap
 
 
 def _parse_git_diff(dspath, diff_thingie=None, paths=None,
@@ -141,9 +191,34 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
 
 @build_doc
 class Diff(Interface):
-    """Report changes of dataset component between revisions.
+    """Report changes of dataset components.
+
+    Reports can be generated for changes between recorded revisions, or
+    between a revision and the state of a dataset's work tree.
+
+    Unlike 'git diff', this command also reports untracked content when
+    comparing a revision to the state of the work tree. Such content is
+    marked with the property `state='untracked'` in the command results.
+
+    The following types of changes are distinguished and reported via the
+    `state` result property:
+
+    - added
+    - copied
+    - deleted
+    - modified
+    - renamed
+    - typechange
+    - unmerged
+    - untracked
+
+    Whenever applicable, source and/or destination revisions are reported
+    to indicate when exactly within the requested revision range a particular
+    component changed its status.
+
+    Optionally, the reported changes can be limited to a subset of paths
+    within a dataset.
     """
-    # TODO describe properties that are reported
 
     # make the custom renderer the default one, as the global default renderer
     # does not yield meaningful output for this command
@@ -242,16 +317,32 @@ class Diff(Interface):
         assert(not completed)
 
         for ds_path in sorted(content_by_ds.keys()):
+            content_paths = content_by_ds[ds_path]
             for r in _parse_git_diff(
                     ds_path,
                     diff_thingie=revision,
-                    paths=content_by_ds[ds_path],
+                    paths=content_paths,
                     ignore_submodules=ignore_subdatasets,
                     staged=staged):
                 r.update(dict(
                     action='diff',
-                    refds=refds_path),
-                    logger=lgr)
+                    logger=lgr))
+                if refds_path:
+                    r['refds'] = refds_path
+                if 'status' not in r:
+                    r['status'] = 'ok'
+                yield r
+            if revision and '..' in revision:
+                # don't look for untracked content, we got a revision range
+                continue
+            for r in _get_untracked_content(
+                    ds_path,
+                    paths=content_paths):
+                r.update(dict(
+                    action='diff',
+                    logger=lgr))
+                if refds_path:
+                    r['refds'] = refds_path
                 if 'status' not in r:
                     r['status'] = 'ok'
                 yield r
@@ -263,9 +354,9 @@ class Diff(Interface):
             # logging reported already
             return
         path = relpath(res['path'], start=res['refds']) \
-            if 'refds' in res else res['path']
+            if res.get('refds', None) else res['path']
         type_ = res.get('type', res.get('type_src', ''))
-        max_len = len('typechange(dataset)')
+        max_len = len('untracked(directory)')
         state_msg = '{}{}'.format(
             res['state'],
             '({})'.format(type_ if type_ else ''))

@@ -12,32 +12,23 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
 from os.path import join as opj
 from datalad.utils import chpwd
 
-from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import DeprecatedError
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.tests.utils import ok_
 from datalad.api import diff
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_result_values_equal
 
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_diff(path, norepo):
+    with chpwd(norepo):
+        assert_status('impossible', diff(on_failure='ignore'))
     ds = Dataset(path).create()
     ok_clean_git(ds.path)
     # reports stupid revision input
@@ -97,3 +88,33 @@ def test_diff(path, norepo):
         action='diff', path=opj(ds.path, 'new'), state='modified')
     ds.save()
     ok_clean_git(ds.path)
+
+    # untracked stuff
+    create_tree(ds.path, {'deep': {'down': 'untracked', 'down2': 'tobeadded'}})
+    # a plain diff should report the untracked file
+    # but not directly, because the parent dir is already unknown
+    res = ds.diff()
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1, state='untracked', type='directory', path=opj(ds.path, 'deep'))
+    # an unmatching path will hide this result
+    assert_result_count(ds.diff(path='somewhere'), 0)
+    # perfect match and anything underneath will do
+    assert_result_count(
+        ds.diff(path='deep'), 1, state='untracked', path=opj(ds.path, 'deep'),
+        type='directory')
+    assert_result_count(
+        ds.diff(path=opj('deep', 'somewhere')), 1,
+        state='untracked', path=opj(ds.path, 'deep'))
+    # now we stage on of the two files in deep
+    ds.add(opj('deep', 'down2'), to_git=True, save=False)
+    # without any reference it will ignore the staged stuff and report the remaining
+    # untracked file
+    assert_result_count(
+        ds.diff(), 1, state='untracked', path=opj(ds.path, 'deep', 'down'),
+        type='file')
+    res = ds.diff(staged=True)
+    assert_result_count(
+        res, 1, state='untracked', path=opj(ds.path, 'deep', 'down'), type='file')
+    assert_result_count(
+        res, 1, state='added', path=opj(ds.path, 'deep', 'down2'), type='file')

@@ -225,6 +225,10 @@ class Save(Interface):
                 modified='HEAD' if not path and recursive else None,
                 return_type='generator',
                 on_failure='ignore'):
+            if ap.get('state', None) == 'untracked' and not ap.get('raw_input', False):
+                # this path was found untracked, but not explicitly given to save
+                # we will silently ignore this
+                continue
             got_nothing = False
             # next check should not be done during annotation, as it is possibly expensive
             # and not generally useful
