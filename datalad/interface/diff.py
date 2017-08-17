@@ -72,14 +72,14 @@ def _translate_type(mode, ap, prop):
         ap[prop] = 'file'
 
 
-def _get_untracked_content(dspath, paths=None):
+def _get_untracked_content(dspath, report_untracked, paths=None):
     cmd = ['git', '--work-tree=.', 'status', '--porcelain',
            # file names NULL terminated
            '-z',
            # we never want to touch submodules, they cannot be untracked
            '--ignore-submodules=all',
            # fully untracked dirs as such, the rest as files
-           '--untracked=normal']
+           '--untracked={}'.format(report_untracked)]
     try:
         stdout, stderr = GitRunner(cwd=dspath).run(
             cmd,
@@ -269,6 +269,14 @@ class Diff(Interface):
             execution will still report other changes in any existing
             subdataset, only the subdataset record in a parent dataset
             is not  evaluated."""),
+        report_untracked=Parameter(
+            args=('--report-untracked',),
+            constraints=EnsureChoice('no', 'normal', 'all'),
+            doc="""If and how untracked content is reported when comparing
+            a revision to the state of the work tree. 'no': no untracked files
+            are reported; 'normal': untracked files and entire untracked
+            directories are reported as such; 'all': report individual files
+            even in fully untracked directories."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
 
@@ -281,6 +289,7 @@ class Diff(Interface):
             revision=None,
             staged=False,
             ignore_subdatasets='none',
+            report_untracked='normal',
             recursive=False,
             recursion_limit=None):
         if not dataset and not path:
@@ -332,11 +341,12 @@ class Diff(Interface):
                 if 'status' not in r:
                     r['status'] = 'ok'
                 yield r
-            if revision and '..' in revision:
+            if (revision and '..' in revision) or report_untracked == 'no':
                 # don't look for untracked content, we got a revision range
                 continue
             for r in _get_untracked_content(
                     ds_path,
+                    report_untracked,
                     paths=content_paths):
                 r.update(dict(
                     action='diff',

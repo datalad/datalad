@@ -97,6 +97,9 @@ def test_diff(path, norepo):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, state='untracked', type='directory', path=opj(ds.path, 'deep'))
+    # report of individual files is also possible
+    assert_result_count(
+        ds.diff(report_untracked='all'), 2, state='untracked', type='file')
     # an unmatching path will hide this result
     assert_result_count(ds.diff(path='somewhere'), 0)
     # perfect match and anything underneath will do
