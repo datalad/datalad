@@ -25,10 +25,16 @@ rm -rf datalad.dist "$distdir"
 # pukes
 echo "I: building with nuitka $nuitka_version under $python_version"
 mode="--exe --standalone `which datalad`"
-#mode="--module datalad"
-nuitka -j 8 --recurse-all --recurse-stdlib --python-flag=no_site --recurse-directory=datalad \
+#mode="--module datalad"  # --standalone"
+#--explain-imports    seems did magic on an old system to include wrapt etc, but suppressed logs
+mode+=" --show-progress --verbose"
+# removed per Kay's recommendation --recurse-stdlib 
+set -x
+nuitka -j 8 --recurse-all --python-flag=no_site --recurse-directory=datalad --explain-imports \
+   --recurse-to=setuptools,distribute,nose,mock,httpretty,scrapy,jsmin,github,pkg_resources \
    --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,scipy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} \
    $mode
+set +x
 # mkdir -p datalad.dist
  
 cat >| datalad.dist/build.info << EOF
