@@ -223,6 +223,9 @@ def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
     subds = ds.create('deep', force=True)
     subds.add('.', recursive=True)
+    ok_clean_git(subds.path)
+    # needs to be able to add a combination of staged files, modified submodule,
+    # and untracked files
     ds.add('.', recursive=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
@@ -291,8 +294,9 @@ def test_uninstall_recursive(path):
     subds = ds.create('deep', force=True)
     # we add one file, but we get a response for the requested
     # directory too
-    assert_result_count(subds.add('.'), 2,
-                        action='add', status='ok')
+    res = subds.add('.')
+    assert_result_count(res, 1, action='add', status='ok', type='file')
+    assert_result_count(res, 1, action='save', status='ok', type='dataset')
     # save all -> all clean
     ds.save(recursive=True)
     ok_clean_git(subds.path)
