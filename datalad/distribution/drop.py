@@ -196,6 +196,10 @@ class Drop(Interface):
                     GitRepo.is_valid_repo(ap['path']) and \
                     not ap['path'] == refds_path:
                 ap['process_content'] = True
+            if ap.get('registered_subds', False) and ap.get('state', None) == 'absent':
+                # nothing to drop in an absent subdataset, don't be annoying
+                # and skip silently
+                continue
             to_drop.append(ap)
 
         content_by_ds, ds_props, completed, nondataset_paths = \

@@ -485,3 +485,13 @@ def test_uninstall_without_super(path):
     assert_result_count(
         res, 1, path=nosub.path, status='error',
         message="will not uninstall top-level dataset (consider `remove` command)")
+
+
+@with_tempfile(mkdir=True)
+def test_drop_nocrash_absent_subds(path):
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    parent.uninstall('sub')
+    ok_clean_git(parent.path)
+    with chpwd(path):
+        assert_status('notneeded', drop('.', recursive=True))
