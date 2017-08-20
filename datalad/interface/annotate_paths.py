@@ -163,7 +163,7 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
-def get_modified_subpaths(aps, refds, revision):
+def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
     """
     Parameters
     ----------
@@ -199,6 +199,10 @@ def get_modified_subpaths(aps, refds, revision):
             # we might want to consider putting 'untracked' here
             # maybe that is a little faster, not tested yet
             ignore_subdatasets='none',
+            # we want to see any individual untracked file, this simplifies further
+            # processing dramatically, but may require subsequent filtering
+            # in order to avoid flooding user output with useless info
+            report_untracked='all',
             # no recursion, we needs to update `revision` for every subdataset
             # before we can `diff`
             recursive=False,
@@ -235,7 +239,7 @@ def get_modified_subpaths(aps, refds, revision):
                 continue
 
     mod_subs = [m for m in modified if m.get('type', None) == 'dataset']
-    if not mod_subs:
+    if not mod_subs or (recursion_limit is not None and recursion_limit < 1):
         return
 
     aps = [ap if isinstance(ap, dict) else rawpath2ap(ap, refds.path) for ap in aps]
@@ -263,7 +267,8 @@ def get_modified_subpaths(aps, refds, revision):
         for r in get_modified_subpaths(
                 sub_aps,
                 Dataset(sub['path']),
-                diff_range):
+                diff_range,
+                recursion_limit=(recursion_limit - 1) if recursion_limit is not None else None ):
             yield r
 
 
@@ -499,13 +504,32 @@ class AnnotatePaths(Interface):
         requested_paths = assure_list(path)
 
         if modified is not None:
+            # modification detection wwould silently kill all nondataset paths
+            # but we have to complain about them, hence doing it here
+            if requested_paths and refds_path:
+                for r in requested_paths:
+                    p = r['path'] if isinstance(r, dict) else r
+                    p = resolve_path(p, ds=refds_path)
+                    if _with_sep(p).startswith(_with_sep(refds_path)):
+                        # all good
+                        continue
+                    # not the refds
+                    path_props = r if isinstance(r, dict) else {}
+                    res = get_status_dict(
+                        **dict(res_kwargs, **path_props))
+                    res['status'] = nondataset_path_status
+                    res['message'] = 'path not associated with reference dataset'
+                    reported_paths[path] = res
+                    yield res
+
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
                 # either the request, or the base dataset, if there was no request
                 requested_paths if requested_paths else [refds_path],
                 refds=Dataset(refds_path),
-                revision=modified)
+                revision=modified,
+                recursion_limit=recursion_limit)
 
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
@@ -524,6 +548,7 @@ class AnnotatePaths(Interface):
                 # discovered via recursive processing of another path before
                 continue
             # the path exists in some shape or form
+            # TODO if we have path_props already we could skip this test
             if isdir(path):
                 # keep any existing type info, previously a more expensive run
                 # could have discovered an uninstalled 'dataset', and we don't
@@ -567,7 +592,8 @@ class AnnotatePaths(Interface):
                         # don't check whether this is actually a true subdataset of the
                         # parent, done further down
                 else:
-                    path_props['parentds'] = dspath
+                    # set parent, but prefer existing property
+                    path_props['parentds'] = path_props.get('parentds', dspath)
 
             # test for `dspath` not `parent`, we only need to know whether there is
             # ANY dataset, not which one is the true parent, logic below relies on
@@ -677,7 +703,8 @@ class AnnotatePaths(Interface):
                 for r in get_modified_subpaths(
                         rec_paths,
                         refds=Dataset(refds_path),
-                        revision=modified):
+                        revision=modified,
+                        recursion_limit=recursion_limit):
                     res = get_status_dict(**dict(r, **res_kwargs))
                     reported_paths[res['path']] = res
                     yield res

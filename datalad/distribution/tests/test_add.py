@@ -10,15 +10,12 @@
 """
 
 import logging
-from os import pardir
 from os.path import join as opj
 
 from datalad.api import create
 from datalad.api import add
 from datalad.api import install
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import CommandError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_file_under_git
@@ -32,10 +29,9 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import create_tree
 from datalad.utils import chpwd
-from datalad.utils import _path_
 
 from ..dataset import Dataset
 
@@ -119,8 +115,39 @@ def test_add_files(path):
         ok_(unstaged.isdisjoint(indexed))
 
 
-@with_tree(**tree_arg)
+@with_tempfile(mkdir=True)
 def test_add_recursive(path):
+    # make simple hierarchy
+    parent = Dataset(path).create()
+    ok_clean_git(parent.path)
+    sub1 = parent.create(opj('down', 'sub1'))
+    ok_clean_git(parent.path)
+    sub2 = parent.create('sub2')
+    # next one make the parent dirty
+    subsub = sub2.create('subsub')
+    ok_clean_git(parent.path, index_modified=['sub2'])
+    res = parent.save()
+    ok_clean_git(parent.path)
+
+    # now add content deep in the hierarchy
+    create_tree(subsub.path, {'new': 'empty'})
+    ok_clean_git(parent.path, index_modified=['sub2'])
+
+    # recursive add should not even touch sub1, because
+    # it knows that it is clean
+    res = parent.add('.', recursive=True)
+    # the key action is done
+    assert_result_count(
+        res, 1, path=opj(subsub.path, 'new'), action='add', status='ok')
+    # sub1 is untouched, and not reported
+    assert_result_count(res, 0, path=sub1.path)
+    # saved all the way up
+    assert_result_count(res, 3, action='save', status='ok')
+    ok_clean_git(parent.path)
+
+
+@with_tree(**tree_arg)
+def test_add_dirty_tree(path):
     ds = Dataset(path)
     ds.create(force=True, save=False)
     subds = ds.create('dir', force=True)

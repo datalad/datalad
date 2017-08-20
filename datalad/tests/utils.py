@@ -977,7 +977,7 @@ def assert_status(label, results):
                 i + 1,
                 len(results),
                 label,
-                dumps(r, indent=1)))
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_message(message, results):
@@ -1003,11 +1003,12 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Did not find the {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+                count,
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1)))
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_in_results(results, **kwargs):
