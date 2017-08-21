@@ -13,12 +13,14 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import json
+import re
 
 from argparse import REMAINDER
 from os.path import join as opj
 from os.path import curdir
 from os.path import pardir
 from os.path import relpath
+from os.path import normpath
 
 from datalad.cmd import Runner
 
@@ -74,6 +76,13 @@ class Run(Interface):
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
+        rerun=Parameter(
+            args=('--rerun',),
+            action='store_true',
+            doc="""re-run the command recorded in the last saved change (if any).
+            This will ignore any command given as an argument, and execute the
+            recorded command call in the recorded working directory. The recorded
+            changeset will be replaced by the outcome of the command re-run."""),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -90,17 +99,17 @@ class Run(Interface):
             # it is optional, because `rerun` can get a recorded one
             cmd=None,
             dataset=None,
-            message=None):
+            message=None,
+            rerun=False):
+        if rerun and cmd:
+            lgr.warning('Ignoring provided command in --rerun mode')
+            cmd = None
         if not dataset:
             # act on the whole dataset if nothing else was specified
             dataset = get_dataset_root(curdir)
         ds = require_dataset(
             dataset, check_installed=True,
             purpose='tracking outcomes of a command')
-        rel_pwd = relpath(getpwd(), start=ds.path)
-        if rel_pwd.startswith(pardir):
-            lgr.warning('Process working directory not inside the dataset, command run may not be reproducible.')
-            rel_pwd = None
         # not needed ATM
         #refds_path = ds.path
         lgr.debug('tracking command output underneath %s', ds)
@@ -115,9 +124,75 @@ class Run(Interface):
                 message='unsaved modifications present, cannot detect changes by command')
             return
 
-        if not cmd:
+        if not cmd and not rerun:
             # TODO here we would need to recover a cmd when a rerun is attempted
             return
+
+        if rerun:
+            # pull run info out of the last commit message
+            err_info = get_status_dict('run', ds=ds)
+            if not ds.repo.get_hexsha():
+                yield dict(
+                    err_info, status='impossible',
+                    message='cannot re-run command, nothing recorded')
+                return
+            last_commit_msg = ds.repo.repo.head.commit.message
+            cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
+            runinfo = re.match(cmdrun_regex, last_commit_msg, re.MULTILINE | re.DOTALL)
+            if not runinfo:
+                yield dict(
+                    err_info, status='impossible',
+                    message='cannot re-run command, last saved state does not look like a recorded command run')
+                return
+            rec_msg, runinfo = runinfo.groups()
+            if message is None:
+                # re-use commit message, if nothing new was given
+                message = rec_msg
+            try:
+                runinfo = json.loads(runinfo)
+            except Exception as e:
+                yield dict(
+                    err_info, status='error',
+                    message=('cannot re-run command, command specification is not valid JSON: %s', e.message))
+                return
+            if 'cmd' not in runinfo:
+                yield dict(
+                    err_info, status='error',
+                    message='cannot re-run command, command specification missing in recorded state')
+                return
+            cmd = runinfo['cmd']
+            rec_exitcode = runinfo.get('exit', 0)
+            rel_pwd = runinfo.get('pwd', None)
+            if rel_pwd:
+                # recording is relative to the dataset
+                pwd = normpath(opj(ds.path, rel_pwd))
+            else:
+                rel_pwd = None  # normalize, just in case
+                pwd = None
+
+            # now we have to find out what was modified during the last run, and enable re-modification
+            # ideally, we would bring back the entire state of the tree with #1424, but we limit ourself
+            # to file addition/not-in-place-modification for now
+            to_unlock = []
+            for r in ds.diff(
+                    recursive=True,
+                    revision='HEAD~1...HEAD',
+                    return_type='generator',
+                    result_renderer=None):
+                if r.get('type', None) == 'file' and \
+                        r.get('state', None) in ('added', 'modified'):
+                    r.pop('status', None)
+                    to_unlock.append(r)
+            if to_unlock:
+                for r in ds.unlock(to_unlock, return_type='generator', result_xfm=None):
+                    yield r
+        else:
+            # not a rerun, figure out where we are running
+            pwd = getpwd()
+            rel_pwd = relpath(pwd, start=ds.path)
+            if rel_pwd.startswith(pardir):
+                lgr.warning('Process working directory not inside the dataset, command run may not be reproducible.')
+                rel_pwd = None
 
         # anticipate quoted compound shell commands
         cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
@@ -128,9 +203,8 @@ class Run(Interface):
 
         # we have a clean dataset, let's run things
         cmd_exitcode = None
-        runner = Runner()
+        runner = Runner(cwd=pwd)
         try:
-            print(cmd)
             lgr.info("== Command start (output follows) =====")
             runner.run(
                 cmd,
@@ -148,8 +222,20 @@ class Run(Interface):
             # strip our own info from the exception. The original command output
             # went to stdout/err -- we just have to exitcode in the same way
             cmd_exitcode = e.code
-            # TODO add the ability to `git reset --hard` the dataset tree on failure
-            # we know that we started clean, so we could easily go back
+            if not rerun or rec_exitcode != cmd_exitcode:
+                # we failed during a fresh run, or in a different way during a rerun
+                # the latter can easily happen if we try to alter a locked file
+                #
+                # let's fail here, the command could have had a typo or some
+                # other undesirable condition. If we would `add` nevertheless,
+                # we would need to rerun and aggregate annex content that we
+                # likely don't want
+                # TODO add switch to ignore failure (some commands are stupid)
+                # TODO add the ability to `git reset --hard` the dataset tree on failure
+                # we know that we started clean, so we could easily go back, needs gh-1424
+                # to be able to do it recursively
+                raise CommandError(code=cmd_exitcode)
+
         lgr.info("== Command exit (modification check follows) =====")
 
         # ammend commit message with `run` info:
@@ -176,6 +262,7 @@ class Run(Interface):
         for r in ds.add('.', recursive=True, message=msg):
             yield r
 
-        if cmd_exitcode:
-            # finally raise due to the original command error
-            raise CommandError(code=cmd_exitcode)
+        # TODO bring back when we can ignore a command failure
+        #if cmd_exitcode:
+        #    # finally raise due to the original command error
+        #    raise CommandError(code=cmd_exitcode)

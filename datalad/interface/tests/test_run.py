@@ -89,3 +89,33 @@ def test_basics(path, nodspath):
             commit_msg = ds.repo.repo.head.commit.message
             # crude test that PWD wasn't recorded
             assert_not_in('"pwd": ', commit_msg)
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_rerun(path, nodspath):
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    probe_path = opj(sub.path, 'sequence')
+    # run inside the dataset
+    with chpwd(path):
+        ds.run('echo x$(cat sub/sequence) > sub/sequence')
+    # command ran once, all clean
+    ok_clean_git(ds.path)
+    eq_('x\n', open(probe_path).read())
+    # now, for a rerun we can be anywhere, PWD and all are recorded
+    # moreover, rerun must figure out which bits to unlock, even in
+    # subdatasets
+    with chpwd(nodspath):
+        ds.run(rerun=True)
+    ok_clean_git(ds.path)
+    # ran twice now
+    eq_('xx\n', open(probe_path).read())
+    # if I give another command, it will be ignored
+    with chpwd(nodspath):
+        with swallow_logs(new_level=logging.WARNING) as cml:
+            ds.run('30BANG3934', rerun=True)
+            cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
+    ok_clean_git(ds.path)
+    eq_('xxx\n', open(probe_path).read())
