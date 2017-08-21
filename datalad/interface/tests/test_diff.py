@@ -15,13 +15,30 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 from datalad.utils import chpwd
 
+from datalad.cmd import GitRunner
+
 from datalad.distribution.dataset import Dataset
 from datalad.api import diff
+from datalad.consts import PRE_INIT_COMMIT_SHA
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_
+from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+
+
+@skip_if_on_windows
+def test_magic_number():
+    # we hard code the magic SHA1 that represents the state of a Git repo
+    # prior to the first commit -- used to diff from scratch to a specific
+    # commit
+    # given the level of dark magic, we better test whether this stays
+    # constant across Git versions (it should!)
+    out, err = GitRunner().run('git hash-object -t tree /dev/null')
+    eq_(out.strip(), PRE_INIT_COMMIT_SHA)
 
 
 @with_tempfile(mkdir=True)
@@ -121,3 +138,47 @@ def test_diff(path, norepo):
         res, 1, state='untracked', path=opj(ds.path, 'deep', 'down'), type='file')
     assert_result_count(
         res, 1, state='added', path=opj(ds.path, 'deep', 'down2'), type='file')
+
+
+@with_tempfile(mkdir=True)
+def test_diff_recursive(path):
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    # look at the last change, and confirm a dataset was added
+    res = ds.diff(revision='HEAD~1..HEAD')
+    assert_result_count(res, 1, action='diff', state='added', path=sub.path, type='dataset')
+    # now recursive
+    res = ds.diff(recursive=True, revision='HEAD~1..HEAD')
+    # we also get the entire diff of the subdataset from scratch
+    assert_status('ok', res)
+    ok_(len(res) > 3)
+    # one specific test
+    assert_result_count(res, 1, action='diff', state='added', path=opj(sub.path, '.datalad', 'config'))
+
+    # now we add a file to just the parent
+    create_tree(ds.path, {'onefile': 'tobeadded', 'sub': {'twofile': 'tobeadded'}})
+    # save sub
+    sub.add('.')
+    # save sub in parent
+    ds.save()
+    # save addition in parent
+    ds.add('.')
+    ok_clean_git(ds.path)
+    # look at the last change, only one file was added
+    res = ds.diff(revision='HEAD~1..HEAD')
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
+
+    # now the exact same thing with recursion, must not be different from the call
+    # above
+    res = ds.diff(recursive=True, revision='HEAD~1..HEAD')
+    assert_result_count(res, 1)
+    # last change in parent
+    assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
+
+    # one further back brings in the modified subdataset, and the added file within it
+    res = ds.diff(recursive=True, revision='HEAD~2..HEAD')
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
+    assert_result_count(res, 1, action='diff', state='added', path=opj(sub.path, 'twofile'), type='file')
+    assert_result_count(res, 1, action='diff', state='modified', path=sub.path, type='dataset')

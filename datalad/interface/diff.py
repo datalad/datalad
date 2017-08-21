@@ -37,6 +37,9 @@ from datalad.cmd import GitRunner
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
+from datalad.consts import PRE_INIT_COMMIT_SHA
+
+
 lgr = logging.getLogger('datalad.interface.diff')
 
 
@@ -298,6 +301,8 @@ class Diff(Interface):
         refds_path = Interface.get_refds_path(dataset)
 
         to_process = []
+        # tracked what commit ranges we want to diff per dataset
+        ds_diffies = {}
         for ap in AnnotatePaths.__call__(
                 path=path,
                 dataset=refds_path,
@@ -307,6 +312,8 @@ class Diff(Interface):
                 # unavailable is OK, because we might query for a deleted file
                 unavailable_path_status='',
                 nondataset_path_status='impossible',
+                # must not use `modified`, infinite loop otherwise
+                modified=None,
                 return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
@@ -315,6 +322,11 @@ class Diff(Interface):
                 continue
             if ap.get('type', None) == 'dataset':
                 ap['process_content'] = True
+            if ap.get('raw_input', False) or ap['path'] == refds_path:
+                # prepopulate the revision specs for all input paths
+                ds_diffies[ap['path']
+                           if ap.get('type', None) == 'dataset'
+                           else ap['parentds']] = revision
             to_process.append(ap)
 
         # sort into datasets
@@ -326,10 +338,16 @@ class Diff(Interface):
         assert(not completed)
 
         for ds_path in sorted(content_by_ds.keys()):
+            if ds_path not in ds_diffies:
+                # we don't know how to diff
+                # this was not neither an input path, not did we see it
+                # when diffing its parent
+                continue
             content_paths = content_by_ds[ds_path]
+            revision = ds_diffies[ds_path]
             for r in _parse_git_diff(
                     ds_path,
-                    diff_thingie=revision,
+                    diff_thingie=ds_diffies[ds_path],
                     paths=content_paths,
                     ignore_submodules=ignore_subdatasets,
                     staged=staged):
@@ -340,6 +358,17 @@ class Diff(Interface):
                     r['refds'] = refds_path
                 if 'status' not in r:
                     r['status'] = 'ok'
+                if r.get('type', None) == 'dataset':
+                    # this is a subdataset report
+                    # we need to use the reported commit range to properly adjust the
+                    # query once we hit that subdataset
+                    from_rev = r.get('revision_src', '')
+                    to_rev = r.get('revision', '')
+                    subrev = '{}..{}'.format(
+                        from_rev if from_rev else PRE_INIT_COMMIT_SHA,
+                        to_rev if to_rev else '',
+                    )
+                    ds_diffies[r['path']] = subrev
                 yield r
             if (revision and '..' in revision) or report_untracked == 'no':
                 # don't look for untracked content, we got a revision range
