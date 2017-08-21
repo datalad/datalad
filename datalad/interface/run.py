@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Run log arbitrary comands and track how they modify a dataset"""
+"""Run arbitrary commands and track how they modify a dataset"""
 
 __docformat__ = 'restructuredtext'
 
@@ -26,6 +26,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
+from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureStr
@@ -49,6 +50,16 @@ lgr = logging.getLogger('datalad.interface.run')
 @build_doc
 class Run(Interface):
     """Run and explain
+
+    If the executed command did not alter the dataset in any way, no record of
+    the command execution is made.
+
+    If the given command errors, a `CommandError` exception with the same exit
+    code will be raised.
+
+    The executed command, the process working directory (PWD; if it is inside
+    the given dataset), and the command's exit code will be recorded in the
+    commit message.
     """
     _params_ = dict(
         cmd=Parameter(
@@ -62,6 +73,7 @@ class Run(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
+        message=save_message_opt,
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -69,12 +81,7 @@ class Run(Interface):
         # --rerun #
         #   rerun command # from the list of recorded commands using the info/cmd
         #   on record
-        # --message
-        #   prepend default message and replace default short summary
     )
-
-    # TODO running a command outside a dataset should be supported, but it will prevent
-    # a reliable rerun, and we do not want to record absolute CWD paths...
 
     @staticmethod
     @datasetmethod(name='run')
@@ -82,13 +89,18 @@ class Run(Interface):
     def __call__(
             # it is optional, because `rerun` can get a recorded one
             cmd=None,
-            dataset=None):
+            dataset=None,
+            message=None):
         if not dataset:
             # act on the whole dataset if nothing else was specified
             dataset = get_dataset_root(curdir)
         ds = require_dataset(
             dataset, check_installed=True,
             purpose='tracking outcomes of a command')
+        rel_pwd = relpath(getpwd(), start=ds.path)
+        if rel_pwd.startswith(pardir):
+            lgr.warning('Process working directory not inside the dataset, command run may not be reproducible.')
+            rel_pwd = None
         # not needed ATM
         #refds_path = ds.path
         lgr.debug('tracking command output underneath %s', ds)
@@ -136,18 +148,19 @@ class Run(Interface):
             # strip our own info from the exception. The original command output
             # went to stdout/err -- we just have to exitcode in the same way
             cmd_exitcode = e.code
+            # TODO add the ability to `git reset --hard` the dataset tree on failure
+            # we know that we started clean, so we could easily go back
         lgr.info("== Command exit (modification check follows) =====")
 
-        # TODO what if a command did not alter the dataset? Record nothing? Empty commit?
-
-        # TODO ammend commit message with `run` info:
-        # - cwd if inside the dataset
+        # ammend commit message with `run` info:
+        # - pwd if inside the dataset
         # - the command itself
+        # - exit code of the command
         run_info = {
-            'command': cmd,
+            'cmd': cmd,
+            'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         }
-        rel_pwd = relpath(getpwd(), start=ds.path)
-        if not rel_pwd.startswith(pardir):
+        if rel_pwd is not None:
             # only when inside the dataset to not leak information
             run_info['pwd'] = rel_pwd
 
@@ -156,19 +169,11 @@ class Run(Interface):
         cmd_shorty = '{}{}'.format(
             cmd_shorty[:40],
             '...' if len(cmd_shorty) > 40 else '')
-        msg = '[DATALAD RUNCMD] {}\n\n{}'.format(
-            cmd_shorty,
-            # YAML might be a better choice...
+        msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
+            message if message is not None else cmd_shorty,
             json.dumps(run_info, indent=1))
 
-        #for r in ds.save(all_changes=True, recursive=True):
         for r in ds.add('.', recursive=True, message=msg):
-            # TODO make `add` look for modifications like `save` to spare us the flood
-            # of useless 'got nothing new here messages'
-            if r.get('status', None) == 'notneeded':
-                # the user didn't trigger this action, hence it makes very little sense
-                # to raise awareness that something did not happen
-                continue
             yield r
 
         if cmd_exitcode:
