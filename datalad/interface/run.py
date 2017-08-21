@@ -51,17 +51,24 @@ lgr = logging.getLogger('datalad.interface.run')
 
 @build_doc
 class Run(Interface):
-    """Run and explain
+    """Run an arbitrary command and record its impact on a dataset.
+
+    It is recommended to craft the command such that it can run in the root
+    directory of the dataset that the command will be recorded in. However,
+    as long as the command is executed somewhere underneath the dataset root,
+    the exact location will be recorded relative to the dataset root.
+
+    Commands can be re-executed using the --rerun flag. This will unlock
+    any dataset content that is on record to have been modified by the
+    previous command run. It will then re-execute the command in the recorded
+    path (if it was inside the dataset). Afterwards, all modifications will be
+    saved.
 
     If the executed command did not alter the dataset in any way, no record of
     the command execution is made.
 
     If the given command errors, a `CommandError` exception with the same exit
-    code will be raised.
-
-    The executed command, the process working directory (PWD; if it is inside
-    the given dataset), and the command's exit code will be recorded in the
-    commit message.
+    code will be raised, and no modifications will be saved.
     """
     _params_ = dict(
         cmd=Parameter(
@@ -71,9 +78,10 @@ class Run(Interface):
             doc="command for execution"),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to query.  If
+            doc="""specify the dataset to record the command results in,
+            or to rerun a recorded command from (see --rerun).  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the input and/or the current working directory""",
+            based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
         rerun=Parameter(
@@ -257,7 +265,7 @@ class Run(Interface):
             '...' if len(cmd_shorty) > 40 else '')
         msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
             message if message is not None else cmd_shorty,
-            json.dumps(run_info, indent=1))
+            json.dumps(run_info, indent=1), sort_keys=True, ensure_ascii=False, encoding='utf-8')
 
         for r in ds.add('.', recursive=True, message=msg):
             yield r
