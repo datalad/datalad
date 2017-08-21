@@ -20,6 +20,7 @@ from datalad.api import diff
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 
@@ -121,3 +122,36 @@ def test_diff(path, norepo):
         res, 1, state='untracked', path=opj(ds.path, 'deep', 'down'), type='file')
     assert_result_count(
         res, 1, state='added', path=opj(ds.path, 'deep', 'down2'), type='file')
+
+
+@with_tempfile(mkdir=True)
+def test_diff_recursive(path):
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    # look at the last change, and confirm a dataset was added
+    res = ds.diff(revision='HEAD~1..HEAD')
+    assert_result_count(res, 1, action='diff', state='added', path=sub.path, type='dataset')
+    # now recursive
+    res = ds.diff(recursive=True, revision='HEAD~1..HEAD')
+    # we also get the entire diff of the subdataset from scratch
+    assert_status('ok', res)
+    ok_(len(res) > 3)
+    # one specific test
+    assert_result_count(res, 1, action='diff', state='added', path=opj(sub.path, '.datalad', 'config'))
+
+    # now we add a file to just the parent
+    create_tree(ds.path, {'onefile': 'tobeadded'})
+    ds.add('.')
+    # look at the last change, only one file was added
+    res = ds.diff(revision='HEAD~1..HEAD')
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
+
+    # now the exact same thing with recursion, one might expect this to be no different from the call
+    # above, but the revision is evaluated PRISTINE for each subdataset!
+    # sub on last commit
+    res = ds.diff(recursive=True, revision='HEAD~1..HEAD')
+    # last change in parent
+    assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
+    # but also last change in sub, despite not causing any diff in the last commit of the parrent
+    assert_result_count(res, 1, action='diff', state='added', path=opj(sub.path, '.datalad', 'config'))
