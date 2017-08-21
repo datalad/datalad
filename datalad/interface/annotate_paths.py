@@ -44,6 +44,9 @@ from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import assure_list
 
+from datalad.consts import PRE_INIT_COMMIT_SHA
+
+
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
@@ -254,7 +257,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
         # from the state we previously had on record, till the state
         # we have in record now
         diff_range = '{}..{}'.format(
-            sub['revision_src'] if sub['revision_src'] else '',
+            sub['revision_src'] if sub['revision_src'] else PRE_INIT_COMMIT_SHA,
             sub['revision'] if sub['revision'] else '')
         if sub['revision_src'] and sub['revision_src'] == sub['revision']:
             # this is a special case, where subdataset reported changes without
