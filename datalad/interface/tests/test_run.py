@@ -29,7 +29,6 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import skip_if_on_windows
 
@@ -60,7 +59,7 @@ def test_basics(path, nodspath):
         with assert_raises(CommandError) as cme:
             ds.run('7i3amhmuch9invalid')
             # let's not speculate that the exit code is always 127
-            ok(cme.code > 0)
+            ok_(cme.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('touch empty', message='TEST')

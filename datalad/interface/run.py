@@ -18,8 +18,6 @@ import re
 from argparse import REMAINDER
 from os.path import join as opj
 from os.path import curdir
-from os.path import pardir
-from os.path import relpath
 from os.path import normpath
 
 from datalad.cmd import Runner
@@ -31,19 +29,14 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 
-from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import get_dataset_root
-from datalad.utils import getpwd
 from datalad.tests.utils import ok_clean_git
 
 lgr = logging.getLogger('datalad.interface.run')
