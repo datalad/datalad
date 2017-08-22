@@ -37,6 +37,8 @@ from datalad.cmd import GitRunner
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
+from datalad.utils import with_pathsep as _with_sep
+
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
 
@@ -113,7 +115,7 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # strip state marker
             line[3:])
         norm_apath = normpath(apath)
-        if paths and not any([norm_apath == p or p.startswith(apath) for p in paths]):
+        if paths and not any([norm_apath == p or apath.startswith(_with_sep(p)) for p in paths]):
             # we got a whitelist for paths, don't report any other
             continue
         ap = dict(
@@ -368,6 +370,15 @@ class Diff(Interface):
                         from_rev if from_rev else PRE_INIT_COMMIT_SHA,
                         to_rev if to_rev else '',
                     )
+                    if from_rev and from_rev == to_rev:
+                        # this is a special case, where subdataset reported changes without
+                        # a change in state/commit -- this is code for uncommited changes
+                        # in the subdataset (including staged ones). In such a case, we
+                        # must not provide a diff range, but only the source commit we want
+                        # to diff against
+                        # XXX if this is changed, likely the same logic in annotate_paths needs
+                        # changing too!
+                        subrev = from_rev
                     ds_diffies[r['path']] = subrev
                 yield r
             if (revision and '..' in revision) or report_untracked == 'no':
