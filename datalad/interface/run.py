@@ -81,7 +81,9 @@ class Run(Interface):
             doc="""specify the dataset to record the command results in,
             or to rerun a recorded command from (see --rerun).  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory""",
+            based on the current working directory. If a dataset is given,
+            the command will be executed in the root directory of this
+            dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
         rerun=Parameter(
@@ -196,11 +198,8 @@ class Run(Interface):
                     yield r
         else:
             # not a rerun, figure out where we are running
-            pwd = getpwd()
-            rel_pwd = relpath(pwd, start=ds.path)
-            if rel_pwd.startswith(pardir):
-                lgr.warning('Process working directory not inside the dataset, command run may not be reproducible.')
-                rel_pwd = None
+            pwd = ds.path
+            rel_pwd = curdir
 
         # anticipate quoted compound shell commands
         cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd

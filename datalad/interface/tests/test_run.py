@@ -81,14 +81,9 @@ def test_basics(path, nodspath):
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath):
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            res = ds.run(['touch', opj(ds.path, 'empty2')], message='TEST')
-            assert_status('ok', res)
-            # we have been warned
-            cml.assert_logged(".*not inside.*", level="WARNING")
-            commit_msg = ds.repo.repo.head.commit.message
-            # crude test that PWD wasn't recorded
-            assert_not_in('"pwd": ', commit_msg)
+        res = ds.run(['touch', 'empty2'], message='TEST')
+        assert_status('ok', res)
+        assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
 
 
 @skip_if_on_windows
