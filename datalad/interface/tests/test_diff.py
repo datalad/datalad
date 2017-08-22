@@ -124,7 +124,7 @@ def test_diff(path, norepo):
         ds.diff(path='deep'), 1, state='untracked', path=opj(ds.path, 'deep'),
         type='directory')
     assert_result_count(
-        ds.diff(path=opj('deep', 'somewhere')), 1,
+        ds.diff(path='deep'), 1,
         state='untracked', path=opj(ds.path, 'deep'))
     # now we stage on of the two files in deep
     ds.add(opj('deep', 'down2'), to_git=True, save=False)
@@ -157,6 +157,11 @@ def test_diff_recursive(path):
 
     # now we add a file to just the parent
     create_tree(ds.path, {'onefile': 'tobeadded', 'sub': {'twofile': 'tobeadded'}})
+    res = ds.diff(recursive=True, report_untracked='all')
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, action='diff', state='untracked', path=opj(ds.path, 'onefile'), type='file')
+    assert_result_count(res, 1, action='diff', state='modified', path=sub.path, type='dataset')
+    assert_result_count(res, 1, action='diff', state='untracked', path=opj(sub.path, 'twofile'), type='file')
     # save sub
     sub.add('.')
     # save sub in parent

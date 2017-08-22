@@ -265,6 +265,8 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
             # in the subdataset (including staged ones). In such a case, we
             # must not provide a diff range, but only the source commit we want
             # to diff against
+            # XXX if this is changed, likely the same logic in diff needs
+            # changing too!
             diff_range = sub['revision_src']
 
         for r in get_modified_subpaths(
