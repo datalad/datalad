@@ -142,6 +142,8 @@ matrix:
 
 before_install:
   - if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ] && [ ! -z "${_DATALAD_NONPR_ONLY:-}" ]; then echo "Exiting early since these tests should run only in master branch"; exit 0; fi
+  # Just in case we need to check if nfs is there etc
+  - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
@@ -167,7 +169,7 @@ install:
   # TMPDIRs
   - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; sudo apt-get install -y nfs-kernel-server; sudo exportfs -o rw localhost:/tmp/nfsmount_; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
