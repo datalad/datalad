@@ -59,18 +59,12 @@ def pipeline(url=None,
             special_remotes.append(ARCHIVES_SPECIAL_REMOTE)
         if datalad_downloader:
             special_remotes.append(DATALAD_SPECIAL_REMOTE)
-        # TODO: if .gitattributes have largefiles settings defined, we must not
-        # override them with -c annex.largefiles
-        kwargs = {}
-        if os.path.exists('.gitattributes'):
-            with open('.gitattributes') as f:
-                attributes = f.read()
         annex = Annexificator(
             create=False,  # must be already initialized etc
             backend=backend,
             statusdb='json',
-            special_remotes=special_remotes
-            #options=["-c", "annex.largefiles=exclude=README* and exclude=LICENSE*"]
+            special_remotes=special_remotes,
+            largefiles="exclude=README* and exclude=LICENSE*"
         )
 
     if url:

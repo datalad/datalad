@@ -268,19 +268,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Figure out, whether we want to allow for a list here or what to
         # do, if there is sth in that setting already
         if persistent:
-            git_attributes_file = _path_(self.path, '.gitattributes')
-            git_attributes = ''
-            if exists(git_attributes_file):
-                with open(git_attributes_file) as f:
-                    git_attributes = f.read()
-            if ' annex.backend=' in git_attributes:
+            # could be set in .gitattributes or $GIT_DIR/info/attributes
+            if 'annex.backend' in self.get_git_attributes():
                 lgr.debug(
-                    "Not (re)setting backend since seems already set in %s"
-                    % git_attributes_file
+                    "Not (re)setting backend since seems already set in git attributes"
                 )
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
                 self.config.set('annex.backends', backend, where='local')
+                git_attributes_file = _path_(self.path, '.gitattributes')
+                git_attributes = ''
+                if exists(git_attributes_file):
+                    with open(git_attributes_file) as f:
+                        git_attributes = f.read()
                 with open(git_attributes_file, 'a') as f:
                     if git_attributes and not git_attributes.endswith(os.linesep):
                         f.write(os.linesep)
