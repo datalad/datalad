@@ -40,9 +40,9 @@ function sleep () {
 }
 function execute () {
     check_asciinema
-	$xdt sleep 0.5 key --window %@ Return sleep 0.5
+	$xdt sleep 0.5 key --window %@ Return
 	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
-		sleep 0.5
+		sleep 0.01
 	done
 }
 function say()
@@ -53,21 +53,28 @@ function say()
 }
 function show () {
     check_asciinema
-	$xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
-	key Return
-	sleep 3
+    $xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+    key Return
+    sleep 3
 }
 function run () {
-	type "$1"
-	execute
-	sleep 2
+    type "$1"
+    t1=$(date +%s.%N)
+    execute
+    t2=$(date +%s.%N)
+    # Subtracting 0.5 imposed by execute before hitting Return
+    dt=$(printf "%.2f" `echo "$t2 - $t1 - 0.5" | bc`)
+    echo "$@" "    # $dt sec" >> "$cmds_log"
+    sleep 2
 }
 function run_expfail () {
 	# TODO we could announce or visualize the expected failure
 	run "$1"
 }
 
-echo "Recording to $(readlink -f "$title.json")"
+cmds_log="$title.cmds"
+rm -f "$cmds_log"
+echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
 type "asciinema rec \"$title.json\" -c 'bash --rcfile tools/screencast_bash.rc' -w 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
