@@ -9,21 +9,43 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.8.2 (??? ??, 2017) -- will be better than ever
+## 0.9.0 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- the `files` argument of [save] has been renamed to `path` to be uniform with
+  any other command
+- all major commands now implement more uniform API semantics and result reporting.
+  Functionality for modification detection of dataset content has been completely replaced
+  with a more efficient implementation
+- [publish] now features a `--transfer-data` switch that allows for a
+  disambiguous specification of whether to publish data -- independent of
+  the selection which datasets to publish (which is done via their paths).
+  Moreover, [publish] now transfers data before repository content is pushed.
 
 ### Fixes
 
-?
+- [drop] no longer errors when some subdatasets are not installed
+- [install] will no longer report nothing when a Dataset instance was
+  given as a source argument, but rather perform as expected
+- [remove] doesn't remove when some files of a dataset could not be dropped
+- [publish] no longer hides error during a repository push
+- improved robustness with broken Git configuration
+
 
 ### Enhancements and new features
 
-?
+- [save] now uses Git for detecting with sundatasets need to be inspected for
+  potential changes, instead of performing a complete traversal of a dataset tree
+- [add] looks for changes relative to the last commited state of a dataset
+  to discover files to add more efficiently
+- [diff] can now report untracked files in addition to modified files
+- [uninstall] will check itself whether a subdataset is properly registered in a
+  superdataset, even when no superdataset is given in a call
+- [subdatasets] can now configure subdatasets for exclusion from recursive
+  installation 
 
 
 ## 0.8.1 (Aug 13, 2017) -- the best birthday gift
