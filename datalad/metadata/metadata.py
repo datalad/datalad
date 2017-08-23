@@ -474,7 +474,7 @@ class Metadata(Interface):
         if not to_save:
             return
         for res in Save.__call__(
-                files=to_save,
+                path=to_save,
                 dataset=refds_path,
                 message='[DATALAD] dataset metadata update',
                 return_type='generator',

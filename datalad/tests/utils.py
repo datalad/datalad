@@ -967,14 +967,17 @@ def assert_status(label, results):
     in this sequence.
     """
     label = assure_list(label)
-    for r in assure_list(results):
+    results = assure_list(results)
+    for i, r in enumerate(results):
         try:
             assert_in('status', r)
             assert_in(r['status'], label)
         except AssertionError:
-            raise AssertionError('Expected status {} not found in:\n{}'.format(
+            raise AssertionError('Test {}/{}: expected status {} not found in:\n{}'.format(
+                i + 1,
+                len(results),
                 label,
-                dumps(r, indent=1)))
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_message(message, results):
@@ -1000,11 +1003,12 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Did not find the {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+                count,
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1)))
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_in_results(results, **kwargs):

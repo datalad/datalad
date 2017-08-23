@@ -55,3 +55,6 @@ TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
 # We use custom ssh runner while interacting with git
 #GIT_SSH_COMMAND = "/tmp/sshrun"  # was a little shell script to help troubleshooting
 GIT_SSH_COMMAND = "datalad sshrun"
+
+# magic sha is from `git hash-object -t tree /dev/null`, i.e. from nothing
+PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'

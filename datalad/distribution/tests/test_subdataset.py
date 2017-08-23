@@ -149,12 +149,8 @@ def test_get_subdatasets(path):
          'sub dataset1/sub sub dataset1',
          'sub dataset1/sub sub dataset1/subm 1'])
     # but it has to be a subdataset, otherwise no match
+    # which is what get_containing_subdataset() used to do
     eq_(ds.subdatasets(contains=ds.path), [])
-    # which is what get_containing_subdataset() does
-    eq_(ds.subdatasets(recursive=True,
-                       contains=target_sub,
-                       result_xfm='paths')[-1],
-        ds.get_containing_subdataset(target_sub).path)
     # no error if contains is bullshit
     eq_(ds.subdatasets(recursive=True,
                        contains='errrr_nope',

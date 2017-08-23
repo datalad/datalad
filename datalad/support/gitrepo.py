@@ -1044,30 +1044,32 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, branch=None):
-        """Return a hexsha for a given branch name. If None - of current branch
+    def get_hexsha(self, object=None):
+        """Return a hexsha for a given object. If None - of current HEAD
 
         Parameters
         ----------
-        branch: str, optional
+        object: str, optional
+          Any type of Git object identifier. See `git show`.
         """
-        # TODO: support not only a branch but any treeish
-        #       Note: repo.tree(treeish).hexsha
-        if branch is None:
-            try:
-                # do not use
-                #self.repo.active_branch.object.hexsha
-                # but HEAD to be able to cope with detached heads
-                return self.repo.head.object.hexsha
-            except ValueError as exc:
-                if 'does not exist' in str(exc):
-                    return None
-                raise
-
-        for b in self.repo.branches:
-            if b.name == branch:
-                return b.object.hexsha
-        raise ValueError("Unknown branch %s" % branch)
+        cmd = ['git', 'show', '--no-patch', "--format=%H"]
+        if object:
+            cmd.append(object)
+        # make sure Git takes our argument as a revision
+        cmd.append('--')
+        try:
+            stdout, stderr = self._git_custom_command(
+                '', cmd, expect_stderr=True, expect_fail=True)
+        except CommandError as e:
+            if 'bad revision' in e.stderr:
+                raise ValueError("Unknown object identifier: %s" % object)
+            elif 'does not have any commits yet' in e.stderr:
+                return None
+            else:
+                raise e
+        stdout = stdout.splitlines()
+        assert(len(stdout) == 1)
+        return stdout[0]
 
     def get_merge_base(self, treeishes):
         """Get a merge base hexsha

@@ -44,6 +44,9 @@ from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import assure_list
 
+from datalad.consts import PRE_INIT_COMMIT_SHA
+
+
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
@@ -163,7 +166,7 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
-def get_modified_subpaths(aps, refds, revision):
+def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
     """
     Parameters
     ----------
@@ -193,10 +196,16 @@ def get_modified_subpaths(aps, refds, revision):
             # `revision` can be anything that Git support for `diff`
             # `True` is code for diff without revision
             revision=revision if revision is not True else None,
+            # it is important that staged is False, otherwise we would miss unstaged
+            # changes when e.g. diffing against HEAD (save does that)
             staged=False,
             # we might want to consider putting 'untracked' here
             # maybe that is a little faster, not tested yet
             ignore_subdatasets='none',
+            # we want to see any individual untracked file, this simplifies further
+            # processing dramatically, but may require subsequent filtering
+            # in order to avoid flooding user output with useless info
+            report_untracked='all',
             # no recursion, we needs to update `revision` for every subdataset
             # before we can `diff`
             recursive=False,
@@ -233,7 +242,7 @@ def get_modified_subpaths(aps, refds, revision):
                 continue
 
     mod_subs = [m for m in modified if m.get('type', None) == 'dataset']
-    if not mod_subs:
+    if not mod_subs or (recursion_limit is not None and recursion_limit < 1):
         return
 
     aps = [ap if isinstance(ap, dict) else rawpath2ap(ap, refds.path) for ap in aps]
@@ -248,12 +257,23 @@ def get_modified_subpaths(aps, refds, revision):
         # from the state we previously had on record, till the state
         # we have in record now
         diff_range = '{}..{}'.format(
-            sub['revision_src'] if sub['revision_src'] else '',
+            sub['revision_src'] if sub['revision_src'] else PRE_INIT_COMMIT_SHA,
             sub['revision'] if sub['revision'] else '')
+        if sub['revision_src'] and sub['revision_src'] == sub['revision']:
+            # this is a special case, where subdataset reported changes without
+            # a change in state/commit -- this is code for uncommited changes
+            # in the subdataset (including staged ones). In such a case, we
+            # must not provide a diff range, but only the source commit we want
+            # to diff against
+            # XXX if this is changed, likely the same logic in diff needs
+            # changing too!
+            diff_range = sub['revision_src']
+
         for r in get_modified_subpaths(
                 sub_aps,
                 Dataset(sub['path']),
-                diff_range):
+                diff_range,
+                recursion_limit=(recursion_limit - 1) if recursion_limit is not None else None ):
             yield r
 
 
@@ -401,9 +421,9 @@ class AnnotatePaths(Interface):
             for details. Unmodified paths will not be annotated. If a requested
             path was not modified but some content underneath it was, then the
             request is replaced by the modified paths and those are annotated
-            instead. This option can be used without an argument to test against
-            changes that have been made, but have not yet been staged for a
-            commit."""))
+            instead. This option can be used [PY: with `True` as PY][CMD: without CMD]
+            an argument to test against changes that have been made, but have not
+            yet been staged for a commit."""))
 
     @staticmethod
     @datasetmethod(name='annotate_paths')
@@ -489,13 +509,32 @@ class AnnotatePaths(Interface):
         requested_paths = assure_list(path)
 
         if modified is not None:
+            # modification detection wwould silently kill all nondataset paths
+            # but we have to complain about them, hence doing it here
+            if requested_paths and refds_path:
+                for r in requested_paths:
+                    p = r['path'] if isinstance(r, dict) else r
+                    p = resolve_path(p, ds=refds_path)
+                    if _with_sep(p).startswith(_with_sep(refds_path)):
+                        # all good
+                        continue
+                    # not the refds
+                    path_props = r if isinstance(r, dict) else {}
+                    res = get_status_dict(
+                        **dict(res_kwargs, **path_props))
+                    res['status'] = nondataset_path_status
+                    res['message'] = 'path not associated with reference dataset'
+                    reported_paths[path] = res
+                    yield res
+
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
             requested_paths = get_modified_subpaths(
                 # either the request, or the base dataset, if there was no request
                 requested_paths if requested_paths else [refds_path],
                 refds=Dataset(refds_path),
-                revision=modified)
+                revision=modified,
+                recursion_limit=recursion_limit)
 
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
@@ -514,6 +553,7 @@ class AnnotatePaths(Interface):
                 # discovered via recursive processing of another path before
                 continue
             # the path exists in some shape or form
+            # TODO if we have path_props already we could skip this test
             if isdir(path):
                 # keep any existing type info, previously a more expensive run
                 # could have discovered an uninstalled 'dataset', and we don't
@@ -557,7 +597,8 @@ class AnnotatePaths(Interface):
                         # don't check whether this is actually a true subdataset of the
                         # parent, done further down
                 else:
-                    path_props['parentds'] = dspath
+                    # set parent, but prefer existing property
+                    path_props['parentds'] = path_props.get('parentds', dspath)
 
             # test for `dspath` not `parent`, we only need to know whether there is
             # ANY dataset, not which one is the true parent, logic below relies on
@@ -667,7 +708,8 @@ class AnnotatePaths(Interface):
                 for r in get_modified_subpaths(
                         rec_paths,
                         refds=Dataset(refds_path),
-                        revision=modified):
+                        revision=modified,
+                        recursion_limit=recursion_limit):
                     res = get_status_dict(**dict(r, **res_kwargs))
                     reported_paths[res['path']] = res
                     yield res
