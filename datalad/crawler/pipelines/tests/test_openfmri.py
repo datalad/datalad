@@ -145,7 +145,7 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     annex = Annexificator(
         dataset_path,
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
+        largefiles="exclude=*.txt and exclude=README")
 
     pipeline = [
         crawl_url(dataset_url),
