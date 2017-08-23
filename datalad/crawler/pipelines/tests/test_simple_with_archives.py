@@ -18,10 +18,12 @@ from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
 from ....tests.utils import with_tempfile
 from ....tests.utils import serve_path_via_http
 from ....tests.utils import ok_file_has_content
-from ....tests.utils import ok_file_under_git
+from ....tests.utils import ok_file_under_git, ok_clean_git
+from ....tests.utils import usecase
 from ..simple_with_archives import pipeline
+from datalad.api import create
 
-from datalad.api import crawl
+from datalad.api import crawl, crawl_init
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -60,3 +62,27 @@ def test_simple1(ind, topurl, outd):
 
     eq_(len(out), 1)
 
+
+@usecase  # created with
+@with_tree(tree={
+    '1.tar.gz': {
+        'd': {"textfile": "1\n",
+              "tooshort": "1"
+              },
+    "anothertext": "1 2 3"
+    }
+}, archives_leading_dir=False)
+@serve_path_via_http
+@with_tempfile
+def test_crawl_autoaddtext(ind, topurl, outd):
+    ds = create(outd, text_no_annex=True)
+    with chpwd(outd):  # TODO -- dataset argument
+        crawl_init(
+            {'url': topurl, 'a_href_match_': '.*'}
+            , save=True
+            , template='simple_with_archives')
+        crawl()
+    ok_clean_git(outd)
+    ok_file_under_git(outd, "anothertext", annexed=False)
+    ok_file_under_git(outd, "d/textfile", annexed=False)
+    ok_file_under_git(outd, "d/tooshort", annexed=True)
