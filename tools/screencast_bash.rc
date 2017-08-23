@@ -32,8 +32,13 @@ export PS3=
 export PS4=+
 
 # make a fake temporary home dir and go into it
-SCREENCAST_HOME=${SCREENCAST_HOME:-/tmp/datalad-demo}
-mkdir -p "$SCREENCAST_HOME"
+SCREENCAST_HOME=${SCREENCAST_HOME:-/demo}
+if [ ! -e "$SCREENCAST_HOME" ]; then
+    mkdir -p ${SCREENCAST_HOME} || {
+        echo "FAILED to create $SCREENCAST_HOME" >&2
+        exit 1;  # we need demo directory!
+    }
+fi
 HOME=$SCREENCAST_HOME
 export HOME
 cd

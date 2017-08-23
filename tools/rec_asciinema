@@ -17,16 +17,29 @@ xterm_pid=$!
 sleep 1
 $xdt --sync sleep 0.5
 
+function check_asciinema () {
+    if [ ! -z "${asciinema_pid:-}" ] && [ ! -e "/proc/$asciinema_pid" ]; then
+        echo "Asciinema stopped unexpectedly. Exiting. Check output in the xterm" >&2
+        # Do not kill xterm so we could see what went wrong!
+        ## [ -z "${xterm_pid:-}" ] || kill $xterm_pid
+        exit 1
+    fi
+}
+
 function type () {
+    check_asciinema
 	$xdt type --clearmodifiers --delay 40 --window %@ "$1"
 }
 function key () {
+    check_asciinema
 	$xdt key --clearmodifiers --window %@ $*
 }
 function sleep () {
+    check_asciinema
 	xdotool sleep $1
 }
 function execute () {
+    check_asciinema
 	$xdt sleep 0.5 key --window %@ Return sleep 0.5
 	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
 		sleep 0.5
@@ -39,6 +52,7 @@ function say()
 	sleep 3
 }
 function show () {
+    check_asciinema
 	$xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
 	key Return
 	sleep 3
