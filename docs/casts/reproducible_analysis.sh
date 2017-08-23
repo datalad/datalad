@@ -17,7 +17,7 @@ run "datalad --output-format '{path}: {revision_descr}' subdatasets"
 say "However, very little data were actually downloaded (the full datasets are several gigabytes in size):"
 run "du -sh inputs/"
 
-say "DataLad datasets are fairly lightweight in size, they only contain pointers to data, and history information in their minimal form."
+say "DataLad datasets are fairly lightweight in size, they only contain pointers to data and history information in their minimal form."
 
 say "Both datasets contain brain imaging data, and are compliant with the BIDS standard. This makes it really easy to locate particular images and perform analysis across datasets."
 say "Here we will use a small script that performs 'brain extraction' using FSL as a stand-in for a full analysis pipeline"
@@ -40,15 +40,15 @@ done
 EOT"
 
 say "Note that this script uses the 'datalad get' command which automatically obtains the required files from their remote source -- we will see this in action shortly"
-say "We are saving this script in the dataset. This way will will know exactly which code was used for the analysis. Also, we track this code file with Git, so we can see more easily how it was edited over time."
+say "We are saving this script in the dataset. This way we will know exactly which code was used for the analysis. Also, we track this code file with Git, so we can see more easily how it was edited over time."
 run "datalad add code -m \"Brain extraction script\" --to-git"
 
 say "In addition, we will \"tag\" this state of the dataset. This is optional, but it can help to identify important milestones more easily"
 run "datalad save --version-tag setup_done"
 
-say "Now we can run our analysis code to produce results. However, instead of running it directly, we will run it with DataLad -- this will automatically create a record of how exactly this script was executed"
-say "For this demo we will just run it on the structural images of the first subject from each dataset. The uniform structure of the datasets makes this very easy. Of course we could run it on all subjects, we are simply saving some time for this demo."
-say "While the command runs you could notice a few things:"
+say "Now we can run our analysis code to produce results. However, instead of running it directly, we will run it with DataLad -- this will automatically create a record of exactly how this script was executed"
+say "For this demo we will just run it on the structural images of the first subject from each dataset. The uniform structure of the datasets makes this very easy. Of course we could run it on all subjects; we are simply saving some time for this demo."
+say "While the command runs, you should notice a few things:"
 say "1) We run this command with 'bash -e' to stop at any failure that may occur"
 say "2) You'll see the required data files being obtained as they are needed -- and only those that are actually required will be downloaded"
 run "datalad run bash -e code/brain_extraction.sh inputs/ds*/sub-01/anat/sub-01_T1w.nii.gz"
@@ -66,7 +66,7 @@ say "DataLad can easily verify if any part of our input dataset was modified sin
 run "datalad diff --revision setup_done inputs"
 
 say "Nothing was changed."
-say "With DataLad with don't have to keep those inputs around -- without loosing the ability to reproduce an analysis."
+say "With DataLad with don't have to keep those inputs around -- without losing the ability to reproduce an analysis."
 say "Let's uninstall them -- checking the size on disk before and after"
 
 run "du -sh" .
