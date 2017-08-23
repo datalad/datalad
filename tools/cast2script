@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+set -u -e
+
+# TODO: we could introduce a 'test_cast' function to be used in the
+# casts scripts that causes this code to be included in these scripts
+# to make them work as tests too.
+# alternatively we could mark up expected failures and use set -e in
+# the script
+
+
+function type () {
+	echo "Not supported in scripts"
+	exit 1
+}
+function key () {
+	echo "Not supported in scripts"
+	exit 1
+}
+function sleep () {
+	# do nothing in a script
+	:
+}
+function execute () {
+	# do nothing in a script
+	:
+}
+function say()
+{
+	printf "\n"
+	printf "# $1\n" | fmt -w 72 --prefix '# '
+}
+function show () {
+	# same as say
+	printf "# $1\n" | fmt -w 72 --prefix '# '
+}
+function run () {
+	printf "$1\n"
+}
+
+
+printf "#!/bin/bash\n"
+show "This script was converted using cast2script from: $1"
+
+# we cannot really do 'set -e' as command failure may be used as
+# an educational tool
+
+. $1
