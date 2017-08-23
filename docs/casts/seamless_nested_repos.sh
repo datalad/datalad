@@ -36,7 +36,7 @@ run_expfail "git add sub1/justadir/sub2/anotherdir/afile"
 say "DataLad does not require users to determine the correct repository in the tree"
 run "datalad add -d . sub1/justadir/sub2/anotherdir/afile"
 
-say "Again, all associated changes in the entire dataset tree, up to the given parent dataset, were commited"
+say "Again, all associated changes in the entire dataset tree, up to the given parent dataset, were committed"
 run "git status"
 
 say "DataLad's 'diff' is able to report the changes from these related commits throughout the repository tree"
