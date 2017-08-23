@@ -31,7 +31,7 @@ say "Like Git, it can report individual untracked files, but also across reposit
 run "datalad diff -r --report-untracked all"
 
 say "Adding this new content with Git or git-annex would be an exercise"
-run "git add sub1/justadir/sub2/anotherdir/afile"
+run_expfail "git add sub1/justadir/sub2/anotherdir/afile"
 
 say "DataLad does not require users to determine the correct repository in the tree"
 run "datalad add -d . sub1/justadir/sub2/anotherdir/afile"

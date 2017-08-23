@@ -5,6 +5,7 @@ set -u -e
 # reduce confusion with xdotool
 setxkbmap us
 
+test ! -e $1 && echo "input file does not exist" && exit 1
 title="$(echo $(basename $1) | sed -e 's/.sh$//')"
 
 # shortcut for making xdotool find the right window
@@ -46,6 +47,10 @@ function run () {
 	type "$1"
 	execute
 	sleep 2
+}
+function run_expfail () {
+	# TODO we could announce or visualize the expected failure
+	run "$1"
 }
 
 echo "Recording to $(readlink -f "$title.json")"
