@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+set -u -e
+
+# reduce confusion with xdotool
+setxkbmap us
+
+title="$(echo $(basename $1) | sed -e 's/.sh$//')"
+
+# shortcut for making xdotool find the right window
+xdt="xdotool search --classname xterm windowactivate"
+
+# make sure the target xterm is up and running
+xterm -e bash &
+xterm_pid=$!
+sleep 1
+$xdt --sync sleep 0.5
+
+function type () {
+	$xdt type --clearmodifiers --delay 40 --window %@ "$1"
+}
+function key () {
+	$xdt key --clearmodifiers --window %@ $*
+}
+function sleep () {
+	xdotool sleep $1
+}
+function execute () {
+	$xdt sleep 0.5 key --window %@ Return sleep 0.5
+	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
+		sleep 0.5
+	done
+}
+function say()
+{
+	type "$(printf "#\n# $1" | fmt -w 72 --prefix '# ')"
+	key Return
+	sleep 3
+}
+function show () {
+	$xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+	key Return
+	sleep 3
+}
+function run () {
+	type "$1"
+	execute
+	sleep 2
+}
+
+echo "Recording to $(readlink -f "$title.json")"
+type "asciinema rec \"$title.json\" -c 'bash --rcfile tools/screencast_bash.rc' -w 2"
+# XXX cannot use execute here, idle detection not yet functional
+key Return
+sleep 1.0
+
+# now get the process tree attached to the terminal so we can
+# figure out when it is idle, and when it is not
+# XXX must happen after asciinema is running
+xterm_pstree="$(pstree -p -A $xterm_pid)"
+asciinema_pid="$(pstree -p $xterm_pid -A -h | sed -e 's/.*asciinema(\([0-9]\+\)).*/\1/')"
+
+. $1
+
+sleep 4
+
+show "$(cowsay "Demo was using $(datalad --version 2>&1 | head -n1). Discover more at http://datalad.org")"
+
+key Control_L+d
+# let it finish
+while test -d "/proc/$asciinema_pid"; do sleep 1; echo "wait for asciinema"; done
+
+# kill the xterm we opened
+kill $xterm_pid

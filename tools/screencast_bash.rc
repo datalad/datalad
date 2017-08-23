@@ -1,0 +1,22 @@
+# we need a compact prompt to maximize use of the small terminal
+PS1='\w % '
+
+# make a fake temporary home dir and go into it
+SCREENCAST_HOME=/demo
+HOME=$SCREENCAST_HOME
+export HOME
+cd
+
+export PATH=~/datalad/bin:$PATH
+export PYTHONPATH=~/datalad
+
+# Basic git setup
+git config --global user.name "Datalad Demo"
+git config --global user.email demo@datalad.org
+
+# pager by default is not helpful in demo
+git config --global core.pager cat
+
+
+# cleanup at the end
+trap "cd ; datalad remove $SCREENCAST_HOME/demo -r --nocheck > /dev/null" EXIT
