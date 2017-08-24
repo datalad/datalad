@@ -51,7 +51,7 @@ if ! hash datalad; then
 fi
 
 # Basic git setup
-git config --global user.name "Datalad Demo"
+git config --global user.name "DataLad Demo"
 git config --global user.email demo@datalad.org
 
 # pager by default is not helpful in demo

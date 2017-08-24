@@ -6,7 +6,7 @@ Meta data
 Overview
 ========
 
-Datalad has built-in, modular, and extensible support for meta data in various
+DataLad has built-in, modular, and extensible support for meta data in various
 formats. The core concept is that meta data is accessed via dedicated parsers
 in their native format, avoiding the need for mandatory conversion into a
 "standard" format. Via these parser datalad is capable of performing a certain
@@ -135,20 +135,20 @@ The following fields are supported:
 Brain Imaging Data Structure (BIDS)
 -----------------------------------
 
-Datalad has basic support for extraction of meta data from the `BIDS
+DataLad has basic support for extraction of meta data from the `BIDS
 <http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
 
 Friction-less data packages
 ---------------------------
 
-Datalad has basic support for extraction of meta data from `friction-less data
+DataLad has basic support for extraction of meta data from `friction-less data
 packages <http://specs.frictionlessdata.io/data-packages>`_
 (``datapackage.json``).  file.
 
 JSON-LD meta data format
 ------------------------
 
-Datalad uses JSON-LD_ as its primary meta data format. By default, the
+DataLad uses JSON-LD_ as its primary meta data format. By default, the
 following context (available from `here <schema.json>`_
 is used for any meta data item:
 

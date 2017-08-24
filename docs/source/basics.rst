@@ -18,7 +18,7 @@ well.
 Datasets
 ========
 
-A Datalad :term:`dataset` is a Git repository that may or may not have a data
+A DataLad :term:`dataset` is a Git repository that may or may not have a data
 :term:`annex` that is used to manage data referenced in a dataset. In practice,
 most DataLad datasets will come with an annex.
 
@@ -58,12 +58,12 @@ live on different servers all around the world.
 API principles
 ==============
 
-You can use Datalad's ``install`` command to download datasets. The command accepts
+You can use DataLad's ``install`` command to download datasets. The command accepts
 URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
 to obtain a first dataset is downloading the canonical :term:`superdataset` from
 http://datasets.datalad.org/ using a shortcut.
 
-Downloading Datalad's canonical superdataset
+Downloading DataLad's canonical superdataset
 --------------------------------------------
 
 DataLad's canonical :term:`superdataset` provides an automated collection of datasets
@@ -93,7 +93,7 @@ regular ``http`` or ``https`` protocol URLs. For example:
 
 Downloading datasets via ssh
 ----------------------------
-Datalad also supports SSH URLs, such as ``ssh://me@localhost/path``. 
+DataLad also supports SSH URLs, such as ``ssh://me@localhost/path``.
 
 ``datalad install ssh://me@localhost/path``
 

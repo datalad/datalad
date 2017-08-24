@@ -13,7 +13,7 @@
 Glossary
 ********
 
-Datalad purposefully uses a terminology that is different from the one used by
+DataLad purposefully uses a terminology that is different from the one used by
 its technological foundations Git_ and git-annex_. This glossary provides
 definitions for terms used in the datalad documentation and API, and relates
 them to the corresponding Git_/git-annex_ concepts.
