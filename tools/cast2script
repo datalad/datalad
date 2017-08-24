@@ -28,7 +28,7 @@ function show () {
 	printf "# $1\n" | fmt -w 72 --prefix '# '
 }
 function run () {
-	printf "$1\n"
+	printf "$1\n" | sed 's/\\\$/\$/g'
 }
 function run_expfail () {
 	printf "$1 || true\n"
