@@ -63,7 +63,7 @@ function run () {
     execute
     t2=$(date +%s.%N)
     # Subtracting 0.5 imposed by execute before hitting Return
-    dt=$(printf "%.2f" `echo "$t2 - $t1 - 0.5" | bc`)
+    dt=$(python -c "print('%.2f' % ($t2 - $t1 - 0.5))")
     echo "$@" "    # $dt sec" >> "$cmds_log"
     sleep 2
 }
