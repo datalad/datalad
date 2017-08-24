@@ -43,7 +43,7 @@ HOME=$SCREENCAST_HOME
 export HOME
 cd
 
-if ! hash datalad; then
+if ! hash datalad 2>/dev/null; then
     # assume layout of the "master" but should be working fine if datalad
     # is system wide or virtualenv installed in the session
     export PATH=~/datalad/bin:$PATH

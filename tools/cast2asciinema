@@ -12,7 +12,7 @@ title="$(echo $(basename $1) | sed -e 's/.sh$//')"
 xdt="xdotool search --classname xterm windowactivate"
 
 # make sure the target xterm is up and running
-xterm -e bash &
+xterm -geometry 80x24 -e bash &
 xterm_pid=$!
 sleep 1
 $xdt --sync sleep 0.5
@@ -63,7 +63,7 @@ function run () {
     execute
     t2=$(date +%s.%N)
     # Subtracting 0.5 imposed by execute before hitting Return
-    dt=$(printf "%.2f" `echo "$t2 - $t1 - 0.5" | bc`)
+    dt=$(python -c "print('%.2f' % ($t2 - $t1 - 0.5))")
     echo "$@" "    # $dt sec" >> "$cmds_log"
     sleep 2
 }
@@ -75,7 +75,7 @@ function run_expfail () {
 cmds_log="$title.cmds"
 rm -f "$cmds_log"
 echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
-bashrc_file="$(dirname $0)/screencast_bash.rc"
+bashrc_file="$(dirname $0)/cast_bash.rc"
 type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -w 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
