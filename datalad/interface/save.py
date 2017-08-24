@@ -20,10 +20,12 @@ from os.path import lexists
 
 
 from datalad.utils import unique
+from datalad.utils import swallow_logs
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.exceptions import CommandError
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -46,8 +48,7 @@ lgr = logging.getLogger('datalad.interface.save')
 def save_dataset(
         ds,
         paths,
-        message=None,
-        version_tag=None):
+        message=None):
     """Save changes in a single dataset.
 
     Parameters
@@ -58,8 +59,6 @@ def save_dataset(
       Annotated paths to dataset components to be saved.
     message: str, optional
       (Commit) message to be attached to the saved state.
-    version_tag : str, optional
-      Tag to be assigned to the saved state.
 
     Returns
     -------
@@ -128,11 +127,6 @@ def save_dataset(
         files=[ap['path'] for ap in paths] if not save_entire_ds else None,
         _datalad_msg=_datalad_msg,
         careless=True)
-
-    # MIH: let's tag even if there was nothing commit. I'd forget this
-    # option too often...
-    if version_tag:
-        ds.repo.tag(version_tag)
 
     current_hexsha = ds.repo.get_hexsha()
     _was_modified = current_hexsha != orig_hexsha
@@ -371,13 +365,35 @@ class Save(Interface):
             saved_state = save_dataset(
                 ds,
                 content_by_ds[dspath],
-                message=message,
-                version_tag=version_tag)
-            if saved_state:
-                res['status'] = 'ok'
+                message=message)
+            res['status'] = 'ok' if saved_state else 'notneeded'
+            # MIH: let's tag even if there was nothing commit. I'd forget this
+            # option too often...
+            if version_tag:
+                try:
+                    # again cannot help but force-silence low-level code, because
+                    # it screams like a made man instead of allowing top-level
+                    # code an orderly error report
+                    with swallow_logs():
+                        ds.repo.tag(version_tag)
+                    # even if we haven't saved anything
+                    res['status'] = 'ok'
+                    yield res
+                except CommandError as e:
+                    if saved_state:
+                        # first we yield the result for the actual save
+                        yield res
+                    # and now complain that tagging didn't work
+                    yield get_status_dict(
+                        'save',
+                        ds=ds,
+                        logger=lgr,
+                        status='error',
+                        message=(
+                            'cannot tag this version: %s',
+                            e.stderr.strip()))
             else:
-                res['status'] = 'notneeded'
-            yield res
+                yield res
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
