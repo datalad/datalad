@@ -12,7 +12,7 @@ title="$(echo $(basename $1) | sed -e 's/.sh$//')"
 xdt="xdotool search --classname xterm windowactivate"
 
 # make sure the target xterm is up and running
-xterm -e bash &
+xterm -geometry 80x24 -e bash &
 xterm_pid=$!
 sleep 1
 $xdt --sync sleep 0.5
