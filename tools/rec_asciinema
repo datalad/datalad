@@ -75,7 +75,8 @@ function run_expfail () {
 cmds_log="$title.cmds"
 rm -f "$cmds_log"
 echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
-type "asciinema rec \"$title.json\" -c 'bash --rcfile tools/screencast_bash.rc' -w 2"
+bashrc_file="$(dirname $0)/screencast_bash.rc"
+type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -w 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
 sleep 1.0
@@ -98,3 +99,7 @@ while test -d "/proc/$asciinema_pid"; do sleep 1; echo "wait for asciinema"; don
 
 # kill the xterm we opened
 kill $xterm_pid
+
+# adjust title if was specified
+full_title=${full_title:-$title}
+sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
