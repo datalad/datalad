@@ -47,7 +47,7 @@ def collection_pipeline(prefix=None):
         create=False,  # must be already initialized etc
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        # largefiles="exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"
     )
 
     return [
@@ -86,7 +86,7 @@ def pipeline(prefix=None, bucket='openfmri', tag=True, skip_problematic=False):
         skip_problematic=skip_problematic,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        # largefiles="exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"
     )
 
     return [

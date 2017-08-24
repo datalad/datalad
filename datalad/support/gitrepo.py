@@ -2061,6 +2061,29 @@ class GitRepo(RepoInterface):
                 for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
                 if f.split('\t')[0] == 'D']
 
+    def get_git_attributes(self):
+        """Check git attribute for the current repository (not per-file support for now)
+
+        Parameters
+        ----------
+        all_: bool
+          Adds --all to git check-attr call
+
+        Returns
+        -------
+        dict:
+          attribute: value pairs
+        """
+        out, err = self._git_custom_command(["."], ["git", "check-attr", "--all"])
+        assert not err, "no stderr output is expected"
+        out_split = [
+            # splitting by : would leave leading space(s)
+            [e.lstrip(' ') for e in l.split(':', 2)]
+            for l in out.split('\n') if l
+        ]
+        assert all(o[0] == '.' for o in out_split)  # for paranoid
+        return dict(o[1:] for o in out_split)
+
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove

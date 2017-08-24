@@ -45,7 +45,9 @@ bet we will fix some bugs and make a world even a better place.
 - [uninstall] will check itself whether a subdataset is properly registered in a
   superdataset, even when no superdataset is given in a call
 - [subdatasets] can now configure subdatasets for exclusion from recursive
-  installation 
+  installation (`datalad-recursiveinstall` submodule configuration property)
+- precrafted pipelines of [crawl] now will not override `annex.largefiles`
+  setting if any was set within `.gitattribues` (e.g. by `datalad create --text-no-annex`)
 
 
 ## 0.8.1 (Aug 13, 2017) -- the best birthday gift

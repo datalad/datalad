@@ -1095,6 +1095,8 @@ def test_GitRepo_gitignore(path):
         gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
 
+    eq_(gr.get_git_attributes(), {})  # nothing is recorded within .gitattributes
+
 
 @with_tempfile(mkdir=True)
 def test_GitRepo_set_remote_url(path):
@@ -1123,3 +1125,15 @@ def test_GitRepo_set_remote_url(path):
         gr.config['remote.some-without-url.url']
     eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
     eq_(set(gr.get_remotes(with_urls_only=True)), {'some'})
+
+
+@with_tempfile(mkdir=True)
+def test_get_git_attributes(path):
+
+    gr = GitRepo(path, create=True)
+    eq_(gr.get_git_attributes(), {})  # nothing is recorded within .gitattributes
+
+    create_tree(gr.path, {'.gitattributes': "* tag\n* sec.key=val"})
+    # ATM we do not do any translation of values, so if it is just a tag, it
+    # would be what git returns -- "set"
+    eq_(gr.get_git_attributes(), {'tag': 'set', 'sec.key': 'val'})

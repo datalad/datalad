@@ -85,7 +85,7 @@ def test_initiate_dataset(path, path2):
 def _test_annex_file(mode, topdir, topurl, outdir):
     annex = Annexificator(path=outdir, mode=mode,
                           statusdb='fileattr',
-                          options=["-c", "annex.largefiles=exclude=*.txt"])
+                          largefiles="exclude=*.txt")
 
     input = {'url': "%sd1/1.dat" % topurl, 'filename': '1-copy.dat'}
     tfile = opj(outdir, '1-copy.dat')
@@ -182,7 +182,7 @@ def _test_add_archive_content_tar(direct, repo_path):
                           mode=mode,
                           direct=direct,
                           special_remotes=special_remotes,
-                          options=["-c", "annex.largefiles=exclude=*.txt and exclude=SOMEOTHER"])
+                          largefiles="exclude=*.txt and exclude=SOMEOTHER")
     output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
     assert_equal(output_add, [{'filename': '1.tar'}])
 
