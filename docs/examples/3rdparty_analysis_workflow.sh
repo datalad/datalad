@@ -79,7 +79,7 @@ datalad ls -r -L .
 # require 3rd-party data. Upon completion of the above command, Bob has now
 # access to the entire dataset content, and precise current version of that
 # dataset got linked to his ``myanalysis``.  However, no data was actually
-# downloaded (yet). Datalad datasets primarily contain information on a
+# downloaded (yet). DataLad datasets primarily contain information on a
 # dataset's content and where to obtain it, hence the installation above was
 # done rather quickly, and will still be relatively lean even for a dataset
 # that contains several hundred GBs of data.
@@ -95,7 +95,7 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 
 #%
 # Although we originally installed the dataset from Github, the actual data is
-# hosted elsewhere. Datalad supports multiple redundant data providers per each
+# hosted elsewhere. DataLad supports multiple redundant data providers per each
 # file in a dataset, and will transparently attempt to obtain data from an
 # alternative location if a particular data provider is not available.
 #
@@ -103,7 +103,7 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 # analysis scripts in the same dataset repository as the input data. Managing
 # input data, analysis code, and results the same version control system
 # creates a precise record of what version of code and input data was used to
-# create which particular results. Datalad datasets are regular Git_
+# create which particular results. DataLad datasets are regular Git_
 # repositories and therefore provide the same powerful source code management
 # features, as any other Git_ repository, and make them available for data too.
 #
@@ -195,7 +195,7 @@ cd bobs_analysis
 #%
 
 #%
-# With the script Bob created, Alice can obtain all required data content. Datalad
+# With the script Bob created, Alice can obtain all required data content. DataLad
 # knows that necessary file is available in Bob's version of the dataset on the
 # same machine, so it won't even attempt to download it from its original location.
 #%
@@ -223,7 +223,7 @@ bash code/run_analysis.sh || true
 
 #%
 # However, when she performs actions that attempt to modify data files managed by
-# datalad she will get an error. Datalad, by default, prevents modification of
+# datalad she will get an error. DataLad, by default, prevents modification of
 # data files. If modification is desired (as in this case), datalad can *unlock*
 # individual files, or the entire dataset. Afterwards modifications are
 # possible.
@@ -274,7 +274,7 @@ datalad get result.txt
 
 # Lastly, let's assume that Bob completed his analysis and he is ready to share
 # the results with the world, or a remote collaborator. One way to make
-# datasets available, is to upload them to a webserver via SSH. Datalad
+# datasets available, is to upload them to a webserver via SSH. DataLad
 # supports this by creating a :term:`sibling` for the dataset on the server,
 # to which the dataset can by published (repeatedly).
 #%
@@ -290,7 +290,7 @@ datalad create-sibling --recursive -s public "$SERVER_URL"
 datalad publish -r --to public .
 
 #%
-# This command can be repeated as often as desired. Datalad checks the state
+# This command can be repeated as often as desired. DataLad checks the state
 # of both the local and the remote sibling and transmits the changes.
 #%
 

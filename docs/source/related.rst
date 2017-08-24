@@ -2,7 +2,7 @@ Delineation from related solutions
 **********************************
 
 To our knowledge, there is no other effort with a scope as broad as DataLad's.
-Datalad aims to unify access to vast arrays of (scientific) data in a domain and
+DataLad aims to unify access to vast arrays of (scientific) data in a domain and
 data modality agnostic fashion with as few and universally available software
 dependencies as possible.
 
@@ -12,7 +12,7 @@ powerful, NSF-supported framework, but it requires non-trivial deployment and
 management procedures. As a representative of *data grid* technology, it is
 more suitable for an institutional deployment, as data access, authentication,
 permission management, and versioning are complex and not-feasible to be
-performed directly by researchers. Datalad on the other hand federates
+performed directly by researchers. DataLad on the other hand federates
 institutionally hosted data, but in addition enables individual researchers and
 small labs to contribute datasets to the federation with minimal cost and
 without the need for centralized coordination and permission management.
@@ -46,7 +46,7 @@ Data delivery/management middleware
 
 Even though there are projects to manage data directly with dVCS (e.g. Git),
 such as the `Rdatasets Git repository`_ this approach does not scale, for example
-to the amount of data typically observed in a scientific context. Datalad
+to the amount of data typically observed in a scientific context. DataLad
 uses git-annex_ to support managing large amounts of data with Git, while
 avoiding the scalability issues of putting data directly into Git repositories.
 
@@ -89,9 +89,9 @@ or git-annex commands directly, it is useful to appreciate that DataLad is
 build atop of very flexible and powerful tools.  Knowing basics of git and
 git-annex in addition to DataLad helps to not only make better use of
 DataLad but also to enable more advanced and more efficient data management
-scenarios. Datalad makes use of lower-level configuration and data structures
-as much as possible. Consequently, it is possible to manipulate Datalad
-datasets with low-level tools if needed. Moreover, Datalad datasets are
+scenarios. DataLad makes use of lower-level configuration and data structures
+as much as possible. Consequently, it is possible to manipulate DataLad
+datasets with low-level tools if needed. Moreover, DataLad datasets are
 compatible with tools and services designed to work with plain Git repositories,
 such as the popular GitHub_ service.
 

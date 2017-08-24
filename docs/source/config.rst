@@ -1,7 +1,7 @@
 Configuration
 *************
 
-Datalad uses the same configuration mechanism and syntax as Git itself.
+DataLad uses the same configuration mechanism and syntax as Git itself.
 Consequently, datalad can be configured using the :command:`git config`
 command. Both a *global* user configuration (typically at
 :file:`~/.gitconfig`), and a *local* repository-specific configuration
