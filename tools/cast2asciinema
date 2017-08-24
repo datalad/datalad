@@ -12,7 +12,17 @@ title="$(echo $(basename $1) | sed -e 's/.sh$//')"
 xdt="xdotool search --classname xterm windowactivate"
 
 # make sure the target xterm is up and running
-xterm -geometry 80x24 -e bash &
+# Sizes
+# "big"
+#width=120
+#height=36
+# "small"
+width=120
+height=36
+text_width=$(($width - 8))
+
+geometry=${width}x${height}
+xterm -geometry $geometry -e bash &
 xterm_pid=$!
 sleep 1
 $xdt --sync sleep 0.5
@@ -47,7 +57,7 @@ function execute () {
 }
 function say()
 {
-	type "$(printf "#\n# $1" | fmt -w 72 --prefix '# ')"
+	type "$(printf "#\n# $1" | fmt -w ${text_width} --prefix '# ')"
 	key Return
 	sleep 3
 }
@@ -101,5 +111,9 @@ while test -d "/proc/$asciinema_pid"; do sleep 1; echo "wait for asciinema"; don
 kill $xterm_pid
 
 # adjust title if was specified
-full_title=${full_title:-$title}
+full_title="${full_title:-$title} [$geometry]"
 sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
+
+# Pre-create description with the list of commands annotated in .md
+echo -e "## List of the commands (with timing after #) executed in the asciinema:\n" > "$title.cmds.md"
+sed -e 's,\(^.*[^ ]\)\( *#.*\)$,**\1** \2\n,g' "$title.cmds" >> "$title.cmds.md"
