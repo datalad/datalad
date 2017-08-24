@@ -75,7 +75,7 @@ function run_expfail () {
 cmds_log="$title.cmds"
 rm -f "$cmds_log"
 echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
-bashrc_file="$(dirname $0)/screencast_bash.rc"
+bashrc_file="$(dirname $0)/cast_bash.rc"
 type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -w 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
