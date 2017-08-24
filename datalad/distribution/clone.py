@@ -223,12 +223,12 @@ class Clone(Interface):
         # combine all given sources (incl. alternatives), maintain order
         for s in [source] + assure_list(alt_sources):
             candidate_sources.extend(_get_flexible_source_candidates(s))
-        lgr.info("Cloning dataset from '%s' (trying %i location candidate(s)) to '%s'",
-                 source, len(candidate_sources), dest_path)
-        for source_ in candidate_sources:
+        lgr.info("Cloning %s to '%s'",
+                 source, dest_path)
+        for isource_, source_ in enumerate(candidate_sources):
             try:
-                lgr.debug("Attempting to clone dataset from '%s' to '%s'",
-                          source_, dest_path)
+                lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
+                          source_, isource_ + 1, len(candidate_sources), dest_path)
                 GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
