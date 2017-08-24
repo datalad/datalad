@@ -17,19 +17,32 @@ xterm_pid=$!
 sleep 1
 $xdt --sync sleep 0.5
 
+function check_asciinema () {
+    if [ ! -z "${asciinema_pid:-}" ] && [ ! -e "/proc/$asciinema_pid" ]; then
+        echo "Asciinema stopped unexpectedly. Exiting. Check output in the xterm" >&2
+        # Do not kill xterm so we could see what went wrong!
+        ## [ -z "${xterm_pid:-}" ] || kill $xterm_pid
+        exit 1
+    fi
+}
+
 function type () {
+    check_asciinema
 	$xdt type --clearmodifiers --delay 40 --window %@ "$1"
 }
 function key () {
+    check_asciinema
 	$xdt key --clearmodifiers --window %@ $*
 }
 function sleep () {
+    check_asciinema
 	xdotool sleep $1
 }
 function execute () {
-	$xdt sleep 0.5 key --window %@ Return sleep 0.5
+    check_asciinema
+	$xdt sleep 0.5 key --window %@ Return
 	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
-		sleep 0.5
+		sleep 0.01
 	done
 }
 function say()
@@ -39,22 +52,31 @@ function say()
 	sleep 3
 }
 function show () {
-	$xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
-	key Return
-	sleep 3
+    check_asciinema
+    $xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+    key Return
+    sleep 3
 }
 function run () {
-	type "$1"
-	execute
-	sleep 2
+    type "$1"
+    t1=$(date +%s.%N)
+    execute
+    t2=$(date +%s.%N)
+    # Subtracting 0.5 imposed by execute before hitting Return
+    dt=$(printf "%.2f" `echo "$t2 - $t1 - 0.5" | bc`)
+    echo "$@" "    # $dt sec" >> "$cmds_log"
+    sleep 2
 }
 function run_expfail () {
 	# TODO we could announce or visualize the expected failure
 	run "$1"
 }
 
-echo "Recording to $(readlink -f "$title.json")"
-type "asciinema rec \"$title.json\" -c 'bash --rcfile tools/screencast_bash.rc' -w 2"
+cmds_log="$title.cmds"
+rm -f "$cmds_log"
+echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
+bashrc_file="$(dirname $0)/screencast_bash.rc"
+type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -w 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
 sleep 1.0
@@ -77,3 +99,7 @@ while test -d "/proc/$asciinema_pid"; do sleep 1; echo "wait for asciinema"; don
 
 # kill the xterm we opened
 kill $xterm_pid
+
+# adjust title if was specified
+full_title=${full_title:-$title}
+sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
