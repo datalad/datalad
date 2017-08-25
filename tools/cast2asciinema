@@ -82,6 +82,21 @@ function run_expfail () {
 	run "$1"
 }
 
+# Take .cmds file and make them into .md file with detected datalad commands
+# invocations accompanied with a [help] url
+
+function cmds2md() {
+    [ $# = 1 ] || exit 1  # one file at a time
+    infile="$1"
+    mdfile="$1.md"
+    echo -e "## List of the commands (with timing after #) executed in the asciinema:\n" >| "$mdfile"
+    sed -e 's,\(^.*[^ ]\)\( *#.*\)$,```\1``` \2\n,g' "$infile" >> "$mdfile"
+    # let's make used datalad commands in the descriptions to point to our manpages
+    # collect all known commands (sorry -- we need datalad available)
+    commands_re=$(datalad -h | sed -n -e '/^ *{/s/ *[{}]//gp' | sed -e 's/,/\\|/g' -e 's,^,\\(,g' -e 's,$,\\),g')
+    sed -i -e 's,\(\<datalad .*'"${commands_re}"'\( \|$\).*\),\1 [help](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$mdfile"
+}
+
 cmds_log="$title.cmds"
 rm -f "$cmds_log"
 echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
@@ -115,10 +130,6 @@ full_title="${full_title:-$title} [$geometry]"
 sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
 
 # Pre-create description with the list of commands annotated in .md
-echo -e "## List of the commands (with timing after #) executed in the asciinema:\n" > "$title.cmds.md"
-sed -e 's,\(^.*[^ ]\)\( *#.*\)$,**\1** \2\n,g' "$title.cmds" >> "$title.cmds.md"
-# Yarik goes crazy
-#  let's make used datalad commands in the descriptions to point to our manpages
-# collect all known commands (sorry -- we need datalad available)
-commands_re=$(datalad -h | sed -n -e '/^ *{/s/ *[{}]//gp' | sed -e 's/,/\\|/g' -e 's,^,\\(,g' -e 's,$,\\),g')
-sed -i -e 's,\(datalad.* \)'"${commands_re}"'\( \|$\)\),[\1\](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$title.cmds.md"
+# ATM those cannot be uploaded automagically to the asciinema but the clip
+# description could be changed online, just cut/paste
+cmds2md "$title.cmds"
