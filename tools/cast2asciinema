@@ -13,12 +13,12 @@ xdt="xdotool search --classname xterm windowactivate"
 
 # make sure the target xterm is up and running
 # Sizes
+# "small"
+width=80
+height=24
 # "big"
 #width=120
 #height=36
-# "small"
-width=120
-height=36
 text_width=$(($width - 8))
 
 geometry=${width}x${height}
