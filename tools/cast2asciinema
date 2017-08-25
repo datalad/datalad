@@ -118,5 +118,7 @@ sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
 echo -e "## List of the commands (with timing after #) executed in the asciinema:\n" > "$title.cmds.md"
 sed -e 's,\(^.*[^ ]\)\( *#.*\)$,**\1** \2\n,g' "$title.cmds" >> "$title.cmds.md"
 # Yarik goes crazy
-#  let's make used commands in the descriptions to point to our manpages
-sed -i -e 's,\(datalad.* \(update\|create\|crawl\|install\|add\|metadata\|ls\|save\)\( \|$\)\),[\1\](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$title.cmds.md"
+#  let's make used datalad commands in the descriptions to point to our manpages
+# collect all known commands (sorry -- we need datalad available)
+commands_re=$(datalad -h | sed -n -e '/^ *{/s/ *[{}]//gp' | sed -e 's/,/\\|/g' -e 's,^,\\(,g' -e 's,$,\\),g')
+sed -i -e 's,\(datalad.* \)'"${commands_re}"'\( \|$\)\),[\1\](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$title.cmds.md"
