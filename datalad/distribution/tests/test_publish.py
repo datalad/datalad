@@ -28,6 +28,7 @@ from nose.tools import eq_, ok_, assert_is_instance
 from nose.tools import assert_false as nok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
+from datalad.utils import _path_
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_not_equal
@@ -39,6 +40,8 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import serve_path_via_http
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -528,3 +531,18 @@ def test_publish_gh1691(origin, src_path, dst_path):
     results = source.publish(path='subm 1', to='target', on_failure='ignore')
     assert_result_count(results, 1, status='impossible', type='dataset', action='publish')
 
+
+@skip_ssh
+@with_tree(tree={'1': '123'})
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_publish_target_url(src, desttop, desturl):
+    # https://github.com/datalad/datalad/issues/1762
+    ds = Dataset(src).create(force=True)
+    ds.add('1')
+    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+                      name='target',
+                      target_url=desturl + 'subdir/.git')
+    results = ds.publish(to='target', transfer_data='all')
+    assert results
+    ok_file_has_content(_path_(desttop, 'subdir/1'), '123')

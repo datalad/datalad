@@ -17,6 +17,7 @@ from os.path import join as opj
 
 from git.remote import PushInfo as PI
 
+from datalad import ssh_manager
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
@@ -31,7 +32,10 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.network import URL, RI, SSHRI, is_ssh
+
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -151,6 +155,7 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
         # if we force, we do not trust local knowledge and do the checks
         annex_copy_options_ += ' --fast'
     # TODO this things needs to return JSON
+    ncopied = 0
     for r in ds.repo.copy_to(
             files=[p for p in paths
                    # TODO we may have to check for any file in Git, but this one can
@@ -158,10 +163,15 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
                    if not p == opj(ds.path, '.gitmodules')],
             remote=remote,
             options=annex_copy_options_):
+        ncopied += 1
         # TODO RF to have copy_to() yield JSON and convert that one
         # at present only the "good" results come out
         yield get_status_dict(status='ok', path=opj(ds.path, r),
                               type='file', parentds=ds.path, **kwargs)
+
+    if ncopied:
+        _check_and_update_remote_server_info(ds, remote)
+
     # if ds.submodules:
     #     # NOTE: we might need to init them on the remote, but needs to
     #     #  be done only if remote is sshurl and it is not bare there
@@ -181,6 +191,33 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
     #     ds.repo.merge_annex(remote)
     #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
 
+
+def _check_and_update_remote_server_info(ds, remote):
+    # if we managed to copy to "http" url  we should should try to trigger git
+    # update-server-info hook on the remote if there was ssh annexurl defined
+    # for it. Apparently we do that already in create_sibling ones, but here
+    # we need more checks and preparation
+    remote_url = ds.repo.config.get('remote.%s.url' % remote, None)
+    if remote_url:
+        remote_url = RI(remote_url)
+        if isinstance(remote_url, URL) and remote_url.scheme in (
+        'http', 'https'):
+            remote_annexurl = ds.repo.config.get('remote.%s.annexurl' % remote,
+                                                 None)
+            if remote_annexurl:
+                remote_annexurl_ri = RI(remote_annexurl)
+                if is_ssh(remote_annexurl_ri):
+                    ssh = ssh_manager.get_connection(remote_annexurl_ri)
+                    ssh('git -C {} update-server-info'.format(
+                        sh_quote(remote_annexurl_ri.path)))
+                    return True
+                else:
+                    lgr.debug(
+                        "There is no annexurl defined but not ssh: %s, "
+                        "dunno if "
+                        "we could/should do anything", remote_annexurl
+                    )
+    return False
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
