@@ -116,14 +116,44 @@ def has_diff(ds, refspec, remote, paths):
         return current_commit != ds.repo.get_hexsha(remote_ref)
 
 
-def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
-    # paths are plain paths not annotated ones
+def _publish_data(ds, remote, paths, annex_copy_options, force, transfer_data, **kwargs):
+    # paths are annotated paths for now, changes below
     if not isinstance(ds.repo, AnnexRepo):
         # impossible to publish annex'ed data
         return
+
     if ds.config.getbool('remote.{}'.format(remote), 'annex-ignore', False):
         # configuration says: don't do it
         return
+
+    if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+        # this remote either isn't an annex, or hasn't been properly initialized
+        for ap in paths:
+            # this is only a problem if this path
+            ap['status'] = 'impossible' \
+                           if transfer_data == 'all' or ap.get('raw_input', False) \
+                           else 'notneeded'
+            ap['message'] = \
+                ("annex for remote '%s' not available, or not properly configured",
+                 remote)
+            yield ap
+        return
+
+    # what data to transfer?
+    if transfer_data == 'all':
+        paths = ['.']
+    elif transfer_data == 'auto':
+        # keep only paths that were requested and are not the base path of the dataset
+        # if the resulting list is empty, the "auto" mode of _publish_data() will
+        # kick in and consult "wanted"
+        paths = [p['path'] for p in paths
+                 if p.get('raw_input', False) and
+                 not p['path'] == ds.path]
+    else:
+        raise ValueError(
+            "unknown label '{}' for `transfer_data` option".format(
+                transfer_data))
+
     # TODO do we really have to call annex for that, or can we take it from
     # the config instead?
     remote_wanted = ds.repo.get_preferred_content('wanted', remote)
@@ -131,6 +161,7 @@ def _publish_data(ds, remote, paths, annex_copy_options, force, **kwargs):
         # nothing that we could tell git annex
         return
 
+    # we should now know what needs doing
     lgr.info("Publishing {0} data to {1}".format(ds, remote))
     # overwrite URL with pushurl if any, reason:
     # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
@@ -225,6 +256,25 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
 
+    # define config var name for potential publication dependencies
+    depvar = 'remote.{}.datalad-publish-depends'.format(remote)
+    # list of remotes that are publication dependencies for the
+    # target remote
+    publish_depends = assure_list(ds.config.get(depvar, []))
+
+    # remote might be set to be ignored by annex, or we might not even know yet its uuid
+    # make sure we are up-to-date on this topic on all affected remotes, before
+    # we start making decisions
+    for r in publish_depends + [remote]:
+        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+            lgr.debug("Obtain remote annex info from '%s'", r)
+            ds.repo.fetch(remote=r)
+            # in order to be able to use git's config to determine what to push,
+            # we need to annex merge first. Otherwise a git push might be
+            # rejected if involving all matching branches for example.
+            ds.repo.merge_annex(r)
+    ds.config.reload()
+
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
     # Plan:
@@ -269,50 +319,38 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     copied_data = False
     # skip right away if data transfer is not desired
     if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
-        # remote might be set to be ignored by annex, or we might not even know yet its uuid
-        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
-            ds.repo.fetch(remote=remote)
-            ds.repo.merge_annex(remote)
-            ds.config.reload()
-        if ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
-            # what data to copy
-            if transfer_data == 'all':
-                tocopy = ['.']
-            elif transfer_data == 'auto':
-                # keep only paths that were requested and are not the base path of the dataset
-                # if the resulting list is empty, the "auto" mode of _publish_data() will
-                # kick in and consult "wanted"
-                tocopy = [p['path'] for p in paths
-                          if p.get('raw_input', False) and
-                          not p['path'] == ds.path]
-            else:
-                raise ValueError(
-                    "unknown label '{}' for `transfer_data` option".format(
-                        transfer_data))
+        # publishing of `remote` might depend on publishing other
+        # remote(s) first, so they need to receive the data first:
+        for d in publish_depends:
+            lgr.info("Transferring data to configured publication dependency: '%s'" % d)
             # properly initialized remote annex -> publish data
             for r in _publish_data(
                     ds,
-                    remote,
-                    tocopy,
+                    d,
+                    paths,
                     annex_copy_options,
                     force,
+                    transfer_data,
                     **kwargs):
-                # note if we published any data, no to sync annex branch below in this case
+                # note if we published any data, notify to sync annex branch below
                 if r['status'] == 'ok' and r['action'] == 'publish' and \
                         r.get('type', None) == 'file':
                     copied_data = True
                 yield r
-        else:
-            # this remote either isn't an annex, or hasn't been properly initialized
-            for ap in paths:
-                # this is only a problem if this path
-                ap['status'] = 'impossible' \
-                               if transfer_data == 'all' or ap.get('raw_input', False) \
-                               else 'notneeded'
-                ap['message'] = \
-                    ("annex for remote '%s' not available, or not properly configured",
-                     remote)
-                yield ap
+        # and for the main target
+        for r in _publish_data(
+                ds,
+                remote,
+                paths,
+                annex_copy_options,
+                force,
+                transfer_data,
+                **kwargs):
+            # note if we published any data, notify to sync annex branch below
+            if r['status'] == 'ok' and r['action'] == 'publish' and \
+                    r.get('type', None) == 'file':
+                copied_data = True
+            yield r
 
     #
     # publish dataset (git push)
@@ -321,24 +359,23 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         lgr.debug("No changes detected with respect to state of '%s'", remote)
         yield get_status_dict(ds=ds, status='notneeded', **kwargs)
     else:
-        # there could still be paths to be copied
         # publishing of `remote` might depend on publishing other
         # remote(s) first:
-        # define config var name for potential publication dependencies
-        depvar = 'remote.{}.datalad-publish-depends'.format(remote)
-        for d in assure_list(ds.config.get(depvar, [])):
-            lgr.info("Dependency detected: '%s'" % d)
+        for d in publish_depends:
+            lgr.info("Publishing to configured dependency: '%s'" % d)
             # call this again to take care of the dependency first,
             # but keep the paths the same, as the goal is to publish those
             # to the primary remote, and not anything elase to a dependency
             for r in _publish_dataset(
                     ds,
                     d,
-                    None,
+                    # should get the same as the base dataset
+                    refspec,
                     paths,
                     annex_copy_options,
                     force=force,
                     jobs=jobs,
+                    transfer_data=transfer_data,
                     **kwargs):
                 yield r
 
@@ -351,11 +388,9 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             return
 
         lgr.info("Publishing {0} to {1}".format(ds, remote))
-
         # in order to be able to use git's config to determine what to push,
         # we need to annex merge first. Otherwise a git push might be
-        # rejected if involving all matching branches for example.
-        # Once at it, also push the annex branch right here.
+        # rejected if involving all matching branches for example
         # even if we already fetched above we need to do it again
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
