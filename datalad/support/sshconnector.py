@@ -389,7 +389,7 @@ class SSHManager(object):
         """
         # parse url:
         from datalad.support.network import RI, is_ssh
-        sshri = RI(url)
+        sshri = RI(url) if not isinstance(url, RI) else url
 
         if not is_ssh(sshri):
             raise ValueError("Unsupported SSH URL: '{0}', use "
