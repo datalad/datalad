@@ -59,6 +59,18 @@ def test_invalid_call(origin, tdir):
     # but if it couldn't be, then should indeed crash
     with chpwd(tdir):
         assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # new dataset, with unavailable subdataset
+    dummy = Dataset(tdir).create()
+    dummy_sub = dummy.create('sub')
+    dummy_sub.uninstall()
+    assert_in('sub', dummy.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    # now an explicit call to publish the unavailable subdataset
+    assert_result_count(
+        dummy.publish('sub', on_failure='ignore'),
+        1,
+        path=dummy_sub.path,
+        status='impossible',
+        type='dataset')
 
 
 @skip_ssh
