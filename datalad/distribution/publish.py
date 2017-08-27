@@ -272,9 +272,14 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # in order to be able to use git's config to determine what to push,
             # we need to annex merge first. Otherwise a git push might be
             # rejected if involving all matching branches for example.
-            ds.repo.merge_annex(r)
+            # NOTE we should not use a precomputed 'is_annex' test here, as
+            # each fetch could give evidence that there is an annex
+            # somewhere and replace the repo class...
+            if isinstance(ds.repo, AnnexRepo):
+                ds.repo.merge_annex(r)
     ds.config.reload()
 
+    # anything that follows will not change the repo type anymore, cache
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
     # Plan:
