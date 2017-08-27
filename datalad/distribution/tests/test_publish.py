@@ -407,10 +407,8 @@ def test_publish_depends(
     source.repo.get('test-annex.dat')
     # pollute config
     depvar = 'remote.target2.datalad-publish-depends'
-    # TODO next line would require `add_sibling` to be called with force
-    # see gh-1235
-    #source.config.add(depvar, 'stupid', where='local')
-    #eq_(source.config.get(depvar, None), 'stupid')
+    source.config.add(depvar, 'stupid', where='local')
+    eq_(source.config.get(depvar, None), 'stupid')
 
     # two remote sibling on two "different" hosts
     source.create_sibling(
