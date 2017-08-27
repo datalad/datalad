@@ -59,6 +59,18 @@ def test_invalid_call(origin, tdir):
     # but if it couldn't be, then should indeed crash
     with chpwd(tdir):
         assert_raises(InsufficientArgumentsError, publish, since='HEAD')
+    # new dataset, with unavailable subdataset
+    dummy = Dataset(tdir).create()
+    dummy_sub = dummy.create('sub')
+    dummy_sub.uninstall()
+    assert_in('sub', dummy.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    # now an explicit call to publish the unavailable subdataset
+    assert_result_count(
+        dummy.publish('sub', on_failure='ignore'),
+        1,
+        path=dummy_sub.path,
+        status='impossible',
+        type='dataset')
 
 
 @skip_ssh
@@ -407,10 +419,8 @@ def test_publish_depends(
     source.repo.get('test-annex.dat')
     # pollute config
     depvar = 'remote.target2.datalad-publish-depends'
-    # TODO next line would require `add_sibling` to be called with force
-    # see gh-1235
-    #source.config.add(depvar, 'stupid', where='local')
-    #eq_(source.config.get(depvar, None), 'stupid')
+    source.config.add(depvar, 'stupid', where='local')
+    eq_(source.config.get(depvar, None), 'stupid')
 
     # two remote sibling on two "different" hosts
     source.create_sibling(
@@ -546,3 +556,31 @@ def test_publish_target_url(src, desttop, desturl):
     results = ds.publish(to='target', transfer_data='all')
     assert results
     ok_file_has_content(_path_(desttop, 'subdir/1'), '123')
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile()
+@with_tempfile()
+def test_gh1763(src, target1, target2):
+    # this test is very similar to test_publish_depends, but more
+    # comprehensible, and directly tests issue 1763
+    src = Dataset(src).create(force=True)
+    src.create_sibling(
+        'ssh://datalad-test' + target1,
+        name='target1')
+    src.create_sibling(
+        'ssh://datalad-test' + target2,
+        name='target2',
+        publish_depends='target1')
+    # a file to annex
+    create_tree(src.path, {'probe1': 'probe1'})
+    src.add('probe1', to_git=False)
+    # make sure the probe is annexed, not straight in Git
+    assert_in('probe1', src.repo.get_annexed_files(with_content_only=True))
+    # publish to target2, must handle dependency
+    src.publish(to='target2', transfer_data='all')
+    for target in (target1, target2):
+        assert_in(
+            'probe1',
+            Dataset(target).repo.get_annexed_files(with_content_only=True))
