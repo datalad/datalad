@@ -27,16 +27,22 @@ height=24
 # "big"
 #width=120
 #height=36
-# live hd resolution (trimmed just a bit on the right and bottom)
-width=116
-height=32
+# live hd resolution with 14 font (trimmed just a bit on the right and bottom)
+# apparently has issue with underscores not printed when working in bash
+#width=116
+#height=32
+#fs=14
+# so let's use fs 15 and slightly smaller window
+width=106
+height=29
+fs=15
 text_width=$(($width - 8))
 
 geometry=${width}x${height}
 this_window=$(xdotool getwindowfocus)
 
 # For consistent appearance
-xterm +sb -fa Hermit -fs 14 -bg white -fg black -geometry $geometry -title Screencast-xterm -e "bash  --rcfile $bashrc_file" &
+xterm +sb -fa Hermit -fs $fs -bg white -fg black -geometry $geometry -title Screencast-xterm -e "bash  --rcfile $bashrc_file" &
 xterm_pid=$!
 sleep 1
 
@@ -71,7 +77,13 @@ function execute () {
 }
 function say()
 {
-	instruct "SAY: $1"
+	ac=$(instruct "SAY: $1")
+	if [ "$ac" != "s" ] ; then
+	    echo "skipping"
+	    return
+	fi
+	type "$(printf "#\n# $1" | fmt -w ${text_width} --prefix '# ')"
+	key Return
 }
 function show () {
     xdt $xterm_window type --clearmodifiers --delay 0 "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
