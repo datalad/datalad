@@ -46,14 +46,13 @@ xterm_window=$(xdotool search --pid $xterm_pid)
 # current one (waiting etc), then switch
 function wait () {
     xdt $this_window
-    read
-    echo "done waiting"
+    read -p "$@" in
+    echo "$in"
     xdt $xterm_window
 }
 function instruct () {
     xdt $this_window
-    echo -n "$@"
-    wait
+    wait "$@"
 }
 function type () {
 	xdt $xterm_window type --clearmodifiers --delay 40  "$1"
@@ -79,9 +78,18 @@ function show () {
     key Return
 }
 function run () {
-    instruct "EXEC: $1.  Press Enter to type"
+    help="Press Enter to type, s to skip this action"
+    ac=$(instruct "EXEC: $1.  $help")
+    if [ "$ac" = "s" ]; then
+        echo "skipping"
+        return
+    fi
     type "$1"
-    instruct "EXEC: $1.  Press Enter to run"
+    ac=$(instruct "EXEC: $1.  $help")
+    if [ "$ac" = "s" ]; then
+        echo "skipping"
+        return
+    fi
     execute
 }
 function run_expfail () {
@@ -109,6 +117,6 @@ show "$(cowsay "Demo was using $(datalad --version 2>&1 | head -n1). Discover mo
 
 # key Control_L+d
 
-echo "INSTRUCTION: Press Enter to exit the terminal"
+echo "INSTRUCTION: Press Ctrl-D or run exit to close the terminal"
 # kill the xterm we opened
-kill $xterm_pid
+#kill $xterm_pid
