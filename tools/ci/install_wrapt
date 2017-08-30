@@ -1,6 +1,9 @@
 #!/bin/bash
 
-git clone https://github.com/GrahamDumpleton/wrapt /tmp/wrapt-dev
-cd /tmp/wrapt-dev
-# patch here if desired
-pip install -e .
+#git clone https://github.com/GrahamDumpleton/wrapt /tmp/wrapt-dev
+#cd /tmp/wrapt-dev
+## patch here if desired
+#pip install -e .
+# just install patched one from github
+
+pip install --upgrade https://github.com/yarikoptic/wrapt/archive/try1.zip
