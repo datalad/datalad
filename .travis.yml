@@ -175,12 +175,15 @@ install:
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit
+  # In this version we will troubleshoot wrapt crash
+  # https://github.com/GrahamDumpleton/wrapt/issues/98
+  - tools/ci/install_wrapt
 
 script:
   # Verify that setup.py build doesn't puke
   - python setup.py build
   # Run tests
-  - WRAPT_DISABLE_EXTENSIONS=1 PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)" --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
+  - PATH=$PWD/tools/coverage-bin:$PATH $NOSE_WRAPPER `which nosetests` $NOSE_OPTS -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)" --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO $TESTS_TO_PERFORM
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
   - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest; fi

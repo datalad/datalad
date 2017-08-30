@@ -1,0 +1,6 @@
+#!/bin/bash
+
+git clone https://github.com/GrahamDumpleton/wrapt /tmp/wrapt-dev
+cd /tmp/wrapt-dev
+# patch here if desired
+pip install -e .
