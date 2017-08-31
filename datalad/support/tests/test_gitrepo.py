@@ -424,6 +424,16 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
 
+    # create a remote without an URL:
+    origin.add_remote('not-available', 'git://example.com/not/existing')
+    origin.config.unset('remote.not-available.url', where='local')
+
+    # fetch without provided URL
+    fetched = origin.fetch('not-available')
+    # nothing was done, nothing returned:
+    eq_([], fetched)
+
+
 
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
