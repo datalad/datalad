@@ -1484,13 +1484,11 @@ class GitRepo(RepoInterface):
 
         fi_list = []
         for rm in remotes_to_fetch:
-            from six.moves.configparser import NoOptionError
-            try:
-                fetch_url = \
-                    rm.config_reader.get('fetchurl'
-                                         if rm.config_reader.has_option('fetchurl')
-                                         else 'url')
-            except NoOptionError:
+            fetch_url = \
+                self.config.get('remote.%s.fetchurl' % rm.name,
+                                self.config.get('remote.%s.url' % rm.name,
+                                                None))
+            if fetch_url is None:
                 lgr.debug("Remote %s has no URL", rm)
                 return []
 
