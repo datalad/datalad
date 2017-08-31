@@ -194,6 +194,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
             #     response = (raw_input if PY2 else input)()
             # else:
             response = (getpass.getpass if hidden else getpass_echo)(msg + ": ")
+            if '\x03' in response:
+                # Ctrl-C is part of the response -> clearly we should not pretend it's all good
+                raise KeyboardInterrupt
 
             if not response and default:
                 response = default
