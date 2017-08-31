@@ -13,8 +13,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 from os.path import basename
 from os.path import relpath
+
+from six.moves.urllib.parse import urlparse
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -42,6 +45,7 @@ from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import location_description
+from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.update import Update
@@ -67,12 +71,14 @@ class Siblings(Interface):
     """Manage sibling configuration
 
     This command offers four different actions: 'query', 'add', 'remove',
-    'configure'. 'query' is the default action and can be used to obtain
+    'configure', 'enable'. 'query' is the default action and can be used to obtain
     information about (all) known siblings. 'add' and 'configure' are highly
     similar actions, the only difference being that adding a sibling
     with a name that is already registered will fail, whereas
     re-configuring a (different) sibling under a known name will not
-    be considered an error. Lastly, the 'remove' action allows for the
+    be considered an error. 'enable' can be used to complete access
+    configuration for non-Git sibling (aka git-annex special remotes).
+    Lastly, the 'remove' action allows for the
     removal (or de-configuration) of a registered sibling.
 
     For each sibling (added, configured, or queried) all known sibling
@@ -124,7 +130,7 @@ class Siblings(Interface):
             nargs='?',
             metavar='ACTION',
             doc="""command action selection (see general documentation)""",
-            constraints=EnsureChoice('query', 'add', 'remove', 'configure') | EnsureNone()),
+            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable') | EnsureNone()),
         url=Parameter(
             args=('--url',),
             doc="""the URL of or path to the dataset sibling named by
@@ -205,6 +211,7 @@ class Siblings(Interface):
             'add': _add_remote,
             'configure': _configure_remote,
             'remove': _remove_remote,
+            'enable': _enable_remote,
         }
         # all worker strictly operate on a single dataset
         # anything that deals with hierarchies and/or dataset
@@ -678,6 +685,80 @@ def _remove_remote(
     yield get_status_dict(
         status='ok',
         **result_props)
+
+
+# always copy signature from above to avoid bugs
+def _enable_remote(
+        ds, name, known_remotes, url, pushurl, fetch, description,
+        as_common_datasrc, publish_depends, publish_by_default,
+        annex_wanted, annex_required, annex_group, annex_groupwanted,
+        inherit, get_annex_info,
+        **res_kwargs):
+    result_props = dict(
+        action='enable-sibling',
+        path=ds.path,
+        type='sibling',
+        name=name,
+        **res_kwargs)
+
+    if not isinstance(ds.repo, AnnexRepo):
+        yield dict(
+            result_props,
+            status='impossible',
+            message='cannot enable sibling of non-annex dataset')
+        return
+
+    if name is None:
+        yield dict(
+            result_props,
+            status='error',
+            message='require `name` of sibling to enable')
+        return
+
+    # get info on special remote
+    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in ds.repo.get_special_remotes().items()}
+    remote_info = sp_remotes.get(name, None)
+
+    if remote_info is None:
+        yield dict(
+            result_props,
+            status='impossible',
+            message=("cannot enable sibling '%s', not known", name))
+        return
+
+    env = None
+    if remote_info.get('type', None) == 'webdav':
+        # a webdav special remote -> we need to supply a username and password
+        if not ('WEBDAV_USERNAME' in os.environ and 'WEBDAV_PASSWORD' in os.environ):
+            # nothing user-supplied
+            # let's consult the credential store
+            hostname = urlparse(remote_info.get('url', '')).netloc
+            if not hostname:
+                yield dict(
+                    result_props,
+                    status='impossible',
+                    message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
+            cred = UserPassword('webdav-{}'.format(hostname))
+            if not cred.is_known:
+                cred.enter_new(
+                    user=os.environ.get('WEBDAV_USERNAME', None),
+                    password=os.environ.get('WEBDAV_PASSWORD', None))
+            creds = cred()
+            # update the env with the two necessary variable
+            # we need to pass a complete env because of #1776
+            env = dict(
+                os.environ,
+                WEBDAV_USERNAME=creds['user'],
+                WEBDAV_PASSWORD=creds['password'])
+
+    ds.repo._run_annex_command(
+        'enableremote',
+        annex_options=[
+            name],
+        env=env)
+
+    result_props['status'] = 'ok'
+    yield result_props
 
 
 def _inherit_annex_var(ds, remote, cfgvar):
