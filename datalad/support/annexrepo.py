@@ -78,6 +78,8 @@ from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
+from .exceptions import AccessDeniedError
+from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -1833,7 +1835,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('initremote', annex_options=[name] + options)
         self.config.reload()
 
-    def enable_remote(self, name):
+    def enable_remote(self, name, env=None):
         """Enables use of an existing special remote
 
         Parameters
@@ -1842,7 +1844,20 @@ class AnnexRepo(GitRepo, RepoInterface):
             name, the special remote was created with
         """
 
-        self._run_annex_command('enableremote', annex_options=[name])
+        try:
+            self._run_annex_command(
+                'enableremote',
+                annex_options=[name],
+                expect_fail=True,
+                log_stderr=True,
+                env=env)
+        except CommandError as e:
+            if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
+                raise AccessDeniedError(e.stderr)
+            elif 'FailedConnectionException' in e.stderr:
+                raise AccessFailedError(e.stderr)
+            else:
+                raise e
         self.config.reload()
 
     def merge_annex(self, remote=None):

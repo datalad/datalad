@@ -31,6 +31,8 @@ from datalad.support.constraints import EnsureBool
 from datalad.support.param import Parameter
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import AccessDeniedError
+from datalad.support.exceptions import AccessFailedError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -296,6 +298,7 @@ class Siblings(Interface):
             **dict(
                 res,
                 path=path,
+                # TODO report '+' for special remotes
                 with_annex='+' if 'annex-uuid' in res \
                     else ('-' if res.get('annex-ignore', None) else '?'),
                 spec=spec)))
@@ -727,6 +730,7 @@ def _enable_remote(
         return
 
     env = None
+    cred = None
     if remote_info.get('type', None) == 'webdav':
         # a webdav special remote -> we need to supply a username and password
         if not ('WEBDAV_USERNAME' in os.environ and 'WEBDAV_PASSWORD' in os.environ):
@@ -751,13 +755,23 @@ def _enable_remote(
                 WEBDAV_USERNAME=creds['user'],
                 WEBDAV_PASSWORD=creds['password'])
 
-    ds.repo._run_annex_command(
-        'enableremote',
-        annex_options=[
-            name],
-        env=env)
+    try:
+        ds.repo.enable_remote(name, env=env)
+        result_props['status'] = 'ok'
+    except AccessDeniedError as e:
+        # credentials are wrong, wipe them out
+        if cred and cred.is_known:
+            cred.delete()
+        result_props['status'] = 'error'
+        result_props['message'] = e.message
+    except AccessFailedError as e:
+        # some kind of connection issue
+        result_props['status'] = 'error'
+        result_props['message'] = e.message
+    except Exception as e:
+        # something unexpected
+        raise e
 
-    result_props['status'] = 'ok'
     yield result_props
 
 
