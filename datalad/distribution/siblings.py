@@ -742,9 +742,10 @@ def _enable_remote(
                     result_props,
                     status='impossible',
                     message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
-            cred = UserPassword('webdav-{}'.format(hostname))
+            cred = UserPassword('webdav:{}'.format(hostname))
             if not cred.is_known:
                 cred.enter_new(
+                    instructions="Enter credentials for authentication with WEBDAV server at {}".format(hostname),
                     user=os.environ.get('WEBDAV_USERNAME', None),
                     password=os.environ.get('WEBDAV_PASSWORD', None))
             creds = cred()
