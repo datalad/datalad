@@ -22,6 +22,7 @@ from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.utils import chpwd
 
 from nose.tools import eq_, ok_, assert_is_instance
@@ -155,6 +156,65 @@ def test_publish_simple(origin, src_path, dst_path):
     # see https://github.com/datalad/datalad/issues/1319
     ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
         set(target.get_branch_commits("git-annex"))))
+
+
+@with_testrepos('basic_git', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_publish_plain_git(origin, src_path, dst_path):
+    # TODO: Since it's mostly the same, melt with test_publish_simple
+
+    # prepare src
+    source = install(src_path, source=origin, recursive=True)
+    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # setting tracking branch to target:
+    source.repo.remove_remote("origin")
+
+    # create plain git at target:
+    target = GitRepo(dst_path, create=True)
+    target.checkout("TMP", ["-b"])
+    source.repo.add_remote("target", dst_path)
+
+    res = publish(dataset=source, to="target", result_xfm='datasets')
+    eq_(res, [source])
+
+    ok_clean_git(source.repo, annex=None)
+    ok_clean_git(target, annex=None)
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+
+    # don't fail when doing it again
+    res = publish(dataset=source, to="target")
+    # and nothing is pushed
+    assert_result_count(res, 1, status='notneeded')
+
+    ok_clean_git(source.repo, annex=None)
+    ok_clean_git(target, annex=None)
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+
+    # some modification:
+    with open(opj(src_path, 'test_mod_file'), "w") as f:
+        f.write("Some additional stuff.")
+    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
+                    commit=True, msg="Modified.")
+    ok_clean_git(source.repo, annex=None)
+
+    res = publish(dataset=source, to='target', result_xfm='datasets')
+    eq_(res, [source])
+
+    ok_clean_git(dst_path, annex=None)
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+
+    # amend and change commit msg in order to test for force push:
+    source.repo.commit("amended", options=['--amend'])
+    # push should be rejected (non-fast-forward):
+    assert_raises(IncompleteResultsError,
+                  publish, dataset=source, to='target', result_xfm='datasets')
+    # push with force=True works:
+    res = publish(dataset=source, to='target', result_xfm='datasets', force=True)
+    eq_(res, [source])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
