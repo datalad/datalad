@@ -42,7 +42,7 @@ geometry=${width}x${height}
 this_window=$(xdotool getwindowfocus)
 
 # For consistent appearance
-xterm +sb -fa Hermit -fs $fs -bg white -fg black -geometry $geometry -title Screencast-xterm -e "bash  --rcfile $bashrc_file" &
+xterm +sb -fa Hermit -fs $fs -bg black -fg white -geometry $geometry -title Screencast-xterm -e "bash  --rcfile $bashrc_file" &
 xterm_pid=$!
 sleep 1
 
