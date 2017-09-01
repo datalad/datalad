@@ -1485,9 +1485,13 @@ class GitRepo(RepoInterface):
         fi_list = []
         for rm in remotes_to_fetch:
             fetch_url = \
-                rm.config_reader.get('fetchurl'
-                                     if rm.config_reader.has_option('fetchurl')
-                                     else 'url')
+                self.config.get('remote.%s.fetchurl' % rm.name,
+                                self.config.get('remote.%s.url' % rm.name,
+                                                None))
+            if fetch_url is None:
+                lgr.debug("Remote %s has no URL", rm)
+                return []
+
             if is_ssh(fetch_url):
                 ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
