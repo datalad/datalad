@@ -744,10 +744,18 @@ def _enable_remote(
                     message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
             cred = UserPassword('webdav:{}'.format(hostname))
             if not cred.is_known:
-                cred.enter_new(
-                    instructions="Enter credentials for authentication with WEBDAV server at {}".format(hostname),
-                    user=os.environ.get('WEBDAV_USERNAME', None),
-                    password=os.environ.get('WEBDAV_PASSWORD', None))
+                try:
+                    cred.enter_new(
+                        instructions="Enter credentials for authentication with WEBDAV server at {}".format(hostname),
+                        user=os.environ.get('WEBDAV_USERNAME', None),
+                        password=os.environ.get('WEBDAV_PASSWORD', None))
+                except KeyboardInterrupt:
+                    # user hit Ctrl-C
+                    yield dict(
+                        result_props,
+                        status='impossible',
+                        message="credentials are required for sibling access, abort")
+                    return
             creds = cred()
             # update the env with the two necessary variable
             # we need to pass a complete env because of #1776
