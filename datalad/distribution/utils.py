@@ -180,7 +180,7 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
 
 def _handle_possible_annex_dataset(dataset, reckless, description=None):
     """If dataset "knows annex" -- annex init it, set into reckless etc
-    
+
     Provides additional tune up to a possibly an annex repo, e.g.
     "enables" reckless mode, sets up description
     """
@@ -205,6 +205,20 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
         repo._init(description=description)
     if reckless:
         repo._run_annex_command('untrust', annex_options=['here'])
+    # go through list of special remotes and issue info message that
+    # some additional ones are present and were not auto-enabled
+    remote_names = repo.get_remotes(
+        with_urls_only=False,
+        exclude_special_remotes=False)
+    for k, v in repo.get_special_remotes().items():
+        sr_name = v.get('name', None)
+        if sr_name and sr_name not in remote_names:
+            # if it is not listed among the remotes, it wasn't enabled
+            lgr.info(
+                'access to dataset sibling "%s" not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
+                sr_name,
+                dataset.path,
+                sr_name)
 
 
 def _get_installationpath_from_url(url):
