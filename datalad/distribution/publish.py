@@ -50,16 +50,16 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.publish')
 
 
-def _push(ds, remote, things2push):
+def _push(ds, remote, things2push, force=False):
     lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-    push_res = ds.repo.push(remote=remote, refspec=things2push)
+    push_res = ds.repo.push(remote=remote, refspec=things2push, force=force)
     if things2push and ds.config.get('remote.{}.push'.format(remote)):
         # we aim to push both auto-detected and possibly configured once
         # above we pushed the result of auto-detection, now push the
         # configured ones
         lgr.debug("Secondary push since custom push targets provided")
         push_res.extend(
-            ds.repo.push(remote=remote))
+            ds.repo.push(remote=remote, force=force))
     if not push_res:
         return 'notneeded', 'Git reported nothing was pushed'
     errors = ['{} -> {} {}'.format(
@@ -249,6 +249,7 @@ def _check_and_update_remote_server_info(ds, remote):
                         "we could/should do anything", remote_annexurl
                     )
     return False
+
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
@@ -444,7 +445,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         things2push = [t for t in things2push
                        if t not in ds.config.get('remote.{}.push'.format(remote), [])]
         # now we know what to push where
-        status, msg = _push(ds, remote, things2push)
+        status, msg = _push(ds, remote, things2push, force)
         yield get_status_dict(ds=ds, status=status, message=msg, **kwargs)
 
 

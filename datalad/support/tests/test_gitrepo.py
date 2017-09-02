@@ -534,6 +534,17 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_in("ssh-test", remote_repo.get_branches())
     assert_in("ssh_testfile.dat", remote_repo.get_files("ssh-test"))
 
+    # amend to make it require "--force":
+    repo.commit("amended", options=['--amend'])
+    # push without --force should yield an error:
+    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in("[rejected] (non-fast-forward)", pushed[0].summary)
+    # now push using force:
+    repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
+    # correct commit message in remote:
+    assert_in("amended",
+              list(remote_repo.get_branch_commits('ssh-test'))[-1].summary)
+
 
 @with_tempfile
 @with_tempfile
