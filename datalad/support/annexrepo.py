@@ -78,6 +78,8 @@ from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
+from .exceptions import AccessDeniedError
+from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -918,6 +920,41 @@ class AnnexRepo(GitRepo, RepoInterface):
             ]
         else:
             return remotes
+
+    def get_special_remotes(self):
+        """Get info about all known (not just enabled) special remotes.
+
+        Returns
+        -------
+        dict
+          Keys are special remore UUIDs, values are dicts with arguments
+          for `git-annex enableremote`. This includes at least the 'type'
+          and 'name' of a special remote. Each type of special remote
+          may require addition arguments that will be available in the
+          respective dictionary.
+        """
+        try:
+            stdout, stderr = self._git_custom_command(
+                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
+                expect_fail=True)
+        except CommandError as e:
+            if 'Not a valid object name git-annex:remote.log' in e.stderr:
+                # no special remotes configures
+                return {}
+            else:
+                # some unforseen error
+                raise e
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
+        for line in stdout.splitlines():
+            # be precise and split by spaces
+            fields = line.split(' ')
+            # special remote UUID
+            sr_id = fields[0]
+            # the rest are config args for enableremote
+            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            srs[sr_id] = sr_info
+        return srs
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -1798,7 +1835,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('initremote', annex_options=[name] + options)
         self.config.reload()
 
-    def enable_remote(self, name):
+    def enable_remote(self, name, env=None):
         """Enables use of an existing special remote
 
         Parameters
@@ -1807,7 +1844,20 @@ class AnnexRepo(GitRepo, RepoInterface):
             name, the special remote was created with
         """
 
-        self._run_annex_command('enableremote', annex_options=[name])
+        try:
+            self._run_annex_command(
+                'enableremote',
+                annex_options=[name],
+                expect_fail=True,
+                log_stderr=True,
+                env=env)
+        except CommandError as e:
+            if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
+                raise AccessDeniedError(e.stderr)
+            elif 'FailedConnectionException' in e.stderr:
+                raise AccessFailedError(e.stderr)
+            else:
+                raise e
         self.config.reload()
 
     def merge_annex(self, remote=None):
