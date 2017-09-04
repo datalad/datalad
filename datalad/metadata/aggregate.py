@@ -204,8 +204,8 @@ class AggregateMetaData(Interface):
     @datasetmethod(name='aggregate_metadata')
     @eval_results
     def __call__(
-            dataset,
             path=None,
+            dataset=None,
             guess_native_type=False,
             recursive=False,
             recursion_limit=None,
