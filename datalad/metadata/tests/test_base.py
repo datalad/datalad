@@ -118,7 +118,7 @@ def test_aggregation(path):
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
-    res = aggregate_metadata(ds, recursive=True)
+    res = ds.aggregate_metadata(recursive=True)
     # we get success report for both superdatasets, and they get saved
     assert_result_count(res, 4)
     assert_result_count(res, 2, status='ok', action='aggregate_metadata')
