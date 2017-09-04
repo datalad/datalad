@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the base of our custom remotes"""
 
+from datalad.tests.utils import skip_direct_mode
 from os.path import isabs
 
 from datalad.tests.utils import with_tree
@@ -17,6 +18,7 @@ from ..base import AnnexCustomRemote
 
 
 @with_tree(tree={'file.dat': ''})
+@skip_direct_mode
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
     repo.add('file.dat')

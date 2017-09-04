@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_direct_mode
 import logging
 import os
 
@@ -399,6 +400,7 @@ def test_install_recursive_with_data(src, path):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
+@skip_direct_mode
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
@@ -440,6 +442,7 @@ def test_install_into_dataset(source, top_path):
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
+@skip_direct_mode
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
 
@@ -497,6 +500,7 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_implicit_install(src, dst):
 
     origin_top = create(src)
@@ -613,6 +617,7 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_install_recursive_repeat(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
@@ -726,6 +731,7 @@ def test_install_skip_failed_recursive(src, path):
                            }
                  })
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_install_noautoget_data(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
@@ -756,6 +762,7 @@ def test_install_source_relpath(src, dest):
 @with_tempfile
 @with_tempfile
 @with_tempfile
+@skip_direct_mode
 def test_install_consistent_state(src, dest, dest2, dest3):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)

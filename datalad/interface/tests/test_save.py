@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj
 from datalad.utils import chpwd
@@ -35,6 +36,7 @@ from datalad.tests.utils import assert_result_values_equal
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
+@skip_direct_mode
 def test_save(path):
 
     ds = Dataset(path)
@@ -110,6 +112,7 @@ def test_save(path):
 
 
 @with_tempfile()
+@skip_direct_mode
 def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
@@ -258,6 +261,7 @@ def test_recursive_save(path):
 
 
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_subdataset_save(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')

@@ -10,6 +10,7 @@
 """Test plugin interface mechanics"""
 
 
+from datalad.tests.utils import skip_direct_mode
 import logging
 from os.path import join as opj
 from os.path import exists
@@ -212,6 +213,7 @@ def test_wtf(path):
 
 
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_no_annex(path):
     ds = create(path)
     ok_clean_git(ds.path)

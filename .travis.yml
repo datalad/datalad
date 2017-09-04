@@ -117,11 +117,6 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
-    # test modules that should not fail in direct mode now:
-    env:
-    - TESTS_TO_PERFORM="datalad/tests datalad/support"
-    - DATALAD_REPO_DIRECT=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -129,8 +124,6 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
-  # For now, don't fail entirely when direct mode fails
-  - env: DATALAD_REPO_DIRECT=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)

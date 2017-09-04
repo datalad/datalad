@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test subdataset command"""
 
+from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj
 from os.path import relpath
@@ -23,6 +24,7 @@ from datalad.tests.utils import assert_status
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
+@skip_direct_mode
 def test_get_subdatasets(path):
     ds = Dataset(path)
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [

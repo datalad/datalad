@@ -10,6 +10,7 @@
 """
 
 
+from datalad.tests.utils import skip_direct_mode
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -213,6 +214,7 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
+@skip_direct_mode
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)

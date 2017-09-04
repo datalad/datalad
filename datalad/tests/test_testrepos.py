@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_direct_mode
 import git
 import os
 
@@ -54,6 +55,7 @@ def test_clone(src, tempdir):
 
 @usecase
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_make_studyforrest_mockup(path):
     # smoke test
     make_studyforrest_mockup(path)

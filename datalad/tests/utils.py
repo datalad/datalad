@@ -842,7 +842,7 @@ def skip_ssh(func):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
         from datalad import cfg
-        test_ssh = cfg.get("datalad.tests.ssh", None)
+        test_ssh = cfg.get("datalad.tests.ssh", '')
         if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)

@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import skip_direct_mode
 from os.path import join as opj
 from datalad.utils import chpwd
 
@@ -141,6 +142,7 @@ def test_diff(path, norepo):
 
 
 @with_tempfile(mkdir=True)
+@skip_direct_mode
 def test_diff_recursive(path):
     ds = Dataset(path).create()
     sub = ds.create('sub')
