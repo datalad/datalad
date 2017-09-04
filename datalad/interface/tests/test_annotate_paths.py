@@ -76,7 +76,7 @@ def test_invalid_call(path):
 
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
@@ -220,7 +220,7 @@ def test_annotate_paths(dspath, nodspath):
 
 
 @with_tree(demo_hierarchy['b'])
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_get_modified_subpaths(path):
     ds = Dataset(path).create(force=True)
     suba = ds.create('ba', force=True)
@@ -325,7 +325,7 @@ def test_get_modified_subpaths(path):
 
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_recurseinto(dspath, dest):
     # make fresh dataset hierarchy
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)

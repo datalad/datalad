@@ -36,7 +36,7 @@ from datalad.tests.utils import assert_result_values_equal
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_save(path):
 
     ds = Dataset(path)
@@ -112,7 +112,7 @@ def test_save(path):
 
 
 @with_tempfile()
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
@@ -261,7 +261,7 @@ def test_recursive_save(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_subdataset_save(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')

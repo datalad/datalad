@@ -51,7 +51,7 @@ def test_annexificator_no_git_if_dirty(outdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_initiate_dataset(path, path2):
     dataset_path = opj(path, 'test')
     datas = list(initiate_dataset('template', 'testdataset', path=dataset_path)())
@@ -169,7 +169,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     assert_equal(output[0]['datalad_stats'], ActivityStats(files=1, add_git=1))
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
@@ -218,7 +218,7 @@ def _test_add_archive_content_tar(direct, repo_path):
         assert_false(annex.repo.dirty)
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_add_archive_content_tar():
     for direct in (True, False):
@@ -229,7 +229,7 @@ def test_add_archive_content_tar():
 @with_tempfile(mkdir=True)
 @with_tree(tree={'file': 'load'})
 @serve_path_via_http
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_add_dir_file(repo_path, p, topurl):
     # test whenever file becomes a directory and then back a file.  Should all work!
     annex = Annexificator(path=repo_path, auto_finalize=False)

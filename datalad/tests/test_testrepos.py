@@ -55,7 +55,7 @@ def test_clone(src, tempdir):
 
 @usecase
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_make_studyforrest_mockup(path):
     # smoke test
     make_studyforrest_mockup(path)

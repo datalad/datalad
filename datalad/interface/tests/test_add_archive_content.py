@@ -73,7 +73,7 @@ treeargs = dict(
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
@@ -166,7 +166,7 @@ tree4uargs = dict(
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_add_archive_content(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
@@ -303,8 +303,8 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode
-@skip_direct_mode
+@skip_direct_mode  #FIXME
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 @skip_v6  #FIXME
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
@@ -330,7 +330,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM

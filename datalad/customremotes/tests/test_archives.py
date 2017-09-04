@@ -121,7 +121,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
@@ -155,7 +155,7 @@ def test_get_git_environ_adjusted():
     assert_equal(sys_env["PWD"], os.environ.get("PWD"))
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False

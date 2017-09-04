@@ -300,7 +300,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
@@ -371,7 +371,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
@@ -435,7 +435,7 @@ def test_failon_no_permissions(src_path, target_path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_replace_and_relative_sshpath(src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653
@@ -536,7 +536,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_target_ssh_inherit():
     # TODO: waits for resolution on

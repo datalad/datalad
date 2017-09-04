@@ -17,7 +17,7 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import ok_startswith
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus', "bogusgroup"]

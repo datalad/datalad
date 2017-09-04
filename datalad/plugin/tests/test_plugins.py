@@ -213,7 +213,7 @@ def test_wtf(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_no_annex(path):
     ds = create(path)
     ok_clean_git(ds.path)

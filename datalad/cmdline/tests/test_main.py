@@ -152,7 +152,7 @@ def test_incorrect_options():
     yield check_incorrect_option, ('--dbg',), err_insufficient
     yield check_incorrect_option, tuple(), err_insufficient
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_script_shims():
     runner = Runner()

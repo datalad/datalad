@@ -18,7 +18,7 @@ from ..base import AnnexCustomRemote
 
 
 @with_tree(tree={'file.dat': ''})
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
     repo.add('file.dat')

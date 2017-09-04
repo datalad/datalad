@@ -31,7 +31,7 @@ from ..fcptable import pipeline, superdataset_pipeline
 
 TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus']

@@ -89,7 +89,7 @@ def test_basics(path, nodspath):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_rerun(path, nodspath):
     ds = Dataset(path).create()
     sub = ds.create('sub')

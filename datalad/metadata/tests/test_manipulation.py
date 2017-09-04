@@ -214,7 +214,7 @@ def test_basic_dsmeta(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 def test_mod_hierarchy(path):
     base = Dataset(path).create()
     sub = base.create('sub')

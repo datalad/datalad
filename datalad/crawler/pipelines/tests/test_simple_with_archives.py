@@ -31,7 +31,7 @@ from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
 
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ["random_url"]
@@ -43,7 +43,7 @@ from .test_balsa import TEST_TREE1
 @with_tree(tree=TEST_TREE1, archives_leading_dir=False)
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_simple1(ind, topurl, outd):
 
@@ -80,7 +80,7 @@ def test_simple1(ind, topurl, outd):
 }, archives_leading_dir=False)
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_crawl_autoaddtext(ind, topurl, outd):
     ds = create(outd, text_no_annex=True)

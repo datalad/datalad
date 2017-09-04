@@ -144,7 +144,7 @@ def test_diff(path, norepo):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode
+@skip_direct_mode  #FIXME
 @skip_v6  #FIXME
 def test_diff_recursive(path):
     ds = Dataset(path).create()
