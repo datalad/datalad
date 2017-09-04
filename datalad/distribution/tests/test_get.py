@@ -325,6 +325,7 @@ def test_get_recurse_subdatasets(src, path):
 
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
+@skip_v6
 def test_get_greedy_recurse_subdatasets(src, path):
 
     ds = install(
