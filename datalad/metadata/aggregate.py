@@ -178,7 +178,7 @@ class AggregateMetaData(Interface):
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""topmost dataset metadata will be aggregated into. All dataset
-            betwween this dataset and any given path will received updated
+            between this dataset and any given path will receive updated
             aggregated metadata from all given paths.""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(

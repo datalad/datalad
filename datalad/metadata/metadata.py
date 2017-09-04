@@ -231,8 +231,8 @@ def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
                 "Metadata parser '%s' yielded something other than a dictionary "
                 "for dataset %s -- this is likely a bug, please consider "
                 "reporting it. "
-                "This type of native metadata will be ignored.",
-                nativetype, ds)
+                "This type of native metadata will be ignored. Got: %s",
+                nativetype, ds, repr(native_meta))
             continue
         mergers[mode](db, native_meta)
 
