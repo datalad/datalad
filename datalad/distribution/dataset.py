@@ -76,7 +76,25 @@ def resolve_path(path, ds=None):
 
 @add_metaclass(Flyweight)
 class Dataset(object):
+    """Representation of a DataLad dataset/repository
 
+    This is the core data type of DataLad: a representation of a dataset.
+    At its core, datasets are (git-annex enabled) Git repositories. This
+    class provides all operations that can be performed on a dataset.
+
+    Creating a dataset instance is cheap, all actual operations are
+    delayed until they are actually needed. Creating multiple `Dataset`
+    class instances for the same Dataset location will automatically
+    yield references to the same object.
+
+    A dataset instance comprises of two major components: a `repo`
+    attribute, and a `config` attribute. The former offers access to
+    low-level functionality of the Git or git-annex repository. The
+    latter gives access to a dataset's configuration manager.
+
+    Most functionality is available via methods of this class, but also
+    as stand-alone functions with the same name in `datalad.api`.
+    """
     # Begin Flyweight
     _unique_instances = WeakValueDictionary()
 
@@ -128,6 +146,13 @@ class Dataset(object):
     # End Flyweight
 
     def __init__(self, path):
+        """
+        Parameters
+        ----------
+        path : str
+          Path to the dataset location. This location may or may not exist
+          yet.
+        """
         self._path = path
         self._repo = None
         self._id = None
@@ -237,6 +262,7 @@ class Dataset(object):
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
+        """DEPRECATED: use `subdatasets()`"""
         # TODO wipe this function out completely once we are comfortable
         # with it. Internally we don't need or use it anymore.
         import inspect
