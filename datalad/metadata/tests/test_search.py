@@ -80,28 +80,36 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
-                list(search(".", regex=True))
+                list(search("."))
 
             # and if path exists and is a valid dataset and we say "no"
             Dataset(central_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
-                list(search(".", regex=True))
+                list(search("."))
 
 
-# MIH: I have no idea how this test is supposed to work
-#      it is out of touch with the new reality
 _mocked_search_results = [
-    ('ds1', {'f': 'v'}),
-    ('d2/ds2', {'f1': 'v1'})
+    {
+        'action': 'search',
+        'status': 'ok',
+        'path': 'ds1',  # this is wrong and must be an abspath
+        'matched': {'f': 'v'},  # this has nothing to do with the actual output
+    },
+    {
+        'action': 'search',
+        'status': 'ok',
+        'path': 'd2/ds2',  # this is wrong and must be an abspath
+        'matched': {'f1': 'v1'}  # this has nothing to do with the actual output,
+    },
 ]
 
 
 class _mock_search(object):
     def __call__(*args, **kwargs):
-        for loc, report in _mocked_search_results:
-            yield loc, report
+        for report in _mocked_search_results:
+            yield report
 
 
 def _check_mocked_install(central_dspath, mock_install):
@@ -110,8 +118,8 @@ def _check_mocked_install(central_dspath, mock_install):
     # we no longer do any custom path tune up from the one returned by search
     # so should match what search returns
     assert_equal(
-        list(gen), [(loc, report)
-                    for loc, report in _mocked_search_results])
+        list(gen), [report
+                    for report in _mocked_search_results])
     mock_install.assert_called_once_with(central_dspath, source='///')
 
 
