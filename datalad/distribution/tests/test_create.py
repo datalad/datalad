@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj
@@ -205,6 +206,7 @@ def test_create_subdataset_hierarchy_from_top(path):
 
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_nested_create(path):
     # to document some more organic usage pattern
     ds = Dataset(path).create()

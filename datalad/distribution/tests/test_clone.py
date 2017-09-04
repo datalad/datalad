@@ -10,6 +10,7 @@
 """
 
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from os.path import join as opj
 from os.path import isdir
@@ -121,6 +122,7 @@ def test_clone_datasets_root(tdir):
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_clone_simple_local(src, path):
     origin = Dataset(path)
 
@@ -163,6 +165,7 @@ def test_clone_simple_local(src, path):
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
+@skip_v6  #FIXME
 def test_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')

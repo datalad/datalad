@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import re
 import sys
@@ -152,6 +153,7 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_script_shims():
     runner = Runner()
     for script in [

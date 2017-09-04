@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import logging
 import os
@@ -222,6 +223,7 @@ def test_install_datasets_root(tdir):
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_install_simple_local(src, path):
     origin = Dataset(path)
 
@@ -261,6 +263,7 @@ def test_install_simple_local(src, path):
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
+@skip_v6  #FIXME
 def test_install_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = install(source=url)
@@ -274,6 +277,7 @@ def test_install_dataset_from_just_source(url, path):
 
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_install_dataset_from_instance(src, dst):
     origin = Dataset(src)
     clone = install(source=origin, path=dst)
@@ -288,6 +292,8 @@ def test_install_dataset_from_instance(src, dst):
 
 @with_testrepos(flavors=['network'])
 @with_tempfile
+@skip_v6  #FIXME
+@skip_v6  #FIXME
 def test_install_dataset_from_just_source_via_path(url, path):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
@@ -327,6 +333,7 @@ def test_install_dataladri(src, topurl, path):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_install_recursive(src, path_nr, path_r):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
@@ -370,6 +377,8 @@ def test_install_recursive(src, path_nr, path_r):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
+@skip_v6  #FIXME
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
@@ -468,6 +477,7 @@ def test_failed_install_multiple(top_path):
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_install_known_subdataset(src, path):
 
     # get the superdataset:
@@ -618,6 +628,7 @@ def test_reckless(path, top_path):
                  })
 @with_tempfile(mkdir=True)
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_install_recursive_repeat(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)

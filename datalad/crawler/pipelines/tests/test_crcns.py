@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from .utils import _test_smoke_pipelines
 from ..crcns import pipeline, superdataset_pipeline
@@ -17,6 +18,7 @@ from datalad.tests.utils import ok_startswith
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus', "bogusgroup"]
     yield _test_smoke_pipelines, superdataset_pipeline, []

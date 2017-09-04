@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from ..archives import ArchiveAnnexCustomRemote
 from ..base import AnnexExchangeProtocol
@@ -121,6 +122,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
@@ -154,6 +156,7 @@ def test_get_git_environ_adjusted():
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
     if not on_windows:

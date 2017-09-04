@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from ..balsa import pipeline as ofpipeline, superdataset_pipeline
@@ -126,6 +127,7 @@ TEST_TREE1 = {
 @with_tempfile
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_balsa_extract_meta(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
@@ -200,6 +202,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
@@ -308,6 +311,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_balsa_pipeline2(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",

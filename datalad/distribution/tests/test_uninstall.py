@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj, split as psplit
@@ -178,6 +179,7 @@ def test_uninstall_git_file(path):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_uninstall_subdataset(src, dst):
 
     ds = install(dst, source=src, recursive=True)

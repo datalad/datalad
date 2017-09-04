@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import os
 from os import chmod
@@ -371,6 +372,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -535,6 +537,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_target_ssh_inherit():
     # TODO: waits for resolution on
     #   https://github.com/datalad/datalad/issues/1274

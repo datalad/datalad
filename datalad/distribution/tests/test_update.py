@@ -9,6 +9,7 @@
 
 """
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj, exists
@@ -36,6 +37,7 @@ from datalad.tests.utils import assert_in_results
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src

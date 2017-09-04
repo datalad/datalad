@@ -10,6 +10,7 @@
 """
 
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from os import curdir
 from os.path import join as opj, basename
@@ -247,6 +248,7 @@ def test_get_recurse_dirs(o_path, c_path):
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_get_recurse_subdatasets(src, path):
 
     ds = install(
@@ -401,6 +403,7 @@ def test_get_mixed_hierarchy(src, path):
 
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
+@skip_v6  #FIXME
 def test_autoresolve_multiple_datasets(src, path):
     with chpwd(path):
         ds1 = install(

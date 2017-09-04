@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from os.path import join as opj
 
@@ -31,6 +32,7 @@ lgr = getLogger('datalad.crawl.tests')
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ["random_url"]
 
@@ -42,6 +44,7 @@ from .test_balsa import TEST_TREE1
 @serve_path_via_http
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_simple1(ind, topurl, outd):
 
     list(initiate_dataset(
@@ -78,6 +81,7 @@ def test_simple1(ind, topurl, outd):
 @serve_path_via_http
 @with_tempfile
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_crawl_autoaddtext(ind, topurl, outd):
     ds = create(outd, text_no_annex=True)
     with chpwd(outd):  # TODO -- dataset argument

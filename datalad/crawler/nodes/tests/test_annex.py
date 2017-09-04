@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 from os import listdir
 from os.path import join as opj, exists, lexists, basename
@@ -169,6 +170,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
         yield _test_annex_file, mode
@@ -217,6 +219,7 @@ def _test_add_archive_content_tar(direct, repo_path):
 
 
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct

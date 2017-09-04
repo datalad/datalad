@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import skip_v6
 from datalad.tests.utils import skip_direct_mode
 import logging
 import os
@@ -73,6 +74,7 @@ treeargs = dict(
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     chpwd(repo_path)
@@ -165,6 +167,7 @@ tree4uargs = dict(
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_add_archive_content(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -302,6 +305,8 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tempfile(mkdir=True)
 @skip_direct_mode
 @skip_direct_mode
+@skip_v6  #FIXME
+@skip_v6  #FIXME
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -326,6 +331,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 @skip_direct_mode
+@skip_v6  #FIXME
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     repo = AnnexRepo(repo_path, create=True, direct=direct)

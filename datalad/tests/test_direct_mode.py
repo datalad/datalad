@@ -11,6 +11,7 @@
 """
 
 
+from datalad.tests.utils import skip_v6
 import logging
 
 # Please do ignore possible unused marking.
@@ -40,6 +41,7 @@ if on_windows:
 @with_tempfile
 @with_tempfile
 @with_tempfile
+@skip_v6  #FIXME
 def test_direct_cfg(path1, path2, path3, path4):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         # create annex repo in direct mode:
@@ -75,6 +77,7 @@ def test_direct_cfg(path1, path2, path3, path4):
 
 
 @with_tempfile
+@skip_v6  #FIXME
 def test_direct_create(path):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         ds = Dataset(path).create()
