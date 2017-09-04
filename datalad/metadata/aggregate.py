@@ -327,7 +327,7 @@ class AggregateMetaData(Interface):
         if not to_save:
             return
         for res in Save.__call__(
-                files=to_save,
+                path=to_save,
                 dataset=refds_path,
                 message='[DATALAD] dataset aggregate metadata update',
                 return_type='generator',
