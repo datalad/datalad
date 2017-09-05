@@ -49,6 +49,7 @@ def test_basic_filemeta(path):
     # create playing field
     create_tree(path, {'somefile': 'content', 'dir': {'deepfile': 'othercontent'}})
     ds = Dataset(path)
+    res = ds.metadata('somefile', add=['plaintag'])
     ds.add('.')
     ok_clean_git(path)
     # full query -> 2 files
@@ -125,6 +126,11 @@ def test_basic_filemeta(path):
     #
     # key: value mapping
     #
+    # invalid key -> exception
+    assert_raises(
+        ValueError, ds.metadata, 'somefile', add={'hd%aa': ('v1', 'v2')})
+    #                  on_failure='ignore')
+    # unknown key, rejected by default
     res = ds.metadata('somefile', add=dict(new=('v1', 'v2')),
                       on_failure='ignore')
     assert_status('error', res)
@@ -276,6 +282,17 @@ def test_mod_hierarchy(path):
     os.remove(opj(base.path, 'probe'))
     os.remove(opj(sub.path, 'probe'))
     ok_clean_git(base.path)
+
+    # no uninstall the subdataset and check of errors are caught properly
+    base.uninstall(sub.path)
+    ok_clean_git(base.path)
+    res = base.metadata(
+        'sub', add=['mike1'], apply2global=True, on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='error',
+        path=sub.path,
+        message='cannot edit metadata of unavailable dataset')
 
 
 @with_tempfile(mkdir=True)
@@ -434,3 +451,18 @@ def test_aggregate_query(path):
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://sub.example.com'}, res[0]['metadata'])
+
+
+@with_tree(tree={'probe': 'anycontent'})
+def test_no_filemeta_with_plaingit(path):
+    ds = Dataset(path).create(force=True, no_annex=True)
+    ds.add('.')
+    ok_clean_git(path)
+    res = ds.metadata('probe', add=['test'], on_failure='ignore')
+    assert_status('impossible', res)
+    assert_result_count(
+        res, 1,
+        status='impossible',
+        message=(
+            'non-annex dataset %s has no file metadata support',
+            ds))

@@ -677,9 +677,9 @@ class Metadata(Interface):
                         # either way we cannot edit its metadata
                         if ap.get('raw_input', False):
                             yield get_status_dict(
-                                ap,
+                                path=ap['path'],
                                 status='error',
-                                message='cannot edit metadata if unavailable dataset',
+                                message='cannot edit metadata of unavailable dataset',
                                 **res_kwargs)
                         continue
                     elif ap['path'] != ds_path:
