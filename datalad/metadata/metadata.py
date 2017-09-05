@@ -375,9 +375,9 @@ class Metadata(Interface):
     read the entire file.
 
     Arbitrary metadata keys can be used. However, DataLad reserves the
-    keys 'tag' and 'definition' for its own use. The can still be
+    keys 'tag' and 'definition' for its own use. They can still be
     manipulated without any restrictions like any other metadata items,
-    but doing so can impact DataLad's metadata-related functionality,
+    but doing so can impact DataLad's metadata-related functionality --
     handle with care.
 
     The 'tag' key is used to store a list of (unique) tags.
