@@ -10,6 +10,7 @@
 
 """
 
+from datalad.tests.utils import skip_direct_mode
 import os
 import logging
 from os.path import join as opj
@@ -133,6 +134,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
 
 @slow  # 74.4509s
 @with_tree(demo_hierarchy)
+@skip_direct_mode  #FIXME
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
