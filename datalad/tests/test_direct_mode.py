@@ -17,6 +17,7 @@ import logging
 # Please do ignore possible unused marking.
 # This is used via Dataset class:
 import datalad.api
+from datalad import cfg
 
 from nose.tools import ok_
 from mock import patch
@@ -36,12 +37,15 @@ if on_windows:
     raise SkipTest("Can't test direct mode switch, "
                    "if direct mode is forced by OS anyway.")
 
+if cfg.obtain("datalad.repo.version") >= 6:
+    raise SkipTest("Can't test direct mode switch, "
+                   "if repository version 6 or later is enforced.")
+
 
 @with_tempfile
 @with_tempfile
 @with_tempfile
 @with_tempfile
-@skip_v6
 def test_direct_cfg(path1, path2, path3, path4):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         # create annex repo in direct mode:
@@ -77,7 +81,6 @@ def test_direct_cfg(path1, path2, path3, path4):
 
 
 @with_tempfile
-@skip_v6
 def test_direct_create(path):
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
         ds = Dataset(path).create()
@@ -91,7 +94,6 @@ def test_direct_create(path):
 @skip_if_no_network
 @with_testrepos('basic_annex', flavors=['network'])
 @with_tempfile
-@skip_v6
 def test_direct_install(url, path):
 
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):

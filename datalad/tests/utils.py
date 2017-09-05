@@ -852,13 +852,16 @@ def skip_ssh(func):
 def skip_v6(func):
     """Skips tests if datalad is configured to use v6 mode
     (DATALAD_REPO_VERSION=6)
+
+    Skipping can be overridden by disabling 'datalad.tests.skipknownfailures'.
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
         from datalad import cfg
         version = cfg.get("datalad.repo.version", None)
         if version is not None and version == '6':
-            raise SkipTest("TODO: Currently disabled in V6")
+            if cfg.obtain("datalad.tests.skipknownfailures"):
+                raise SkipTest("TODO: Currently disabled in V6")
         return func(*args, **kwargs)
     return newfunc
 
@@ -866,13 +869,16 @@ def skip_v6(func):
 def skip_direct_mode(func):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
+
+    Skipping can be overridden by disabling 'datalad.tests.skipknownfailures'.
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
         from datalad import cfg
         direct = cfg.get("datalad.repo.direct", None)
         if direct is not None:
-            raise SkipTest("TODO: Currently disabled in direct mode")
+            if cfg.obtain("datalad.tests.skipknownfailures"):
+                raise SkipTest("TODO: Currently disabled in direct mode")
         return func(*args, **kwargs)
     return newfunc
 
