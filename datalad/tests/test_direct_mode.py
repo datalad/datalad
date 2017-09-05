@@ -37,7 +37,8 @@ if on_windows:
     raise SkipTest("Can't test direct mode switch, "
                    "if direct mode is forced by OS anyway.")
 
-if cfg.obtain("datalad.repo.version") >= 6:
+repo_version = cfg.get("datalad.repo.version", None)
+if repo_version is not None and int(repo_version) >= 6:
     raise SkipTest("Can't test direct mode switch, "
                    "if repository version 6 or later is enforced.")
 
