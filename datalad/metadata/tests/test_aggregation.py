@@ -33,9 +33,11 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import skip_direct_mode
 
 
 @with_tempfile(mkdir=True)
+@skip_direct_mode  #FIXME
 def test_basic_aggregate(path):
     base = Dataset(path).create()
     sub = base.create('sub')
