@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test subdataset command"""
 
+from datalad.tests.utils import skip_direct_mode
 import os
 from os.path import join as opj
 from os.path import relpath
@@ -23,6 +24,7 @@ from datalad.tests.utils import assert_status
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
+@skip_direct_mode  #FIXME
 def test_get_subdatasets(path):
     ds = Dataset(path)
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
@@ -149,12 +151,8 @@ def test_get_subdatasets(path):
          'sub dataset1/sub sub dataset1',
          'sub dataset1/sub sub dataset1/subm 1'])
     # but it has to be a subdataset, otherwise no match
+    # which is what get_containing_subdataset() used to do
     eq_(ds.subdatasets(contains=ds.path), [])
-    # which is what get_containing_subdataset() does
-    eq_(ds.subdatasets(recursive=True,
-                       contains=target_sub,
-                       result_xfm='paths')[-1],
-        ds.get_containing_subdataset(target_sub).path)
     # no error if contains is bullshit
     eq_(ds.subdatasets(recursive=True,
                        contains='errrr_nope',

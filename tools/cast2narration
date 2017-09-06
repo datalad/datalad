@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# This helper executes a screencast script. It expects an xterm window to be up and
+# running (or fails otherwise). This player is ignorant regarding the actual setup
+# of the terminal session running in the xterm window, it just feeds that window
+# via a keyboard input simulation, while generating text-to-speech output
+# according to the script
+#
+# Usage: play_script <scriptfile>
+#
+# Note: If a script is written in way that paths are deterministic and identical
+#       across the running script and the scripted terminal session, this script
+#       can also be used to implement tests. Scripts are executed in a bash session
+#       with -u and -e flags active. However, this would only work of the sessions
+#       run on the same system, and not, for example, the demo in docker container.
+
+set -u -e
+
+#
+# http://www.festvox.org/docs/manual-2.4.0/festival_10.html#Sable-example
+#
+#The boy saw the girl <BREAK/> in the park with the telescope. Good morning <BREAK /> My name is Stuart, which is spelled
+#<RATE SPEED="-40%">
+#<SAYAS MODE="literal">stuart</SAYAS> </RATE>
+#though some people pronounce it 
+#<PRON SUB="stoo art">stuart</PRON>.  My telephone number
+#is <SAYAS MODE="literal">2787</SAYAS>.
+#
+#I used to work in <PRON SUB="Buckloo">Buccleuch</PRON> Place, 
+#but no one can pronounce that.
+
+# shortcut for making xdotool find the right window
+xdt="xdotool search --classname xterm windowactivate"
+
+# need a tempfile for feeding festival
+tts_file=$(mktemp).sable
+# cleanup on exit
+trap "rm -f $tts_file" EXIT
+
+function say()
+{
+cat << EOT > $tts_file
+<?xml version="1.0"?>
+<!DOCTYPE SABLE PUBLIC "-//SABLE//DTD SABLE speech mark up//EN" "Sable.v0_2.dtd" []>
+<SABLE>
+<SPEAKER NAME="cmu_us_slt_arctic_hts">
+$(echo "$1" | sed -e 's/datalad/data-lad/g')
+</SPEAKER>
+</SABLE>
+EOT
+festival --tts $tts_file
+}
+
+function type () {
+	$xdt type --delay 25 --window %@ "$1"
+}
+function key () {
+	$xdt key --window %@ $*
+}
+function sleep () {
+	xdotool sleep $1
+}
+function execute () {
+	$xdt sleep 0.5 key --window %@ Return
+}
+
+# make sure the target xterm is up and running
+
+$xdt --sync sleep 0.2
+
+. $1

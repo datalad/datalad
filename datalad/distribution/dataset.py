@@ -11,7 +11,6 @@
 
 import logging
 from os.path import abspath
-from os.path import commonprefix
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
@@ -19,7 +18,6 @@ from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
 from os.path import relpath
-from os.path import sep
 from weakref import WeakValueDictionary
 from six import PY2
 from six import string_types
@@ -32,7 +30,6 @@ from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.exceptions import PathOutsideRepositoryError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
@@ -40,8 +37,7 @@ from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 
 from datalad.utils import getpwd
-from datalad.utils import optional_args, expandpath, is_explicit_path, \
-    with_pathsep
+from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.distribution.utils import get_git_dir
@@ -80,7 +76,25 @@ def resolve_path(path, ds=None):
 
 @add_metaclass(Flyweight)
 class Dataset(object):
+    """Representation of a DataLad dataset/repository
 
+    This is the core data type of DataLad: a representation of a dataset.
+    At its core, datasets are (git-annex enabled) Git repositories. This
+    class provides all operations that can be performed on a dataset.
+
+    Creating a dataset instance is cheap, all actual operations are
+    delayed until they are actually needed. Creating multiple `Dataset`
+    class instances for the same Dataset location will automatically
+    yield references to the same object.
+
+    A dataset instance comprises of two major components: a `repo`
+    attribute, and a `config` attribute. The former offers access to
+    low-level functionality of the Git or git-annex repository. The
+    latter gives access to a dataset's configuration manager.
+
+    Most functionality is available via methods of this class, but also
+    as stand-alone functions with the same name in `datalad.api`.
+    """
     # Begin Flyweight
     _unique_instances = WeakValueDictionary()
 
@@ -132,6 +146,13 @@ class Dataset(object):
     # End Flyweight
 
     def __init__(self, path):
+        """
+        Parameters
+        ----------
+        path : str
+          Path to the dataset location. This location may or may not exist
+          yet.
+        """
         self._path = path
         self._repo = None
         self._id = None
@@ -241,6 +262,7 @@ class Dataset(object):
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
+        """DEPRECATED: use `subdatasets()`"""
         # TODO wipe this function out completely once we are comfortable
         # with it. Internally we don't need or use it anymore.
         import inspect
@@ -303,7 +325,8 @@ class Dataset(object):
         else:
             return was_once_installed
 
-    def get_superdataset(self, datalad_only=False, topmost=False):
+    def get_superdataset(self, datalad_only=False, topmost=False,
+                         registered_only=False):
         """Get the dataset's superdataset
 
         Parameters
@@ -313,6 +336,10 @@ class Dataset(object):
           id), or (if False, which is default) - any git repository
         topmost : bool, optional
           Return the topmost super-dataset. Might then be the current one.
+        registered_only : bool, optional
+          Test whether any discovered superdataset actually contains the
+          dataset in question as a registered subdataset (as opposed to
+          just being located in a subdirectory without a formal relationship).
 
         Returns
         -------
@@ -331,13 +358,17 @@ class Dataset(object):
                 # no more parents, use previous found
                 break
 
+            sds = Dataset(sds_path_)
             if datalad_only:
                 # test if current git is actually a dataset?
-                sds = Dataset(sds_path_)
                 # can't use ATM since we just autogenerate and ID, see
                 # https://github.com/datalad/datalad/issues/986
                 # if not sds.id:
                 if not sds.config.get('datalad.dataset.id', None):
+                    break
+            if registered_only:
+                if path not in sds.subdatasets(
+                        recursive=False, result_xfm='paths'):
                     break
 
             # That was a good candidate
@@ -355,61 +386,6 @@ class Dataset(object):
         # tries its best to not resolve symlinks now
 
         return Dataset(sds_path)
-
-    # TODO this function is obselete and replaced by a faster
-    # `subdatasets --contains` -- remove once `aggregate` is RF'ed to no
-    # longer use it
-    def get_containing_subdataset(self, path, recursion_limit=None):
-        """Get the (sub-)dataset containing `path`
-
-        Note: The "mount point" of a subdataset is classified as belonging to
-        that respective subdataset.
-
-        WARNING: This function is rather expensive, because it queries for all
-        subdatasets recursively, and repeatedly -- which can take a substantial
-        amount of time for datasets with many (sub-)subdatasets.  In Many cases
-        the `subdatasets` command can be used with its `contains` parameter to
-        achieve the desired result in a less expensive way.
-
-        Parameters
-        ----------
-        path : str
-          Path to determine the containing (sub-)dataset for
-        recursion_limit: int or None
-          limit the subdatasets to take into account to the given number of
-          hierarchy levels
-
-        Returns
-        -------
-        Dataset
-        """
-
-        if recursion_limit is not None and (recursion_limit < 1):
-            lgr.warning("recursion limit < 1 (%s) always results in self.",
-                        recursion_limit)
-            return self
-
-        if is_explicit_path(path):
-            path = resolve_path(path, self)
-            if not path.startswith(self.path):
-                raise PathOutsideRepositoryError(file_=path, repo=self)
-            path = relpath(path, self.path)
-
-        candidates = []
-        # TODO: this one would follow all the sub-datasets, which might
-        # be inefficient if e.g. there is lots of other sub-datasets already
-        # installed but under another sub-dataset.  There is a TODO 'pattern'
-        # option which we could use I guess eventually
-        for subds in self.subdatasets(recursive=True,
-                                      #pattern=
-                                      recursion_limit=recursion_limit,
-                                      result_xfm='relpaths'):
-            common = commonprefix((with_pathsep(subds), with_pathsep(path)))
-            if common.endswith(sep) and common == with_pathsep(subds):
-                candidates.append(common)
-        if candidates:
-            return Dataset(path=opj(self.path, max(candidates, key=len)))
-        return self
 
 
 @optional_args

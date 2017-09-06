@@ -26,42 +26,6 @@ from ...support.strings import get_replacement_dict
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.kaggle")
 
-#
-# def superdataset_pipeline():
-#     lgr.info("Creating a CRCNS collection pipeline")
-#     # Should return a list representing a pipeline
-#     annex = Annexificator(no_annex=True)
-#     return [
-#         crawl_url("http://crcns.org/data-sets",
-#             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
-# #                      a_href_match('.*/data-sets/[\S+/\S+'),]),
-#         # TODO:  such matchers don't have state so if they get to the same url from multiple
-#         # pages they pass that content twice.  Implement state to remember yielded results +
-#         # .reset() for nodes with state so we could first get through the pipe elements and reset
-#         # them all
-#         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
-#         # http://crcns.org/data-sets/vc/pvc-1
-#         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-#         annex.initiate_dataset(
-#             template="crcns",
-#             data_fields=['dataset_category', 'dataset'],
-#             # branch='incoming',  # there will be archives etc
-#             existing='skip',
-#             # further any additional options
-#         )
-#     ]
-#
-#
-# def extract_readme(data):
-#     # TODO - extract data from the page/response  but not into README I guess since majority of datasets
-#     # already provide README
-#     if os.path.exists("README.txt"):
-#         os.unlink("README.txt")
-#     with open("README.txt", "w") as f:
-#         f.write("CRCNS dataset from %(url)s" % data)
-#     lgr.info("Generated README.txt")
-#     yield {'filename': "README.txt"}
-#
 
 def pipeline(url=None,
              a_href_match_='.*/download/.*\.(tgz|tar.*|zip)',
@@ -74,7 +38,12 @@ def pipeline(url=None,
              add_archive_leading_dir=False,
              annex=None,
              incoming_pipeline=None):
-    """Pipeline to crawl/annex an crcns dataset"""
+    """Pipeline to crawl/annex a simple web page with some tarballs on it
+    
+    If .gitattributes file in the repository already provides largefiles
+    setting, none would be provided here to calls to git-annex.  But if not -- 
+    README* and LICENSE* files will be added to git, while the rest to annex
+    """
 
     if not isinstance(leading_dirs_depth, int):
         leading_dirs_depth = int(leading_dirs_depth)
@@ -95,7 +64,7 @@ def pipeline(url=None,
             backend=backend,
             statusdb='json',
             special_remotes=special_remotes,
-            options=["-c", "annex.largefiles=exclude=README* and exclude=LICENSE*"]
+            largefiles="exclude=README* and exclude=LICENSE*"
         )
 
     if url:

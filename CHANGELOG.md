@@ -9,21 +9,65 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.8.1 (??? ??, 2017) -- will be better than ever
+## 0.9.0 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- the `files` argument of [save] has been renamed to `path` to be uniform with
+  any other command
+- all major commands now implement more uniform API semantics and result reporting.
+  Functionality for modification detection of dataset content has been completely replaced
+  with a more efficient implementation
+- [publish] now features a `--transfer-data` switch that allows for a
+  disambiguous specification of whether to publish data -- independent of
+  the selection which datasets to publish (which is done via their paths).
+  Moreover, [publish] now transfers data before repository content is pushed.
+
+### Fixes
+
+- [drop] no longer errors when some subdatasets are not installed
+- [install] will no longer report nothing when a Dataset instance was
+  given as a source argument, but rather perform as expected
+- [remove] doesn't remove when some files of a dataset could not be dropped
+- [publish] no longer hides error during a repository push
+- improved robustness with broken Git configuration
+
+
+### Enhancements and new features
+
+- [save] now uses Git for detecting with sundatasets need to be inspected for
+  potential changes, instead of performing a complete traversal of a dataset tree
+- [add] looks for changes relative to the last commited state of a dataset
+  to discover files to add more efficiently
+- [diff] can now report untracked files in addition to modified files
+- [uninstall] will check itself whether a subdataset is properly registered in a
+  superdataset, even when no superdataset is given in a call
+- [subdatasets] can now configure subdatasets for exclusion from recursive
+  installation (`datalad-recursiveinstall` submodule configuration property)
+- precrafted pipelines of [crawl] now will not override `annex.largefiles`
+  setting if any was set within `.gitattribues` (e.g. by `datalad create --text-no-annex`)
+
+
+## 0.8.1 (Aug 13, 2017) -- the best birthday gift
+
+Bugfixes
 
 ### Fixes
 
 - Do not attempt to [update] a not installed sub-dataset
+- In case of too many files to be specified for [get] or [copy_to], we
+  will make multiple invocations of underlying git-annex command to not
+  overfill command line
+- More robust handling of unicode output in terminals which might not support it
 
 ### Enhancements and new features
 
-?
+- Ship a copy of numpy.testing to facilitate [test] without requiring numpy
+  as dependency. Also allow to pass to command which test(s) to run
+- In [get] and [copy_to] provide actual original requested paths, not the
+  ones we deduced need to be transferred, solely for knowing the total
 
 
 ## 0.8.0 (Jul 31, 2017) -- it is better than ever
@@ -388,12 +432,11 @@ publishing
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 
-[add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
+[add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
-[drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
@@ -404,8 +447,8 @@ publishing
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
 [metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
-[publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
+[publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html

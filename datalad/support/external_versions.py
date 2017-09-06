@@ -79,14 +79,15 @@ def _get_system_ssh_version():
     if installed
     """
     try:
-        out, err = _runner.run('ssh -V'.split())
+        out, err = _runner.run('ssh -V'.split(),
+                               expect_fail=True, expect_stderr=True)
         # apparently spits out to err but I wouldn't trust it blindly
         if err.startswith('OpenSSH'):
             out = err
         assert out.startswith('OpenSSH')  # that is the only one we care about atm
         return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
     except CommandError as exc:
-        lgr.warn("Could not determine version of ssh available: %s", exc_str(exc))
+        lgr.debug("Could not determine version of ssh available: %s", exc_str(exc))
         return None
 
 

@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import skip_v6
+from datalad.tests.utils import skip_direct_mode
 import os
 from glob import glob
 from os.path import join as opj
@@ -145,7 +147,7 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     annex = Annexificator(
         dataset_path,
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
+        largefiles="exclude=*.txt and exclude=README")
 
     pipeline = [
         crawl_url(dataset_url),
@@ -204,6 +206,8 @@ _versioned_files = """
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
+@skip_direct_mode  #FIXME
+@skip_v6  #FIXME
 def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     index_html = opj(ind, 'ds666', 'index.html')
 
@@ -433,6 +437,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 )
 @serve_path_via_http
 @with_tempfile
+@skip_direct_mode  #FIXME
+@skip_v6  #FIXME
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 

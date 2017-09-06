@@ -122,6 +122,12 @@ definitions = {
                'title': 'Skips SSH tests if this flag is **not** set'}),
         'type': EnsureBool(),
     },
+    'datalad.tests.skipknownfailures': {
+        'ui': ('yesno', {
+               'title': 'Skips tests that are known to currently fail'}),
+        'type': EnsureBool(),
+        'default': 'yes',
+    },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
