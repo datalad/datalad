@@ -26,6 +26,9 @@ from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
+from datalad.interface.results import success_status_map
+from datalad.interface.results import annexjson2result
+from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import common_key_defs
@@ -343,6 +346,7 @@ def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
             res['status'] = 'ok'
             yield res
 
+# TODO: check call 'datalad metadata -a mike' (no path)
 
 @build_doc
 class Metadata(Interface):
@@ -794,8 +798,8 @@ class Metadata(Interface):
             #
             ds_paths = [p['path'] for p in content]
             if not apply2global and (reset or purge or add or init or remove):
-                mod_paths = []
-                for mp in ds.repo.set_metadata(
+                respath_by_status = {}
+                for res in ds.repo.set_metadata(
                         ds_paths,
                         reset=reset,
                         add=add,
@@ -807,15 +811,34 @@ class Metadata(Interface):
                         # this kind of recursive from the one across datasets in
                         # the API?
                         recursive=True):
-                    if mp.get('success', False):
-                        mod_paths.append(mp['file'])
-                    else:
-                        yield get_status_dict(
-                            status='error',
-                            message='setting metadata failed',
-                            path=opj(ds.path, mp[0]),
-                            type='file',
-                            **res_kwargs)
+                    res = annexjson2result(
+                        # annex reports are always about files
+                        res, ds, type='file', **res_kwargs)
+                    success = success_status_map[res['status']]
+                    respath_by_status[success] = \
+                        respath_by_status.get(success, []) + [res['path']]
+                    if not success:
+                        # if there was success we get the full query after manipulation
+                        # at the very end
+                        yield res
+                # report on things requested that annex was silent about
+                for r in results_from_annex_noinfo(
+                        ds, ds_paths, respath_by_status,
+                        dir_fail_msg='could not set metadata for some content in %s %s',
+                        noinfo_dir_msg='no metadata to set in %s',
+                        noinfo_file_msg="metadata not supported (only annex'ed files)",
+                        noinfo_status='impossible',
+                        **res_kwargs):
+                    if r['status'] in ('ok', 'notneeded'):
+                        # for cases where everything is good enough honor `reporton`
+                        if reporton in ('none', 'datasets'):
+                            # we only get file/directory reports at this stage
+                            continue
+                        elif r.get('type', None) != 'file' and not reporton == 'all':
+                            # anything that is not a file (e.g. directory) is ignored
+                            # unless all reports are requested
+                            continue
+                    yield r
             # report metadata after modification
             for r in _query_metadata(reporton, ds, ds_paths, merge_native,
                                      db=db, **res_kwargs):

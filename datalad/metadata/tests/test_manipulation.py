@@ -49,7 +49,12 @@ def test_basic_filemeta(path):
     # create playing field
     create_tree(path, {'somefile': 'content', 'dir': {'deepfile': 'othercontent'}})
     ds = Dataset(path)
-    res = ds.metadata('somefile', add=['plaintag'])
+    res = ds.metadata('somefile', add=['plaintag'], on_failure='ignore')
+    assert_result_count(
+        res, 1,
+        status='impossible',
+        message="metadata not supported (only annex'ed files)",
+        path=opj(ds.path, 'somefile'))
     ds.add('.')
     ok_clean_git(path)
     # full query -> 2 files
