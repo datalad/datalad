@@ -77,8 +77,13 @@ def get_metadata_type(ds, guess=False):
       optional auto-detection yielded no results
     """
     cfg_key = 'datalad.metadata.nativetype'
+    old_cfg_key = 'metadata.nativetype'
     if cfg_key in ds.config:
         return ds.config[cfg_key]
+    # FIXME this next conditional should be removed once datasets at
+    # datasets.datalad.org have received the metadata config update
+    elif old_cfg_key in ds.config:
+        return ds.config[old_cfg_key]
 
     mtypes = []
     if guess:
@@ -275,6 +280,9 @@ def _load_json_object(fpath):
 
 
 def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
+    lgr.debug(
+        'Query metadata of %s for %s at %s (merge mode: %s)',
+        ds, reporton, paths, merge_native)
     if db is None:
         db_path = opj(ds.path, db_relpath)
         db = _load_json_object(db_path)
