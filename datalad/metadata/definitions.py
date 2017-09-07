@@ -17,6 +17,12 @@ common_key_defs = {
     "@vocab": {
         'def': "http://schema.org/",
         'descr': 'base vocabulary'},
+    "dcterms": {
+        'def': "http://purl.org/dc/terms/",
+        'descr': 'DCMI metadata terms'},
+    "dctype": {
+        'def': "http://purl.org/dc/dcmitype/",
+        'descr': 'DCMI Type Vocabulary'},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'ontology for the description of a project'},
@@ -63,6 +69,9 @@ common_key_defs = {
     # MIH: we have name and short description
     #      adding title seems superfluous
     #"title": "dcterms:title",
+    "subject": {
+        'def': 'dcterms:subject',
+        'descr': 'topic of a resource, best practice is to use a controlled vocabulary'},
     "type": {
         'def': "schema:type",
         'descr': 'type or category of a resource (e.g. file, dataset)'},
