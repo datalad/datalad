@@ -148,13 +148,13 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.url, 'subm 2'], **kw)
+            '', ['git', 'submodule', 'add', annex.url, '2'], **kw)
         self.repo._git_custom_command(
-            '', ['git', 'commit', '-m', 'Added subm 1 and subm 2.'], **kw)
+            '', ['git', 'commit', '-m', 'Added subm 1 and 2.'], **kw)
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
-        for s in ('subm 1', 'subm 2'):
+        for s in ('subm 1', '2'):
             self.repo._git_custom_command(
                 '', ['git', 'annex', 'init'],
                 cwd=opj(self.path, s), expect_stderr=True)
