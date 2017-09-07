@@ -170,7 +170,7 @@ class AggregateMetaData(Interface):
 
     By default meta data is aggregated across all configured native meta data
     sources. Optionally, the type of available meta data can guessed, if no
-    types are configures. Moreover, it is possible to aggregate meta data from
+    types are configured. Moreover, it is possible to aggregate meta data from
     any subdatasets into the superdataset, in order to facilitate data
     discovery without having to obtain any subdataset.
     """
@@ -214,7 +214,7 @@ class AggregateMetaData(Interface):
         # - use `metadata` to get homogenized metadata for any path
         # - sort into dataset metadata and file metadata
         # - store in form that allows fast access for `metadata`, so
-        #   it get use it transparently for metadata reporting of
+        #   it can use it transparently for metadata reporting of
         #   unavailable dataset components without the need of a dedicated
         #   parser
         # - the point is: `metadata` does the access and homogenization,
