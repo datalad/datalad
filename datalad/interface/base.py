@@ -386,7 +386,7 @@ class Interface(object):
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
         if cls.__name__ not in (
-                'AddArchiveContent', 'AggregateMetaData',
+                'AddArchiveContent',
                 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
                 'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
                 'SSHRun', 'Test'):
