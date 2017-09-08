@@ -98,12 +98,20 @@ def has_diff(ds, refspec, remote, paths):
               remote_branch_name, remote)
     current_commit = ds.repo.get_hexsha()
     within_ds_paths = [p for p in paths if p['path'] != ds.path]
-    if within_ds_paths:
+    commit_differ = current_commit != ds.repo.get_hexsha(remote_ref)
+    # yoh: not sure what "logic" was intended here for comparing only
+    # some files.  By now we get a list of files, if any were changed,
+    # from the commit on remote, and somehow diff says below that they didn't differ...
+    # but if commit is different -- there must be differences and we
+    # should publish. otherwise now skips publishing root dataset
+    # although its master is behind by 1 commit.  Moreover there could
+    # be an empty commit -- shouldn't we publish then???
+    if not commit_differ and within_ds_paths:
         # only if any paths is different from just the parentds root
         # in which case we can do the same muuuch cheaper (see below)
         # if there were custom paths, we will look at the diff
         lgr.debug("Since paths provided, looking at diff")
-        return len(ds.diff(
+        return any(ds.diff(
             path=within_ds_paths,
             revision=remote_ref,
             # only commited changes in this dataset
@@ -113,7 +121,7 @@ def has_diff(ds, refspec, remote, paths):
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
-        return current_commit != ds.repo.get_hexsha(remote_ref)
+        return commit_differ
 
 
 def _publish_data(ds, remote, paths, annex_copy_options, force, transfer_data, **kwargs):
@@ -682,6 +690,7 @@ class Publish(Interface):
                 if tracked_remote:
                     if tracked_refspec.startswith('refs/heads/'):
                         tracked_refspec = tracked_refspec[len('refs/heads/'):]
+                    #to = tracked_remote
                     since = '%s/%s' % (tracked_remote, tracked_refspec)
                 else:
                     lgr.info(
@@ -715,7 +724,7 @@ class Publish(Interface):
                 return_type='generator',
                 on_failure='ignore',
                 force_no_revision_change_discovery=False, # we cannot publish what was not committed
-                force_untracked_discovery=False  # since we cannot publish untracked
+                force_untracked_discovery=False  # we cannot publish untracked
         ):
             if ap.get('status', None):
                 # this is done
