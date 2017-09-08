@@ -152,46 +152,41 @@ def _get_key(k):
     return k
 
 
-#
-# common manipulator functions
-#
-def _init(db, spec):
-    for k, v in spec.items() if spec else []:
-        if k not in db:
-            db[k] = v
+class MetadataDict(dict):
+    """Metadata dict helper class"""
+    def merge_init(self, spec):
+        for k, v in spec.items() if spec else []:
+            if k not in self:
+                self[k] = v
 
+    def merge_purge(self, spec):
+        for k in spec:
+            if k in self:
+                del self[k]
 
-def _purge(db, spec):
-    for k in spec:
-        if k in db:
-            del db[k]
+    def merge_reset(self, spec):
+        for k, v in spec.items():
+            self[k] = v
 
+    def merge_add(self, spec):
+        for k, v in spec.items():
+            vals = sorted(unique(
+                assure_list(self.get(k, [])) + assure_list(v)))
+            if len(vals) == 1:
+                vals = vals[0]
+            self[k] = vals
 
-def _reset(db, spec):
-    for k, v in spec.items():
-        db[k] = v
-
-
-def _add(db, spec):
-    for k, v in spec.items():
-        vals = sorted(unique(
-            assure_list(db.get(k, [])) + assure_list(v)))
-        if len(vals) == 1:
-            vals = vals[0]
-        db[k] = vals
-
-
-def _remove(db, spec):
-    for k, v in spec.items():
-        existing_data = db.get(k, [])
-        if isinstance(existing_data, dict):
-            db[k] = {dk: existing_data[dk]
-                     for dk in set(existing_data).difference(v)}
-        else:
-            db[k] = list(set(existing_data).difference(v))
-        # wipe out if empty
-        if not db[k]:
-            del db[k]
+    def merge_remove(self, spec):
+        for k, v in spec.items():
+            existing_data = self.get(k, [])
+            if isinstance(existing_data, dict):
+                self[k] = {dk: existing_data[dk]
+                           for dk in set(existing_data).difference(v)}
+            else:
+                self[k] = list(set(existing_data).difference(v))
+            # wipe out if empty
+            if not self[k]:
+                del self[k]
 
 
 # TODO generalize to also work with file metadata
@@ -208,11 +203,6 @@ def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
     nativetypes : list
     mode : {'init', 'add', 'reset'}
     """
-    mergers = dict(
-        init=_init,
-        add=_add,
-        reset=_reset)
-
     # keep local, who knows what some parsers might pull in
     from . import parsers
     for nativetype in nativetypes:
@@ -242,7 +232,7 @@ def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
                 "This type of native metadata will be ignored. Got: %s",
                 nativetype, ds, repr(native_meta))
             continue
-        mergers[mode](db, native_meta)
+        getattr(db, 'merge_{}'.format(mode))(native_meta)
 
 
 def _prep_manipulation_spec(init, add, remove, reset):
@@ -285,7 +275,8 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
         ds, reporton, paths, merge_native)
     if db is None:
         db_path = opj(ds.path, db_relpath)
-        db = _load_json_object(db_path)
+        # TODO wrap this into a datalad native metadata parser
+        db = MetadataDict(_load_json_object(db_path))
 
     if reporton in ('all', 'datasets'):
         res = get_status_dict(
@@ -309,6 +300,7 @@ def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
     #
     # report on this dataset's files
     #
+    # TODO wrap this into a git-annex metadata parser
     if reporton in ('all', 'files') and isinstance(ds.repo, AnnexRepo):
         for file, meta in ds.repo.get_metadata(paths):
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
@@ -710,7 +702,7 @@ class Metadata(Interface):
             # reported, and no key definitions have to be checked
             #
             db_path = opj(ds_path, db_relpath)
-            db = _load_json_object(db_path)
+            db = MetadataDict(_load_json_object(db_path))
             #
             # key handling
             #
@@ -777,11 +769,11 @@ class Metadata(Interface):
             if apply2global and \
                     (init or purge or reset or add or remove or define_key):
                 # TODO make manipulation order identical to what git-annex does
-                _init(db, init)
-                _purge(db, purge)
-                _reset(db, reset)
-                _add(db, add)
-                _remove(db, remove)
+                db.merge_init(init)
+                db.merge_purge(purge)
+                db.merge_reset(reset)
+                db.merge_add(add)
+                db.merge_remove(remove)
 
             if db and (added_def or (apply2global and
                        (init or purge or reset or add or remove))):
