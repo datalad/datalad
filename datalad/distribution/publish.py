@@ -701,7 +701,10 @@ class Publish(Interface):
                 nondataset_path_status='error',
                 modified=since,
                 return_type='generator',
-                on_failure='ignore'):
+                on_failure='ignore',
+                force_no_revision_change_discovery=False, # we cannot publish what was not committed
+                force_untracked_discovery=False  # since we cannot publish untracked
+        ):
             if ap.get('status', None):
                 # this is done
                 yield ap
