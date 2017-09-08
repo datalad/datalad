@@ -707,7 +707,7 @@ class Publish(Interface):
                 yield ap
                 continue
             remote_info_result = None
-            if ap.get('type', 'dataset') != 'dataset':
+            if ap.get('type', ap.get('type_src', 'dataset')) != 'dataset':
                 # for everything that is not a dataset get the remote info
                 # for the parent
                 parentds = ap.get('parentds', None)
