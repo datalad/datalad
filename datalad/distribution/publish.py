@@ -601,9 +601,8 @@ class Publish(Interface):
             doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
             from which to look for changes
             to decide either updated publishing is necessary for this and which children.
-            If empty argument is provided, then we will always run publish command.
-            By default, would take from the previously published to that remote/sibling
-            state (for the current branch)"""),
+            If empty argument is provided, then we would take from the previously 
+            published to that remote/sibling state (for the current branch)"""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -670,13 +669,26 @@ class Publish(Interface):
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        if dataset and to and since == '':
-            # default behavior - only updated since last update
-            # so we figure out what was the last update
-            # XXX here we assume one to one mapping of names from local branches
-            # to the remote
+        if dataset and since == '':
+            # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
-            since = '%s/%s' % (to, active_branch)
+            if to:
+                # XXX here we assume one to one mapping of names from local branches
+                # to the remote
+                since = '%s/%s' % (to, active_branch)
+            else:
+                # take tracking remote for the active branch
+                tracked_remote, tracked_refspec = dataset.repo.get_tracking_branch()
+                if tracked_remote:
+                    if tracked_refspec.startswith('refs/heads/'):
+                        tracked_refspec = tracked_refspec[len('refs/heads/'):]
+                    since = '%s/%s' % (tracked_remote, tracked_refspec)
+                else:
+                    lgr.info(
+                        "No tracked remote for %s. since option is of no effect",
+                        active_branch
+                    )
+                    since = None
 
         # here is the plan
         # 1. figure out remote to publish to
