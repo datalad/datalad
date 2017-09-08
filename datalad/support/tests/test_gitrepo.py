@@ -875,7 +875,7 @@ def test_get_tracking_branch(o_path, c_path):
 def test_submodule_deinit(path):
 
     top_repo = GitRepo(path, create=False)
-    eq_(['subm 1', '2'], [s.name for s in top_repo.get_submodules()])
+    eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)

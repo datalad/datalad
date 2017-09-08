@@ -720,7 +720,8 @@ def test_install_skip_failed_recursive(src, path):
         # toplevel dataset was in the house already
         assert_result_count(
             result, 0, path=ds.path, type='dataset')
-        assert_status('error', [result[0]])
+        # subm 1 should fail to install. [1] since comes after '2' submodule
+        assert_in_results(result, status='error', path=sub1.path)
         assert_in_results(result, status='ok', path=sub2.path)
 
         cml.assert_logged(
