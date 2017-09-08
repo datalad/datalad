@@ -33,9 +33,9 @@ def test_get_subdatasets(path):
     ])
     ds.get('sub dataset1')
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/2',
     ])
     # obtain key subdataset, so all leave subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
@@ -44,19 +44,19 @@ def test_get_subdatasets(path):
         [(path, opj(path, 'sub dataset1'))])
     eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
         'sub dataset1',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/sub sub dataset1/subm 1',
-        'sub dataset1/sub sub dataset1/2',
-        'sub dataset1/subm 1',
         'sub dataset1/2',
+        'sub dataset1/sub sub dataset1',
+        'sub dataset1/sub sub dataset1/2',
+        'sub dataset1/sub sub dataset1/subm 1',
+        'sub dataset1/subm 1',
     ])
     # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
-        'sub dataset1/sub sub dataset1/subm 1',
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1/2',
+        'sub dataset1/sub sub dataset1/subm 1',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/2',
         'sub dataset1',
     ])
     eq_(subdatasets(ds, recursive=True, fulfilled=True, result_xfm='relpaths'), [
@@ -66,11 +66,11 @@ def test_get_subdatasets(path):
     eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
         (os.curdir, 'sub dataset1'),
-        ('sub dataset1', 'sub dataset1/sub sub dataset1'),
-        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
-        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/2'),
-        ('sub dataset1', 'sub dataset1/subm 1'),
         ('sub dataset1', 'sub dataset1/2'),
+        ('sub dataset1', 'sub dataset1/sub sub dataset1'),
+        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/2'),
+        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
+        ('sub dataset1', 'sub dataset1/subm 1'),
     ])
     # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, recursion_limit=0),
@@ -82,9 +82,9 @@ def test_get_subdatasets(path):
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
         'sub dataset1',
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/2',
     ])
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
