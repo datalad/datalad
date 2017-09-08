@@ -43,6 +43,7 @@ from datalad.support.json_py import dump as jsondump
 from datalad.support.json_py import load as jsonload
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import merge_native_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -154,6 +155,10 @@ def _get_key(k):
 
 class MetadataDict(dict):
     """Metadata dict helper class"""
+    def merge_none(self, spec):
+        # we are not merging, done
+        pass
+
     def merge_init(self, spec):
         for k, v in spec.items() if spec else []:
             if k not in self:
@@ -523,22 +528,7 @@ class Metadata(Interface):
             is modified, but the resulting state does not need to be
             reported).""",
             constraints=EnsureChoice('all', 'datasets', 'files', 'none')),
-        merge_native=Parameter(
-            args=('--merge-native',),
-            metavar='MODE',
-            doc="""merge procedure to use when a dataset provides
-            native metadata in some format. Such a dataset has to
-            indicate the type of native metadata via its
-            configuration setting ``datalad.metadata.nativetype``.
-            Multiple different types of metadata are supported. Merging
-            is performed in the order in which they are configured.
-            Custom DataLad metadata always takes precedence over
-            native metadata. Merge procedure modes are semantically
-            identical to the corresponding manipulation arguments.
-            Setting the mode to 'none' disables merging of native
-            metadata.""",
-            constraints=EnsureChoice('init', 'add', 'reset', 'none')),
-
+        merge_native=merge_native_opt,
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
 
