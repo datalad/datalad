@@ -1199,13 +1199,13 @@ def get_dataset_root(path):
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
     """
-    suffix = os.sep + '.git'
+    suffix = '.git'
     if not isdir(path):
         path = dirname(path)
     apath = abspath(path)
     # while we can still go up
     while psplit(apath)[1]:
-        if exists(path + suffix):
+        if exists(opj(path, suffix)):
             return path
         # new test path in the format we got it
         path = normpath(opj(path, os.pardir))
