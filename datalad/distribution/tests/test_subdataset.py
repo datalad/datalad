@@ -166,6 +166,7 @@ def test_get_subdatasets(path):
         [])
 
 
+@skip_direct_mode  #FIXME
 @with_tempfile
 def test_get_subdatasets_types(path):
     from datalad.api import create
