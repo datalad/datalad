@@ -207,4 +207,9 @@ definitions = {
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
     },
+    'datalad.metadata.nativetype': {
+        'ui': ('question', {
+               'title': 'Native dataset metadata scheme',
+               'text': 'Set this label to engage a particular metadata extraction parser'}),
+    },
 }
