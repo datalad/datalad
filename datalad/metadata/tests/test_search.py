@@ -124,11 +124,15 @@ def test_our_metadataset_search(tdir):
     assert list(ds.search('.', report='*'))
     assert list(ds.search('.', report_matched=True))
 
-    # there is a problem with argparse not decoding into utf8
+    # there is a problem with argparse not decoding into utf8 in PY2
     from datalad.cmdline.tests.test_main import run_main
+    # TODO: make it into an independent lean test
     from datalad.cmd import Runner
     out, err = Runner(cwd=tdir)('datalad search Buzsáki')
-    assert_in('crcns/pfc-2', out)
+    assert_in('crcns/pfc-2', out)  # has it in description
+    # and then another aspect: this entry it among multiple authors, need to
+    # check if aggregating them into a searchable entity was done correctly
+    assert_in('crcns/hc-1', out)
 
     # TODO generator
     # bring this back when `search` is a new-style command
