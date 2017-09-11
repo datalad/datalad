@@ -124,9 +124,15 @@ def test_our_metadataset_search(tdir):
     assert list(ds.search('.', report='*'))
     assert list(ds.search('.', report_matched=True))
 
+    # there is a problem with argparse not decoding into utf8
+    from datalad.cmdline.tests.test_main import run_main
+    from datalad.cmd import Runner
+    out, err = Runner(cwd=tdir)('datalad search Buzsáki')
+    assert_in('crcns/pfc-2', out)
+
     # TODO generator
     # bring this back when `search` is a new-style command
-    raise SkipTest
+    raise SkipTest("Needs more testing")
     #import simplejson
     #from datalad.utils import swallow_outputs
     #with swallow_outputs() as cmo:

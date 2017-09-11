@@ -60,6 +60,10 @@ class Search(Interface):
             args=("match",),
             metavar='STRING',
             nargs="+",
+            # by default would use sys.getdefaultencoding() (yoh thinks) which
+            # might be ascii, so let's use the one of stdin
+            # Seems to be needed for PY2 and works in PY3 without this
+            type=lambda s: s.decode(sys.stdin.encoding),
             doc="a string (or a regular expression if "
                 "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
                 "in all meta data values. If multiple provided, all must have "
