@@ -292,6 +292,10 @@ def test_remove_file_handle_only(path):
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
+    # remove without specifying the dataset
+    with chpwd(path):
+        remove('one', check=False)
+        ok_(not exists("one"))
 
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})

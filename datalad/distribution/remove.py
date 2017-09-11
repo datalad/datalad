@@ -275,7 +275,9 @@ class Remove(Interface):
                 # TODO compose hand-selected annotated paths
                 path=to_save,
                 # we might have removed the reference dataset by now, recheck
-                dataset=refds_path if GitRepo.is_valid_repo(refds_path) else None,
+                dataset=refds_path
+                        if (refds_path and GitRepo.is_valid_repo(refds_path))
+                        else None,
                 # TODO allow for custom message
                 #message=message if message else '[DATALAD] removed content',
                 message='[DATALAD] removed content',
