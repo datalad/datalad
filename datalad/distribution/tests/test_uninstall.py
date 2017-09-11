@@ -272,7 +272,7 @@ def test_uninstall_dataset(path):
     ok_(not exists(ds.path))
 
 
-@with_tree({'one': 'test', 'two': 'test'})
+@with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
 @skip_direct_mode  #FIXME
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
@@ -288,14 +288,18 @@ def test_remove_file_handle_only(path):
     path_two = opj(ds.path, 'two')
     ok_(exists(path_two))
     # remove one handle, should not affect the other
-    ds.remove('two', check=False)
+    ds.remove('two', check=False, message="custom msg")
+    eq_(ds.repo.repo.head.commit.message.rstrip(), "custom msg")
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
-    # remove without specifying the dataset
+    # remove file without specifying the dataset -- shouldn't fail
     with chpwd(path):
         remove('one', check=False)
         ok_(not exists("one"))
+    # and we should be able to remove without saving
+    ds.remove('three', check=False, save=False)
+    ok_(ds.repo.is_dirty())
 
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
