@@ -1363,9 +1363,17 @@ class GitRepo(RepoInterface):
         -------
         stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
-            if isinstance(cmd_str, string_types) \
-            else cmd_str + files
+
+        if isinstance(cmd_str, string_types):
+            if files and not cmd_str.strip().endwith(" --"):
+                cmd_str += " --"
+            cmd = shlex.split(cmd_str + " " + " ".join(files),
+                              posix=not on_windows)
+        else:
+            if files and cmd_str[-1] != '--':
+                cmd_str.append('--')
+            cmd = cmd_str + files
+
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
@@ -1948,8 +1956,7 @@ class GitRepo(RepoInterface):
             #  yoh: I thought I saw one recently but thought it was some kind of
             #  an artifact from running submodule update --init manually at
             #  some point, but looking at this code now I worry that it was not
-        cmd += ['--', path]
-        self._git_custom_command('', cmd)
+        self._git_custom_command(path, cmd)
         # TODO: return value
 
     def update_ref(self, ref, value, symbolic=False):
