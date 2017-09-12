@@ -1364,15 +1364,16 @@ class GitRepo(RepoInterface):
         stdout, stderr
         """
 
+        # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, string_types):
-            if files and not cmd_str.strip().endwith(" --"):
+            if files and not cmd_str.strip().endswith(" --"):
                 cmd_str += " --"
-            cmd = shlex.split(cmd_str + " " + " ".join(files),
-                              posix=not on_windows)
+            cmd_str = shlex.split(cmd_str, posix=not on_windows)
         else:
             if files and cmd_str[-1] != '--':
                 cmd_str.append('--')
-            cmd = cmd_str + files
+
+        cmd = cmd_str + files
 
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
