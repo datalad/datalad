@@ -12,6 +12,7 @@ import sys
 from genericpath import exists
 from os import linesep, makedirs
 from os.path import dirname, join as opj
+from importlib import import_module
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
@@ -226,41 +227,85 @@ class BuildSchema(Command):
         self.announce('Generating JSON-LD schema file')
 
     def run(self):
-        from datalad.metadata.definitions import common_key_defs
+        from datalad.metadata.definitions import common_defs
         from datalad.metadata.definitions import version as schema_version
         import json
         import shutil
 
-        opath = opj(self.path, 'schema_v{}.json'.format(schema_version))
-        odir = dirname(opath)
-        if not os.path.exists(odir):
-            os.makedirs(odir)
+        def _mk_fname(label, version):
+            return '{}{}{}.json'.format(
+                label,
+                '_v' if version else '',
+                version)
 
-        # to become DataLad's own JSON-LD context
-        context = {}
-        schema = {"@context": context}
-        for key, val in common_key_defs.items():
-            val = val['def']
-            if not (val.startswith('http://') or val.startswith('https://')):
-                # this is not a URL, hence an @id definitions that points
-                # to another schema
-                val = {'@id': val}
-            # git-annex doesn't allow ':', but in JSON-LD we need it for
-            # namespace separation -- let's make '.' in git-annex mean
-            # ':' in JSON-LD
-            key = key.replace('.', ':')
-            context[key] = val
+        def _defs2context(defs, context_label, vocab_version, main_version=schema_version):
+            opath = opj(
+                self.path,
+                _mk_fname(context_label, vocab_version))
+            odir = dirname(opath)
+            if not os.path.exists(odir):
+                os.makedirs(odir)
 
-        with open(opath, 'w') as fp:
-            json.dump(
-                schema,
-                fp,
-                ensure_ascii=True,
-                indent=None,
-                separators=(',\n', ': '),
-                sort_keys=True)
+            # to become DataLad's own JSON-LD context
+            context = {}
+            schema = {"@context": context}
+            if context_label != 'schema':
+                schema['@vocab'] = 'http://docs.datalad.org/{}'.format(
+                    _mk_fname('schema', main_version))
+            for key, val in defs.items():
+                # git-annex doesn't allow ':', but in JSON-LD we need it for
+                # namespace separation -- let's make '.' in git-annex mean
+                # ':' in JSON-LD
+                key = key.replace('.', ':')
+                definition = val['def']
+                if definition.startswith('http://') or definition.startswith('https://'):
+                    # this is not a URL, hence an @id definitions that points
+                    # to another schema
+                    context[key] = definition
+                    continue
+                # the rest are compound definitions
+                props = {'@id': definition}
+                if 'unit' in val:
+                    props['@type'] = val['unit']
+                if 'descr' in val:
+                    props['description'] = val['descr']
+                context[key] = props
+
+            with open(opath, 'w') as fp:
+                json.dump(
+                    schema,
+                    fp,
+                    ensure_ascii=True,
+                    indent=1,
+                    separators=(', ', ': '),
+                    sort_keys=True)
+            print('schema written to {}'.format(opath))
+
+        common_defs = common_defs.copy()
+        # for all parsers that have their own vocabulary
+        import datalad.metadata.parsers as parsers
+        for parser in [p for p in dir(parsers)
+                       if not (p.startswith('_') or p == 'base')]:
+            pmod = getattr(parsers, parser)
+            if not hasattr(pmod, 'vocabulary'):
+                print('parser {} defines no vocabulary, skipped'.format(parser))
+                continue
+            vocab_version = getattr(pmod, 'vocabulary_version', '')
+            _defs2context(
+                getattr(pmod, 'vocabulary'),
+                'schema_{}'.format(parser),
+                vocab_version)
+            common_defs['dlp_{}'.format(parser)] = {'def': 'http://docs.datalad.org/{}'.format(
+                _mk_fname(
+                    'schema_{}'.format(parser),
+                    vocab_version))}
+        # core vocabulary
+        _defs2context(common_defs, 'schema', schema_version)
+
         # present the same/latest version also as the default
-        shutil.copy(opath, opj(dirname(opath), 'schema.json'))
+        shutil.copy(
+            opj(self.path, _mk_fname('schema', schema_version)),
+            opj(self.path, 'schema.json'))
 
 
 def setup_entry_points(entry_points):
