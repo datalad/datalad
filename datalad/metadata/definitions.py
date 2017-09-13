@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata (key) definitions"""
+"""Metadata definitions"""
 
 
 # this is the cannonical version string of Datalad's current metadata scheme
@@ -16,7 +16,7 @@ version = '1.0'
 # dictionary should be all lower-case, and be limited to alphanumerics, plus
 # '_', '-', and '.' -- except for JSON-LD keywords (which start with '@' and
 # will be ignored in the context of git-annex metadata
-common_key_defs = {
+common_defs = {
     "@vocab": {
         'def': "http://schema.org/",
         'descr': 'base vocabulary'},

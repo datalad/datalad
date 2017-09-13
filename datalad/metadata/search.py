@@ -31,7 +31,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
-from datalad.metadata.definitions import common_key_defs
+from datalad.metadata.definitions import common_defs
 from datalad.metadata.metadata import agginfo_relpath
 from datalad.metadata.metadata import Metadata
 
@@ -43,7 +43,7 @@ from datalad.support.json_py import load as jsonload
 from datalad.ui import ui
 
 
-# this ammends the metadata key definitions (common_key_defs)
+# this ammends the metadata key definitions (common_defs)
 # default will be TEXT, hence we only need to specific the differences
 # using string identifiers to not have to import whoosh at global scope
 whoosh_field_types = {
@@ -281,7 +281,7 @@ class Search(Interface):
             path=wf.ID(stored=True),
             type=wf.ID(stored=True),
             **{k: getattr(wf, whoosh_field_types.get(k, 'TEXT'))
-               for k in common_key_defs
+               for k in common_defs
                if not k.startswith('@') and not k == 'type'})
 
         idx_obj = _get_search_index(
@@ -292,7 +292,7 @@ class Search(Interface):
             # parse the query string, default whoosh parser ATM, could be
             # tailored with plugins
             parser = qparse.MultifieldParser(
-                [k for k in common_key_defs if not k.startswith('@')] +
+                [k for k in common_defs if not k.startswith('@')] +
                 ['id', 'path', 'type'],
                 datalad_schema)
             # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
