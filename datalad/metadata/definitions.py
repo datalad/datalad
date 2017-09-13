@@ -9,6 +9,9 @@
 """Metadata (key) definitions"""
 
 
+# this is the cannonical version string of Datalad's current metadata scheme
+version = '1.0'
+
 # for maximum compatibility with git-annex' metadata setup, _keys_ in this
 # dictionary should be all lower-case, and be limited to alphanumerics, plus
 # '_', '-', and '.' -- except for JSON-LD keywords (which start with '@' and
@@ -26,6 +29,12 @@ common_key_defs = {
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'ontology for the description of a project'},
+    "pato": {
+        'def': "http://purl.obolibrary.org/obo/PATO_",
+        'descr': 'Vocabulary of phenotypic qualities'},
+    "uo": {
+        'def': "http://purl.obolibrary.org/obo/UO_",
+        'descr': "Units of Measurement Ontology"},
     "author": {
         'def': "schema:author",
         'descr': 'author of some resource'},

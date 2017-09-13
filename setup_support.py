@@ -217,7 +217,7 @@ class BuildSchema(Command):
     ]
 
     def initialize_options(self):
-        self.path = opj('docs', 'source', '_extras', 'schema.json')
+        self.path = opj('docs', 'source', '_extras')
 
     def finalize_options(self):
         if self.path is None:
@@ -226,13 +226,15 @@ class BuildSchema(Command):
         self.announce('Generating JSON-LD schema file')
 
     def run(self):
-        opath = self.path
+        from datalad.metadata.definitions import common_key_defs
+        from datalad.metadata.definitions import version as schema_version
+        import json
+        import shutil
+
+        opath = opj(self.path, 'schema_v{}.json'.format(schema_version))
         odir = dirname(opath)
         if not os.path.exists(odir):
             os.makedirs(odir)
-
-        from datalad.metadata.definitions import common_key_defs
-        import json
 
         # to become DataLad's own JSON-LD context
         context = {}
@@ -257,6 +259,8 @@ class BuildSchema(Command):
                 indent=None,
                 separators=(',\n', ': '),
                 sort_keys=True)
+        # present the same/latest version also as the default
+        shutil.copy(opath, opj(dirname(opath), 'schema.json'))
 
 
 def setup_entry_points(entry_points):
