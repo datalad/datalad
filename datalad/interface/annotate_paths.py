@@ -111,7 +111,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
             continue
         parentds = r.get('parentds', None)
         if r.get('type', None) == 'dataset':
-            # to dataset handling first, it is the more complex beast
+            # do dataset handling first, it is the more complex beast
             orig_request = r.get('orig_request', None)
             if parentds is None or refds_path is None or \
                     r.get('process_content', False) or (orig_request and (
