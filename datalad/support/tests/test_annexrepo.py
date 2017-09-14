@@ -242,13 +242,13 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     # test-annex.dat should return the correct key:
     eq_(
         ar.get_file_key("test-annex.dat"),
-        'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
+        'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat')
 
     # and should take a list with an empty string as result, if a file wasn't
     # in annex:
     eq_(
         ar.get_file_key(["filenotpresent.wtf", "test-annex.dat"]),
-        ['', 'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat']
+        ['', 'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat']
     )
 
     # test.dat is actually in git
@@ -826,7 +826,7 @@ def test_AnnexRepo_get(src, dst):
     with swallow_outputs():
         annex.get(testfile)
     ok_(annex.file_has_content("test-annex.dat"))
-    ok_file_has_content(testfile_abs, '123', strip=True)
+    ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
     called = []
     # for some reason yoh failed mock to properly just call original func
@@ -851,7 +851,7 @@ def test_AnnexRepo_get(src, dst):
             swallow_outputs():
         annex.get(testfile, jobs=5)
     eq_(called, ['find', 'get'])
-    ok_file_has_content(testfile_abs, '123', strip=True)
+    ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
 # TODO:
