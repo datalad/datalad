@@ -1044,30 +1044,32 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, branch=None):
-        """Return a hexsha for a given branch name. If None - of current branch
+    def get_hexsha(self, object=None):
+        """Return a hexsha for a given object. If None - of current HEAD
 
         Parameters
         ----------
-        branch: str, optional
+        object: str, optional
+          Any type of Git object identifier. See `git show`.
         """
-        # TODO: support not only a branch but any treeish
-        #       Note: repo.tree(treeish).hexsha
-        if branch is None:
-            try:
-                # do not use
-                #self.repo.active_branch.object.hexsha
-                # but HEAD to be able to cope with detached heads
-                return self.repo.head.object.hexsha
-            except ValueError as exc:
-                if 'does not exist' in str(exc):
-                    return None
-                raise
-
-        for b in self.repo.branches:
-            if b.name == branch:
-                return b.object.hexsha
-        raise ValueError("Unknown branch %s" % branch)
+        cmd = ['git', 'show', '--no-patch', "--format=%H"]
+        if object:
+            cmd.append(object)
+        # make sure Git takes our argument as a revision
+        cmd.append('--')
+        try:
+            stdout, stderr = self._git_custom_command(
+                '', cmd, expect_stderr=True, expect_fail=True)
+        except CommandError as e:
+            if 'bad revision' in e.stderr:
+                raise ValueError("Unknown object identifier: %s" % object)
+            elif 'does not have any commits yet' in e.stderr:
+                return None
+            else:
+                raise e
+        stdout = stdout.splitlines()
+        assert(len(stdout) == 1)
+        return stdout[0]
 
     def get_merge_base(self, treeishes):
         """Get a merge base hexsha
@@ -1483,9 +1485,13 @@ class GitRepo(RepoInterface):
         fi_list = []
         for rm in remotes_to_fetch:
             fetch_url = \
-                rm.config_reader.get('fetchurl'
-                                     if rm.config_reader.has_option('fetchurl')
-                                     else 'url')
+                self.config.get('remote.%s.fetchurl' % rm.name,
+                                self.config.get('remote.%s.url' % rm.name,
+                                                None))
+            if fetch_url is None:
+                lgr.debug("Remote %s has no URL", rm)
+                return []
+
             if is_ssh(fetch_url):
                 ssh_manager.get_connection(fetch_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
@@ -2058,6 +2064,29 @@ class GitRepo(RepoInterface):
         return [f.split('\t')[1]
                 for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
                 if f.split('\t')[0] == 'D']
+
+    def get_git_attributes(self):
+        """Check git attribute for the current repository (not per-file support for now)
+
+        Parameters
+        ----------
+        all_: bool
+          Adds --all to git check-attr call
+
+        Returns
+        -------
+        dict:
+          attribute: value pairs
+        """
+        out, err = self._git_custom_command(["."], ["git", "check-attr", "--all"])
+        assert not err, "no stderr output is expected"
+        out_split = [
+            # splitting by : would leave leading space(s)
+            [e.lstrip(' ') for e in l.split(':', 2)]
+            for l in out.split('\n') if l
+        ]
+        assert all(o[0] == '.' for o in out_split)  # for paranoid
+        return dict(o[1:] for o in out_split)
 
 
 # TODO

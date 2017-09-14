@@ -13,21 +13,29 @@
 import logging
 import re
 from collections import OrderedDict
-from os.path import curdir
-from os.path import sep as dirsep
+from os.path import join as opj
 
+from git.remote import PushInfo as PI
+
+from datalad import ssh_manager
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.interface.utils import filter_unmodified
+from datalad.interface.utils import eval_results
+from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts, jobs_opt
 from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandError
+from datalad.support.network import URL, RI, SSHRI, is_ssh
+
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -41,98 +49,239 @@ __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
-# TODO: make consistent configurable output
 
-
-def _log_push_info(pi_list, log_nothing=True):
-    from git.remote import PushInfo as PI
-
-    error = False
-    if pi_list:
-        for push_info in pi_list:
-            if (push_info.flags & PI.ERROR) == PI.ERROR:
-                lgr.debug('Push failed: %s', push_info.summary)
-                error = True
-            else:
-                lgr.debug('Pushed: %s', push_info.summary)
+def _push(ds, remote, things2push, force=False):
+    lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
+    push_res = ds.repo.push(remote=remote, refspec=things2push, force=force)
+    if things2push and ds.config.get('remote.{}.push'.format(remote)):
+        # we aim to push both auto-detected and possibly configured once
+        # above we pushed the result of auto-detection, now push the
+        # configured ones
+        lgr.debug("Secondary push since custom push targets provided")
+        push_res.extend(
+            ds.repo.push(remote=remote, force=force))
+    if not push_res:
+        return 'notneeded', 'Git reported nothing was pushed'
+    errors = ['{} -> {} {}'.format(
+        pi.local_ref,
+        pi.remote_ref,
+        pi.summary.strip()) for pi in push_res if (pi.flags & PI.ERROR) == PI.ERROR]
+    successes = [pi.summary.strip() for pi in push_res if (pi.flags & PI.ERROR) != PI.ERROR]
+    if errors:
+        return 'error', \
+               ('failed to push to %s: %s;%s',
+                remote,
+                '; '.join(errors),
+                ' pushed: {}'.format(successes) if successes else '')
     else:
-        if log_nothing:
-            lgr.debug("Pushed: nothing")
-    return error
+        return 'ok', ('pushed to %s: %s', remote, successes)
 
 
-def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None):
+def has_diff(ds, refspec, remote, paths):
+    """Return bool if a dataset was modified wrt to a given remote state"""
+    if refspec:
+        remote_branch_name = refspec[11:] \
+            if refspec.startswith('refs/heads/') \
+            else refspec
+    else:
+        # there was no tracking branch, check the push target
+        remote_branch_name = ds.repo.get_active_branch()
+
+    remote_ref = '/'.join((remote, remote_branch_name))
+    if remote_ref not in ds.repo.get_remote_branches():
+        lgr.debug("Remote '%s' has no branch matching %r. Will publish",
+                  remote, remote_branch_name)
+        # we don't have any remote state, need to push for sure
+        return True
+
+    lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
+              remote_branch_name, remote)
+    current_commit = ds.repo.get_hexsha()
+    within_ds_paths = [p for p in paths if p['path'] != ds.path]
+    if within_ds_paths:
+        # only if any paths is different from just the parentds root
+        # in which case we can do the same muuuch cheaper (see below)
+        # if there were custom paths, we will look at the diff
+        lgr.debug("Since paths provided, looking at diff")
+        return len(ds.diff(
+            path=within_ds_paths,
+            revision=remote_ref,
+            # only commited changes in this dataset
+            staged=False,
+            # consider only commited changes in subdataset
+            ignore_subdatasets='dirty')) > 0
+    else:
+        # if commits differ at all
+        lgr.debug("Since no paths provided, comparing commits")
+        return current_commit != ds.repo.get_hexsha(remote_ref)
+
+
+def _publish_data(ds, remote, paths, annex_copy_options, force, transfer_data, **kwargs):
+    # paths are annotated paths for now, changes below
+    if not isinstance(ds.repo, AnnexRepo):
+        # impossible to publish annex'ed data
+        return
+
+    if ds.config.getbool('remote.{}'.format(remote), 'annex-ignore', False):
+        # configuration says: don't do it
+        return
+
+    if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+        # this remote either isn't an annex, or hasn't been properly initialized
+        for ap in paths:
+            # this is only a problem if this path
+            ap['status'] = 'impossible' \
+                           if transfer_data == 'all' or ap.get('raw_input', False) \
+                           else 'notneeded'
+            ap['message'] = \
+                ("annex for remote '%s' not available, or not properly configured",
+                 remote)
+            yield ap
+        return
+
+    # what data to transfer?
+    if transfer_data == 'all':
+        paths = ['.']
+    elif transfer_data == 'auto':
+        # keep only paths that were requested and are not the base path of the dataset
+        # if the resulting list is empty, the "auto" mode of _publish_data() will
+        # kick in and consult "wanted"
+        paths = [p['path'] for p in paths
+                 if p.get('raw_input', False) and
+                 not p['path'] == ds.path]
+    else:
+        raise ValueError(
+            "unknown label '{}' for `transfer_data` option".format(
+                transfer_data))
+
+    # TODO do we really have to call annex for that, or can we take it from
+    # the config instead?
+    remote_wanted = ds.repo.get_preferred_content('wanted', remote)
+    if not (paths or annex_copy_options or remote_wanted):
+        # nothing that we could tell git annex
+        return
+
+    # we should now know what needs doing
+    lgr.info("Publishing {0} data to {1}".format(ds, remote))
+    # overwrite URL with pushurl if any, reason:
+    # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
+    # Note: This shouldn't happen anymore with newly added siblings.
+    #       But for now check for it, until we agree on how to fix existing
+    #       ones.
+    pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
+    annexurl = ds.config.get('remote.{}.annexurl'.format(remote), None)
+    annex_copy_options_ = annex_copy_options or ''
+    if pushurl and not annexurl:
+        annex_copy_options_ += ' -c "remote.{}.annexurl={}"'.format(remote, pushurl)
+    if not paths and remote_wanted:
+        lgr.debug("Invoking copy --auto")
+        annex_copy_options_ += ' --auto'
+    # TODO:  we might need additional logic comparing the state of git-annex
+    # branch locally and on remote to see if information about the 'copy'
+    # was also reflected on the remote end
+    #git_annex_hexsha = ds.repo.get_hexsha('git-annex')
+    # TODO: must be the same if we merged/pushed before, if not -- skip
+    # special logic may be with a warning
+    if not force:
+        # if we force, we do not trust local knowledge and do the checks
+        annex_copy_options_ += ' --fast'
+    # TODO this things needs to return JSON
+    ncopied = 0
+    for r in ds.repo.copy_to(
+            files=[p for p in paths
+                   # TODO we may have to check for any file in Git, but this one can
+                   # easily happen with --since
+                   if not p == opj(ds.path, '.gitmodules')],
+            remote=remote,
+            options=annex_copy_options_):
+        ncopied += 1
+        # TODO RF to have copy_to() yield JSON and convert that one
+        # at present only the "good" results come out
+        yield get_status_dict(status='ok', path=opj(ds.path, r),
+                              type='file', parentds=ds.path, **kwargs)
+
+    if ncopied:
+        _check_and_update_remote_server_info(ds, remote)
+
+    # if ds.submodules:
+    #     # NOTE: we might need to init them on the remote, but needs to
+    #     #  be done only if remote is sshurl and it is not bare there
+    #     #  (which I think we do not even support ATM)...
+    #     #  or we could do that in the hook, as it is done for now
+    #     #  (see create_sibling.py)
+    #     #
+    #     pass
+
+    # TODO unclear why this was commented out
+    # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
+    #     # there were changes which should be pushed
+    #     lgr.debug(
+    #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
+    #         remote)
+    #     ds.repo.fetch(remote=remote, refspec='git-annex')
+    #     ds.repo.merge_annex(remote)
+    #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
+
+
+def _check_and_update_remote_server_info(ds, remote):
+    # if we managed to copy to "http" url  we should should try to trigger git
+    # update-server-info hook on the remote if there was ssh annexurl defined
+    # for it. Apparently we do that already in create_sibling ones, but here
+    # we need more checks and preparation
+    remote_url = ds.repo.config.get('remote.%s.url' % remote, None)
+    if remote_url:
+        remote_url = RI(remote_url)
+        if isinstance(remote_url, URL) and remote_url.scheme in (
+        'http', 'https'):
+            remote_annexurl = ds.repo.config.get('remote.%s.annexurl' % remote,
+                                                 None)
+            if remote_annexurl:
+                remote_annexurl_ri = RI(remote_annexurl)
+                if is_ssh(remote_annexurl_ri):
+                    ssh = ssh_manager.get_connection(remote_annexurl_ri)
+                    ssh('git -C {} update-server-info'.format(
+                        sh_quote(remote_annexurl_ri.path)))
+                    return True
+                else:
+                    lgr.debug(
+                        "There is no annexurl defined but not ssh: %s, "
+                        "dunno if "
+                        "we could/should do anything", remote_annexurl
+                    )
+    return False
+
+
+def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
+                     transfer_data='auto', **kwargs):
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
 
+    # define config var name for potential publication dependencies
+    depvar = 'remote.{}.datalad-publish-depends'.format(remote)
+    # list of remotes that are publication dependencies for the
+    # target remote
+    publish_depends = assure_list(ds.config.get(depvar, []))
+
+    # remote might be set to be ignored by annex, or we might not even know yet its uuid
+    # make sure we are up-to-date on this topic on all affected remotes, before
+    # we start making decisions
+    for r in publish_depends + [remote]:
+        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+            lgr.debug("Obtain remote annex info from '%s'", r)
+            ds.repo.fetch(remote=r)
+            # in order to be able to use git's config to determine what to push,
+            # we need to annex merge first. Otherwise a git push might be
+            # rejected if involving all matching branches for example.
+            # NOTE we should not use a precomputed 'is_annex' test here, as
+            # each fetch could give evidence that there is an annex
+            # somewhere and replace the repo class...
+            if isinstance(ds.repo, AnnexRepo):
+                ds.repo.merge_annex(r)
+    ds.config.reload()
+
+    # anything that follows will not change the repo type anymore, cache
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
-
-    def _publish_data():
-        if ds.repo.is_remote_annex_ignored(remote):
-            return [], []  # Cannot publish any data
-        try:
-            remote_wanted = ds.repo.get_preferred_content('wanted', remote)
-        except CommandError as exc:
-            if "cannot determine uuid" in str(exc):
-                if not ds.repo.is_remote_annex_ignored(remote):
-                    lgr.warning(
-                        "Annex failed to determine UUID, skipping publishing data for now: %s",
-                        exc_str(exc)
-                    )
-                return [], []
-            raise
-
-        if (paths or annex_copy_options or remote_wanted) and is_annex_repo:
-            lgr.info("Publishing {0} data to {1}".format(ds, remote))
-            # overwrite URL with pushurl if any, reason:
-            # https://git-annex.branchable.com/bugs/annex_ignores_pushurl_and_uses_only_url_upon___34__copy_--to__34__/
-            # Note: This shouldn't happen anymore with newly added siblings.
-            #       But for now check for it, until we agree on how to fix existing
-            #       ones.
-            pushurl = ds.config.get('remote.{}.pushurl'.format(remote), None)
-            annexurl = ds.config.get('remote.{}.annexurl'.format(remote), None)
-            annex_copy_options_ = annex_copy_options or ''
-            if pushurl and not annexurl:
-                annex_copy_options_ += ' -c "remote.{}.annexurl={}"'.format(remote, pushurl)
-            if not paths and remote_wanted:
-                lgr.debug("Invoking copy --auto")
-                annex_copy_options_ += ' --auto'
-            # TODO:  we might need additional logic comparing the state of git-annex
-            # branch locally and on remote to see if information about the 'copy'
-            # was also reflected on the remote end
-            #git_annex_hexsha = ds.repo.get_hexsha('git-annex')
-            # TODO: must be the same if we merged/pushed before, if not -- skip
-            # special logic may be with a warning
-            if not force:
-                # if we force, we do not trust local knowledge and do the checks
-                annex_copy_options_ += ' --fast'
-            pblshd = ds.repo.copy_to(
-                files=paths,
-                remote=remote,
-                options=annex_copy_options_,
-                jobs=jobs
-            )
-            # if ds.submodules:
-            #     # NOTE: we might need to init them on the remote, but needs to
-            #     #  be done only if remote is sshurl and it is not bare there
-            #     #  (which I think we do not even support ATM)...
-            #     #  or we could do that in the hook, as it is done for now
-            #     #  (see create_sibling.py)
-            #     #
-            #     pass
-
-            # if ds.repo.get_hexsha('git-annex') != git_annex_hexsha:
-            #     # there were changes which should be pushed
-            #     lgr.debug(
-            #         "We have progressed git-annex branch should fetch/merge/push it to %s again",
-            #         remote)
-            #     ds.repo.fetch(remote=remote, refspec='git-annex')
-            #     ds.repo.merge_annex(remote)
-            #     _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
-            return pblshd
-        else:
-            return []
 
     # Plan:
     # 1. Check if there is anything to push, and if so
@@ -141,27 +290,16 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     #    4. push non-annex branch(es)
     # 5. copy data to the remote if paths are provided or it wants something generally
 
-    published, skipped = [], []
-
     # upstream refspec needed for update (merge) and subsequent push,
     # in case there is no.
     # no tracking refspec yet?
 
-    if force:
-        # if forced -- we push regardless if there are differences or not
-        diff = True
-    # check if there are any differences wrt the to-be-published paths,
-    # and if not skip this dataset
-    else:
-        if refspec:
-            remote_branch_name = refspec[11:] \
-                if refspec.startswith('refs/heads/') \
-                else refspec
-        else:
-            # there was no tracking branch, check the push target
-            remote_branch_name = ds.repo.get_active_branch()
+    # TODO: i think this whole modification detection could be done by path
+    # annotation at the very beginning -- keeping it for now to not get too
+    # dizzy in the forehead....
 
-        diff = _get_remote_diff(ds, paths, None, remote, remote_branch_name)
+    # if forced -- we push regardless if there are differences or not
+    diff = True if force else has_diff(ds, refspec, remote, paths)
 
     # We might have got new information in git-annex branch although no other
     # changes
@@ -170,52 +308,83 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             git_annex_commit = next(ds.repo.get_branch_commits('git-annex'))
         except StopIteration:
             git_annex_commit = None
-        diff = _get_remote_diff(ds, [], git_annex_commit, remote, 'git-annex')
+        #diff = _get_remote_diff(ds, [], git_annex_commit, remote, 'git-annex')
+        diff = _get_remote_diff(ds, git_annex_commit, remote, 'git-annex')
         if diff:
             lgr.info("Will publish updated git-annex")
 
+    #
+    # publish data (annex copy --to)
+    #
     # # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # annex_ignore = ds.config.getbool('remote.{}.annex-ignore'.format(remote), None)
     # annex_uuid = ds.config.get('remote.{}.annex-uuid'.format(remote), None)
     # if not annex_ignore:
     #     if annex_uuid is None:
     #         # most probably not yet 'known' and might require some annex
-    knew_remote_uuid = None
-    if is_annex_repo and not ds.repo.is_remote_annex_ignored(remote):
-        try:
-            ds.repo.get_preferred_content('wanted', remote)  # could be just checking config.remote.uuid
-            knew_remote_uuid = True
-        except CommandError:
-            knew_remote_uuid = False
 
-    if knew_remote_uuid:
-        # we can try publishing right away
-        published += _publish_data()
+    copied_data = False
+    # skip right away if data transfer is not desired
+    if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
+        # publishing of `remote` might depend on publishing other
+        # remote(s) first, so they need to receive the data first:
+        for d in publish_depends:
+            lgr.info("Transferring data to configured publication dependency: '%s'" % d)
+            # properly initialized remote annex -> publish data
+            for r in _publish_data(
+                    ds,
+                    d,
+                    paths,
+                    annex_copy_options,
+                    force,
+                    transfer_data,
+                    **kwargs):
+                # note if we published any data, notify to sync annex branch below
+                if r['status'] == 'ok' and r['action'] == 'publish' and \
+                        r.get('type', None) == 'file':
+                    copied_data = True
+                yield r
+        # and for the main target
+        for r in _publish_data(
+                ds,
+                remote,
+                paths,
+                annex_copy_options,
+                force,
+                transfer_data,
+                **kwargs):
+            # note if we published any data, notify to sync annex branch below
+            if r['status'] == 'ok' and r['action'] == 'publish' and \
+                    r.get('type', None) == 'file':
+                copied_data = True
+            yield r
 
-    if not diff:
+    #
+    # publish dataset (git push)
+    #
+    if not diff and not copied_data:
         lgr.debug("No changes detected with respect to state of '%s'", remote)
-        # there could still be paths to be copied
+        yield get_status_dict(ds=ds, status='notneeded', **kwargs)
     else:
         # publishing of `remote` might depend on publishing other
         # remote(s) first:
-        # define config var name for potential publication dependencies
-        depvar = 'remote.{}.datalad-publish-depends'.format(remote)
-        for d in assure_list(ds.config.get(depvar, [])):
-            lgr.info("Dependency detected: '%s'" % d)
+        for d in publish_depends:
+            lgr.info("Publishing to configured dependency: '%s'" % d)
             # call this again to take care of the dependency first,
             # but keep the paths the same, as the goal is to publish those
             # to the primary remote, and not anything elase to a dependency
-            pblsh, skp = _publish_dataset(
-                ds,
-                d,
-                None,
-                paths,
-                annex_copy_options,
-                force=force,
-                jobs=jobs
-            )
-            published.extend(pblsh)
-            skipped.extend(skp)
+            for r in _publish_dataset(
+                    ds,
+                    d,
+                    # should get the same as the base dataset
+                    refspec,
+                    paths,
+                    annex_copy_options,
+                    force=force,
+                    jobs=jobs,
+                    transfer_data=transfer_data,
+                    **kwargs):
+                yield r
 
         if is_annex_repo and \
                 ds.repo.is_special_annex_remote(remote):
@@ -223,14 +392,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             lgr.debug(
                 "{0} is a special annex remote, no git push is needed".format(remote)
             )
-            return published, skipped
+            return
 
         lgr.info("Publishing {0} to {1}".format(ds, remote))
-
         # in order to be able to use git's config to determine what to push,
         # we need to annex merge first. Otherwise a git push might be
-        # rejected if involving all matching branches for example.
-        # Once at it, also push the annex branch right here.
+        # rejected if involving all matching branches for example
+        # even if we already fetched above we need to do it again
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
             ds.repo.fetch(remote=remote)
@@ -277,44 +445,74 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         things2push = [t for t in things2push
                        if t not in ds.config.get('remote.{}.push'.format(remote), [])]
         # now we know what to push where
-        lgr.debug("Attempt to push '%s' to sibling '%s'", things2push, remote)
-        _log_push_info(ds.repo.push(remote=remote, refspec=things2push))
-        if things2push and ds.config.get('remote.{}.push'.format(remote)):
-            # since current state of ideas is to push both auto-detected and the
-            # possibly prescribed, if anything was, let's push again to possibly
-            # push left-over prescribed ones.
-            lgr.debug("Secondary push since custom push targets provided")
-            _log_push_info(ds.repo.push(remote=remote), log_nothing=False)
-
-        published.append(ds)
-
-    late_published_data = None
-    if knew_remote_uuid is False and is_annex_repo:
-        # publish only after we tried to sync/push and if it was annex repo
-        late_published_data = _publish_data()
-        published += late_published_data
-
-    # if we published something (data, subdatasets) even though there were no
-    # diff (thus no push), or there was an additional data published later
-    if ((not diff and published) or late_published_data) \
-            and is_annex_repo:
-        # we need to do the same annex merge dance and push updated git-annex
-        # and this way also trigger post-update hook which might update
-        # web UI meta-data
-        # https://github.com/datalad/datalad/issues/1658
-        lgr.info(
-            "Obtaining remote annex info from '%s' and pushing updated",
-            remote
-        )
-        ds.repo.fetch(remote=remote)
-        ds.repo.merge_annex(remote)
-        # this will trigger post-update hook if present
-        _log_push_info(ds.repo.push(remote=remote, refspec=['git-annex']))
-
-    return published, skipped
+        status, msg = _push(ds, remote, things2push, force)
+        yield get_status_dict(ds=ds, status=status, message=msg, **kwargs)
 
 
-def _get_remote_diff(ds, paths, current_commit, remote, remote_branch_name):
+def _get_remote_info(ds_path, ds_remote_info, to, missing):
+    """Returns None if desired info was obtained, or a tuple (status, message)
+    if not"""
+    ds = Dataset(ds_path)
+    if to is None:
+        # we need an upstream remote, if there's none given. We could
+        # wait for git push to complain, but we need to explicitly
+        # figure it out for pushing annex branch anyway and we might as
+        # well fail right here.
+        track_remote, track_refspec = ds.repo.get_tracking_branch()
+        if not track_remote:
+            # no tracking remote configured, but let try one more
+            # if we only have one remote, and it has a push target
+            # configured that is "good enough" for us
+            cand_remotes = [r for r in ds.repo.get_remotes()
+                            if 'remote.{}.push'.format(r) in ds.config]
+            if len(cand_remotes) > 1:
+                lgr.warning('Target sibling ambiguous, please specific via --to')
+            elif len(cand_remotes) == 1:
+                track_remote = cand_remotes[0]
+            else:
+                return ('impossible',
+                        'No target sibling configured for default publication, '
+                        'please specific via --to')
+        if track_remote:
+            ds_remote_info[ds_path] = dict(zip(
+                ('remote', 'refspec'),
+                (track_remote, track_refspec)))
+        elif missing == 'skip':
+            ds_remote_info[ds_path] = None
+            return ('notneeded',
+                    'Cannot determine target sibling, skipping publication')
+        else:
+            # we have no remote given and no upstream
+            return 'error', 'Cannot determine a default target sibling for publication'
+    elif to not in ds.repo.get_remotes():
+        # unknown given remote
+        if missing == 'skip':
+            ds_remote_info[ds_path] = None
+            return ('notneeded',
+                    ("Unkown target sibling '%s', skipping publication", to))
+        elif missing == 'inherit':
+            superds = ds.get_superdataset()
+            if not superds:
+                return ('error',
+                        ("No super-dataset to inherit settings for remote %s", to))
+            # XXX due to difference between create-sibling and create-sibling-github
+            # would not be as transparent to inherit for -github
+            lgr.info("Will try to create a sibling inheriting settings from %s", superds)
+            # XXX explicit None as sshurl for now
+            # TODO this is not good: e.g. #1344
+            ds.create_sibling(None, name=to, inherit=True)
+            ds_remote_info[ds_path] = {'remote': to}
+        else:
+            return ('error',
+                    ("Unknown target sibling '%s' for publication", to))
+    else:
+        # all good: remote given and is known
+        ds_remote_info[ds_path] = {'remote': to}
+
+
+
+def _get_remote_diff(ds, current_commit, remote, remote_branch_name):
+#def _get_remote_diff(ds, paths, current_commit, remote, remote_branch_name):
     """Helper to check if remote has different state of the branch"""
     if remote_branch_name in ds.repo.repo.remotes[remote].refs:
         lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
@@ -322,17 +520,18 @@ def _get_remote_diff(ds, paths, current_commit, remote, remote_branch_name):
         if current_commit is None:
             current_commit = ds.repo.repo.commit()
         remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
-        if paths:
-            # if there were custom paths, we will look at the diff
-            lgr.debug("Since paths provided, looking at diff")
-            diff = current_commit.diff(
-                remote_ref,
-                paths=paths
-            )
-        else:
-            # if commits differ at all
-            lgr.debug("Since no paths provided, comparing commits")
-            diff = current_commit != remote_ref.commit
+        # XXX: ATM nothing calls this function with a non-empty `paths` arg
+        #if paths:
+        #    # if there were custom paths, we will look at the diff
+        #    lgr.debug("Since paths provided, looking at diff")
+        #    diff = current_commit.diff(
+        #        remote_ref,
+        #        paths=paths
+        #    )
+        #else:
+        # if commits differ at all
+        lgr.debug("Since no paths provided, comparing commits")
+        diff = current_commit != remote_ref.commit
     else:
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
                   remote, remote_branch_name)
@@ -410,6 +609,7 @@ class Publish(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
+            # TODO this description is no longer correct
             doc="path(s), that may point to file handle(s) to publish including "
                 "their actual content or to subdataset(s) to be published. If a "
                 "file handle is published with its data, this implicitly means "
@@ -423,6 +623,11 @@ class Publish(Interface):
             doc="""enforce doing publish activities (git push etc) regardless of
             the analysis if they seemed needed""",
             action='store_true'),
+        # TODO add option to decide what branch/repo to push
+        transfer_data=Parameter(
+            args=("--transfer-data",),
+            doc="""ADDME""",
+            constraints=EnsureChoice('auto', 'none', 'all')),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         git_opts=git_opts,
@@ -433,6 +638,7 @@ class Publish(Interface):
 
     @staticmethod
     @datasetmethod(name='publish')
+    @eval_results
     def __call__(
             path=None,
             dataset=None,
@@ -440,6 +646,7 @@ class Publish(Interface):
             since=None,
             missing='fail',
             force=False,
+            transfer_data='auto',
             recursive=False,
             recursion_limit=None,
             git_opts=None,
@@ -463,22 +670,13 @@ class Publish(Interface):
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        content_by_ds, unavailable_paths = Interface._prep(
-            path=path,
-            dataset=dataset,
-            recursive=recursive,
-            recursion_limit=recursion_limit,
-            # we do not want for this command state that we want to publish
-            # content by default by assigning paths for each sub-dataset
-            # automagically. But if paths were provided -- sorting would
-            # happen to point only to the submodules under those paths, and
-            # then to stay consistent we want to copy those paths data
-            sub_paths=bool(path)
-        )
-        if unavailable_paths:
-            raise ValueError(
-                'cannot publish content that is not available locally: %s'
-                % ', '.join(unavailable_paths))
+        if dataset and to and since == '':
+            # default behavior - only updated since last update
+            # so we figure out what was the last update
+            # XXX here we assume one to one mapping of names from local branches
+            # to the remote
+            active_branch = dataset.repo.get_active_branch()
+            since = '%s/%s' % (to, active_branch)
 
         # here is the plan
         # 1. figure out remote to publish to
@@ -488,6 +686,56 @@ class Publish(Interface):
         # 4. publish the content needed to go to the primary remote to
         #    the dependencies first, and to the primary afterwards
         ds_remote_info = {}
+
+        refds_path = Interface.get_refds_path(dataset)
+        res_kwargs = dict(refds=refds_path, logger=lgr, action='publish')
+
+        to_process = []
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                path=path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='publish',
+                unavailable_path_status='impossible',
+                nondataset_path_status='error',
+                modified=since,
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            remote_info_result = None
+            if ap.get('type', 'dataset') != 'dataset':
+                # for everything that is not a dataset get the remote info
+                # for the parent
+                parentds = ap.get('parentds', None)
+                if parentds and parentds not in ds_remote_info:
+                    remote_info_result = _get_remote_info(
+                        parentds, ds_remote_info, to, missing)
+            else:
+                # this is a dataset
+                if ap.get('state', None) == 'absent':
+                    continue
+                # get the remote info for itself
+                remote_info_result = _get_remote_info(
+                    ap['path'], ds_remote_info, to, missing)
+                ap['process_content'] = True
+            if remote_info_result is not None:
+                ap['status'] = remote_info_result[0]
+                ap['message'] = remote_info_result[1]
+                yield ap
+                continue
+            to_process.append(ap)
+
+        content_by_ds, ds_props, completed, nondataset_paths = \
+            annotated2content_by_ds(
+                to_process,
+                refds_path=refds_path,
+                path_only=False)
+        assert(not completed)
+
         lgr.debug(
             "Evaluating %i dataset publication candidate(s)",
             len(content_by_ds))
@@ -501,114 +749,45 @@ class Publish(Interface):
         content_by_ds = OrderedDict(
             (d, content_by_ds[d]) for d in sorted(content_by_ds, reverse=True)
         )
-        for ds_path in content_by_ds:
-            ds = Dataset(ds_path)
-            if to is None:
-                # we need an upstream remote, if there's none given. We could
-                # wait for git push to complain, but we need to explicitly
-                # figure it out for pushing annex branch anyway and we might as
-                # well fail right here.
-                track_remote, track_refspec = ds.repo.get_tracking_branch()
-                if not track_remote:
-                    # no tracking remote configured, but let try one more
-                    # if we only have one remote, and it has a push target
-                    # configured that is "good enough" for us
-                    cand_remotes = [r for r in ds.repo.get_remotes()
-                                    if 'remote.{}.push'.format(r) in ds.config]
-                    if len(cand_remotes) > 1:
-                        lgr.warning('Target sibling ambiguous, please specific via --to')
-                    elif len(cand_remotes) == 1:
-                        track_remote = cand_remotes[0]
-                    else:
-                        lgr.warning(
-                            'No target sibling configured for default publication, '
-                            'please specific via --to')
-                if track_remote:
-                    ds_remote_info[ds_path] = dict(zip(
-                        ('remote', 'refspec'),
-                        (track_remote, track_refspec)))
-                elif missing == 'skip':
-                    lgr.warning(
-                        'Cannot determine target sibling, skipping %s',
-                        ds)
-                    ds_remote_info[ds_path] = None
-                else:
-                    # we have no remote given and no upstream => fail
-                    raise InsufficientArgumentsError(
-                        'Cannot determine target sibling for %s' % (ds,))
-            elif to not in ds.repo.get_remotes():
-                # unknown given remote
-                if missing == 'skip':
-                    lgr.warning(
-                        "Unknown target sibling '%s', skipping %s",
-                        to, ds)
-                    ds_remote_info[ds_path] = None
-                elif missing == 'inherit':
-                    superds = ds.get_superdataset()
-                    if not superds:
-                        raise RuntimeError(
-                            "%s has no super-dataset to inherit settings for the remote %s"
-                            % (ds, to)
-                        )
-                    # XXX due to difference between create-sibling and create-sibling-github
-                    # would not be as transparent to inherit for -github
-                    lgr.info("Will try to create a sibling inheriting settings from %s", superds)
-                    # XXX explicit None as sshurl for now
-                    ds.create_sibling(None, name=to, inherit=True)
-                    ds_remote_info[ds_path] = {'remote': to}
-                else:
-                    raise ValueError(
-                        "Unknown target sibling '%s' for %s" % (to, ds))
-            else:
-                # all good: remote given and is known
-                ds_remote_info[ds_path] = {'remote': to}
-
-        if dataset and since:
-            # remove all unmodified components from the spec
-            lgr.debug(
-                "Testing %i dataset(s) for modifications since '%s'",
-                len(content_by_ds), since)
-            content_by_ds = filter_unmodified(
-                content_by_ds, dataset, since)
 
         lgr.debug("Attempt to publish %i datasets", len(content_by_ds))
-        published, skipped = [], []
         for ds_path in content_by_ds:
-            remote_info = ds_remote_info[ds_path]
-            if not remote_info:
-                # in case we are skipping
-                lgr.debug("Skipping dataset at '%s'", ds_path)
-                continue
+            remote_info = ds_remote_info.get(ds_path, None)
+            if remote_info is None:
+                # maybe this dataset wasn't annotated above, try to get info
+                # MIH: I think this entire if-branch is practically impossible
+                # to reach. It is certainly untested, but I think this is due
+                # to mutually exclusive conditions during remote_info detection
+                remote_info_result = _get_remote_info(
+                    ds_path, ds_remote_info, to, missing)
+                if remote_info_result is not None:
+                    yield get_status_dict(
+                        type='dataset',
+                        path=ds_path,
+                        status=remote_info_result[0],
+                        message=remote_info_result[1],
+                        **res_kwargs)
+                    continue
+                # continue with freshly obtained info
+                remote_info = ds_remote_info[ds_path]
+                # condition above must catch all other cases
+                assert remote_info
             # and publish
             ds = Dataset(ds_path)
-            pblsh, skp = _publish_dataset(
-                ds,
-                remote=remote_info['remote'],
-                refspec=remote_info.get('refspec', None),
-                paths=content_by_ds[ds_path],
-                annex_copy_options=annex_copy_opts,
-                force=force,
-                jobs=jobs
-            )
-            published.extend(pblsh)
-            skipped.extend(skp)
-        return published, skipped
-
-    @staticmethod
-    def result_renderer_cmdline(results, args):
-        from datalad.ui import ui
-        for res, res_label in zip(results, ('published', 'skipped')):
-            if not res:
-                if res_label == 'published':
-                    ui.message("Nothing was %s" % res_label)
-                continue
-            msg = "{n} {obj} {res_label}:\n".format(
-                obj='items were' if len(res) > 1 else 'item was',
-                n=len(res),
-                res_label=res_label)
-            for item in res:
-                if isinstance(item, Dataset):
-                    msg += "Dataset: %s\n" % item.path
-                else:
-                    msg += "File: %s\n" % item
-            ui.message(msg)
+            for r in _publish_dataset(
+                    ds,
+                    remote=remote_info['remote'],
+                    refspec=remote_info.get('refspec', None),
+                    # only send paths that were explicitly requested
+                    paths=[p for p in content_by_ds[ds_path]
+                           # do not feed (sub)dataset paths into the beast
+                           # makes no sense to try to annex copy them
+                           # for the base dataset itself let `transfer_data`
+                           # decide
+                           if p.get('type', None) != 'dataset'],
+                    annex_copy_options=annex_copy_opts,
+                    force=force,
+                    jobs=jobs,
+                    transfer_data=transfer_data,
+                    **res_kwargs):
+                yield r

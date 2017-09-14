@@ -10,7 +10,7 @@ Getting started
 Installation
 ============
 
-Unless system packages are available for your operating system (see below), Datalad 
+Unless system packages are available for your operating system (see below), DataLad
 can be installed via pip_ (**P**\ip **I**\nstalls **P**\ython). To automatically install 
 datalad and all its software dependencies type::
 
@@ -63,7 +63,7 @@ above. ``pip`` comes with Python distributions like anaconda_.
 First steps
 ===========
 
-Datalad can be queried for information about known datasets. Doing a first search 
+DataLad can be queried for information about known datasets. Doing a first search
 query, datalad automatically offers assistence to obtain a :term:`superdataset` first.
 The superdataset is a lightweight container that contains meta information about known datasets but does not contain actual data itself. 
 

@@ -113,9 +113,10 @@ class SilentConsoleLog(ConsoleLog):
         return SilentProgressBar(*args, out=self.out, **kwargs)
 
 
-def getpass_echo(prompt='Password: ', stream=None):
+def getpass_echo(prompt='Password', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
     """
+    prompt = '{}: '.format(prompt)
     if on_windows:
         # Can't do anything fancy yet, so just ask the one without echo
         return getpass.getpass(prompt=prompt, stream=stream)
@@ -167,6 +168,14 @@ class DialogUI(ConsoleLog, InteractiveUI):
                 if default is not None and x == default \
                 else x
 
+        def ask_repetition_match(msg):
+            response = getpass.getpass('{}: '.format(msg))
+            response_r = getpass.getpass('{} (repeat): '.format(msg))
+            if response != response_r:
+                return None
+            else:
+                return response
+
         if choices is not None:
             msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
         elif default is not None:
@@ -193,7 +202,13 @@ class DialogUI(ConsoleLog, InteractiveUI):
             #     # and provide per-OS handling with stdin being override
             #     response = (raw_input if PY2 else input)()
             # else:
-            response = (getpass.getpass if hidden else getpass_echo)(msg + ": ")
+            response = (ask_repetition_match if hidden else getpass_echo)(msg)
+            if response is None:
+                self.error("input mismatch, please start over")
+                continue
+            elif '\x03' in response:
+                # Ctrl-C is part of the response -> clearly we should not pretend it's all good
+                raise KeyboardInterrupt
 
             if not response and default:
                 response = default

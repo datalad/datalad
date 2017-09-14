@@ -109,4 +109,4 @@ class CrawlInit(Interface):
             from datalad.api import save
             ds = Dataset(curdir)
             ds.repo.add(configfile, git=True)
-            ds.save("committing crawl config file", files=[configfile])
+            ds.save("committing crawl config file", path=configfile)

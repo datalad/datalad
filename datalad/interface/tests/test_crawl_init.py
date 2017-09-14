@@ -8,6 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 
+from datalad.tests.utils import skip_v6
+from datalad.tests.utils import skip_direct_mode
 from nose.tools import eq_, assert_raises, assert_in
 from mock import patch
 from ...api import crawl_init
@@ -35,6 +37,8 @@ def _test_crawl_init(args, template, template_func, save, target_value, tmpdir):
             ok_clean_git(tmpdir, annex=isinstance(ds.repo, AnnexRepo))
 
 
+@skip_direct_mode  #FIXME
+@skip_v6  #FIXME
 def test_crawl_init():
     yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', False, \
           '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
@@ -53,6 +57,8 @@ def _test_crawl_init_error(args, template, template_func, target_value, tmpdir):
             assert_raises(target_value, crawl_init, args=args, template=template, template_func=template_func)
 
 
+@skip_direct_mode  #FIXME
+@skip_v6  #FIXME
 def test_crawl_init_error():
     yield _test_crawl_init_error, 'tmpdir', None, None, ValueError
     yield _test_crawl_init_error, ['dataset=Baltimore', 'pie=True'], 'openfmri', None, RuntimeError
@@ -73,6 +79,8 @@ def _test_crawl_init_error_patch(return_value, exc, exc_msg, d):
             cm.assert_called_with('openfmri', None, return_only=True, kwargs=OrderedDict([('dataset', 'Baltimore')]))
 
 
+@skip_direct_mode  #FIXME
+@skip_v6  #FIXME
 def test_crawl_init_error_patch():
     yield _test_crawl_init_error_patch, [], ValueError, "returned pipeline is empty"
     yield _test_crawl_init_error_patch, {1: 2}, ValueError, "pipeline should be represented as a list. Got: {1: 2}"

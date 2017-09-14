@@ -273,7 +273,7 @@ class Remove(Interface):
 
         for res in Save.__call__(
                 # TODO compose hand-selected annotated paths
-                files=to_save,
+                path=to_save,
                 # we might have removed the reference dataset by now, recheck
                 dataset=refds_path if GitRepo.is_valid_repo(refds_path) else None,
                 # TODO allow for custom message

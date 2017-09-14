@@ -155,7 +155,7 @@ class Create(Interface):
             action='append',
             constraints=EnsureStr() | EnsureNone(),
             doc="""Metadata type label. Must match the name of the respective
-            parser implementation in Datalad (e.g. "bids").[CMD:  This option
+            parser implementation in DataLad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
         # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
@@ -261,26 +261,26 @@ class Create(Interface):
         # just discard, we have a new story to tell
         path.pop('message', None)
         if 'parentds' in path:
-            try:
-                subds = next(
-                    sds
-                    for sds in Subdatasets.__call__(
-                        dataset=path['parentds'],
-                        # any known
-                        fulfilled=None,
-                        recursive=False,
-                        result_xfm='paths')
-                    if path_startswith(path['path'], sds)
-                )
+            subs = Subdatasets.__call__(
+                dataset=path['parentds'],
+                # any known
+                fulfilled=None,
+                recursive=False,
+                contains=path['path'],
+                result_xfm='relpaths')
+            if len(subs):
                 path.update({
                     'status': 'error',
                     'message': ('collision with known subdataset %s/ in dataset %s',
-                                relpath(subds, path['parentds']), path['parentds'])})
+                                subs[0], path['parentds'])})
                 yield path
                 return
-            except StopIteration:
-                # all good
-                pass
+
+        # TODO here we need a further test that if force=True, we need to look if
+        # there is a superdataset (regardless of whether we want to create a
+        # subdataset or not), and if that superdataset tracks anything within
+        # this directory -- if so, we need to stop right here and whine, because
+        # the result of creating a repo here will produce an undesired mess
 
         if git_opts is None:
             git_opts = {}

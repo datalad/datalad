@@ -111,7 +111,7 @@ def pipeline(bucket,
         allow_dirty=allow_dirty,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        # largefiles="exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"
         **annex_kw
     )
 
