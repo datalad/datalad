@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
+import csv
 from io import open
 from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
@@ -18,8 +19,44 @@ import logging
 lgr = logging.getLogger('datalad.meta.bids')
 
 
+# BIDS parser metadata definitions (dlp_bids:)
+vocabulary_version = '1.0'
+vocabulary = {
+    # characteristics (metadata keys)
+    "age(years)": {
+        'def': "pato:0000011",
+        'unit': "uo:0000036",  # year
+        'descr': "age of a sample (organism) at the time of data acquisition in years"},
+    "sex": {
+        'def': "pato:0000047",
+        'descr': "biological sex"},
+    # qualities (metadata values)
+    "female": {
+        'def': "pato:0000383",
+        'descr': "A biological sex quality inhering in an individual or a population that only produces gametes that can be fertilised by male gametes"},
+    "male": {
+        'def': "pato:0000384",
+        'descr': "A biological sex quality inhering in an individual or a population whose sex organs contain only male gametes"},
+}
+
+# only BIDS metadata properties that match a key in this dict will be considered
+# for reporting
+content_metakey_map = {
+    'age': 'dlp_bids:age(years)',
+    'sex': 'dlp_bids:sex',
+}
+
+sex_label_map = {
+    'female': 'dlp_bids:female',
+    'f': 'dlp_bids:female',
+    'male': 'dlp_bids:male',
+    'm': 'dlp_bids:male',
+}
+
+
 class MetadataParser(BaseMetadataParser):
-    _core_metadata_filenames = ['dataset_description.json']
+    _core_metadata_filename = 'dataset_description.json'
+    _core_metadata_filenames = [_core_metadata_filename]
 
     _key2stdkey = {
         'Name': 'name',
@@ -30,11 +67,15 @@ class MetadataParser(BaseMetadataParser):
         'Description': 'description',
     }
 
-    def _get_metadata(self, ds_identifier, meta, full):
-        core_meta_files = list(self.get_core_metadata_files())
-        if not core_meta_files:
+    def get_key_definitions(self):
+        return metakey_defs
+
+    def get_dataset_metadata(self):
+        meta = {}
+        metadata_path = opj(self.ds.path, 'dataset_description.json')
+        if not exists(metadata_path):
             return meta
-        bids = jsonload(core_meta_files[0])
+        bids = jsonload(metadata_path)
 
         # TODO maybe normalize labels of standard licenses to definition URIs
         # perform mapping
@@ -67,3 +108,30 @@ class MetadataParser(BaseMetadataParser):
         else:
             meta['conformsto'] = 'http://bids.neuroimaging.io'
         return meta
+
+    def get_content_metadata(self):
+        participants_fname = opj(self.ds.path, 'participants.tsv')
+        if exists(participants_fname):
+            with open(participants_fname, 'rb') as tsvfile:
+                # add robustness, use a sniffer
+                dialect = csv.Sniffer().sniff(tsvfile.read(1024))
+                tsvfile.seek(0)
+                for row in csv.DictReader(tsvfile, dialect=dialect):
+                    if not 'participant_id' in row:
+                        # not sure what this is, but we cannot use it
+                        break
+                    props = {}
+                    for k in row:
+                        # take away some ambiguity
+                        k = k.lower()
+                        hk = content_metakey_map.get(k, None)
+                        if hk is None:
+                            hk = 'comment[{}]'.format(k)
+                        elif hk == 'dlp_bids:sex':
+                            val = sex_label_map.get(row[k].lower(), None)
+                            if val:
+                                props[hk] = val
+                        else:
+                            props[hk] = row[k]
+                    if props:
+                        yield '^{}/.*'.format(row['participant_id']), props

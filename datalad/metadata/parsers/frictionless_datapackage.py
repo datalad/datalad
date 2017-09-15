@@ -10,6 +10,7 @@
 (http://specs.frictionlessdata.io/data-packages)
 """
 
+from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -37,7 +38,7 @@ def _compact_license(obj):
 
 
 class MetadataParser(BaseMetadataParser):
-    _core_metadata_filenames = ['datapackage.json']
+    metadatasrc_fname = 'datapackage.json'
 
     _key2stdkey = {
         'name': 'name',
@@ -48,11 +49,16 @@ class MetadataParser(BaseMetadataParser):
         'homepage': 'homepage',
     }
 
-    def _get_metadata(self, ds_identifier, meta, full):
-        core_meta_files = list(self.get_core_metadata_files())
-        if not core_meta_files:
+    def has_metadata(self):
+        metadata_path = opj(self.ds.path, self.metadatasrc_fname)
+        return exists(metadata_path)
+
+    def get_dataset_metadata(self):
+        meta = {}
+        metadata_path = opj(self.ds.path, self.metadatasrc_fname)
+        if not exists(metadata_path):
             return meta
-        foreign = jsonload(core_meta_files[0])
+        foreign = jsonload(metadata_path)
 
         for term in self._key2stdkey:
             if term in foreign:
@@ -71,3 +77,6 @@ class MetadataParser(BaseMetadataParser):
         meta['conformsto'] = 'http://specs.frictionlessdata.io/data-packages'
 
         return meta
+
+    def get_content_metadata(self):
+        return {}

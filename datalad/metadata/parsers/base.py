@@ -29,6 +29,29 @@ class BaseMetadataParser(object):
 
         self.ds = ds
 
+    def get_dataset_metadata(self):
+        """
+        Returns
+        -------
+        dict
+          keys are homogenized datalad metadata keys, values are arbitrary
+        """
+        raise NotImplementedError
+
+    def get_content_metadata(self):
+        """Get ALL metadata for all dataset content.
+
+        Returns
+        -------
+        generator((location, metadata_dict))
+        """
+        raise NotImplementedError
+
+    #######################################################################
+    ## OLD STUFF ## to be removed #########################################
+    #######################################################################
+
+    # TODO replace with NotImplementedError implementation
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
         # default implementation, override with more efficient, if possible
