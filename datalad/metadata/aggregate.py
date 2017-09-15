@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 import os
 from os import makedirs
 from os import listdir
@@ -48,12 +49,13 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from datalad.support.annexrepo import AnnexRepo
-from datalad.log import lgr
 from datalad.support.json_py import dump as jsondump
 
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import assure_list
 
+
+lgr = logging.getLogger('datalad.metadata.aggregate')
 
 location_keys = ('dataset_info', 'content_info', 'filepath_info')
 
@@ -608,7 +610,7 @@ class AggregateMetaData(Interface):
         # info on what states we just aggregated from
 
         # first, let's figure out what dataset need updating at all
-        # get adjencency info of the dataset tree spanning the base to all leave dataset
+        # get adjencency info of the dataset tree spanning the base to all leaf dataset
         # associated with the path arguments
         ds_adj = {}
         discover_dataset_trace_to_targets(ds.path, to_aggregate, [], ds_adj)
