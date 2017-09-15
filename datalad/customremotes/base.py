@@ -12,6 +12,7 @@ from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
+import inspect
 import errno
 import os
 import sys
@@ -42,6 +43,21 @@ from datalad.ui.progressbars import ProgressBarBase
 
 class AnnexRemoteQuit(Exception):
     pass
+
+
+def get_function_nargs(f):
+    while hasattr(f, 'wrapped'):
+        f = f.wrapped
+    argspec = inspect.getargspec(f)
+    assert not argspec.keywords, \
+        "ATM we have none defined with keywords, so disabling having them"
+    if argspec.varargs:
+        # Variable number of arguments
+        return -1
+    else:
+        assert argspec.args, "ATM no static methods"
+        assert argspec.args[0] == "self"
+        return len(argspec.args) - 1
 
 
 class AnnexExchangeProtocol(ProtocolInterface):
@@ -227,6 +243,25 @@ class AnnexCustomRemote(object):
         if ui.backend == 'annex':
             ui.set_specialremote(self)
 
+        # Delay introspection until the first instance gets born
+        # could in principle be done once in the metaclass I guess
+        self.__class__._introspect_req_signatures()
+
+    @classmethod
+    def _introspect_req_signatures(cls):
+        """
+        Check req_ methods to figure out expected number of arguments
+        See https://github.com/datalad/datalad/issues/1727
+        """
+        if hasattr(cls, '_req_nargs'):
+            # We have already figured it out for this class
+            return
+        cls._req_nargs = {
+            m[4:]: get_function_nargs(getattr(cls, m))
+            for m in dir(cls)
+            if m.startswith('req_')
+        }
+
     @classmethod
     def _get_custom_scheme(cls, prefix):
         """Helper to generate custom datalad URL prefixes
@@ -367,7 +402,7 @@ class AnnexCustomRemote(object):
         self.send("VERSION", SUPPORTED_PROTOCOL)
 
         while True:
-            l = self.read(n=-1)
+            l = self.read(n=1)
 
             if l is not None and not l:
                 # empty line: exit
@@ -375,6 +410,14 @@ class AnnexCustomRemote(object):
                 return
 
             req, req_load = l[0], l[1:]
+            req_nargs = self._req_nargs[req]
+            if req_load and req_nargs > 1:
+                assert len(req_load) == 1, "Could be only one due to n=1"
+                # but now we need to slice it according to the respective req
+                # We assume that at least it shouldn't start with a space
+                # since str.split would get rid of it as well, and then we should
+                # have used re.split(" ", ...)
+                req_load = req_load[0].split(None, req_nargs - 1)
 
             method = getattr(self, "req_%s" % req, None)
             if not method:

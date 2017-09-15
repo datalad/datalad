@@ -18,6 +18,7 @@ from datalad.api import subdatasets
 
 from nose.tools import eq_
 from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
@@ -164,3 +165,13 @@ def test_get_subdatasets(path):
                        result_xfm='paths'),
         [])
 
+
+@skip_direct_mode  #FIXME
+@with_tempfile
+def test_get_subdatasets_types(path):
+    from datalad.api import create
+    ds = create(path)
+    ds.create('1')
+    ds.create('true')
+    # no types casting should happen
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])

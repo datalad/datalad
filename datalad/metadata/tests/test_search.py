@@ -123,6 +123,50 @@ def _check_mocked_install(central_dspath, mock_install):
     mock_install.assert_called_once_with(central_dspath, source='///')
 
 
+# TODO renable test when /// metadata actually conforms to the new metadata
+# scheme
+#@with_tempfile
+#def test_our_metadataset_search(tdir):
+#    # smoke test for basic search operations on our super-megadataset
+#    # expensive operation but ok
+#    ds = install(
+#        path=tdir, source="///",
+#        result_xfm='datasets', return_type='item-or-list')
+#    assert list(ds.search('.', report='*', regex=True))
+#    assert list(ds.search('.', report='*'))
+#    assert list(ds.search('.', report_matched=True))
+#
+#    # there is a problem with argparse not decoding into utf8 in PY2
+#    from datalad.cmdline.tests.test_main import run_main
+#    # TODO: make it into an independent lean test
+#    from datalad.cmd import Runner
+#    out, err = Runner(cwd=tdir)('datalad search Buzsáki')
+#    assert_in('crcns/pfc-2', out)  # has it in description
+#    # and then another aspect: this entry it among multiple authors, need to
+#    # check if aggregating them into a searchable entity was done correctly
+#    assert_in('crcns/hc-1', out)
+#
+#    # TODO generator
+#    # bring this back when `search` is a new-style command
+#    raise SkipTest("Needs more testing")
+#    #import simplejson
+#    #from datalad.utils import swallow_outputs
+#    #with swallow_outputs() as cmo:
+#    #    assert list(search_('.', report='*', regex=True, format='json', dataset=ds))
+#    #    out = cmo.out
+#    ## since this one is just absorbs all first, we can't go one by one
+#    #assert simplejson.loads(out)
+#
+#    #try:
+#    #    import yaml
+#    #except ImportError:
+#    #    raise SkipTest("no yaml module")
+#    #with swallow_outputs() as cmo:
+#    #    assert list(search_('.', report='*', regex=True, format='yaml', dataset=ds))
+#    #    out = cmo.out
+#    #assert yaml.load(out)
+
+
 @with_tempfile
 def test_search_non_dataset(tdir):
     from datalad.support.gitrepo import GitRepo

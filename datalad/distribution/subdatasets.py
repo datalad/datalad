@@ -65,7 +65,11 @@ def _parse_gitmodules(dspath):
     parser = GitConfigParser(gitmodule_path)
     mods = {}
     for sec in parser.sections():
-        modpath = parser.get_value(sec, 'path', default=0)
+        try:
+            modpath = parser.get(sec, 'path')
+        except Exception:
+            lgr.debug("Failed to get '%s.path', skipping section", sec)
+            continue
         if not modpath or not sec.startswith('submodule '):
             continue
         modpath = normpath(opj(dspath, modpath))

@@ -17,6 +17,7 @@ from nose.tools import assert_raises, assert_in, assert_true, assert_false, \
     assert_not_in, assert_equal
 from nose import SkipTest
 
+from ..create_sibling_github import get_repo_url
 
 try:
     import github as gh
@@ -59,3 +60,16 @@ def test_dont_trip_over_missing_subds(path):
     assert_raises(gh.BadCredentialsException, ds1.create_sibling_github, 'bogus', recursive=True, github_login='disabledloginfortesting', existing='reconfigure')
     # return happy emptiness when all is skipped
     assert_equal(ds1.create_sibling_github('bogus', recursive=True, github_login='disabledloginfortesting', existing='skip'), [])
+
+
+def test_get_repo_url():
+    from collections import namedtuple
+    FakeRepo = namedtuple('FakeRepo', ('clone_url', 'ssh_url'))
+    https_url1 = 'https://github.com/user1/repo'
+    ssh_ri1 = 'git@github.com/user1/repo1'
+    repo1 = FakeRepo(https_url1, ssh_ri1)
+
+    assert_equal(get_repo_url(repo1, 'ssh', None), ssh_ri1)
+    assert_equal(get_repo_url(repo1, 'ssh', 'user2'), ssh_ri1)  # no support for changing
+    assert_equal(get_repo_url(repo1, 'https', None), https_url1)
+    assert_equal(get_repo_url(repo1, 'https', 'user2'), 'https://user2@github.com/user1/repo')

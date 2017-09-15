@@ -25,6 +25,7 @@ from datalad.downloaders.credentials import UserPassword
 from datalad.dochelpers import exc_str
 from datalad.utils import assure_list
 from datalad.support.param import Parameter
+from datalad.support.network import URL
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.constraints import EnsureChoice
 from datalad.support.exceptions import MissingExternalDependency
@@ -37,11 +38,20 @@ from datalad.distribution.siblings import Siblings
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
 
-def get_repo_url(repo, access_protocol):
+def get_repo_url(repo, access_protocol, github_login):
     """Report the repository access URL for Git matching the protocol"""
     prop = {
         'https': repo.clone_url,
-        'ssh': repo.ssh_url}[access_protocol]
+        'ssh': repo.ssh_url
+    }[access_protocol]
+    if access_protocol == 'https' and github_login:
+        # we were provided explicit github login.  For ssh access it is
+        # impossible to specify different login within ssh RI, but it is
+        # possible to do so for https logins
+        url = URL(prop)
+        assert url.scheme in ('http', 'https')
+        url.username = github_login
+        prop = url.as_str()
     return prop
 
 
@@ -101,7 +111,10 @@ def _get_github_entity(gh, cred, github_login, github_passwd, github_organizatio
 def _make_github_repos(
         gh, github_login, github_passwd, github_organization, rinfo, existing,
         access_protocol, dryrun):
-    cred = UserPassword('github', 'https://github.com/login')
+    # make it per user if github_login was provided. People might want to use
+    # different credentials etc
+    cred_identity = "%s@github" % github_login if github_login else "github"
+    cred = UserPassword(cred_identity, 'https://github.com/login')
 
     # determine the entity under which to create the repos
     entity = _get_github_entity(
@@ -116,6 +129,7 @@ def _make_github_repos(
         try:
             access_url, existed = _make_github_repo(
                 gh,
+                github_login,
                 entity,
                 reponame,
                 existing,
@@ -125,12 +139,17 @@ def _make_github_repos(
         except gh.BadCredentialsException as e:
             # things blew up, wipe out cred store, if anything is in it
             if cred.is_known:
+                # to avoid surprises "who ate my creds?", warn the user
+                lgr.warning(
+                    "Authentication failed, deleting stored credential %s",
+                    cred_identity
+                )
                 cred.delete()
             raise e
     return res
 
 
-def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
+def _make_github_repo(gh, github_login, entity, reponame, existing, access_protocol, dryrun):
     repo = None
     try:
         repo = entity.get_repo(reponame)
@@ -144,7 +163,7 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
 
     if repo is not None:
         if existing in ('skip', 'reconfigure'):
-            access_url = get_repo_url(repo, access_protocol)
+            access_url = get_repo_url(repo, access_protocol, github_login)
             return access_url, existing == 'skip'
         elif existing == 'error':
             msg = 'repository "{}" already exists on Github'.format(reponame)
@@ -182,7 +201,7 @@ def _make_github_repo(gh, entity, reponame, existing, access_protocol, dryrun):
         return '{}:github/.../{}'.format(access_protocol, reponame), False
     else:
         # report URL for given access protocol
-        return get_repo_url(repo, access_protocol), False
+        return get_repo_url(repo, access_protocol, github_login), False
 
 
 # presently only implemented method to turn subdataset paths into Github
@@ -293,7 +312,7 @@ class CreateSiblingGithub(Interface):
             dryrun=False):
         try:
             # this is an absolute leaf package, import locally to avoid
-            # unecessary dependencies
+            # unnecessary dependencies
             import github as gh
         except ImportError:
             raise MissingExternalDependency(
