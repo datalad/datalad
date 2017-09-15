@@ -349,13 +349,22 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
                       for ai in ds_agginfos.values()
                       for k in location_keys
                       if k in ai)
+    # TODO look for datasets that are no longer registered and remove all
+    # info about them
+
     # track which objects need to be copied
     objs2copy = []
     # for each subdataset (any depth level)
     for dpath in [ds_path] + subds_paths:
         # relative path of the currect dataset within the dataset we are updating
         drelpath = relpath(dpath, start=ds.path)
-        # build aggregate info for the current subdataset
+        # TODO figure out why `None` could be a value in the DB
+        ## build aggregate info for the current subdataset
+        #ds_dbinfo = agginfo_db.get(dpath, {})
+        #if not ds_dbinfo:
+        #    # we got nothing new, keep what we had
+        #    continue
+        #ds_dbinfo = ds_dbinfo.copy()
         ds_dbinfo = agginfo_db.get(dpath, {}).copy()
         for loclabel in location_keys:
             if loclabel == 'filepath_info' and drelpath == curdir:
@@ -384,6 +393,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
                      for k in location_keys
                      if k in ai)
     objs2remove = objlocs_was.difference(objlocs_is)
+    # TODO do we need to (double?) check if all object files exist?
+    #objs2add = [o for o in objlocs_is if exists(opj(ds_path, o))]
     objs2add = objlocs_is
 
     # secretly remove obsolete object files, not really a result from a
@@ -416,6 +427,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             # no need to unlock, just wipe out and replace
             os.remove(copy_to)
         shutil.copy(copy_from, copy_to)
+    # TODO is there any chance that this file could be gone at the end?
+    #if exists(agginfo_fpath):
     to_save.append(
         dict(path=agginfo_fpath, type='file', staged=True))
 
