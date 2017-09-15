@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
+import os
 from os import makedirs
 from os.path import dirname
 from os.path import relpath
@@ -20,9 +21,9 @@ from os.path import curdir
 from os.path import exists
 from os.path import join as opj
 from importlib import import_module
+from collections import OrderedDict
 
 from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
 from datalad.interface.results import get_status_dict
@@ -31,7 +32,8 @@ from datalad.interface.results import annexjson2result
 from datalad.interface.results import results_from_annex_noinfo
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.metadata.definitions import common_key_defs
+from datalad.metadata.definitions import common_defs
+from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
@@ -49,8 +51,10 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.utils import unique
 from datalad.utils import assure_list
+from datalad.utils import with_pathsep as _with_sep
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
+
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
@@ -58,6 +62,10 @@ valid_key = re.compile(r'^[0-9a-z._-]+$')
 
 db_relpath = opj('.datalad', 'metadata', 'dataset.json')
 agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
+
+# relative paths which to exclude from any metadata processing
+# including anything underneath them
+exclude_from_metadata = ('.datalad', '.git', '.gitmodules', '.gitattributes')
 
 
 def get_metadata_type(ds, guess=False):
@@ -194,52 +202,6 @@ class MetadataDict(dict):
                 del self[k]
 
 
-# TODO generalize to also work with file metadata
-def _merge_global_with_native_metadata(db, ds, nativetypes, mode='init'):
-    """Parse a dataset to gather its native metadata
-
-    In-place modification of `db`. Merge multiple native types
-    in the order in which they were given.
-
-    Parameters
-    ----------
-    db : dict
-    ds : Dataset
-    nativetypes : list
-    mode : {'init', 'add', 'reset'}
-    """
-    # keep local, who knows what some parsers might pull in
-    from . import parsers
-    for nativetype in nativetypes:
-        try:
-            pmod = import_module('.{}'.format(nativetype),
-                                 package=parsers.__package__)
-        except ImportError as e:
-            lgr.warning(
-                "Failed to import metadata parser for '%s', "
-                "broken dataset configuration (%s)? "
-                "This type of native metadata will be ignored: %s",
-                nativetype, ds, exc_str(e))
-            continue
-        try:
-            native_meta = pmod.MetadataParser(ds).get_global_metadata()
-        except Exception as e:
-            lgr.error('Failed to get native metadata ({}): {}'.format(
-                nativetype, exc_str(e)))
-            continue
-        if not native_meta:
-            continue
-        if not isinstance(native_meta, dict):
-            lgr.error(
-                "Metadata parser '%s' yielded something other than a dictionary "
-                "for dataset %s -- this is likely a bug, please consider "
-                "reporting it. "
-                "This type of native metadata will be ignored. Got: %s",
-                nativetype, ds, repr(native_meta))
-            continue
-        getattr(db, 'merge_{}'.format(mode))(native_meta)
-
-
 def _prep_manipulation_spec(init, add, remove, reset):
     """Process manipulation args and bring in form needed by git-annex"""
     # bring metadataset setter args in shape first
@@ -267,95 +229,326 @@ def _prep_manipulation_spec(init, add, remove, reset):
     return init, add, remove, reset, purge
 
 
-def _load_json_object(fpath):
-    obj = {}
-    if exists(fpath):
-        return jsonload(fpath, fixup=True)
+def _load_json_object(fpath, cache=None):
+    if cache is None:
+        cache = {}
+    obj = cache.get(
+        fpath,
+        jsonload(fpath, fixup=True) if exists(fpath) else {})
+    cache[fpath] = obj
     return obj
 
 
-def _query_metadata(reporton, ds, paths, merge_native, db=None, **kwargs):
-    lgr.debug(
-        'Query metadata of %s for %s at %s (merge mode: %s)',
-        ds, reporton, paths, merge_native)
-    if db is None:
-        db_path = opj(ds.path, db_relpath)
-        # TODO wrap this into a datalad native metadata parser
-        db = MetadataDict(_load_json_object(db_path))
-
-    if reporton in ('all', 'datasets'):
-        res = get_status_dict(
-            status='ok',
-            ds=ds,
-            metadata=db,
-            **kwargs)
-        if ds.id:
-            res['id'] = ds.id
-        res['shasum'] = ds.repo.get_hexsha()
-        # guessing would be expensive, and if the maintainer
-        # didn't advertise it we better not brag about it either
-        nativetypes = get_metadata_type(ds, guess=False)
-        if nativetypes and merge_native != 'none':
-            res['metadata_nativetype'] = nativetypes
-            _merge_global_with_native_metadata(
-                # TODO expose arg, include `None` to disable
-                db, ds, assure_list(nativetypes),
-                mode=merge_native)
-        yield res
-    #
-    # report on this dataset's files
-    #
-    # TODO wrap this into a git-annex metadata parser
-    if reporton in ('all', 'files') and isinstance(ds.repo, AnnexRepo):
-        for file, meta in ds.repo.get_metadata(paths):
-            meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
-                    for k, v in meta.items()}
-            r = get_status_dict(
-                status='ok',
-                path=opj(ds.path, file),
-                type='file',
-                metadata=meta,
-                parentds=ds.path,
-                **kwargs)
-            yield r
+def _get_metadatarelevant_paths(ds, subds_relpaths):
+    return [f for f in ds.repo.get_files()
+            if not any(f.startswith(_with_sep(ex)) or
+                       f == ex
+                       for ex in list(exclude_from_metadata) + subds_relpaths)]
 
 
-def _query_aggregated_metadata(reporton, ds, aps, **kwargs):
+def _get_containingds_from_agginfo(info, rpath):
+    """Return the relative path of a dataset that contains a relative query path
+
+    Parameters
+    ----------
+    info : dict
+      Content of aggregate.json (dict with relative subdataset paths as keys)
+    rpath : str
+      Relative query path
+
+    Returns
+    -------
+    str or None
+      None is returned if the is no match, the relative path of the closest
+      containing subdataset otherwise.
+    """
+    if rpath in info:
+        dspath = rpath
+    else:
+        # not a direct hit, hence we find the closest
+        # containing subdataset (if there is any)
+        containing_ds = sorted(
+            [subds for subds in sorted(info)
+             if rpath.startswith(_with_sep(subds))],
+            # TODO os.sep might not be OK on windows,
+            # depending on where it was aggregated, ensure uniform UNIX
+            # storage
+            key=lambda x: x.count(os.sep), reverse=True)
+        dspath = containing_ds[0] if len(containing_ds) else None
+    return dspath
+
+
+def _query_aggregated_metadata(reporton, ds, aps, merge_mode, **kwargs):
+    """Query the aggregated metadata in a dataset
+
+    Query paths (`aps`) have to be compose in an intelligent fashion
+    by the caller of this function, i.e. it should have been decided
+    outside which dataset to query for any given path.
+
+    Also this function doesn't cache anything, hence the caller must
+    make sure to only call this once per dataset to avoid waste.
+    """
     # TODO recursive! TODO recursion_limit (will be trickier)
-    # TODO filter by origin
+
+    # TODO rename function and query datalad/annex own metadata
+    # for all actually present dataset after looking at aggregated data
+
+    # look for and load the aggregation info for the base dataset
     info_fpath = opj(ds.path, agginfo_relpath)
     agg_base_path = dirname(info_fpath)
     agginfos = _load_json_object(info_fpath)
 
-    if reporton == 'files':
-        lgr.warning(
-            'Look-up of file-based information in aggregated metadata is not yet supported')
+    # cache once loaded metadata objects for additional lookups
+    # TODO possibly supply this cache from outside, if objects could
+    # be needed again -- there filename does not change in a superdataset
+    # if done, cache under relpath, not abspath key
+    objcache = {}
+    subds_relpaths = None
+
+    # for all query paths
     for ap in aps:
-        metadata = {}
+        metadata = MetadataDict()
+        # all metadata is registered via its relative path to the
+        # dataset that is being queried
         rpath = relpath(ap['path'], start=ds.path)
-        agginfos = agginfos.get(rpath, [])
-        for agginfo in agginfos:
+
+        containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
+        if containing_ds is None:
+            if rpath == curdir:
+                # could happen if there was no aggregated metadata at all
+                # but the queried dataset is known to be present
+                containing_ds = curdir
+            else:
+                # we know absolutely nothing, done
+                lgr.debug('%s has no metadata on %s', ds, ap['path'])
+                continue
+        # info about the dataset that contains the query path
+        dsinfo = agginfos.get(containing_ds, dict(id=ds.id))
+
+        if (rpath == curdir or rpath == containing_ds) and reporton in ('datasets', 'all'):
+            # this is a direct match for a dataset (we only have agginfos for
+            # datasets) -> prep result
             res = get_status_dict(
                 path=ap['path'],
+                type='dataset',
                 metadata=metadata,
                 **kwargs)
-            # TODO exclude by type
-            res['type'] = agginfo['type']
-            # TODO annex-get the respective object files
-            if agginfo['location']:
-                metadata.update(_load_json_object(opj(agg_base_path, agginfo['location'])))
-            if 'id' in agginfo:
-                res['id'] = agginfo['id']
-            if 'shasum' in agginfo:
-                res['shasum'] = agginfo['shasum']
+            for key in ('id', 'refcommit'):
+                if key in dsinfo:
+                    res[key] = dsinfo[key]
+            if rpath == curdir:
+                # we are querying this dataset itself, which we know to be present
+                # rerun datalad_core parser to reflect potential local
+                # modifications since the last aggregation
+                # (if there even was any ever)
+                dsmeta, _, errored = _get_metadata(
+                    ds,
+                    ['datalad_core'],
+                    'init',
+                    global_meta=True,
+                    content_meta=False)
+                if errored:
+                    res['status'] = 'error'
+                    res['message'] = errored
+                    yield res
+                    continue
+                # merge current dsmeta
+                metadata.update(dsmeta)
+            # and now blend with any previously aggregated metadata
+            objloc = dsinfo.get('dataset_info', None)
+            if objloc is not None:
+                obj = _load_json_object(
+                    opj(agg_base_path, objloc),
+                    cache=objcache)
+                getattr(metadata, 'merge_{}'.format(merge_mode))(obj)
+
+            # all info on the dataset is gathered -> eject
             res['status'] = 'ok'
             yield res
+            if reporton == 'datasets':
+                # we had a direct match on a dataset for this path, we are done
+                continue
+
+        if reporton not in ('files', 'all'):
+            continue
+
+        #
+        # everything that follows is about content metadata
+        #
+        contentinfo_objloc = dsinfo.get('content_info', None)
+
+        # content info dicts have metadata stored under paths that are relative
+        # to the dataset they were aggregated from
+        rparentpath = relpath(rpath, start=containing_ds)
+        # get the list of files to evaluate
+        # if the containing dataset is present we can get the files directly from it
+        # this is only the case if the containing dataset is '.', otherwise
+        # this query would have gone to a subdataset instead
+        filepathinfo_objloc = dsinfo.get('filepath_info', None)
+        if containing_ds == curdir:
+            if subds_relpaths is None:
+                subds_relpaths = ds.subdatasets(
+                    fulfilled=None,
+                    result_xfm='relpaths',
+                    return_type='list',
+                    result_renderer=None)
+            # we pull out ALL files at once, not just those matching the query paths
+            # because this will be much faster than doing it multiple times for
+            # multiple queries within the same dataset
+            files = _get_metadatarelevant_paths(ds, subds_relpaths)
+        elif filepathinfo_objloc:
+            files = _load_json_object(
+                opj(agg_base_path, filepathinfo_objloc),
+                cache=objcache)
+        else:
+            files = None
+
+        if files is None:
+            # no files at all, done
+            continue
+
+        # get matching files
+        files = [f for f in files
+                 if rparentpath == curdir or f == rparentpath or f.startswith(_with_sep(rparentpath))]
+
+        if not files:
+            # no relevant files or no info about them available, done
+            continue
+
+        annex_meta = {}
+        if containing_ds == curdir:
+            # we are querying this dataset itself, which we know to be present
+            # get uptodate file metadata from git-annex to reflect potential local
+            # modifications since the last aggregation
+            # (if there even was any ever)
+            from datalad.metadata.parsers.datalad_core import MetadataParser as DLCP
+            annex_meta.update(DLCP(ds).get_content_metadata(files))
+
+        # so we have some files to query, and we also have some content metadata
+        contentmeta = _load_json_object(
+            opj(agg_base_path, contentinfo_objloc),
+            cache=objcache) if contentinfo_objloc else {}
+        # content info dicts have metadata stored under paths that are relative
+        # to the dataset they were aggregated from
+        rparentpath = relpath(rpath, start=containing_ds)
+
+        for fpath in files:
+            # we might be onto something here, prepare result
+            # start with the current annex metadata for this path, if anything
+            metadata = MetadataDict(annex_meta.get(fpath, {}))
+            res = get_status_dict(
+                status='ok',
+                # the specific match within the containing dataset
+                path=opj(ds.path, containing_ds, fpath),
+                # we can only match files
+                type='file',
+                metadata=metadata,
+                **kwargs)
+
+            # loop over all records, check if path matched and merge properties
+            for pathexp in contentmeta:
+                if not re.match(pathexp, fpath):
+                    continue
+                metadata.merge_add(contentmeta[pathexp])
+
+            yield res
+
+
+def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
+    """Make a direct query of a dataset to extract its metadata.
+
+    Parameters
+    ----------
+    ds : Dataset
+    types : list
+    mode : {'init', 'add', 'reset'}
+    """
+    errored = False
+    dsmeta = MetadataDict()
+    # each item in here will be a MetadataDict, but not the whole thing
+    contentmeta = {}
+
+    if not global_meta and not content_meta:
+        return dsmeta, contentmeta, errored
+
+    # keep local, who knows what some parsers might pull in
+    from . import parsers
+    for mtype in types:
+        try:
+            pmod = import_module('.{}'.format(mtype),
+                                 package=parsers.__package__)
+        except ImportError as e:
+            lgr.warning(
+                "Failed to import metadata parser for '%s', "
+                "broken dataset configuration (%s)? "
+                "This type of metadata will be ignored: %s",
+                mtype, ds, exc_str(e))
+            errored = True
+            continue
+        parser = pmod.MetadataParser(ds)
+        #
+        # dataset global metadata
+        #
+        if global_meta:
+            try:
+                dsmeta_t = parser.get_dataset_metadata()
+            except Exception as e:
+                lgr.error('Failed to get dataset metadata ({}): {}'.format(
+                    mtype, exc_str(e)))
+                errored = True
+                # if we dont get global metadata we do not want content metadata
+                continue
+            if not isinstance(dsmeta_t, dict):
+                lgr.error(
+                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "for dataset %s -- this is likely a bug, please consider "
+                    "reporting it. "
+                    "This type of native metadata will be ignored. Got: %s",
+                    mtype, ds, repr(dsmeta_t))
+                errored = True
+            elif dsmeta_t:
+                if hasattr(pmod, 'vocabulary_version'):
+                    dsmeta_t['vocab_version_{}'.format(mtype)] = pmod.vocabulary_version
+                getattr(dsmeta, 'merge_{}'.format(merge_mode))(dsmeta_t)
+        #
+        # dataset content metadata
+        #
+        if content_meta:
+            try:
+                for loc, meta in parser.get_content_metadata():
+                    if not isinstance(meta, dict):
+                        lgr.error(
+                            "Metadata parser '%s' yielded something other than a dictionary "
+                            "for dataset %s content %s -- this is likely a bug, please consider "
+                            "reporting it. "
+                            "This type of native metadata will be ignored. Got: %s",
+                            mtype, ds, loc, repr(meta))
+                        errored = True
+                    elif meta:
+                        if loc in meta:
+                            # we already have this on record -> merge
+                            getattr(contentmeta[loc], 'merge_{}'.format(merge_mode))(meta)
+                        else:
+                            # no prior record, wrap an helper and store
+                            contentmeta[loc] = MetadataDict(meta)
+            except Exception as e:
+                lgr.error('Failed to get dataset content metadata ({}): {}'.format(
+                    mtype, exc_str(e)))
+                errored = True
+    # always force a record of our current vocabulary version
+    dsmeta['vocab_version_datalad_core'] = vocabulary_version
+
+    return dsmeta, contentmeta, errored
+
 
 # TODO: check call 'datalad metadata -a mike' (no path)
+
 
 @build_doc
 class Metadata(Interface):
     # TODO work in idea that we also access "foreign" metadata, if there is a parser
+    # TODO mention return value on metadata manipulation only reflects
+    # git-annex metadata
     """Metadata manipulation for files and whole datasets
 
     Two types of metadata are supported:
@@ -407,7 +600,6 @@ class Metadata(Interface):
     Again, the amount of metadata is not limited, but metadata is stored
     in git-annex' internal data structures in the Git repository of a
     dataset. Large amounts of metadata can slow its performance.
-
 
     || CMDLINE >>
     *Output rendering*
@@ -562,14 +754,14 @@ class Metadata(Interface):
         if show_keys:
             # to get into the ds meta branches below
             apply2global = True
-            for k in sorted(common_key_defs):
+            for k in sorted(common_defs):
                 if k.startswith('@'):
                     continue
                 ui.message('{}: {} ({})\n  {}'.format(
                     ac.color_word(k, ac.BOLD),
-                    common_key_defs[k]['def'],
+                    common_defs[k]['def'],
                     ac.color_word('builtin', ac.MAGENTA),
-                    common_key_defs[k]['descr']))
+                    common_defs[k]['descr']))
             # we need to go on with the command, because further definitions
             # could be provided in each dataset
 
@@ -578,7 +770,7 @@ class Metadata(Interface):
             # error generation happens during annotation
             path = curdir
 
-        to_process = []
+        content_by_ds = OrderedDict()
         for ap in AnnotatePaths.__call__(
                 dataset=refds_path,
                 path=path,
@@ -591,6 +783,7 @@ class Metadata(Interface):
                 nondataset_path_status='error',
                 # we need to know when to look into aggregated data
                 force_subds_discovery=True,
+                force_parentds_discovery=True,
                 return_type='generator',
                 on_failure='ignore'):
             if ap.get('status', None):
@@ -599,15 +792,20 @@ class Metadata(Interface):
                 continue
             if ap.get('type', None) == 'dataset' and GitRepo.is_valid_repo(ap['path']):
                 ap['process_content'] = True
-            to_process.append(ap)
-
-        # sort paths into datasets
-        content_by_ds, ds_props, completed, nondataset_paths = \
-            annotated2content_by_ds(
-                to_process,
-                refds_path=refds_path,
-                path_only=False)
-        assert(not completed)
+            to_query = None
+            if ap.get('state', None) == 'absent' or \
+                    ap.get('type', 'dataset') != 'dataset':
+                # this is a lonely absent dataset/file or content in a present dataset
+                # -> query through parent
+                # there must be a parent, otherwise this would be a non-dataset path
+                # and would have errored during annotation
+                to_query = ap['parentds']
+            else:
+                to_query = ap['path']
+            if to_query:
+                pcontent = content_by_ds.get(to_query, [])
+                pcontent.append(ap)
+                content_by_ds[to_query] = pcontent
 
         # first deal with the two simple cases
         if show_keys:
@@ -625,7 +823,17 @@ class Metadata(Interface):
             return
         elif not (init or purge or reset or add or remove or define_key):
             # just a query of metadata, no modification
+            # test for datasets that will be queried, but have never been aggregated
+            to_aggregate = [d for d in content_by_ds
+                            if not exists(opj(d, agginfo_relpath))]
+            if to_aggregate:
+                lgr.warning(
+                    'Metadata query results might be incomplete, initial '
+                    'metadata aggregation was not yet performed in datasets at: %s',
+                    to_aggregate)
+
             for ds_path in content_by_ds:
+                DIRECT_QUERY = False
                 ds = Dataset(ds_path)
                 # sort requested paths into available components of this dataset
                 # and into things that might be available in aggregated metadata
@@ -639,24 +847,29 @@ class Metadata(Interface):
                         # iteration
                         continue
                     else:
-                        query_ds.append(ap)
+                        (query_ds if DIRECT_QUERY else query_agg).append(ap)
                 # report directly available metadata
                 if query_ds:
-                    for r in _query_metadata(
-                            reporton,
-                            ds,
-                            [ap['path'] for ap in query_ds],
-                            merge_native,
-                            **res_kwargs):
-                        yield r
+                    pass
+                   # # TODO RF to use code form `aggregate`
+                   # for r in _query_metadata(
+                   #         reporton,
+                   #         ds,
+                   #         [ap['path'] for ap in query_ds],
+                   #         merge_native,
+                   #         **res_kwargs):
+                   #     yield r
                 if query_agg:
                     # report from aggregated metadata
                     for r in _query_aggregated_metadata(
-                            reporton, ds, query_agg, **res_kwargs):
+                            reporton, ds, query_agg, merge_native,
+                            **res_kwargs):
                         yield r
             return
         #
-        # all the rest is about modification of metadata
+        # all the rest is about modification of metadata there is no dedicated
+        # query code beyond this point, only git-annex's report on metadata status
+        # for files after modification
         #
         # iterate over all datasets, order doesn't matter
         to_save = []
@@ -722,7 +935,7 @@ class Metadata(Interface):
             #
             # validate keys (only possible once dataset-defined keys are known)
             #
-            known_keys = set(common_key_defs.keys()).union(set(defs.keys()))
+            known_keys = set(common_defs.keys()).union(set(defs.keys()))
             key_error = False
             for cat in (init, add, reset) if not permit_undefined_keys else []:
                 for k in cat if cat else []:
@@ -783,6 +996,14 @@ class Metadata(Interface):
                 to_save.append(dict(
                     path=ds.path,
                     type='dataset'))
+            # report metadata after modification
+            if define_key or (apply2global and
+                              (init or purge or reset or add or remove)):
+                yield get_status_dict(
+                    ds=ds,
+                    status='ok',
+                    metadata=db,
+                    **res_kwargs)
             #
             # file metadata manipulation
             #
@@ -807,10 +1028,10 @@ class Metadata(Interface):
                     success = success_status_map[res['status']]
                     respath_by_status[success] = \
                         respath_by_status.get(success, []) + [res['path']]
-                    if not success:
-                        # if there was success we get the full query after manipulation
-                        # at the very end
-                        yield res
+                    #if not success:
+                    #    # if there was success we get the full query after manipulation
+                    #    # at the very end
+                    yield res
                 # report on things requested that annex was silent about
                 for r in results_from_annex_noinfo(
                         ds, ds_paths, respath_by_status,
@@ -829,10 +1050,10 @@ class Metadata(Interface):
                             # unless all reports are requested
                             continue
                     yield r
-            # report metadata after modification
-            for r in _query_metadata(reporton, ds, ds_paths, merge_native,
-                                     db=db, **res_kwargs):
-                yield r
+            ## report metadata after modification
+            #for r in _query_metadata(reporton, ds, ds_paths, merge_native,
+            #                         db=db, **res_kwargs):
+            #    yield r
         #
         # save potential modifications to dataset global metadata
         #
@@ -862,7 +1083,8 @@ class Metadata(Interface):
             path=path,
             type=' ({})'.format(res['type']) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
-            meta=','.join(k for k in sorted(meta.keys()) if not k == 'tag')
+            meta=','.join(k for k in sorted(meta.keys())
+                          if not (k == 'tag' or k.startswith('vocab_version')))
                  if meta else ' -',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(assure_list(meta['tag'])))))

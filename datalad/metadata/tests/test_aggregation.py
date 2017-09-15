@@ -44,21 +44,13 @@ def test_basic_aggregate(path):
     base.metadata(sub.path, init=dict(homepage='this'), apply2global=True)
     subsub = base.create(opj('sub', 'subsub'))
     ok_clean_git(base.path)
-    # grep metadata for sub prior aggregation (which will change shasum due to
-    # injections of metadata from sub/subsub
-    direct_meta = base.metadata(sub.path, return_type='item-or-list')
-    eq_(direct_meta['metadata']['homepage'], 'this')
-    # no aggregate, comes out clean
-    base.aggregate_metadata('.', recursive=True)
-    # the fact that aggregation happened doesnt change metadata
-    eq_(base.metadata(sub.path, return_type='item-or-list')['metadata']['homepage'],
-        'this')
+    base.aggregate_metadata(recursive=True)
     ok_clean_git(base.path)
+    direct_meta = base.metadata(sub.path, return_type='item-or-list')
     # no we can throw away the subdataset tree, and loose no metadata
     base.uninstall('sub', recursive=True)
     assert(not sub.is_installed())
     ok_clean_git(base.path)
     # same result for aggregate query than for (saved) direct query
-    assert_dict_equal(
-        direct_meta,
-        base.metadata(sub.path, return_type='item-or-list'))
+    agg_meta = base.metadata(sub.path, return_type='item-or-list')
+    assert_dict_equal(direct_meta, agg_meta)

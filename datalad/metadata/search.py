@@ -111,8 +111,7 @@ def _get_search_index(index_dir, ds, schema, force_reindex,
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer()
     # load metadata of the base dataset
-    # TODO think about when to obtained files without content
-    # via `get`
+    # TODO replace this entire logic: metadata() already queries aggregate metadata
     for res in Metadata.__call__(
             dataset=ds,
             reporton='all',

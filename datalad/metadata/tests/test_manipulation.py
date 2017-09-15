@@ -36,6 +36,11 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import swallow_outputs
 
 
+def _assert_metadata_empty(meta):
+    assert (not len(meta) or meta.keys() == ['vocab_version_datalad_core']), \
+        'metadata record is not empty'
+
+
 @with_tempfile(mkdir=True)
 def test_basic_filemeta(path):
     with chpwd(path):
@@ -43,8 +48,8 @@ def test_basic_filemeta(path):
         assert_status('error', metadata(on_failure='ignore'))
         # fine with annex
         AnnexRepo('.', create=True)
-        eq_({}, metadata()[0]['metadata'])
-        eq_({}, metadata('.')[0]['metadata'])
+        _assert_metadata_empty(metadata()[0]['metadata'])
+        _assert_metadata_empty(metadata('.')[0]['metadata'])
 
     # create playing field
     create_tree(path, {'somefile': 'content', 'dir': {'deepfile': 'othercontent'}})
@@ -180,7 +185,7 @@ def test_basic_dsmeta(path):
     # ensure clean slate
     res = ds.metadata(reporton='datasets')
     assert_result_count(res, 1)
-    eq_(res[0]['metadata'], {})
+    _assert_metadata_empty(res[0]['metadata'])
     # init
     res = ds.metadata(init=['tag1', 'tag2'], apply2global=True)
     eq_(res[0]['metadata']['tag'], ['tag1', 'tag2'])
@@ -191,7 +196,7 @@ def test_basic_dsmeta(path):
     ds.metadata(reset=['tag'], apply2global=True)
     res = ds.metadata(reporton='datasets')
     assert_result_count(res, 1)
-    eq_(res[0]['metadata'], {})
+    _assert_metadata_empty(res[0]['metadata'])
     # add something arbitrary
     res = ds.metadata(add=dict(dtype=['heavy'], readme=['short', 'long']),
                       apply2global=True, on_failure='ignore')
@@ -300,34 +305,6 @@ def test_mod_hierarchy(path):
         message='cannot edit metadata of unavailable dataset')
 
 
-@with_tempfile(mkdir=True)
-def test_report_native_type(path):
-    ds = Dataset(path).create()
-    assert_not_in(
-        'native_metadata_types',
-        ds.metadata(reporton='datasets', return_type='item-or-list'))
-    # add a type config
-    ds.config.add(
-        'datalad.metadata.nativetype',
-        'schwupp',
-        where='dataset')
-    # as the metadata type is fictional there will be no parser
-    # this leads to a warning, but not to failure
-    eq_('schwupp',
-        ds.metadata(
-            reporton='datasets',
-            return_type='item-or-list')['metadata_nativetype'])
-    # add another type config
-    ds.config.add(
-        'datalad.metadata.nativetype',
-        'schwapp',
-        where='dataset')
-    eq_(('schwupp', 'schwapp'),
-        ds.metadata(
-            reporton='datasets',
-            return_type='item-or-list')['metadata_nativetype'])
-
-
 def _clean_meta(meta):
     # we don't want to worry about anything else in such a test
     [meta.pop(k, None) for k in list(meta.keys())
@@ -340,9 +317,8 @@ def _clean_meta(meta):
 })
 def test_custom_native_merge(path):
     ds = Dataset(path).create(force=True)
-    # no metadata, because no native type is configured
-    assert_dict_equal(
-        {},
+    # no metadata, because nothing is commited
+    _assert_metadata_empty(
         ds.metadata(
             reporton='datasets',
             result_xfm='metadata', return_type='item-or-list'))
@@ -351,6 +327,14 @@ def test_custom_native_merge(path):
         'datalad.metadata.nativetype',
         'bids',
         where='dataset')
+    ds.aggregate_metadata()
+    # no metadata, because still nothing is commited
+    _assert_metadata_empty(
+        ds.metadata(
+            reporton='datasets',
+            result_xfm='metadata', return_type='item-or-list'))
+    ds.add('.')
+    ds.aggregate_metadata()
     meta = ds.metadata(
         reporton='datasets',
         result_xfm='metadata', return_type='item-or-list')
@@ -397,6 +381,8 @@ def test_custom_native_merge(path):
         'datalad.metadata.nativetype',
         'frictionless_datapackage',
         where='dataset')
+    # we need to reaggregate after the config change
+    ds.aggregate_metadata(merge_native='add')
     meta = ds.metadata(
         reporton='datasets', merge_native='add',
         result_xfm='metadata', return_type='item-or-list')
@@ -416,11 +402,9 @@ def test_custom_native_merge(path):
                 'someshasum': '{"homepage": "http://top.example.com"}'},
             'aggregate.json': """\
 {
-    "sub/deep/some": [{
-        "location": "objects/someshasum",
-        "origin": "datalad",
-        "type": "dataset"
-    }]
+    "sub/deep/some": {
+        "dataset_info": "objects/someshasum"
+    }
 }
 """}},
     'sub': {
@@ -430,11 +414,9 @@ def test_custom_native_merge(path):
                     'someotherhash': '{"homepage": "http://sub.example.com"}'},
                 'aggregate.json': """\
 {
-    "deep/some": [{
-        "location": "objects/someotherhash",
-        "origin": "datalad",
-        "type": "dataset"
-    }]
+    "deep/some": {
+        "dataset_info": "objects/someotherhash"
+    }
 }
 """}}},
 })
@@ -444,7 +426,7 @@ def test_aggregate_query(path):
     # aggregated metadata
     res = ds.metadata(reporton='datasets')
     assert_result_count(res, 1)
-    eq_({}, res[0]['metadata'])
+    _assert_metadata_empty(res[0]['metadata'])
     # but we can now ask for metadata of stuff that is unknown on disk
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
