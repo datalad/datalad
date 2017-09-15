@@ -23,8 +23,6 @@ def test_has_metadata(path):
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
-    assert_equal(list(p.get_metadata_files()),
-                 [opj(path, 'datapackage.json')])
 
 
 @with_tempfile(mkdir=True)
@@ -32,7 +30,6 @@ def test_has_no_metadata(path):
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_false(p.has_metadata())
-    assert_raises(IncompleteResultsError, list, p.get_core_metadata_files())
 
 
 # bits from examples and the specs
@@ -62,7 +59,7 @@ def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
-    meta = p.get_global_metadata()
+    meta = p.get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\

@@ -23,8 +23,6 @@ def test_has_metadata(path):
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_true(p.has_metadata())
-    assert_equal(list(p.get_core_metadata_files()),
-                 [opj(path, 'dataset_description.json')])
 
 
 @with_tempfile(mkdir=True)
@@ -32,7 +30,6 @@ def test_has_no_metadata(path):
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
     assert_false(p.has_metadata())
-    assert_raises(IncompleteResultsError, list, p.get_core_metadata_files())
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -54,7 +51,7 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds).get_global_metadata()
+    meta = MetadataParser(ds).get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\
@@ -87,7 +84,7 @@ description
 def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds).get_global_metadata()
+    meta = MetadataParser(ds).get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\
@@ -111,7 +108,7 @@ description с юникодом
 """})
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds).get_global_metadata()
+    meta = MetadataParser(ds).get_dataset_metadata()
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
         dump,
