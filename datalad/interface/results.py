@@ -218,7 +218,8 @@ def annexjson2result(d, ds, **kwargs):
         res['annexkey'] = d['key']
     if 'fields' in d:
         # this is annex metadata, filter out timestamps
-        res['metadata'] = {k: v for k, v in d['fields'].items()
+        res['metadata'] = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
+                           for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     # avoid meaningless standard messages
     if 'note' in d and (
