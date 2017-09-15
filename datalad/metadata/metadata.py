@@ -17,6 +17,7 @@ import os
 from os import makedirs
 from os.path import dirname
 from os.path import relpath
+from os.path import normpath
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
@@ -314,14 +315,10 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, **kwargs):
 
         containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
         if containing_ds is None:
-            if rpath == curdir:
-                # could happen if there was no aggregated metadata at all
-                # but the queried dataset is known to be present
-                containing_ds = curdir
-            else:
-                # we know absolutely nothing, done
-                lgr.debug('%s has no metadata on %s', ds, ap['path'])
-                continue
+            # could happen if there was no aggregated metadata at all
+            # or the path is in this dataset, but luckily the queried dataset
+            # is known to be present
+            containing_ds = curdir
         # info about the dataset that contains the query path
         dsinfo = agginfos.get(containing_ds, dict(id=ds.id))
 
@@ -439,7 +436,8 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, **kwargs):
             res = get_status_dict(
                 status='ok',
                 # the specific match within the containing dataset
-                path=opj(ds.path, containing_ds, fpath),
+                # normpath() because containing_ds could be `curdir`
+                path=normpath(opj(ds.path, containing_ds, fpath)),
                 # we can only match files
                 type='file',
                 metadata=metadata,
