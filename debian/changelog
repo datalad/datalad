@@ -1,8 +1,12 @@
 datalad (0.8.1+git226-gb20e2a3c-1) neurodebian-devel; urgency=medium
 
   * New upstream snapshot from 0.8.1-226-gb20e2a3c
+  * debian/rules
+    - define WRAPT_DISABLE_EXTENSIONS=1 while running tests to overcome
+      wrapt segfaults (needs either wrapt >= 1.10.11 or patched, as in
+      neurodebian)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 13 Sep 2017 22:27:51 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 14 Sep 2017 23:39:22 -0400
 
 datalad (0.8.1-1) neurodebian; urgency=medium
 

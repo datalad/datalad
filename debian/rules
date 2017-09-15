@@ -35,6 +35,7 @@ override_dh_auto_test:
 	# setup_package placing it back into HOME
 	GIT_HOME=$(CURDIR)/build PATH=$(CURDIR)/bin:$$PATH \
 	    PYBUILD_TEST_ARGS="-s -v datalad" \
+	    WRAPT_DISABLE_EXTENSIONS=1 \
 	    dh_auto_test -- --test-nose
 
 
