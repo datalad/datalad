@@ -48,6 +48,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.json_py import dump as jsondump
 
@@ -233,22 +234,21 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     return errored
 
 
-def _adj2subtrees(base, adj):
+def _adj2subtrees(base, adj, subs):
     # given a set of parent-child mapping, compute a mapping of each parent
     # to all its (grand)children of any depth level
     subtrees = dict(adj)
-    subs = set()
+    subs = set(subs)
     # from bottom up
     for ds in sorted(adj, reverse=True):
         subtree = []
         for sub in subtrees[ds]:
-            subs.add(sub)
             subtree.append(sub)
             subtree.extend(subtrees.get(sub, []))
         subtrees[ds] = subtree
     # give each leaf dataset an entry too
     for sub in subs:
-        if sub not in subtrees:
+        if sub not in subtrees and GitRepo.is_valid_repo(sub):
             subtrees[sub] = []
     return subtrees
 
@@ -618,12 +618,7 @@ class AggregateMetaData(Interface):
         discover_dataset_trace_to_targets(ds.path, to_aggregate, [], ds_adj)
         # TODO we need to work in the info about dataset that we only got from
         # aggregated metadata, that had no trace on the file system in here!!
-        subtrees = _adj2subtrees(ds.path, ds_adj)
-        # push an empty entry for each present leaf dataset that we aggregated
-        # from -> also needs its agginfo updated
-        for d in to_aggregate:
-            if d not in subtrees:
-                subtrees[d] = []
+        subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
         # go over datasets in bottom-up fashion
         for parentds_path in sorted(subtrees, reverse=True):
             lgr.info('Update aggregate metadata in dataset at: %s', parentds_path)
