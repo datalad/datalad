@@ -37,8 +37,10 @@ from datalad.tests.utils import swallow_outputs
 
 
 def _assert_metadata_empty(meta):
-    assert (not len(meta) or meta.keys() == ['vocab_version_datalad_core']), \
-        'metadata record is not empty'
+    ignore = set(['vocab_version_datalad_core'])
+    assert (not len(meta) or set(meta.keys()) == ignore), \
+        'metadata record is not empty: {}'.format(
+            {k: v for k in meta if k not in ignore})
 
 
 @with_tempfile(mkdir=True)
