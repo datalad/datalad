@@ -81,16 +81,18 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
       A string is an error message, a list contains all absolute paths for
       all datasets on which info was put into the DB.
     """
+    info_fpath = opj(ds_path, agginfo_relpath)
+    info_basepath = dirname(info_fpath)
+    # TODO cache these
+    agginfos = _load_json_object(info_fpath)
+
     def _ensure_abs_obj_location(rec):
         # object location in the DB must be absolute so we can copy easily
         # to all relevant datasets
         for key in location_keys:
             if key in rec and not isabs(rec[key]):
-                rec[key] = opj(ds_path, agginfo_relpath, rec[key])
-
-    info_fpath = opj(ds_path, agginfo_relpath)
-    # TODO cache these
-    agginfos = _load_json_object(info_fpath)
+                rec[key] = opj(info_basepath, rec[key])
+        return rec
 
     rpath = relpath(path, start=ds_path)
     seed_ds = _get_containingds_from_agginfo(agginfos, rpath)
