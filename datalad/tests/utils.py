@@ -860,8 +860,19 @@ def skip_v6(func):
         from datalad import cfg
         version = cfg.get("datalad.repo.version", None)
         if version is not None and version == '6':
-            if cfg.obtain("datalad.tests.skipknownfailures"):
+            if cfg.obtain("datalad.tests.knownfailures.skip"):
                 raise SkipTest("TODO: Currently disabled in V6")
+            if cfg.obtain("datalad.tests.knownfailures.probe"):
+                func_failed = False
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    # we expected it to fail; all good
+                    func_failed = True
+                finally:
+                    if not func_failed:
+                        raise AssertionError("Test was marked as a known failure "
+                                             "but didn't fail")
         return func(*args, **kwargs)
     return newfunc
 
@@ -879,6 +890,18 @@ def skip_direct_mode(func):
         if direct is not None:
             if cfg.obtain("datalad.tests.skipknownfailures"):
                 raise SkipTest("TODO: Currently disabled in direct mode")
+            if cfg.obtain("datalad.tests.knownfailures.probe"):
+                func_failed = False
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    # we expected it to fail; all good
+                    func_failed = True
+                finally:
+                    if not func_failed:
+                        raise AssertionError("Test was marked as a known failure "
+                                             "but didn't fail")
+
         return func(*args, **kwargs)
     return newfunc
 

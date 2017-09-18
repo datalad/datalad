@@ -122,11 +122,17 @@ definitions = {
                'title': 'Skips SSH tests if this flag is **not** set'}),
         'type': EnsureBool(),
     },
-    'datalad.tests.skipknownfailures': {
+    'datalad.tests.knownfailures.skip': {
         'ui': ('yesno', {
                'title': 'Skips tests that are known to currently fail'}),
         'type': EnsureBool(),
         'default': 'yes',
+    },
+    'datalad.tests.knownfailures.probe': {
+        'ui': ('yesno', {
+               'title': 'Probes tests that are known to fail on whether or not they are actually still failing'}),
+        'type': EnsureBool(),
+        'default': 'no',
     },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
