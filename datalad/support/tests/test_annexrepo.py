@@ -97,6 +97,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import ProcessAnnexProgressIndicators
 from .utils import check_repo_deals_with_inode_change
 
+
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
@@ -810,6 +811,29 @@ def test_AnnexRepo_add_to_git(path):
 
     # and committed:
     ok_clean_git(repo, annex=True, ignore_submodules=True)
+
+
+@with_testrepos('submodule_annex', flavors=['clone'])
+def test_AnnexRepo_add_unexpected_direct_mode(path):
+    # tests a special case where a submodule is in direct mode, while it's
+    # superproject is not.
+    # There is no point in this test, if direct mode was enforced in the
+    # superproject already (either by test run configuration or FS) or if the
+    # repositories are in V6 by default (where there is no direct mode)
+
+    top = AnnexRepo(path)
+
+    if top.is_direct_mode() or top.config.get("annex.version") == '6':
+        raise SkipTest("Nothing to test for")
+
+    top.update_submodule('subm 1', init=True)
+    sub = AnnexRepo(opj(path, 'subm 1'))
+    sub.set_direct_mode(True)
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        top.add('.')
+        cml.assert_logged(msg="Known bug in direct mode.",
+                          level="WARNING",
+                          regex=False)
 
 
 @ignore_nose_capturing_stdout

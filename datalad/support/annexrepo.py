@@ -197,6 +197,13 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if version is None:
             version = self.config.get("datalad.repo.version", None)
+            # we might get an empty string here
+            # TODO: if we use obtain() instead, we get an error complaining
+            # '' cannot be converted to int (via Constraint as defined for
+            # "datalad.repo.version" in common_cfg
+            # => Allow conversion to result in None?
+            if not version:
+                version = None
 
         if fix_it:
             self._init(version=version, description=description)
@@ -1357,7 +1364,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_paths
     def add(self, files, git=None, backend=None, options=None, commit=False,
-            msg=None, dry_run=False,
+            msg=None,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False,
             update=False):
@@ -1376,9 +1383,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           the list of files that were added, is created by default.
         backend:
         options:
-        dry_run : bool, optional
-          Calls git add with --dry-run -N --ignore-missing, to just output list
-          of files to be added
         update: bool
           --update option for git-add. From git's manpage:
            Update the index just where it already has an entry matching
@@ -1413,95 +1417,107 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
-        if dry_run:
 
-            git_options = ['--dry-run', '-N', '--ignore-missing']
+        def _get_to_be_added_recs(paths):
+
+            if self.is_direct_mode():
+                # we already know we can't use --dry-run
+                return self._process_git_get_output(
+                    linesep.join(["'{}'".format(p) for p in paths]))
+            else:
+                # Note: if a path involves a submodule in direct mode, while we
+                # are not in direct mode at current level, we might still fail.
+                # Hence the except clause is still needed. However, this is
+                # unlikely, since direct mode usually should be used only, if it
+                # was enforced by FS and/or OS and therefore concerns the entire
+                # hierarchy.
+                _git_options = ['--dry-run', '-N', '--ignore-missing']
+                try:
+                    return super(AnnexRepo, self).add(
+                        files, git_options=_git_options, update=update)
+                except CommandError as e:
+                    if "fatal: This operation must be run in a work tree" \
+                       in e.stderr and \
+                       "fatal: 'git status --porcelain' failed in submodule" \
+                       in e.stderr:
+
+                        lgr.warning(
+                            "Known bug in direct mode."
+                            "We can't use --dry-run when there are submodules in "
+                            "direct mode, because the internal call to git status "
+                            "fails. To be resolved by using (Dataset's) status "
+                            "instead of a git-add --dry-run altogether.")
+                        # fake the return for now
+                        return self._process_git_get_output(
+                            linesep.join(["'{}'".format(f) for f in files]))
+                    else:
+                        # unexpected failure
+                        raise e
+
+        # Theoretically we could have done for git as well, if it could have
+        # been batched
+        # Call git annex add for any to have full control of either to go
+        # to git or to annex
+        # 1. Figure out what actually will be added
+        to_be_added_recs = _get_to_be_added_recs(files)
+        # collect their sizes for the progressbar
+        expected_additions = {
+            rec['file']: self.get_file_size(rec['file'])
+            for rec in to_be_added_recs
+        }
+
+        # if None -- leave it to annex to decide
+        if git is not None:
+            if 'annex.version' in self.config and \
+                    self.config.getint("annex", "version") == 6:
+                # Note: For now ugly workaround to prevent unexpected
+                # outcome when adding to git. See:
+                # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
+                lgr.warning("Workaround: Wait for {} to add to git ({})."
+                            "".format(files, self))
+                time.sleep(1)
+
+            options += [
+                '-c',
+                'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
+            ]
+            if git:
+                # to maintain behaviour similar to git
+                options += ['--include-dotfiles']
+
+        if git and update:
+            # explicitly use git-add with --update instead of git-annex-add
+            # TODO: This might still need some work, when --update AND files
+            # are specified!
+            if self.is_direct_mode():
+                self.GIT_DIRECT_MODE_PROXY = True
             try:
                 return_list = super(AnnexRepo, self).add(
-                    files, git_options=git_options, update=update)
-            except CommandError as e:
-                if "fatal: This operation must be run in a work tree" \
-                   in e.stderr and \
-                   "fatal: 'git status --porcelain' failed in submodule" \
-                   in e.stderr:
-
-                    lgr.warning(
-                        "Known bug in direct mode."
-                        "We can't use --dry-run when there are submodules in "
-                        "direct mode, because the internal call to git status "
-                        "fails. To be resolved by using (Dataset's) status "
-                        "instead of a git-add --dry-run altogether.")
-                    # fake the return for now
-                    return_list = self._process_git_get_output(
-                        linesep.join(["'{}'".format(f) for f in files]))
-                else:
-                    # unexpected failure
-                    raise e
-        else:
-            # Theoretically we could have done for git as well, if it could have
-            # been batched
-            # Call git annex add for any to have full control of either to go
-            # to git or to annex
-            # 1. Figure out what actually will be added
-            to_be_added_recs = self.add(files, git=True, dry_run=True)
-            # collect their sizes for the progressbar
-            expected_additions = {
-                rec['file']: self.get_file_size(rec['file'])
-                for rec in to_be_added_recs
-            }
-
-            # if None -- leave it to annex to decide
-            if git is not None:
-                if 'annex.version' in self.config and \
-                        self.config.getint("annex", "version") == 6:
-                    # Note: For now ugly workaround to prevent unexpected
-                    # outcome when adding to git. See:
-                    # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
-                    lgr.warning("Workaround: Wait for {} to add to git ({})."
-                                "".format(files, self))
-                    time.sleep(1)
-
-                options += [
-                    '-c',
-                    'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
-                ]
-                if git:
-                    # to maintain behaviour similar to git
-                    options += ['--include-dotfiles']
-
-            if git and update:
-                # explicitly use git-add with --update instead of git-annex-add
-                # TODO: This might still need some work, when --update AND files
-                # are specified!
+                                           files,
+                                           # Note: committing is dealed with
+                                           # later on
+                                           commit=False,
+                                           msg=msg,
+                                           git=True,
+                                           git_options=git_options,
+                                           _datalad_msg=_datalad_msg,
+                                           update=update)
+            finally:
                 if self.is_direct_mode():
-                    self.GIT_DIRECT_MODE_PROXY = True
-                try:
-                    return_list = super(AnnexRepo, self).add(
-                                               files,
-                                               # Note: committing is dealed with
-                                               # later on
-                                               commit=False,
-                                               msg=msg,
-                                               git=True,
-                                               git_options=git_options,
-                                               _datalad_msg=_datalad_msg,
-                                               update=update)
-                finally:
-                    if self.is_direct_mode():
-                        # don't accidentally cause other git calls to be done
-                        # via annex-proxy
-                        self.GIT_DIRECT_MODE_PROXY = False
+                    # don't accidentally cause other git calls to be done
+                    # via annex-proxy
+                    self.GIT_DIRECT_MODE_PROXY = False
 
-            else:
-                return_list = list(self._run_annex_command_json(
-                    'add',
-                    args=options + files,
-                    backend=backend,
-                    expect_fail=True,
-                    jobs=jobs,
-                    expected_entries=expected_additions,
-                    expect_stderr=True
-                ))
+        else:
+            return_list = list(self._run_annex_command_json(
+                'add',
+                args=options + files,
+                backend=backend,
+                expect_fail=True,
+                jobs=jobs,
+                expected_entries=expected_additions,
+                expect_stderr=True
+            ))
 
         if commit:
             if msg is None:
@@ -2588,9 +2604,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     else:
                         options = ["--allow-empty-message"]
 
-                # committing explicitly given paths in direct mode via proxy used to
-                # fail, because absolute paths are used. Using annex proxy this
-                # leads to an error (path outside repository)
+                # committing explicitly given paths in direct mode via proxy
+                # used to fail, because absolute paths are used. Using annex
+                # proxy this leads to an error (path outside repository)
                 if files:
                     files = assure_list(files)
                     if options is None:
