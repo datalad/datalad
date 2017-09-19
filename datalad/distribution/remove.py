@@ -30,6 +30,8 @@ from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import save_message_opt
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -83,6 +85,8 @@ class Remove(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         check=check_argument,
+        save=nosave_opt,
+        message=save_message_opt,
         if_dirty=if_dirty_opt,
     )
 
@@ -94,6 +98,8 @@ class Remove(Interface):
             dataset=None,
             recursive=False,
             check=True,
+            save=True,
+            message=None,
             if_dirty='save-before'):
         res_kwargs = dict(action='remove', logger=lgr)
         if not dataset and not path:
@@ -270,15 +276,18 @@ class Remove(Interface):
         if not to_save:
             # nothing left to do, potentially all errored before
             return
+        if not save:
+            lgr.debug('Not calling `save` as instructed')
+            return
 
         for res in Save.__call__(
                 # TODO compose hand-selected annotated paths
                 path=to_save,
                 # we might have removed the reference dataset by now, recheck
-                dataset=refds_path if GitRepo.is_valid_repo(refds_path) else None,
-                # TODO allow for custom message
-                #message=message if message else '[DATALAD] removed content',
-                message='[DATALAD] removed content',
+                dataset=refds_path
+                        if (refds_path and GitRepo.is_valid_repo(refds_path))
+                        else None,
+                message=message if message else '[DATALAD] removed content',
                 return_type='generator',
                 result_xfm=None,
                 result_filter=None,

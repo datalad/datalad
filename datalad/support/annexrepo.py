@@ -197,6 +197,13 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if version is None:
             version = self.config.get("datalad.repo.version", None)
+            # we might get an empty string here
+            # TODO: if we use obtain() instead, we get an error complaining
+            # '' cannot be converted to int (via Constraint as defined for
+            # "datalad.repo.version" in common_cfg
+            # => Allow conversion to result in None?
+            if not version:
+                version = None
 
         if fix_it:
             self._init(version=version, description=description)

@@ -484,8 +484,8 @@ class CreateSibling(Interface):
                 name)
 
         if since == '':
-            # default behavior - only updated since last update
-            # so we figure out what was the last update
+            # consider creating siblings only since the point of
+            # the last update
             # XXX here we assume one to one mapping of names from local branches
             # to the remote
             active_branch = ds.repo.get_active_branch()
