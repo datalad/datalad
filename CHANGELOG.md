@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.9.0 (Sep 13, 2017) -- isn't it a lucky day even though not a Friday?
+## 0.9.0 (Sep 19, 2017) -- isn't it a lucky day even though not a Friday?
 
 ### Major refactoring and deprecations
 
@@ -31,6 +31,8 @@ We would recommend to consult log of the
 - [remove] doesn't remove when some files of a dataset could not be dropped
 - [publish] 
   - no longer hides error during a repository push
+  - publish behaves "correctly" for `--since=` in considering only the
+    differences the last "pushed" state
   - data transfer handling while publishing with dependencies, to github
 - improved robustness with broken Git configuration
 - [search] should search for unicode strings correctly and not crash
