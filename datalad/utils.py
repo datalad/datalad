@@ -372,6 +372,27 @@ def encode_filename(filename):
     else:
         return filename
 
+
+def decode_input(s):
+    """Given input string/bytes, decode according to stdin codepage (or UTF-8)
+    if not defined
+
+    If fails -- issue warning and decode allowing for errors
+    being replaced
+    """
+    if isinstance(s, text_type):
+        return s
+    else:
+        encoding = sys.stdin.encoding or 'UTF-8'
+        try:
+            return s.decode(encoding)
+        except UnicodeDecodeError as exc:
+            lgr.warning(
+                "Failed to decode input string using %s encoding. "
+                "Decoding allowing for errors", encoding)
+            return s.decode(encoding, errors='replace')
+
+
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
