@@ -353,8 +353,10 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
         if recursive:
             # in case of recursion this is also anything in any dataset underneath
             # the query path
-            matching_subds = [(sub, sub) for sub in agginfos
-                              if sub.startswith(_with_sep(rpath))]
+            matching_subds = [(sub, sub) for sub in sorted(agginfos)
+                              # we already have the base dataset
+                              if (rpath == curdir and sub != curdir) or
+                              sub.startswith(_with_sep(rpath))]
             to_query.extend(matching_subds)
 
         for qds, qpath in to_query:
