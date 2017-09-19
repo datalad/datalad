@@ -849,30 +849,123 @@ def skip_ssh(func):
     return newfunc
 
 
-def skip_v6(func):
-    """Skips tests if datalad is configured to use v6 mode
-    (DATALAD_REPO_VERSION=6)
+# ### ###
+# START known failure decorators
+# ### ###
 
-    Skipping can be overridden by disabling 'datalad.tests.skipknownfailures'.
+def probe_known_failure(func):
+    """Test decorator allowing the test to pass when it fails and vice versa
+
+    Setting config datalad.tests.knownfailures.probe to True tests, whether or
+    not the test is still failing. If it's not, an AssertionError is raised in
+    order to indicate that the reason for failure seems to be gone.
     """
+
     @wraps(func)
     def newfunc(*args, **kwargs):
         from datalad import cfg
-        version = cfg.get("datalad.repo.version", None)
-        if version is not None and version == '6':
-            if cfg.obtain("datalad.tests.knownfailures.skip"):
-                raise SkipTest("TODO: Currently disabled in V6")
-            if cfg.obtain("datalad.tests.knownfailures.probe"):
-                func_failed = False
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    # we expected it to fail; all good
-                    func_failed = True
-                finally:
-                    if not func_failed:
-                        raise AssertionError("Test was marked as a known failure "
-                                             "but didn't fail")
+        if cfg.obtain("datalad.tests.knownfailures.probe"):
+            assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
+            # Note: Since assert_raises lacks a `msg` argument, a comment
+            # in the same line is helpful to determine what's going on whenever
+            # this assertion fails and we see a trace back. Otherwise that line
+            # wouldn't be very telling.
+        else:
+            return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_known_failure(func):
+    """Test decorator allowing to skip a test that is known to fail
+
+    Setting config datalad.tests.knownfailures.skip to a bool enables/disables
+    skipping.
+    """
+    from datalad import cfg
+
+    @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
+             msg="Skip test known to fail")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure(func):
+    """Test decorator marking a test as known to fail
+
+    This combines `probe_known_failure` and `skip_known_failure` giving the
+    skipping precedence over the probing.
+    """
+
+    @skip_known_failure
+    @probe_known_failure
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure_v6(func):
+    """Test decorator marking a test as known to fail in a v6 test run
+
+    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
+    the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    version = cfg.obtain("datalad.repo.version")
+    if version and version == 6:
+
+        @known_failure
+        @wraps(func)
+        def v6_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return v6_func
+
+    return func
+
+
+def known_failure_direct_mode(func):
+    """Test decorator marking a test as known to fail in a direct mode test run
+
+    If datalad.repo.direct is set to True behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    if direct:
+
+        @known_failure
+        @wraps(func)
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+
+    return func
+
+
+# ### ###
+# END known failure decorators
+# ### ###
+
+
+def skip_v6(func):
+    """Skips tests if datalad is configured to use v6 mode
+    (DATALAD_REPO_VERSION=6)
+    """
+
+    from datalad import cfg
+    version = cfg.obtain("datalad.repo.version")
+
+    @skip_if(version == 6)
+    @wraps(func)
+    def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
@@ -880,28 +973,13 @@ def skip_v6(func):
 def skip_direct_mode(func):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
-
-    Skipping can be overridden by disabling 'datalad.tests.skipknownfailures'.
     """
+
+    from datalad import cfg
+
+    @skip_if(cfg.obtain("datalad.repo.direct"))
     @wraps(func)
     def newfunc(*args, **kwargs):
-        from datalad import cfg
-        direct = cfg.get("datalad.repo.direct", None)
-        if direct is not None:
-            if cfg.obtain("datalad.tests.skipknownfailures"):
-                raise SkipTest("TODO: Currently disabled in direct mode")
-            if cfg.obtain("datalad.tests.knownfailures.probe"):
-                func_failed = False
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    # we expected it to fail; all good
-                    func_failed = True
-                finally:
-                    if not func_failed:
-                        raise AssertionError("Test was marked as a known failure "
-                                             "but didn't fail")
-
         return func(*args, **kwargs)
     return newfunc
 
@@ -950,6 +1028,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
             reraise(*exc_info)
 
     return newfunc
+
 
 @optional_args
 def run_under_dir(func, newdir='.'):
