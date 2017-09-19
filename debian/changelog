@@ -1,8 +1,8 @@
-datalad (0.9.0-1) neurodebian; urgency=medium
+datalad (0.9.0-1) unstable; urgency=medium
 
   * Fresh to be release
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 18 Sep 2017 22:36:27 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 19 Sep 2017 09:15:12 -0400
 
 datalad (0.8.1+git226-gb20e2a3c-1) neurodebian-devel; urgency=medium
 
