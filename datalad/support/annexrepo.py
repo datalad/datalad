@@ -1436,10 +1436,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return super(AnnexRepo, self).add(
                         files, git_options=_git_options, update=update)
                 except CommandError as e:
-                    if "fatal: This operation must be run in a work tree" \
-                       in e.stderr and \
-                       "fatal: 'git status --porcelain' failed in submodule" \
-                       in e.stderr:
+                    if re.match(
+                            r'.*This operation must be run in a work tree.*git status.*failed in submodule',
+                            e.stderr,
+                            re.MULTILINE | re.DOTALL):
 
                         lgr.warning(
                             "Known bug in direct mode."
