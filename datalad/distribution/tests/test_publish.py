@@ -352,7 +352,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # since published to origin -- destination should not get that file
     nok_(lexists(opj(sub2_target.path, 'file.dat')))
     res_ = publish(dataset=source, to='target', recursive=True)
-    assert_status(('ok', 'notneeded'), res)
+    assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 1, status='ok', path=sub2.path, type='dataset')
     assert_result_count(res_, 0, path=opj(sub2.path, 'file.dat'), type='file')
 
@@ -374,6 +374,19 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     ok_(sub2_target.file_has_content('file.dat'))
     assert_result_count(
         res_, 1, status='ok', path=opj(sub2.path, 'file.dat'))
+
+    # Let's save those present changes and publish while implying "since last
+    # merge point"
+    source.save(message="Changes in subm2")
+    # and test if it could deduce the remote/branch to push to
+    source.config.set('branch.master.remote', 'target', where='local')
+    with chpwd(source.path):
+        res_ = publish(since='', recursive=True)
+    # TODO: somehow test that there were no even attempt to diff within "subm 1"
+    # since if `--since=''` worked correctly, nothing has changed there and it
+    # should have not been even touched
+    assert_status(('ok', 'notneeded'), res_)
+    assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
