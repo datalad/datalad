@@ -40,7 +40,6 @@ def _test_crawl_init(args, template, template_func, save, target_value, tmpdir):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_crawl_init():
     yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', False, \
           '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
@@ -48,7 +47,8 @@ def test_crawl_init():
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n\n'
     yield _test_crawl_init, ['dataset=ds000001', 'versioned_urls=True'], 'openfmri', None, False, \
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n_versioned_urls = True\n\n'
-    yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', True, \
+    #FIXME:
+    yield known_failure_v6(_test_crawl_init), None, 'openfmri', 'superdataset_pipeline', True, \
           '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
 
 
@@ -60,7 +60,6 @@ def _test_crawl_init_error(args, template, template_func, target_value, tmpdir):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_crawl_init_error():
     yield _test_crawl_init_error, 'tmpdir', None, None, ValueError
     yield _test_crawl_init_error, ['dataset=Baltimore', 'pie=True'], 'openfmri', None, RuntimeError
@@ -82,7 +81,6 @@ def _test_crawl_init_error_patch(return_value, exc, exc_msg, d):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_crawl_init_error_patch():
     yield _test_crawl_init_error_patch, [], ValueError, "returned pipeline is empty"
     yield _test_crawl_init_error_patch, {1: 2}, ValueError, "pipeline should be represented as a list. Got: {1: 2}"
