@@ -121,12 +121,14 @@ matrix:
     - _DATALAD_NONPR_ONLY=1
   - python: 2.7
     # test whether known v6 failures still fail
+    env:
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
   - python: 2.7
     # test whether known direct mode failures still fail
+    env:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
