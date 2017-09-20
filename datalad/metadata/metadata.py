@@ -47,6 +47,7 @@ from datalad.support.json_py import load as jsonload
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import merge_native_opt
+from datalad.interface.common_opts import reporton_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -364,6 +365,10 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
                     ds, agginfos, agg_base_path, qpath, qds, reporton,
                     cache, merge_mode):
                 r.update(kwargs)
+                # if we are coming from `search` we want to record why this is being
+                # reported
+                if 'query_matched' in ap:
+                    r['query_matched'] = ap['query_matched']
                 yield r
                 reported.add(qpath)
 
@@ -765,16 +770,7 @@ class Metadata(Interface):
             given metadata for all files in a dataset, whereas with
             this flag only the metadata record of the dataset itself
             will be altered."""),
-        reporton=Parameter(
-            args=('--reporton',),
-            metavar='TYPE',
-            doc="""choose on what type metadata will be reported for
-            the requested paths: dataset-global metadata ('datasets'),
-            file-based metadata ('files'), any available metadata
-            ('all'), or no metadata ('none'; useful when metadata
-            is modified, but the resulting state does not need to be
-            reported).""",
-            constraints=EnsureChoice('all', 'datasets', 'files', 'none')),
+        reporton=reporton_opt,
         merge_native=merge_native_opt,
         recursive=recursion_flag,
         recursion_limit=recursion_limit)
