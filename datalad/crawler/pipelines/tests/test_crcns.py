@@ -7,8 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from .utils import _test_smoke_pipelines
 from ..crcns import pipeline, superdataset_pipeline
 from ..crcns import get_metadata
@@ -17,8 +19,8 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import ok_startswith
 
 
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus', "bogusgroup"]
     yield _test_smoke_pipelines, superdataset_pipeline, []

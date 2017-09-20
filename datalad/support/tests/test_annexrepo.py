@@ -10,7 +10,8 @@
 
 """
 
-from datalad.tests.utils import skip_v6
+from datalad.tests.utils import known_failure_v6
+
 import logging
 from functools import partial
 import os
@@ -235,7 +236,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_file_key(src, annex_path):
 
     ar = AnnexRepo.clone(src, annex_path)
@@ -263,7 +264,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
 
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_outofspace(annex_path):
     ar = AnnexRepo(annex_path, create=True)
 
@@ -282,7 +283,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
 
 
 @with_testrepos('basic_annex', flavors=['local'])
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_remote_na(path):
     ar = AnnexRepo(path)
 
@@ -300,7 +301,7 @@ def test_AnnexRepo_get_remote_na(path):
 @with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     ar = AnnexRepo.clone(src, annex_path, direct=direct)
     testfiles = ["test-annex.dat", "test.dat"]
@@ -599,7 +600,7 @@ def test_AnnexRepo_backend_option(path, url):
 
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
     AnnexRepo(src)
@@ -722,7 +723,7 @@ def test_AnnexRepo_commit(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_annex(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -776,7 +777,7 @@ def test_AnnexRepo_add_to_annex(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_git(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -841,7 +842,7 @@ def test_AnnexRepo_add_unexpected_direct_mode(path):
 @with_testrepos('.*annex.*', flavors=['local'])
 # TODO: flavor 'network' has wrong content for test-annex.dat!
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get(src, dst):
 
     annex = AnnexRepo.clone(src, dst)
@@ -916,7 +917,7 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
             os.path.realpath(opj(annex.path, key_location)))
 
 
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_contentlocation():
     for batch in (False, True):
         yield _test_AnnexRepo_get_contentlocation, batch
@@ -1186,7 +1187,7 @@ def test_repo_version(path1, path2, path3):
 
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_annex_copy_to(origin, clone):
     repo = AnnexRepo(origin, create=False)
     remote = AnnexRepo.clone(origin, clone, create=True)
@@ -1259,7 +1260,7 @@ def test_annex_copy_to(origin, clone):
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_annex_drop(src, dst):
     ar = AnnexRepo.clone(src, dst)
     testfile = 'test-annex.dat'
@@ -1588,7 +1589,7 @@ def test_AnnexRepo_flyweight(path1, path2):
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
 
     reporeal = realpath(repo)
@@ -1623,7 +1624,7 @@ def test_AnnexRepo_update_submodule():
     raise SkipTest("TODO")
 
 
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
 
@@ -2132,7 +2133,7 @@ def test_change_description(path):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
@@ -2152,7 +2153,7 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_AnnexRepo_get_tracking_branch(path):
 
     ar = AnnexRepo(path)

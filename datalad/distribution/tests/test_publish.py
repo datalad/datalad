@@ -9,8 +9,10 @@
 
 """
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import logging
 import os
 from os.path import join as opj
@@ -101,8 +103,8 @@ def test_smth_about_not_supported(p1, p2):
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -227,8 +229,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
     # we will be publishing back to origin, so to not alter testrepo
@@ -395,8 +397,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
@@ -489,8 +491,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 @with_tempfile()
 @with_tempfile()
 @with_tempfile()
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_depends(
         origin,
         src_path,
@@ -570,7 +572,7 @@ def test_publish_depends(
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_gh1426(origin_path, target_path):
     # set up a pair of repos, one the published copy of the other
     origin = create(origin_path)
@@ -599,7 +601,7 @@ def test_gh1426(origin_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_gh1691(origin, src_path, dst_path):
 
     # prepare src; no subdatasets installed, but mount points present
@@ -631,7 +633,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
@@ -648,7 +650,7 @@ def test_publish_target_url(src, desttop, desturl):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_gh1763(src, target1, target2):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763

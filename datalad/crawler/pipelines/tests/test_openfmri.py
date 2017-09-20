@@ -7,8 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from glob import glob
 from os.path import join as opj
@@ -206,8 +208,8 @@ _versioned_files = """
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     index_html = opj(ind, 'ds666', 'index.html')
 
@@ -437,8 +439,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 )
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 

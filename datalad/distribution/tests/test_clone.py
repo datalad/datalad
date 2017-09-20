@@ -10,8 +10,10 @@
 """
 
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -122,7 +124,7 @@ def test_clone_datasets_root(tdir):
 
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_clone_simple_local(src, path):
     origin = Dataset(path)
 
@@ -165,7 +167,7 @@ def test_clone_simple_local(src, path):
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')
@@ -217,7 +219,7 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)

@@ -7,7 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
 import os
 from glob import glob
 from os.path import join as opj, exists
@@ -54,7 +55,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 )
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
 
     list(initiate_dataset(

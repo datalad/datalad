@@ -8,7 +8,8 @@
 """Test create testdataset helpers
 
 """
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
 from glob import glob
 from os.path import join as opj
 
@@ -37,7 +38,7 @@ def test_parse_spec():
     eq_(_parse_spec(''), [])
 
 
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_create_test_dataset():
     # rudimentary smoke test
     from datalad.api import create_test_dataset
@@ -49,7 +50,7 @@ def test_create_test_dataset():
         ok_(len(glob(opj(ds, 'file*'))))
 
 
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_create_1test_dataset():
     # and just a single dataset
     from datalad.api import create_test_dataset
@@ -60,7 +61,7 @@ def test_create_1test_dataset():
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_new_relpath(topdir):
     from datalad.api import create_test_dataset
     with swallow_logs(), chpwd(topdir), swallow_outputs():
@@ -72,7 +73,7 @@ def test_new_relpath(topdir):
 
 
 @with_tempfile()
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_hierarchy(topdir):
     # GH 1178
     from datalad.api import create_test_dataset
