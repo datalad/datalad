@@ -963,7 +963,7 @@ def skip_v6(func):
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6)
+    @skip_if(version == 6, msg="Skip test in v6 test run")
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -977,7 +977,8 @@ def skip_direct_mode(func):
 
     from datalad import cfg
 
-    @skip_if(cfg.obtain("datalad.repo.direct"))
+    @skip_if(cfg.obtain("datalad.repo.direct"),
+             msg="Skip test in direct mode test run")
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)

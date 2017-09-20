@@ -16,6 +16,8 @@ from appdirs import AppDirs
 from os.path import join as opj
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
+from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureChoice
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -126,13 +128,13 @@ definitions = {
         'ui': ('yesno', {
                'title': 'Skips tests that are known to currently fail'}),
         'type': EnsureBool(),
-        'default': 'yes',
+        'default': True,
     },
     'datalad.tests.knownfailures.probe': {
         'ui': ('yesno', {
                'title': 'Probes tests that are known to fail on whether or not they are actually still failing'}),
         'type': EnsureBool(),
-        'default': 'no',
+        'default': False,
     },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
@@ -206,11 +208,13 @@ definitions = {
                'title': 'Direct Mode for git-annex repositories',
                'text': 'Set this flag to create annex repositories in direct mode by default'}),
         'type': EnsureBool(),
+        'default': False,
     },
     'datalad.repo.version': {
         'ui': ('question', {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
+        'default': 5,
     },
 }

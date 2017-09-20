@@ -836,8 +836,10 @@ def test_AnnexRepo_add_unexpected_direct_mode(path):
                           regex=False)
 
 
+
 @ignore_nose_capturing_stdout
-@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_testrepos('.*annex.*', flavors=['local'])
+# TODO: flavor 'network' has wrong content for test-annex.dat!
 @with_tempfile
 @skip_v6  #FIXME
 def test_AnnexRepo_get(src, dst):
