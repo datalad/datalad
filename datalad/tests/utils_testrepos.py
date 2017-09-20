@@ -172,9 +172,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
         for s in ('subm 1', 'subm 2'):
-            self.repo._git_custom_command(
-                '', ['git', 'annex', 'init'],
-                cwd=opj(self.path, s), expect_stderr=True)
+            AnnexRepo(opj(self.path, s), init=True)
 
 
 class NestedDataset(BasicAnnexTestRepo):
@@ -201,9 +199,7 @@ class NestedDataset(BasicAnnexTestRepo):
             cwd=self.path, **kw)
         # init all annexes
         for s in ('', 'sub dataset1', opj('sub dataset1', 'sub sub dataset1')):
-            self.repo._git_custom_command(
-                '', ['git', 'annex', 'init'],
-                cwd=opj(self.path, s), expect_stderr=True)
+            AnnexRepo(opj(self.path, s), init=True)
 
 
 class InnerSubmodule(object):
