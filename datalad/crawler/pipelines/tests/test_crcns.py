@@ -20,7 +20,6 @@ from datalad.tests.utils import ok_startswith
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus', "bogusgroup"]
     yield _test_smoke_pipelines, superdataset_pipeline, []

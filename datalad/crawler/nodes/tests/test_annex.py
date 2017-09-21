@@ -172,10 +172,9 @@ def _test_annex_file(mode, topdir, topurl, outdir):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
-        yield _test_annex_file, mode
+        yield known_failure_v6(_test_annex_file), mode  #FIXME
 
 
 @assert_cwd_unchanged()  # we are passing annex, not chpwd
@@ -221,7 +220,6 @@ def _test_add_archive_content_tar(direct, repo_path):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct
