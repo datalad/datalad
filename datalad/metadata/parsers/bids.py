@@ -67,9 +67,6 @@ class MetadataParser(BaseMetadataParser):
         'Description': 'description',
     }
 
-    def get_key_definitions(self):
-        return metakey_defs
-
     def get_dataset_metadata(self):
         meta = {}
         metadata_path = opj(self.ds.path, 'dataset_description.json')
