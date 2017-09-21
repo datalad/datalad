@@ -539,7 +539,6 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
 
 
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_target_ssh_inherit():
     # TODO: waits for resolution on
     #   https://github.com/datalad/datalad/issues/1274

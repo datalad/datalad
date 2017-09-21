@@ -181,7 +181,6 @@ def test_uninstall_git_file(path):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_uninstall_subdataset(src, dst):
 
     ds = install(dst, source=src, recursive=True)

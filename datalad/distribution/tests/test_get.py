@@ -406,7 +406,6 @@ def test_get_mixed_hierarchy(src, path):
 
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_autoresolve_multiple_datasets(src, path):
     with chpwd(path):
         ds1 = install(

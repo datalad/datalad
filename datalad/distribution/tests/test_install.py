@@ -223,9 +223,9 @@ def test_install_datasets_root(tdir):
             assert_in("already exists and not empty", str(cme))
 
 
+@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_install_simple_local(src, path):
     origin = Dataset(path)
 
@@ -263,9 +263,9 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-@known_failure_v6  #FIXME
 def test_install_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = install(source=url)
@@ -277,9 +277,9 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_install_dataset_from_instance(src, dst):
     origin = Dataset(src)
     clone = install(source=origin, path=dst)
@@ -334,7 +334,6 @@ def test_install_dataladri(src, topurl, path):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_install_recursive(src, path_nr, path_r):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
@@ -378,7 +377,6 @@ def test_install_recursive(src, path_nr, path_r):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
@@ -477,7 +475,6 @@ def test_failed_install_multiple(top_path):
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_install_known_subdataset(src, path):
 
     # get the superdataset:
@@ -628,7 +625,6 @@ def test_reckless(path, top_path):
                  })
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_install_recursive_repeat(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)

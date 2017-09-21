@@ -122,9 +122,9 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_clone_simple_local(src, path):
     origin = Dataset(path)
 
@@ -165,9 +165,9 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-@known_failure_v6  #FIXME
 def test_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')
