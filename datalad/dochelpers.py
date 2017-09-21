@@ -331,6 +331,8 @@ def exc_str(exc=None, limit=None):
         if not exc:
             exc = value
             out = str(exc)
+        if not out:
+            out = repr(exc)
         # verify that it seems to be the exception we were passed
         #assert(isinstance(exc, exctype))
         if exc:
