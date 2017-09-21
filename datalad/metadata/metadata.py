@@ -36,7 +36,6 @@ from datalad.interface.base import build_doc
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureStr
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -56,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
+from datalad.dochelpers import single_or_plural
 
 
 lgr = logging.getLogger('datalad.metadata.metadata')
@@ -880,7 +880,9 @@ class Metadata(Interface):
             if to_aggregate:
                 lgr.warning(
                     'Metadata query results might be incomplete, initial '
-                    'metadata aggregation was not yet performed in datasets at: %s',
+                    'metadata aggregation was not yet performed in %s at: %s',
+                    single_or_plural(
+                        'dataset', 'datasets', len(to_aggregate), include_count=True),
                     to_aggregate)
 
             for ds_path in content_by_ds:
