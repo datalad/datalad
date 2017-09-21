@@ -156,7 +156,6 @@ def test_get_git_environ_adjusted():
     assert_equal(sys_env["PWD"], os.environ.get("PWD"))
 
 
-@known_failure_direct_mode  #FIXME
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
     if not on_windows:

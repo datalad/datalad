@@ -155,7 +155,6 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
-@known_failure_direct_mode  #FIXME
 def test_script_shims():
     runner = Runner()
     for script in [
