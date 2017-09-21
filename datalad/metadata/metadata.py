@@ -891,7 +891,7 @@ class Metadata(Interface):
                              # this is an available subdataset, will be processed in another
                              # iteration
                              if ap.get('state', None) == 'absent' or
-                                not(ap.get('type', None) == 'dataset' and ap['path'] != ds_path)]
+                             not(ap.get('type', None) == 'dataset' and ap['path'] != ds_path)]
                 if not query_agg:
                     continue
                 # report from aggregated metadata
