@@ -7,7 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 
 
@@ -33,7 +32,6 @@ from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
 
-@known_failure_direct_mode  #FIXME
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ["random_url"]
 
