@@ -538,10 +538,9 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
-@known_failure_direct_mode  #FIXME
 def test_target_ssh_inherit():
     # TODO: waits for resolution on
     #   https://github.com/datalad/datalad/issues/1274
     #yield _test_target_ssh_inherit, None      # no wanted etc
     #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files
+    yield known_failure_direct_mode(_test_target_ssh_inherit), 'backup'  # backup -- all data files  #FIXME

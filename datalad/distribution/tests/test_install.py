@@ -400,6 +400,7 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
+@known_failure_direct_mode  #FIXME
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
@@ -407,7 +408,6 @@ def test_install_recursive_with_data(src, path):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
@@ -738,7 +738,6 @@ def test_install_skip_failed_recursive(src, path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_install_noautoget_data(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)

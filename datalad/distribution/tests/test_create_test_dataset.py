@@ -60,8 +60,8 @@ def test_create_1test_dataset():
     ok_clean_git(dss[0], annex=False)
 
 
-@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
 def test_new_relpath(topdir):
     from datalad.api import create_test_dataset
     with swallow_logs(), chpwd(topdir), swallow_outputs():
@@ -72,8 +72,8 @@ def test_new_relpath(topdir):
         ok_clean_git(ds, annex=False)
 
 
-@with_tempfile()
 @known_failure_direct_mode  #FIXME
+@with_tempfile()
 def test_hierarchy(topdir):
     # GH 1178
     from datalad.api import create_test_dataset

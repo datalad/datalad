@@ -219,7 +219,6 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)
