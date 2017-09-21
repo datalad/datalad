@@ -886,46 +886,27 @@ class Metadata(Interface):
                     to_aggregate)
 
             for ds_path in content_by_ds:
-                DIRECT_QUERY = False
                 ds = Dataset(ds_path)
-                # sort requested paths into available components of this dataset
-                # and into things that might be available in aggregated metadata
-                query_agg = []
-                query_ds = []
-                for ap in content_by_ds[ds_path]:
-                    if ap.get('state', None) == 'absent':
-                        query_agg.append(ap)
-                    elif ap.get('type', None) == 'dataset' and not ap['path'] == ds_path:
-                        # this is an available subdataset, will be processed in another
-                        # iteration
-                        continue
-                    else:
-                        (query_ds if DIRECT_QUERY else query_agg).append(ap)
-                # report directly available metadata
-                if query_ds:
-                    pass
-                   # # TODO RF to use code form `aggregate`
-                   # for r in _query_metadata(
-                   #         reporton,
-                   #         ds,
-                   #         [ap['path'] for ap in query_ds],
-                   #         merge_native,
-                   #         **res_kwargs):
-                   #     yield r
-                if query_agg:
-                    # report from aggregated metadata
-                    for r in _query_aggregated_metadata(
-                            reporton, ds, query_agg, merge_native,
-                            # recursion was already performed during
-                            # path annotation
-                            # TODO is that right? it could only recurse into datasets
-                            # on the filesystem, but there might be any number of
-                            # uninstalled datasets underneath the last installed one
-                            # for which we might have metadata -- like this just
-                            # needs to pass the flag to the query function
-                            recursive=False,
-                            **res_kwargs):
-                        yield r
+                query_agg = [ap for ap in content_by_ds[ds_path]
+                             # this is an available subdataset, will be processed in another
+                             # iteration
+                             if ap.get('state', None) == 'absent' or
+                                not(ap.get('type', None) == 'dataset' and ap['path'] != ds_path)]
+                if not query_agg:
+                    continue
+                # report from aggregated metadata
+                for r in _query_aggregated_metadata(
+                        reporton, ds, query_agg, merge_native,
+                        # recursion was already performed during
+                        # path annotation
+                        # TODO is that right? it could only recurse into datasets
+                        # on the filesystem, but there might be any number of
+                        # uninstalled datasets underneath the last installed one
+                        # for which we might have metadata -- like this just
+                        # needs to pass the flag to the query function
+                        recursive=False,
+                        **res_kwargs):
+                    yield r
             return
         #
         # all the rest is about modification of metadata there is no dedicated
