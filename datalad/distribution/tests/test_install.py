@@ -400,9 +400,13 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
-@known_failure_direct_mode  #FIXME
+# @known_failure_direct_mode  #FIXME:
+# If we use all testrepos, we get a mixed hierarchy. Therefore ok_clean_git
+# fails if we are in direct mode and run into a plain git beneath an annex, due
+# to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
+
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
-@with_testrepos(flavors=['local'])
+@with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."

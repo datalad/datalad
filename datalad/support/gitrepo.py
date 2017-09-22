@@ -745,8 +745,12 @@ class GitRepo(RepoInterface):
         only_remote: bool, optional
             Check only remote (no local branches) for having git-annex branch
         """
-        return any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
-            ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
+        return any((b.endswith('/git-annex') or
+                    'annex/direct' in b
+                    for b in self.get_remote_branches())) or \
+            ((not only_remote) and
+             any((b == 'git-annex' or 'annex/direct' in b
+                  for b in self.get_branches())))
 
     @classmethod
     def get_toppath(cls, path, follow_up=True, git_options=None):

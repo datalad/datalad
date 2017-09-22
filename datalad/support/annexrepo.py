@@ -541,13 +541,20 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     submodules=False, path=path):
                     sm_dirty = True
             else:
-                raise InvalidGitRepositoryError
+                # uninitialized submodule
+                # it can't be dirty and we can't recurse any deeper:
+                continue
 
             if sm_dirty:
                 # the submodule itself is dirty
                 modified_subs.append(sm.path)
             else:
                 # the submodule itself is clean, recurse:
+                # TODO: This fails ATM with AttributeError, if sm is a GitRepo.
+                # we need get_status and this recursion method to be available
+                # to both classes. Issue: We need to be able to come back to
+                # AnnexRepo from GitRepo if there's again an annex beneath. But
+                # we can't import AnnexRepo in gitrepo.py.
                 modified_subs.extend(
                     sm_repo._submodules_dirty_direct_mode(
                         untracked=untracked, deleted=deleted,
@@ -1419,6 +1426,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         # `git` parameter and call GitRepo's add() instead.
 
         def _get_to_be_added_recs(paths):
+            """Try to collect what actually is going to be added
+
+            This is used for progress information
+            """
 
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
