@@ -390,9 +390,9 @@ def _query_aggregated_metadata_singlepath(
             path=normpath(opj(ds.path, rpath)),
             type='dataset',
             metadata=metadata)
-        for key in ('id', 'refcommit'):
-            if key in dsinfo:
-                res[key] = dsinfo[key]
+        for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
+            if s in dsinfo:
+                res[d] = dsinfo[s]
         if rpath == curdir:
             # we are querying this dataset itself, which we know to be present
             # rerun datalad_core parser to reflect potential local
@@ -504,6 +504,9 @@ def _query_aggregated_metadata_singlepath(
             # we can only match files
             type='file',
             metadata=metadata)
+        for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
+            if s in dsinfo:
+                res[d] = dsinfo[s]
 
         # loop over all records, check if path matched and merge properties
         for pathexp in contentmeta:

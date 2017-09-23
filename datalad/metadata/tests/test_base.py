@@ -96,7 +96,7 @@ def _compare_metadata_helper(origres, compds):
         cres = cres[0]
         assert_dict_equal(ores['metadata'], cres['metadata'])
         if ores['type'] == 'dataset':
-            for i in ('id', ):
+            for i in ('dsid', ):
                 eq_(ores[i], cres[i])
 
 
@@ -133,7 +133,7 @@ def test_aggregation(path):
     assert_result_count(origres, 3, type='dataset')
     assert_result_count(origres, 4, type='file')
     # three different IDs
-    assert_equal(3, len(set([s['id'] for s in origres if s['type'] == 'dataset'])))
+    assert_equal(3, len(set([s['dsid'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
     for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(
