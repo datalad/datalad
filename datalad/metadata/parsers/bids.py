@@ -10,7 +10,8 @@
 
 import csv
 from io import open
-from os.path import join as opj, exists
+from os.path import join as opj
+from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
@@ -56,7 +57,6 @@ sex_label_map = {
 
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filename = 'dataset_description.json'
-    _core_metadata_filenames = [_core_metadata_filename]
 
     _key2stdkey = {
         'Name': 'name',
@@ -67,9 +67,12 @@ class MetadataParser(BaseMetadataParser):
         'Description': 'description',
     }
 
+    def has_metadata(self):
+        return exists(opj(self.ds.path, self._core_metadata_filename))
+
     def get_dataset_metadata(self):
         meta = {}
-        metadata_path = opj(self.ds.path, 'dataset_description.json')
+        metadata_path = opj(self.ds.path, self._core_metadata_filename)
         if not exists(metadata_path):
             return meta
         bids = jsonload(metadata_path)

@@ -11,6 +11,7 @@
 
 import re
 from os.path import join as opj
+from os.path import exists
 from collections import OrderedDict
 
 try:
@@ -94,10 +95,11 @@ def _process_tree(tree, nstag):
 
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filename = opj('.datalad', 'meta.datacite.xml')
-    _core_metadata_filenames = [_core_metadata_filename]
+
+    def has_metadata(self):
+        return exists(opj(self.ds.path, self._core_metadata_filename))
 
     def get_dataset_metadata(self):
-
         fname = opj(self.ds.path, self._core_metadata_filename)
         # those namespaces are a b.ch
         # TODO: avoid reading file twice

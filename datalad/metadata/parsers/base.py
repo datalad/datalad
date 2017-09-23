@@ -8,17 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parser base class"""
 
-from os.path import lexists
-from os.path import join as opj
-# needed to guarantee that this method is bound to the Dataset class
-from datalad.api import get
-
 
 class BaseMetadataParser(object):
-    # subclass can use this to provide a simple list of candidate files
-    # to check
-    _core_metadata_filenames = []
-
     def __init__(self, ds):
         """
         Parameters
@@ -47,66 +38,8 @@ class BaseMetadataParser(object):
         """
         raise NotImplementedError
 
-    #######################################################################
-    ## OLD STUFF ## to be removed #########################################
-    #######################################################################
-
-    # TODO replace with NotImplementedError implementation
     def has_metadata(self):
         """Returns whether a dataset provides this kind meta data"""
-        # default implementation, override with more efficient, if possible
-        fnames = [opj(self.ds.path, f) for f in self._core_metadata_filenames]
-        return len([f for f in fnames if lexists(f)]) > 0
-
-    def get_core_metadata_files(self):
-        """Obtain (if needed) and return list of absolute filenames making up
-        the core meta data source"""
-        # default implementation, override if _core_metadata_filenames is not
-        # used
-        for r in self.ds.get(self._core_metadata_filenames):
-            if r['status'] in ('ok', 'notneeded'):
-                yield r['path']
-
-    def get_metadata_files(self):
-        """Obtain (if needed) and return list of absolute filenames making up
-        the full meta data source"""
-        # default implementation: core == full
-        return self.get_core_metadata_files()
-
-    def get_metadata(self, dsid=None, full=False):
-        """Returns meta data structure
-
-        Parameter
-        ---------
-        full : bool
-          If True, all intelligible meta data is return. Otherwise only
-          meta data deemed essential by the author is returned.
-
-        Returns
-        -------
-        dict
-        """
-        if dsid is None:
-            dsid = self.ds.id
-        meta = {}
-        if self.has_metadata():
-            meta = self._get_metadata(dsid, meta, full)
-        return meta
-
-    def get_global_metadata(self):
-        """Returns dataset global metadata
-
-        Returns
-        -------
-        dict
-          Keys should be a subset of the those commoly defined
-          by DataLad
-        """
-        # XXX for now this is reusing the old methods
-        meta = self._get_metadata(None, {}, False)
-        return meta if meta else None
-
-    def _get_metadata(self, dsid, basemeta, full):
         raise NotImplementedError
 
     def get_homogenized_key(self, key):

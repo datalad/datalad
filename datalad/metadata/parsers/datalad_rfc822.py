@@ -17,6 +17,7 @@ i.e. can be composed from scratch, by hand, in an editor -- with a good
 chance of producing syntax-compliant content with the first attempt.
 """
 
+from os.path import exists
 import email
 import email.parser  # necessary on Python 2.7.6 (trusty)
 from os.path import join as opj
@@ -47,7 +48,7 @@ def _beautify_multiline_field(content):
 
 class MetadataParser(BaseMetadataParser):
     _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
-    _core_metadata_filenames = [opj('.datalad', 'meta.rfc822')]
+    _core_metadata_filename = opj('.datalad', 'meta.rfc822')
 
     _key2stdkey = {
         'name': 'name',
@@ -64,12 +65,15 @@ class MetadataParser(BaseMetadataParser):
         'description': None,
     }
 
-    def _get_metadata(self, ds_identifier, meta, full):
-        core_meta_files = list(self.get_core_metadata_files())
-        if not core_meta_files:
+    def has_metadata(self):
+        return exists(opj(self.ds.path, self._core_metadata_filename))
+
+    def get_dataset_metadata(self):
+        meta = {}
+        if not self.has_metadata():
             return meta
         spec = email.parser.Parser().parse(
-            open(core_meta_files[0]),
+            open(opj(self.ds.path, self._core_metadata_filename)),
             headersonly=True)
 
         for term in self._key2stdkey:
