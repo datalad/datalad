@@ -93,15 +93,12 @@ def _process_tree(tree, nstag):
 
 
 class MetadataParser(BaseMetadataParser):
-    _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
-    _core_metadata_filenames = [opj('.datalad', 'meta.datacite.xml')]
+    _core_metadata_filename = opj('.datalad', 'meta.datacite.xml')
+    _core_metadata_filenames = [_core_metadata_filename]
 
-    def _get_metadata(self, ds_identifier, meta, full):
-        core_meta_files = list(self.get_core_metadata_files())
-        if not core_meta_files:
-            return meta
+    def get_dataset_metadata(self):
 
-        fname = core_meta_files[0]
+        fname = opj(self.ds.path, self._core_metadata_filename)
         # those namespaces are a b.ch
         # TODO: avoid reading file twice
         namespaces = dict([
@@ -115,5 +112,7 @@ class MetadataParser(BaseMetadataParser):
             return './/{%s}%s' % (ns, tag)
 
         tree = ET.ElementTree(file=fname)
-        meta.update(_process_tree(tree, nstag))
-        return meta
+        return _process_tree(tree, nstag)
+
+    def get_content_metadata(self):
+        return []  # no content metadata provided
