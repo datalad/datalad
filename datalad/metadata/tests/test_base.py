@@ -163,10 +163,10 @@ def test_aggregation(path):
     _compare_metadata_helper(origres, clone)
 
     # query smoke test
-    assert_result_count(clone.search('mother*', reporton='datasets'), 1)
-    assert_result_count(clone.search('MoTHER*', reporton='datasets'), 1)  # case insensitive
+    assert_result_count(clone.search('mother*'), 1)
+    assert_result_count(clone.search('MoTHER*'), 1)  # case insensitive
 
-    child_res = clone.search('*child*', reporton='datasets')
+    child_res = clone.search('*child*')
     assert_result_count(child_res, 2)
     for r in child_res:
         eq_(r['query_matched']['name'], r['metadata']['name'])
@@ -176,7 +176,7 @@ def test_aggregation(path):
     assert_result_count(clone.search(['*child*', '*subsub*']), 1)
     assert_result_count(clone.search(['*bids*', '*sub*']), 2)
 
-    assert_result_count(clone.search(['*', 'type:dataset'], reporton='datasets'), 3)
+    assert_result_count(clone.search(['*', 'type:dataset']), 3)
 
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe
 

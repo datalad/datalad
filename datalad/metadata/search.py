@@ -22,7 +22,6 @@ from six import PY3
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.interface.common_opts import reporton_opt
 from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
@@ -45,14 +44,6 @@ from datalad.dochelpers import single_or_plural
 unicode_srctypes = string_types
 if PY3:
     unicode_srctypes = unicode_srctypes + (bytes,)
-
-# this ammends the metadata key definitions (common_defs)
-# default will be TEXT, hence we only need to specific the differences
-# using string identifiers to not have to import whoosh at global scope
-whoosh_field_types = {
-    "id": "ID",
-    "modified": "DATETIME",
-}
 
 
 def _add_document(idx, **kwargs):
@@ -135,6 +126,7 @@ def _get_search_index(index_dir, ds, schema, force_reindex):
             # and anything else we know about, and is known to the schema
             **_meta2index_dict(res.get('metadata', None), schema))
     idx.commit()
+    lgr.info('Search index contains %i documents', idx.doc_count())
     return idx_obj
 
 
@@ -222,14 +214,6 @@ class Search(Interface):
             to 0 will report any search matches, and make searching substantially
             slower on large metadata sets.""",
             constraints=EnsureInt()),
-        reporton=reporton_opt,
-        requery_metadata=Parameter(
-            args=('--requery-metadata',),
-            action='store_true',
-            doc="""Flag whether to re-query up-to-date metadata for any path
-            matching a search query that is presently available on disk.
-            If not set, previously aggregated metadata will be reported instead.
-            The latter might be substantially faster."""),
     )
 
     @staticmethod
@@ -238,11 +222,15 @@ class Search(Interface):
     def __call__(query,
                  dataset=None,
                  force_reindex=False,
-                 max_nresults=20,
-                 reporton='all',
-                 requery_metadata=False):
+                 max_nresults=20):
         from whoosh import fields as wf
         from whoosh import qparser as qparse
+
+        # this ammends the metadata key definitions (common_defs)
+        # default will be TEXT, hence we only need to specify the differences
+        whoosh_field_types = {
+            "modified": wf.DATETIME,
+        }
 
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
@@ -266,7 +254,7 @@ class Search(Interface):
             id=wf.ID(stored=True),
             path=wf.ID(stored=True),
             type=wf.ID(stored=True),
-            **{k: getattr(wf, whoosh_field_types.get(k, 'TEXT'))
+            **{k: whoosh_field_types.get(k, wf.TEXT(stored=True))
                # TODO not just common_defs, but the entire vocabulary defined
                # by any parser
                for k in common_defs
@@ -312,57 +300,21 @@ class Search(Interface):
                         'match', 'matches',
                         min(max_nresults, nhits)))
                 if max_nresults else ''))
-            # XXX now there are to principle ways to continue.
-            # 1. we ignore everything, just takes the path of any hits
-            #    and pass it to `metadata`, which will then do whatever is
-            #    necessary and state of the art to report metadata
-            #    This is great, because it minimizes the code, but it is likely
-            #    a little slower, because annex might be called again to report
-            #    file metadata, and we also loose some specificity (e.g. the
-            #    `metadata` won't know whether we query a specific path to
-            #    get all metadata for anything underneath it, or to just get
-            #    dataset metadata
-            # 2. we pull only from aggregated metadata. No calls, fast, but
-            #    increased chances of yielding outdated results, and duplication
-            #    in code base.
-            # TODO implement alternative to just query aggregated metadata
+
             if not hits:
                 return
-            qpaths = [dict(
-                # normpath to avoid trailing dot
-                path=normpath(opj(ds.path, h['path'])),
-                # we must not pre-annotate the paths with the recorded type
-                # depending on how the metadata query below is performed
-                # this will throw off the detection of absent subdatasets
-                #type=h['type'],
-                query_matched={assure_unicode(k): assure_unicode(v)
-                               if isinstance(v, unicode_srctypes) else v
-                               for k, v in h.matched_terms()})
-                      for h in hits]
-            if requery_metadata:
-                gen = ds.metadata(
-                    # turn hits into annotated paths
-                    path=qpaths,
-                    # TODO expose as arg?
-                    merge_native='init',
-                    reporton=reporton,
-                    recursive=False,
-                    return_type='generator',
-                    on_failure='ignore',
-                    result_renderer=None)
-            else:
-                gen = _query_aggregated_metadata(
-                    reporton=reporton,
-                    ds=ds,
-                    aps=qpaths,
-                    # TODO expose as arg?
-                    merge_mode='init',
-                    recursive=False)
-            for r in gen:
-                # assemble result
-                r.update(dict(
+
+            for hit in hits:
+                res = dict(
                     action='search',
                     status='ok',
                     logger=lgr,
-                    refds=ds.path))
-                yield r
+                    refds=ds.path,
+                    # normpath to avoid trailing dot
+                    path=normpath(opj(ds.path, hit['path'])),
+                    query_matched={assure_unicode(k): assure_unicode(v)
+                                   if isinstance(v, unicode_srctypes) else v
+                                   for k, v in hit.matched_terms()},
+                    metadata={k: v for k, v in hit.fields().items()
+                              if k not in ('path',)})
+                yield res
