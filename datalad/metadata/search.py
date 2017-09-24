@@ -287,19 +287,19 @@ class Search(Interface):
                 limit=max_nresults if max_nresults > 0 else None)
             # cheap way to get an approximate number of hits, without an expensive
             # scoring of all items
-            nhits = hits.estimated_length()
+            nhits = hits.estimated_min_length()
             # report query stats
-            lgr.info('{} {} matching {} in {} sec.{}'.format(
-                'Estimated' if nhits else 'Found',
+            lgr.info('Found {} matching {}{} in {} sec.{}'.format(
                 nhits,
                 single_or_plural('record', 'records', nhits),
+                '' if hits.has_exact_length() else ' (initial estimate)',
                 hits.runtime,
-                ' Reporting metadata for the {} top {}.'.format(
+                ' Reporting metadata for {} top {}.'.format(
                     min(max_nresults, nhits),
                     single_or_plural(
                         'match', 'matches',
                         min(max_nresults, nhits)))
-                if max_nresults else ''))
+                if max_nresults and hits.has_exact_length() else ''))
 
             if not hits:
                 return
