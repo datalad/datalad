@@ -410,6 +410,13 @@ class AnnexCustomRemote(object):
                 return
 
             req, req_load = l[0], l[1:]
+            method = getattr(self, "req_%s" % req, None)
+            if not method:
+                self.debug("We have no support for %s request, part of %s response"
+                           % (req, l))
+                self.send("UNSUPPORTED-REQUEST")
+                continue
+
             req_nargs = self._req_nargs[req]
             if req_load and req_nargs > 1:
                 assert len(req_load) == 1, "Could be only one due to n=1"
@@ -418,13 +425,6 @@ class AnnexCustomRemote(object):
                 # since str.split would get rid of it as well, and then we should
                 # have used re.split(" ", ...)
                 req_load = req_load[0].split(None, req_nargs - 1)
-
-            method = getattr(self, "req_%s" % req, None)
-            if not method:
-                self.error("We have no support for %s request, part of %s response"
-                           % (req, l))
-                self.send("UNSUPPORTED-REQUEST")
-                continue
 
             try:
                 method(*req_load)
@@ -460,6 +460,17 @@ class AnnexCustomRemote(object):
                        "PREPARE-FAILURE")
         else:
             self.send("PREPARE-SUCCESS")
+
+    def req_EXPORTSUPPORTED(self):
+        self.send(
+            'EXPORTSUPPORTED-SUCCESS'
+            if hasattr(self, 'req_EXPORT')
+            else 'EXPORTSUPPORTED-FAILURE'
+        )
+
+    ## define in subclass if EXPORT is supported
+    # def req_EXPORT(self, name):
+    #   pass
 
     def req_GETCOST(self):
         self.send("COST", self.cost)
