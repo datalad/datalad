@@ -117,14 +117,19 @@ def _get_search_index(index_dir, ds, schema, force_reindex):
             # the metadata)
             recursive=True):
             # **kwargs):
-        _add_document(
-            idx,
-            id=ds.id if res['type'] == 'dataset' else None,
+        # this assumes that files are reported after each dataset report,
+        # and after a subsequent dataset report no files for the previous
+        # dataset will be reported again
+        doc_props = dict(
             path=relpath(res['path'], start=ds.path),
             type=res['type'],
             # TODO emulate old approach of building one giant text blob per entry
             # and anything else we know about, and is known to the schema
             **_meta2index_dict(res.get('metadata', None), schema))
+        if 'parentds' in res:
+            doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
+        _add_document(idx, **doc_props)
+
     idx.commit()
     lgr.info('Search index contains %i documents', idx.doc_count())
     return idx_obj
@@ -253,6 +258,7 @@ class Search(Interface):
         datalad_schema = wf.Schema(
             id=wf.ID(stored=True),
             path=wf.ID(stored=True),
+            parentds=wf.ID(stored=True),
             type=wf.ID(stored=True),
             **{k: whoosh_field_types.get(k, wf.TEXT(stored=True))
                # TODO not just common_defs, but the entire vocabulary defined
@@ -316,5 +322,7 @@ class Search(Interface):
                                    if isinstance(v, unicode_srctypes) else v
                                    for k, v in hit.matched_terms()},
                     metadata={k: v for k, v in hit.fields().items()
-                              if k not in ('path',)})
+                              if k not in ('path', 'parentds')})
+                if 'parentds' in hit:
+                    res['parentds'] = normpath(opj(ds.path, hit['parentds']))
                 yield res
