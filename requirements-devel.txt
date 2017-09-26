@@ -4,7 +4,5 @@
 # For now, until https://github.com/GrahamDumpleton/wrapt/issues/98 resolved
 # we should use fresh version allowing to disable extensions
 wrapt>=1.10.11
-# to test against my patched version of GitPython
-git+https://github.com/yarikoptic/GitPython@bf-useget
 -e .[devel]
 
