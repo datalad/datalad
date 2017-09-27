@@ -634,6 +634,8 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    if GitRepo(tdir).is_with_annex():
+        AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 

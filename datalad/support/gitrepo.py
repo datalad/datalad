@@ -1905,7 +1905,6 @@ class GitRepo(RepoInterface):
     def deinit_submodule(self, path, **kwargs):
         """Deinit a submodule
 
-
         Parameters
         ----------
         path: str
@@ -1914,9 +1913,9 @@ class GitRepo(RepoInterface):
             see `__init__`
         """
 
-        kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
-        self._gitpy_custom_call('submodule', ['deinit', path],
-                                cmd_options=kwargs)
+        self._git_custom_command(path,
+                                 ['git', 'submodule', 'deinit'] +
+                                 to_options(**kwargs))
         # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):

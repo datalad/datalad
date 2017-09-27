@@ -678,8 +678,14 @@ def test_AnnexRepo_always_commit(path):
     eq_(num_commits, 4)
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_AnnexRepo_on_uninited_annex(path):
+@with_testrepos('basic_annex', flavors=['local'])
+@with_tempfile
+def test_AnnexRepo_on_uninited_annex(origin, path):
+    # "Manually" clone to avoid initialization:
+    from datalad.cmd import Runner
+    runner = Runner()
+    _ = runner(["git", "clone", origin, path], expect_stderr=True)
+
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
     # and still can get our things
