@@ -36,7 +36,7 @@ URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
 
 DEFAULT_COST = 100
-DEFAULT_AVAILABILITY = "local"
+DEFAULT_AVAILABILITY = "LOCAL"
 
 from datalad.ui.progressbars import ProgressBarBase
 
@@ -192,12 +192,12 @@ class AnnexCustomRemote(object):
     # Must be defined in subclasses.  There is no classlevel properties, so leaving as this for now
 
     CUSTOM_REMOTE_NAME = None  # if None -- no additional custom remote name
-    # SUPPORTED_SCHEMES = ()
+    SUPPORTED_SCHEMES = ()
 
     COST = DEFAULT_COST
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path=None, cost=None):  # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=None, fin=None, fout=None):  # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -206,6 +206,9 @@ class AnnexCustomRemote(object):
             Usually this class is instantiated by a script which runs already
             within that directory, so the default is to point to current
             directory, i.e. '.'
+        fin:
+        fout:
+            input/output streams.  If not specified, stdin, stdout used
         """
         # TODO: probably we shouldn't have runner here but rather delegate
         # to AnnexRepo's functionality
@@ -215,8 +218,8 @@ class AnnexCustomRemote(object):
         self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
-        self.fin = sys.stdin
-        self.fout = sys.stdout
+        self.fin = fin or sys.stdin
+        self.fout = fout or sys.stdout
 
         self.repo = get_repo_instance(class_=AnnexRepo) \
             if not path \
