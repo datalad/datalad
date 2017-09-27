@@ -12,7 +12,7 @@
 ontology_id = 'http://edamontology.org/data_2338'
 
 # this is the cannonical version string of Datalad's current metadata scheme
-version = '1.0'
+version = '2.0'
 
 # for maximum compatibility with git-annex' metadata setup, _keys_ in this
 # dictionary should be all lower-case, and be limited to alphanumerics, plus
@@ -92,6 +92,9 @@ common_defs = {
     "type": {
         'def': "schema:type",
         'descr': 'type or category of a resource (e.g. file, dataset)'},
+    "unit": {
+        'def': 'uo:0000000',
+        'descr': 'standardized quantity of a physical quality'},
     "version": {
         'def': "doap:Version",
         'descr': 'version of a resource'},

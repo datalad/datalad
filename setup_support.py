@@ -266,7 +266,7 @@ class BuildSchema(Command):
                 # the rest are compound definitions
                 props = {'@id': definition}
                 if 'unit' in val:
-                    props['@type'] = val['unit']
+                    props['unit'] = val['unit']
                 if 'descr' in val:
                     props['description'] = val['descr']
                 context[key] = props
