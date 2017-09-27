@@ -600,6 +600,18 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
                 lgr.error('Failed to get dataset content metadata ({}): {}'.format(
                     mtype, exc_str(e)))
                 errored = True
+    # go through content metadata and inject report of unique keys
+    # and values into `dsmeta`
+    unique_cm = {}
+    for cm in contentmeta.values():
+        for k, v in cm.items():
+            # TODO instead of a set, it could be a set with counts
+            vset = unique_cm.get(k, set())
+            vset.add(v)
+            unique_cm[k] = vset
+    if unique_cm:
+        dsmeta['content_summary'] = {k: sorted(v) for k, v in unique_cm.items()}
+
     # always force a record of our current vocabulary version
     dsmeta['vocab_version_datalad_core'] = vocabulary_version
 
