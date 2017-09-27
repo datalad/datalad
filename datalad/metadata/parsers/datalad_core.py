@@ -40,7 +40,11 @@ class MetadataParser(BaseMetadataParser):
         fpath = opj(self.ds.path, self._dataset_metadata_filename)
         obj = {}
         if exists(fpath):
-            return jsonload(fpath, fixup=True)
+            obj = jsonload(fpath, fixup=True)
+        if 'definition' in obj:
+            obj['@context'] = obj['definition']
+            del obj['definition']
+        obj['@id'] = self.ds.id
         return obj
 
     # the optional arg is a special case and only used for internal puposes

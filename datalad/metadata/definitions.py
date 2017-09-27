@@ -31,6 +31,9 @@ common_defs = {
         'def': "http://purl.org/dc/dcmitype/",
         'descr': 'DCMI Type Vocabulary',
         'type': ontology_id},
+    "dlp_bids": {
+        'description': 'Vocabulary of the DataLad BIDS metadata parser',
+        'type': ontology_id},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'ontology for the description of a project',

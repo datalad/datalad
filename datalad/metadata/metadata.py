@@ -172,6 +172,8 @@ class MetadataDict(dict):
     def merge_init(self, spec):
         for k, v in spec.items() if spec else []:
             if k not in self:
+                if isinstance(v, (list, tuple)) and len(v) == 1:
+                    v = v[0]
                 self[k] = v
 
     def merge_purge(self, spec):
@@ -185,6 +187,8 @@ class MetadataDict(dict):
 
     def merge_add(self, spec):
         for k, v in spec.items():
+            # TODO we should probably refuse to add to any
+            # keys that start with '@' (JSON-LD reserved keys)
             vals = sorted(unique(
                 assure_list(self.get(k, [])) + assure_list(v)))
             if len(vals) == 1:
@@ -420,6 +424,9 @@ def _query_aggregated_metadata_singlepath(
                 opj(agg_base_path, objloc),
                 cache=cache['objcache'])
             getattr(metadata, 'merge_{}'.format(merge_mode))(obj)
+            context = metadata.get('@context', {})
+            _merge_context(ds, context, obj.get('@context', {}))
+            metadata['@context'] = context
 
         # all info on the dataset is gathered -> eject
         res['status'] = 'ok'
@@ -519,6 +526,22 @@ def _query_aggregated_metadata_singlepath(
         yield res
 
 
+def _merge_context(ds, old, new):
+    # keys in contexts should not conflict and we want to union of the
+    # vocabulary in any case
+    for k, v in new.items():
+        if k in old and v != old[k]:
+            # there is no point in mangling the keys here, the conflict
+            # was introduced by our own parsers, or by a custom
+            # definition in this dataset, and should be fixed at the
+            # source and not here
+            lgr.warning(
+                '%s redefines metadata key %s to "%s" (was: %s), ignored',
+                ds, k, v, old[k])
+        else:
+            old[k] = v
+
+
 def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
     """Make a direct query of a dataset to extract its metadata.
 
@@ -535,6 +558,10 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
 
     if not global_meta and not content_meta:
         return dsmeta, contentmeta, errored
+
+    context = {
+        '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
+            vocabulary_version)}
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
@@ -572,10 +599,12 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
                     mtype, ds, repr(dsmeta_t))
                 errored = True
             elif dsmeta_t:
-                if hasattr(pmod, 'vocabulary_version'):
-                    dsmeta_t['vocab_version_{}'.format(mtype)] = pmod.vocabulary_version
                 getattr(dsmeta, 'merge_{}'.format(merge_mode))(dsmeta_t)
-        #
+                # treat @context info dsmeta_t separately
+                # keys in their should not conflict and we want to union of the
+                # vocabulary in any case
+                _merge_context(ds, context, dsmeta_t.get('@context', {}))
+
         # dataset content metadata
         #
         if content_meta:
@@ -610,10 +639,10 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
             vset.add(v)
             unique_cm[k] = vset
     if unique_cm:
-        dsmeta['content_summary'] = {k: sorted(v) for k, v in unique_cm.items()}
+        dsmeta['unique_content_properties'] = {k: sorted(v) for k, v in unique_cm.items()}
 
-    # always force a record of our current vocabulary version
-    dsmeta['vocab_version_datalad_core'] = vocabulary_version
+    # always identify the effective vocabulary - JSON-LD style
+    dsmeta['@context'] = context
 
     return dsmeta, contentmeta, errored
 
@@ -817,7 +846,9 @@ class Metadata(Interface):
 
         # prep results
         refds_path = Interface.get_refds_path(dataset)
-        res_kwargs = dict(action='metadata', logger=lgr, refds=refds_path)
+        res_kwargs = dict(action='metadata', logger=lgr)
+        if refds_path:
+            res_kwargs['refds'] = refds_path
 
         if show_keys:
             # to get into the ds meta branches below
@@ -1143,7 +1174,7 @@ class Metadata(Interface):
             type=' ({})'.format(res['type']) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys())
-                          if not (k == 'tag' or k.startswith('vocab_version')))
+                          if not (k == 'tag'))
                  if meta else ' -',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(assure_list(meta['tag'])))))

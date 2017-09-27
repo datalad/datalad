@@ -14,6 +14,7 @@ from os.path import join as opj
 from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
+from datalad.metadata.definitions import ontology_id
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 import logging
@@ -21,23 +22,18 @@ lgr = logging.getLogger('datalad.meta.bids')
 
 
 # BIDS parser metadata definitions (dlp_bids:)
-vocabulary_version = '1.0'
 vocabulary = {
     # characteristics (metadata keys)
-    "age(years)": {
-        'def': "pato:0000011",
-        'unit': "uo:0000036",  # year
-        'descr': "age of a sample (organism) at the time of data acquisition in years"},
-    "sex": {
+    "dlp_bids:sex": {
         'def': "pato:0000047",
-        'descr': "biological sex"},
+        'description': "biological sex"},
     # qualities (metadata values)
-    "female": {
-        'def': "pato:0000383",
-        'descr': "A biological sex quality inhering in an individual or a population that only produces gametes that can be fertilised by male gametes"},
-    "male": {
-        'def': "pato:0000384",
-        'descr': "A biological sex quality inhering in an individual or a population whose sex organs contain only male gametes"},
+    "dlp_bids:female": {
+        '@id': "pato:0000383",
+        'description': "A biological sex quality inhering in an individual or a population that only produces gametes that can be fertilised by male gametes"},
+    "dlp_bids:male": {
+        '@id': "pato:0000384",
+        'description': "A biological sex quality inhering in an individual or a population whose sex organs contain only male gametes"},
 }
 
 # only BIDS metadata properties that match a key in this dict will be considered
@@ -107,6 +103,7 @@ class MetadataParser(BaseMetadataParser):
                     bids['BIDSVersion'].strip())
         else:
             meta['conformsto'] = 'http://bids.neuroimaging.io'
+        meta['@context'] = vocabulary
         return meta
 
     def get_content_metadata(self):
