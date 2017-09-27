@@ -8,6 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata definitions"""
 
+# identifiers that defines an ontology as a whole
+ontology_id = 'http://edamontology.org/data_2338'
 
 # this is the cannonical version string of Datalad's current metadata scheme
 version = '1.0'
@@ -17,24 +19,30 @@ version = '1.0'
 # '_', '-', and '.' -- except for JSON-LD keywords (which start with '@' and
 # will be ignored in the context of git-annex metadata
 common_defs = {
-    "@vocab": {
+    "schema": {
         'def': "http://schema.org/",
-        'descr': 'base vocabulary'},
+        'descr': 'base vocabulary',
+        'type': ontology_id},
     "dcterms": {
         'def': "http://purl.org/dc/terms/",
-        'descr': 'DCMI metadata terms'},
+        'descr': 'DCMI metadata terms',
+        'type': ontology_id},
     "dctype": {
         'def': "http://purl.org/dc/dcmitype/",
-        'descr': 'DCMI Type Vocabulary'},
+        'descr': 'DCMI Type Vocabulary',
+        'type': ontology_id},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
-        'descr': 'ontology for the description of a project'},
+        'descr': 'ontology for the description of a project',
+        'type': ontology_id},
     "pato": {
         'def': "http://purl.obolibrary.org/obo/PATO_",
-        'descr': 'Vocabulary of phenotypic qualities'},
+        'descr': 'Vocabulary of phenotypic qualities',
+        'type': ontology_id},
     "uo": {
         'def': "http://purl.obolibrary.org/obo/UO_",
-        'descr': "Units of Measurement Ontology"},
+        'descr': "Units of Measurement Ontology",
+        'type': ontology_id},
     "author": {
         'def': "schema:author",
         'descr': 'author of some resource'},
