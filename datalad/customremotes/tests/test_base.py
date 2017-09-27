@@ -83,7 +83,7 @@ def test_interactions(tdir):
 
     # now we should test interactions
     import re
-    ERROR_ARGS = re.compile('^ERROR .*takes exactly \d+ argument')
+    ERROR_ARGS = re.compile('^ERROR .*(missing|takes) .*\d+ .*argument')
     for scenario in [
         [],  # default of doing nothing
         [    # support of EXPORT which by default is not supported
