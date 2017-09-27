@@ -36,7 +36,6 @@ def test_get_contentlocation(tdir):
 
 
 @with_tree(tree={'file.dat': ''})
-@skip_direct_mode  #FIXME
 def test_interactions(tdir):
     # Just a placeholder since constructor expects a repo
     repo = AnnexRepo(tdir, create=True, init=True)
