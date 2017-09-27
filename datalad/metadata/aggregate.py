@@ -205,9 +205,6 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
             'filepath',
             sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths)),
             agginto_ds))
-    # TODO collect list of files from aggfrom_ds.repo.get_files()
-    # and store in reference dataset to enable file lookup based
-    # on metadata
 
     # for both types of metadata
     for label, mtype, meta, dest in metasources:
