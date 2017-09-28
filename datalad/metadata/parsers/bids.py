@@ -25,7 +25,7 @@ lgr = logging.getLogger('datalad.meta.bids')
 vocabulary = {
     # characteristics (metadata keys)
     "dlp_bids:sex": {
-        'def': "pato:0000047",
+        '@id': "pato:0000047",
         'description': "biological sex"},
     # qualities (metadata values)
     "dlp_bids:female": {
