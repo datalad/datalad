@@ -24,6 +24,10 @@ lgr = logging.getLogger('datalad.meta.bids')
 # BIDS parser metadata definitions (dlp_bids:)
 vocabulary = {
     # characteristics (metadata keys)
+    "dlp_bids:age(years)": {
+        '@id': "pato:0000011",
+        'unit': "uo:0000036",  # year
+        'description': "age of a sample (organism) at the time of data acquisition in years"},
     "dlp_bids:sex": {
         '@id': "pato:0000047",
         'description': "biological sex"},
