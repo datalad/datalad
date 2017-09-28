@@ -85,6 +85,7 @@ def _get_search_schema(ds):
     per_ds_defs = {}
     ds_defs = {}
 
+    lgr.info('Scanning for metadata keys')
     # quick 1st pass over all dataset to gather the needed schema fields
     for res in _query_aggregated_metadata(
             reporton='datasets',
@@ -182,6 +183,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer()
 
+    lgr.info('Building search index')
     # load metadata of the base dataset and what it knows about all its subdatasets
     # (recursively)
     for res in _query_aggregated_metadata(
@@ -195,6 +197,7 @@ def _get_search_index(index_dir, ds, force_reindex):
             # MIH: I cannot see a case when we would not want recursion (within
             # the metadata)
             recursive=True):
+        rpath = relpath(res['path'], start=ds.path)
         # this assumes that files are reported after each dataset report,
         # and after a subsequent dataset report no files for the previous
         # dataset will be reported again
@@ -202,6 +205,7 @@ def _get_search_index(index_dir, ds, force_reindex):
         if rtype == 'dataset':
             # get any custom dataset mappings
             ds_defs = per_ds_defs.get(res['path'], {})
+            lgr.info('Adding information about Dataset %s', rpath)
         meta = res.get('metadata', {})
 
         # now we merge all reported unique content properties (flattened representation
@@ -213,7 +217,7 @@ def _get_search_index(index_dir, ds, force_reindex):
         meta.merge_add(meta.get('unique_content_properties', {}))
 
         doc_props = dict(
-            path=relpath(res['path'], start=ds.path),
+            path=rpath,
             type=rtype,
             **_meta2index_dict(meta, definitions, ds_defs))
         if 'parentds' in res:
