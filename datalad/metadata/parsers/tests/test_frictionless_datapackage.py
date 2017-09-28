@@ -8,14 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test frictionless datapackage meta data parser """
 
-from os.path import join as opj
 from simplejson import dumps
-from datalad.distribution.dataset import Dataset
+from datalad.api import Dataset
 from datalad.metadata.parsers.frictionless_datapackage import MetadataParser
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'datapackage.json': '{"name": "some"}'})
@@ -40,7 +37,7 @@ def test_has_no_metadata(path):
   "description": "Annual Consumer Price Index (CPI) for most countries in the world. Reference year is 2005.",
   "license" : {
       "type": "odc-pddl",
-      "url": "http://opendatacommons.org/licenses/pddl/"
+      "path": "http://opendatacommons.org/licenses/pddl/"
   },
   "keywords": [ "CPI", "World", "Consumer Price Index", "Annual Data", "The World Bank" ],
   "version": "2.0.0",

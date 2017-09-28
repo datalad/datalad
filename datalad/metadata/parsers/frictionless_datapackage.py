@@ -32,7 +32,7 @@ def _compact_author(obj):
 def _compact_license(obj):
     if isinstance(obj, dict):
         # With obj itself if no url or type
-        return obj.get('url', obj.get('type', obj))
+        return obj.get('path', obj.get('type', obj))
     else:
         return obj
 
