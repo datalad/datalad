@@ -17,7 +17,6 @@ from os.path import exists
 
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from datalad.utils import chpwd
@@ -37,10 +36,10 @@ from datalad.tests.utils import swallow_outputs
 
 
 def _assert_metadata_empty(meta):
-    ignore = set(['vocab_version_datalad_core'])
+    ignore = set(['@id', '@context'])
     assert (not len(meta) or set(meta.keys()) == ignore), \
         'metadata record is not empty: {}'.format(
-            {k: v for k in meta if k not in ignore})
+            {k: meta[k] for k in meta if k not in ignore})
 
 
 @with_tempfile(mkdir=True)
@@ -266,7 +265,7 @@ def test_mod_hierarchy(path):
     # only sub modified
     assert_result_count(res, 3)
     assert_result_count(res, 1, status='ok', action='metadata',
-                        metadata={'tag': ['tag1']})
+                        metadata={'tag': 'tag1'})
     assert_result_count(res, 2, status='ok', action='save')
     assert(not exists(basedb_path))
     assert(exists(subdb_path))
@@ -276,7 +275,7 @@ def test_mod_hierarchy(path):
     res = base.metadata(init=['tag2'], apply2global=True)
     assert_result_count(res, 2)
     assert_result_count(res, 1, status='ok', action='metadata',
-                        metadata={'tag': ['tag2']}, path=base.path)
+                        metadata={'tag': 'tag2'}, path=base.path)
     assert_result_count(res, 1, status='ok', action='save', path=base.path)
 
     # and again with removal of all metadata in sub

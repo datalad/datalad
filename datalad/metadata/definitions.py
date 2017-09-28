@@ -33,7 +33,8 @@ common_defs = {
         'descr': 'DCMI Type Vocabulary',
         'type': ontology_id},
     "dlp_bids": {
-        'description': 'Vocabulary of the DataLad BIDS metadata parser',
+        'def': 'TODO',
+        'descr': 'Vocabulary of the DataLad BIDS metadata parser',
         'type': ontology_id},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",

@@ -10,7 +10,7 @@
 
 from os.path import join as opj
 from simplejson import dumps
-from datalad.distribution.dataset import Dataset
+from datalad.api import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
@@ -52,8 +52,10 @@ def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_dataset_metadata()
+    del meta['@context']
+    dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
+        dump,
         """\
 {
   "author": [
@@ -85,8 +87,10 @@ def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_dataset_metadata()
+    del meta['@context']
+    dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
+        dump,
         """\
 {
   "conformsto": "http://bids.neuroimaging.io",
@@ -109,6 +113,7 @@ description с юникодом
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds).get_dataset_metadata()
+    del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
         dump,

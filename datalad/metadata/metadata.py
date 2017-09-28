@@ -423,10 +423,13 @@ def _query_aggregated_metadata_singlepath(
             obj = _load_json_object(
                 opj(agg_base_path, objloc),
                 cache=cache['objcache'])
-            getattr(metadata, 'merge_{}'.format(merge_mode))(obj)
+            # must pull out old context before the merge to avoid
+            # dtype mangling of the context dict
             context = metadata.get('@context', {})
+            getattr(metadata, 'merge_{}'.format(merge_mode))(obj)
             _merge_context(ds, context, obj.get('@context', {}))
-            metadata['@context'] = context
+            if context:
+                metadata['@context'] = context
 
         # all info on the dataset is gathered -> eject
         res['status'] = 'ok'
@@ -642,7 +645,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
         dsmeta['unique_content_properties'] = {k: sorted(v) for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
-    dsmeta['@context'] = context
+    if context:
+        dsmeta['@context'] = context
 
     return dsmeta, contentmeta, errored
 
