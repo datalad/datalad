@@ -19,6 +19,7 @@ version = '2.0'
 # '_', '-', and '.' -- except for JSON-LD keywords (which start with '@' and
 # will be ignored in the context of git-annex metadata
 common_defs = {
+    # ontologies/external vocabularies
     "schema": {
         'def': "http://schema.org/",
         'descr': 'base vocabulary',
@@ -46,6 +47,7 @@ common_defs = {
         'def': "http://purl.obolibrary.org/obo/UO_",
         'descr': "Units of Measurement Ontology",
         'type': ontology_id},
+    # individually defined terms
     "author": {
         'def': "schema:author",
         'descr': 'author of some resource'},
@@ -92,6 +94,7 @@ common_defs = {
     "subject": {
         'def': 'dcterms:subject',
         'descr': 'topic of a resource, best practice is to use a controlled vocabulary'},
+    # TODO why not JSON-LD @type instead, an annexed file is type 'file' anyways
     "type": {
         'def': "schema:type",
         'descr': 'type or category of a resource (e.g. file, dataset)'},

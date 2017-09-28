@@ -53,16 +53,92 @@ def _add_document(idx, **kwargs):
            for k, v in kwargs.items()})
 
 
-def _meta2index_dict(meta, schema):
+def _meta2index_dict(meta, definitions, ds_defs):
+    """Takes care of dtype conversion into unicode, potential key mappings
+    and concatenation of sequence-type fields into CSV strings
+    """
     return {
-        k: ', '.join(assure_unicode(i) for i in v)
+        ds_defs.get(k, k): ', '.join(assure_unicode(i) for i in v)
         if isinstance(v, list) else assure_unicode(v)
         for k, v in (meta or {}).items()
-        if k in schema.names()
+        # ignore anything that is not defined
+        if k in definitions
     }
 
 
-def _get_search_index(index_dir, ds, schema, force_reindex):
+def _get_search_schema(ds):
+    from whoosh import fields as wf
+
+    # this will harvest all discovered term definitions
+    definitions = {
+        '@id': 'unique identifier of an entity',
+        'path': 'path name of an entity relative to the searched base dataset',
+        'parentds': 'path of the datasets that contains an entity',
+        # 'type' will not come from a metadata field, hence will not be detected
+        'type': common_defs['type'],
+    }
+
+    schema_fields = {n: wf.ID(stored=True) for n in definitions}
+    # this will contain any dataset-specific term mappings, in case we find
+    # non-unique keys that are differently defined
+    per_ds_defs = {}
+    ds_defs = {}
+
+    # quick 1st pass over all dataset to gather the needed schema fields
+    for res in _query_aggregated_metadata(
+            reporton='datasets',
+            ds=ds,
+            aps=[dict(path=ds.path, type='dataset')],
+            merge_mode='init',
+            recursive=True):
+        ds_defs = {}
+        meta = res.get('metadata', {})
+        for k, v in meta.get('@context', {}).items():
+            if k not in definitions or definitions[k] == v:
+                # this is new, but unique, or uniformly defined
+                definitions[k] = v
+            else:
+                # non-unique key (across all seen datasets)
+                # make unique
+                # TODO we have to deal with @vocab fields in here, those
+                # might be different when some aggregated metadata was
+                # generated with an old version of datalad
+                # in this case we should actually load the old vocabulary
+                # and perform the mapping to the current one in here
+                count = 0
+                uk = k
+                while uk in definitions:
+                    count += 1
+                    uk = '{}_{}'.format(k, count)
+                ds_defs[k] = uk
+                k = uk
+            definitions[k] = v
+            # we register a field for any definition in the context.
+            # while this has the potential to needlessly blow up the
+            # index size, the only alternative would be to iterate over
+            # all content metadata in this first pass too, in order to
+            # do a full scan.
+            schema_fields[k] = wf.TEXT(stored=True)
+        if ds_defs:
+            # store ds-specific mapping for the second pass that actually
+            # generates the search index
+            per_ds_defs[res['path']] = ds_defs
+
+        for k in meta:
+            if k not in definitions:
+                termdef = common_defs.get(k, None)
+                if termdef is None:
+                    # ignore anything that is not defined
+                    continue
+                definitions[k] = termdef
+                # TODO treat keywords/tags separately
+                schema_fields[k] = wf.TEXT(stored=True)
+
+    schema = wf.Schema(**schema_fields)
+    return schema, definitions, per_ds_defs
+
+
+def _get_search_index(index_dir, ds, force_reindex):
     from whoosh import index as widx
 
     if not force_reindex and exists(index_dir):
@@ -100,6 +176,8 @@ def _get_search_index(index_dir, ds, schema, force_reindex):
     if not exists(index_dir):
         os.makedirs(index_dir)
 
+    schema, definitions, per_ds_defs = _get_search_schema(ds)
+
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer()
 
@@ -116,16 +194,19 @@ def _get_search_index(index_dir, ds, schema, force_reindex):
             # MIH: I cannot see a case when we would not want recursion (within
             # the metadata)
             recursive=True):
-            # **kwargs):
         # this assumes that files are reported after each dataset report,
         # and after a subsequent dataset report no files for the previous
         # dataset will be reported again
+        rtype = res['type']
+        if rtype == 'dataset':
+            # get any custom dataset mappings
+            ds_defs = per_ds_defs.get(res['path'], {})
+        meta = res.get('metadata', {})
+
         doc_props = dict(
             path=relpath(res['path'], start=ds.path),
-            type=res['type'],
-            # TODO emulate old approach of building one giant text blob per entry
-            # and anything else we know about, and is known to the schema
-            **_meta2index_dict(res.get('metadata', None), schema))
+            type=rtype,
+            **_meta2index_dict(meta, definitions, ds_defs))
         if 'parentds' in res:
             doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
         _add_document(idx, **doc_props)
@@ -228,14 +309,7 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20):
-        from whoosh import fields as wf
         from whoosh import qparser as qparse
-
-        # this ammends the metadata key definitions (common_defs)
-        # default will be TEXT, hence we only need to specify the differences
-        whoosh_field_types = {
-            "modified": wf.DATETIME,
-        }
 
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
@@ -252,31 +326,15 @@ class Search(Interface):
         # where does the bunny have the eggs?
         index_dir = opj(ds.path, get_git_dir(ds.path), 'datalad', 'search_index')
 
-        # auto-builds search schema from common metadata keys
-        # the idea is to only store what we need to pull up the full metadata
-        # for a search hit
-        datalad_schema = wf.Schema(
-            id=wf.ID(stored=True),
-            path=wf.ID(stored=True),
-            parentds=wf.ID(stored=True),
-            type=wf.ID(stored=True),
-            **{k: whoosh_field_types.get(k, wf.TEXT(stored=True))
-               # TODO not just common_defs, but the entire vocabulary defined
-               # by any parser
-               for k in common_defs
-               if not k.startswith('@') and not k == 'type'})
-
         idx_obj = _get_search_index(
-            index_dir, ds, datalad_schema, force_reindex)
+            index_dir, ds, force_reindex)
 
         with idx_obj.searcher() as searcher:
             # parse the query string, default whoosh parser ATM, could be
             # tailored with plugins
             parser = qparse.MultifieldParser(
-                # TODO same here, not just common defs
-                [k for k in common_defs if not k.startswith('@')] +
-                ['id', 'path', 'type'],
-                datalad_schema)
+                idx_obj.schema.names(),
+                idx_obj.schema)
             # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
             # upstream
             parser.add_plugin(qparse.FuzzyTermPlugin())
