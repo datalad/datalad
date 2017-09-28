@@ -638,6 +638,7 @@ class AggregateMetaData(Interface):
         #
         if not to_save:
             return
+        lgr.info('Attempting to save %i files/datasets', len(to_save))
         for res in Save.__call__(
                 path=to_save,
                 dataset=refds_path,
