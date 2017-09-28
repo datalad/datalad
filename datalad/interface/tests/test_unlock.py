@@ -31,6 +31,8 @@ from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import on_windows, skip_if
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
 from datalad.utils import swallow_logs
 
 
@@ -67,6 +69,7 @@ def test_unlock_raises(path, path2, path3):
     chpwd(_cwd)
 
 
+@known_failure_v6  # FIXME: See TODOs in the comments below
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
 @skip_if(cond=not on_windows and geteuid() == 0)  # uid not available on windows
@@ -79,13 +82,20 @@ def test_unlock(path):
     # TODO: use get_annexed_files instead of hardcoded filename
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
-    from datalad.tests.utils import assert_status, assert_result_count, assert_in_results, assert_not_in_results, assert_result_values_equal
+    # in direct mode there is no unlock:
     if ds.repo.is_direct_mode():
         res = ds.unlock()
         assert_result_count(res, 1)
         assert_status('notneeded', res)
 
-    # TODO: What about V6? => You can unlock even if there's no content!
+    # in V6 we can unlock even if the file's content isn't present:
+    elif ds.repo.config.getint("annex", "version") == 6:
+        res = ds.unlock()
+        assert_result_count(res, 1)
+        assert_status('ok', res)
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     else:
         # cannot unlock without content (annex get wasn't called)
         assert_raises(CommandError, ds.unlock)  # FIXME
@@ -102,6 +112,11 @@ def test_unlock(path):
         f.write("change content")
 
     ds.repo.add('test-annex.dat')
+    # in V6 we need to explicitly re-lock it:
+    if ds.repo.config.getint("annex", "version") == 6:
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
     if not ds.repo.is_direct_mode():
@@ -130,7 +145,18 @@ def test_unlock(path):
         f.write("change content again")
 
     ds.repo.add('test-annex.dat')
+    # in V6 we need to explicitly re-lock it:
+    if ds.repo.config.getint("annex", "version") == 6:
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
+
+    # TODO:
+    # BOOOM: test-annex.dat writeable in V6!
+    # Why the hell is this different than the first time we wrote to the file
+    # and locked it again?
+    # Also: After opening the file is empty.
 
     if not ds.repo.is_direct_mode():
         # after commit, file is locked again:
