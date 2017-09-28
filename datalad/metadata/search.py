@@ -33,6 +33,7 @@ from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.metadata import _query_aggregated_metadata
+from datalad.metadata.metadata import MetadataDict
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
@@ -202,6 +203,14 @@ def _get_search_index(index_dir, ds, force_reindex):
             # get any custom dataset mappings
             ds_defs = per_ds_defs.get(res['path'], {})
         meta = res.get('metadata', {})
+
+        # now we merge all reported unique content properties (flattened representation
+        # of content metadata) with the main metadata set, using the 'add' strategy
+        # this way any existing metadata value of a dataset itself will be amended by
+        # those coming from the content. E.g. a single dataset 'license' might be turned
+        # into a sequence of unique license identifiers across all dataset components
+        meta = MetadataDict(meta)
+        meta.merge_add(meta.get('unique_content_properties', {}))
 
         doc_props = dict(
             path=relpath(res['path'], start=ds.path),
