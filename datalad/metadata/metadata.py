@@ -24,6 +24,7 @@ from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
 
+from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
@@ -590,6 +591,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
             except Exception as e:
                 lgr.error('Failed to get dataset metadata ({}): {}'.format(
                     mtype, exc_str(e)))
+                if cfg.get('datalad.runtime.raiseonerror'):
+                    raise
                 errored = True
                 # if we dont get global metadata we do not want content metadata
                 continue
@@ -632,6 +635,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
                 lgr.error('Failed to get dataset content metadata ({}): {}'.format(
                     mtype, exc_str(e)))
                 errored = True
+                if cfg.get('datalad.runtime.raiseonerror'):
+                    raise
     # go through content metadata and inject report of unique keys
     # and values into `dsmeta`
     unique_cm = {}

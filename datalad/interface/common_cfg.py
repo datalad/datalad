@@ -212,4 +212,12 @@ definitions = {
                'title': 'Native dataset metadata scheme',
                'text': 'Set this label to engage a particular metadata extraction parser'}),
     },
+    'datalad.runtime.raiseonerror': {
+        'ui': ('question', {
+               'title': 'Error behavior',
+               'text': 'Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+
 }
