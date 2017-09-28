@@ -461,6 +461,10 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
     """Returns None if desired info was obtained, or a tuple (status, message)
     if not"""
     ds = Dataset(ds_path)
+    if ds.repo is None:
+        # There is no repository, nothing could be done
+        return ('impossible',
+                'No repository found for %s' % ds)
     if to is None:
         # we need an upstream remote, if there's none given. We could
         # wait for git push to complain, but we need to explicitly
@@ -497,7 +501,7 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
         if missing == 'skip':
             ds_remote_info[ds_path] = None
             return ('notneeded',
-                    ("Unkown target sibling '%s', skipping publication", to))
+                    ("Unknown target sibling '%s', skipping publication", to))
         elif missing == 'inherit':
             superds = ds.get_superdataset()
             if not superds:

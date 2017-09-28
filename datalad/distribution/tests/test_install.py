@@ -343,7 +343,7 @@ def test_install_recursive(src, path_nr, path_r):
             "Unintentionally installed: %s" % (sub,))
     # this also means, subdatasets to be listed as not fulfilled:
     eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
-        {'subm 1', 'subm 2'})
+        {'subm 1', '2'})
 
     # now recursively:
     # don't filter implicit results so we can inspect them
@@ -361,7 +361,7 @@ def test_install_recursive(src, path_nr, path_r):
     # (Note: Until we provide proper (singleton) instances for Datasets,
     # need to check for their paths)
     assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
-    assert_in(opj(top_ds.path, 'subm 2'), [i.path for i in ds_list])
+    assert_in(opj(top_ds.path, '2'), [i.path for i in ds_list])
 
     eq_(len(top_ds.subdatasets(recursive=True)), 2)
 
@@ -592,22 +592,22 @@ def test_install_list(path, top_path):
     assert_not_in('annex.hardlink', ds.config)
     ok_(ds.is_installed())
     sub1 = Dataset(opj(top_path, 'subm 1'))
-    sub2 = Dataset(opj(top_path, 'subm 2'))
+    sub2 = Dataset(opj(top_path, '2'))
     ok_(not sub1.is_installed())
     ok_(not sub2.is_installed())
 
     # fails, when `source` is passed:
     assert_raises(ValueError, ds.install,
-                  path=['subm 1', 'subm 2'],
+                  path=['subm 1', '2'],
                   source='something')
 
     # now should work:
-    result = ds.install(path=['subm 1', 'subm 2'], result_xfm='paths')
+    result = ds.install(path=['subm 1', '2'], result_xfm='paths')
     ok_(sub1.is_installed())
     ok_(sub2.is_installed())
     eq_(set(result), {sub1.path, sub2.path})
     # and if we request it again via get, result should be empty
-    get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
+    get_result = ds.get(path=['subm 1', '2'], get_data=False)
     assert_status('notneeded', get_result)
 
 
@@ -674,7 +674,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
 
     # install a list with valid and invalid items:
     result = ds.install(
-        path=['subm 1', 'not_existing', path_outside, 'subm 2'],
+        path=['subm 1', 'not_existing', path_outside, '2'],
         get_data=False,
         on_failure='ignore', result_xfm=None, return_type='list')
     # good and bad results together
@@ -686,7 +686,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
                          (path_outside, "path not associated with any dataset")]:
         assert_result_count(
             result, 1, status='impossible', message=msg, path=skipped)
-    for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
+    for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, '2'))]:
         assert_result_count(
             result, 1, status='ok',
             message=('Installed subdataset in order to get %s', sub.path))
@@ -708,7 +708,7 @@ def test_install_skip_failed_recursive(src, path):
     # install top level:
     ds = install(path, source=src)
     sub1 = Dataset(opj(path, 'subm 1'))
-    sub2 = Dataset(opj(path, 'subm 2'))
+    sub2 = Dataset(opj(path, '2'))
     # sabotage recursive installation of 'subm 1' by polluting the target:
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
@@ -720,7 +720,8 @@ def test_install_skip_failed_recursive(src, path):
         # toplevel dataset was in the house already
         assert_result_count(
             result, 0, path=ds.path, type='dataset')
-        assert_status('error', [result[0]])
+        # subm 1 should fail to install. [1] since comes after '2' submodule
+        assert_in_results(result, status='error', path=sub1.path)
         assert_in_results(result, status='ok', path=sub2.path)
 
         cml.assert_logged(

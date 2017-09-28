@@ -309,7 +309,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     source = install(src_path, source=origin, recursive=True)
 
     sub1 = Dataset(opj(src_path, "subm 1"))
-    sub2 = Dataset(opj(src_path, "subm 2"))
+    sub2 = Dataset(opj(src_path, "2"))
 
     for flat in False, True:
         target_path_ = target_dir_tpl = target_path + "-" + str(flat)
@@ -330,7 +330,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 ui=True)
 
         # raise if git repos were not created
-        for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
+        for suffix in [sep + 'subm 1', sep + '2', '']:
             target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
