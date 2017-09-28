@@ -505,6 +505,7 @@ def _query_aggregated_metadata_singlepath(
     # to the dataset they were aggregated from
     rparentpath = relpath(rpath, start=containing_ds)
 
+    compiled_exp = {pathexp: re.compile(pathexp) for pathexp in contentmeta}
     for fpath in files:
         # we might be onto something here, prepare result
         # start with the current annex metadata for this path, if anything
@@ -523,7 +524,7 @@ def _query_aggregated_metadata_singlepath(
 
         # loop over all records, check if path matched and merge properties
         for pathexp in contentmeta:
-            if not re.match(pathexp, fpath):
+            if not compiled_exp[pathexp].match(fpath):
                 continue
             metadata.merge_add(contentmeta[pathexp])
 
