@@ -115,19 +115,23 @@ class MetadataParser(BaseMetadataParser):
         if exists(participants_fname):
             with open(participants_fname, 'rb') as tsvfile:
                 # add robustness, use a sniffer
-                dialect = csv.Sniffer().sniff(tsvfile.read(1024))
+                try:
+                    dialect = csv.Sniffer().sniff(tsvfile.read(16384))
+                except:
+                    lgr.warning('Could not determine file-format, assuming TSV')
+                    dialect = 'excel-tab'
                 tsvfile.seek(0)
                 for row in csv.DictReader(tsvfile, dialect=dialect):
-                    if not 'participant_id' in row:
+                    if 'participant_id' not in row:
                         # not sure what this is, but we cannot use it
                         break
                     props = {}
                     for k in row:
                         # take away some ambiguity
-                        k = k.lower()
-                        hk = content_metakey_map.get(k, None)
+                        normk = k.lower()
+                        hk = content_metakey_map.get(normk, None)
                         if hk is None:
-                            hk = 'comment[{}]'.format(k)
+                            hk = 'comment[{}]'.format(normk)
                         elif hk == 'dlp_bids:sex':
                             val = sex_label_map.get(row[k].lower(), None)
                             if val:
