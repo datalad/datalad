@@ -1673,15 +1673,28 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
 
         if self.is_direct_mode():
+
+            # TODO:
+            # If anything there should be a CommandNotAvailableError now:
             lgr.debug("'%s' is in direct mode, "
                       "'annex unlock' not available", self)
             lgr.warning("In direct mode there is no 'unlock'. However if "
                         "the file's content is present, it is kind of "
                         "unlocked. Therefore just checking whether this is "
                         "the case.")
+            # TODO/FIXME:
+            # Note: the following isn't exactly nice, if `files` is a dir.
+            # For a "correct" result we would need to report all files within
+            # potential dir(s) in `files`, that are annexed and have content.
+            # Also note, that even now files in git might be reported "unlocked",
+            # since they have content. This might be a confusing result.
+            # On the other hand, this is solved on the level of Dataset.unlock
+            # by annotating those paths 'notneeded' beforehand.
             return [f for f in files if self.file_has_content(f)]
 
         else:
+
+            # TODO: catch and parse output if failed (missing content ...)
             std_out, std_err = \
                 self._run_annex_command('unlock', annex_options=files + options)
 

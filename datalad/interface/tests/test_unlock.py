@@ -79,13 +79,24 @@ def test_unlock(path):
     # TODO: use get_annexed_files instead of hardcoded filename
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
-    # cannot unlock without content (annex get wasn't called):
-    assert_raises(CommandError, ds.unlock)
+    from datalad.tests.utils import assert_status, assert_result_count, assert_in_results, assert_not_in_results, assert_result_values_equal
+    if ds.repo.is_direct_mode():
+        res = ds.unlock()
+        assert_result_count(res, 1)
+        assert_status('notneeded', res)
+
+    # TODO: What about V6? => You can unlock even if there's no content!
+    else:
+        # cannot unlock without content (annex get wasn't called)
+        assert_raises(CommandError, ds.unlock)  # FIXME
 
     ds.repo.get('test-annex.dat')
     result = ds.unlock()
-    assert len(result) >= 1
-    assert_in('test-annex.dat', result)
+    assert_result_count(result, 1)
+    if ds.repo.is_direct_mode():
+        assert_status('notneeded', result)
+    else:
+        assert_in_results(result, path='test-annex.dat', status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
@@ -93,8 +104,9 @@ def test_unlock(path):
     ds.repo.add('test-annex.dat')
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    if not ds.repo.is_direct_mode():
+        # after commit, file is locked again:
+        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:
@@ -102,7 +114,17 @@ def test_unlock(path):
 
     # unlock again, this time more specific:
     result = ds.unlock(path='test-annex.dat')
-    eq_(['test-annex.dat'], result)
+    assert_result_count(result, 1)
+
+    # TODO: Why in the following result there is the absolute path in direct mode
+    # while it's the relative one in indirect mode?
+    # Probably:
+    # => direct mode: no actual call to annex-unlock
+    # => indirect mode: it's what AnnexRepo.unlock returns
+    if ds.repo.is_direct_mode():
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='notneeded')
+    else:
+        assert_in_results(result, path='test-annex.dat', status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")
@@ -110,8 +132,9 @@ def test_unlock(path):
     ds.repo.add('test-annex.dat')
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    if not ds.repo.is_direct_mode():
+        # after commit, file is locked again:
+        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:
