@@ -161,7 +161,6 @@ tree4uargs = dict(
 )
 
 
-@known_failure_v6  # FIXME: git files make repo unexpectedly dirty
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()

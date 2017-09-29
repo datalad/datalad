@@ -12,7 +12,6 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
-from datalad.tests.utils import skip_v6
 
 from os import curdir
 from os.path import join as opj, basename
@@ -327,7 +326,6 @@ def test_get_recurse_subdatasets(src, path):
 
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-@skip_v6
 def test_get_greedy_recurse_subdatasets(src, path):
 
     ds = install(

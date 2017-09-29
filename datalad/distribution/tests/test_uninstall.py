@@ -180,7 +180,6 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
-@known_failure_v6  # FIXME: git files end up in annex, therefore drop result is different
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
