@@ -126,7 +126,6 @@ matrix:
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-
   - python: 2.7
     # test whether known direct mode failures still fail
     env:
@@ -141,6 +140,18 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
+  # test whether known v6 failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  # test whether known direct mode failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
