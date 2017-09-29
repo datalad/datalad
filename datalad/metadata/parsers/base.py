@@ -20,7 +20,20 @@ class BaseMetadataParser(object):
 
         self.ds = ds
 
-    def get_dataset_metadata(self):
+    def get_metadata(self, dataset=True, content=True):
+        """
+        Returns
+        -------
+        dict or None, dict or None
+          Dataset metadata dict, dictionary of filepath regexes with metadata,
+          dicts, each return value could be None if there is no such metadata
+        """
+        # default implementation
+        return \
+            self._get_dataset_metadata() if dataset else None, \
+            {k: v for k, v in self._get_content_metadata()} if content else None
+
+    def _get_dataset_metadata(self):
         """
         Returns
         -------
@@ -29,7 +42,7 @@ class BaseMetadataParser(object):
         """
         raise NotImplementedError
 
-    def get_content_metadata(self):
+    def _get_content_metadata(self):
         """Get ALL metadata for all dataset content.
 
         Returns

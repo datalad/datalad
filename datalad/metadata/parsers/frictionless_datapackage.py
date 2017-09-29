@@ -57,7 +57,7 @@ class MetadataParser(BaseMetadataParser):
         metadata_path = opj(self.ds.path, self.metadatasrc_fname)
         return exists(metadata_path)
 
-    def get_dataset_metadata(self):
+    def _get_dataset_metadata(self):
         meta = {}
         metadata_path = opj(self.ds.path, self.metadatasrc_fname)
         if not exists(metadata_path):
@@ -82,5 +82,5 @@ class MetadataParser(BaseMetadataParser):
 
         return meta
 
-    def get_content_metadata(self):
-        return {}
+    def _get_content_metadata(self):
+        return []

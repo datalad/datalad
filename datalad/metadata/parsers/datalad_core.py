@@ -30,7 +30,7 @@ class MetadataParser(BaseMetadataParser):
         fpath = opj(self.ds.path, self._dataset_metadata_filename)
         return exists(fpath) or isinstance(self.ds.repo, AnnexRepo)
 
-    def get_dataset_metadata(self):
+    def _get_dataset_metadata(self):
         """
         Returns
         -------
@@ -48,7 +48,7 @@ class MetadataParser(BaseMetadataParser):
         return obj
 
     # the optional arg is a special case and only used for internal puposes
-    def get_content_metadata(self, paths=None):
+    def _get_content_metadata(self, paths=None):
         """Get ALL metadata for all dataset content.
 
         Returns

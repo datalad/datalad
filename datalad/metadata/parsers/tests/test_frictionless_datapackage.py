@@ -56,7 +56,7 @@ def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
     p = MetadataParser(ds)
-    meta = p.get_dataset_metadata()
+    meta = p._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\

@@ -99,7 +99,7 @@ class MetadataParser(BaseMetadataParser):
     def has_metadata(self):
         return exists(opj(self.ds.path, self._core_metadata_filename))
 
-    def get_dataset_metadata(self):
+    def _get_dataset_metadata(self):
         fname = opj(self.ds.path, self._core_metadata_filename)
         # those namespaces are a b.ch
         # TODO: avoid reading file twice
@@ -116,5 +116,5 @@ class MetadataParser(BaseMetadataParser):
         tree = ET.ElementTree(file=fname)
         return _process_tree(tree, nstag)
 
-    def get_content_metadata(self):
+    def _get_content_metadata(self):
         return []  # no content metadata provided

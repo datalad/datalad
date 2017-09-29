@@ -495,7 +495,7 @@ def _query_aggregated_metadata_singlepath(
         # modifications since the last aggregation
         # (if there even was any ever)
         from datalad.metadata.parsers.datalad_core import MetadataParser as DLCP
-        annex_meta.update(DLCP(ds).get_content_metadata(files))
+        annex_meta.update(DLCP(ds)._get_content_metadata(files))
 
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_json_object(
@@ -583,21 +583,21 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
             errored = True
             continue
         parser = pmod.MetadataParser(ds)
-        #
-        # dataset global metadata
-        #
-        if global_meta:
-            try:
-                dsmeta_t = parser.get_dataset_metadata()
-            except Exception as e:
-                lgr.error('Failed to get dataset metadata ({}): {}'.format(
-                    mtype, exc_str(e)))
-                if cfg.get('datalad.runtime.raiseonerror'):
-                    raise
-                errored = True
-                # if we dont get global metadata we do not want content metadata
-                continue
-            if not isinstance(dsmeta_t, dict):
+        try:
+            dsmeta_t, contentmeta_t = parser.get_metadata(
+                dataset=global_meta,
+                content=content_meta)
+        except Exception as e:
+            lgr.error('Failed to get dataset metadata ({}): {}'.format(
+                mtype, exc_str(e)))
+            if cfg.get('datalad.runtime.raiseonerror'):
+                raise
+            errored = True
+            # if we dont get global metadata we do not want content metadata
+            continue
+
+        if dsmeta_t:
+            if dsmeta_t is not None and not isinstance(dsmeta_t, dict):
                 lgr.error(
                     "Metadata parser '%s' yielded something other than a dictionary "
                     "for dataset %s -- this is likely a bug, please consider "
@@ -612,32 +612,22 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
                 # vocabulary in any case
                 _merge_context(ds, context, dsmeta_t.get('@context', {}))
 
-        # dataset content metadata
-        #
-        if content_meta:
-            try:
-                for loc, meta in parser.get_content_metadata():
-                    if not isinstance(meta, dict):
-                        lgr.error(
-                            "Metadata parser '%s' yielded something other than a dictionary "
-                            "for dataset %s content %s -- this is likely a bug, please consider "
-                            "reporting it. "
-                            "This type of native metadata will be ignored. Got: %s",
-                            mtype, ds, loc, repr(meta))
-                        errored = True
-                    elif meta:
-                        if loc in meta:
-                            # we already have this on record -> merge
-                            getattr(contentmeta[loc], 'merge_{}'.format(merge_mode))(meta)
-                        else:
-                            # no prior record, wrap an helper and store
-                            contentmeta[loc] = MetadataDict(meta)
-            except Exception as e:
-                lgr.error('Failed to get dataset content metadata ({}): {}'.format(
-                    mtype, exc_str(e)))
+        for loc, meta in contentmeta_t or {}:
+            if not isinstance(meta, dict):
+                lgr.error(
+                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "for dataset %s content %s -- this is likely a bug, please consider "
+                    "reporting it. "
+                    "This type of native metadata will be ignored. Got: %s",
+                    mtype, ds, loc, repr(meta))
                 errored = True
-                if cfg.get('datalad.runtime.raiseonerror'):
-                    raise
+            elif meta:
+                if loc in meta:
+                    # we already have this on record -> merge
+                    getattr(contentmeta[loc], 'merge_{}'.format(merge_mode))(meta)
+                else:
+                    # no prior record, wrap an helper and store
+                    contentmeta[loc] = MetadataDict(meta)
     # go through content metadata and inject report of unique keys
     # and values into `dsmeta`
     unique_cm = {}

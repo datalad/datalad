@@ -68,7 +68,7 @@ class MetadataParser(BaseMetadataParser):
     def has_metadata(self):
         return exists(opj(self.ds.path, self._core_metadata_filename))
 
-    def get_dataset_metadata(self):
+    def _get_dataset_metadata(self):
         meta = {}
         if not self.has_metadata():
             return meta
@@ -101,3 +101,6 @@ class MetadataParser(BaseMetadataParser):
 
         meta['conformsto'] = self._metadata_compliance
         return meta
+
+    def _get_content_metadata(self):
+        return []

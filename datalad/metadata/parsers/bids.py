@@ -70,7 +70,7 @@ class MetadataParser(BaseMetadataParser):
     def has_metadata(self):
         return exists(opj(self.ds.path, self._core_metadata_filename))
 
-    def get_dataset_metadata(self):
+    def _get_dataset_metadata(self):
         meta = {}
         metadata_path = opj(self.ds.path, self._core_metadata_filename)
         if not exists(metadata_path):
@@ -110,7 +110,7 @@ class MetadataParser(BaseMetadataParser):
         meta['@context'] = vocabulary
         return meta
 
-    def get_content_metadata(self):
+    def _get_content_metadata(self):
         participants_fname = opj(self.ds.path, 'participants.tsv')
         if exists(participants_fname):
             with open(participants_fname, 'rb') as tsvfile:
