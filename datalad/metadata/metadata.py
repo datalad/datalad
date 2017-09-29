@@ -1184,7 +1184,7 @@ class Metadata(Interface):
             type=' ({})'.format(res['type']) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys())
-                          if not (k == 'tag'))
+                          if k not in ('tag', '@context', '@id'))
                  if meta else ' -',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(assure_list(meta['tag'])))))
