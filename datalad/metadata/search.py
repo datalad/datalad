@@ -58,9 +58,17 @@ def _meta2index_dict(meta, definitions, ds_defs):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
+    # TODO maybe leave the unicode conversion out here and only do in
+    # _add_document()
     return {
-        ds_defs.get(k, k): ', '.join(assure_unicode(i) for i in v)
-        if isinstance(v, list) else assure_unicode(v)
+        # apply any dataset-specific key mapping
+        ds_defs.get(k, k):
+        # turn lists into CSV strings
+        ', '.join(assure_unicode(i) for i in v) if isinstance(v, list) else
+        # dicts into SSV strings
+        '; '.join(assure_unicode(v[i]) for i in v) if isinstance(v, dict) else
+        # and the rest into unicode
+        assure_unicode(v)
         for k, v in (meta or {}).items()
         # ignore anything that is not defined
         if k in definitions
@@ -131,6 +139,11 @@ def _get_search_schema(ds):
                 termdef = common_defs.get(k, None)
                 if termdef is None:
                     # ignore anything that is not defined
+                    # TODO this might be too strict, let's say we find
+                    # 'dicom:PatientName' and 'dicom' is defined
+                    # so we could in principle resolve that later on and all is good
+                    # ATM we would need to ship the entire DICOM ontology in a
+                    # DICOM dataset to be ready and compliant...
                     continue
                 definitions[k] = termdef
                 # TODO treat keywords/tags separately
