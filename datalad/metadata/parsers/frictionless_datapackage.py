@@ -32,7 +32,11 @@ def _compact_author(obj):
 def _compact_license(obj):
     if isinstance(obj, dict):
         # With obj itself if no url or type
-        return obj.get('path', obj.get('type', obj))
+        obj = obj.get('path', obj.get('type', obj))
+        if isinstance(obj, dict) and len(obj) == 1:
+            # didn't get lucky with compacting, try one more
+            obj = obj.values()[0]
+        return obj
     else:
         return obj
 
