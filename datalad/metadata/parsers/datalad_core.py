@@ -26,10 +26,6 @@ from datalad.metadata.definitions import version as vocabulary_version
 class MetadataParser(BaseMetadataParser):
     _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
 
-    def has_metadata(self):
-        fpath = opj(self.ds.path, self._dataset_metadata_filename)
-        return exists(fpath) or isinstance(self.ds.repo, AnnexRepo)
-
     def _get_dataset_metadata(self):
         """
         Returns

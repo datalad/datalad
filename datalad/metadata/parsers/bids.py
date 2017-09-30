@@ -66,9 +66,6 @@ class MetadataParser(BaseMetadataParser):
         'Description': 'description',
     }
 
-    def has_metadata(self):
-        return exists(opj(self.ds.path, self._core_metadata_filename))
-
     def _get_dataset_metadata(self):
         meta = {}
         metadata_path = opj(self.ds.path, self._core_metadata_filename)

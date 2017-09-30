@@ -8,28 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test BIDS meta data parser """
 
-from os.path import join as opj
 from simplejson import dumps
 from datalad.api import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
-from nose.tools import assert_true, assert_false, assert_equal
+from nose.tools import assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.support.exceptions import IncompleteResultsError
-
-
-@with_tree(tree={'dataset_description.json': '{}'})
-def test_has_metadata(path):
-    ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds, [])
-    assert_true(p.has_metadata())
-
-
-@with_tempfile(mkdir=True)
-def test_has_no_metadata(path):
-    ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds, [])
-    assert_false(p.has_metadata())
 
 
 @with_tree(tree={'dataset_description.json': """

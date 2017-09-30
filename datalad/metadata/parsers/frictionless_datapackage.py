@@ -53,10 +53,6 @@ class MetadataParser(BaseMetadataParser):
         'homepage': 'homepage',
     }
 
-    def has_metadata(self):
-        metadata_path = opj(self.ds.path, self.metadatasrc_fname)
-        return exists(metadata_path)
-
     def _get_dataset_metadata(self):
         meta = {}
         metadata_path = opj(self.ds.path, self.metadatasrc_fname)

@@ -11,7 +11,6 @@
 
 import re
 from os.path import join as opj
-from os.path import exists
 from collections import OrderedDict
 
 try:
@@ -95,9 +94,6 @@ def _process_tree(tree, nstag):
 
 class MetadataParser(BaseMetadataParser):
     _core_metadata_filename = opj('.datalad', 'meta.datacite.xml')
-
-    def has_metadata(self):
-        return exists(opj(self.ds.path, self._core_metadata_filename))
 
     def _get_dataset_metadata(self):
         fname = opj(self.ds.path, self._core_metadata_filename)

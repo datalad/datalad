@@ -54,10 +54,6 @@ class BaseMetadataParser(object):
         """
         raise NotImplementedError
 
-    def has_metadata(self):
-        """Returns whether a dataset provides this kind meta data"""
-        raise NotImplementedError
-
     def get_homogenized_key(self, key):
         # TODO decide on how to error
         return self._key2stdkey.get(key)

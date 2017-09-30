@@ -15,7 +15,6 @@ lgr = logging.getLogger('datalad.metadata.parser.audio')
 
 from mutagen import File as audiofile
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.metadata import _get_metadatarelevant_paths
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 
@@ -34,13 +33,6 @@ vocab_map = {
 
 
 class MetadataParser(BaseMetadataParser):
-    def has_metadata(self):
-        for f in self.paths:
-            if audiofile(f) is not None:
-                return True
-        # tried all files without having any luck
-        return False
-
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []
