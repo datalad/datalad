@@ -237,12 +237,12 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # prepare src
     source = install(src_path, source=origin.path, recursive=True)
     # we will be trying to push into this later on, need to give permissions...
-    origin_sub2 = Dataset(opj(origin_path, 'subm 2'))
+    origin_sub2 = Dataset(opj(origin_path, '2'))
     origin_sub2.config.set(
         'receive.denyCurrentBranch', 'updateInstead', where='local')
     ## TODO this manual fixup is needed due to gh-1548 -- needs proper solution
     #os.remove(opj(origin_sub2.path, '.git'))
-    #os.rename(opj(origin_path, '.git', 'modules', 'subm 2'), opj(origin_sub2.path, '.git'))
+    #os.rename(opj(origin_path, '.git', 'modules', '2'), opj(origin_sub2.path, '.git'))
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -265,7 +265,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # we will be testing presence of the file content, so let's make it progress
     sub2_target.config.set('receive.denyCurrentBranch', 'updateInstead', where='local')
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
+    sub2 = GitRepo(opj(src_path, '2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -416,7 +416,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     sub2_target = AnnexRepo(sub2_pub, create=True)
     sub2_target.checkout("TMP", ["-b"])
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
+    sub2 = GitRepo(opj(src_path, '2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 

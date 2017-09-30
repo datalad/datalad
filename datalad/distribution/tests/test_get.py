@@ -257,7 +257,7 @@ def test_get_recurse_subdatasets(src, path):
 
     # ask for the two subdatasets specifically. This will obtain them,
     # but not any content of any files in them
-    subds1, subds2 = ds.get(['subm 1', 'subm 2'], get_data=False,
+    subds1, subds2 = ds.get(['subm 1', '2'], get_data=False,
                             description="youcouldnotmakethisup",
                             result_xfm='datasets')
     for d in (subds1, subds2):
@@ -333,7 +333,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
         result_xfm='datasets', return_type='item-or-list')
 
     # GIMME EVERYTHING
-    ds.get(['subm 1', 'subm 2'])
+    ds.get(['subm 1', '2'])
 
     # We got all content in the subdatasets
     subds1, subds2 = ds.subdatasets(result_xfm='datasets')

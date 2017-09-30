@@ -9,6 +9,18 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+# 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
+
+Minor bugfix release
+
+### Fixes
+
+- Should work correctly with subdatasets named as numbers of bool
+  values (requires also GitPython >= 2.1.6)
+- Custom special remotes should work without crashing with 
+  git-annex >= 6.20170924
+
+
 ## 0.9.0 (Sep 19, 2017) -- isn't it a lucky day even though not a Friday?
 
 ### Major refactoring and deprecations
