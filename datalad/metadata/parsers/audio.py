@@ -40,7 +40,6 @@ class MetadataParser(BaseMetadataParser):
         for f in self.paths:
             info = audiofile(f, easy=True)
             if info is None:
-                print(f)
                 continue
             meta = {vocab_map.get(k, 'mutagen:{}'.format(k)): info[k][0]
                     if isinstance(info[k], list) and len(info[k]) == 1 else info[k]
