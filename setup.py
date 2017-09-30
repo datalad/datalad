@@ -90,6 +90,8 @@ requires = {
     ],
     'metadata-extra': [
         'PyYAML',  # very optional
+        'mutagen',  # audio metadata
+        'exifread',  # EXIF metadata
     ]
 }
 
