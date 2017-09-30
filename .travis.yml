@@ -22,7 +22,6 @@ env:
     - COVERAGE=coverage
   matrix:
     - DATALAD_REPO_DIRECT=yes
-    - DATALAD_REPO_DIRECT=no
     - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
 
