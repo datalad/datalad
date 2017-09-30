@@ -21,14 +21,14 @@ from datalad.support.exceptions import IncompleteResultsError
 @with_tree(tree={'dataset_description.json': '{}'})
 def test_has_metadata(path):
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds)
+    p = MetadataParser(ds, [])
     assert_true(p.has_metadata())
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds)
+    p = MetadataParser(ds, [])
     assert_false(p.has_metadata())
 
 
@@ -51,7 +51,7 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds)._get_dataset_metadata()
+    meta = MetadataParser(ds, [])._get_dataset_metadata()
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -86,7 +86,7 @@ description
 def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds)._get_dataset_metadata()
+    meta = MetadataParser(ds, [])._get_dataset_metadata()
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -112,7 +112,7 @@ description с юникодом
 """})
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds)._get_dataset_metadata()
+    meta = MetadataParser(ds, [])._get_dataset_metadata()
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(

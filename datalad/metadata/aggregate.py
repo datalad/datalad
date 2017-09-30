@@ -174,22 +174,23 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     # put in DB
     db[aggfrom_ds.path] = agginfo
 
-    if objid:  # if there is any chance for metadata
-        # obtain metadata for dataset and content
-        # guessing is ON -- this slows things!
-        # TODO make config switch for guessing
-        nativetypes = get_metadata_type(aggfrom_ds, guess=True)
-        dsmeta, contentmeta, errored = _get_metadata(
-            aggfrom_ds,
-            # core must come first
-            ['datalad_core'] + assure_list(nativetypes),
-            merge_native,
-            global_meta=True,
-            content_meta=True)
-    else:
+    if not objid:
         dsmeta = contentmeta = None
         # this is no error, there is simply no metadata whatsoever
         return False
+
+    # if there is any chance for metadata
+    # obtain metadata for dataset and content
+    relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
+    nativetypes = get_metadata_type(aggfrom_ds)
+    dsmeta, contentmeta, errored = _get_metadata(
+        aggfrom_ds,
+        # core must come first
+        ['datalad_core'] + assure_list(nativetypes),
+        merge_native,
+        global_meta=True,
+        content_meta=True,
+        paths=relevant_paths)
 
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
@@ -203,7 +204,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
         metasources.append((
             'fs',
             'filepath',
-            sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths)),
+            relevant_paths,
             agginto_ds))
 
     # for both types of metadata

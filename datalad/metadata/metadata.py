@@ -71,16 +71,13 @@ agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
 exclude_from_metadata = ('.datalad', '.git', '.gitmodules', '.gitattributes')
 
 
-def get_metadata_type(ds, guess=False):
+def get_metadata_type(ds):
     """Return the metadata type(s)/scheme(s) of a dataset
 
     Parameters
     ----------
     ds : Dataset
       Dataset instance to be inspected
-    guess : bool
-      Whether to try to auto-detect the type if no metadata type setting is
-      found. All supported metadata schemes are tested in alphanumeric order.
 
     Returns
     -------
@@ -96,19 +93,7 @@ def get_metadata_type(ds, guess=False):
     # datasets.datalad.org have received the metadata config update
     elif old_cfg_key in ds.config:
         return ds.config[old_cfg_key]
-
-    mtypes = []
-    if guess:
-        # keep local, who knows what some parsers might pull in
-        from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
-            pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
-            if pmod.MetadataParser(ds).has_metadata():
-                lgr.debug('Predicted presence of "%s" meta data', mtype)
-                mtypes.append(mtype)
-            else:
-                lgr.debug('No evidence for "%s" meta data', mtype)
-    return mtypes
+    return []
 
 
 def _parse_argspec(args):
@@ -247,10 +232,10 @@ def _load_json_object(fpath, cache=None):
 
 
 def _get_metadatarelevant_paths(ds, subds_relpaths):
-    return [f for f in ds.repo.get_files()
+    return (f for f in ds.repo.get_files()
             if not any(f.startswith(_with_sep(ex)) or
                        f == ex
-                       for ex in list(exclude_from_metadata) + subds_relpaths)]
+                       for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
 def _get_containingds_from_agginfo(info, rpath):
@@ -495,7 +480,10 @@ def _query_aggregated_metadata_singlepath(
         # modifications since the last aggregation
         # (if there even was any ever)
         from datalad.metadata.parsers.datalad_core import MetadataParser as DLCP
-        annex_meta.update(DLCP(ds)._get_content_metadata(files))
+        # TODO this could be further limited to particular paths (now []), but we would
+        # need to get the list of metadata-relevant paths all the way down here
+        # without having to recompute
+        annex_meta.update(DLCP(ds, [])._get_content_metadata(files))
 
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_json_object(
@@ -547,7 +535,8 @@ def _merge_context(ds, old, new):
             old[k] = v
 
 
-def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
+def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
+                  paths=None):
     """Make a direct query of a dataset to extract its metadata.
 
     Parameters
@@ -582,7 +571,7 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True):
                 mtype, ds, exc_str(e))
             errored = True
             continue
-        parser = pmod.MetadataParser(ds)
+        parser = pmod.MetadataParser(ds, paths=paths)
         try:
             dsmeta_t, contentmeta_t = parser.get_metadata(
                 dataset=global_meta,

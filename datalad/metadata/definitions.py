@@ -40,9 +40,17 @@ common_defs = {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'ontology for the description of a project',
         'type': ontology_id},
+    "mime": {
+        'def': "https://www.iana.org/assignments/media-types/",
+        'descr': 'IANA media types, see https://www.iana.org/assignments/media-types/media-types.xhtml',
+        'type': ontology_id},
     "pato": {
         'def': "http://purl.obolibrary.org/obo/PATO_",
         'descr': 'Vocabulary of phenotypic qualities',
+        'type': ontology_id},
+    "time": {
+        'def': 'https://www.w3.org/TR/owl-time/#',
+        'descr': 'ontology of temporal concepts',
         'type': ontology_id},
     "uo": {
         'def': "http://purl.obolibrary.org/obo/UO_",
@@ -64,6 +72,9 @@ common_defs = {
     "description": {
         'def': "schema:description",
         'descr': 'description of a resource'},
+    'format': {
+        'def': 'http://purl.org/dc/elements/1.1/format',
+        'descr': 'file format, physical medium, or dimensions of the resource.'},
     "homepage": {
         'def': "doap:homepage",
         'descr': 'homepage associated with a resource'},

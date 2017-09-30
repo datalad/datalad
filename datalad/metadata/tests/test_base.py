@@ -73,16 +73,6 @@ def test_get_metadata_type(path):
     assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
 
 
-@with_tree(tree={
-    'dataset_description.json': "{}",
-    'datapackage.json': '{"name": "some"}'
-})
-def test_get_multiple_metadata_types(path):
-    assert_equal(
-        sorted(get_metadata_type(Dataset(path), guess=True)),
-        ['bids', 'frictionless_datapackage'])
-
-
 def _compare_metadata_helper(origres, compds):
     for ores in origres:
         rpath = relpath(ores['path'], ores['refds'])

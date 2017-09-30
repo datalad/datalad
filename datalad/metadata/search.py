@@ -32,6 +32,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
+from datalad.metadata.definitions import ontology_id
 from datalad.metadata.metadata import _query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
@@ -60,15 +61,16 @@ def _meta2index_dict(meta, definitions, ds_defs):
     """
     # TODO maybe leave the unicode conversion out here and only do in
     # _add_document()
+    # TODO also take care of the conversion from numerical values to a string type elsewhere
     return {
         # apply any dataset-specific key mapping
         ds_defs.get(k, k):
         # turn lists into CSV strings
-        ', '.join(assure_unicode(i) for i in v) if isinstance(v, list) else
+        ', '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(i) for i in v) if isinstance(v, list) else
         # dicts into SSV strings
-        '; '.join(assure_unicode(v[i]) for i in v) if isinstance(v, dict) else
+        '; '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(v[i]) for i in v) if isinstance(v, dict) else
         # and the rest into unicode
-        assure_unicode(v)
+        str(v) if isinstance(v, (int, float)) else assure_unicode(v)
         for k, v in (meta or {}).items()
         # ignore anything that is not defined
         if k in definitions
@@ -128,24 +130,34 @@ def _get_search_schema(ds):
             # index size, the only alternative would be to iterate over
             # all content metadata in this first pass too, in order to
             # do a full scan.
+            if k == '@vocab' or isinstance(v, dict) and v.get('type', None) == ontology_id:
+                continue
             schema_fields[k] = wf.TEXT(stored=True)
         if ds_defs:
             # store ds-specific mapping for the second pass that actually
             # generates the search index
             per_ds_defs[res['path']] = ds_defs
 
-        for k in meta:
+        # anything that is a direct metadata key or is reported as being a content metadata
+        # key is a valid candidate for inclusion into the schema
+        cand_keys = list(meta)
+        cand_keys.extend(meta.get('unique_content_properties', []))
+        for k in cand_keys:
+            # check if we have any kind of definitions for this key
             if k not in definitions:
+                # not in the dataset definitions
                 termdef = common_defs.get(k, None)
                 if termdef is None:
-                    # ignore anything that is not defined
-                    # TODO this might be too strict, let's say we find
-                    # 'dicom:PatientName' and 'dicom' is defined
-                    # so we could in principle resolve that later on and all is good
-                    # ATM we would need to ship the entire DICOM ontology in a
-                    # DICOM dataset to be ready and compliant...
-                    continue
-                definitions[k] = termdef
+                    # not in the common vocabulary
+                    if ':' not in k and k.split(':')[0] not in definitions:
+                        # this key also doesn't have a prefix that is defined in the
+                        # vocabulary, we are lost -> ignore this key as it cannot
+                        # possibly be resolved
+                        continue
+                    # we cannt resolve this for cheaps, just keep a record
+                    definitions[k] = k
+                else:
+                    definitions[k] = termdef
                 # TODO treat keywords/tags separately
                 schema_fields[k] = wf.TEXT(stored=True)
 
@@ -215,20 +227,19 @@ def _get_search_index(index_dir, ds, force_reindex):
         # and after a subsequent dataset report no files for the previous
         # dataset will be reported again
         rtype = res['type']
+        meta = res.get('metadata', {})
+        meta = MetadataDict(meta)
         if rtype == 'dataset':
             # get any custom dataset mappings
             ds_defs = per_ds_defs.get(res['path'], {})
             lgr.info('Adding information about Dataset %s', rpath)
-        meta = res.get('metadata', {})
-
-        # now we merge all reported unique content properties (flattened representation
-        # of content metadata) with the main metadata set, using the 'add' strategy
-        # this way any existing metadata value of a dataset itself will be amended by
-        # those coming from the content. E.g. a single dataset 'license' might be turned
-        # into a sequence of unique license identifiers across all dataset components
-        meta = MetadataDict(meta)
-        meta.merge_add(meta.get('unique_content_properties', {}))
-
+            # now we merge all reported unique content properties (flattened representation
+            # of content metadata) with the main metadata set, using the 'add' strategy
+            # this way any existing metadata value of a dataset itself will be amended by
+            # those coming from the content. E.g. a single dataset 'license' might be turned
+            # into a sequence of unique license identifiers across all dataset components
+            meta.merge_add(meta.get('unique_content_properties', {}))
+            meta.pop('unique_content_properties', None)
         doc_props = dict(
             path=rpath,
             type=rtype,

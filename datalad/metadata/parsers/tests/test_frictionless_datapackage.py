@@ -18,14 +18,14 @@ from datalad.tests.utils import with_tree, with_tempfile
 @with_tree(tree={'datapackage.json': '{"name": "some"}'})
 def test_has_metadata(path):
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds)
+    p = MetadataParser(ds, [])
     assert_true(p.has_metadata())
 
 
 @with_tempfile(mkdir=True)
 def test_has_no_metadata(path):
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds)
+    p = MetadataParser(ds, [])
     assert_false(p.has_metadata())
 
 
@@ -55,7 +55,7 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds)
+    p = MetadataParser(ds, [])
     meta = p._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

@@ -10,15 +10,18 @@
 
 
 class BaseMetadataParser(object):
-    def __init__(self, ds):
+    def __init__(self, ds, paths):
         """
         Parameters
         ----------
         ds : dataset instance
           Dataset to extract metadata from.
+        paths : list
+          Paths to investigate when extracting content metadata
         """
 
         self.ds = ds
+        self.paths = paths
 
     def get_metadata(self, dataset=True, content=True):
         """
