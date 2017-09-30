@@ -32,7 +32,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
-from datalad.metadata.definitions import ontology_id
+from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.metadata import _query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
@@ -130,7 +130,7 @@ def _get_search_schema(ds):
             # index size, the only alternative would be to iterate over
             # all content metadata in this first pass too, in order to
             # do a full scan.
-            if k == '@vocab' or isinstance(v, dict) and v.get('type', None) == ontology_id:
+            if k == '@vocab' or isinstance(v, dict) and v.get('type', None) == vocabulary_id:
                 continue
             schema_fields[k] = wf.TEXT(stored=True)
         if ds_defs:

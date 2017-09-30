@@ -14,7 +14,6 @@ from os.path import join as opj
 from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
-from datalad.metadata.definitions import ontology_id
 from datalad.metadata.parsers.base import BaseMetadataParser
 
 import logging

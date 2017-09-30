@@ -14,7 +14,7 @@ import logging
 lgr = logging.getLogger('datalad.metadata.parser.audio')
 
 from mutagen import File as audiofile
-from datalad.metadata.definitions import ontology_id
+from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.metadata import _get_metadatarelevant_paths
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -69,12 +69,12 @@ class MetadataParser(BaseMetadataParser):
                 'mutagen': {
                     '@id': 'https://mutagen.readthedocs.io/',
                     'description': 'Adhoc-vocabulary used by the Python mutagen package',
-                    'type': ontology_id,
+                    'type': vocabulary_id,
                 },
                 'music': {
                     '@id': 'http://purl.org/ontology/mo/',
                     'description': 'Music Ontology with main concepts and properties for describing music',
-                    'type': ontology_id,
+                    'type': vocabulary_id,
                 },
                 'duration(s)': {
                     "@id": 'time:Duration',

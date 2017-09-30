@@ -9,7 +9,7 @@
 """Metadata definitions"""
 
 # identifiers that defines an ontology as a whole
-ontology_id = 'http://edamontology.org/data_2338'
+vocabulary_id = 'http://purl.org/dc/dcam/VocabularyEncodingScheme'
 
 # this is the cannonical version string of Datalad's current metadata scheme
 version = '2.0'
@@ -23,39 +23,39 @@ common_defs = {
     "schema": {
         'def': "http://schema.org/",
         'descr': 'base vocabulary',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "dcterms": {
         'def': "http://purl.org/dc/terms/",
         'descr': 'DCMI metadata terms',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "dctype": {
         'def': "http://purl.org/dc/dcmitype/",
         'descr': 'DCMI Type Vocabulary',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "dlp_bids": {
         'def': 'TODO',
         'descr': 'Vocabulary of the DataLad BIDS metadata parser',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
-        'descr': 'ontology for the description of a project',
-        'type': ontology_id},
+        'descr': 'vocabulary for the description of a project',
+        'type': vocabulary_id},
     "mime": {
         'def': "https://www.iana.org/assignments/media-types/",
         'descr': 'IANA media types, see https://www.iana.org/assignments/media-types/media-types.xhtml',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "pato": {
         'def': "http://purl.obolibrary.org/obo/PATO_",
         'descr': 'Vocabulary of phenotypic qualities',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "time": {
         'def': 'https://www.w3.org/TR/owl-time/#',
         'descr': 'ontology of temporal concepts',
-        'type': ontology_id},
+        'type': vocabulary_id},
     "uo": {
         'def': "http://purl.obolibrary.org/obo/UO_",
         'descr': "Units of Measurement Ontology",
-        'type': ontology_id},
+        'type': vocabulary_id},
     # individually defined terms
     "author": {
         'def': "schema:author",
