@@ -16,3 +16,4 @@ from . import frictionless_datapackage
 from . import datalad_rfc822
 from . import datacite
 from . import audio
+from . import exif
