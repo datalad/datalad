@@ -1,4 +1,10 @@
-datalad (0.9.0-1) unstable; urgency=medium
+datalad (0.9.1-1) neurodebian; urgency=medium
+
+  * Fresh very minor bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 30 Sep 2017 18:03:32 -0400
+
+datalad (0.9.0-1) neurodebian; urgency=medium
 
   * Fresh to be release
 
