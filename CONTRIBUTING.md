@@ -420,7 +420,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.9.2 (??? ??, 2017) -- will be better than ever
+## 0.9.3 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
