@@ -1416,10 +1416,23 @@ class GitRepo(RepoInterface):
         """
 
         # TODO: testing and error handling!
+        from .exceptions import RemoteNotAvailableError
+        try:
+            out, err = self._git_custom_command(
+                '', ['git', 'remote', 'remove', name])
+        except CommandError as e:
+            if 'fatal: No such remote' in e.stderr:
+                raise RemoteNotAvailableError(name,
+                                              cmd="git remote remove",
+                                              msg="No such remote",
+                                              stdout=out,
+                                              stderr=err)
+            else:
+                raise e
+
         # TODO: config.reload necessary?
-        return self._git_custom_command(
-            '', ['git', 'remote', 'remove', name]
-        )
+        self.config.reload()
+        return
 
     def update_remote(self, name=None, verbose=False):
         """

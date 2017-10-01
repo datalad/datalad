@@ -33,6 +33,7 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AccessDeniedError
 from datalad.support.exceptions import AccessFailedError
+from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -674,15 +675,12 @@ def _remove_remote(
     try:
         # failure can happen and is OK
         ds.repo.remove_remote(name)
-    except CommandError as e:
-        if 'fatal: No such remote' in e.stderr:
-            yield get_status_dict(
-                # result-oriented! given remote is absent already
-                status='notneeded',
-                **result_props)
-            return
-        else:
-            raise e
+    except RemoteNotAvailableError as e:
+        yield get_status_dict(
+            # result-oriented! given remote is absent already
+            status='notneeded',
+            **result_props)
+        return
 
     yield get_status_dict(
         status='ok',
