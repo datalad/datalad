@@ -21,7 +21,7 @@ from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.utils import assure_unicode
 
 
-xmp_field_re = re.compile('^([^\[\]]+)(\[\d\]|)(/?.*|)')
+xmp_field_re = re.compile('^([^\[\]]+)(\[\d+\]|)(/?.*|)')
 
 
 class MetadataParser(BaseMetadataParser):
@@ -66,9 +66,9 @@ class MetadataParser(BaseMetadataParser):
                     val = val.replace(u"\xa0", ' ')
 
                     field, idx, qual = xmp_field_re.match(key).groups()
-                    normkey = '{}{}'.format(field, qual)
+                    normkey = u'{}{}'.format(field, qual)
                     if '/' in key:
-                        normkey = '{0}({1})'.format(*normkey.split('/'))
+                        normkey = u'{0}({1})'.format(*normkey.split('/'))
                     if idx:
                         # array
                         arr = meta.get(normkey, [])
