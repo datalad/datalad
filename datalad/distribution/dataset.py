@@ -199,7 +199,6 @@ class Dataset(object):
         # TODO: Still this is somewhat problematic. We can't invalidate strong
         # references
 
-        #with swallow_logs():
         for cls, ckw, kw in (
                 # TODO: Do we really want to allow_noninitialized=True here?
                 # And if so, leave a proper comment!

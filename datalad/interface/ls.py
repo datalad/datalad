@@ -239,9 +239,9 @@ class GitModel(object):
     @property
     def describe(self):
         try:
-            with swallow_logs():
-                describe, outerr = self.repo._git_custom_command([], ['git', 'describe', '--tags'])
+            describe, outerr = self.repo._git_custom_command([], ['git', 'describe', '--tags'])
             return describe.strip()
+        # TODO: WTF "catch everything"?
         except:
             return None
 

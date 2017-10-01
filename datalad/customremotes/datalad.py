@@ -67,8 +67,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
 
         try:
-            with swallow_logs():
-                status = self._providers.get_status(url)
+            status = self._providers.get_status(url)
             size = str(status.size) if status.size is not None else 'UNKNOWN'
             resp = ["CHECKURL-CONTENTS", size] \
                 + ([status.filename] if status.filename else [])
@@ -97,8 +96,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in self.get_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
-                with swallow_logs():
-                    status = self._providers.get_status(url)
+                status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     resp = "CHECKPRESENT-SUCCESS"
                     break

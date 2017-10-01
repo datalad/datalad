@@ -673,8 +673,7 @@ def _remove_remote(
         **res_kwargs)
     try:
         # failure can happen and is OK
-        with swallow_logs():
-            ds.repo.remove_remote(name)
+        ds.repo.remove_remote(name)
     except CommandError as e:
         if 'fatal: No such remote' in e.stderr:
             yield get_status_dict(

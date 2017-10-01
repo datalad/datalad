@@ -371,11 +371,12 @@ class Save(Interface):
             # option too often...
             if version_tag:
                 try:
+                    # TODO: check whether comment below is still true after
+                    # removing the log swallowing:
                     # again cannot help but force-silence low-level code, because
                     # it screams like a made man instead of allowing top-level
                     # code an orderly error report
-                    with swallow_logs():
-                        ds.repo.tag(version_tag)
+                    ds.repo.tag(version_tag)
                     # even if we haven't saved anything
                     res['status'] = 'ok'
                     yield res
