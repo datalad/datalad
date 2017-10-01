@@ -66,7 +66,7 @@ def _meta2index_dict(meta, definitions, ds_defs):
         # apply any dataset-specific key mapping
         ds_defs.get(k, k):
         # turn lists into CSV strings
-        ', '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(i) for i in v) if isinstance(v, list) else
+        ', '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(i) for i in v) if isinstance(v, (list, tuple)) else
         # dicts into SSV strings
         '; '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(v[i]) for i in v) if isinstance(v, dict) else
         # and the rest into unicode
@@ -116,6 +116,7 @@ def _get_search_schema(ds):
                 # might be different when some aggregated metadata was
                 # generated with an old version of datalad
                 # in this case we should actually load the old vocabulary
+                set.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
                 # and perform the mapping to the current one in here
                 count = 0
                 uk = k

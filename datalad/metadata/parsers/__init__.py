@@ -8,8 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parsers"""
 
-# the following imports are only needed for knowing which meta data types
-# we can try to guess
+# this is needed to make the on-demand import logic for metadata extraction work
 from . import datalad_core
 from . import bids
 from . import frictionless_datapackage
@@ -17,3 +16,4 @@ from . import datalad_rfc822
 from . import datacite
 from . import audio
 from . import exif
+from . import xmp

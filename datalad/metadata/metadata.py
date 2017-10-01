@@ -569,6 +569,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
                 "broken dataset configuration (%s)? "
                 "This type of metadata will be ignored: %s",
                 mtype, ds, exc_str(e))
+            if cfg.get('datalad.runtime.raiseonerror'):
+                raise
             errored = True
             continue
         parser = pmod.MetadataParser(ds, paths=paths)
@@ -624,7 +626,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
         for k, v in cm.items():
             # TODO instead of a set, it could be a set with counts
             vset = unique_cm.get(k, set())
-            vset.add(v)
+            # prevent nested structures in unique prop list
+            vset.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {k: sorted(v) for k, v in unique_cm.items()}
