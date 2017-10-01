@@ -1415,6 +1415,8 @@ class GitRepo(RepoInterface):
         """Remove existing remote
         """
 
+        # TODO: testing and error handling!
+        # TODO: config.reload necessary?
         return self._git_custom_command(
             '', ['git', 'remote', 'remove', name]
         )
@@ -1987,6 +1989,9 @@ class GitRepo(RepoInterface):
           Custom tag label.
         """
         # TODO later to be extended with tagging particular commits and signing
+        # TODO: call in save.py complains about extensive logging. When does it
+        # happen in what way? Figure out, whether to just silence it or raise or
+        # whatever else.
         self._git_custom_command(
             '', ['git', 'tag', str(tag)]
         )
