@@ -2022,6 +2022,27 @@ class GitRepo(RepoInterface):
         else:
             return tags
 
+    def describe(self, **kwargs):
+        """ Quick and dirty implementation to call git-describe
+
+        Parameters:
+        -----------
+        kwargs:
+            transformed to cmdline options for git-describe;
+            see __init__ for description of the transformation
+        """
+        # TODO: be more precise what failure to expect when and raise actual
+        # errors
+        try:
+            describe, outerr = self._git_custom_command(
+                [],
+                ['git', 'describe'] + to_options(**kwargs),
+                expect_fail=True)
+            return describe.strip()
+        # TODO: WTF "catch everything"?
+        except:
+            return None
+
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
 

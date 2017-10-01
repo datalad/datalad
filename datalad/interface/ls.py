@@ -238,12 +238,7 @@ class GitModel(object):
 
     @property
     def describe(self):
-        try:
-            describe, outerr = self.repo._git_custom_command([], ['git', 'describe', '--tags'])
-            return describe.strip()
-        # TODO: WTF "catch everything"?
-        except:
-            return None
+        return self.repo.describe(tags=True)
 
     @property
     def date(self):
