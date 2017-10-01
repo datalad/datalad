@@ -207,6 +207,13 @@ definitions = {
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
     },
+    'datalad.metadata.maxfieldsize': {
+        'ui': ('question', {
+               'title': 'Maximum metadata field size',
+               'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
+        'default': 200,
+        'type': EnsureInt(),
+    },
     'datalad.metadata.nativetype': {
         'ui': ('question', {
                'title': 'Native dataset metadata scheme',

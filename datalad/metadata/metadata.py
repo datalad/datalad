@@ -23,6 +23,7 @@ from os.path import exists
 from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
+from six import binary_type, string_types
 
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -535,6 +536,11 @@ def _merge_context(ds, old, new):
             old[k] = v
 
 
+def _limit_field_size(d, maxsize):
+    return {k: v for k, v in d.items()
+            if len(str(v) if not isinstance(v, string_types + (binary_type,)) else v) <= maxsize}
+
+
 def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
                   paths=None):
     """Make a direct query of a dataset to extract its metadata.
@@ -619,6 +625,12 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
                 else:
                     # no prior record, wrap an helper and store
                     contentmeta[loc] = MetadataDict(meta)
+
+    # enforce size limits
+    max_fieldsize = cfg.obtain('datalad.metadata.maxfieldsize')
+    dsmeta = _limit_field_size(dsmeta, max_fieldsize)
+    contentmeta = {k: _limit_field_size(contentmeta[k], max_fieldsize) for k in contentmeta}
+
     # go through content metadata and inject report of unique keys
     # and values into `dsmeta`
     unique_cm = {}
