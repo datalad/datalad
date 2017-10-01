@@ -384,9 +384,6 @@ def split_remote_branch(branch):
 class GitRepo(RepoInterface):
     """Representation of a git repository
 
-    Not sure if needed yet, since there is GitPython. By now, wrap it to have
-    control. Convention: method's names starting with 'git_' to not be
-    overridden accidentally by AnnexRepo.
     """
 
     # We use our sshrun helper
@@ -533,9 +530,9 @@ class GitRepo(RepoInterface):
                     path,
                     ' %s' % git_opts if git_opts else '')
                 self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
-                                                  mkdir=True,
-                                                  odbt=default_git_odbt,
-                                                  **git_opts)
+                                                   mkdir=True,
+                                                   odbt=default_git_odbt,
+                                                   **git_opts)
             except GitCommandError as e:
                 lgr.error(exc_str(e))
                 raise
@@ -580,7 +577,7 @@ class GitRepo(RepoInterface):
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
             self._repo = self.cmd_call_wrapper(Repo, self.path)
-            lgr.debug("Using existing Git repository at {0}".format(self.path))
+            lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -768,13 +765,12 @@ class GitRepo(RepoInterface):
             cmd.extend(git_options)
         cmd += ["rev-parse", "--show-toplevel"]
         try:
-            with swallow_logs():
-                toppath, err = GitRunner().run(
-                    cmd,
-                    cwd=path,
-                    log_stdout=True, log_stderr=True,
-                    expect_fail=True, expect_stderr=True)
-                toppath = toppath.rstrip('\n\r')
+            toppath, err = GitRunner().run(
+                cmd,
+                cwd=path,
+                log_stdout=True, log_stderr=True,
+                expect_fail=True, expect_stderr=True)
+            toppath = toppath.rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
