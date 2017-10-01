@@ -281,24 +281,6 @@ class BuildSchema(Command):
                     sort_keys=True)
             print('schema written to {}'.format(opath))
 
-        common_defs = common_defs.copy()
-        # for all parsers that have their own vocabulary
-        import datalad.metadata.parsers as parsers
-        for parser in [p for p in dir(parsers)
-                       if not (p.startswith('_') or p == 'base')]:
-            pmod = getattr(parsers, parser)
-            if not hasattr(pmod, 'vocabulary'):
-                print('parser {} defines no vocabulary, skipped'.format(parser))
-                continue
-            vocab_version = getattr(pmod, 'vocabulary_version', '')
-            _defs2context(
-                getattr(pmod, 'vocabulary'),
-                'schema_{}'.format(parser),
-                vocab_version)
-            common_defs['dlp_{}'.format(parser)] = {'def': 'http://docs.datalad.org/{}'.format(
-                _mk_fname(
-                    'schema_{}'.format(parser),
-                    vocab_version))}
         # core vocabulary
         _defs2context(common_defs, 'schema', schema_version)
 
