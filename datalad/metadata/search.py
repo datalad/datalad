@@ -325,7 +325,7 @@ class Search(Interface):
         query=Parameter(
             args=("query",),
             metavar='QUERY',
-            nargs="+",
+            nargs="*",
             doc="tell me"),
         force_reindex=Parameter(
             args=("--reindex",),
@@ -338,15 +338,21 @@ class Search(Interface):
             to 0 will report any search matches, and make searching substantially
             slower on large metadata sets.""",
             constraints=EnsureInt()),
+        show_keys=Parameter(
+            args=('--show-keys',),
+            action='store_true',
+            doc="""if given, a list of known search keys is shown (one per line).
+            No other action is performed, even if other arguments are given."""),
     )
 
     @staticmethod
     @datasetmethod(name='search')
     @eval_results
-    def __call__(query,
+    def __call__(query=None,
                  dataset=None,
                  force_reindex=False,
-                 max_nresults=20):
+                 max_nresults=20,
+                 show_keys=False):
         from whoosh import qparser as qparse
 
         try:
@@ -366,6 +372,14 @@ class Search(Interface):
 
         idx_obj = _get_search_index(
             index_dir, ds, force_reindex)
+
+        if show_keys:
+            for k in idx_obj.schema.names():
+                print(k)
+            return
+
+        if not query:
+            return
 
         with idx_obj.searcher() as searcher:
             # parse the query string, default whoosh parser ATM, could be
