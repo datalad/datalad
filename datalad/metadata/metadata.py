@@ -627,7 +627,7 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
                     contentmeta[loc] = MetadataDict(meta)
 
     # enforce size limits
-    max_fieldsize = cfg.obtain('datalad.metadata.maxfieldsize')
+    max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     dsmeta = _limit_field_size(dsmeta, max_fieldsize)
     contentmeta = {k: _limit_field_size(contentmeta[k], max_fieldsize) for k in contentmeta}
 
