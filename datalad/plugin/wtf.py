@@ -35,8 +35,30 @@ def dlplugin(dataset=None):
         cfg = ds.config
     from datalad.ui import ui
     from datalad.api import metadata
+    import os
+    import platform as pl
+
+    # formatting helper
+    def _t2s(t):
+        res = []
+        for e in t:
+            if isinstance(e, tuple):
+                es = _t2s(e)
+                if es != '':
+                    res += ['(%s)' % es]
+            elif e != '':
+                res += [e]
+        return '/'.join(res)
+
 
     report_template = """\
+System
+======
+{system}
+
+Environment
+===========
+{env}
 {dataset}
 Configuration
 =============
@@ -45,6 +67,7 @@ Configuration
 """
 
     dataset_template = """\
+
 Dataset information
 ===================
 {basic}
@@ -52,7 +75,6 @@ Dataset information
 Metadata
 --------
 {meta}
-
 """
     ds_meta = None
     if ds and ds.is_installed():
@@ -63,6 +85,20 @@ Metadata
         ds_meta = ds_meta['metadata']
 
     ui.message(report_template.format(
+        system='\n'.join(
+            '{}: {}'.format(*i) for i in (
+                ('OS          ', ' '.join([
+                    os.name,
+                    pl.system(),
+                    pl.release(),
+                    pl.version()]).rstrip()),
+                ('Distribution',
+                 ' '.join([_t2s(pl.dist()),
+                           _t2s(pl.mac_ver()),
+                           _t2s(pl.win32_ver())]).rstrip()))),
+        env='\n'.join(
+            '{}: {}'.format(k, v) for k, v in os.environ.iteritems()
+            if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')),
         dataset='' if not ds else dataset_template.format(
             basic='\n'.join(
                 '{}: {}'.format(k, v) for k, v in (
@@ -74,7 +110,10 @@ Metadata
             if ds_meta else '[no metadata]'
         ),
         cfg='\n'.join(
-            '{}: {}'.format(k, '<HIDDEN>' if k.startswith('user.') or 'token' in k else v)
+            '{}: {}'.format(
+                k,
+                '<HIDDEN>'
+                if k.startswith('user.') or 'token' in k or 'user' in k else v)
             for k, v in sorted(cfg.items(), key=lambda x: x[0])),
     ))
     yield
