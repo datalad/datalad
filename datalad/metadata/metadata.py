@@ -38,6 +38,7 @@ from datalad.interface.base import build_doc
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import version as vocabulary_version
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureStr
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -395,7 +396,9 @@ def _query_aggregated_metadata_singlepath(
                 ds,
                 ['datalad_core'],
                 'init',
-                global_meta=True,
+                # we acknowledge the dataset configuration for global metadata
+                global_meta=None,
+                # but we force-stop the content metadata query via git-annex
                 content_meta=False)
             if errored:
                 res['status'] = 'error'
@@ -475,7 +478,10 @@ def _query_aggregated_metadata_singlepath(
     annex_meta = {}
     # TODO this condition is inadequate once we query something in an aggregated subdataset
     # but through the dataset at curdir
-    if containing_ds == curdir:
+    if containing_ds == curdir and ds.config.obtain(
+            'datalad.metadata.aggregate-content-datalad-core',
+            default=True,
+            valtype=EnsureBool()):
         # we are querying this dataset itself, which we know to be present
         # get uptodate file metadata from git-annex to reflect potential local
         # modifications since the last aggregation
@@ -499,6 +505,7 @@ def _query_aggregated_metadata_singlepath(
         # we might be onto something here, prepare result
         # start with the current annex metadata for this path, if anything
         metadata = MetadataDict(annex_meta.get(fpath, {}))
+
         res = get_status_dict(
             status='ok',
             # the specific match within the containing dataset
@@ -541,7 +548,7 @@ def _limit_field_size(d, maxsize):
             if len(str(v) if not isinstance(v, string_types + (binary_type,)) else v) <= maxsize}
 
 
-def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
+def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                   paths=None):
     """Make a direct query of a dataset to extract its metadata.
 
@@ -556,7 +563,9 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
     # each item in here will be a MetadataDict, but not the whole thing
     contentmeta = {}
 
-    if not global_meta and not content_meta:
+    if global_meta is not None and content_meta is not None and \
+            not global_meta and not content_meta:
+        # both are false and not just none
         return dsmeta, contentmeta, errored
 
     context = {
@@ -582,8 +591,14 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
         parser = pmod.MetadataParser(ds, paths=paths)
         try:
             dsmeta_t, contentmeta_t = parser.get_metadata(
-                dataset=global_meta,
-                content=content_meta)
+                dataset=global_meta if global_meta is not None else ds.config.obtain(
+                    'datalad.metadata.aggregate-dataset-{}'.format(mtype.replace('_', '-')),
+                    default=True,
+                    valtype=EnsureBool()),
+                content=content_meta if content_meta is not None else ds.config.obtain(
+                    'datalad.metadata.aggregate-content-{}'.format(mtype.replace('_', '-')),
+                    default=True,
+                    valtype=EnsureBool()))
         except Exception as e:
             lgr.error('Failed to get dataset metadata ({}): {}'.format(
                 mtype, exc_str(e)))
@@ -639,7 +654,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=True, content_meta=True,
             # TODO instead of a set, it could be a set with counts
             vset = unique_cm.get(k, set())
             # prevent nested structures in unique prop list
-            vset.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
+            vset.add(', '.join(str(i) if isinstance(i, (int, float)) else i
+                               for i in v) if isinstance(v, (tuple, list)) else v)
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {k: sorted(v) for k, v in unique_cm.items()}

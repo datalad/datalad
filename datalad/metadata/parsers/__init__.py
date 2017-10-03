@@ -17,3 +17,4 @@ from . import datacite
 from . import audio
 from . import exif
 from . import xmp
+from . import dicom

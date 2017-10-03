@@ -47,6 +47,7 @@ from datalad.distribution.dataset import datasetmethod, EnsureDataset, require_d
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureBool
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -148,7 +149,11 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     if exists(dsmetafile):
         objid += md5(open(dsmetafile, 'r').read().encode()).hexdigest()
     # 3. potential annex-based metadata
-    if isinstance(aggfrom_ds, AnnexRepo):
+    if isinstance(aggfrom_ds, AnnexRepo) and \
+            aggfrom_ds.config.obtain(
+                'datalad.metadata.aggregate-content-datalad-core',
+                default=True,
+                valtype=EnsureBool()):
         # if there is no annex metadata, this will come out empty,
         # hence hash would be same as for a plain GitRepo
         # and no, we cannot use the shasum of the annex branch,
@@ -188,17 +193,31 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
         # core must come first
         ['datalad_core'] + assure_list(nativetypes),
         merge_native,
-        global_meta=True,
-        content_meta=True,
+        # None indicates to honor a datasets per-parser configuration and to be
+        # on by default
+        global_meta=None,
+        content_meta=None,
         paths=relevant_paths)
 
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds),
-                   ('cn', 'content', contentmeta, aggfrom_ds)]
+    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds)]
 
-    if contentmeta and aggfrom_ds != agginto_ds:
+    # do not store content metadata if either the source or the target dataset
+    # do not want it
+    if aggfrom_ds.config.obtain(
+            'datalad.metadata.store-aggregate-content',
+            default=True,
+            valtype=EnsureBool()) or \
+            agginto_ds.config.obtain(
+                'datalad.metadata.store-aggregate-content',
+                default=True,
+                valtype=EnsureBool()):
+        metasources.append((
+            'cn', 'content', contentmeta, aggfrom_ds))
+
+    if len(metasources) > 1 and contentmeta and aggfrom_ds != agginto_ds:
         # we have content metadata and we are aggregation into another dataset,
         # grab and store list of metadata-relevant files
         metasources.append((
