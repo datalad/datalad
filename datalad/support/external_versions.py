@@ -113,6 +113,18 @@ class ExternalVersions(object):
         'cmd:system-git': _get_system_git_version,
         'cmd:system-ssh': _get_system_ssh_version,
     }
+    INTERESTING = (
+        'appdirs',
+        'boto',
+        'iso8601',
+        'git', 'gitdb',
+        'humanize',
+        'msgpack',
+        'patool',
+        'requests',
+        'scrapy', 'six',
+        'wrapt',
+    )
 
     def __init__(self):
         self._versions = {}
@@ -126,6 +138,14 @@ class ExternalVersions(object):
             if hasattr(value, attr):
                 version = getattr(value, attr)
                 break
+
+        # try pkg_resources
+        if version is None and hasattr(value, '__name__'):
+            try:
+                import pkg_resources
+                version = pkg_resources.get_distribution(value.__name__).version
+            except Exception:
+                pass
 
         # assume that value is the version
         if version is None:
@@ -198,7 +218,7 @@ class ExternalVersions(object):
         """Return dictionary (copy) of versions"""
         return self._versions.copy()
 
-    def dumps(self, indent=False, preamble="Versions:", query=False):
+    def dumps(self, indent=None, preamble="Versions:", query=False):
         """Return listing of versions as a string
 
         Parameters
@@ -213,13 +233,16 @@ class ExternalVersions(object):
           get those which weren't queried for yet
         """
         if query:
-            [self[k] for k in self.CUSTOM]
+            [self[k] for k in tuple(self.CUSTOM) + self.INTERESTING]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]
-        out = "%s" % preamble
-        if indent:
-            out += (linesep + indent).join([''] + items) + linesep
+        out = "%s" % preamble if preamble else ''
+        if indent is not None:
+            if preamble:
+                preamble += linesep
+            indent = ' ' if indent is True else str(indent)
+            out += (linesep + indent).join(items) + linesep
         else:
             out += " " + ' '.join(items)
         return out

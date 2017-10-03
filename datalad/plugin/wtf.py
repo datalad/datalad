@@ -35,6 +35,7 @@ def dlplugin(dataset=None):
         cfg = ds.config
     from datalad.ui import ui
     from datalad.api import metadata
+    from datalad.support.external_versions import external_versions
     import os
     import platform as pl
 
@@ -60,6 +61,9 @@ Environment
 ===========
 {env}
 {dataset}
+Externals
+=========
+{externals}
 Configuration
 =============
 {cfg}
@@ -83,7 +87,6 @@ Metadata
             result_filter=lambda x: x['action'] == 'metadata')
     if ds_meta:
         ds_meta = ds_meta['metadata']
-
     ui.message(report_template.format(
         system='\n'.join(
             '{}: {}'.format(*i) for i in (
@@ -109,6 +112,7 @@ Metadata
                 '{}: {}'.format(k, v) for k, v in ds_meta)
             if ds_meta else '[no metadata]'
         ),
+        externals=external_versions.dumps(preamble=None, indent='', query=True),
         cfg='\n'.join(
             '{}: {}'.format(
                 k,
