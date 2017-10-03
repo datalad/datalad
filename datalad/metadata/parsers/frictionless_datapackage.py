@@ -35,7 +35,7 @@ def _compact_license(obj):
         obj = obj.get('path', obj.get('type', obj))
         if isinstance(obj, dict) and len(obj) == 1:
             # didn't get lucky with compacting, try one more
-            obj = obj.values()[0]
+            obj = obj.popitem()[1]
         return obj
     else:
         return obj
