@@ -116,7 +116,6 @@ def test_siblings(origin, repo_path):
     eq_(httpurl1 + "/elsewhere",
         source.repo.get_remote_url("test-remote"))
 
-
     # no longer a use case, I would need additional convincing that
     # this is anyhow useful other then tripple checking other peoples
     # errors. for an actual check use 'query'
@@ -187,7 +186,17 @@ def test_siblings(origin, repo_path):
         pushurl = repo.get_remote_url("test-remote-2", push=True)
         ok_(url.startswith(httpurl1))
         ok_(pushurl.startswith(sshurl))
-        if repo != source.repo:
+        # FIXME: next condition used to compare the *Repo objects instead of
+        # there paths. Due to missing annex-init in
+        # datalad/tests/utils.py:clone_url this might not be the same, since
+        # `source` actually is an annex, but after flavor 'clone' in
+        # `with_testrepos` and then `install` any trace of an annex might be
+        # gone in v5 (branch 'master' only), while in direct mode it still is
+        # considered an annex. `repo` is forced to be a `GitRepo`, so we might
+        # compare two objects of different classes while they actually are
+        # pointing to the same repository.
+        # See github issue #1854
+        if repo.path != source.repo.path:
             ok_(url.endswith('/' + basename(repo.path)))
             ok_(pushurl.endswith(basename(repo.path)))
         eq_(url, r['url'])

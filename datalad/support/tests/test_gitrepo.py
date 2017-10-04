@@ -419,7 +419,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit.name for commit in fetched])
 
-    ok_clean_git(clone.path)
+    ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
@@ -874,20 +874,26 @@ def test_get_tracking_branch(o_path, c_path):
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
 
-    top_repo = GitRepo(path, create=False)
+    top_repo = AnnexRepo(path, create=False)
     eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)
         assert_in('Do not use update_submodule with init=True', cml.out)
     top_repo.update_submodule('2', init=True)
-    ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+
+    # ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+    # TODO: old assertion above if non-bare? (can't use "direct mode" in test_gitrepo)
+    # Alternatively: New testrepo (plain git submodules) and have a dedicated
+    # test for annexes in addition
+    ok_(all([GitRepo.is_valid_repo(opj(top_repo.path, s.path))
+             for s in top_repo.get_submodules()]))
 
     # modify submodule:
     with open(opj(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
         f.write("some content")
 
-    assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
+    assert_raises(CommandError, top_repo.deinit_submodule, 'sub1')
 
     # using force should work:
     top_repo.deinit_submodule('subm 1', force=True)

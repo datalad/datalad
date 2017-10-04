@@ -24,8 +24,21 @@ from ..utils import swallow_logs
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
-
+from .utils import get_tempfile_kwargs
 from datalad.customremotes.base import init_datalad_remote
+
+
+# we need a local file, that is supposed to be treated as a remote file via
+# file-scheme URL
+remote_file_fd, remote_file_path = \
+    tempfile.mkstemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+# to be removed upon teardown
+_TEMP_PATHS_GENERATED.append(remote_file_path)
+with open(remote_file_path, "w") as f:
+    f.write("content to be annex-addurl'd")
+# OS-level descriptor needs to be closed!
+os.close(remote_file_fd)
+
 
 @add_metaclass(ABCMeta)
 class TestRepo(object):
@@ -34,7 +47,6 @@ class TestRepo(object):
 
     def __init__(self, path=None, puke_if_exists=True):
         if not path:
-            from .utils import get_tempfile_kwargs
             path = tempfile.mktemp(**get_tempfile_kwargs({}, prefix='testrepo'))
             # to be removed upon teardown
             _TEMP_PATHS_GENERATED.append(path)
@@ -96,9 +108,14 @@ class BasicAnnexTestRepo(TestRepo):
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
-        fileurl = get_local_file_url(opj(self.path, 'test.dat')) \
-                  if not on_windows \
-                  else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
+        fileurl = get_local_file_url(remote_file_path)
+        # Note:
+        # The line above used to be conditional:
+        # if not on_windows \
+        # else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
+        # This self-reference-ish construction (pointing to 'test.dat'
+        # and therefore have the same content in git and annex) is outdated and
+        # causes trouble especially in annex V6 repos.
         self.repo.add_url_to_file("test-annex.dat", fileurl)
         self.repo.commit("Adding a rudimentary git-annex load file")
         self.repo.drop("test-annex.dat")  # since available from URL
@@ -155,9 +172,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
         for s in ('subm 1', '2'):
-            self.repo._git_custom_command(
-                '', ['git', 'annex', 'init'],
-                cwd=opj(self.path, s), expect_stderr=True)
+            AnnexRepo(opj(self.path, s), init=True)
 
 
 class NestedDataset(BasicAnnexTestRepo):
@@ -184,9 +199,7 @@ class NestedDataset(BasicAnnexTestRepo):
             cwd=self.path, **kw)
         # init all annexes
         for s in ('', 'sub dataset1', opj('sub dataset1', 'sub sub dataset1')):
-            self.repo._git_custom_command(
-                '', ['git', 'annex', 'init'],
-                cwd=opj(self.path, s), expect_stderr=True)
+            AnnexRepo(opj(self.path, s), init=True)
 
 
 class InnerSubmodule(object):
