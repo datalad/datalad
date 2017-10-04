@@ -30,6 +30,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import skip_direct_mode
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -90,6 +91,7 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
+@skip_direct_mode  #FIXME
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
