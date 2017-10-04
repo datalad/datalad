@@ -38,6 +38,7 @@ def dlplugin(dataset=None):
     from datalad.support.external_versions import external_versions
     import os
     import platform as pl
+    import json
 
     # formatting helper
     def _t2s(t):
@@ -60,14 +61,14 @@ System
 Environment
 ===========
 {env}
-{dataset}
+
 Externals
 =========
 {externals}
 Configuration
 =============
 {cfg}
-
+{dataset}
 """
 
     dataset_template = """\
@@ -87,6 +88,8 @@ Metadata
             result_filter=lambda x: x['action'] == 'metadata')
     if ds_meta:
         ds_meta = [dm['metadata'] for dm in ds_meta]
+        if len(ds_meta) == 1:
+            ds_meta = ds_meta.pop()
     ui.message(report_template.format(
         system='\n'.join(
             '{}: {}'.format(*i) for i in (
@@ -108,8 +111,7 @@ Metadata
                     ('path', ds.path),
                     ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
                 )),
-            meta='\n'.join(
-                '{}: {}'.format(k, v) for dm in ds_meta for k, v in dm.items())
+            meta=json.dumps(ds_meta, indent=1)
             if ds_meta else '[no metadata]'
         ),
         externals=external_versions.dumps(preamble=None, indent='', query=True),
