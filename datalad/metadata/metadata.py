@@ -560,9 +560,14 @@ def _merge_context(ds, old, new):
             old[k] = v
 
 
-def _limit_field_size(d, maxsize):
-    return {k: v for k, v in d.items()
-            if len(str(v) if not isinstance(v, string_types + (binary_type,)) else v) <= maxsize}
+def _filter_metadata_fields(d, maxsize=None, blacklist=None):
+    if blacklist:
+        d = {k: v for k, v in d.items()
+             if not any(bl.match(k) for bl in blacklist)}
+    if maxsize:
+        d = {k: v for k, v in d.items()
+             if len(str(v) if not isinstance(v, string_types + (binary_type,)) else v) <= maxsize}
+    return d
 
 
 def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
@@ -658,11 +663,22 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                     # no prior record, wrap an helper and store
                     contentmeta[loc] = MetadataDict(meta)
 
+    # pull out potential metadata field blacklist config settings
+    blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
+        'datalad.metadata.aggregate-ignore-fields',
+        default=[]))]
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-    dsmeta = _limit_field_size(dsmeta, max_fieldsize)
-    contentmeta = {k: _limit_field_size(contentmeta[k], max_fieldsize) for k in contentmeta}
-
+    dsmeta = _filter_metadata_fields(
+        dsmeta,
+        maxsize=max_fieldsize,
+        blacklist=blacklist)
+    contentmeta = {
+        k: _filter_metadata_fields(
+            contentmeta[k],
+            maxsize=max_fieldsize,
+            blacklist=blacklist)
+        for k in contentmeta}
     # go through content metadata and inject report of unique keys
     # and values into `dsmeta`
     unique_cm = {}
@@ -676,8 +692,8 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {
-                k: sorted(v) if len(v) > 1 else list(v)[0]
-                for k, v in unique_cm.items()}
+            k: sorted(v) if len(v) > 1 else list(v)[0]
+            for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
     if context:
