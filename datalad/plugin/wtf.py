@@ -35,9 +35,35 @@ def dlplugin(dataset=None):
         cfg = ds.config
     from datalad.ui import ui
     from datalad.api import metadata
+    from datalad.support.external_versions import external_versions
+    import os
+    import platform as pl
+
+    # formatting helper
+    def _t2s(t):
+        res = []
+        for e in t:
+            if isinstance(e, tuple):
+                es = _t2s(e)
+                if es != '':
+                    res += ['(%s)' % es]
+            elif e != '':
+                res += [e]
+        return '/'.join(res)
+
 
     report_template = """\
+System
+======
+{system}
+
+Environment
+===========
+{env}
 {dataset}
+Externals
+=========
+{externals}
 Configuration
 =============
 {cfg}
@@ -45,6 +71,7 @@ Configuration
 """
 
     dataset_template = """\
+
 Dataset information
 ===================
 {basic}
@@ -52,7 +79,6 @@ Dataset information
 Metadata
 --------
 {meta}
-
 """
     ds_meta = None
     if ds and ds.is_installed():
@@ -61,8 +87,21 @@ Metadata
             result_filter=lambda x: x['action'] == 'metadata')
     if ds_meta:
         ds_meta = [dm['metadata'] for dm in ds_meta]
-
     ui.message(report_template.format(
+        system='\n'.join(
+            '{}: {}'.format(*i) for i in (
+                ('OS          ', ' '.join([
+                    os.name,
+                    pl.system(),
+                    pl.release(),
+                    pl.version()]).rstrip()),
+                ('Distribution',
+                 ' '.join([_t2s(pl.dist()),
+                           _t2s(pl.mac_ver()),
+                           _t2s(pl.win32_ver())]).rstrip()))),
+        env='\n'.join(
+            '{}: {}'.format(k, v) for k, v in os.environ.items()
+            if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')),
         dataset='' if not ds else dataset_template.format(
             basic='\n'.join(
                 '{}: {}'.format(k, v) for k, v in (
@@ -73,6 +112,7 @@ Metadata
                 '{}: {}'.format(k, v) for dm in ds_meta for k, v in dm.items())
             if ds_meta else '[no metadata]'
         ),
+        externals=external_versions.dumps(preamble=None, indent='', query=True),
         cfg='\n'.join(
             '{}: {}'.format(
                 k,

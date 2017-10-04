@@ -151,12 +151,6 @@ def teardown_package():
 
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
-    # request versioning for few others which we do not check at runtime
-    for m in ('git', 'system-ssh'):
-        try:  # Let's make sure to not blow up when we are almost done
-            ev[m]
-        except Exception:
-            pass
     print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")
