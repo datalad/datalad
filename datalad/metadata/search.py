@@ -89,7 +89,9 @@ def _get_search_schema(ds):
         'type': common_defs['type'],
     }
 
-    schema_fields = {n: wf.ID(stored=True) for n in definitions}
+    schema_fields = {
+        n: wf.ID(stored=True, unique=n == '@id')
+        for n in definitions}
     # this will contain any dataset-specific term mappings, in case we find
     # non-unique keys that are differently defined
     per_ds_defs = {}
@@ -403,19 +405,17 @@ class Search(Interface):
                 limit=max_nresults if max_nresults > 0 else None)
             # cheap way to get an approximate number of hits, without an expensive
             # scoring of all items
-            nhits = hits.estimated_min_length()
+            # disabled: unreliable estimate, often confusing
+            #nhits = hits.estimated_min_length()
             # report query stats
-            lgr.info('Found {} matching {}{} in {} sec.{}'.format(
-                nhits,
-                single_or_plural('record', 'records', nhits),
-                '' if hits.has_exact_length() else ' (initial estimate)',
+            lgr.info('Query completed in {} sec.{}'.format(
                 hits.runtime,
-                ' Reporting metadata for {} top {}.'.format(
-                    min(max_nresults, nhits),
-                    single_or_plural(
-                        'match', 'matches',
-                        min(max_nresults, nhits)))
-                if max_nresults and hits.has_exact_length() else ''))
+                ' Reporting {}.'.format(
+                    'max. {} top {}'.format(
+                        max_nresults,
+                        single_or_plural('match', 'matches', max_nresults))
+                    if max_nresults > 0 else 'all matches')
+                if not hits.is_empty() else ''))
 
             if not hits:
                 return
