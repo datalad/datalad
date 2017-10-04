@@ -100,7 +100,7 @@ Metadata
                            _t2s(pl.mac_ver()),
                            _t2s(pl.win32_ver())]).rstrip()))),
         env='\n'.join(
-            '{}: {}'.format(k, v) for k, v in os.environ.iteritems()
+            '{}: {}'.format(k, v) for k, v in os.environ.items()
             if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')),
         dataset='' if not ds else dataset_template.format(
             basic='\n'.join(
