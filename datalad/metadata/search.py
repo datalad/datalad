@@ -33,6 +33,7 @@ from datalad.support.constraints import EnsureInt
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
+from datalad.metadata.metadata import _get_last_commit_hash
 from datalad.metadata.metadata import _query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
@@ -171,7 +172,15 @@ def _get_search_schema(ds):
 def _get_search_index(index_dir, ds, force_reindex):
     from whoosh import index as widx
 
-    if not force_reindex and exists(index_dir):
+    # what is the lastest state of aggregated metadata
+    metadata_state = _get_last_commit_hash(
+        ds,
+        opj('.datalad', 'metadata', 'aggregate.json'))
+    stamp_fname = opj(index_dir, 'datalad_metadata_state')
+
+    if not force_reindex and \
+            exists(stamp_fname) and \
+            open(stamp_fname).read() == metadata_state:
         try:
             # TODO check that the index schema is the same
             # as the one we would have used for reindexing
@@ -203,6 +212,9 @@ def _get_search_index(index_dir, ds, force_reindex):
             # we can just continue with generating an index
             pass
 
+    lgr.info('{} search index'.format(
+        'Rebuilding' if exists(index_dir) else 'Building'))
+
     if not exists(index_dir):
         os.makedirs(index_dir)
 
@@ -211,7 +223,6 @@ def _get_search_index(index_dir, ds, force_reindex):
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer()
 
-    lgr.info('Building search index')
     # load metadata of the base dataset and what it knows about all its subdatasets
     # (recursively)
     for res in _query_aggregated_metadata(
@@ -252,6 +263,11 @@ def _get_search_index(index_dir, ds, force_reindex):
         _add_document(idx, **doc_props)
 
     idx.commit()
+
+    # "timestamp" the search index to allow for automatic invalidation
+    with open(stamp_fname, 'w') as f:
+        f.write(metadata_state)
+
     lgr.info('Search index contains %i documents', idx.doc_count())
     return idx_obj
 

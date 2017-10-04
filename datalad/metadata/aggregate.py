@@ -41,6 +41,7 @@ from datalad.metadata.metadata import exclude_from_metadata
 from datalad.metadata.metadata import get_metadata_type
 from datalad.metadata.metadata import _load_json_object
 from datalad.metadata.metadata import _get_metadata
+from datalad.metadata.metadata import _get_last_commit_hash
 from datalad.metadata.metadata import _get_metadatarelevant_paths
 from datalad.metadata.metadata import _get_containingds_from_agginfo
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, require_dataset
@@ -48,7 +49,6 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
-from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.json_py import dump as jsondump
@@ -314,17 +314,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
     if not relevant_paths:
         return None
 
-    try:
-        stdout, stderr = ds.repo._git_custom_command(
-            relevant_paths,
-            ['git', 'log', '-n', '1', '--pretty=format:%H'],
-            expect_fail=True)
-        commit = stdout.strip()
-        return commit
-    except CommandError as e:
-        if 'does not have any commits' in e.stderr:
-            return None
-        raise
+    return _get_last_commit_hash(ds, relevant_paths)
 
 
 def _get_obj_location(hash_str, ref_type):
