@@ -20,10 +20,12 @@ import shutil
 import shlex
 import atexit
 import functools
+import tempfile
 
 from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type
+from subprocess import PIPE
 from os.path import abspath, isabs, pathsep
 
 from .consts import GIT_SSH_COMMAND
@@ -33,6 +35,7 @@ from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
 from .dochelpers import borrowdoc
+from .utils import get_tempfile_kwargs
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -360,8 +363,12 @@ class Runner(object):
         # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
         # would need either threaded solution as in .communicate or just allow
         # only one to be monitored and another one just being dumped into a file
-        outputstream = subprocess.PIPE if log_stdout else sys.stdout
-        errstream = subprocess.PIPE if log_stderr else sys.stderr
+        outputstream = PIPE if log_stdout else sys.stdout
+        errstream = PIPE if log_stderr else sys.stderr
+
+        if outputstream == PIPE and errstream == PIPE:
+            kw = get_tempfile_kwargs({}, prefix="outputs")
+            errstream = open(tempfile.mktemp(**kw), 'w')
 
         popen_env = env or self.env
 
@@ -391,6 +398,13 @@ class Runner(object):
         log_msg = '\n'.join(log_msgs)
         self.log(log_msg, *log_args)
 
+        def close_pipes():
+            # Those streams are for us to close if we asked for a PIPE
+            if outputstream == PIPE:
+                proc.stdout.close()
+            if errstream == PIPE:
+                proc.stderr.close()
+
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
@@ -415,6 +429,7 @@ class Runner(object):
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
+                close_pipes()
                 raise
 
             finally:
@@ -456,11 +471,7 @@ class Runner(object):
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
             finally:
-                # Those streams are for us to close if we asked for a PIPE
-                if outputstream == subprocess.PIPE:
-                    proc.stdout.close()
-                if errstream == subprocess.PIPE:
-                    proc.stderr.close()
+                close_pipes()
 
         else:
             if self.protocol.records_ext_commands:

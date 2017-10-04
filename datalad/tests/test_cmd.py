@@ -108,7 +108,7 @@ def test_runner_instance_callable_wet():
     cmd = [sys.executable, "-c", "print('Testing')"]
 
     out = runner(cmd)
-    eq_(out[0].rstrip(), ('Testing'))
+    eq_(out[0].rstrip(), 'Testing')
     eq_(out[1], '')
 
     ret = runner(os.path.join, 'foo', 'bar')
