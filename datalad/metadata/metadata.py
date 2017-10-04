@@ -658,7 +658,9 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                                for i in v) if isinstance(v, (tuple, list)) else v)
             unique_cm[k] = vset
     if unique_cm:
-        dsmeta['unique_content_properties'] = {k: sorted(v) for k, v in unique_cm.items()}
+        dsmeta['unique_content_properties'] = {
+                k: sorted(v) if len(v) > 1 else list(v)[0]
+                for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
     if context:
