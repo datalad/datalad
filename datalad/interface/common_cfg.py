@@ -222,7 +222,7 @@ definitions = {
     'datalad.metadata.store-aggregate-content': {
         'ui': ('question', {
                'title': 'Aggregated content metadata storage',
-               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}).
+               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}),
         'type': EnsureBool(),
         'default': True,
     },
