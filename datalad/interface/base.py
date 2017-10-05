@@ -434,7 +434,10 @@ class Interface(object):
     def get_refds_path(cls, dataset):
         """Return a resolved reference dataset path from a `dataset` argument"""
         # theoretically a dataset could come in as a relative path -> resolve
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if dataset is None:
+            return dataset
+        refds_path = dataset.path if isinstance(dataset, Dataset) \
+            else Dataset(dataset).path
         if refds_path:
             refds_path = resolve_path(refds_path)
         return refds_path
