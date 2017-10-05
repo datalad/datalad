@@ -76,7 +76,7 @@ class Runner(object):
              Protocol object to write to.
         log_outputs : bool, optional
              Switch to instruct either outputs should be logged or not.  If not
-             set (default), config 'datalad.log outputs' would be consulted
+             set (default), config 'datalad.log.outputs' would be consulted
         """
 
         self.cwd = cwd
@@ -194,8 +194,8 @@ class Runner(object):
     def _log_err(self, line, expected=False):
         if line and self.log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
-                     level={True: logging.DEBUG,
-                            False: logging.ERROR}[expected])
+                     level={True: 9,
+                            False: 11}[expected])
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
                            expect_stderr=False, expect_fail=False):
@@ -320,17 +320,17 @@ class Runner(object):
 
         expect_stderr: bool, optional
             Normally, having stderr output is a signal of a problem and thus it
-            gets logged at ERROR level.  But some utilities, e.g. wget, use
+            gets logged at level 11.  But some utilities, e.g. wget, use
             stderr for their progress output.  Whenever such output is expected,
-            set it to True and output will be logged at DEBUG level unless
+            set it to True and output will be logged at level 9 unless
             exit status is non-0 (in non-online mode only, in online -- would
-            log at DEBUG)
+            log at 9)
 
         expect_fail: bool, optional
             Normally, if command exits with non-0 status, it is considered an
-            ERROR and logged accordingly.  But if the call intended for checking
-            routine, such alarming message should not be logged as ERROR, thus
-            it will be logged at DEBUG level.
+            error and logged at level 11 (above DEBUG). But if the call intended
+            for checking routine, such messages are usually not needed, thus
+            it will be logged at level 9.
 
         cwd : string, optional
             Directory under which run the command (passed to Popen)
@@ -413,8 +413,8 @@ class Runner(object):
 
             except Exception as e:
                 prot_exc = e
-                lgr.error("Failed to start %r%r: %s" %
-                          (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
+                lgr.log(11, "Failed to start %r%r: %s" %
+                        (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
                 raise
 
             finally:
@@ -450,7 +450,7 @@ class Runner(object):
                 if status not in [0, None]:
                     msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
                         % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
-                    (lgr.debug if expect_fail else lgr.error)(msg)
+                    lgr.log(9 if expect_fail else 11, msg)
                     raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
@@ -478,9 +478,11 @@ class Runner(object):
         Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with
         its arguments to `commands` otherwise.
 
-        f : callable
-
-        `*args`, `**kwargs`:
+        Parameters:
+        -----------
+        f: callable
+        *args:
+        **kwargs:
           Callable arguments
         """
         if self.protocol.do_execute_callables:
@@ -506,10 +508,10 @@ class Runner(object):
     def log(self, msg, *args, **kwargs):
         """log helper
 
-        Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
+        Logs at level 9 by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        level = kwargs.pop('level', logging.DEBUG)
+        level = kwargs.pop('level', 9)
         if isinstance(self.protocol, NullProtocol):
             lgr.log(level, msg, *args, **kwargs)
         else:
@@ -556,10 +558,8 @@ class GitRunner(Runner):
                 else:
                     alongside = os.path.lexists(os.path.join(annex_path, 'git'))
             GitRunner._GIT_PATH = annex_path if alongside else ''
-            lgr.debug(
-                "Will use git under %r (no adjustments to PATH if empty string)",
-                GitRunner._GIT_PATH
-            )
+            lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
+                       "string)", GitRunner._GIT_PATH)
             assert(GitRunner._GIT_PATH is not None)  # we made the decision!
 
     @staticmethod
@@ -579,7 +579,7 @@ class GitRunner(Runner):
             if var:                                    # if env variable set
                 if not isabs(var):                     # and it's a relative path
                     git_env[varstring] = abspath(var)  # to absolute path
-                    lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
+                    lgr.log(9, "Updated %s to %s", varstring, git_env[varstring])
 
         if 'GIT_SSH_COMMAND' not in git_env:
             git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
@@ -603,11 +603,10 @@ def link_file_load(src, dst, dry_run=False):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     if os.path.lexists(dst):
-        lgr.debug("Destination file %(dst)s exists. Removing it first"
-                  % locals())
+        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
-    lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
+    lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
     src_realpath = os.path.realpath(src)
 
     try:

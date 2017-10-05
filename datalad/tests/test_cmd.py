@@ -41,7 +41,7 @@ def test_runner_dry(tempfile):
 
     # test dry command call
     cmd = 'echo Testing dry run > %s' % tempfile
-    with swallow_logs(new_level=logging.DEBUG) as cml:
+    with swallow_logs(new_level=9) as cml:
         ret = runner.run(cmd)
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
     assert_equal(("DRY", "DRY"), ret,
@@ -117,19 +117,28 @@ def test_runner_instance_callable_wet():
 
 @ignore_nose_capturing_stdout
 def test_runner_log_stderr():
-    # TODO: no idea of how to check correct logging via any kind of
-    # assertion yet.
 
-    runner = Runner()
+    runner = Runner(log_outputs=True)
     cmd = 'echo stderr-Message should be logged >&2'
-    ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
+    with swallow_outputs() as cmo:
+        with swallow_logs(new_level=9) as cml:
+            ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
+            cml.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            if not on_windows:
+                # we can just count on sanity
+                cml.assert_logged("stderr| stderr-"
+                                  "Message should be logged", regex=False)
+            else:
+                # echo outputs quoted lines for some reason, so relax check
+                ok_("stdout-Message should be logged" in cml.lines[1])
 
     cmd = 'echo stderr-Message should not be logged >&2'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=logging.INFO) as cml:
+        with swallow_logs(new_level=9) as cml:
             ret = runner.run(cmd, log_stderr=False)
             eq_(cmo.err.rstrip(), "stderr-Message should not be logged")
-            eq_(cml.out, "")
+            assert_raises(AssertionError, cml.assert_logged,
+                          "stderr| stderr-Message should not be logged")
 
 
 @ignore_nose_capturing_stdout
@@ -137,7 +146,7 @@ def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
     # assertion yet.
 
-    runner = Runner()
+    runner = Runner(log_outputs=True)
     cmd_ = ['echo', 'stdout-Message should be logged']
     for cmd in [cmd_, ' '.join(cmd_)]:
         # should be identical runs, either as a string or as a list
@@ -145,22 +154,20 @@ def test_runner_log_stdout():
         # on Windows it can't find echo if ran outside the shell
         if on_windows and isinstance(cmd, list):
             kw['shell'] = True
-        with swallow_logs(logging.DEBUG) as cm:
+        with swallow_logs(9) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
-            cm.assert_logged("Running: %s" % cmd, level='DEBUG', regex=False)
-            from datalad import cfg
-            if cfg.getbool('datalad.log', 'outputs', default=False):
-                if not on_windows:
-                    # we can just count on sanity
-                    cm.assert_logged("stdout| stdout-"
-                                     "Message should be logged", regex=False)
-                else:
-                    # echo outputs quoted lines for some reason, so relax check
-                    ok_("stdout-Message should be logged" in cm.lines[1])
+            cm.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            if not on_windows:
+                # we can just count on sanity
+                cm.assert_logged("stdout| stdout-"
+                                 "Message should be logged", regex=False)
+            else:
+                # echo outputs quoted lines for some reason, so relax check
+                ok_("stdout-Message should be logged" in cm.lines[1])
 
     cmd = 'echo stdout-Message should not be logged'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=logging.INFO) as cml:
+        with swallow_logs(new_level=11) as cml:
             ret = runner.run(cmd, log_stdout=False)
             eq_(cmo.out, "stdout-Message should not be logged\n")
             eq_(cml.out, "")
