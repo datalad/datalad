@@ -42,10 +42,14 @@ def dump(obj, fname):
     if not exists(indir):
         makedirs(indir)
     with open(fname, 'wb') as f:
-        return jsondump(
-            obj,
-            codecs.getwriter('utf-8')(f),
-            **json_dump_kwargs)
+        return dump2fileobj(obj, f)
+
+
+def dump2fileobj(obj, fileobj):
+    return jsondump(
+        obj,
+        codecs.getwriter('utf-8')(fileobj),
+        **json_dump_kwargs)
 
 
 def load(fname, fixup=True, **kw):

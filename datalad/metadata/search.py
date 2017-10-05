@@ -19,6 +19,7 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
+from gzip import open as gzopen
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -30,6 +31,8 @@ from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
+from datalad.support.network import is_url
+from datalad.support.json_py import dump2fileobj as jsondump2file
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
@@ -84,10 +87,14 @@ def _get_search_schema(ds):
     # this will harvest all discovered term definitions
     definitions = {
         '@id': 'unique identifier of an entity',
+        # TODO make proper JSON-LD definition
         'path': 'path name of an entity relative to the searched base dataset',
+        # TODO make proper JSON-LD definition
         'parentds': 'path of the datasets that contains an entity',
         # 'type' will not come from a metadata field, hence will not be detected
-        'type': common_defs['type'],
+        'type': {
+            '@id': common_defs['type']['def'],
+            'description': common_defs['type']['descr']},
     }
 
     schema_fields = {
@@ -150,16 +157,38 @@ def _get_search_schema(ds):
             # check if we have any kind of definitions for this key
             if k not in definitions:
                 # not in the dataset definitions
-                termdef = common_defs.get(k, None)
+                termdef = common_defs.get(k, {}).get('def', None)
                 if termdef is None:
                     # not in the common vocabulary
-                    if ':' not in k and k.split(':')[0] not in definitions:
-                        # this key also doesn't have a prefix that is defined in the
-                        # vocabulary, we are lost -> ignore this key as it cannot
-                        # possibly be resolved
+                    if ':' in k:
+                        prefix = k.split(':')[0]
+                        term = k[len(prefix) + 1:]
+                        prefix_def = definitions.get(prefix, None)
+                        prefix_def = prefix_def.get('@id', None) \
+                            if isinstance(prefix_def, dict) else prefix_def
+                        if prefix_def is None:
+                            # this key also doesn't have a prefix that is defined in
+                            # the vocabulary, we are lost -> ignore this key as it
+                            # cannot possibly be resolved
+                            lgr.debug(
+                                "Ignoring term '%s', no prefix definition found",
+                                k)
+                            continue
+                        if is_url(prefix_def):
+                            # proper URL, just concat to get full definition
+                            definitions[k] = u'{}{}'.format(
+                                prefix_def, term)
+                        else:
+                            # make adhoc definitions
+                            definitions[k] = u'{} (term: {})'.format(
+                                prefix_def, term)
+                    else:
+                        # we know nothing about this key, ignore
+                        lgr.debug(
+                            "Ignoring term '%s', no definition found",
+                            k)
                         continue
                     # we cannt resolve this for cheaps, just keep a record
-                    definitions[k] = k
                 else:
                     definitions[k] = termdef
                 # TODO treat keywords/tags separately
@@ -177,6 +206,7 @@ def _get_search_index(index_dir, ds, force_reindex):
         ds,
         opj('.datalad', 'metadata', 'aggregate.json'))
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
+    definitions_fname = opj(index_dir, 'datalad_term_definitions.json.gz')
 
     if not force_reindex and \
             exists(stamp_fname) and \
@@ -267,6 +297,12 @@ def _get_search_index(index_dir, ds, force_reindex):
     # "timestamp" the search index to allow for automatic invalidation
     with open(stamp_fname, 'w') as f:
         f.write(metadata_state)
+
+    # dump the term/field definitions records for later introspection
+    # use compressed storage, the is not point in inflating the
+    # diskspace requirements
+    with gzopen(definitions_fname, 'wb') as f:
+        jsondump2file(definitions, f)
 
     lgr.info('Search index contains %i documents', idx.doc_count())
     return idx_obj
