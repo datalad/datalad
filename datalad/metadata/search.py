@@ -46,9 +46,16 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 
-unicode_srctypes = string_types
 if PY3:
     unicode_srctypes = unicode_srctypes + (bytes,)
+    str_contructor = str
+else:
+    unicode_srctypes = string_types
+    str_contructor = unicode
+
+
+def _any2unicode(val):
+    return str_contructor(val) if isinstance(val, (int, float)) else assure_unicode(val)
 
 
 def _add_document(idx, **kwargs):
@@ -62,18 +69,15 @@ def _meta2index_dict(meta, definitions, ds_defs):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
-    # TODO maybe leave the unicode conversion out here and only do in
-    # _add_document()
-    # TODO also take care of the conversion from numerical values to a string type elsewhere
     return {
         # apply any dataset-specific key mapping
         ds_defs.get(k, k):
         # turn lists into CSV strings
-        ', '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(i) for i in v) if isinstance(v, (list, tuple)) else
+        u', '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
         # dicts into SSV strings
-        '; '.join(str(i) if isinstance(i, (int, float)) else assure_unicode(v[i]) for i in v) if isinstance(v, dict) else
+        u'; '.join('{}: {}'.format(_any2unicode(i), _any2unicode(v[i])) for i in v) if isinstance(v, dict) else
         # and the rest into unicode
-        str(v) if isinstance(v, (int, float)) else assure_unicode(v)
+        _any2unicode(v)
         for k, v in (meta or {}).items()
         # ignore anything that is not defined
         if k in definitions
