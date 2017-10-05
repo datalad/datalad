@@ -8,13 +8,27 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parsers"""
 
-# this is needed to make the on-demand import logic for metadata extraction work
-from . import datalad_core
-from . import bids
-from . import frictionless_datapackage
-from . import datalad_rfc822
-from . import datacite
-from . import audio
-from . import exif
-from . import xmp
-from . import dicom
+import logging as __logging
+__lgr = __logging.getLogger('datalad.metadata.parsers')
+
+from importlib import import_module as __impmod
+
+for __modname in (
+        'audio',
+        'bids',
+        'datacite',
+        'datalad_core',
+        'datalad_rfc822',
+        'dicom',
+        'exif',
+        'frictionless_datapackage',
+        'xmp'):
+    try:
+        if __modname == '--':
+            continue
+        globals()[__modname] = __impmod(
+            '.{}'.format(__modname),
+            'datalad.metadata.parsers')
+    except ImportError as e:
+        from datalad.dochelpers import exc_str
+        __lgr.debug('Metadata parser unusable: %s', exc_str(__modname))
