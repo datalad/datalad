@@ -11,6 +11,7 @@
 
 import re
 from os.path import join as opj
+from os.path import lexists
 from collections import OrderedDict
 
 try:
@@ -97,6 +98,8 @@ class MetadataParser(BaseMetadataParser):
 
     def _get_dataset_metadata(self):
         fname = opj(self.ds.path, self._core_metadata_filename)
+        if not lexists(fname):
+            return {}
         # those namespaces are a b.ch
         # TODO: avoid reading file twice
         namespaces = dict([
