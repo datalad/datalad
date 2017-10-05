@@ -11,6 +11,9 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.metadata.search')
+
 import os
 from os.path import join as opj, exists
 from os.path import relpath
@@ -33,7 +36,6 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.support.network import is_url
 from datalad.support.json_py import dump2fileobj as jsondump2file
-from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.metadata import _query_aggregated_metadata
