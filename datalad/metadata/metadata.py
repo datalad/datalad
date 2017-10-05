@@ -411,8 +411,11 @@ def _query_aggregated_metadata_singlepath(
         # and now blend with any previously aggregated metadata
         objloc = dsinfo.get('dataset_info', None)
         if objloc is not None:
+            obj_path = opj(agg_base_path, objloc)
+            # TODO get annexed obj file
+            #ds.get(path=[obj_path], result_renderer=None)
             obj = _load_json_object(
-                opj(agg_base_path, objloc),
+                obj_path,
                 cache=cache['objcache'])
             # must pull out old context before the merge to avoid
             # dtype mangling of the context dict
@@ -458,8 +461,11 @@ def _query_aggregated_metadata_singlepath(
         # multiple queries within the same dataset
         files = _get_metadatarelevant_paths(ds, cache['subds_relpaths'])
     elif filepathinfo_objloc:
+        obj_path = opj(agg_base_path, filepathinfo_objloc)
+        # TODO get annexed obj file
+        #ds.get(path=[obj_path], result_renderer=None)
         files = _load_json_object(
-            opj(agg_base_path, filepathinfo_objloc),
+            obj_path,
             cache=cache['objcache'])
     else:
         files = None
