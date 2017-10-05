@@ -36,7 +36,6 @@ from datalad.support.json_py import dump2fileobj as jsondump2file
 from datalad.log import lgr
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.metadata import _get_last_commit_hash
 from datalad.metadata.metadata import _query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
@@ -202,8 +201,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     from whoosh import index as widx
 
     # what is the lastest state of aggregated metadata
-    metadata_state = _get_last_commit_hash(
-        ds,
+    metadata_state = ds.repo.get_last_commit_hash(
         opj('.datalad', 'metadata', 'aggregate.json'))
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
     definitions_fname = opj(index_dir, 'datalad_term_definitions.json.gz')

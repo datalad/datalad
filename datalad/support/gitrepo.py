@@ -1071,6 +1071,22 @@ class GitRepo(RepoInterface):
         assert(len(stdout) == 1)
         return stdout[0]
 
+    @normalize_paths(match_return_type=False)
+    def get_last_commit_hash(self, files):
+        """Return the hash of the last commit the modified any of the given
+        paths"""
+        try:
+            stdout, stderr = self._git_custom_command(
+                files,
+                ['git', 'log', '-n', '1', '--pretty=format:%H'],
+                expect_fail=True)
+            commit = stdout.strip()
+            return commit
+        except CommandError as e:
+            if 'does not have any commits' in e.stderr:
+                return None
+            raise
+
     def get_merge_base(self, treeishes):
         """Get a merge base hexsha
 

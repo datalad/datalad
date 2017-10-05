@@ -74,22 +74,6 @@ agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
 exclude_from_metadata = ('.datalad', '.git', '.gitmodules', '.gitattributes')
 
 
-def _get_last_commit_hash(ds, paths):
-    """Return the hash of the last commit the modified any of the given
-    paths"""
-    try:
-        stdout, stderr = ds.repo._git_custom_command(
-            paths,
-            ['git', 'log', '-n', '1', '--pretty=format:%H'],
-            expect_fail=True)
-        commit = stdout.strip()
-        return commit
-    except CommandError as e:
-        if 'does not have any commits' in e.stderr:
-            return None
-        raise
-
-
 def get_metadata_type(ds):
     """Return the metadata type(s)/scheme(s) of a dataset
 
