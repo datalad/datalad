@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
-from ..utils import swallow_logs
+from ..utils import disable_logger
 from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 
@@ -67,7 +67,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
 
         try:
-            status = self._providers.get_status(url)
+            with disable_logger():
+                status = self._providers.get_status(url)
             size = str(status.size) if status.size is not None else 'UNKNOWN'
             resp = ["CHECKURL-CONTENTS", size] \
                 + ([status.filename] if status.filename else [])
@@ -96,7 +97,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in self.get_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
-                status = self._providers.get_status(url)
+                with disable_logger():
+                    status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     resp = "CHECKPRESENT-SUCCESS"
                     break

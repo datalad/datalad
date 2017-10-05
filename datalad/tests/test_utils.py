@@ -52,6 +52,7 @@ from ..utils import better_wraps
 from ..utils import path_startswith
 from ..utils import safe_print
 from ..utils import generate_chunks
+from ..utils import disable_logger
 
 from ..support.annexrepo import AnnexRepo
 
@@ -197,6 +198,34 @@ def test_swallow_logs_assert():
     cm.assert_logged("some.hing", level="INFO", match=False)
     # and we indeed logged something
     cm.assert_logged(match=False)
+
+
+def test_disable_logger():
+
+    # get a logger hierarchy:
+    lgr_top = logging.getLogger('datalad')
+    lgr_middle = logging.getLogger('datalad.tests')
+    lgr_bottom = logging.getLogger('datalad.tests.utils')
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger():  # default: 'datalad':
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # nothing logged:
+        assert_raises(AssertionError, cml.assert_logged)
+
+    # again, but pass in the logger at mid level:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger(lgr_middle):
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # top level unaffected:
+        cml.assert_logged("log sth at top level", level="DEBUG", regex=False)
+        # but both of the lower ones don't log anything:
+        assert_raises(AssertionError, cml.assert_logged, "log sth at mid level")
+        assert_raises(AssertionError, cml.assert_logged, "log sth at bottom level")
 
 
 def _check_setup_exceptionhook(interactive):
