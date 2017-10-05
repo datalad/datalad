@@ -242,7 +242,8 @@ merge_native_opt = Parameter(
     is performed in the order in which they are configured.
     Custom DataLad metadata always takes precedence over
     native metadata. Merge procedure modes are semantically
-    identical to the corresponding manipulation arguments.
+    identical to the corresponding manipulation arguments of
+    [PY: 'Dataset.metadata()' PY][CMD: the 'metadata' command CMD].
     Setting the mode to 'none' disables merging of native
     metadata.""",
     constraints=EnsureChoice('init', 'add', 'reset', 'none'))
