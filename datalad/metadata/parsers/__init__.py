@@ -24,8 +24,6 @@ for __modname in (
         'frictionless_datapackage',
         'xmp'):
     try:
-        if __modname == '--':
-            continue
         globals()[__modname] = __impmod(
             '.{}'.format(__modname),
             'datalad.metadata.parsers')
