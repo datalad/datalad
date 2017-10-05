@@ -32,8 +32,6 @@ class MetadataParser(BaseMetadataParser):
         context = {}
         contentmeta = []
         for f in self.paths:
-            # TODO we might want to do some more elaborate extraction in the future
-            # but for now plain EXIF, no maker extensions, no thumbnails
             info = file_to_dict(opj(self.ds.path, f))
             if not info:
                 # got nothing, likely nothing there
