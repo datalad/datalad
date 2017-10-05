@@ -10,6 +10,7 @@
 from __future__ import absolute_import
 
 import re
+from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.dicom')
 
@@ -32,7 +33,7 @@ class MetadataParser(BaseMetadataParser):
         lgr.info("Attempting to extract DICOM metadata from %i files", len(self.paths))
         for f in self.paths:
             try:
-                d = dcm.read_file(f, stop_before_pixels=True)
+                d = dcm.read_file(opj(self.ds.path, f), stop_before_pixels=True)
             except InvalidDicomError:
                 # we can only ignore
                 lgr.debug('"%s" does not look like a DICOM file, skipped', f)

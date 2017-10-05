@@ -9,6 +9,7 @@
 """EXIF metadata parser"""
 
 import re
+from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.exif')
 
@@ -38,7 +39,7 @@ class MetadataParser(BaseMetadataParser):
         for f in self.paths:
             # TODO we might want to do some more elaborate extraction in the future
             # but for now plain EXIF, no maker extensions, no thumbnails
-            info = process_file(open(f, 'rb'), details=False)
+            info = process_file(open(opj(self.ds.path, f), 'rb'), details=False)
             if not info:
                 # got nothing, likely nothing there
                 continue

@@ -10,6 +10,7 @@
 from __future__ import absolute_import
 
 import re
+from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.audio')
 
@@ -38,7 +39,7 @@ class MetadataParser(BaseMetadataParser):
             return {}, []
         contentmeta = []
         for f in self.paths:
-            info = audiofile(f, easy=True)
+            info = audiofile(opj(self.ds.path, f), easy=True)
             if info is None:
                 continue
             meta = {vocab_map.get(k, 'mutagen:{}'.format(k)): info[k][0]

@@ -12,6 +12,7 @@ https://en.wikipedia.org/wiki/Extensible_Metadata_Platform
 """
 
 import re
+from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.xmp')
 
@@ -33,7 +34,7 @@ class MetadataParser(BaseMetadataParser):
         for f in self.paths:
             # TODO we might want to do some more elaborate extraction in the future
             # but for now plain EXIF, no maker extensions, no thumbnails
-            info = file_to_dict(f)
+            info = file_to_dict(opj(self.ds.path, f))
             if not info:
                 # got nothing, likely nothing there
                 # TODO check if this is an XMP sidecar file, parse that, and assign metadata
