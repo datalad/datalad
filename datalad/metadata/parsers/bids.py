@@ -15,6 +15,7 @@ from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.definitions import vocabulary_id
 
 import logging
 lgr = logging.getLogger('datalad.meta.bids')
@@ -22,6 +23,10 @@ lgr = logging.getLogger('datalad.meta.bids')
 
 # BIDS parser metadata definitions (dlp_bids:)
 vocabulary = {
+    "dlp_bids": {
+        'def': 'TODO',
+        'descr': 'Vocabulary of the DataLad BIDS metadata parser',
+        'type': vocabulary_id},
     # characteristics (metadata keys)
     "dlp_bids:age(years)": {
         '@id': "pato:0000011",

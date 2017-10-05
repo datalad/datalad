@@ -32,10 +32,6 @@ common_defs = {
         'def': "http://purl.org/dc/dcmitype/",
         'descr': 'DCMI Type Vocabulary',
         'type': vocabulary_id},
-    "dlp_bids": {
-        'def': 'TODO',
-        'descr': 'Vocabulary of the DataLad BIDS metadata parser',
-        'type': vocabulary_id},
     "doap": {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'vocabulary for the description of a project',
