@@ -897,8 +897,8 @@ def disable_logger(logger=None):
     This is to provide one of swallow_logs' purposes without unnecessarily
     creating temp files (see gh-1865)
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     logger: Logger
         Logger whose handlers will be ordered to not log anything.
         Default: datalad's topmost Logger ('datalad')

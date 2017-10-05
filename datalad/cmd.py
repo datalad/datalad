@@ -478,12 +478,9 @@ class Runner(object):
         Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with
         its arguments to `commands` otherwise.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         f: callable
-        *args:
-        **kwargs:
-          Callable arguments
         """
         if self.protocol.do_execute_callables:
             if self.protocol.records_callables:
