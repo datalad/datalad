@@ -412,6 +412,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
     if objs2remove:
         ds.remove(
             [opj(agg_base_path, p) for p in objs2remove],
+            # Don't use the misleading default commit message of `remove`:
+            message='[DATALAD] Remove obsolete metadata object files',
             # we do not want to drop these files by default, because we would
             # loose them for other branches, and earlier tags
             # TODO evaluate whether this should be exposed as a switch
