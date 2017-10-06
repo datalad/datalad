@@ -605,6 +605,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # this is for use with older annex, which didn't exit non-zero
             # in case of the failure we are interested in
 
+            # TODO: If we are to keep this workaround (we probably rely on a
+            # newer annex anyway), we should not use swallow_logs, since we
+            # actually don't want to swallow it, but inspect it. Use a proper
+            # handler/filter for the logger instead to not create temp files via
+            # swallow_logs
+
             old_log_state = self.cmd_call_wrapper.log_outputs
             self.cmd_call_wrapper._log_opts['outputs'] = True
 

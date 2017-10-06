@@ -38,7 +38,6 @@ from datalad.support.network import RI
 
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.distribution.utils import get_git_dir
 

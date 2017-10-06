@@ -52,7 +52,6 @@ from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.update import Update
-from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import slash_join
 from datalad.dochelpers import exc_str

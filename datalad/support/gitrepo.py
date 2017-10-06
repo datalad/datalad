@@ -51,7 +51,6 @@ from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
-from datalad.utils import swallow_logs
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 

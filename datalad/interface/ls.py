@@ -28,7 +28,6 @@ from ..utils import auto_repr
 from .base import Interface
 from datalad.interface.base import build_doc
 from ..ui import ui
-from ..utils import swallow_logs
 from ..utils import safe_print
 from ..consts import METADATA_DIR
 from ..consts import METADATA_FILENAME

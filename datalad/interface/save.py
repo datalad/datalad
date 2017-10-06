@@ -20,7 +20,6 @@ from os.path import lexists
 
 
 from datalad.utils import unique
-from datalad.utils import swallow_logs
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
