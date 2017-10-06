@@ -49,7 +49,7 @@ from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 
 if PY3:
-    unicode_srctypes = unicode_srctypes + (bytes,)
+    unicode_srctypes = string_types + (bytes,)
     str_contructor = str
 else:
     unicode_srctypes = string_types
