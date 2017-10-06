@@ -34,7 +34,7 @@ class BaseMetadataParser(object):
         # default implementation
         return \
             self._get_dataset_metadata() if dataset else None, \
-            {k: v for k, v in self._get_content_metadata()} if content else None
+            ((k, v) for k, v in self._get_content_metadata()) if content else None
 
     def _get_dataset_metadata(self):
         """
