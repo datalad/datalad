@@ -114,30 +114,34 @@ class MetadataParser(BaseMetadataParser):
     def _get_content_metadata(self):
         participants_fname = opj(self.ds.path, 'participants.tsv')
         if exists(participants_fname):
-            with open(participants_fname, 'rb') as tsvfile:
-                # add robustness, use a sniffer
-                try:
-                    dialect = csv.Sniffer().sniff(tsvfile.read(16384))
-                except:
-                    lgr.warning('Could not determine file-format, assuming TSV')
-                    dialect = 'excel-tab'
-                tsvfile.seek(0)
-                for row in csv.DictReader(tsvfile, dialect=dialect):
-                    if 'participant_id' not in row:
-                        # not sure what this is, but we cannot use it
-                        break
-                    props = {}
-                    for k in row:
-                        # take away some ambiguity
-                        normk = k.lower()
-                        hk = content_metakey_map.get(normk, None)
-                        if hk is None:
-                            hk = 'comment[{}]'.format(normk)
-                        elif hk == 'dlp_bids:sex':
-                            val = sex_label_map.get(row[k].lower(), None)
-                            if val:
-                                props[hk] = val
-                        else:
-                            props[hk] = row[k]
-                    if props:
-                        yield '^{}/.*'.format(row['participant_id']), props
+            for r in yield_participant_info(participants_fname):
+                yield r
+
+
+def yield_participant_info(fname):
+    with open(fname, 'rb') as tsvfile:
+        # add robustness, use a sniffer
+        try:
+            dialect = csv.Sniffer().sniff(tsvfile.read(16384))
+        except:
+            lgr.warning('Could not determine file-format, assuming TSV')
+            dialect = 'excel-tab'
+        tsvfile.seek(0)
+        for row in csv.DictReader(tsvfile, dialect=dialect):
+            if 'participant_id' not in row:
+                # not sure what this is, but we cannot use it
+                break
+            props = {}
+            for k in row:
+                # take away some ambiguity
+                normk = k.lower()
+                hk = content_metakey_map.get(normk, None)
+                val = row[k]
+                if hk is None:
+                    hk = 'comment[{}]'.format(normk)
+                elif hk == 'dlp_bids:sex':
+                    val = sex_label_map.get(row[k].lower(), None)
+                if val:
+                    props[hk] = val
+            if props:
+                yield r'^{}/.*'.format(row['participant_id']), props

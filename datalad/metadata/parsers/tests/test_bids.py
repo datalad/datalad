@@ -30,6 +30,11 @@ from datalad.tests.utils import with_tree, with_tempfile
         "http://studyforrest.org"
     ]
 }
+""",
+    'participants.tsv': """\
+participant_id\tgender\tage\thandedness\thearing_problems_current
+sub-01\tm\t30-35\tr\tn
+sub-03\tf\t20-25\tr\tn
 """})
 def test_get_metadata(path):
 
@@ -54,6 +59,9 @@ def test_get_metadata(path):
   "license": "PDDL",
   "name": "studyforrest_phase2"
 }""")
+
+    cmeta = list(MetadataParser(ds, [])._get_content_metadata())
+    assert_equal(len(cmeta), 2)
 
 
 @with_tree(tree={'dataset_description.json': """
