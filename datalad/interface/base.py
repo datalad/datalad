@@ -402,7 +402,10 @@ class Interface(object):
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = \
-                    lambda x, **kwargs: ui.message(args.common_output_format.format(**x))
+                    lambda x, **kwargs: ui.message(args.common_output_format.format(
+                        **{k: {k_.replace(':', '#'): v_ for k_, v_ in v.items()}
+                           if isinstance(v, dict) else v
+                           for k, v in x.items()}))
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
