@@ -138,7 +138,7 @@ def yield_participant_info(fname):
                 hk = content_metakey_map.get(normk, None)
                 val = row[k]
                 if hk is None:
-                    hk = 'comment[{}]'.format(normk)
+                    hk = 'comment({})'.format(normk)
                 elif hk == 'dlp_bids:sex':
                     val = sex_label_map.get(row[k].lower(), None)
                 if val:
