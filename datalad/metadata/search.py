@@ -187,6 +187,9 @@ def _get_search_schema(ds):
                             # make adhoc definitions
                             definitions[k] = u'{} (term: {})'.format(
                                 prefix_def, term)
+                    elif k.startswith('comment<') and k.endswith('>'):
+                        # catch fields like 'comment<someundefinedkey>'
+                        definitions[k] = 'comment'
                     else:
                         # we know nothing about this key, ignore
                         lgr.debug(

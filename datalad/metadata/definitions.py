@@ -65,6 +65,9 @@ common_defs = {
     "contributors": {
         'def': "schema:contributor",
         'descr': 'secondary author of a resource'},
+    "comment": {
+        'def': 'http://purl.obolibrary.org/obo/NCIT_C25393',
+        'descr': 'A written explanation, or observation'},
     "description": {
         'def': "schema:description",
         'descr': 'description of a resource'},

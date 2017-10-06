@@ -67,7 +67,7 @@ class MetadataParser(BaseMetadataParser):
                     field, idx, qual = xmp_field_re.match(key).groups()
                     normkey = u'{}{}'.format(field, qual)
                     if '/' in key:
-                        normkey = u'{0}({1})'.format(*normkey.split('/'))
+                        normkey = u'{0}<{1}>'.format(*normkey.split('/'))
                     if idx:
                         # array
                         arr = meta.get(normkey, [])

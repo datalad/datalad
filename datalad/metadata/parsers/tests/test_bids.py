@@ -11,8 +11,9 @@
 from simplejson import dumps
 from datalad.api import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
-from nose.tools import assert_false, assert_equal
-from datalad.tests.utils import with_tree, with_tempfile
+from nose.tools import assert_equal
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import assert_in
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -62,6 +63,10 @@ def test_get_metadata(path):
 
     cmeta = list(MetadataParser(ds, [])._get_content_metadata())
     assert_equal(len(cmeta), 2)
+    for cm in cmeta:
+        if cm[0].startswith('^sub'):
+            # unknown keys come out as comments
+            assert_in('comment<handedness>', cm[1])
 
 
 @with_tree(tree={'dataset_description.json': """
