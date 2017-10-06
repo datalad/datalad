@@ -21,10 +21,9 @@ env:
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
   matrix:
-    - DATALAD_REPO_DIRECT=1
-    - DATALAD_REPO_DIRECT=
+    - DATALAD_REPO_DIRECT=yes
     - DATALAD_REPO_VERSION=6
-    - DATALAD_REPO_VERSION=
+    - DATALAD_REPO_VERSION=5
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -119,6 +118,20 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
+  - python: 2.7
+    # test whether known v6 failures still fail
+    env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  - python: 2.7
+    # test whether known direct mode failures still fail
+    env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -126,6 +139,18 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
+  # test whether known v6 failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  # test whether known direct mode failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)

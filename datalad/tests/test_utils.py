@@ -11,6 +11,8 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
 import inspect
 import os
 import shutil
@@ -71,6 +73,7 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+from .utils import probe_known_failure, skip_known_failure, known_failure, known_failure_v6, known_failure_direct_mode
 
 
 def test_get_func_kwargs_doc():
@@ -707,3 +710,134 @@ def test_safe_print():
     with patch.object(__builtin__, 'print', _print):
         safe_print("bua")
     assert_equal(called[0], 2)
+
+
+def test_probe_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.probe"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @probe_known_failure
+    def not_failing():
+        pass
+
+    @probe_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if switch:
+        # if probing is enabled the failing is considered to be expected and
+        # therefore the decorated function doesn't actually fail:
+        failing()
+        # in opposition a function that doesn't fail raises an AssertionError:
+        assert_raises(AssertionError, not_failing)
+    else:
+        # if probing is disabled it should just fail/pass as is:
+        assert_raises(AssertionError, failing)
+        not_failing()
+
+
+def test_skip_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.skip"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @skip_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.skip")
+
+    if switch:
+        # if skipping is enabled, we shouldn't see the exception:
+        failing()
+    else:
+        # if it's disabled, failing() is executed and therefore exception
+        # is raised:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure():
+
+    @known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if skip:
+        # skipping takes precedence over probing
+        failing()
+    elif probe:
+        # if we probe a known failure it's okay to fail:
+        failing()
+    else:
+        # not skipping and not probing results in the original failure:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_v6():
+
+    @known_failure_v6
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    v6 = cfg.obtain("datalad.repo.version") == 6
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if v6:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_direct_mode():
+
+    @known_failure_direct_mode
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if direct:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)

@@ -10,7 +10,8 @@
 """Test meta data manipulation"""
 
 
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
 import os
 from os.path import join as opj
 from os.path import exists
@@ -214,7 +215,7 @@ def test_basic_dsmeta(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_mod_hierarchy(path):
     base = Dataset(path).create()
     sub = base.create('sub')

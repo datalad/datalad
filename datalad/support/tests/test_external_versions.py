@@ -199,3 +199,8 @@ def test_system_ssh_version():
                 return "", s
         with patch('datalad.support.external_versions._runner', _runner()):
             assert_equal(ev['cmd:system-ssh'], v)
+
+
+def test_humanize():
+    # doesn't provide __version__
+    assert ExternalVersions()['humanize']

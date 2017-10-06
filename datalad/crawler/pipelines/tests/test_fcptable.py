@@ -7,8 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+
 from os.path import exists
 from requests.exceptions import InvalidURL
 
@@ -31,8 +30,7 @@ from ..fcptable import pipeline, superdataset_pipeline
 
 TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus']
     yield _test_smoke_pipelines, superdataset_pipeline, []
