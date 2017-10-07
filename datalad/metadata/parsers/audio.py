@@ -42,7 +42,7 @@ class MetadataParser(BaseMetadataParser):
             info = audiofile(opj(self.ds.path, f), easy=True)
             if info is None:
                 continue
-            meta = {vocab_map.get(k, 'mutagen:{}'.format(k)): info[k][0]
+            meta = {vocab_map.get(k, 'comment<{}>'.format(k)): info[k][0]
                     if isinstance(info[k], list) and len(info[k]) == 1 else info[k]
                     for k in info}
             if hasattr(info, 'mime') and len(info.mime):
@@ -58,11 +58,6 @@ class MetadataParser(BaseMetadataParser):
 
         return {
             '@context': {
-                'mutagen': {
-                    '@id': 'https://mutagen.readthedocs.io/',
-                    'description': 'Adhoc-vocabulary used by the Python mutagen package',
-                    'type': vocabulary_id,
-                },
                 'music': {
                     '@id': 'http://purl.org/ontology/mo/',
                     'description': 'Music Ontology with main concepts and properties for describing music',
