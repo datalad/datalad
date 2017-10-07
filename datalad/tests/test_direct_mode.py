@@ -11,7 +11,7 @@
 """
 
 
-from datalad.tests.utils import skip_v6
+
 import logging
 
 # Please do ignore possible unused marking.

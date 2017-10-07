@@ -41,7 +41,7 @@ except ImportError:
 # some additional testing, e.g. non-context manager style of invocation
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
-    TEST_CONTENT = "123\n"
+    TEST_CONTENT = "content to be annex-addurl'd"
     fname = 'test-annex.dat'
     fpath = opj(repo, fname)
     assert_raises(IOError, open, fpath)
