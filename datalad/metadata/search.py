@@ -453,7 +453,7 @@ class Search(Interface):
             parser.add_plugin(qparse.FuzzyTermPlugin())
             parser.add_plugin(qparse.GtLtPlugin())
             # replace field defintion to allow for colons to be part of a field's name:
-            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[:\w]+|[*]):"))
+            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>:\w]+|[*]):"))
             # for convenience we accept any number of args-words from the
             # shell and put them together to a single string here
             querystr = ' '.join(assure_list(query))
