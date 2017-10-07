@@ -119,7 +119,7 @@ class MetadataParser(BaseMetadataParser):
 
 
 def yield_participant_info(fname):
-    with open(fname, 'rb') as tsvfile:
+    with open(fname) as tsvfile:
         # add robustness, use a sniffer
         try:
             dialect = csv.Sniffer().sniff(tsvfile.read(16384))
