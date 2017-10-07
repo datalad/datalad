@@ -32,6 +32,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import setup_exceptionhook, chpwd
+from ..utils import assure_unicode
 from ..dochelpers import exc_str
 
 
@@ -111,6 +112,7 @@ def setup_parser(
     parser.add_argument(
         '--output-format', dest='common_output_format',
         default='default',
+        type=assure_unicode,
         metavar="{default,json,json_pp,tailored,'<template>'",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
