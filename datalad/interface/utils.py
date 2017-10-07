@@ -516,7 +516,11 @@ def _process_results(
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **kwargs)
         elif hasattr(result_renderer, '__call__'):
-            result_renderer(res, **kwargs)
+            try:
+                result_renderer(res, **kwargs)
+            except Exception as e:
+                lgr.warn('Result rendering failed for: %s [%s]',
+                         res, exc_str(e))
         if result_xfm:
             res = result_xfm(res)
             if res is None:
