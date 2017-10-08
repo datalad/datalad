@@ -13,8 +13,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 from os.path import basename
 from os.path import relpath
+
+from six.moves.urllib.parse import urlparse
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -28,6 +31,9 @@ from datalad.support.constraints import EnsureBool
 from datalad.support.param import Parameter
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import AccessDeniedError
+from datalad.support.exceptions import AccessFailedError
+from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -42,10 +48,10 @@ from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
 from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import location_description
+from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.update import Update
-from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import slash_join
 from datalad.dochelpers import exc_str
@@ -67,12 +73,14 @@ class Siblings(Interface):
     """Manage sibling configuration
 
     This command offers four different actions: 'query', 'add', 'remove',
-    'configure'. 'query' is the default action and can be used to obtain
+    'configure', 'enable'. 'query' is the default action and can be used to obtain
     information about (all) known siblings. 'add' and 'configure' are highly
     similar actions, the only difference being that adding a sibling
     with a name that is already registered will fail, whereas
     re-configuring a (different) sibling under a known name will not
-    be considered an error. Lastly, the 'remove' action allows for the
+    be considered an error. 'enable' can be used to complete access
+    configuration for non-Git sibling (aka git-annex special remotes).
+    Lastly, the 'remove' action allows for the
     removal (or de-configuration) of a registered sibling.
 
     For each sibling (added, configured, or queried) all known sibling
@@ -124,7 +132,7 @@ class Siblings(Interface):
             nargs='?',
             metavar='ACTION',
             doc="""command action selection (see general documentation)""",
-            constraints=EnsureChoice('query', 'add', 'remove', 'configure') | EnsureNone()),
+            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable') | EnsureNone()),
         url=Parameter(
             args=('--url',),
             doc="""the URL of or path to the dataset sibling named by
@@ -205,6 +213,7 @@ class Siblings(Interface):
             'add': _add_remote,
             'configure': _configure_remote,
             'remove': _remove_remote,
+            'enable': _enable_remote,
         }
         # all worker strictly operate on a single dataset
         # anything that deals with hierarchies and/or dataset
@@ -289,7 +298,9 @@ class Siblings(Interface):
             **dict(
                 res,
                 path=path,
-                with_annex='+' if 'annex-uuid' in res else '-',
+                # TODO report '+' for special remotes
+                with_annex='+' if 'annex-uuid' in res \
+                    else ('-' if res.get('annex-ignore', None) else '?'),
                 spec=spec)))
 
 
@@ -609,20 +620,37 @@ def _query_remotes(
             for remotecfg in [k for k in ds.config.keys()
                               if k.startswith('remote.{}.'.format(remote))]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
-        if get_annex_info and 'annex-uuid' in info:
+        if get_annex_info and info.get('annex-uuid', None):
             ainfo = annex_info.get(info['annex-uuid'])
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description
         if get_annex_info and isinstance(ds.repo, AnnexRepo):
-            for prop in ('wanted', 'required', 'group'):
-                var = ds.repo.get_preferred_content(
-                    prop, '.' if remote == 'here' else remote)
-                if var:
-                    info['annex-{}'.format(prop)] = var
-            groupwanted = ds.repo.get_groupwanted(remote)
-            if groupwanted:
-                info['annex-groupwanted'] = groupwanted
+            if not ds.repo.is_remote_annex_ignored(remote):
+                try:
+                    for prop in ('wanted', 'required', 'group'):
+                        var = ds.repo.get_preferred_content(
+                            prop, '.' if remote == 'here' else remote)
+                        if var:
+                            info['annex-{}'.format(prop)] = var
+                    groupwanted = ds.repo.get_groupwanted(remote)
+                    if groupwanted:
+                        info['annex-groupwanted'] = groupwanted
+                except CommandError as exc:
+                    if 'cannot determine uuid' in str(exc):
+                        # not an annex (or no connection), would be marked as
+                        #  annex-ignore
+                        msg = "Failed to determine if %s carries annex." % remote
+                        ds.repo.config.reload()
+                        if ds.repo.is_remote_annex_ignored(remote):
+                            msg += " Remote was marked by annex as annex-ignore.  " \
+                                   "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
+                        lgr.warning(msg)
+                        info['annex-ignore'] = True
+                    else:
+                        raise
+            else:
+                info['annex-ignore'] = True
 
         info['status'] = 'ok'
         yield info
@@ -645,21 +673,111 @@ def _remove_remote(
         **res_kwargs)
     try:
         # failure can happen and is OK
-        with swallow_logs():
-            ds.repo.remove_remote(name)
-    except CommandError as e:
-        if 'fatal: No such remote' in e.stderr:
-            yield get_status_dict(
-                # result-oriented! given remote is absent already
-                status='notneeded',
-                **result_props)
-            return
-        else:
-            raise e
+        ds.repo.remove_remote(name)
+    except RemoteNotAvailableError as e:
+        yield get_status_dict(
+            # result-oriented! given remote is absent already
+            status='notneeded',
+            **result_props)
+        return
 
     yield get_status_dict(
         status='ok',
         **result_props)
+
+
+# always copy signature from above to avoid bugs
+def _enable_remote(
+        ds, name, known_remotes, url, pushurl, fetch, description,
+        as_common_datasrc, publish_depends, publish_by_default,
+        annex_wanted, annex_required, annex_group, annex_groupwanted,
+        inherit, get_annex_info,
+        **res_kwargs):
+    result_props = dict(
+        action='enable-sibling',
+        path=ds.path,
+        type='sibling',
+        name=name,
+        **res_kwargs)
+
+    if not isinstance(ds.repo, AnnexRepo):
+        yield dict(
+            result_props,
+            status='impossible',
+            message='cannot enable sibling of non-annex dataset')
+        return
+
+    if name is None:
+        yield dict(
+            result_props,
+            status='error',
+            message='require `name` of sibling to enable')
+        return
+
+    # get info on special remote
+    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in ds.repo.get_special_remotes().items()}
+    remote_info = sp_remotes.get(name, None)
+
+    if remote_info is None:
+        yield dict(
+            result_props,
+            status='impossible',
+            message=("cannot enable sibling '%s', not known", name))
+        return
+
+    env = None
+    cred = None
+    if remote_info.get('type', None) == 'webdav':
+        # a webdav special remote -> we need to supply a username and password
+        if not ('WEBDAV_USERNAME' in os.environ and 'WEBDAV_PASSWORD' in os.environ):
+            # nothing user-supplied
+            # let's consult the credential store
+            hostname = urlparse(remote_info.get('url', '')).netloc
+            if not hostname:
+                yield dict(
+                    result_props,
+                    status='impossible',
+                    message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
+            cred = UserPassword('webdav:{}'.format(hostname))
+            if not cred.is_known:
+                try:
+                    cred.enter_new(
+                        instructions="Enter credentials for authentication with WEBDAV server at {}".format(hostname),
+                        user=os.environ.get('WEBDAV_USERNAME', None),
+                        password=os.environ.get('WEBDAV_PASSWORD', None))
+                except KeyboardInterrupt:
+                    # user hit Ctrl-C
+                    yield dict(
+                        result_props,
+                        status='impossible',
+                        message="credentials are required for sibling access, abort")
+                    return
+            creds = cred()
+            # update the env with the two necessary variable
+            # we need to pass a complete env because of #1776
+            env = dict(
+                os.environ,
+                WEBDAV_USERNAME=creds['user'],
+                WEBDAV_PASSWORD=creds['password'])
+
+    try:
+        ds.repo.enable_remote(name, env=env)
+        result_props['status'] = 'ok'
+    except AccessDeniedError as e:
+        # credentials are wrong, wipe them out
+        if cred and cred.is_known:
+            cred.delete()
+        result_props['status'] = 'error'
+        result_props['message'] = e.message
+    except AccessFailedError as e:
+        # some kind of connection issue
+        result_props['status'] = 'error'
+        result_props['message'] = e.message
+    except Exception as e:
+        # something unexpected
+        raise e
+
+    yield result_props
 
 
 def _inherit_annex_var(ds, remote, cfgvar):

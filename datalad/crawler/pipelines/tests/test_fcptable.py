@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+
 from os.path import exists
 from requests.exceptions import InvalidURL
 
@@ -28,6 +29,7 @@ lgr = getLogger('datalad.crawl.tests')
 from ..fcptable import pipeline, superdataset_pipeline
 
 TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
+
 
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ['bogus']

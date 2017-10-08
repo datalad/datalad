@@ -204,18 +204,20 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
                 m['dcterms:isPartOf'] = ds.id
         sp = opj(ds.path, metadata_basepath, subds_relpath)
         _store_json(ds, sp, smeta)
+        # TODO this is all wrong! It should not talk to repo methods and emulate
+        # high-level code, but use the (now) existing high-level commands
         # stage potential changes in the subdataset
         try:
             ds.repo.add(subds_relpath, git=True)
         except CommandError:
+            # TODO as a bonus this exception handling is untested! wipe out during
+            # upcoming RF
             # it can blow if we skipped a non-dataset submodule
             # in this case we need to find the chain of submodules leading to it and
             # save then bottom-up
             testpath = dirname(subds_relpath)
             while testpath:
-                # TODO this is a slow call that implies pretty bad repeated traversal
-                # of dataset trees -- RF to use `subdatasets --contains`
-                repo = ds.get_containing_subdataset(testpath)
+                repo = ds.subdatasets(contains=testpath, result_xfm='datasets', return_type='item-or-list')
                 repo.repo.add(relpath(subds_relpath, testpath), git=True)
                 modified_ds = _save_helper(repo, save, modified_ds)
                 # see if there is anything left...

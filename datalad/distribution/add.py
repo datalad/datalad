@@ -72,7 +72,7 @@ def _discover_subdatasets_recursively(
         return
     if GitRepo.is_valid_repo(top):
         if top in discovered:
-            # this was found already, assume everythin beneath it too
+            # this was found already, assume everything beneath it too
             return
         discovered[top] = dict(
             path=top,
@@ -141,6 +141,16 @@ class Add(Interface):
             as it inflates dataset sizes and impacts flexibility of data
             transport. If not specified - it will be up to git-annex to
             decide, possibly on .gitattributes options."""),
+        to_annex=Parameter(
+            args=("--to-annex",),
+            action='store_false',
+            dest='to_git',
+            doc="""flag whether to force adding data to Annex, instead of
+        git.  It might be that .gitattributes instructs for a file to be
+        added to git, but for some particular files it is desired to be
+        added to annex (e.g. sensitive files etc).
+        If not specified - it will be up to git-annex to
+        decide, possibly on .gitattributes options."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         # TODO not functional anymore
@@ -178,7 +188,6 @@ class Add(Interface):
             annex_opts=None,
             annex_add_opts=None,
             jobs=None):
-
         # parameter constraints:
         if not path:
             raise InsufficientArgumentsError(
@@ -189,6 +198,7 @@ class Add(Interface):
         to_add = []
         subds_to_add = {}
         ds_to_annotate_from_recursion = {}
+        got_nothing = True
         for ap in AnnotatePaths.__call__(
                 path=path,
                 dataset=dataset,
@@ -196,11 +206,19 @@ class Add(Interface):
                 # discover untracked content
                 recursive=False,
                 action='add',
+                # speed things up by using Git's modification detection, if there
+                # is a repo with at least one commit
+                modified='HEAD' \
+                if dataset and \
+                GitRepo.is_valid_repo(refds_path) and \
+                GitRepo(refds_path).get_hexsha() \
+                else None,
                 unavailable_path_status='impossible',
                 unavailable_path_msg="path does not exist: %s",
                 nondataset_path_status='impossible',
                 return_type='generator',
                 on_failure='ignore'):
+            got_nothing = False
             if ap.get('status', None):
                 # this is done
                 yield ap
@@ -211,10 +229,18 @@ class Add(Interface):
                     message='"there is no dataset to add this path to',
                     **dict(common_report, **ap))
                 continue
-            if ap.get('raw_input', False) and recursive and (
-                    ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
-                # this was an actually requested input path
-                # we need to recursive into all subdirs to find potentially
+            if ap.get('type', None) == 'directory' and \
+                    ap.get('state', None) == 'untracked' and \
+                    GitRepo.is_valid_repo(ap['path']):
+                # this is an untracked wannabe subdataset in disguise
+                ap['type'] = 'dataset'
+            if recursive and \
+                    (ap.get('raw_input', False) or
+                     ap.get('state', None) in ('modified', 'untracked')) and \
+                    (ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
+                # this was an actually requested input path, or a path that was found
+                # modified by path annotation, based on an input argument
+                # we need to recurse into all subdirs to find potentially
                 # unregistered subdatasets
                 # but only if this path has a parent, or is itself a dataset
                 # otherwise there is nothing to add to
@@ -222,6 +248,10 @@ class Add(Interface):
                     ds_to_annotate_from_recursion,
                     ap['path'], [ap['parentds'] if 'parentds' in ap else ap['path']],
                     recursion_limit)
+                # get the file content of the root dataset of this search added too
+                # but be careful with extreme recursion_limit settings
+                if recursion_limit is None or recursion_limit > 0:
+                    ap['process_content'] = True
             # record for further processing
             if not ap['path'] in ds_to_annotate_from_recursion:
                 # if it was somehow already discovered
@@ -230,6 +260,18 @@ class Add(Interface):
             if dataset and ap.get('type', None) == 'dataset':
                 # duplicates not possible, annotated_paths returns unique paths
                 subds_to_add[ap['path']] = ap
+        if got_nothing:
+            # path annotation yielded nothing, most likely cause is that nothing
+            # was found modified, we need to say something about the reference
+            # dataset
+            yield get_status_dict(
+                'add',
+                status='notneeded',
+                path=refds_path,
+                type='dataset',
+                logger=lgr)
+            return
+
         for subds in ds_to_annotate_from_recursion:
             if subds not in subds_to_add:
                 # always prefer the already annotated path
@@ -395,7 +437,10 @@ class Add(Interface):
                     # in the dataset
                     ap = {k: v for k, v in res.items() if k != 'status'}
                     ap['staged'] = True
-                    to_save.append({k: v for k, v in res.items() if k != 'status'})
+                    # strip any status and state info (e.g. save will refuse to save
+                    # stuff that is marked state='untracked'
+                    to_save.append({k: v for k, v in res.items()
+                                    if k not in ('status', 'state')})
                 if a['file'] == '.gitmodules':
                     # filter out .gitmodules, because this is only included for
                     # technical reasons and has nothing to do with the actual content
@@ -423,7 +468,13 @@ class Add(Interface):
                     # pull out correct ap for any path that comes out here
                     # (that we know things about), and use the original annotation
                     # instead of just the annex report
-                    r = dict(torepoadd[r['path']], **r)
+                    r = dict(r, **torepoadd[r['path']])
+
+                if r['status'] == 'notneeded':
+                    # this could be a file that was staged already, it doesn't need
+                    # to be added, but it should be saved/commited if so desired
+                    to_save.append({k: v for k, v in r.items()
+                                    if k not in ('status', 'state')})
 
                 # XXX something is fishy with the next one, rethink when sober....
                 if r['path'] == ds_path and r['status'] == 'ok':
@@ -465,7 +516,7 @@ class Add(Interface):
         # more comprehensible
         for res in Save.__call__(
                 # hand-selected annotated paths
-                files=to_save,
+                path=to_save,
                 dataset=refds_path,
                 message=message if message else '[DATALAD] added content',
                 return_type='generator',

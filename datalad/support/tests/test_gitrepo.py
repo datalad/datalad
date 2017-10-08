@@ -419,10 +419,20 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit.name for commit in fetched])
 
-    ok_clean_git(clone.path)
+    ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
+
+    # create a remote without an URL:
+    origin.add_remote('not-available', 'git://example.com/not/existing')
+    origin.config.unset('remote.not-available.url', where='local')
+
+    # fetch without provided URL
+    fetched = origin.fetch('not-available')
+    # nothing was done, nothing returned:
+    eq_([], fetched)
+
 
 
 @skip_ssh
@@ -523,6 +533,17 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     # remote now knows the changes:
     assert_in("ssh-test", remote_repo.get_branches())
     assert_in("ssh_testfile.dat", remote_repo.get_files("ssh-test"))
+
+    # amend to make it require "--force":
+    repo.commit("amended", options=['--amend'])
+    # push without --force should yield an error:
+    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in("[rejected] (non-fast-forward)", pushed[0].summary)
+    # now push using force:
+    repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
+    # correct commit message in remote:
+    assert_in("amended",
+              list(remote_repo.get_branch_commits('ssh-test'))[-1].summary)
 
 
 @with_tempfile
@@ -853,20 +874,26 @@ def test_get_tracking_branch(o_path, c_path):
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
 
-    top_repo = GitRepo(path, create=False)
-    eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
+    top_repo = AnnexRepo(path, create=False)
+    eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)
         assert_in('Do not use update_submodule with init=True', cml.out)
-    top_repo.update_submodule('subm 2', init=True)
-    ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+    top_repo.update_submodule('2', init=True)
+
+    # ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+    # TODO: old assertion above if non-bare? (can't use "direct mode" in test_gitrepo)
+    # Alternatively: New testrepo (plain git submodules) and have a dedicated
+    # test for annexes in addition
+    ok_(all([GitRepo.is_valid_repo(opj(top_repo.path, s.path))
+             for s in top_repo.get_submodules()]))
 
     # modify submodule:
     with open(opj(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
         f.write("some content")
 
-    assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
+    assert_raises(CommandError, top_repo.deinit_submodule, 'sub1')
 
     # using force should work:
     top_repo.deinit_submodule('subm 1', force=True)
@@ -1095,6 +1122,8 @@ def test_GitRepo_gitignore(path):
         gr.add(['ignore.me', 'dontigno.re', opj('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
 
+    eq_(gr.get_git_attributes(), {})  # nothing is recorded within .gitattributes
+
 
 @with_tempfile(mkdir=True)
 def test_GitRepo_set_remote_url(path):
@@ -1123,3 +1152,15 @@ def test_GitRepo_set_remote_url(path):
         gr.config['remote.some-without-url.url']
     eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
     eq_(set(gr.get_remotes(with_urls_only=True)), {'some'})
+
+
+@with_tempfile(mkdir=True)
+def test_get_git_attributes(path):
+
+    gr = GitRepo(path, create=True)
+    eq_(gr.get_git_attributes(), {})  # nothing is recorded within .gitattributes
+
+    create_tree(gr.path, {'.gitattributes': "* tag\n* sec.key=val"})
+    # ATM we do not do any translation of values, so if it is just a tag, it
+    # would be what git returns -- "set"
+    eq_(gr.get_git_attributes(), {'tag': 'set', 'sec.key': 'val'})

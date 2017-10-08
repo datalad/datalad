@@ -9,11 +9,16 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from os import chmod
 import stat
 import re
 from os.path import join as opj, exists
+from six import text_type
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling
@@ -37,6 +42,7 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_set_equal
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_no_errors_logged
 from datalad.tests.utils import get_mtimes_and_digests
@@ -51,7 +57,7 @@ from datalad.utils import on_windows
 from datalad.utils import _path_
 
 import logging
-
+lgr = logging.getLogger('datalad.tests')
 
 def _test_correct_publish(target_path, rootds=False, flat=True):
 
@@ -99,7 +105,8 @@ from datalad.support.external_versions import external_versions
 # used on remote, so we will compare against system-git
 assert_create_sshwebserver = (
     assert_no_errors_logged(create_sibling)
-    if external_versions['cmd:system-git'] >= '2.4'
+    if (external_versions['cmd:system-git'] >= '2.4' and
+        lgr.getEffectiveLevel() > logging.DEBUG)
     else create_sibling
 )
 
@@ -170,7 +177,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target_alt",
             sshurl="ssh://localhost",
             target_dir=target_path)
-    ok_(str(cm.exception).startswith(
+    ok_(text_type(cm.exception).startswith(
         "Target path %s already exists. And it fails to rmdir" % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
@@ -295,13 +302,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
 
     sub1 = Dataset(opj(src_path, "subm 1"))
-    sub2 = Dataset(opj(src_path, "subm 2"))
+    sub2 = Dataset(opj(src_path, "2"))
 
     for flat in False, True:
         target_path_ = target_dir_tpl = target_path + "-" + str(flat)
@@ -322,7 +330,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 ui=True)
 
         # raise if git repos were not created
-        for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
+        for suffix in [sep + 'subm 1', sep + '2', '']:
             target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
@@ -365,6 +373,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -427,6 +437,7 @@ def test_failon_no_permissions(src_path, target_path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_replace_and_relative_sshpath(src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653
@@ -437,8 +448,8 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     ds.add('sub.dat')
 
     ds.create_sibling(url)
-    published = ds.publish('.', to='localhost')
-    assert_in('sub.dat', published[0])
+    published = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
     # since it exits with 0 exit even if there was a problem
     out, err = Runner(cwd=opj(dst_path, '.git'))(_path_('hooks/post-update'))
@@ -449,24 +460,26 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     # https://github.com/datalad/datalad/issues/1656
     # Strangely it spits outs IncompleteResultsError exception atm... so just
     # checking that it fails somehow
-    assert_raises(Exception, ds.create_sibling, url)
+    res = ds.create_sibling(url, on_failure='ignore')
+    assert_status('error', res)
+    assert_in('already configured', res[0]['message'][0])
     ds.create_sibling(url, existing='replace')
-    published2 = ds.publish('.', to='localhost')
-    assert_in('sub.dat', published2[0])
+    published2 = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
     ds.add('sub2.dat')
-    published3 = ds.publish(to='localhost')  # we publish just git
-    assert_not_in('sub2.dat', published3[0])
+    published3 = ds.publish(to='localhost', transfer_data='none')  # we publish just git
+    assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
     # now publish "with" data, which should also trigger the hook!
     # https://github.com/datalad/datalad/issues/1658
     from glob import glob
     from datalad.consts import WEB_META_LOG
     logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
-    published4 = ds.publish('.', to='localhost')
-    assert_in('sub2.dat', published4[0])
+    published4 = ds.publish(to='localhost', transfer_data='all')
+    assert_result_count(published4, 1, path=opj(ds.path, 'sub2.dat'))
     logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
     eq_(len(logs_post), len(logs_prior) + 1)
 
@@ -494,12 +507,21 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     # since we do not have yet/thus have not used an option to record to publish
     # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
     # -- should fail
-    assert_raises(InsufficientArgumentsError, ds.publish)
+    assert_result_count(
+        ds.publish(on_failure='ignore'),
+        1,
+        status='impossible',
+        message='No target sibling configured for default publication, please specific via --to')
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     ok_(not target_sub.is_installed())  # still not there
-    with swallow_logs():  # so no warnings etc
-        assert_raises(ValueError, ds.publish, recursive=True)  # since remote doesn't exist
+    res = ds.publish(to=remote, recursive=True, on_failure='ignore')
+    assert_result_count(res, 2)
+    assert_status(('error', 'notneeded'), res)
+    assert_result_count(
+        res, 1,
+        status='error',
+        message=("Unknown target sibling '%s' for publication", 'magical'))
     ds.publish(to=remote, recursive=True, missing='inherit')
     # we added the remote and set all the
     eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
@@ -521,4 +543,4 @@ def test_target_ssh_inherit():
     #   https://github.com/datalad/datalad/issues/1274
     #yield _test_target_ssh_inherit, None      # no wanted etc
     #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files
+    yield known_failure_direct_mode(_test_target_ssh_inherit), 'backup'  # backup -- all data files  #FIXME

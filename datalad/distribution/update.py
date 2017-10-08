@@ -123,6 +123,9 @@ class Update(Interface):
                 continue
             # this is definitely as dataset from here on
             ds = Dataset(ap['path'])
+            if not ds.is_installed():
+                lgr.debug("Skipping update since not installed %s", ds)
+                continue
             repo = ds.repo
             # prepare return value
             # TODO reuse AP for return props

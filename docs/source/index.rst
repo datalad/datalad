@@ -1,4 +1,4 @@
-Datalad |---| data management and distribution suite: Documentation
+DataLad |---| data management and distribution suite: Documentation
 *******************************************************************
 
 .. toctree::

@@ -185,10 +185,10 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         # many datasets are actually quite small, so we can simply git them up
         # below one didn't work out as it should have -- caused major headache either due to bug here or in annex
         # and comitting to git large .mat and .h5 files
-        # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
+        # largefiles="exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"
         #
         # CRCNS requires authorization, so only README* should go straight under git
-        options=["-c", "annex.largefiles=exclude=README* and exclude=*/meta.datacite.xml"]
+        largefiles="exclude=README* and exclude=*/meta.datacite.xml"
     )
 
     crawler = crawl_url(dataset_url)

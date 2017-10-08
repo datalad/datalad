@@ -108,11 +108,11 @@ class Metadata(Interface):
     2. metadata for individual files in a dataset.
 
     Both types can be accessed and modified with this command.
-    Note, however, that this only refers to Datalad's native metadata,
+    Note, however, that this only refers to DataLad's native metadata,
     and not to any other metadata that is possibly stored in files of a
     dataset.
 
-    Datalad's native metadata capability is primarily targeting data
+    DataLad's native metadata capability is primarily targeting data
     description via arbitrary tags and other (brief) key-value attributes
     (with possibly multiple values for a single key).
 
@@ -124,15 +124,15 @@ class Metadata(Interface):
 
     Metadata describing a dataset as a whole is stored in JSON format
     in the dataset at .datalad/metadata/dataset.json. The amount of
-    metadata that can be stored is not limited by Datalad. However,
+    metadata that can be stored is not limited by DataLad. However,
     it should be kept brief as this information is stored in the Git
     history of the dataset, and access or modification requires to
     read the entire file.
 
-    Arbitrary metadata keys can be used. However, Datalad reserves the
+    Arbitrary metadata keys can be used. However, DataLad reserves the
     keys 'tag' and 'definition' for its own use. The can still be
     manipulated without any restrictions like any other metadata items,
-    but doing so can impact Datalad's metadata-related functionality,
+    but doing so can impact DataLad's metadata-related functionality,
     handle with care.
 
     The 'tag' key is used to store a list of (unique) tags.
@@ -474,7 +474,7 @@ class Metadata(Interface):
         if not to_save:
             return
         for res in Save.__call__(
-                files=to_save,
+                path=to_save,
                 dataset=refds_path,
                 message='[DATALAD] dataset metadata update',
                 return_type='generator',

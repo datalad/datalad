@@ -2,7 +2,7 @@
 # Since we use requirements.txt ATM only for development IMHO it is ok but
 # we need to figure out/complaint to pip folks
 # For now, until https://github.com/GrahamDumpleton/wrapt/issues/98 resolved
-# we should use our version which allows to disable extension(s)
-git+https://github.com/yarikoptic/wrapt@develop
+# we should use fresh version allowing to disable extensions
+wrapt>=1.10.11
 -e .[devel]
 

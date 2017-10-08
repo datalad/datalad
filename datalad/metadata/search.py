@@ -36,6 +36,7 @@ from . import get_metadata, flatten_metadata_graph, pickle
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import assure_list
+from datalad.utils import decode_input
 from datalad.utils import get_path_prefix
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support import ansi_colors
@@ -60,6 +61,10 @@ class Search(Interface):
             args=("match",),
             metavar='STRING',
             nargs="+",
+            # by default would use sys.getdefaultencoding() (yoh thinks) which
+            # might be ascii, so let's use the one of stdin
+            # Seems to be needed for PY2 and works in PY3 without this
+            type=decode_input,
             doc="a string (or a regular expression if "
                 "[PY: `regex=True` PY][CMD: --regex CMD]) to search for "
                 "in all meta data values. If multiple provided, all must have "
@@ -123,7 +128,6 @@ class Search(Interface):
         report : dict
             fields which were requested by `report` option
         """
-
         lgr.debug("Initiating search for match=%r and dataset %r",
                   match, dataset)
         try:
@@ -289,8 +293,9 @@ class Search(Interface):
                         continue
                     # so we have a hit, no need to track
                     observed_properties = None
-                if isinstance(v, dict) or isinstance(v, list):
-                    v = text_type(v)
+                if isinstance(v, (dict, list, tuple)):
+                    v_values = v.values() if isinstance(v, dict) else v
+                    v = ' '.join(map(text_type, v_values))
                 for imatcher, matcher in enumerate(matchers):
                     if matcher(v):
                         hits[imatcher] = True

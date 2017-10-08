@@ -8,6 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import re
 import sys
 from six.moves import StringIO
@@ -149,6 +153,7 @@ def test_incorrect_options():
     err_insufficient = err_invalid # "specify"
     yield check_incorrect_option, ('--dbg',), err_insufficient
     yield check_incorrect_option, tuple(), err_insufficient
+
 
 def test_script_shims():
     runner = Runner()

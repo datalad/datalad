@@ -21,8 +21,9 @@ env:
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
   matrix:
-    - DATALAD_REPO_DIRECT=1
-    - DATALAD_REPO_DIRECT=
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_REPO_VERSION=5
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -118,10 +119,19 @@ matrix:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
   - python: 2.7
-    # test modules that should not fail in direct mode now:
+    # test whether known v6 failures still fail
     env:
-    - TESTS_TO_PERFORM="datalad/tests datalad/support"
-    - DATALAD_REPO_DIRECT=1
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  - python: 2.7
+    # test whether known direct mode failures still fail
+    env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -129,8 +139,18 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
-  # For now, don't fail entirely when direct mode fails
-  - env: DATALAD_REPO_DIRECT=1
+  # test whether known v6 failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_VERSION=6
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  # test whether known direct mode failures still fail
+  - env:
+    - DATALAD_TESTS_SSH=1
+    - DATALAD_REPO_DIRECT=yes
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
+    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -142,6 +162,8 @@ matrix:
 
 before_install:
   - if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ] && [ ! -z "${_DATALAD_NONPR_ONLY:-}" ]; then echo "Exiting early since these tests should run only in master branch"; exit 0; fi
+  # Just in case we need to check if nfs is there etc
+  - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
@@ -167,7 +189,7 @@ install:
   # TMPDIRs
   - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
   - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; sudo apt-get install -y nfs-kernel-server; sudo exportfs -o rw localhost:/tmp/nfsmount_; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests

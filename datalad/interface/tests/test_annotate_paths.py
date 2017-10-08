@@ -10,10 +10,13 @@
 
 """
 
+from datalad.tests.utils import known_failure_direct_mode
+
 from copy import deepcopy
 
 from os.path import join as opj
 from os.path import basename
+from os.path import lexists
 
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
@@ -21,10 +24,12 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import create_tree
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import annotate_paths
+from datalad.api import install
 from datalad.interface.annotate_paths import get_modified_subpaths
 from datalad.utils import chpwd
 
@@ -72,6 +77,7 @@ def test_invalid_call(path):
 
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
@@ -215,6 +221,7 @@ def test_annotate_paths(dspath, nodspath):
 
 
 @with_tree(demo_hierarchy['b'])
+@known_failure_direct_mode  #FIXME
 def test_get_modified_subpaths(path):
     ds = Dataset(path).create(force=True)
     suba = ds.create('ba', force=True)
@@ -315,3 +322,48 @@ def test_get_modified_subpaths(path):
     assert_result_count(
         res, 1,
         type_src='dataset', path=suba.path)
+
+
+@with_tree(demo_hierarchy)
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_recurseinto(dspath, dest):
+    # make fresh dataset hierarchy
+    ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
+    ds.add('.', recursive=True)
+    # label intermediate dataset as 'norecurseinto'
+    res = Dataset(opj(ds.path, 'b')).subdatasets(
+        contains='bb',
+        set_property=[('datalad-recursiveinstall', 'skip')])
+    assert_result_count(res, 1, path=opj(ds.path, 'b', 'bb'))
+    ds.add('b/', recursive=True)
+    ok_clean_git(ds.path)
+
+    # recursive install, should skip the entire bb branch
+    res = install(source=ds.path, path=dest, recursive=True,
+                  result_xfm=None, result_filter=None)
+    assert_result_count(res, 5)
+    assert_result_count(res, 5, type='dataset')
+    # we got the neighbor subdataset
+    assert_result_count(res, 1, type='dataset',
+                        path=opj(dest, 'b', 'ba'))
+    # we did not get the one we wanted to skip
+    assert_result_count(res, 0, type='dataset',
+                        path=opj(dest, 'b', 'bb'))
+    assert_not_in(
+        opj(dest, 'b', 'bb'),
+        Dataset(dest).subdatasets(fulfilled=True, result_xfm='paths'))
+    assert(not Dataset(opj(dest, 'b', 'bb')).is_installed())
+
+    # cleanup
+    Dataset(dest).remove(recursive=True)
+    assert(not lexists(dest))
+    # again but just clone the base, and then get content and grab 'bb'
+    # explicitly -- must get it installed
+    dest = install(source=ds.path, path=dest)
+    res = dest.get(['.', opj('b', 'bb')], get_data=False, recursive=True)
+    assert_result_count(res, 8)
+    assert_result_count(res, 8, type='dataset')
+    assert_result_count(res, 1, type='dataset',
+                        path=opj(dest.path, 'b', 'bb'))
+    assert(Dataset(opj(dest.path, 'b', 'bb')).is_installed())

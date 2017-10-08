@@ -11,6 +11,8 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
 import inspect
 import os
 import shutil
@@ -19,6 +21,7 @@ import logging
 from mock import patch
 from six import PY3
 from six import text_type
+import six.moves.builtins as __builtin__
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -48,10 +51,15 @@ from ..utils import get_timestamp_suffix
 from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
+from ..utils import path_startswith
+from ..utils import safe_print
+from ..utils import generate_chunks
+from ..utils import disable_logger
 
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from datalad.tests.utils import nok_
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
@@ -65,6 +73,7 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+from .utils import probe_known_failure, skip_known_failure, known_failure, known_failure_v6, known_failure_direct_mode
 
 
 def test_get_func_kwargs_doc():
@@ -192,6 +201,34 @@ def test_swallow_logs_assert():
     cm.assert_logged("some.hing", level="INFO", match=False)
     # and we indeed logged something
     cm.assert_logged(match=False)
+
+
+def test_disable_logger():
+
+    # get a logger hierarchy:
+    lgr_top = logging.getLogger('datalad')
+    lgr_middle = logging.getLogger('datalad.tests')
+    lgr_bottom = logging.getLogger('datalad.tests.utils')
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger():  # default: 'datalad':
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # nothing logged:
+        assert_raises(AssertionError, cml.assert_logged)
+
+    # again, but pass in the logger at mid level:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger(lgr_middle):
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # top level unaffected:
+        cml.assert_logged("log sth at top level", level="DEBUG", regex=False)
+        # but both of the lower ones don't log anything:
+        assert_raises(AssertionError, cml.assert_logged, "log sth at mid level")
+        assert_raises(AssertionError, cml.assert_logged, "log sth at bottom level")
 
 
 def _check_setup_exceptionhook(interactive):
@@ -372,6 +409,18 @@ def test_assure_bool():
         for v in values:
             eq_(assure_bool(v), t)
     assert_raises(ValueError, assure_bool, "unknown")
+
+
+def test_generate_chunks():
+    ok_generator(generate_chunks([1], 1))
+    eq_(list(generate_chunks([1], 1)), [[1]])
+    eq_(list(generate_chunks([1], 2)), [[1]])
+    eq_(list(generate_chunks([1, 2, 3], 2)), [[1, 2], [3]])
+    # type is preserved
+    eq_(list(generate_chunks((1, 2, 3), 2)), [(1, 2), (3,)])
+    # no hangers
+    eq_(list(generate_chunks((1, 2, 3, 4), 2)), [(1, 2), (3, 4)])
+    assert_raises(AssertionError, list, generate_chunks([1], 0))
 
 
 def test_any_re_search():
@@ -637,3 +686,158 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
         # non-dir paths are no issue
         eq_(get_dataset_root(fname), os.curdir)
+
+
+def test_path_startswith():
+    ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/'))
+    ok_(path_startswith('/aaa/b/c', '/aaa'))
+    nok_(path_startswith('/aaa/b/c', '/aa'))
+    nok_(path_startswith('/a/b', '/a/c'))
+    nok_(path_startswith('/a/b/c', '/a/c'))
+
+
+def test_safe_print():
+    """Just to test that we are getting two attempts to print"""
+
+    called = [0]
+    def _print(s):
+        assert_equal(s, "bua")
+        called[0] += 1
+        if called[0] == 1:
+            raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
+
+    with patch.object(__builtin__, 'print', _print):
+        safe_print("bua")
+    assert_equal(called[0], 2)
+
+
+def test_probe_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.probe"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @probe_known_failure
+    def not_failing():
+        pass
+
+    @probe_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if switch:
+        # if probing is enabled the failing is considered to be expected and
+        # therefore the decorated function doesn't actually fail:
+        failing()
+        # in opposition a function that doesn't fail raises an AssertionError:
+        assert_raises(AssertionError, not_failing)
+    else:
+        # if probing is disabled it should just fail/pass as is:
+        assert_raises(AssertionError, failing)
+        not_failing()
+
+
+def test_skip_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.skip"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @skip_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.skip")
+
+    if switch:
+        # if skipping is enabled, we shouldn't see the exception:
+        failing()
+    else:
+        # if it's disabled, failing() is executed and therefore exception
+        # is raised:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure():
+
+    @known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if skip:
+        # skipping takes precedence over probing
+        failing()
+    elif probe:
+        # if we probe a known failure it's okay to fail:
+        failing()
+    else:
+        # not skipping and not probing results in the original failure:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_v6():
+
+    @known_failure_v6
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    v6 = cfg.obtain("datalad.repo.version") == 6
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if v6:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_direct_mode():
+
+    @known_failure_direct_mode
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if direct:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)

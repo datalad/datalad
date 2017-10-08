@@ -33,6 +33,7 @@ from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
@@ -49,6 +50,7 @@ lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 submodule_full_props = re.compile(r'([0-9a-f]+) (.*) \((.*)\)$')
 submodule_nodescribe_props = re.compile(r'([0-9a-f]+) (.*)$')
+valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 status_map = {
     ' ': 'clean',
@@ -63,7 +65,11 @@ def _parse_gitmodules(dspath):
     parser = GitConfigParser(gitmodule_path)
     mods = {}
     for sec in parser.sections():
-        modpath = parser.get_value(sec, 'path', default=0)
+        try:
+            modpath = parser.get(sec, 'path')
+        except Exception:
+            lgr.debug("Failed to get '%s.path', skipping section", sec)
+            continue
         if not modpath or not sec.startswith('submodule '):
             continue
         modpath = normpath(opj(dspath, modpath))
@@ -72,6 +78,9 @@ def _parse_gitmodules(dspath):
                     if not (opt.startswith('__') or opt == 'path')}
         modprops['gitmodule_name'] = sec[11:-1]
         mods[modpath] = modprops
+    # make sure we let go of any resources held be the parser
+    # we cannot rely on __del__
+    parser.release()
     return mods
 
 
@@ -120,14 +129,6 @@ def _parse_git_submodules(dspath, recursive):
         yield sm
 
 
-def _get_gitmodule_parser(dspath):
-    """Get a parser instance for write access"""
-    gitmodule_path = opj(dspath, ".gitmodules")
-    parser = GitConfigParser(gitmodule_path, read_only=False, merge_includes=False)
-    parser.read()
-    return parser
-
-
 @build_doc
 class Subdatasets(Interface):
     """Report subdatasets and their properties.
@@ -161,11 +162,22 @@ class Subdatasets(Interface):
     "gitmodule_<label>"
         Any additional configuration property on record.
 
-    Performance note: Requesting `bottomup` reporting order, or a particular
-    numerical `recursion_limit` implies an internal switch to an alternative
-    query implementation for recursive query that is more flexible, but also
-    notably slower (performs one call to Git per dataset versus a single call
-    for all combined).
+    Performance note: Property modification, requesting `bottomup` reporting
+    order, or a particular numerical `recursion_limit` implies an internal
+    switch to an alternative query implementation for recursive query that is
+    more flexible, but also notably slower (performs one call to Git per
+    dataset versus a single call for all combined).
+
+    The following properties for subdatasets are recognized by DataLad
+    (without the 'gitmodule\_' prefix that is used in the query results):
+
+    "datalad-recursiveinstall"
+        If set to 'skip', the respective subdataset is skipped when DataLad
+        is recursively installing its superdataset. However, the subdataset
+        remains installable when explicitly requested, and no other features
+        are impaired.
+
+
 
     """
     _params_ = dict(
@@ -198,11 +210,13 @@ class Subdatasets(Interface):
             each branch in the dataset tree, and not top-down."""),
         set_property=Parameter(
             args=('--set-property',),
-            metavar='VALUE',
+            metavar=('NAME', 'VALUE'),
             nargs=2,
             action='append',
             doc="""Name and value of one or more subdataset properties to
-            be set in the parent dataset's .gitmodules file. The value can be
+            be set in the parent dataset's .gitmodules file. The property name
+            is case-insensitive, must start with a letter, and consist only
+            of alphanumeric characters. The value can be
             a Python format() template string wrapped in '<>' (e.g.
             '<{gitmodule_name}>').
             Supported keywords are any item reported in the result properties
@@ -246,6 +260,12 @@ class Subdatasets(Interface):
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):
             return
 
+        if set_property:
+            for k, v in set_property:
+                if valid_key.match(k) is None:
+                    raise ValueError(
+                        "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
+                        k)
         try:
             if not (bottomup or contains or set_property or delete_property or \
                     (recursive and recursion_limit is not None)):
@@ -309,8 +329,13 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     modinfo = _parse_gitmodules(dspath)
     # write access parser
     parser = None
-    if set_property or delete_property:
-        parser = _get_gitmodule_parser(dspath)
+    # TODO bring back in more global scope from below once segfaults are
+    # figured out
+    #if set_property or delete_property:
+    #    gitmodule_path = opj(dspath, ".gitmodules")
+    #    parser = GitConfigParser(
+    #        gitmodule_path, read_only=False, merge_includes=False)
+    #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath, recursive=False):
         if contains and \
@@ -321,6 +346,10 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
             continue
         sm.update(modinfo.get(sm['path'], {}))
         if set_property or delete_property:
+            gitmodule_path = opj(dspath, ".gitmodules")
+            parser = GitConfigParser(
+                gitmodule_path, read_only=False, merge_includes=False)
+            parser.read()
             # do modifications now before we read the info out for reporting
             # use 'submodule "NAME"' section ID style as this seems to be the default
             submodule_section = 'submodule "{}"'.format(sm['gitmodule_name'])
@@ -345,6 +374,11 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     val)
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
+            Dataset(dspath).add(
+                '.gitmodules', to_git=True,
+                message='[DATALAD] modified subdataset properties')
+            # let go of resources, locks, ...
+            parser.release()
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):

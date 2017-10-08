@@ -42,9 +42,6 @@ class Unlock(Interface):
     Unlock files of a dataset in order to be able to edit the actual content
     """
 
-    result_xfm = 'paths'
-    on_failure = 'continue'
-
     _params_ = dict(
         path=Parameter(
             args=("path",),
@@ -112,6 +109,7 @@ class Unlock(Interface):
             ds = Dataset(ds_path)
             content = content_by_ds[ds_path]
 
+            # no annex, no unlock:
             if not isinstance(ds.repo, AnnexRepo):
                 for ap in content:
                     ap['status'] = 'notneeded'
@@ -120,8 +118,55 @@ class Unlock(Interface):
                     yield ap
                 continue
 
-            files = [ap['path'] for ap in content]
+            # direct mode, no unlock:
+            elif ds.repo.is_direct_mode():
+                for ap in content:
+                    ap['status'] = 'notneeded'
+                    ap['message'] = "direct mode, nothing to unlock"
+                    ap.update(res_kwargs)
+                    yield ap
+                continue
 
-            for r in ds.repo.unlock(files):
+            # only files in annex with their content present:
+            files = [ap['path'] for ap in content]
+            to_unlock = []
+            for ap, under_annex, has_content in \
+                zip(content,
+                    ds.repo.is_under_annex(files),
+                    ds.repo.file_has_content(files)):
+
+                # TODO: what about directories? Make sure, there is no
+                # situation like no file beneath with content or everything in
+                # git, that leads to a CommandError
+                # For now pass to annex:
+                from os.path import isdir
+                if isdir(ap['path']):
+                    to_unlock.append(ap)
+                    continue
+
+                # Note, that `file_has_content` is (planned to report) True on
+                # files in git. Therefore order matters: First check for annex!
+                if under_annex:
+                    if has_content:
+                        to_unlock.append(ap)
+                    # no content, no unlock:
+                    else:
+                        ap['status'] = 'impossible'
+                        ap['message'] = "no content present, can't unlock"
+                        ap.update(res_kwargs)
+                        yield ap
+                # file in git, no unlock:
+                else:
+                    ap['status'] = 'notneeded'
+                    ap['message'] = "not controlled by annex, nothing to unlock"
+                    ap.update(res_kwargs)
+                    yield ap
+
+            # don't call annex-unlock with no path, if this is this case because
+            # nothing survived the filtering above
+            if content and not to_unlock:
+                continue
+
+            for r in ds.repo.unlock([ap['path'] for ap in to_unlock]):
                 yield get_status_dict(
                     path=r, status='ok', type='file', **res_kwargs)

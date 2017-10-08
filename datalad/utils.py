@@ -66,6 +66,12 @@ except:  # pragma: no cover
     on_debian_wheezy = False
     linux_distribution_name = linux_distribution_release = None
 
+# Maximal length of cmdline string
+# Did not find anything in Python which could tell at run time and
+# probably   getconf ARG_MAX   might not be available
+# The last one would be the most conservative/Windows
+CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+
 #
 # Little helpers
 #
@@ -366,6 +372,27 @@ def encode_filename(filename):
     else:
         return filename
 
+
+def decode_input(s):
+    """Given input string/bytes, decode according to stdin codepage (or UTF-8)
+    if not defined
+
+    If fails -- issue warning and decode allowing for errors
+    being replaced
+    """
+    if isinstance(s, text_type):
+        return s
+    else:
+        encoding = sys.stdin.encoding or 'UTF-8'
+        try:
+            return s.decode(encoding)
+        except UnicodeDecodeError as exc:
+            lgr.warning(
+                "Failed to decode input string using %s encoding. "
+                "Decoding allowing for errors", encoding)
+            return s.decode(encoding, errors='replace')
+
+
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -522,6 +549,15 @@ def unique(seq, key=None):
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
+
+def generate_chunks(container, size):
+    """Given a container, generate chunks from it with size up to `size`
+    """
+    # There could be a "smarter" solution but I think this would suffice
+    assert size > 0,  "Size should be non-0 positive"
+    while container:
+        yield container[:size]
+        container = container[size:]
 
 #
 # Generators helpers
@@ -853,6 +889,40 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         adapter.cleanup()
 
 
+# TODO: May be melt in with swallow_logs at some point:
+@contextmanager
+def disable_logger(logger=None):
+    """context manager to temporarily disable logging
+
+    This is to provide one of swallow_logs' purposes without unnecessarily
+    creating temp files (see gh-1865)
+
+    Parameters
+    ----------
+    logger: Logger
+        Logger whose handlers will be ordered to not log anything.
+        Default: datalad's topmost Logger ('datalad')
+    """
+
+    class NullFilter(logging.Filter):
+        """Filter class to reject all records
+        """
+        def filter(self, record):
+            return 0
+
+    if logger is None:
+        # default: all of datalad's logging:
+        logger = logging.getLogger('datalad')
+
+    filter_ = NullFilter(logger.name)
+    [h.addFilter(filter_) for h in logger.handlers]
+
+    try:
+        yield logger
+    finally:
+        [h.removeFilter(filter_) for h in logger.handlers]
+
+
 #
 # Additional handlers
 #
@@ -986,6 +1056,12 @@ def get_path_prefix(path, pwd=None):
     else:
         # just return absolute path
         return path
+
+
+def path_startswith(path, prefix):
+    """Return True if path starts with prefix path"""
+    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
+           == with_pathsep(prefix)
 
 
 def knows_annex(path):
@@ -1178,13 +1254,13 @@ def get_dataset_root(path):
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
     """
-    suffix = os.sep + opj('.git', 'objects')
+    suffix = '.git'
     if not isdir(path):
         path = dirname(path)
     apath = abspath(path)
     # while we can still go up
     while psplit(apath)[1]:
-        if exists(path + suffix):
+        if exists(opj(path, suffix)):
             return path
         # new test path in the format we got it
         path = normpath(opj(path, os.pardir))
@@ -1221,6 +1297,20 @@ def slash_join(base, extension):
         (base.rstrip('/'),
          extension.lstrip('/')))
 
+
+def safe_print(s):
+    """Print with protection against UTF-8 encoding errors"""
+    # A little bit of dance to be able to test this code
+    print_f = getattr(__builtin__, "print")
+    try:
+        print_f(s)
+    except UnicodeEncodeError:
+        # failed to encode so let's do encoding while ignoring errors
+        # to print at least something
+        # explicit `or ascii` since somehow on buildbot it seemed to return None
+        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
+            if hasattr(s, 'encode') else s
+        print_f(s.decode())
 
 lgr.log(5, "Done importing datalad.utils")
 
