@@ -226,7 +226,7 @@ def test_add_archive_content_tar():
     # 1. We have a dedicated direct mode test build
     # 2. On a FS where direct mode is enforced, we can't switch
     for direct in (True, False):
-        yield _test_add_archive_content_tar, direct
+        yield known_failure_v6(_test_add_archive_content_tar), direct  #FIXME: the usual thing: in V6 the repo is dirty in the end, since there are files in git falsely marked 'modified'
 
 
 @assert_cwd_unchanged()

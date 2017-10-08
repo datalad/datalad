@@ -17,7 +17,7 @@ from ...dochelpers import exc_str
 from ...support.status import FileStatus
 from ...support.exceptions import CommandError
 from ...utils import auto_repr
-from ...utils import swallow_logs
+from ...utils import disable_logger
 from ...consts import CRAWLER_META_STATUSES_DIR
 
 from .base import JsonBaseDB, FileStatusesBaseDB
@@ -53,7 +53,7 @@ class PhysicalFileStatusesDB(FileStatusesBaseDB):
         # File might be under git, not annex so then we would need to assess size
         filestat = os.lstat(filepath)
         try:
-            with swallow_logs():
+            with disable_logger():
                 info = self.annex.info(filepath, batch=True)
             size = info['size']
         except (CommandError, TypeError) as exc:
