@@ -177,14 +177,14 @@ class ItemModifyFile(ItemCommand):
 
     # + optional commit
 
-    def __init__(self, cwd, cmd, runner, file): # file: ItemFile # runner: NOPE! from file
+    def __init__(self, cwd, cmd, runner, item): # item: ItemFile # runner: NOPE! from file
         pass
 
 
 class ItemNewBranch(ItemCommand):
     # create a new branch (git checkout -b)
 
-    def __init__(self, cwd, cmd, runner, repo): # file: ItemRepo # runner: NOPE from repo
+    def __init__(self, cwd, cmd, runner, item): # item: ItemRepo # runner: NOPE from repo
         pass
 
 
@@ -234,6 +234,11 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
     # list of commands to execute in order to create this test repository
     _item_definitions = []
     # list of tuples: Item's class and kwargs for constructor
+    # Note:
+    # - item references are paths
+    # - 'path' and 'cwd' arguments are relative to TestRepo's root
+    # - toplevel repo: path = None ???
+
     # example:
     # _item_list = [(ItemRepo, {'path': 'somewhere', 'annex': False, ...})
     #           (ItemFile, {'path': os.path.join('somewhere', 'beneath'),
@@ -243,7 +248,13 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
     def __init__(self, path=None, runner=None):
 
-        #check path!  => look up, how it is done now in case of persistent ones
+        self._path = path
+        # check path!  => look up, how it is done now in case of persistent ones
+        # Note: If we want to test whether an existing one is valid, we need to
+        # do it after instantiation of items.
+        # But: Probably just fail. Persistent ones are to be kept in some kind
+        # of registry and delivered by with_testrepos without trying to
+        # instantiate again.
 
         self._runner = runner or GitRunner(cwd=path)
 
@@ -253,21 +264,57 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                           # => needs special definition
                           # TODO: That means, that the properties need to respect that!
 
-        # TODO: paths relative to TestRepo's path!
-
-        # TODO: for items to be passed the path should be accepted, too!
-        #       => additional entry in the tuple, so we can link the instance
-        #          here; Needs to be done here due to the path modification!
-        #          (see above)
         self._items = {}
         for item in self._item_definitions:
             # pass the Runner if there's None:
             if item[1].get('runner', None) is None:
                 item[1]['runner'] = self._runner
 
-            # instantiate and use 'path' as key for the dict of item instances:
-            self._items[item[1]['path']] = item[0](**item[1])
+            # 'path' and 'cwd' arguments in definitions are relative to the
+            # TestRepo's root. Replace them for instantiation, but keep for
+            # identification (key in the items dict):
+            # TODO: We might want to use ['path'] instead of get('path') and
+            # raise if there's none, since this is a mandatory argument. On the
+            # other hand `None` might be convenient for defining the top level
+            # ItemRepo.
+            # TODO: Raise if encounter a path that's in use already?
+            argument = 'cwd' if issubclass(item[0], ItemCommand) else 'path'
+            rpath = item[1].get(argument)
+            # TODO: we need a solution for ItemCommand! It can't be identified
+            # by its 'cwd'! May be we want an execution list in addition to the
+            # item dict. After creation we probably don't need to reference
+            # ItemCommand instances anyway. So, self.create() would run the
+            # list, not the dict.
+            item[1][argument] = opj(self._path, rpath)
 
+            # 'item' arguments in ItemCommand definitions are paths, since we
+            # can't reference an actual object therein. Do the conversion:
+            ref_item = item[1].get('item')
+            if ref_item:
+                try:
+                    item[1]['item'] = self._items[ref_item]
+                except KeyError as e:
+                    if ref_item in e.message:
+                        # TODO: raise InvalidTestRepoDefinitionError()
+                        raise RuntimeError("TestRepo definition invalid.{ls}"
+                                           "Item {it} referenced before it was "
+                                           "defined:{ls}{cl}({args})"
+                                           "".format(ls=os.linesep,
+                                                     cl=item[0].__class__,
+                                                     args=item[1]))
+                    else:
+                        # No idea how this could possibly happen. However,
+                        # better checking than making assumptions.
+                        # TODO: exc_str and may be let's still raise
+                        # InvalidTestRepoDefinitionError
+                        raise e
+
+            # instantiate and use original 'path' as key for the dict of
+            # item instances:
+            self._items[rpath] = item[0](**item[1])
+
+        # - not sure yet whether we want to instantly and unconditionally create
+        # - do we need some TestRepoCreationError? (see path checking)
         self.create()
 
     @property
@@ -275,7 +322,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         return self.repo.path  # TODO
 
     @property
-    def url(self):
+    def url(self):  # same for ItemFile?
         return get_local_file_url(self.path)
 
     # ???
@@ -288,10 +335,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         pass
 
     def create(self):
-        # default implementation:  # wouldn't work ATM if Items were passed into others
-        # TODO: Could work, if we point to the path of the item in the definition
-
-        # => dict
+        # default implementation:
         for item in self._items:
             item.create()
 
