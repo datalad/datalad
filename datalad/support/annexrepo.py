@@ -605,6 +605,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # this is for use with older annex, which didn't exit non-zero
             # in case of the failure we are interested in
 
+            # TODO: If we are to keep this workaround (we probably rely on a
+            # newer annex anyway), we should not use swallow_logs, since we
+            # actually don't want to swallow it, but inspect it. Use a proper
+            # handler/filter for the logger instead to not create temp files via
+            # swallow_logs
+
             old_log_state = self.cmd_call_wrapper.log_outputs
             self.cmd_call_wrapper._log_opts['outputs'] = True
 
@@ -776,7 +782,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # purpose of the call to find this repository. Therefore
             # core.bare=False has no effect at all.
 
-            # Disabeld. See notes.
+            # Disabled. See notes.
             # git_options.extend(['-c', 'core.bare=False'])
             # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
             #                               git_options=git_options)
@@ -799,13 +805,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cmd.append("--git-dir")
 
             try:
-                with swallow_logs():
-                    toppath, err = GitRunner().run(
-                        cmd,
-                        cwd=path,
-                        log_stdout=True, log_stderr=True,
-                        expect_fail=True, expect_stderr=True)
-                    toppath = toppath.rstrip('\n\r')
+                toppath, err = GitRunner().run(
+                    cmd,
+                    cwd=path,
+                    log_stdout=True, log_stderr=True,
+                    expect_fail=True, expect_stderr=True)
+                toppath = toppath.rstrip('\n\r')
             except CommandError:
                 return None
             except OSError:
@@ -1000,7 +1005,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
-        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
+        debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
         backend = ['--backend=%s' % backend] if backend else []
 
         git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
@@ -1289,32 +1294,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # options  might be the '--key' which should go last
         options = ['--json-progress'] + options
 
-        # Note: Currently swallowing logs, due to the workaround to report files
-        # not found, but don't fail and report about other files and use JSON,
-        # which are contradicting conditions atm. (See _run_annex_command_json)
-
-        # YOH:  oh -- this puts quite a bit of stress on the pipe since now
-        # annex runs in --debug mode spitting out shits load of information.
-        # Since nothing was hardcoded in tests, have no clue what was expected
-        # effect.  I will swallow the logs so they don't scare the user, but only
-        # in non debugging level of logging
-        cm = swallow_logs() \
-            if lgr.getEffectiveLevel() > logging.DEBUG \
-            else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        with cm:
-            # TODO: reproduce DK's bug on OSX, and either switch to
-            #  --batch mode (I don't think we have --progress support in long
-            #  alive batch processes ATM),
-            #
-            results = self._run_annex_command_json(
-                'get',
-                args=options,
-                # TODO: eventually make use of --batch mode
-                files=files,  # fetch_files
-                jobs=jobs,
-                expected_entries=expected_downloads)
+        # TODO: reproduce DK's bug on OSX, and either switch to
+        #  --batch mode (I don't think we have --progress support in long
+        #  alive batch processes ATM),
+        #
+        results = self._run_annex_command_json(
+            'get',
+            args=options,
+            # TODO: eventually make use of --batch mode
+            files=files,  # fetch_files
+            jobs=jobs,
+            expected_entries=expected_downloads)
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
         # and vomit an exception of incomplete download????
@@ -2950,21 +2942,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         if options:
             annex_options.extend(shlex.split(options))
 
-        cm = swallow_logs() \
-            if lgr.getEffectiveLevel() > logging.DEBUG \
-            else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        with cm:
-            results = self._run_annex_command_json(
-                'copy',
-                args=annex_options,
-                files=files,  # copy_files,
-                jobs=jobs,
-                expected_entries=expected_copys
-                #log_stdout=True, log_stderr=not log_online,
-                #log_online=log_online, expect_stderr=True
-            )
+        results = self._run_annex_command_json(
+            'copy',
+            args=annex_options,
+            files=files,  # copy_files,
+            jobs=jobs,
+            expected_entries=expected_copys
+            #log_stdout=True, log_stderr=not log_online,
+            #log_online=log_online, expect_stderr=True
+        )
         results_list = list(results)
         # XXX this is the only logic different ATM from get
         # check if any transfer failed since then we should just raise an Exception

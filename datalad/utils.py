@@ -890,6 +890,40 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         adapter.cleanup()
 
 
+# TODO: May be melt in with swallow_logs at some point:
+@contextmanager
+def disable_logger(logger=None):
+    """context manager to temporarily disable logging
+
+    This is to provide one of swallow_logs' purposes without unnecessarily
+    creating temp files (see gh-1865)
+
+    Parameters
+    ----------
+    logger: Logger
+        Logger whose handlers will be ordered to not log anything.
+        Default: datalad's topmost Logger ('datalad')
+    """
+
+    class NullFilter(logging.Filter):
+        """Filter class to reject all records
+        """
+        def filter(self, record):
+            return 0
+
+    if logger is None:
+        # default: all of datalad's logging:
+        logger = logging.getLogger('datalad')
+
+    filter_ = NullFilter(logger.name)
+    [h.addFilter(filter_) for h in logger.handlers]
+
+    try:
+        yield logger
+    finally:
+        [h.removeFilter(filter_) for h in logger.handlers]
+
+
 #
 # Additional handlers
 #

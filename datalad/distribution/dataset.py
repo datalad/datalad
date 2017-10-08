@@ -38,7 +38,6 @@ from datalad.support.network import RI
 
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.distribution.utils import get_git_dir
 
@@ -199,29 +198,28 @@ class Dataset(object):
         # TODO: Still this is somewhat problematic. We can't invalidate strong
         # references
 
-        #with swallow_logs():
         for cls, ckw, kw in (
-                # TODO: Do we really want allow_noninitialized=True here?
+                # TODO: Do we really want to allow_noninitialized=True here?
                 # And if so, leave a proper comment!
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):
             if cls.is_valid_repo(self._path, **ckw):
                 try:
-                    lgr.debug("Detected %s at %s", cls, self._path)
+                    lgr.log(5, "Detected %s at %s", cls, self._path)
                     self._repo = cls(self._path, create=False, **kw)
                     break
                 except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                    lgr.debug(
-                        "Oops -- guess on repo type was wrong?: %s",
-                        exc_str(exc))
+                    lgr.log(5,
+                            "Oops -- guess on repo type was wrong?: %s",
+                            exc_str(exc))
                     pass
                 # version problems come as RuntimeError: DO NOT CATCH!
         if self._repo is None:
             # Often .repo is requested to 'sense' if anything is installed
             # under, and if so -- to proceed forward. Thus log here only
             # at DEBUG level and if necessary "complaint upstairs"
-            lgr.debug("Failed to detect a valid repo at %s" % self.path)
+            lgr.log(5, "Failed to detect a valid repo at %s", self.path)
 
         return self._repo
 

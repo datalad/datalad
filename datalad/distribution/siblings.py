@@ -33,6 +33,7 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AccessDeniedError
 from datalad.support.exceptions import AccessFailedError
+from datalad.support.exceptions import RemoteNotAvailableError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -51,7 +52,6 @@ from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.update import Update
-from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import slash_join
 from datalad.dochelpers import exc_str
@@ -673,17 +673,13 @@ def _remove_remote(
         **res_kwargs)
     try:
         # failure can happen and is OK
-        with swallow_logs():
-            ds.repo.remove_remote(name)
-    except CommandError as e:
-        if 'fatal: No such remote' in e.stderr:
-            yield get_status_dict(
-                # result-oriented! given remote is absent already
-                status='notneeded',
-                **result_props)
-            return
-        else:
-            raise e
+        ds.repo.remove_remote(name)
+    except RemoteNotAvailableError as e:
+        yield get_status_dict(
+            # result-oriented! given remote is absent already
+            status='notneeded',
+            **result_props)
+        return
 
     yield get_status_dict(
         status='ok',

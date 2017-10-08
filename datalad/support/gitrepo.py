@@ -51,7 +51,6 @@ from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
-from datalad.utils import swallow_logs
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 
@@ -384,9 +383,6 @@ def split_remote_branch(branch):
 class GitRepo(RepoInterface):
     """Representation of a git repository
 
-    Not sure if needed yet, since there is GitPython. By now, wrap it to have
-    control. Convention: method's names starting with 'git_' to not be
-    overridden accidentally by AnnexRepo.
     """
 
     # We use our sshrun helper
@@ -533,9 +529,9 @@ class GitRepo(RepoInterface):
                     path,
                     ' %s' % git_opts if git_opts else '')
                 self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
-                                                  mkdir=True,
-                                                  odbt=default_git_odbt,
-                                                  **git_opts)
+                                                   mkdir=True,
+                                                   odbt=default_git_odbt,
+                                                   **git_opts)
             except GitCommandError as e:
                 lgr.error(exc_str(e))
                 raise
@@ -580,7 +576,7 @@ class GitRepo(RepoInterface):
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
             self._repo = self.cmd_call_wrapper(Repo, self.path)
-            lgr.debug("Using existing Git repository at {0}".format(self.path))
+            lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -772,13 +768,12 @@ class GitRepo(RepoInterface):
             cmd.extend(git_options)
         cmd += ["rev-parse", "--show-toplevel"]
         try:
-            with swallow_logs():
-                toppath, err = GitRunner().run(
-                    cmd,
-                    cwd=path,
-                    log_stdout=True, log_stderr=True,
-                    expect_fail=True, expect_stderr=True)
-                toppath = toppath.rstrip('\n\r')
+            toppath, err = GitRunner().run(
+                cmd,
+                cwd=path,
+                log_stdout=True, log_stderr=True,
+                expect_fail=True, expect_stderr=True)
+            toppath = toppath.rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
@@ -1439,9 +1434,24 @@ class GitRepo(RepoInterface):
         """Remove existing remote
         """
 
-        return self._git_custom_command(
-            '', ['git', 'remote', 'remove', name]
-        )
+        # TODO: testing and error handling!
+        from .exceptions import RemoteNotAvailableError
+        try:
+            out, err = self._git_custom_command(
+                '', ['git', 'remote', 'remove', name])
+        except CommandError as e:
+            if 'fatal: No such remote' in e.stderr:
+                raise RemoteNotAvailableError(name,
+                                              cmd="git remote remove",
+                                              msg="No such remote",
+                                              stdout=out,
+                                              stderr=err)
+            else:
+                raise e
+
+        # TODO: config.reload necessary?
+        self.config.reload()
+        return
 
     def update_remote(self, name=None, verbose=False):
         """
@@ -2010,6 +2020,9 @@ class GitRepo(RepoInterface):
           Custom tag label.
         """
         # TODO later to be extended with tagging particular commits and signing
+        # TODO: call in save.py complains about extensive logging. When does it
+        # happen in what way? Figure out, whether to just silence it or raise or
+        # whatever else.
         self._git_custom_command(
             '', ['git', 'tag', str(tag)]
         )
@@ -2044,6 +2057,27 @@ class GitRepo(RepoInterface):
             return [t[output] for t in tags]
         else:
             return tags
+
+    def describe(self, **kwargs):
+        """ Quick and dirty implementation to call git-describe
+
+        Parameters:
+        -----------
+        kwargs:
+            transformed to cmdline options for git-describe;
+            see __init__ for description of the transformation
+        """
+        # TODO: be more precise what failure to expect when and raise actual
+        # errors
+        try:
+            describe, outerr = self._git_custom_command(
+                [],
+                ['git', 'describe'] + to_options(**kwargs),
+                expect_fail=True)
+            return describe.strip()
+        # TODO: WTF "catch everything"?
+        except:
+            return None
 
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.

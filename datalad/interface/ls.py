@@ -28,7 +28,6 @@ from ..utils import auto_repr
 from .base import Interface
 from datalad.interface.base import build_doc
 from ..ui import ui
-from ..utils import swallow_logs
 from ..utils import safe_print
 from ..consts import METADATA_DIR
 from ..consts import METADATA_FILENAME
@@ -238,12 +237,7 @@ class GitModel(object):
 
     @property
     def describe(self):
-        try:
-            with swallow_logs():
-                describe, outerr = self.repo._git_custom_command([], ['git', 'describe', '--tags'])
-            return describe.strip()
-        except:
-            return None
+        return self.repo.describe(tags=True)
 
     @property
     def date(self):
