@@ -500,6 +500,11 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         fmt = fmts[dsm.__class__]
         ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
         safe_print(ds_str)
+        # workaround for explosion of git cat-file --batnch processes
+        # https://github.com/datalad/datalad/issues/1888
+        dsm.repo.repo.close()
+        del dsm.repo
+        dsm.repo = None
 
 
 def machinesize(humansize):
