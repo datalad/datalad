@@ -8,6 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test audio parser"""
 
+from datalad.tests.utils import SkipTest
+try:
+    import mutagen
+except ImportError:
+    raise SkipTest
 
 from shutil import copy
 from os.path import dirname

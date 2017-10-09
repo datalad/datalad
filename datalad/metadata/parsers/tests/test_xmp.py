@@ -8,6 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test XMP parser"""
 
+from datalad.tests.utils import SkipTest
+try:
+    import libxmp
+except ImportError:
+    raise SkipTest
 
 from shutil import copy
 from os.path import dirname
