@@ -3,6 +3,8 @@
 
 set -eu
 curdir=$(dirname $0)
+# TODO: would not work for OSX
+curdir=$(readlink -f "$curdir")
 
 # if we want to make all of git-annex stuff available
 #export PATH=$curdir/../git-annex.linux/:$PATH
