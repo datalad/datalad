@@ -27,6 +27,6 @@ for __modname in (
         globals()[__modname] = __impmod(
             '.{}'.format(__modname),
             'datalad.metadata.parsers')
-    except ImportError as e:
+    except Exception as e:
         from datalad.dochelpers import exc_str
         __lgr.debug('Metadata parser unusable: %s', exc_str(__modname))
