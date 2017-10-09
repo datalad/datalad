@@ -25,6 +25,15 @@ except ImportError:
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.parsers.base import BaseMetadataParser
 
+from six import string_types
+def _is_good_type(v):
+    if isinstance(v, (int, float, string_types)):
+        return True
+    elif isinstance(v, (list, tuple)):
+        return all(map(_is_good_type, v))
+    else:
+        return False
+
 
 # TODO allow for blacklisting fields
 class MetadataParser(BaseMetadataParser):
@@ -66,6 +75,7 @@ class MetadataParser(BaseMetadataParser):
             # set and use a compacted regex if it does (hachoir_regex module)
             (('({})'.format(
                 '|'.join(re.escape(f) for f in files)),
-             {'dicom:{}'.format(k): info[k] for k in info})
+             {'dicom:{}'.format(k): v for k, v in info.items()
+				                    if _is_good_type(v)})
              for info, files in imgseries.values())
         )
