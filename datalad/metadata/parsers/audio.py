@@ -53,7 +53,7 @@ class MetadataParser(BaseMetadataParser):
                     if k == 'length':
                         # duration comes in seconds, cap at millisecond level
                         val = round(val, 3)
-                    meta[vocab_map.get(k, 'mutagen:{}'.format(k))] = val
+                    meta[vocab_map.get(k, 'comment<{}>'.format(k))] = val
             contentmeta.append((re.escape(f), meta))
 
         return {
