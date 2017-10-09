@@ -28,9 +28,18 @@ mode="--exe --standalone `which datalad`"
 #mode="--module datalad"  # --standalone"
 #--explain-imports    seems did magic on an old system to include wrapt etc, but suppressed logs
 mode+=" --show-progress --verbose"
+
+# cannot specify atm submodules to recurse for plugins
+for m in patoolib.programs datalad.plugin; do
+    p=`python -c "import $m as m; print(m.__path__[0])"`
+    mode+=" --recurse-plugins=$p"
+done
+
 # removed per Kay's recommendation --recurse-stdlib 
 set -x
-nuitka -j 8 --recurse-all --python-flag=no_site --recurse-directory=datalad --explain-imports \
+nuitka -j 8 --recurse-all --python-flag=no_site \
+   --recurse-directory=datalad \
+   --explain-imports \
    --recurse-to=setuptools,distribute,nose,mock,httpretty,scrapy,jsmin,github,pkg_resources \
    --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,scipy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} \
    $mode
