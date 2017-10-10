@@ -107,7 +107,7 @@ common_defs = {
         'descr': 'topic of a resource, best practice is to use a controlled vocabulary'},
     # TODO why not JSON-LD @type instead, an annexed file is type 'file' anyways
     "type": {
-        'def': "schema:type",
+        'def': "dcterms:type",
         'descr': 'type or category of a resource (e.g. file, dataset)'},
     "unit": {
         'def': 'uo:0000000',
