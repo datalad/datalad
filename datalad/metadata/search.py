@@ -88,6 +88,50 @@ def _meta2index_dict(meta, definitions, ds_defs):
     }
 
 
+def _resolve_term(term, definitions, common_defs):
+    termdef = common_defs.get(term, {}).get('def', None)
+    if termdef is not None:
+        if is_url(termdef) and termdef.startswith('http'):
+            # because is_url('schema:name') -> True
+            return termdef
+        else:
+            term = termdef
+
+    # not in the common vocabulary
+    if ':' in term:
+        prefix = term.split(':')[0]
+        term = term[len(prefix) + 1:]
+        prefix_def = definitions.get(prefix, None)
+        prefix_def = prefix_def.get('@id', None) \
+            if isinstance(prefix_def, dict) else prefix_def
+        if prefix_def is None:
+            # try the common defs
+            prefix_def = common_defs.get(prefix, {}).get('def', None)
+            if prefix_def is None:
+                # this key also doesn't have a prefix that is defined in
+                # the vocabulary, we are lost -> ignore this key as it
+                # cannot possibly be resolved
+                lgr.debug(
+                    "Cannot resolve term prefix '%s', no definition found",
+                    prefix)
+                return
+        if is_url(prefix_def):
+            # proper URL, just concat to get full definition
+            return u'{}{}'.format(prefix_def, term)
+        else:
+            # make adhoc definitions
+            return u'{} (term: {})'.format(prefix_def, term)
+    elif term.startswith('comment<') and term.endswith('>'):
+        # catch fields like 'comment<someundefinedkey>'
+        return common_defs['comment']['def']
+    else:
+        # we know nothing about this key, ignore
+        lgr.debug(
+            "Cannot resolve term '%s', no definition found",
+            term)
+        return
+
+
 def _get_search_schema(ds):
     from whoosh import fields as wf
 
@@ -100,7 +144,7 @@ def _get_search_schema(ds):
         'parentds': 'path of the datasets that contains an entity',
         # 'type' will not come from a metadata field, hence will not be detected
         'type': {
-            '@id': common_defs['type']['def'],
+            '@id': _resolve_term(common_defs['type']['def'], {}, common_defs),
             'description': common_defs['type']['descr']},
     }
 
@@ -163,46 +207,24 @@ def _get_search_schema(ds):
         for k in cand_keys:
             # check if we have any kind of definitions for this key
             if k not in definitions:
-                # not in the dataset definitions
-                termdef = common_defs.get(k, {}).get('def', None)
+                termdef = _resolve_term(k, definitions, common_defs)
                 if termdef is None:
-                    # not in the common vocabulary
-                    if ':' in k:
-                        prefix = k.split(':')[0]
-                        term = k[len(prefix) + 1:]
-                        prefix_def = definitions.get(prefix, None)
-                        prefix_def = prefix_def.get('@id', None) \
-                            if isinstance(prefix_def, dict) else prefix_def
-                        if prefix_def is None:
-                            # this key also doesn't have a prefix that is defined in
-                            # the vocabulary, we are lost -> ignore this key as it
-                            # cannot possibly be resolved
-                            lgr.debug(
-                                "Ignoring term '%s', no prefix definition found",
-                                k)
-                            continue
-                        if is_url(prefix_def):
-                            # proper URL, just concat to get full definition
-                            definitions[k] = u'{}{}'.format(
-                                prefix_def, term)
-                        else:
-                            # make adhoc definitions
-                            definitions[k] = u'{} (term: {})'.format(
-                                prefix_def, term)
-                    elif k.startswith('comment<') and k.endswith('>'):
-                        # catch fields like 'comment<someundefinedkey>'
-                        definitions[k] = 'comment'
-                    else:
-                        # we know nothing about this key, ignore
-                        lgr.debug(
-                            "Ignoring term '%s', no definition found",
-                            k)
-                        continue
-                    # we cannt resolve this for cheaps, just keep a record
-                else:
-                    definitions[k] = termdef
+                    # we know nothing about this key, ignore
+                    lgr.debug(
+                        "Ignoring term '%s', no definition found",
+                        k)
+                    continue
+                definitions[k] = termdef
                 # TODO treat keywords/tags separately
                 schema_fields[k] = wf.TEXT(stored=True)
+            else:
+                if isinstance(definitions[k], dict):
+                    definitions[k] = \
+                        {k if k == '@id' else '{} ({})'.format(
+                            k,
+                            _resolve_term(k, definitions, common_defs)) :
+                         _resolve_term(v, definitions, common_defs)
+                         for k, v in definitions[k].items()}
 
     schema = wf.Schema(**schema_fields)
     return schema, definitions, per_ds_defs
@@ -385,7 +407,7 @@ class Search(Interface):
     metadata on dataset content (e.g. one or more files). One dataset can also
     contain metadata from multiple subdatasets (see the 'aggregate-metadata'
     command), in which case a search can discover any dataset or any file in
-    these dataset.
+    of these datasets.
 
     A search index is automatically built from the available metadata of any
     dataset or file, and a schema for this index is generated dynamically, too.
@@ -450,7 +472,13 @@ class Search(Interface):
             action='store_true',
             doc="""if given, a list of known search keys is shown (one per line).
             No other action is performed (except for reindexing), even if other
-            arguments are given."""),
+            arguments are given. Each key is accompanied by a term definition in
+            parenthesis. In most cases a definition is given in the form
+            of a URL. If an ontology definition for a term is known, this URL
+            can resolve to a webpage that provides a comprehensive definition
+            of the term. However, for speed reasons term resolution is done purely
+            on information contained in a dataset's metadata and definition URLs
+            might be outdated or point to no longer existing resources."""),
         show_query=Parameter(
             args=('--show-query',),
             action='store_true',
