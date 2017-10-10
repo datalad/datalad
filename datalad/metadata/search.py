@@ -424,11 +424,20 @@ class Search(Interface):
 
     Here are a few examples. Basic search::
 
-      $ datalad search searchterm
+      % datalad search searchterm
 
     Search for a file::
 
-      $ datalad search searchterm type:file
+      % datalad search searchterm type:file
+
+    Show definitions of search keys/fields::
+
+      % datalad search --show-keys
+        @id (unique identifier of an entity)
+        dcterms:rights (http://purl.org/dc/terms/rights)
+        duration(s) {'unit (http://purl.obolibrary.org/obo/UO_0000000)': 'http://purl.obolibrary.org/obo/UO_0000010', '@id': 'https://www.w3.org/TR/owl-time/#Duration'}
+        name (http://schema.org/name)
+        ...
 
     .. seealso::
       - Description of the Whoosh query language:
@@ -476,9 +485,9 @@ class Search(Interface):
             parenthesis. In most cases a definition is given in the form
             of a URL. If an ontology definition for a term is known, this URL
             can resolve to a webpage that provides a comprehensive definition
-            of the term. However, for speed reasons term resolution is done purely
-            on information contained in a dataset's metadata and definition URLs
-            might be outdated or point to no longer existing resources."""),
+            of the term. However, for speed reasons term resolution is solely done
+            on information contained in a local dataset's metadata, and definition
+            URLs might be outdated or point to no longer existing resources."""),
         show_query=Parameter(
             args=('--show-query',),
             action='store_true',
