@@ -46,8 +46,9 @@ Meta data handling
 .. autosummary::
    :toctree: generated
 
-   api.search
+   api.metadata
    api.aggregate_metadata
+   api.search
 
 Plumbing commands
 -----------------

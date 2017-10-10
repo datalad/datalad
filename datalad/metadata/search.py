@@ -375,6 +375,14 @@ def _search_from_virgin_install(dataset, query):
 @build_doc
 class Search(Interface):
     """Search within available in datasets' meta data
+
+    .. seealso::
+      - Description of the Whoosh query language:
+        http://whoosh.readthedocs.io/en/latest/querylang.html)
+      - Description of a number of query language customizations that are
+        enabled in DataLad, such as, querying multiple fields by default and
+        fuzzy term matching:
+        http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations
     """
     _params_ = dict(
         dataset=Parameter(
@@ -387,23 +395,36 @@ class Search(Interface):
             args=("query",),
             metavar='QUERY',
             nargs="*",
-            doc="tell me"),
+            doc="""search query using the Whoosh query language (see link to
+            detailed description above). For simple queries, any number of search
+            terms can be given as a list[CMD: (space-separated) CMD], and the
+            query will return all hits that match all terms (AND) in any combination
+            of fields (OR)."""),
         force_reindex=Parameter(
             args=("--reindex",),
             dest='force_reindex',
             action='store_true',
-            doc="tell me"),
+            doc="""force rebuilding the search index, even if no change in the
+            dataset's state has been detected. This is mostly useful for
+            developing new metadata support extensions."""),
         max_nresults=Parameter(
             args=("--max-nresults",),
             doc="""maxmimum number of search results to report. Setting this
-            to 0 will report any search matches, and make searching substantially
+            to 0 will report all search matches, and make searching substantially
             slower on large metadata sets.""",
             constraints=EnsureInt()),
         show_keys=Parameter(
             args=('--show-keys',),
             action='store_true',
             doc="""if given, a list of known search keys is shown (one per line).
-            No other action is performed, even if other arguments are given."""),
+            No other action is performed (except for reindexing), even if other
+            arguments are given."""),
+        show_query=Parameter(
+            args=('--show-query',),
+            action='store_true',
+            doc="""if given, the formal query that was generated from the given
+            query string is shown, but not actually executed. This is mostly useful
+            for debugging purposes."""),
     )
 
     @staticmethod
@@ -413,7 +434,8 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20,
-                 show_keys=False):
+                 show_keys=False,
+                 show_query=False):
         from whoosh import qparser as qparse
 
         try:
@@ -459,6 +481,10 @@ class Search(Interface):
             querystr = ' '.join(assure_list(query))
             # this gives a formal whoosh query
             wquery = parser.parse(querystr)
+
+            if show_query:
+                print(wquery)
+                return
             # perform the actual search
             hits = searcher.search(
                 wquery,
