@@ -29,7 +29,7 @@ from ..utils import better_wraps
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
 from .utils import get_tempfile_kwargs
-from ..dochelpers import exc_str, borrowdoc
+from ..dochelpers import exc_str, borrowdoc, single_or_plural
 from datalad.customremotes.base import init_datalad_remote
 from datalad import cfg
 
@@ -136,10 +136,10 @@ class Item(object):
             root. Conversion is done within `TestRepo_NEW.__init__()`
         runner: Runner or None
             `Runner` instance to use for creation of the item. By default an
-            instance is created using basename(path) as CWD.
+            instance is created using dirname(path) as CWD.
         """
         self._path = path
-        self._runner = runner or GitRunner(cwd=os.path.basename(path))
+        self._runner = runner or GitRunner(cwd=os.path.dirname(path))
 
     @property
     def path(self):
@@ -180,7 +180,7 @@ class ItemRepo(Item):
 
     def __init__(self, path, src=None, runner=None,
                  annex=True, annex_version=None, annex_direct=None,
-                 annex_init=True):
+                 annex_init=None):
         """
 
         Parameters
@@ -193,7 +193,7 @@ class ItemRepo(Item):
             path or URL to clone the repository from
         runner: Runner or None
             `Runner` instance to use for creation of the item. By default an
-            instance is created using basename(path) as CWD.
+            instance is created using dirname(path) as CWD.
         annex: bool
             whether or not this repository should be an annex
         annex_version: int or None
@@ -202,6 +202,11 @@ class ItemRepo(Item):
         annex_direct: bool or None
             whether annex should use direct mode. If None, it's up to git-annex
             (or `datalad.tests.repo.direct` config) to decide
+        annex_init: bool or None
+            whether or not to initialize the annex. Valid only if `annex`
+            is True. By default it is set to True, if `annex` is True. Set to
+            False if you want to clone an annex and not annex-init that clone.
+            It doesn't make sense in other cases.
         """
         # TODO: What to do if annex settings are contradicting whatever is
         # enforced by git-annex or our test config?
@@ -221,6 +226,10 @@ class ItemRepo(Item):
                 msg="Parameters 'annex_version' or 'annex_direct' or "
                     "'annex_init' were specified, while 'annex' wasn't True."
             )
+
+        if annex and annex_init is None:
+            annex_init = True
+
         if annex and annex_version and annex_direct and annex_version >= 6:
             raise InvalidTestRepoDefinitionError(
                 item=self.__class__,
@@ -238,7 +247,7 @@ class ItemRepo(Item):
                     "specified, while 'annex_init' wasn't True."
             )
 
-        super(self.__class__, self).__init__(path=path, runner=runner)
+        super(ItemRepo, self).__init__(path=path, runner=runner)
         self._src = src
         self._annex = annex
         self._annex_version = annex_version
@@ -405,28 +414,28 @@ class ItemSelf(ItemRepo):
 
     @borrowdoc(ItemRepo, '__init__')
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(ItemSelf, self).__init__(*args, **kwargs)
 
-# Note:
-# States: untracked, modified, staged, new file, typechanged
 
-# TODO:
-class ItemFile(Item):  # How about remote files to addurl'd? Dedicated class or parameter?
+@auto_repr
+class ItemFile(Item):
     """
     """
-    # snippets:
 
-            # raise InvalidTestRepoDefinitionError(
-            #     item=self.__class__,
-            #     msg="Parameters 'annex_version' or 'annex_direct' or "
-            #         "'annex_init' were specified, while 'annex' wasn't True."
-            # )
-            # raise TestRepoCreationError("Target path {} is not empty."
-            #                             "".format(self._path),
-            #                             item=self.__class__)
+    # file status constants corresponding to git-status' short format
+    UNTRACKED = '?'
+    UNMODIFIED = ' '
+    MODIFIED = 'M'
+    ADDED = 'A'
+    DELETED = 'D'
+    RENAMED = 'R'
+    COPIED = 'C'
+    TYPECHANGED = 'T'  # Note: This one is missing in git-status short format
+    UPDATED_BUT_UNMERGED = 'U'
 
-    def __init__(self, path, src=None, runner=None,
-                 content=None, state=None, locked=True, annexed=False):
+    def __init__(self, path, runner=None,
+                 content=None, state=None, commit_msg=None,
+                 annexed=False, src=None, locked=None):
         """
 
         Parameters
@@ -435,49 +444,123 @@ class ItemFile(Item):  # How about remote files to addurl'd? Dedicated class or 
             absolute path where to create this file
         runner: Runner or None
             `Runner` instance to use for creation of the item. By default an
-            instance is created using basename(path) as CWD.
+            instance is created using dirname(path) as CWD.
+        content: str
+            content of the file. Mutually exclusive with `src`.
         state: tuple of str
-
-            tuple (index, working_tree)
-            see man git-status => short format
-            TODO
-
+            a tuple defining the state of the file in the index and the working
+            tree respectively. This is pretty much the way git-status represents
+            it in its short format. Constants are available from this class, so
+            you can specify `state` using those constants.
+            For example, a file that was newly added but not yet committed would
+            have the state `(ItemFile.ADDED, ItemFile.UNMODIFIED)`.
+            See the short format in git-status' man page if you're not familiar
+            with that concept.
+        commit_msg: str
+            commit message to use, if the file is to be committed. That means
+            `state` has to be (ItemFile.UNMODIFIED, ItemFile.UNMODIFIED).
+            By default the commit message would read
+            "ItemFile: Added file <path> to [git | annex]"
         annexed: bool
             whether or not this file should be annexed
         src: str or None
             path or url to annex-addurl from. Mutually exclusive with `content`.
             Valid only if `annexed` is True.
-        content: str
-            content of the file. Mutually exclusive with `src`.
-            Valid only if `annexed` is True.
+
         locked: bool
-            whether or not the file should be locked.
+            whether or not the file should be locked by annex.
             Valid only if `annexed` is True.
+            Note, that locked/unlocked isn't available in annex direct mode.
         """
 
-        super(self.__class__, self).__init__(path=path, runner=runner)
+        # TODO: Use constraints (like EnsureChoice for 'state') for sanity
+        # checks on the arguments?
+
+        if src and content:
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameters 'src' and 'content' were specified for "
+                    "{it}({p}) but are mutually exclusive.".format(
+                        it=self.__class__,
+                        p=path),
+                item=self.__class__
+            )
+
+        # TODO: - neither content nor src
+
+        # TODO: locked's default can't be bool. Default should work with git
+
+        if commit_msg and state != (ItemFile.UNMODIFIED, ItemFile.UNMODIFIED):
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'commit_msg' was specified for {it}({p}) but "
+                    "'state' doesn't suggest to commit the file or is invalid "
+                    "for initial definition."
+                    "".format(it=self.__class__,
+                              p=path),
+                item=self.__class__
+            )
+
+        if not annexed:
+            invalid_parameters = []
+            if src:
+                invalid_parameters.append('src')
+            if locked:
+                invalid_parameters.append('locked')
+            if invalid_parameters:
+                raise InvalidTestRepoDefinitionError(
+                    msg="{param_s} {params} {was_were} specified for "
+                        "{it}({p}) but are invalid when 'annexed' is False"
+                        "".format(
+                            param_s=single_or_plural("Parameter",
+                                                     "Parameters",
+                                                     len(invalid_parameters)
+                                                     ),
+                            params="and ".join(invalid_parameters),
+                            was_were=single_or_plural("was",
+                                                      "were",
+                                                      len(invalid_parameters)
+                                                      ),
+                            it=self.__class__,
+                            p=path
+                        )
+                )
+
+        super(ItemFile, self).__init__(path=path, runner=runner)
         self._content = content
-        self._state = state  # EnsureChoice?
+        self._state_index = state[0]
+        self._state_worktree = state[1]
+        self._commit_msg = commit_msg
+        self._src = src
         self._locked = locked  # TODO: consider direct mode. There's no lock ...
         self._annexed = annexed
 
     @property
     def is_untracked(self):
-        return self._state[1] == 'untracked'
+        return self._state_index == ItemFile.UNTRACKED and \
+               self._state_worktree == ItemFile.UNTRACKED
 
-    # TODO: state needs to be tuple! (modified + staged)
-    # Or flags?
     @property
     def is_staged(self):
-        return self._state[0] in ['modified', 'added', 'typechanged', 'deleted', 'renamed']
+        return self._state_index in [ItemFile.MODIFIED,
+                                     ItemFile.ADDED,
+                                     ItemFile.DELETED,
+                                     ItemFile.RENAMED,
+                                     ItemFile.COPIED,
+                                     ItemFile.TYPECHANGED] and \
+               self._state_worktree == ItemFile.UNMODIFIED
 
     @property
-    def is_modified(self):   # problem! how?
-        return self._state == 'modified'
+    def is_modified(self):
+        return self._state_index == ItemFile.MODIFIED or \
+               self._state_worktree == ItemFile.MODIFIED
+
+    @property
+    def is_clean(self):  # TODO: Better name
+        return self._state_index == ItemFile.UNMODIFIED and \
+               self._state_worktree == ItemFile.UNMODIFIED
 
     @property
     def is_unlocked(self):
-        pass
+        return self._locked is False  # not `None`!
 
     @property
     def content(self):
@@ -486,40 +569,178 @@ class ItemFile(Item):  # How about remote files to addurl'd? Dedicated class or 
     def annex_key(self):
         pass
 
-    def is_unlocked(self):
-        pass
-
     def create(self):
         if exists(self.path):
-            raise  # What error?
-    def create(self):
-        if exists(self.path):
-            raise TestRepoCreationError# What error?
-        with open(self.path, 'w') as f:
-            f.write(self.content)
-        # TODO: depends on state: add, annex-add, commit, ...
+            raise TestRepoCreationError(
+                msg="Path {p} already exists.".format(p=self.path),
+                item=self.__class__
+            )
+        try:
+            with open(self.path, 'w') as f:
+                f.write(self.content)
+        except EnvironmentError as e:
+            raise TestRepoCreationError(
+                msg="The following exception occurred while trying to write to "
+                    "file {p}:{ls}{exc}".format(ls=os.linesep,
+                                                p=self.path,
+                                                exc=exc_str(e)
+                                                ),
+                item=self.__class__
+            )
+
+        # Furthermore, we can git-add, git-annex-add and commit the new file.
+        # Anything more complex (like add, commit, change the content,
+        # stage again, ...) cannot be achieved by create(), since this would
+        # require way too complex definitions. That's what ItemCommand(item=...)
+        # is for instead.
+        to_add = False
+        to_commit = False
+        if self.is_untracked:
+            # we are done
+            return
+        elif self._state_index == ItemFile.ADDED and \
+                self._state_worktree == ItemFile.UNMODIFIED:
+            # we need to add
+            to_add = True
+        elif self.is_clean:
+            # we need to add and commit
+            to_add = True
+            to_commit = True
+        else:
+            # everything else is invalid as an item's initial definition
+            raise InvalidTestRepoDefinitionError(
+                msg="Requested state ('{i_state}', '{w_state}') of {it}({p}) is"
+                    " invalid as initial definition. Instead specify "
+                    "ItemCommand(s) like ItemModifyFile to further manipulate "
+                    "this item."
+                    "".format(i_state=self._state_index,
+                              w_state=self._state_worktree,
+                              it=self.__class__,
+                              p=self.path
+                              ),
+                item=self.__class__
+            )
+
+        if to_add:
+            # TODO: This part needs attention for V6. See gh-1798
+            add_cmd = ['git']
+            if self._annexed:
+                # git-annex
+                add_cmd.append('annex')
+                if self._src:
+                    # we want to annex-addurl
+                    add_cmd.extend(['addurl', self._src, '--file="%s"' % self.path])
+                else:
+                    # we want to annex-add
+                    add_cmd.extend(['add', self.path])
+            else:
+                # git-add
+                add_cmd.extend(['add', self.path])
+
+            try:
+                self._runner.run(add_cmd)
+            except CommandError as e:
+                # raise TestRepoCreationError instead, so TestRepo can add
+                # more information
+                raise TestRepoCreationError(
+                    msg="Failed to add {it}({p}) ({exc})"
+                        "".format(it=self.__class__,
+                                  p=self.path,
+                                  exc=exc_str(e)
+                                  ),
+                        item=self.__class__
+                )
+
+            # TODO: get annex key as a property!
+
+        if self.is_unlocked:
+            # unlock needs to be done before committing (at least in v6 it
+            # would be 'typechanged' otherwise)
+            # TODO: Double check the result for v5
+            # TODO: When and how to check for direct mode? Remember, that direct
+            # mode could be enforced without being specified in the definition
+            unlock_cmd = ['git', 'annex', 'unlock', self.path]
+            try:
+                self._runner.run(unlock_cmd)
+            except CommandError as e:
+                # raise TestRepoCreationError instead, so TestRepo can add
+                # more information
+                raise TestRepoCreationError(
+                    msg="Failed to unlock {it}({p}) ({exc})"
+                        "".format(it=self.__class__,
+                                  p=self.path,
+                                  exc=exc_str(e)
+                                  ),
+                    item=self.__class__
+                )
+
+        if to_commit:
+            if not self._commit_msg:
+                self._commit_msg = "{it}: Added file {p} to {git_annex}" \
+                                   "".format(it=self.__class__,
+                                             p=self.path,
+                                             git_annex="annex" if self._annexed
+                                             else "git")
+            commit_cmd = ['git', 'commit', '-m', '"%s"' % self._commit_msg,
+                          '--', self.path]
+            try:
+                self._runner.run(commit_cmd)
+            except CommandError as e:
+                # raise TestRepoCreationError instead, so TestRepo can add
+                # more information
+                raise TestRepoCreationError(
+                    msg="Failed to commit {it}({p}) ({exc})"
+                        "".format(it=self.__class__,
+                                  p=self.path,
+                                  exc=exc_str(e)
+                                  ),
+                    item=self.__class__
+                )
+
+            # TODO: We probably need the commit SHA and make it available as a
+            # property for ItemRepo to access.
+
+        return
 
 
-# TODO:
+@auto_repr
 class ItemInfoFile(ItemFile):
 
-    default_path = 'INFO.txt'  # assigned
+    default_path = 'INFO.txt'  # needs to accessible by TestRepo.__init__
 
-    def __init__(self, class_, path=None, annexed=False, content=None, definition=None):
-        self._content = content or \
-            "git: {git}{ls}" \
-            "annex: {annex}{ls}" \
-            "datalad: {dl}{ls}" \
-            "TestRepo: {repo}({v}){ls}" \
-            "Definition:{ls}" \
-            "".format(ls=os.linesep,
-                      repo=class_,
-                      v=class_.version,
-                      git=external_versions['cmd:git'],
-                      annex=external_versions['cmd:annex'],
-                      dl=__version__)
-            # TODO: git-annex, definition
-        super(self.__class__, self).__init__(path=path, annexed=annexed)  # ....
+    def __init__(self, class_, definition=None,
+                 path=None, runner=None, annexed=False, content=None,
+                 # directly committed on creation:
+                 state=(ItemFile.UNMODIFIED, ItemFile.UNMODIFIED),
+                 commit_msg=None,
+                 src=None,
+                 locked=None):
+        if not content:
+            content = "git: {git}{ls}" \
+                      "annex: {annex}{ls}" \
+                      "datalad: {dl}{ls}" \
+                      "TestRepo: {repo}({v}){ls}" \
+                      "Definition:{ls}{definition}" \
+                      "".format(ls=os.linesep,
+                                repo=class_,
+                                v=class_.version,
+                                git=external_versions['cmd:git'],
+                                annex=external_versions['cmd:annex'],
+                                dl=__version__,
+                                definition=definition  # TODO: pprint or sth ...
+                                )
+        if not commit_msg and state == (ItemFile.UNMODIFIED,
+                                        ItemFile.UNMODIFIED):
+            # default commit_msg only if caller didn't change the state
+            # otherwise either the state is invalid for initial definition
+            # altogether or it's not to be committed and a message passed to
+            # superclass will result in InvalidTestRepoDefinitionError
+            commit_msg = "{}: Added ItemInfoFile ({})." \
+                         "".format(class_, os.path.basename(path))
+
+        super(ItemInfoFile, self).__init__(
+            path=path, runner=runner, content=content, state=state,
+            commit_msg=commit_msg, annexed=annexed, src=src, locked=locked)
 
 
 # TODO: some standard "remote" files; classes like ItemInfoFile?
@@ -538,55 +759,58 @@ os.close(remote_file_fd)
 ###################################################################
 
 
-# Is that the solution?
-# Insert arbitrary shell commands in the list at any point and let TestRepo.create() just loop over that list
-
+@auto_repr
 class ItemCommand(Item):
 
     def __init__(self, cwd, cmd, runner):  #runner? => optional (for protocols, but remember that cwd needs to take precedence
-        super(self.__class__, self).__init__(path=cwd, runner=runner)
+        super(ItemCommand, self).__init__(path=cwd, runner=runner)
 
     def create(self):  #? or __call__?
         pass
 
 
+@auto_repr
 class ItemModifyFile(ItemCommand):
 
     # + optional commit
 
     def __init__(self, cwd, runner, item): # item: ItemFile # runner: NOPE! from file
-        super(self.__class__, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemModifyFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
+@auto_repr
 class ItemNewBranch(ItemCommand):
     # create a new branch (git checkout -b)
 
     def __init__(self, cwd, runner, item): # item: ItemRepo # runner: NOPE from repo
-        super(self.__class__, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemNewBranche, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
+@auto_repr
 class ItemCommitFile(ItemCommand):  #file(s)
     # if needed after modification or sth
 
     def __init__(self, cwd, runner):
-        super(self.__class__, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemCommitFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
+@auto_repr
 class ItemStageFile(ItemCommand):  #file(s)
     # if file(s) need to be staged after they were created
 
     # + optional commit
     def __init__(self, cwd, runner):
-        super(self.__class__, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemStageFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
+@auto_repr
 class ItemAddSubmodule(ItemCommand):
 
     # + optional commit
     def __init__(self, cwd, runner):
-        super(self.__class__, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemAddSubmodule, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
-# TODO: Commands for (special remotes)!
+# TODO: Commands for (special) remotes
 
 
 @auto_repr
@@ -676,6 +900,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 # store absolute path for instantiation
                 item[1]['cwd'] = opj(self._path, r_cwd)
 
+                # TODO: Probably the same mechanism has to be applied for ItemFile(src=...)!
                 # 'item' arguments in ItemCommand definitions are paths, since
                 # we can't reference an actual object therein.
                 # Do the conversion:
@@ -737,6 +962,8 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
             # special case ItemInfoFile
             if issubclass(item[0], ItemInfoFile):
+                # pass TestRepo subclass to the info file:
+                item[1]['class_'] = self.__class__
                 # pass item definitions to the info file:
                 item[1]['definition'] = self._item_definitions
 
@@ -828,29 +1055,44 @@ def with_testrepos_new(t, read_only=False, selector='all'):
     def new_func(*arg, **kw):
         pass
 
+# TODO: known_failure_XXX needs opt_arg 'testrepo' to pass the TestRepo
+# class(es) the test does fail on.
+
 
 #
 #  Actual test repositories:
 #
 
+
+@auto_repr
 class BasicGit(TestRepo_NEW):
+    version = '0.1'
+
+    # TODO: INFO.txt gets its own commit ATM.
+    # Is this, how it used to be in old test repos?
+    # If not so, this might be an issue during RF'ing of the actual
+    # tests.
+
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': False}),
+                         (ItemInfoFile, {'state': (ItemFile.ADDED,
+                                                   ItemFile.UNMODIFIED)}),
                          (ItemFile, {'path': 'test.dat',
                                      'content': "123",
                                      'annexed': False,
-                                     'state': 'staged'}),  # or just untracked and include staging in committing?
-                         (ItemInfoFile, {}),
-                         (ItemCommitFile, {'cwd': '.',
-                                           'items': ['test.dat', 'INFO.txt']})  # TODO: It's a list! see TestRepo_NEW.__init__!
+                                     'state': (ItemFile.UNMODIFIED,
+                                               ItemFile.UNMODIFIED)}),
+
+                         # (ItemCommitFile, {'cwd': '.',
+                         #                   'items': ['test.dat', 'INFO.txt']})  # TODO: It's a list! see TestRepo_NEW.__init__!
                          ]
 
-    def __init__(self):
-        super(BasicGit).__init__()
-        pass
+    def __init__(self, path=None, runner=None):
+        super(BasicGit, self).__init__(path=path, runner=runner)
 
     def assert_intact(self):
-        pass
+        # fake sth:
+        assert "everything is fine"
 
 
 # 4 times: untracked, modified, staged, all of them
