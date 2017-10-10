@@ -55,23 +55,6 @@ from datalad import cfg
 #   uninitialized submodule and a corresponding property
 
 
-
-
-#################### OLD: #########################################
-
-# we need a local file, that is supposed to be treated as a remote file via
-# file-scheme URL
-remote_file_fd, remote_file_path = \
-    tempfile.mkstemp(**get_tempfile_kwargs({}, prefix='testrepo'))
-# to be removed upon teardown
-_TEMP_PATHS_GENERATED.append(remote_file_path)
-with open(remote_file_path, "w") as f:
-    f.write("content to be annex-addurl'd")
-# OS-level descriptor needs to be closed!
-os.close(remote_file_fd)
-###################################################################
-
-
 class InvalidTestRepoDefinitionError(Exception):
     """Thrown if the definition of a test repository is invalid
     """
@@ -429,28 +412,72 @@ class ItemSelf(ItemRepo):
 
 # TODO:
 class ItemFile(Item):  # How about remote files to addurl'd? Dedicated class or parameter?
+    """
+    """
+    # snippets:
 
-    def __init__(self, path, runner=None, content=None, state=None, locked=True, annexed=False):
-        super(self.__class__, self).__init__(path=path,runner=runner)
+            # raise InvalidTestRepoDefinitionError(
+            #     item=self.__class__,
+            #     msg="Parameters 'annex_version' or 'annex_direct' or "
+            #         "'annex_init' were specified, while 'annex' wasn't True."
+            # )
+            # raise TestRepoCreationError("Target path {} is not empty."
+            #                             "".format(self._path),
+            #                             item=self.__class__)
+
+    def __init__(self, path, src=None, runner=None,
+                 content=None, state=None, locked=True, annexed=False):
+        """
+
+        Parameters
+        ----------
+        path: str
+            absolute path where to create this file
+        runner: Runner or None
+            `Runner` instance to use for creation of the item. By default an
+            instance is created using basename(path) as CWD.
+        state: tuple of str
+
+            tuple (index, working_tree)
+            see man git-status => short format
+            TODO
+
+        annexed: bool
+            whether or not this file should be annexed
+        src: str or None
+            path or url to annex-addurl from. Mutually exclusive with `content`.
+            Valid only if `annexed` is True.
+        content: str
+            content of the file. Mutually exclusive with `src`.
+            Valid only if `annexed` is True.
+        locked: bool
+            whether or not the file should be locked.
+            Valid only if `annexed` is True.
+        """
+
+        super(self.__class__, self).__init__(path=path, runner=runner)
         self._content = content
         self._state = state  # EnsureChoice?
         self._locked = locked  # TODO: consider direct mode. There's no lock ...
         self._annexed = annexed
-        # option: instead of abs path  # WTF did this mean?
 
     @property
     def is_untracked(self):
-        return self._state == 'untracked'
+        return self._state[1] == 'untracked'
 
     # TODO: state needs to be tuple! (modified + staged)
     # Or flags?
     @property
     def is_staged(self):
-        return self._state == 'staged'
+        return self._state[0] in ['modified', 'added', 'typechanged', 'deleted', 'renamed']
 
     @property
     def is_modified(self):   # problem! how?
         return self._state == 'modified'
+
+    @property
+    def is_unlocked(self):
+        pass
 
     @property
     def content(self):
@@ -465,6 +492,9 @@ class ItemFile(Item):  # How about remote files to addurl'd? Dedicated class or 
     def create(self):
         if exists(self.path):
             raise  # What error?
+    def create(self):
+        if exists(self.path):
+            raise TestRepoCreationError# What error?
         with open(self.path, 'w') as f:
             f.write(self.content)
         # TODO: depends on state: add, annex-add, commit, ...
@@ -492,6 +522,20 @@ class ItemInfoFile(ItemFile):
         super(self.__class__, self).__init__(path=path, annexed=annexed)  # ....
 
 
+# TODO: some standard "remote" files; classes like ItemInfoFile?
+#################### OLD: #########################################
+
+# we need a local file, that is supposed to be treated as a remote file via
+# file-scheme URL
+remote_file_fd, remote_file_path = \
+    tempfile.mkstemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+# to be removed upon teardown
+_TEMP_PATHS_GENERATED.append(remote_file_path)
+with open(remote_file_path, "w") as f:
+    f.write("content to be annex-addurl'd")
+# OS-level descriptor needs to be closed!
+os.close(remote_file_fd)
+###################################################################
 
 
 # Is that the solution?
@@ -778,6 +822,8 @@ def with_testrepos_new(t, read_only=False, selector='all'):
     # TODO: if possible provide a signature that's (temporarily) compatible with
     # old one to ease RF'ing
 
+    # TODO: if assert_intact fails and readonly == True, re-create for other tests
+
     @better_wraps(t)
     def new_func(*arg, **kw):
         pass
@@ -825,5 +871,6 @@ class BasicAnnexDirty(BasicAnnex):
 class BasicMixed(TestRepo_NEW):
     pass
 
+# v6 adjusted branch ...
 
 # Datasets (.datalad/config, .datalad/metadata ...) ?
