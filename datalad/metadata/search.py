@@ -36,6 +36,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.support.network import is_url
 from datalad.support.json_py import dump2fileobj as jsondump2file
+from simplejson import load as jsonload
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.metadata import _query_aggregated_metadata
@@ -47,6 +48,7 @@ from datalad.utils import assure_unicode
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
+from datalad.dochelpers import exc_str
 
 if PY3:
     unicode_srctypes = string_types + (bytes,)
@@ -309,6 +311,8 @@ def _get_search_index(index_dir, ds, force_reindex):
     # use compressed storage, the is not point in inflating the
     # diskspace requirements
     with gzopen(definitions_fname, 'wb') as f:
+        # TODO actually go through all, incl. compound, defintions ('@id' plus 'unit'
+        # or similar) and resolve terms to URLs, if anyhow possible
         jsondump2file(definitions, f)
 
     lgr.info('Search index contains %i documents', idx.doc_count())
@@ -374,7 +378,35 @@ def _search_from_virgin_install(dataset, query):
 
 @build_doc
 class Search(Interface):
-    """Search within available in datasets' meta data
+    """Search a dataset's metadata.
+
+    Search capabilities depend on the amount and nature of metadata available
+    in a dataset. This can include metadata about a dataset as a whole, or
+    metadata on dataset content (e.g. one or more files). One dataset can also
+    contain metadata from multiple subdatasets (see the 'aggregate-metadata'
+    command), in which case a search can discover any dataset or any file in
+    these dataset.
+
+    A search index is automatically built from the available metadata of any
+    dataset or file, and a schema for this index is generated dynamically, too.
+    Consequently, the search index will be tailored to data provided in a
+    particular collection of datasets.
+
+    Metadata fields (and possibly also values) are typically defined terms
+    from a controlled vocabulary. Term definitions are accessible via the
+    --show-keys flag.
+
+    DataLad's search is built on the Python package 'Whoosh', which provides
+    a powerful query language. Links to a description of the language and
+    particular feature can be found below.
+
+    Here are a few examples. Basic search::
+
+      $ datalad search searchterm
+
+    Search for a file::
+
+      $ datalad search searchterm type:file
 
     .. seealso::
       - Description of the Whoosh query language:
@@ -457,8 +489,23 @@ class Search(Interface):
             index_dir, ds, force_reindex)
 
         if show_keys:
+            definitions_fname = opj(
+                index_dir,
+                'datalad_term_definitions.json.gz')
+            try:
+                defs = jsonload(gzopen(definitions_fname))
+            except Exception as e:
+                lgr.warning(
+                    'No term definitions found alongside search index: %s',
+                    exc_str(e))
+                defs = {}
+
             for k in idx_obj.schema.names():
-                print(k)
+                print('{}{}'.format(
+                    k,
+                    ' {}'.format(
+                        defs[k] if isinstance(defs[k], dict) else '({})'.format(
+                            defs[k])) if k in defs else ''))
             return
 
         if not query:
