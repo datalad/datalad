@@ -216,15 +216,8 @@ def setup_parser(
                     intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
-            # all subparser can report the version
-            helpers.parser_add_common_opt(
-                subparser, 'version',
-                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                                 _license_info()))
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
-            helpers.parser_add_common_opt(subparser, 'log_level')
-            helpers.parser_add_common_opt(subparser, 'pbs_runner')
             # let module configure the parser
             _intf.setup_parser(subparser)
             # logger for command
