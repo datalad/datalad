@@ -36,7 +36,7 @@ from datalad.utils import assure_list
 from six import string_types
 import shlex
 from datalad.utils import on_windows
-from .utils import eq_, assert_is_instance, assert_raises
+from .utils import eq_, assert_is_instance, assert_raises, assert_in
 
 # decorator replacing "with_testrepos":
 # - delivers instances of TestRepo* classes instead of paths
@@ -58,6 +58,17 @@ from .utils import eq_, assert_is_instance, assert_raises
 # - properties to
 # - (annex) init optional? don't think so (well, might be useful for testing). But: Should be possible to have an
 #   uninitialized submodule and a corresponding property
+
+
+# TODO: - Our actual tests could instantiate Items (without creating them!) to
+#         represent changes and then just call assert_intact() to test for
+#         everything without the need to think of everything when writing the
+#         test.
+#       - That way, we can have helper functions for such assertions like:
+#         take that file from the TestRepo and those changes I specified and
+#         test, whether or not those changes and those changes only actually
+#         apply. This would just copy the Item from TestRepo, inject the changes
+#         and call assert_intact()
 
 
 class InvalidTestRepoDefinitionError(Exception):
@@ -266,14 +277,20 @@ class ItemRepo(Item):
             )
 
         super(ItemRepo, self).__init__(path=path, runner=runner)
+
+        # TODO: datalad config!
+
         self._src = src
         self._annex = annex
-        self._annex_version = annex_version
-        self._annex_direct = annex_direct
-        self._annex_init = annex_init
+        self._annex_version = annex_version if annex else None
+        self._annex_direct = annex_direct if annex else False
+        self._annex_init = annex_init if annex else False
         self._files = set()  # ... of ItemFile
         self._submodules = set()  # ... of ItemRepo
         self._commits = []
+        self._branches = []
+        self._remotes = []
+        self._super = None
 
     # TODO: May be let properties return anything only after creation?
     @property
@@ -336,25 +353,31 @@ class ItemRepo(Item):
         return self._commits
 
     # TODO: How to represent branches? Just the names or names plus commit SHAs?
+    @property
     def branches(self):
-        pass
+        return self._branches
 
     # TODO: How to represent remotes? Just the names or names plus url(s)?
     # What about special remotes?
+    @property
     def remotes(self):
         # Note: names and url(s)
-        pass
+        return self._remotes
 
+    @property
     def submodules(self):
-        pass
+        return self._submodules
 
+    @property
     def superproject(self):
-        pass
+        return self._super
 
     # TODO: This might change. May be we need a self._items and look for ItemFile in it. Consider untracked files!
+    # Also: Let it be Items instead of paths, and return paths only from TestRepo? Would be easier for internal access.
     @property
     def files(self):
-        return [os.path.relpath(f_.path, self.path) for f_ in self._files]
+        return  self._files
+        #return [os.path.relpath(f_.path, self.path) for f_ in self._files]
 
     def create(self):
         """Creates the physical repository
@@ -388,6 +411,9 @@ class ItemRepo(Item):
             raise TestRepoCreationError("Failed to create git repository{}({})"
                                         "".format(os.linesep, exc_str(e)),
                                         item=self.__class__)
+        if self._src:
+            # we just cloned
+            self.remotes.add('origin')
 
         # we want to make it an annex
         if self._annex and self._annex_init:
@@ -423,6 +449,69 @@ class ItemRepo(Item):
                         item=self.__class__)
 
             # TODO: Verify annex_version and annex_direct from .git/config
+
+    def assert_intact(self):
+        """This supposed to make basic tests on whether or not what is stored in
+        this ItemRepo instance actually is, what can be found on disc plus some
+        consistency checks for the object itself.
+        Everything else is out of scope and needs to be tested by ItemRepo and
+        the subclasses of TestRepo.
+        """
+
+        # object consistency
+        if self.is_git:
+            assert(not self.is_annex)
+            assert(self.annex_is_initialized is False)
+            assert(self.annex_version is None)
+            assert(self.is_direct_mode is False)
+
+        if self.is_annex:
+            assert(not self.is_git)
+            if self.annex_version or self.is_direct_mode:
+                assert(self.annex_is_initialized is True)
+
+        if self._src:
+            # Note: self._src indicates that we cloned the repo from somewhere.
+            # Therefore we have 'origin'. Theoretically there could be an
+            # ItemCommand that removed that remote, but left self._src.
+            # If that happens, that ItemCommand probably should be adapted to
+            # also remove self._src.
+            assert(self.remotes)
+
+        [assert_is_instance(b, string_types) for b in self.branches]
+        for c in self.commits:
+            assert_is_instance(c, tuple)
+            eq_(len(c), 2)
+            assert_is_instance(c[0], string_types)  # SHA
+            assert_is_instance(c[1], string_types)  # message
+
+        if self.branches:
+            assert self.commits
+            # Not necessarily vice versa? Could be just detached HEAD, I guess.
+
+        [assert_is_instance(f_, ItemFile) for f_ in self._files]
+        [assert_is_instance(r_, ItemRepo) for r_ in self._submodules]
+        # TODO: What about unregistered repos beneath? May be just part of TestRepo instance, not the ItemRepo.
+
+        for it in self.files:
+            assert(it.path.startswith(self.path))
+            it.assert_intact()
+            # Note: Not actually sure how this would look if there were files
+            # moved from one repo to another within the testrepo setup. In case
+            # we ever get there: Reconsider whether this should be true:
+            [assert_in(commit, self.commits) for commit in it.commits]
+
+        for it in self.submodules:
+            assert(it.path.startswith(self.path))
+            it.assert_intact()
+            # TODO: For now, there is no place to easily check for commits that
+            # changed submodules (not commits WITHIN them)
+            assert(it.superproject is self)
+
+
+##################
+        # physical appearance:
+##################
 
 
 @auto_repr
@@ -853,6 +942,8 @@ class ItemFile(Item):
             assert(self.annex_key is None)
             assert(self.content_available is None)
             assert(not self.is_untracked)
+
+        assert(os.path.isabs(self.path))
 
         # physical appearance:
         if self.content_available or not self.annexed:
@@ -1522,9 +1613,10 @@ class BasicGit(TestRepo_NEW):
         super(BasicGit, self).__init__(path=path, runner=runner)
 
     def assert_intact(self):
-        from .utils import eq_, assert_is_instance
 
-        # 1. test the objects
+        # ###
+        # Assertions to test object properties against what is defined:
+        # ###
         eq_(len(self._items), 3)  # ItemRepo and ItemFile only
         assert_is_instance(self._items['.'], ItemSelf)
         assert_is_instance(self._items['test.dat'], ItemFile)
@@ -1549,7 +1641,6 @@ class BasicGit(TestRepo_NEW):
         eq_([c[1] for c in self.repo.commits],
             ["Adding a basic INFO file and rudimentary load file."])
         # TODO: eq_(self.repo.branches, ['master'])
-        eq_(set(self.repo.files), {'test.dat', 'INFO.txt'})
 
         # test.dat:
         test_dat = self._items['test.dat']
@@ -1565,6 +1656,9 @@ class BasicGit(TestRepo_NEW):
         # be expected and shouldn't change, so make assertions to indicate
         # integrity of the file's content:
         assert_is_instance(info_txt, ItemInfoFile)
+
+        # both objects make up `files` of ItemSelf:
+        eq_(set(self.repo.files), {test_dat, info_txt})
 
         # for both files the following should be true:
         for file_ in [test_dat, info_txt]:
@@ -1584,8 +1678,19 @@ class BasicGit(TestRepo_NEW):
             eq_(file_.commits[0][1],
                 "Adding a basic INFO file and rudimentary load file.")
 
-        # 2. test appearance on disk
-
+        # ###
+        # The objects' inner consistency and testing against what is physically
+        # the case is done recursively via their respective assert_intact().
+        # Note, that this requires to call assert_intact of all ItemRepo
+        # instances in this TestRepo, that have no superproject.
+        # In most cases this will just be one call to the toplevel instance:
+        # ###
+        # TODO: The note above might change a little, once it is clear what to
+        # do about unregistered subs and untracked files.
+        # TODO: May be that part can be done by TestRepo anyway, if it gets more
+        # complicated. Then assert_intact wouldn't be abstract, but to be
+        # enhanced.
+        self.repo.assert_intact()
 
 
 @auto_repr
