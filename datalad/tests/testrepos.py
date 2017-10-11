@@ -32,6 +32,10 @@ from .utils import get_tempfile_kwargs
 from ..dochelpers import exc_str, borrowdoc, single_or_plural
 from datalad.customremotes.base import init_datalad_remote
 from datalad import cfg
+from datalad.utils import assure_list
+from six import string_types
+import shlex
+from datalad.utils import on_windows
 
 # decorator replacing "with_testrepos":
 # - delivers instances of TestRepo* classes instead of paths
@@ -435,7 +439,7 @@ class ItemFile(Item):
 
     def __init__(self, path, runner=None,
                  content=None, state=None, commit_msg=None,
-                 annexed=False, src=None, locked=None):
+                 annexed=False, key=None, src=None, locked=None):
         """
 
         Parameters
@@ -463,11 +467,17 @@ class ItemFile(Item):
             "ItemFile: Added file <path> to [git | annex]"
         annexed: bool
             whether or not this file should be annexed
+        key: str
+            annex' key for that file. Valid only if `annexed` is True. If not
+            given it will be determined automatically. While this should usually
+            work, please consider that providing information on what SHOULD be
+            and compare to what IS the case, is the whole point of testing.
+            Relying on what actually happened generally breaks the logic of
+            testing to a certain extend.
         src: str or None
             path or url to annex-addurl from. Mutually exclusive with `content`.
             Valid only if `annexed` is True.
-
-        locked: bool
+        locked: bool or None
             whether or not the file should be locked by annex.
             Valid only if `annexed` is True.
             Note, that locked/unlocked isn't available in annex direct mode.
@@ -481,13 +491,20 @@ class ItemFile(Item):
                 msg="Parameters 'src' and 'content' were specified for "
                     "{it}({p}) but are mutually exclusive.".format(
                         it=self.__class__,
-                        p=path),
+                        p=path
+                    ),
                 item=self.__class__
             )
 
-        # TODO: - neither content nor src
-
-        # TODO: locked's default can't be bool. Default should work with git
+        if not src and not content:
+            raise InvalidTestRepoDefinitionError(
+                msg="Neither 'src' nor 'content were specified for "
+                    "{it}({p}).".format(
+                        it=self.__class__,
+                        p=path
+                    ),
+                item=self.__class__
+            )
 
         if commit_msg and state != (ItemFile.UNMODIFIED, ItemFile.UNMODIFIED):
             raise InvalidTestRepoDefinitionError(
@@ -503,8 +520,10 @@ class ItemFile(Item):
             invalid_parameters = []
             if src:
                 invalid_parameters.append('src')
-            if locked:
+            if locked is not None:  # False is equally invalid!
                 invalid_parameters.append('locked')
+            if key:
+                invalid_parameters.append('key')
             if invalid_parameters:
                 raise InvalidTestRepoDefinitionError(
                     msg="{param_s} {params} {was_were} specified for "
@@ -532,6 +551,8 @@ class ItemFile(Item):
         self._src = src
         self._locked = locked  # TODO: consider direct mode. There's no lock ...
         self._annexed = annexed
+        self._key = key
+        self._commits = []
 
     @property
     def is_untracked(self):
@@ -566,8 +587,21 @@ class ItemFile(Item):
     def content(self):
         return self._content
 
+    @property
     def annex_key(self):
-        pass
+        return self._key
+
+    @property
+    def commits(self):
+        """list of the commits involving this file
+
+        Returns
+        -------
+        tuple
+            (str, str)
+            First element is the commit's SHA, the second its message
+        """
+        return self._commits
 
     def create(self):
         if exists(self.path):
@@ -651,7 +685,23 @@ class ItemFile(Item):
                         item=self.__class__
                 )
 
-            # TODO: get annex key as a property!
+            if self._annexed and not self._key:
+                # look it up
+                lookup_cmd = ['git', 'annex', 'lookupkey', self._path]
+                try:
+                    out, err = self._runner.run(lookup_cmd)
+                except CommandError as e:
+                    # raise TestRepoCreationError instead, so TestRepo can add
+                    # more information
+                    raise TestRepoCreationError(
+                        msg="Failed to look up key for {it}({p}) ({exc})"
+                            "".format(it=self.__class__,
+                                      p=self.path,
+                                      exc=exc_str(e)
+                                      ),
+                        item=self.__class__
+                    )
+                self._key = out.strip()
 
         if self.is_unlocked:
             # unlock needs to be done before committing (at least in v6 it
@@ -697,8 +747,25 @@ class ItemFile(Item):
                     item=self.__class__
                 )
 
-            # TODO: We probably need the commit SHA and make it available as a
-            # property for ItemRepo to access.
+            # get the commit's SHA for property:
+            lookup_SHA_cmd = ['git', 'log', '-n', '1',
+                              "--pretty=format:\"%H%n%B\""]
+            try:
+                out, err = self._runner.run(lookup_SHA_cmd)
+            except CommandError as e:
+                # raise TestRepoCreationError instead, so TestRepo can add
+                # more information
+                raise TestRepoCreationError(
+                    msg="Failed to look up commit SHA for {it}({p}) ({exc})"
+                        "".format(it=self.__class__,
+                                  p=self.path,
+                                  exc=exc_str(e)
+                                  ),
+                    item=self.__class__
+                )
+            commit_SHA = out.splitlines()[0]
+            commit_msg = os.linesep.join(out.splitlines()[1:])
+            self._commits.append((commit_SHA, commit_msg))
 
         return
 
@@ -759,14 +826,143 @@ os.close(remote_file_fd)
 ###################################################################
 
 
+
+# TODO: Commands need to notify the ItemRepos! Otherwise we don't know what belongs where!
+#       Same is true for instant file adding/committing
+
 @auto_repr
 class ItemCommand(Item):
+    """Base class for commands to be included in TestRepo's definition
 
-    def __init__(self, cwd, cmd, runner):  #runner? => optional (for protocols, but remember that cwd needs to take precedence
+    Also provides a generic call to an arbitrary command. Use with caution!
+    Since it's generic it doesn't know in what way it might manipulate any items
+    and therefore can't set their properties accordingly.
+    """
+
+    def __init__(self, cmd, runner=None, item=None, cwd=None):
+        """
+
+        Parameters
+        ----------
+        runner: Runner or None
+        cmd: list
+        item: Item or list of Item or None
+        cwd: str or None
+        """
+
         super(ItemCommand, self).__init__(path=cwd, runner=runner)
 
-    def create(self):  #? or __call__?
-        pass
+        if isinstance(cmd, string_types):
+            self._cmd = shlex.split(cmd, posix=not on_windows)
+        elif isinstance(cmd, list):
+            self._cmd = cmd
+        else:
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'cmd' is expected to be a list or a string."
+                    "Found {type}: {cmd}"
+                    "".format(type=type(cmd),
+                              cmd=cmd
+                              ),
+                item=ItemCommand
+            )
+
+        self._ref_items = assure_list(item)
+
+        # if items were passed, append them:
+        if self._ref_items:
+            self._cmd.append('--')
+            self._cmd.extend([it.path for it in self._ref_items])
+
+        self._cwd = cwd
+
+    def create(self):
+        """Default implementation to run `self._cmd`
+
+        May (and probably SHOULD) be overridden by subclasses. While it can be
+        used by subclasses to run the actual command, they should at least
+        extend it to modify properties of involved Items.
+        """
+
+        try:
+            self._runner.run(self._cmd, cwd=self._cwd)
+        except CommandError as e:
+            # raise TestRepoCreationError instead, so TestRepo can add
+            # more information
+            raise TestRepoCreationError(
+                msg="Command failed: {it}({cmd}) ({exc})"
+                    "".format(it=self.__class__,
+                              cmd=self._cmd,
+                              exc=exc_str(e)
+                              ),
+                item=self.__class__
+            )
+
+
+@auto_repr
+class ItemCommit(ItemCommand):
+    """Item to include an explicit call to git-commit in TestRepo's definition
+
+    This is needed in particular when you want to commit several Items at once,
+    which can't be done via their definitions, since they don't know each other
+    or the ItemRepo they belong to.
+    """
+
+    def __init__(self, runner, item=None, cwd=None, msg=None):
+
+        item = assure_list(item)
+        # build default commit message:
+        if not msg:
+            if item:
+                msg = "{self}: Committed {what}: {items}".format(
+                        self=ItemCommit,
+                        what=single_or_plural("item", "items",
+                                              len(item),
+                                              include_count=True),
+                        items=", ".join(["{it}({p})"
+                                         "".format(it=it,
+                                                   p=it.path)
+                                         for it in item])
+                )
+            else:
+                msg = "{self}: Committed staged changes." \
+                            "".format(self=ItemCommit)
+
+        # build command call:
+        commit_cmd = ['git', '--work-tree=.', 'commit',
+                      '-m', '"%s"' % msg]
+        # Note, that items will be appended by super class
+
+        super(ItemCommit, self).__init__(runner=runner, item=item, cwd=cwd,
+                                         cmd=commit_cmd)
+
+    def create(self):
+        # run the command:
+        super(ItemCommit, self).create()
+
+        # now, get the commit let the items know:
+        # Note, that git-log should work in direct mode without --work-tree
+        lookup_sha_cmd = ['git', 'log', '-n', '1',
+                          "--pretty=format:\"%H%n%B\""]
+        try:
+            out, err = self._runner.run(lookup_sha_cmd, cwd=self._cwd)
+        except CommandError as e:
+            # raise TestRepoCreationError instead, so TestRepo can add
+            # more information
+            raise TestRepoCreationError(
+                msg="Failed to look up commit SHA for {it}({p}) ({exc})"
+                    "".format(it=self.__class__,
+                              p=self.path,
+                              exc=exc_str(e)
+                              ),
+                item=self.__class__
+            )
+        commit_sha = out.splitlines()[0]
+        commit_msg = os.linesep.join(out.splitlines()[1:])
+        for it in self._ref_items:
+            it._commits.append((commit_sha, commit_msg))
+            it._state_index = ItemFile.UNMODIFIED
+            # TODO: Does "git commit -- myfile" stage that file before?
+            # If so: adjust it._state_worktree as well!
 
 
 @auto_repr
@@ -783,15 +979,7 @@ class ItemNewBranch(ItemCommand):
     # create a new branch (git checkout -b)
 
     def __init__(self, cwd, runner, item): # item: ItemRepo # runner: NOPE from repo
-        super(ItemNewBranche, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
-
-
-@auto_repr
-class ItemCommitFile(ItemCommand):  #file(s)
-    # if needed after modification or sth
-
-    def __init__(self, cwd, runner):
-        super(ItemCommitFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemNewBranch, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
 @auto_repr
@@ -891,35 +1079,44 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                     raise InvalidTestRepoDefinitionError(
                         msg="Missing argument 'cwd' for {cl}:{ls}"
                             "{cl}({args})".format(ls=os.linesep,
-                                                  cl=item[0].__class__,
+                                                  cl=item[0].__name__,
                                                   args=item[1]),
                         repo=self.__class__,
-                        item=item[0].__class__,
+                        item=item[0].__name__,
                         index=index
                         )
                 # store absolute path for instantiation
                 item[1]['cwd'] = opj(self._path, r_cwd)
 
-                # TODO: Probably the same mechanism has to be applied for ItemFile(src=...)!
+                # TODO: Probably the same mechanism has to be applied for
+                # ItemFile(src=...) in order to be able to assign predefined
+                # ItemFile instances!
+
                 # 'item' arguments in ItemCommand definitions are paths, since
                 # we can't reference an actual object therein.
                 # Do the conversion:
                 ref_item = item[1].get('item')
                 if ref_item:
-                    try:
-                        item[1]['item'] = self._items[ref_item]
-                    except KeyError:
-                        raise InvalidTestRepoDefinitionError(
-                            "Item {it} referenced before it was "
-                            "defined:{ls}{cl}({args})"
-                            "".format(ls=os.linesep,
-                                      it=ref_item,
-                                      cl=item[0].__class__,
-                                      args=item[1]),
-                            repo=self.__class__,
-                            item=item[0].__class__,
-                            index=index
-                        )
+                    # might be a list, therefore always treat as such
+                    ref_item = assure_list(ref_item)
+                    #print "DEBUG: ref_item: %s" % ref_item
+                    item[1]['item'] = []
+                    for ref in ref_item:
+                        #print "DEBUG: ref: %s" % ref
+                        try:
+                            item[1]['item'].append(self._items[ref])
+                        except KeyError:
+                            raise InvalidTestRepoDefinitionError(
+                                "Item {it} referenced before it was "
+                                "defined:{ls}{cl}({args})"
+                                "".format(ls=os.linesep,
+                                          it=ref,
+                                          cl=item[0].__name__,
+                                          args=item[1]),
+                                repo=self.__class__,
+                                item=item[0].__name__,
+                                index=index
+                            )
 
             if issubclass(item[0], ItemRepo) or issubclass(item[0], ItemFile):
                 # paths are relative in definitions
@@ -933,10 +1130,10 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                         raise InvalidTestRepoDefinitionError(
                             msg="Missing argument 'path' for {cl}:{ls}"
                                 "{cl}({args})".format(ls=os.linesep,
-                                                      cl=item[0].__class__,
+                                                      cl=item[0].__name__,
                                                       args=item[1]),
                             repo=self.__class__,
-                            item=item[0].__class__,
+                            item=item[0].__name__,
                             index=index
                             )
                 # `r_path` identifies an item; it must be unique:
@@ -947,10 +1144,10 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                             "Encountered second use of {p}:{ls}{cl}({args})"
                             "".format(ls=os.linesep,
                                       p=r_path,
-                                      cl=item[0].__class__,
+                                      cl=item[0].__name__,
                                       args=item[1]),
                             repo=self.__class__,
-                            item=item[0].__class__,
+                            item=item[0].__name__,
                             index=index
                         )
 
@@ -989,7 +1186,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 self._items[r_path] = item_instance
 
             # 3. special case: save reference to "self":
-            if item[0].__class__ is ItemSelf:
+            if item[0] is ItemSelf:
                 if self.repo:
                     # we had one already
                     raise InvalidTestRepoDefinitionError(
@@ -1066,12 +1263,14 @@ def with_testrepos_new(t, read_only=False, selector='all'):
 
 @auto_repr
 class BasicGit(TestRepo_NEW):
-    version = '0.1'
+    """Simple plain git repository
 
-    # TODO: INFO.txt gets its own commit ATM.
-    # Is this, how it used to be in old test repos?
-    # If not so, this might be an issue during RF'ing of the actual
-    # tests.
+    RF'ing note: This resembles the old `BasicGitTestRepo`. The only difference
+    is the content of INFO.txt, which is now more detailed. In particular it
+    includes the entire definition of this test repository.
+    """
+
+    version = '0.1'
 
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': False}),
@@ -1080,11 +1279,13 @@ class BasicGit(TestRepo_NEW):
                          (ItemFile, {'path': 'test.dat',
                                      'content': "123",
                                      'annexed': False,
-                                     'state': (ItemFile.UNMODIFIED,
+                                     'state': (ItemFile.ADDED,
                                                ItemFile.UNMODIFIED)}),
 
-                         # (ItemCommitFile, {'cwd': '.',
-                         #                   'items': ['test.dat', 'INFO.txt']})  # TODO: It's a list! see TestRepo_NEW.__init__!
+                         (ItemCommit, {'cwd': '.',
+                                       'item': ['test.dat', 'INFO.txt'],
+                                       'msg': "Adding a basic INFO file and "
+                                              "rudimentary load file."})
                          ]
 
     def __init__(self, path=None, runner=None):
@@ -1095,13 +1296,67 @@ class BasicGit(TestRepo_NEW):
         assert "everything is fine"
 
 
+@auto_repr
+class BasicMixed(TestRepo_NEW):
+    """Simple mixed repository
+
+    RF'ing note: This resembles the old `BasicAnnexTestRepo`. The only difference
+    is the content of INFO.txt, which is now more detailed. In particular it
+    includes the entire definition of this test repository.
+    The renaming takes into account, that this repository has a file in git,
+    which turns out to be not that "basic" as an annex with no file in git due
+    to issues with annex repository version 6.
+    """
+
+    version = '0.1'
+
+    # TODO: test-annex.dat needs to be addurl'ed and dropped.
+    _item_definitions = [(ItemSelf, {'path': '.',
+                                     'annex': True}),
+                         (ItemInfoFile, {'state': (ItemFile.ADDED,
+                                                   ItemFile.UNMODIFIED)}),
+                         (ItemFile, {'path': 'test.dat',
+                                     'content': "123",
+                                     'annexed': False,
+                                     'state': (ItemFile.ADDED,
+                                               ItemFile.UNMODIFIED)}),
+
+                         (ItemCommit, {'cwd': '.',
+                                       'item': ['test.dat', 'INFO.txt'],
+                                       'msg': "Adding a basic INFO file and "
+                                              "rudimentary load file for annex "
+                                              "testing"}),
+                         (ItemFile, {'path': 'test-annex.dat',
+                                     'content': "content to be annex-addurl'd",
+                                     'state': (ItemFile.ADDED,
+                                               ItemFile.UNMODIFIED),
+                                     'annexed': True,
+                                     'key': "SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat"
+                                     }),
+                         (ItemCommit, {'cwd': '.',
+                                       'item': 'test-annex.dat',
+                                       'msg': "Adding a rudimentary git-annex load file"}),
+
+                         #self.repo.drop("test-annex.dat")  # since available from URL
+                         ]
+
+    def __init__(self, path=None, runner=None):
+        super(BasicMixed, self).__init__(path=path, runner=runner)
+
+    def assert_intact(self):
+        # fake sth:
+        assert "everything is fine"
+
+
+class BasicAnnex(TestRepo_NEW):
+    pass
+
+
 # 4 times: untracked, modified, staged, all of them
 class BasicGitDirty(BasicGit):
     pass
 
 
-class BasicAnnex(TestRepo_NEW):
-    pass
 
 
 # see above (staged: annex, git, both)
@@ -1110,8 +1365,7 @@ class BasicAnnexDirty(BasicAnnex):
 
 
 # ....
-class BasicMixed(TestRepo_NEW):
-    pass
+
 
 # v6 adjusted branch ...
 
