@@ -472,8 +472,7 @@ class AggregateMetaData(Interface):
     """Aggregate metadata of a dataset for later query.
 
     By default metadata is aggregated across all configured native metadata
-    sources. Optionally, the type of available metadata can guessed, if no
-    types are configured. Moreover, it is possible to aggregate metadata from
+    sources. Moreover, it is possible to aggregate metadata from
     any subdatasets into the superdataset, in order to facilitate data
     discovery without having to obtain any subdataset.
     """
@@ -496,12 +495,6 @@ class AggregateMetaData(Interface):
             containing dataset will be aggregated.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        guess_native_type=Parameter(
-            args=("--guess-native-type",),
-            action="store_true",
-            doc="""guess native metadata type of datasets, if none is
-            configured. With a configured, or auto-detected metadata type,
-            no native metadata will be aggregated."""),
         merge_native=merge_native_opt,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -514,7 +507,6 @@ class AggregateMetaData(Interface):
     def __call__(
             path=None,
             dataset=None,
-            guess_native_type=False,
             merge_native='init',
             recursive=False,
             recursion_limit=None,
