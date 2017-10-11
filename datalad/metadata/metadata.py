@@ -745,7 +745,7 @@ class Metadata(Interface):
     generally the same rules as for dataset-global metadata apply.
     However, there is just one reserved key name: 'tag'.
 
-    Again, the amount of metadata is not limited, but metadata is stored
+    Again, the amount of metadata is not limited, but metadata are stored
     in git-annex's internal data structures in the Git repository of a
     dataset. Large amounts of metadata can slow its performance.
 
@@ -754,7 +754,7 @@ class Metadata(Interface):
 
     When this command is called on just a path (or multiple paths) without any
     of the metadata manipulation options, the recorded metadata for each path
-    is reported. If metadata from other sources has been aggregated previously
+    are reported. If metadata from other sources has been aggregated previously
     (see 'aggregated-metadata' command), a report comprises the merged
     information from both types of metadata, aggregated and DataLad-native. The
     merge-strategy can be selected via the --merge-native option.
@@ -804,8 +804,8 @@ class Metadata(Interface):
       <path> (<type>): -|<keys> [<tags>]
 
     where <path> is the path of the respective component, <type> a label
-    for the type of dataset components metadata is presented for. Non-existant
-    metadata is indicated by a dash, otherwise a comma-separated list of
+    for the type of dataset components metadata are presented for. Non-existant
+    metadata are indicated by a dash, otherwise a comma-separated list of
     metadata keys (except for 'tag'), is followed by a list of tags, if there
     are any.
 
