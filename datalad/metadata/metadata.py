@@ -697,22 +697,19 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
 
 @build_doc
 class Metadata(Interface):
-    # TODO work in idea that we also access "foreign" metadata, if there is a parser
-    # TODO mention return value on metadata manipulation only reflects
-    # git-annex metadata
-    """Metadata manipulation for files and whole datasets
+    """Metadata manipulation for files and entire datasets
 
     Two types of metadata are supported:
 
-    1. metadata describing a dataset as a whole (dataset-global), and
+    1. metadata describing a dataset as a whole (dataset-global metadata), and
 
-    2. metadata for individual files in a dataset.
+    2. metadata for files in a dataset (content metadata).
 
     Both types can be accessed and modified with this command.
 
-    DataLad's native metadata capability is primarily targeting data
+    DataLad's native metadata capabilities are primarily targeting data
     description via arbitrary tags and other (brief) key-value attributes
-    (with possibly multiple values for a single key).
+    (possibly with multiple values for a single key).
 
     Metadata key names are limited to alphanumerics (and [_-.]). Moreover,
     all key names are converted to lower case.
@@ -733,24 +730,70 @@ class Metadata(Interface):
     but doing so can impact DataLad's metadata-related functionality --
     handle with care.
 
-    The 'tag' key is used to store a list of (unique) tags.
+    The 'tag' key is used to store a list of (unique) tags or keywords.
 
     The 'definition' key is used to store key-value mappings that define
-    metadata keys used elsewhere in the metadata. Using the feature is
-    optional (see --define-key). It can be useful in the context of
-    data discovery needs, where metadata keys can be precisely defined
-    by linking them to specific ontology terms.
+    metadata terms (including keys) used elsewhere in the metadata. Using the
+    feature is optional (see --define-key). It can be useful in the context of
+    data discovery needs, where metadata terms can be precisely defined by
+    linking them to specific ontology terms.
 
 
-    *File metadata*
+    *Content metadata*
 
     Metadata storage for individual files is provided by git-annex, and
     generally the same rules as for dataset-global metadata apply.
     However, there is just one reserved key name: 'tag'.
 
     Again, the amount of metadata is not limited, but metadata is stored
-    in git-annex' internal data structures in the Git repository of a
+    in git-annex's internal data structures in the Git repository of a
     dataset. Large amounts of metadata can slow its performance.
+
+
+    *Metadata reporting*
+
+    When this command is called on just a path (or multiple paths) without any
+    of the metadata manipulation options, the recorded metadata for each path
+    is reported. If metadata from other sources has been aggregated previously
+    (see 'aggregated-metadata' command), a report comprises the merged
+    information from both types of metadata, aggregated and DataLad-native. The
+    merge-strategy can be selected via the --merge-native option.
+
+    In contrast, when this command is used to manipulate metadata, the final
+    metadata report will only reflect the DataLad-native metadata stored for a
+    given path.
+
+
+    *Metadata manipulation*
+
+    While DataLad supports a variety of metadata standards and formats, only
+    DataLad-native metadata can be altered via this command.  Modification of
+    any other metadata source is not supported, and requires tailored
+    modification of the respective file(s) containing said metadata.
+
+    Manipulation of dataset-global and content metadata uses the same logic and
+    semantics (see --apply2global for the switch to select which type of
+    metadata to alter). Four manipulation methods are provided:
+
+    --add
+      add a value to a key, and create the key if it doesn't exist yet
+
+    --init
+      only assign a value to a key, if the key doesn't exist yet
+
+    --remove
+      remove a particular value from an existing metadata key
+
+    --reset
+      replace any values for a key with the given ones, or
+      remove the entire key if no values are given.
+
+    By default, DataLad will refuse to add metadata keys that are undefined.
+    A key can either be defined in the basic DataLad vocabulary, or by
+    adding a custom definition to the dataset-global metadata (see --define-key).
+    While it is possible to override this behavior (see --permit-undefined-keys),
+    it is strongly advised to only use defined metadata keys to avoid significantly
+    impaired data discovery performance across datasets.
 
     || CMDLINE >>
     *Output rendering*
@@ -776,12 +819,12 @@ class Metadata(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""""",
+            doc="""dataset to operate on""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path(s) to set/get metadata",
+            doc="path(s) to set/get metadata for",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         add=Parameter(
@@ -1207,6 +1250,7 @@ class Metadata(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+        import datalad.support.ansi_colors as ac
         if res['status'] != 'ok' or not res.get('action', None) == 'metadata':
             # logging complained about this already
             return
@@ -1215,8 +1259,9 @@ class Metadata(Interface):
                        res['refds']) if res.get('refds', None) else res['path']
         meta = res.get('metadata', {})
         ui.message('{path}{type}:{spacer}{meta}{tags}'.format(
-            path=path,
-            type=' ({})'.format(res['type']) if 'type' in res else '',
+            path=ac.color_word(path, ac.BOLD),
+            type=' ({})'.format(
+                ac.color_word(res['type'], ac.MAGENTA)) if 'type' in res else '',
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys())
                           if k not in ('tag', '@context', '@id'))
