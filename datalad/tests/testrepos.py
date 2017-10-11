@@ -85,7 +85,7 @@ class InvalidTestRepoDefinitionError(Exception):
         self.index = index
 
     def __str__(self):
-        to_str = "{}: Invalid definition".format(self.__class__)
+        to_str = "Invalid definition"
         to_str += " in {}".format(self.repo) if self.repo else ""
         to_str += " at index {}".format(self.index) if self.index else ""
         to_str += " for item {}.".format(self.item) if self.item else "."
@@ -257,6 +257,8 @@ class ItemRepo(Item):
         self._annex_version = annex_version
         self._annex_direct = annex_direct
         self._annex_init = annex_init
+        self._files = set()  # ... of ItemFile
+        self._submodules = set()  # ... of ItemRepo
 
     # TODO: May be let properties return anything only after creation?
     @property
@@ -336,9 +338,6 @@ class ItemRepo(Item):
     def create(self):
         """Creates the physical repository
         """
-
-        # TODO: Rethink whether or not it makes sense to explicitly set `cwd`
-        # for the Runner calls. Default Runner uses that path anyway ...
 
         # Note: self.path is the directory we want to create in. But it's also
         # CWD of the default Runner. Therefore we need to make sure the
@@ -627,6 +626,11 @@ class ItemFile(Item):
         # stage again, ...) cannot be achieved by create(), since this would
         # require way too complex definitions. That's what ItemCommand(item=...)
         # is for instead.
+        # TODO: If we allow to add/commit here, we can't easily notify ItemRepo
+        #       about it! This would require TestRepo.__init__ (or .create()) to
+        #       inspect the tree. (keep in mind there might be untracked files
+        #       or even repos that were not registered as submodules)
+
         to_add = False
         to_commit = False
         if self.is_untracked:
@@ -672,7 +676,10 @@ class ItemFile(Item):
                 add_cmd.extend(['add', self.path])
 
             try:
-                self._runner.run(add_cmd)
+                # Note, that the default runner comes from TestRepo and has its
+                # default cwd set to TestRepo's root. We don't know, whether or
+                # not this is right here. We could as well be in a submodule.
+                self._runner.run(add_cmd, cwd=os.path.dirname(self.path))
             except CommandError as e:
                 # raise TestRepoCreationError instead, so TestRepo can add
                 # more information
@@ -689,7 +696,8 @@ class ItemFile(Item):
                 # look it up
                 lookup_cmd = ['git', 'annex', 'lookupkey', self._path]
                 try:
-                    out, err = self._runner.run(lookup_cmd)
+                    out, err = self._runner.run(lookup_cmd,
+                                                cwd=os.path.dirname(self.path))
                 except CommandError as e:
                     # raise TestRepoCreationError instead, so TestRepo can add
                     # more information
@@ -711,7 +719,7 @@ class ItemFile(Item):
             # mode could be enforced without being specified in the definition
             unlock_cmd = ['git', 'annex', 'unlock', self.path]
             try:
-                self._runner.run(unlock_cmd)
+                self._runner.run(unlock_cmd, cwd=os.path.dirname(self.path))
             except CommandError as e:
                 # raise TestRepoCreationError instead, so TestRepo can add
                 # more information
@@ -734,7 +742,7 @@ class ItemFile(Item):
             commit_cmd = ['git', 'commit', '-m', '"%s"' % self._commit_msg,
                           '--', self.path]
             try:
-                self._runner.run(commit_cmd)
+                self._runner.run(commit_cmd, cwd=os.path.dirname(self.path))
             except CommandError as e:
                 # raise TestRepoCreationError instead, so TestRepo can add
                 # more information
@@ -751,7 +759,8 @@ class ItemFile(Item):
             lookup_SHA_cmd = ['git', 'log', '-n', '1',
                               "--pretty=format:\"%H%n%B\""]
             try:
-                out, err = self._runner.run(lookup_SHA_cmd)
+                out, err = self._runner.run(lookup_SHA_cmd,
+                                            cwd=os.path.dirname(self.path))
             except CommandError as e:
                 # raise TestRepoCreationError instead, so TestRepo can add
                 # more information
@@ -829,6 +838,7 @@ os.close(remote_file_fd)
 
 # TODO: Commands need to notify the ItemRepos! Otherwise we don't know what belongs where!
 #       Same is true for instant file adding/committing
+# TODO: runner calls need to set cwd! By default it's the TestRepo's runner, so cwd is its root!
 
 @auto_repr
 class ItemCommand(Item):
@@ -839,7 +849,7 @@ class ItemCommand(Item):
     and therefore can't set their properties accordingly.
     """
 
-    def __init__(self, cmd, runner=None, item=None, cwd=None):
+    def __init__(self, cmd, runner=None, item=None, cwd=None, repo=None):
         """
 
         Parameters
@@ -848,7 +858,12 @@ class ItemCommand(Item):
         cmd: list
         item: Item or list of Item or None
         cwd: str or None
+        repo: ItemRepo or None
         """
+
+        # if `cwd` wasn't specified, use root of `repo`
+        if not cwd:
+            cwd = repo.path
 
         super(ItemCommand, self).__init__(path=cwd, runner=runner)
 
@@ -867,13 +882,13 @@ class ItemCommand(Item):
             )
 
         self._ref_items = assure_list(item)
+        self._cwd = cwd
+        self._repo = repo
 
         # if items were passed, append them:
         if self._ref_items:
             self._cmd.append('--')
             self._cmd.extend([it.path for it in self._ref_items])
-
-        self._cwd = cwd
 
     def create(self):
         """Default implementation to run `self._cmd`
@@ -907,7 +922,16 @@ class ItemCommit(ItemCommand):
     or the ItemRepo they belong to.
     """
 
-    def __init__(self, runner, item=None, cwd=None, msg=None):
+    def __init__(self, runner, item=None, cwd=None, msg=None, repo=None):
+
+        if not repo:
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is required. By default this could "
+                    "also be derived from 'cwd' by the TestRepo (sub-)class, "
+                    "but apparently this didn't happen."
+                    "".format(it=self.__class__),
+                item=self.__class__
+            )
 
         item = assure_list(item)
         # build default commit message:
@@ -933,7 +957,7 @@ class ItemCommit(ItemCommand):
         # Note, that items will be appended by super class
 
         super(ItemCommit, self).__init__(runner=runner, item=item, cwd=cwd,
-                                         cmd=commit_cmd)
+                                         cmd=commit_cmd, repo=repo)
 
     def create(self):
         # run the command:
@@ -963,6 +987,14 @@ class ItemCommit(ItemCommand):
             it._state_index = ItemFile.UNMODIFIED
             # TODO: Does "git commit -- myfile" stage that file before?
             # If so: adjust it._state_worktree as well!
+
+            # If ItemRepo didn't know about the committed items, it definitely
+            # should now!
+            # TODO: Not sure yet, how to add those (may be just _items):
+            if isinstance(it, ItemFile):
+                self._repo._files.add(it)
+            elif isinstance(it, ItemRepo):
+                self._repo._submodules.add(it)
 
 
 @auto_repr
@@ -1044,6 +1076,50 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
     def __init__(self, path=None, runner=None):
 
+        # TODO: Probably the same mechanism has to be applied for
+        # ItemFile(src=...) in order to be able to assign predefined
+        # ItemFile instances!
+        def _path2item(def_item, def_idx, kw):
+            """internal helper to convert item references in definitions
+
+            Items need to be referenced by path in TestRepo definitions.
+            Converts those paths and assigns the actual objects instead.
+
+            Parameters
+            ----------
+            def_item: tuple
+                an entry of _item_definition
+            def_idx: int
+                index of that entry
+            kw: str
+                the keyword to convert
+            """
+
+            ref_it = def_item[1].get(kw)
+            if ref_it:
+                # might be a list, therefore always treat as such
+                ref_it = assure_list(ref_it)
+                def_item[1][kw] = []
+                for r in ref_it:
+                    try:
+                        def_item[1][kw].append(self._items[r])
+                    except KeyError:
+                        raise InvalidTestRepoDefinitionError(
+                            "Item {it} referenced before definition:"
+                            "{ls}{cl}({args})"
+                            "".format(ls=os.linesep,
+                                      it=r,
+                                      cl=def_item[0].__name__,
+                                      args=def_item[1]),
+                            repo=self.__class__,
+                            item=def_item[0].__name__,
+                            index=def_idx
+                        )
+
+                # if it's not a list undo assure_list:
+                if len(def_item[1][kw]) == 1:
+                    def_item[1][kw] = def_item[1][kw][0]
+
         self._path = path
         # TODO
         # check path!  => look up, how it is done now in case of persistent ones
@@ -1061,65 +1137,73 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         for item, index in zip(self._item_definitions,
                                range(len(self._item_definitions))):
 
+            if not (issubclass(item[0], Item) and isinstance(item[1], dict)):
+                raise InvalidTestRepoDefinitionError(
+                    msg="Malformed definition entry. An entry of a TestRepo's "
+                        "definition list is expected to be a tuple, consisting "
+                        "of a subclass of Item and a dict, containing kwargs "
+                        "for its instantiation. Entry at index {idx} is "
+                        "violating this constraint:{ls}{cl}({args})"
+                        "".format(ls=os.linesep,
+                                  cl=item[0],
+                                  args=item[1]
+                                  ),
+                    repo=self.__class__,
+                    item=item[0].__name__,
+                    index=index
+                )
+
             # 1. necessary adaptions of arguments for instantiation
             # pass the Runner if there's None:
             if item[1].get('runner', None) is None:
                 item[1]['runner'] = self._runner
 
-            # 'path' and 'cwd' arguments in definitions are relative to the
-            # TestRepo's root, but absolute in the Item instances. Replace them
-            # for instantiation, but keep `r_path` for identification
-            # (key in the items dict):
             if issubclass(item[0], ItemCommand):
-                # paths are relative in definitions
-                try:
-                    r_cwd = item[1]['cwd']
-                except KeyError:
-                    # 'cwd' is mandatory for ItemCommand:
+                # commands need a 'cwd' or a 'repo' to run in.
+                r_cwd = item[1].get('cwd')
+                it_repo = item[1].get('repo')
+                if not r_cwd and not it_repo:
                     raise InvalidTestRepoDefinitionError(
-                        msg="Missing argument 'cwd' for {cl}:{ls}"
-                            "{cl}({args})".format(ls=os.linesep,
-                                                  cl=item[0].__name__,
-                                                  args=item[1]),
+                        msg="Neither 'cwd' nor 'repo' was specified for {cl}. "
+                            "At least one of those is required by ItemCommand:"
+                            "{ls}{cl}({args})".format(ls=os.linesep,
+                                                      cl=item[0].__name__,
+                                                      args=item[1]),
                         repo=self.__class__,
                         item=item[0].__name__,
                         index=index
-                        )
-                # store absolute path for instantiation
-                item[1]['cwd'] = opj(self._path, r_cwd)
+                    )
 
-                # TODO: Probably the same mechanism has to be applied for
-                # ItemFile(src=...) in order to be able to assign predefined
-                # ItemFile instances!
+                # If 'repo' wasn't specified, we can try whether we already know
+                # an ItemRepo at 'cwd' and pass it into 'repo'.
+                # Note, that 'repo' isn't necessarily required by a command, but
+                # most of them will need it and if not so, they just shouldn't
+                # care, so we can safely pass one.
+                if not it_repo:
+                    repo_by_cwd = self._items.get(r_cwd)
+                    if repo_by_cwd:
+                        # adjust definition, meaning we need to assign the
+                        # relative path as if it was done by the user
+                        item[1]['repo'] = r_cwd
+                        it_repo = r_cwd
 
-                # 'item' arguments in ItemCommand definitions are paths, since
-                # we can't reference an actual object therein.
-                # Do the conversion:
-                ref_item = item[1].get('item')
-                if ref_item:
-                    # might be a list, therefore always treat as such
-                    ref_item = assure_list(ref_item)
-                    #print "DEBUG: ref_item: %s" % ref_item
-                    item[1]['item'] = []
-                    for ref in ref_item:
-                        #print "DEBUG: ref: %s" % ref
-                        try:
-                            item[1]['item'].append(self._items[ref])
-                        except KeyError:
-                            raise InvalidTestRepoDefinitionError(
-                                "Item {it} referenced before it was "
-                                "defined:{ls}{cl}({args})"
-                                "".format(ls=os.linesep,
-                                          it=ref,
-                                          cl=item[0].__name__,
-                                          args=item[1]),
-                                repo=self.__class__,
-                                item=item[0].__name__,
-                                index=index
-                            )
+                # paths are relative in TestRepo definitions, but absolute in
+                # the Item instances. Replace 'cwd' if needed.
+                if r_cwd:
+                    # store absolute path for instantiation
+                    item[1]['cwd'] = opj(self._path, r_cwd)
+
+                if it_repo:
+                    # convert the reference in argument 'repo':
+                    _path2item(item, index, 'repo')
+
+                # convert item references in argument 'item':
+                _path2item(item, index, 'item')
 
             if issubclass(item[0], ItemRepo) or issubclass(item[0], ItemFile):
-                # paths are relative in definitions
+                # paths are relative in TestRepo definitions, but absolute in
+                # the Item instances. Replace them for instantiation, but keep
+                # `r_path` for identification (key in the items dict).
                 # Additionally 'path' is mandatory for ItemRepo and ItemFile.
                 # Exception: ItemInfoFile has a default path
                 r_path = item[1].get('path', None)
@@ -1201,8 +1285,15 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                     )
                 self.repo = self._items[r_path]
 
-        # - not sure yet whether we want to instantly and unconditionally create
-        # - do we need some TestRepoCreationError? (see path checking)
+        if not self.repo:
+            raise InvalidTestRepoDefinitionError(
+                msg="Definition must contain exactly one {cl}. Found none."
+                    "".format(cl=ItemSelf),
+                repo=self.__class__
+            )
+
+        # TODO: not sure yet whether or not we want to instantly and
+        # unconditionally create, but think so ATM
         self.create()
 
     @property
