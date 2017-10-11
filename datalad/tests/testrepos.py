@@ -97,7 +97,7 @@ class TestRepoCreationError(Exception):
     """Thrown if the creation of a test repository failed
     """
 
-    def __init__(self, msg, repo=None, item=None):
+    def __init__(self, msg, repo=None, item=None, index=None):
         """
 
         Parameters
@@ -114,10 +114,12 @@ class TestRepoCreationError(Exception):
         super(self.__class__, self).__init__(msg)
         self.repo = repo
         self.item = item
+        self.index = index
 
     def __str__(self):
-        to_str = "{}: Creation failed".format(self.__class__)
+        to_str = "Creation failed"
         to_str += " in {}".format(self.repo) if self.repo else ""
+        to_str += " at index {}".format(self.index) if self.index else ""
         to_str += " for item {}.".format(self.item) if self.item else "."
         to_str += os.linesep
         return to_str + (self.message if self.message else "")
@@ -539,8 +541,22 @@ class ItemFile(Item):
                                                       ),
                             it=self.__class__,
                             p=path
-                        )
+                        ),
+                    item=self.__class__
                 )
+
+        if src and state != (ItemFile.ADDED, ItemFile.UNMODIFIED):
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'src' was specified, but state doesn't suggest to"
+                    "annex-addurl or state is invalid for initial definition:"
+                    "{ls}{it}({p}, src={src}, state={state})"
+                    "".format(ls=os.linesep,
+                              it=self.__class__,
+                              p=path,
+                              src=src,
+                              state=state),
+                item=self.__class__
+            )
 
         super(ItemFile, self).__init__(path=path, runner=runner)
         self._content = content
@@ -552,6 +568,8 @@ class ItemFile(Item):
         self._annexed = annexed
         self._key = key
         self._commits = []
+        self._content_present = None  # to be set when actually adding the file
+                                      # to annex
 
     @property
     def is_untracked(self):
@@ -583,6 +601,10 @@ class ItemFile(Item):
         return self._locked is False  # not `None`!
 
     @property
+    def content_available(self):
+        return self._content_present
+
+    @property
     def content(self):
         return self._content
 
@@ -608,18 +630,19 @@ class ItemFile(Item):
                 msg="Path {p} already exists.".format(p=self.path),
                 item=self.__class__
             )
-        try:
-            with open(self.path, 'w') as f:
-                f.write(self.content)
-        except EnvironmentError as e:
-            raise TestRepoCreationError(
-                msg="The following exception occurred while trying to write to "
-                    "file {p}:{ls}{exc}".format(ls=os.linesep,
-                                                p=self.path,
-                                                exc=exc_str(e)
-                                                ),
-                item=self.__class__
-            )
+        if self.content:
+            try:
+                with open(self.path, 'w') as f:
+                    f.write(self.content)
+            except EnvironmentError as e:
+                raise TestRepoCreationError(
+                    msg="The following exception occurred while trying to write to "
+                        "file {p}:{ls}{exc}".format(ls=os.linesep,
+                                                    p=self.path,
+                                                    exc=exc_str(e)
+                                                    ),
+                    item=self.__class__
+                )
 
         # Furthermore, we can git-add, git-annex-add and commit the new file.
         # Anything more complex (like add, commit, change the content,
@@ -667,7 +690,7 @@ class ItemFile(Item):
                 add_cmd.append('annex')
                 if self._src:
                     # we want to annex-addurl
-                    add_cmd.extend(['addurl', self._src, '--file="%s"' % self.path])
+                    add_cmd.extend(['addurl', self._src, '--file=%s' % self.path])
                 else:
                     # we want to annex-add
                     add_cmd.extend(['add', self.path])
@@ -691,6 +714,10 @@ class ItemFile(Item):
                                   ),
                         item=self.__class__
                 )
+
+            if self._annexed:
+                # we just annex-added. So the content is available ATM.
+                self._content_present = True
 
             if self._annexed and not self._key:
                 # look it up
@@ -833,7 +860,6 @@ with open(remote_file_path, "w") as f:
 # OS-level descriptor needs to be closed!
 os.close(remote_file_fd)
 ###################################################################
-
 
 
 # TODO: Commands need to notify the ItemRepos! Otherwise we don't know what belongs where!
@@ -998,6 +1024,47 @@ class ItemCommit(ItemCommand):
 
 
 @auto_repr
+class ItemDropFile(ItemCommand):
+    """Item to include an explicit call to git-annex-drop in TestRepo's
+    definition
+    """
+
+    def __init__(self, runner, item=None, cwd=None, repo=None):
+
+        if not repo:
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is required. By default this could "
+                    "also be derived from 'cwd' by the TestRepo (sub-)class, "
+                    "but apparently this didn't happen."
+                    "".format(it=self.__class__),
+                item=self.__class__
+            )
+        if not (isinstance(repo, ItemRepo) and repo.is_annex):
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is not an ItemRepo or not an annex:"
+                    " {repo}({p}).".format(it=self.__class__,
+                                           repo=str(repo)),
+                item=self.__class__
+            )
+
+        item = assure_list(item)
+
+        # build command call:
+        drop_cmd = ['git', 'annex', 'drop']
+
+        super(ItemDropFile, self).__init__(cmd=drop_cmd, runner=runner,
+                                           item=item, cwd=cwd, repo=repo)
+
+    def create(self):
+        # run the command:
+        super(ItemDropFile, self).create()
+
+        # notify files:
+        for it in self._ref_items:
+            it._content_present = False
+
+
+@auto_repr
 class ItemModifyFile(ItemCommand):
 
     # + optional commit
@@ -1015,12 +1082,12 @@ class ItemNewBranch(ItemCommand):
 
 
 @auto_repr
-class ItemStageFile(ItemCommand):  #file(s)
+class ItemAddFile(ItemCommand):  #file(s)
     # if file(s) need to be staged after they were created
 
     # + optional commit
     def __init__(self, cwd, runner):
-        super(ItemStageFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
+        super(ItemAddFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
 
 @auto_repr
@@ -1181,7 +1248,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 # care, so we can safely pass one.
                 if not it_repo:
                     repo_by_cwd = self._items.get(r_cwd)
-                    if repo_by_cwd:
+                    if repo_by_cwd and isinstance(repo_by_cwd, ItemRepo):
                         # adjust definition, meaning we need to assign the
                         # relative path as if it was done by the user
                         item[1]['repo'] = r_cwd
@@ -1325,8 +1392,14 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         """Physically create the beast
         """
         # default implementation:
-        for item in self._execution:
-            item.create()
+        for item, index in zip(self._execution, range(len(self._execution))):
+            try:
+                item.create()
+            except TestRepoCreationError as e:
+                # add information the Item classes can't know:
+                e.repo = self.__class__
+                e.index = index
+                raise e
 
 
 @optional_args
@@ -1401,7 +1474,6 @@ class BasicMixed(TestRepo_NEW):
 
     version = '0.1'
 
-    # TODO: test-annex.dat needs to be addurl'ed and dropped.
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': True}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
@@ -1418,7 +1490,7 @@ class BasicMixed(TestRepo_NEW):
                                               "rudimentary load file for annex "
                                               "testing"}),
                          (ItemFile, {'path': 'test-annex.dat',
-                                     'content': "content to be annex-addurl'd",
+                                     'src': get_local_file_url(remote_file_path),
                                      'state': (ItemFile.ADDED,
                                                ItemFile.UNMODIFIED),
                                      'annexed': True,
@@ -1427,8 +1499,8 @@ class BasicMixed(TestRepo_NEW):
                          (ItemCommit, {'cwd': '.',
                                        'item': 'test-annex.dat',
                                        'msg': "Adding a rudimentary git-annex load file"}),
-
-                         #self.repo.drop("test-annex.dat")  # since available from URL
+                         (ItemDropFile, {'cwd': '.',
+                                         'item': 'test-annex.dat'})
                          ]
 
     def __init__(self, path=None, runner=None):
