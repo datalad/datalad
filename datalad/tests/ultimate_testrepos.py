@@ -36,6 +36,7 @@ from datalad.utils import assure_list
 from six import string_types
 import shlex
 from datalad.utils import on_windows
+from .utils import eq_, assert_is_instance, assert_raises
 
 # decorator replacing "with_testrepos":
 # - delivers instances of TestRepo* classes instead of paths
@@ -170,6 +171,17 @@ class Item(object):
         """
         pass
 
+    def assert_intact(self):
+        # Note: Went for this solution, since assert_intact isn't required by
+        # subclasses of ItemCommand. @abstractmethod would force them to
+        # override. This way overriding is "enforced" only, if it's actually
+        # called.
+        raise InvalidTestRepoDefinitionError(
+            msg="{it} didn't override Item.assert_intact()."
+                "".format(it=self.__class__),
+            item=self.__class__
+        )
+
 
 @auto_repr
 class ItemRepo(Item):
@@ -261,6 +273,7 @@ class ItemRepo(Item):
         self._annex_init = annex_init
         self._files = set()  # ... of ItemFile
         self._submodules = set()  # ... of ItemRepo
+        self._commits = []
 
     # TODO: May be let properties return anything only after creation?
     @property
@@ -318,8 +331,9 @@ class ItemRepo(Item):
     # TODO: How to represent commits? SHAs, messages are kind of obvious but
     # what about structure?
     # Just a plain list? A list per branch?
+    @property
     def commits(self):
-        pass
+        return self._commits
 
     # TODO: How to represent branches? Just the names or names plus commit SHAs?
     def branches(self):
@@ -336,6 +350,11 @@ class ItemRepo(Item):
 
     def superproject(self):
         pass
+
+    # TODO: This might change. May be we need a self._items and look for ItemFile in it. Consider untracked files!
+    @property
+    def files(self):
+        return [os.path.relpath(f_.path, self.path) for f_ in self._files]
 
     def create(self):
         """Creates the physical repository
@@ -572,6 +591,10 @@ class ItemFile(Item):
                                       # to annex
 
     @property
+    def annexed(self):
+        return self._annexed
+
+    @property
     def is_untracked(self):
         return self._state_index == ItemFile.UNTRACKED and \
                self._state_worktree == ItemFile.UNTRACKED
@@ -599,6 +622,10 @@ class ItemFile(Item):
     @property
     def is_unlocked(self):
         return self._locked is False  # not `None`!
+
+    @property
+    def is_locked(self):
+        return self._locked is True # not `None`!
 
     @property
     def content_available(self):
@@ -738,6 +765,11 @@ class ItemFile(Item):
                     )
                 self._key = out.strip()
 
+            # If we just annex-addurl'd we should get the content:
+            if self._annexed and self._src:
+                with open(self.path, 'r') as f:
+                    self._content = f.read()
+
         if self.is_unlocked:
             # unlock needs to be done before committing (at least in v6 it
             # would be 'typechanged' otherwise)
@@ -804,6 +836,37 @@ class ItemFile(Item):
             self._commits.append((commit_SHA, commit_msg))
 
         return
+
+    def assert_intact(self):
+        """This supposed to make basic tests on whether or not what is stored in
+        this ItemFile instance actually is, what can be found on disc plus some
+        consistency checks for the object itself.
+        Everything else is out of scope and needs to be tested by ItemRepo and
+        the subclasses of TestRepo.
+        """
+        # object consistency
+        if self.is_untracked:
+            assert(self.commits is [])
+            assert(self.annexed is False)
+
+        if self.annexed is False:
+            assert(self.annex_key is None)
+            assert(self.content_available is None)
+            assert(not self.is_untracked)
+
+        # physical appearance:
+        if self.content_available or not self.annexed:
+            with open(self.path, 'r') as f:
+                content_from_disc = f.read()
+            eq_(content_from_disc, self.content)
+
+        if self.is_locked:
+            assert_raises(EnvironmentError, open, self.path, 'w')
+        # TODO:
+        # - commits
+        # - annex key
+        # - state? This might need annex-proxy and ignore-submodules, but since
+        #   we have a certain file to specify it might work
 
 
 @auto_repr
@@ -992,7 +1055,7 @@ class ItemCommit(ItemCommand):
         # now, get the commit let the items know:
         # Note, that git-log should work in direct mode without --work-tree
         lookup_sha_cmd = ['git', 'log', '-n', '1',
-                          "--pretty=format:\"%H%n%B\""]
+                          "--pretty=format:%H%n%B"]
         try:
             out, err = self._runner.run(lookup_sha_cmd, cwd=self._cwd)
         except CommandError as e:
@@ -1007,7 +1070,10 @@ class ItemCommit(ItemCommand):
                 item=self.__class__
             )
         commit_sha = out.splitlines()[0]
-        commit_msg = os.linesep.join(out.splitlines()[1:])
+        commit_msg = out[len(commit_sha):].strip().strip('\"')
+
+        # notify involved items:
+        self._repo._commits.append((commit_sha, commit_msg))
         for it in self._ref_items:
             it._commits.append((commit_sha, commit_msg))
             it._state_index = ItemFile.UNMODIFIED
@@ -1258,7 +1324,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 # the Item instances. Replace 'cwd' if needed.
                 if r_cwd:
                     # store absolute path for instantiation
-                    item[1]['cwd'] = opj(self._path, r_cwd)
+                    item[1]['cwd'] = os.path.normpath(opj(self._path, r_cwd))
 
                 if it_repo:
                     # convert the reference in argument 'repo':
@@ -1303,7 +1369,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                         )
 
                 # store absolute path for instantiation
-                item[1]['path'] = opj(self._path, r_path)
+                item[1]['path'] = os.path.normpath(opj(self._path, r_path))
 
             # END path conversion
             # For ItemRepo and ItemFile the relative path is kept in `r_path`
@@ -1456,8 +1522,70 @@ class BasicGit(TestRepo_NEW):
         super(BasicGit, self).__init__(path=path, runner=runner)
 
     def assert_intact(self):
-        # fake sth:
-        assert "everything is fine"
+        from .utils import eq_, assert_is_instance
+
+        # 1. test the objects
+        eq_(len(self._items), 3)  # ItemRepo and ItemFile only
+        assert_is_instance(self._items['.'], ItemSelf)
+        assert_is_instance(self._items['test.dat'], ItemFile)
+        assert_is_instance(self._items['INFO.txt'], ItemFile)
+
+        # the top-level item `self.repo`
+        assert(self.repo is self._items['.'])
+        assert(self.repo.is_annex is False)
+        assert(self.repo.is_git is True)
+
+        for att in ['annex_version',
+                    'is_direct_mode',
+                    'annex_is_initialized',
+                    'remotes',
+                    'submodules',
+                    'superproject']:
+            value = self.repo.__getattribute__(att)
+            assert(value is None,
+                   "ItemSelf({p}).{att} is not None but: {v}"
+                   "".format(p=self.repo.path, att=att, v=value))
+
+        eq_([c[1] for c in self.repo.commits],
+            ["Adding a basic INFO file and rudimentary load file."])
+        # TODO: eq_(self.repo.branches, ['master'])
+        eq_(set(self.repo.files), {'test.dat', 'INFO.txt'})
+
+        # test.dat:
+        test_dat = self._items['test.dat']
+        assert_is_instance(test_dat, ItemFile)
+        eq_(test_dat.path, opj(self.path, 'test.dat'))
+        eq_(test_dat.content, "123")
+
+        # INFO.txt:
+        info_txt = self._items['INFO.txt']
+        eq_(info_txt.path, opj(self.path, 'INFO.txt'))
+        # Note: we can't compare the entire content of INFO.txt, since
+        # it contains versions of git, git-annex, datalad. But some parts can
+        # be expected and shouldn't change, so make assertions to indicate
+        # integrity of the file's content:
+        assert_is_instance(info_txt, ItemInfoFile)
+
+        # for both files the following should be true:
+        for file_ in [test_dat, info_txt]:
+            file_.assert_intact()
+            assert(file_.is_clean is True)
+            for att in ['annexed', 'is_modified', 'is_staged', 'is_untracked']:
+                value = file_.__getattribute__(att)
+                assert(value is False,
+                       "ItemFile({p}).{att} is not False but: {v}"
+                       "".format(p=file_.path, att=att, v=value))
+            for att in ['annex_key', 'content_available', 'is_unlocked']:
+                value = file_.__getattribute__(att)
+                assert(value is None,
+                       "ItemFile({p}).{att} is not None but: {v}"
+                       "".format(p=file_.path, att=att, v=value))
+            eq_(len(file_.commits), 1)
+            eq_(file_.commits[0][1],
+                "Adding a basic INFO file and rudimentary load file.")
+
+        # 2. test appearance on disk
+
 
 
 @auto_repr
