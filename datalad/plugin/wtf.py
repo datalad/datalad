@@ -35,6 +35,7 @@ def dlplugin(dataset=None):
         cfg = ds.config
     from datalad.ui import ui
     from datalad.api import metadata
+    from datalad.metadata import parsers as metaparsers
     from datalad.support.external_versions import external_versions
     import os
     import platform as pl
@@ -65,6 +66,10 @@ Environment
 Externals
 =========
 {externals}
+Available metadata parsers
+==========================
+{metaparsers}
+
 Configuration
 =============
 {cfg}
@@ -115,6 +120,7 @@ Metadata
             if ds_meta else '[no metadata]'
         ),
         externals=external_versions.dumps(preamble=None, indent='', query=True),
+        metaparsers='\n'.join(p for p in dir(metaparsers) if not p.startswith('_')),
         cfg='\n'.join(
             '{}: {}'.format(
                 k,
