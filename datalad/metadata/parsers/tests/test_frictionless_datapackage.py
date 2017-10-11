@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test frictionless datapackage meta data parser """
+"""Test frictionless datapackage metadata parser """
 
 from simplejson import dumps
 from datalad.api import Dataset

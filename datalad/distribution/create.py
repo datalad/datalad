@@ -355,7 +355,7 @@ class Create(Interface):
 
         # make sure that v6 annex repos never commit content under .datalad
         with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
-            # TODO this will need adjusting, when annex'ed aggregate meta data
+            # TODO this will need adjusting, when annex'ed aggregate metadata
             # comes around
             gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
             gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')

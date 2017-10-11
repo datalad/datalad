@@ -469,11 +469,11 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 
 @build_doc
 class AggregateMetaData(Interface):
-    """Aggregate meta data of a dataset for later query.
+    """Aggregate metadata of a dataset for later query.
 
-    By default meta data is aggregated across all configured native meta data
-    sources. Optionally, the type of available meta data can guessed, if no
-    types are configured. Moreover, it is possible to aggregate meta data from
+    By default metadata is aggregated across all configured native metadata
+    sources. Optionally, the type of available metadata can guessed, if no
+    types are configured. Moreover, it is possible to aggregate metadata from
     any subdatasets into the superdataset, in order to facilitate data
     discovery without having to obtain any subdataset.
     """
@@ -499,9 +499,9 @@ class AggregateMetaData(Interface):
         guess_native_type=Parameter(
             args=("--guess-native-type",),
             action="store_true",
-            doc="""guess native meta data type of datasets, if none is
-            configured. With a configured, or auto-detected meta data type,
-            no native meta data will be aggregated."""),
+            doc="""guess native metadata type of datasets, if none is
+            configured. With a configured, or auto-detected metadata type,
+            no native metadata will be aggregated."""),
         merge_native=merge_native_opt,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -523,7 +523,7 @@ class AggregateMetaData(Interface):
 
         # it really doesn't work without a dataset
         ds = require_dataset(
-            dataset, check_installed=True, purpose='meta data aggregation')
+            dataset, check_installed=True, purpose='metadata aggregation')
         # always include the reference dataset
         path = assure_list(path)
         path.append(ds.path)

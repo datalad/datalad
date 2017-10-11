@@ -1,30 +1,30 @@
 .. _chap_metadata:
 
-Meta data
-*********
+Metadata
+********
 
 Overview
 ========
 
-DataLad has built-in, modular, and extensible support for meta data in various
-formats. The core concept is that meta data is accessed via dedicated parsers
+DataLad has built-in, modular, and extensible support for metadata in various
+formats. The core concept is that metadata is accessed via dedicated parsers
 in their native format, avoiding the need for mandatory conversion into a
 "standard" format. Via these parser datalad is capable of performing a certain
-amount of meta data homogenization, and standardization into a JSON-LD_
-compliant `linked data`_ structure for the purpose of meta data aggregation in
+amount of metadata homogenization, and standardization into a JSON-LD_
+compliant `linked data`_ structure for the purpose of metadata aggregation in
 :term:`superdataset`\ s.  Through this mechanism it is possible to obtain and
-query meta data of any number of :term:`subdataset`\ s without the need to
+query metadata of any number of :term:`subdataset`\ s without the need to
 actually install them.
 
 .. _JSON-LD: http://json-ld.org/
 .. _linked data: https://en.wikipedia.org/wiki/Linked_data
 
-Sample datasets with meta data
-==============================
+Sample datasets with metadata
+=============================
 
 http://datasets.datalad.org superdataset contains a collection of datasets
 which we have prepared primarily from available online data resources such
-as OpenfMRI_, CRCNS_, etc.  Many of those datasets came with meta data in
+as OpenfMRI_, CRCNS_, etc.  Many of those datasets came with metadata in
 their native formats, such as `Brain Imaging Data Structure (BIDS)`_.  DataLad has
 :ref:`aggregated <man_datalad-aggregate-metadata>` metadata where it was available
 to enable basic :ref:`search <man_datalad-search>` queries.  If you
@@ -49,21 +49,21 @@ using `-d ///` option, e.g.::
 .. _OpenfMRI: http://openfmri.org
 .. _CRCNS: http://crcns.org
 
-Supported meta data formats
-===========================
+Supported metadata formats
+==========================
 
-This following sections provide an overview of supported meta data formats.
+This following sections provide an overview of supported metadata formats.
 
 
-RFC822-compliant meta data
---------------------------
+RFC822-compliant metadata
+-------------------------
 
-This is a custom meta data format, inspired by the standard used for Debian
+This is a custom metadata format, inspired by the standard used for Debian
 software packages that is particularly suited for manual entry. This format is
-a good choice when meta data describing a dataset as a whole cannot be obtained
+a good choice when metadata describing a dataset as a whole cannot be obtained
 from some other structured format. The syntax is :rfc:`822`-compliant. In other
 words: this is a text-based format that uses the syntax of email headers.
-Meta data must be placed in ``DATASETROOT/.datalad/meta.rfc822`` for this format.
+Metadata must be placed in ``DATASETROOT/.datalad/meta.rfc822`` for this format.
 
 .. _RFC822: https://tools.ietf.org/html/rfc822
 
@@ -135,22 +135,22 @@ The following fields are supported:
 Brain Imaging Data Structure (BIDS)
 -----------------------------------
 
-DataLad has basic support for extraction of meta data from the `BIDS
+DataLad has basic support for extraction of metadata from the `BIDS
 <http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
 
 Friction-less data packages
 ---------------------------
 
-DataLad has basic support for extraction of meta data from `friction-less data
+DataLad has basic support for extraction of metadata from `friction-less data
 packages <http://specs.frictionlessdata.io/data-packages>`_
 (``datapackage.json``).  file.
 
-JSON-LD meta data format
-------------------------
+JSON-LD metadata format
+-----------------------
 
-DataLad uses JSON-LD_ as its primary meta data format. By default, the
+DataLad uses JSON-LD_ as its primary metadata format. By default, the
 following context (available from `here <schema.json>`_
-is used for any meta data item:
+is used for any metadata item:
 
 .. literalinclude:: _extras/schema.json
    :language: json
@@ -158,7 +158,7 @@ is used for any meta data item:
 While it is technically possible to mix different contexts across items this
 has not been fully tested yet.
 
-The following sections describe details and changes in the meta data
+The following sections describe details and changes in the metadata
 specifications implemented in datalad.
 
 .. _0.1:

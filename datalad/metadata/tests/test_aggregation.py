@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test meta data manipulation"""
+"""Test metadata manipulation"""
 
 
 import os

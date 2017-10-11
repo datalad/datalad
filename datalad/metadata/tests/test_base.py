@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test meta data """
+"""Test metadata """
 
 import os
 
@@ -139,7 +139,7 @@ def test_aggregation(path):
     # ID mechanism works
     assert_equal(ds.id, clone.id)
 
-    # get fresh meta data
+    # get fresh metadata
     cloneres = clone.metadata()
     # basic sanity check
     assert_result_count(cloneres, 3)
@@ -170,7 +170,7 @@ def test_aggregation(path):
 
     assert_result_count(clone.search(['*', 'type:dataset']), 3)
 
-    #TODO update the clone or reclone to check whether saved meta data comes down the pipe
+    #TODO update the clone or reclone to check whether saved metadata comes down the pipe
 
 
 @with_tempfile(mkdir=True)

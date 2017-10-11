@@ -39,8 +39,8 @@ Dataset operations
    api.uninstall
    api.unlock
 
-Meta data handling
-------------------
+Metadata handling
+-----------------
 
 .. currentmodule:: datalad
 .. autosummary::

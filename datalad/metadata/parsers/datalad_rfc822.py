@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Parser for RFC822-based metadata specifications
 
-This is inspired by (and very similiar to) Debian's package meta data format.
+This is inspired by (and very similiar to) Debian's package metadata format.
 The main difference is that information spread across multiple files in Debian
 packages, is concentrated in one file.
 

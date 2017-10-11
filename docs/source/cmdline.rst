@@ -36,8 +36,8 @@ Dataset operations
    generated/man/datalad-uninstall
    generated/man/datalad-unlock
 
-Meta data handling
-==================
+Metadata handling
+=================
 
 .. toctree::
    :maxdepth: 1

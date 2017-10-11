@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test meta data manipulation"""
+"""Test metadata manipulation"""
 
 
 from datalad.tests.utils import known_failure_direct_mode

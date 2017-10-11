@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test datacite meta data parser """
+"""Test datacite metadata parser """
 
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset

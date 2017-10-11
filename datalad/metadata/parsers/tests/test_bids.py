@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS meta data parser """
+"""Test BIDS metadata parser """
 
 from simplejson import dumps
 from datalad.api import Dataset
