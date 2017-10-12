@@ -190,10 +190,10 @@ class ItemRepo(Item):
         self._annex_direct = annex_direct if annex else False
         self._annex_init = annex_init if annex else False
         self._items = set()  # ... of Item
-        self._commits = set()
+        self._commits = set()  # ... of tuple (SHA, msg)
         self._branches = set()
         self._remotes = set()
-        self._super = None
+        self._super = None  # ItemRepo
 
     # TODO: May be let properties return anything only after creation?
     @property

@@ -24,7 +24,7 @@ from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
     TestRepoCreationError
 from datalad.tests.testrepos.items import Item, ItemRepo, ItemSelf, ItemFile, \
     ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile
-from datalad.tests.utils import eq_, assert_is_instance
+from datalad.tests.utils import eq_, assert_is_instance, assert_in
 
 from datalad.utils import assure_list
 from datalad.utils import auto_repr
@@ -332,9 +332,9 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         # We can discover them only now after all Items were created, since
         # ItemCommands may have changed what could have been discovered during
         # instantiation.
-        self._roots = [self._items[p] for p in self._items
+        self._roots = {self._items[p] for p in self._items
                        if isinstance(self._items[p], ItemRepo) and
-                       self._items[p].superproject is None]
+                       self._items[p].superproject is None}
 
         # Note, that by now there's no limitation on whether or not there needs
         # to be an item '.'. Theoretically everything should work with several
@@ -361,12 +361,44 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
     def assert_intact(self):
         """Assertions to run to check integrity of this test repository
 
-        Should be enhanced by subclasses and is supposed to recursively call
-        assert_intact of its items
+        Should probably be enhanced by subclasses and is supposed to recursively
+        call assert_intact of its items. Therefore, call it via super if you
+        derive a new class!
         """
 
-        # all items are included:
-        # TODO: everything in self._items needs to be recursively accessible via self._roots
+        # object consistency:
+
+        assert_is_instance(self.repo, ItemSelf)
+        [assert_is_instance(it, ItemRepo) for it in self._roots]
+        [assert_is_instance(self._items[p], Item) for p in self._items]
+
+        # everything, that's in the definition, needs to be in the execution
+        # list
+        # TODO: come up with a better idea than just testing length. Note, that
+        # execution can't be a dict and definition does not contain actual
+        # instances
+        eq_(len(self._item_definitions), len(self._execution))
+        eq_(set(self._items[p] for p in self._items),
+            set(it for it in self._execution if not isinstance(it, ItemCommand)))
+
+        # all items are recursively accessible via self._roots:
+        def get_items_recursively(item):
+            # everything directly underneath
+            items = item._items
+            result = set(items)
+            # plus recursively all subrepos
+            print "initial set: %s" % result
+            for it in items:
+                if isinstance(it, ItemRepo):
+                    result = result.union(get_items_recursively(it))
+                    print "current set: %s" % result
+
+            return result
+
+        reachable = self._roots
+        for it in self._roots:
+            reachable = reachable.union(get_items_recursively(it))
+        eq_(reachable, set(self._items[p] for p in self._items))
 
         # check them recursively:
         [item.assert_intact() for item in self._roots]
@@ -392,7 +424,6 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 #
 #  Actual test repositories:
 #
-
 
 @auto_repr
 class BasicGit(TestRepo_NEW):
@@ -427,6 +458,8 @@ class BasicGit(TestRepo_NEW):
         super(BasicGit, self).__init__(path=path, runner=runner)
 
     def assert_intact(self):
+
+        super(BasicGit, self).assert_intact()
 
         # ###
         # Assertions to test object properties against what is defined:
