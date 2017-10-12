@@ -92,7 +92,7 @@ def _parse_env(store):
     for k in os.environ:
         if not k.startswith('DATALAD_'):
             continue
-        dct[k.replace('_', '.').lower()] = os.environ[k]
+        dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
     store.update(dct)
     return store
 
