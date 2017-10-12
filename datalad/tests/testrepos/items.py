@@ -28,6 +28,7 @@ from datalad.support.network import get_local_file_url
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
     TestRepoCreationError
 from datalad.utils import auto_repr, assure_list, on_windows
+from .helpers import _excute_by_item
 
 
 # TODO: Commands need to notify the ItemRepos! Otherwise we don't know what belongs where!
@@ -306,14 +307,12 @@ class ItemRepo(Item):
         create_cmd = ['git']
         create_cmd.extend(['clone', self._src, os.curdir]
                           if self._src else ['init'])
-        try:
-            self._runner.run(create_cmd, cwd=self._path)
-        except CommandError as e:
-            # raise TestRepoCreationError instead, so TestRepo can add
-            # more information
-            raise TestRepoCreationError("Failed to create git repository{}({})"
-                                        "".format(os.linesep, exc_str(e)),
-                                        item=self.__class__)
+
+        _excute_by_item(cmd=create_cmd, item=self,
+                        exc=TestRepoCreationError(
+                            "Failed to create git repository")
+                        )
+
         if self._src:
             # we just cloned
             self.remotes.add('origin')
@@ -323,12 +322,11 @@ class ItemRepo(Item):
             annex_cmd = ['git', 'annex', 'init']
             if self._annex_version:
                 annex_cmd.append('--version=%s' % self._annex_version)
-            try:
-                self._runner.run(['git', 'annex', 'init'], cwd=self._path)
-            except CommandError as e:
-                raise TestRepoCreationError("Failed to initialize annex{}({})"
-                                            "".format(os.linesep, exc_str(e)),
-                                            item=self.__class__)
+
+            _excute_by_item(cmd=annex_cmd, item=self,
+                            exc=TestRepoCreationError(
+                                "Failed to initialize annex")
+                            )
 
             # TODO: This is code from old test repos that still uses actual
             # datalad code (AnnexRepo in particular). Should be replaced.
@@ -343,15 +341,13 @@ class ItemRepo(Item):
 
             if self._annex_direct:
                 annex_cmd = ['git', 'annex', 'direct']
-                try:
-                    self._runner.run(annex_cmd, cwd=self._path)
-                except CommandError as e:
-                    raise TestRepoCreationError(
-                        "Failed to switch to direct mode{}({})"
-                        "".format(os.linesep, exc_str(e)),
-                        item=self.__class__)
+                _excute_by_item(cmd=annex_cmd, item=self,
+                                exc=TestRepoCreationError(
+                                    "Failed to switch to direct mode")
+                                )
 
             # TODO: Verify annex_version and annex_direct from .git/config
+            # => might go into assert_intact
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -642,6 +638,19 @@ class ItemFile(Item):
         """
         return self._commits
 
+    def _get_annex_key_from_disc(self, exc=None):
+        """get the key of the file as git-annex reports it
+
+        Parameters
+        ----------
+        exc: TestRepoError
+            predefined exception to raise instead of CommandError to give more
+            information about when what item ran into the error.
+        """
+        lookup_cmd = ['git', 'annex', 'lookupkey', self._path]
+        out, err = _excute_by_item(cmd=lookup_cmd, item=self, exc=exc)
+        return out.strip()
+
     def create(self):
         if exists(self.path):
             raise TestRepoCreationError(
@@ -654,11 +663,11 @@ class ItemFile(Item):
                     f.write(self.content)
             except EnvironmentError as e:
                 raise TestRepoCreationError(
-                    msg="The following exception occurred while trying to write to "
-                        "file {p}:{ls}{exc}".format(ls=os.linesep,
-                                                    p=self.path,
-                                                    exc=exc_str(e)
-                                                    ),
+                    msg="The following exception occurred while trying to write"
+                        " to file {p}:{ls}{exc}".format(ls=os.linesep,
+                                                        p=self.path,
+                                                        exc=exc_str(e)
+                                                        ),
                     item=self.__class__
                 )
 
@@ -667,10 +676,6 @@ class ItemFile(Item):
         # stage again, ...) cannot be achieved by create(), since this would
         # require way too complex definitions. That's what ItemCommand(item=...)
         # is for instead.
-        # TODO: If we allow to add/commit here, we can't easily notify ItemRepo
-        #       about it! This would require TestRepo.__init__ (or .create()) to
-        #       inspect the tree. (keep in mind there might be untracked files
-        #       or even repos that were not registered as submodules)
 
         to_add = False
         to_commit = False
@@ -714,24 +719,11 @@ class ItemFile(Item):
                     add_cmd.extend(['add', self.path])
             else:
                 # git-add
-                add_cmd.extend(['add', self.path])
+                add_cmd.extend(['--work-tree=.', 'add', self.path])
 
-            try:
-                # Note, that the default runner comes from TestRepo and has its
-                # default cwd set to TestRepo's root. We don't know, whether or
-                # not this is right here. We could as well be in a submodule.
-                self._runner.run(add_cmd, cwd=os.path.dirname(self.path))
-            except CommandError as e:
-                # raise TestRepoCreationError instead, so TestRepo can add
-                # more information
-                raise TestRepoCreationError(
-                    msg="Failed to add {it}({p}) ({exc})"
-                        "".format(it=self.__class__,
-                                  p=self.path,
-                                  exc=exc_str(e)
-                                  ),
-                        item=self.__class__
-                )
+            _excute_by_item(cmd=add_cmd, item=self,
+                            exc=TestRepoCreationError("Failed to add")
+                            )
 
             if self._annexed:
                 # we just annex-added. So the content is available ATM.
@@ -739,22 +731,9 @@ class ItemFile(Item):
 
             if self._annexed and not self._key:
                 # look it up
-                lookup_cmd = ['git', 'annex', 'lookupkey', self._path]
-                try:
-                    out, err = self._runner.run(lookup_cmd,
-                                                cwd=os.path.dirname(self.path))
-                except CommandError as e:
-                    # raise TestRepoCreationError instead, so TestRepo can add
-                    # more information
-                    raise TestRepoCreationError(
-                        msg="Failed to look up key for {it}({p}) ({exc})"
-                            "".format(it=self.__class__,
-                                      p=self.path,
-                                      exc=exc_str(e)
-                                      ),
-                        item=self.__class__
-                    )
-                self._key = out.strip()
+                self._key = self._get_annex_key_from_disc(
+                    exc=TestRepoCreationError("Failed to look up annex key")
+                )
 
             # If we just annex-addurl'd we should get the content:
             if self._annexed and self._src:
@@ -768,19 +747,10 @@ class ItemFile(Item):
             # TODO: When and how to check for direct mode? Remember, that direct
             # mode could be enforced without being specified in the definition
             unlock_cmd = ['git', 'annex', 'unlock', self.path]
-            try:
-                self._runner.run(unlock_cmd, cwd=os.path.dirname(self.path))
-            except CommandError as e:
-                # raise TestRepoCreationError instead, so TestRepo can add
-                # more information
-                raise TestRepoCreationError(
-                    msg="Failed to unlock {it}({p}) ({exc})"
-                        "".format(it=self.__class__,
-                                  p=self.path,
-                                  exc=exc_str(e)
-                                  ),
-                    item=self.__class__
-                )
+
+            _excute_by_item(cmd=unlock_cmd, item=self,
+                            exc=TestRepoCreationError("Failed to unlock")
+                            )
 
         if to_commit:
             if not self._commit_msg:
@@ -789,44 +759,21 @@ class ItemFile(Item):
                                              p=self.path,
                                              git_annex="annex" if self._annexed
                                              else "git")
-            commit_cmd = ['git', 'commit', '-m', '"%s"' % self._commit_msg,
+            commit_cmd = ['git', '--work-tree=.', 'commit',
+                          '-m', '"%s"' % self._commit_msg,
                           '--', self.path]
-            try:
-                self._runner.run(commit_cmd, cwd=os.path.dirname(self.path))
-            except CommandError as e:
-                # raise TestRepoCreationError instead, so TestRepo can add
-                # more information
-                raise TestRepoCreationError(
-                    msg="Failed to commit {it}({p}) ({exc})"
-                        "".format(it=self.__class__,
-                                  p=self.path,
-                                  exc=exc_str(e)
-                                  ),
-                    item=self.__class__
-                )
+
+            _excute_by_item(cmd=commit_cmd, item=self,
+                            exc=TestRepoCreationError("Failed to commit")
+                            )
 
             # get the commit's SHA for property:
-            lookup_SHA_cmd = ['git', 'log', '-n', '1',
-                              "--pretty=format:\"%H%n%B\""]
-            try:
-                out, err = self._runner.run(lookup_SHA_cmd,
-                                            cwd=os.path.dirname(self.path))
-            except CommandError as e:
-                # raise TestRepoCreationError instead, so TestRepo can add
-                # more information
-                raise TestRepoCreationError(
-                    msg="Failed to look up commit SHA for {it}({p}) ({exc})"
-                        "".format(it=self.__class__,
-                                  p=self.path,
-                                  exc=exc_str(e)
-                                  ),
-                    item=self.__class__
-                )
-            commit_SHA = out.splitlines()[0]
-            commit_msg = os.linesep.join(out.splitlines()[1:])
-            self._commits.append((commit_SHA, commit_msg))
+            from .helpers import _get_last_commit_from_disc
 
-        return
+            self._commits.append(_get_last_commit_from_disc(
+                item=self,
+                exc=TestRepoCreationError("Failed to look up commit SHA")
+            ))
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -960,19 +907,9 @@ class ItemCommand(Item):
         extend it to modify properties of involved Items.
         """
 
-        try:
-            self._runner.run(self._cmd, cwd=self._cwd)
-        except CommandError as e:
-            # raise TestRepoCreationError instead, so TestRepo can add
-            # more information
-            raise TestRepoCreationError(
-                msg="Command failed: {it}({cmd}) ({exc})"
-                    "".format(it=self.__class__,
-                              cmd=self._cmd,
-                              exc=exc_str(e)
-                              ),
-                item=self.__class__
-            )
+        _excute_by_item(cmd=self._cmd, item=self, cwd=self._cwd,
+                        exc=TestRepoCreationError("Command failed")
+                        )
 
 
 @auto_repr
@@ -1025,30 +962,16 @@ class ItemCommit(ItemCommand):
         # run the command:
         super(ItemCommit, self).create()
 
-        # now, get the commit let the items know:
-        # Note, that git-log should work in direct mode without --work-tree
-        lookup_sha_cmd = ['git', 'log', '-n', '1',
-                          "--pretty=format:%H%n%B"]
-        try:
-            out, err = self._runner.run(lookup_sha_cmd, cwd=self._cwd)
-        except CommandError as e:
-            # raise TestRepoCreationError instead, so TestRepo can add
-            # more information
-            raise TestRepoCreationError(
-                msg="Failed to look up commit SHA for {it}({p}) ({exc})"
-                    "".format(it=self.__class__,
-                              p=self.path,
-                              exc=exc_str(e)
-                              ),
-                item=self.__class__
-            )
-        commit_sha = out.splitlines()[0]
-        commit_msg = out[len(commit_sha):].strip().strip('\"')
+        # now, get the commit and let the items know:
+        from .helpers import _get_last_commit_from_disc
+        commit = _get_last_commit_from_disc(item=self,
+                                            exc=TestRepoCreationError(
+                                                "Failed to look up commit SHA")
+                                            )
 
-        # notify involved items:
-        self._repo._commits.append((commit_sha, commit_msg))
+        self._repo._commits.append(commit)
         for it in self._ref_items:
-            it._commits.append((commit_sha, commit_msg))
+            it._commits.append(commit)
             it._state_index = ItemFile.UNMODIFIED
             # TODO: Does "git commit -- myfile" stage that file before?
             # If so: adjust it._state_worktree as well!
