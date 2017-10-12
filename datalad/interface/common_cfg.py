@@ -236,6 +236,13 @@ definitions = {
         'type': EnsureBool(),
         'default': True,
     },
+    'datalad.metadata.searchindex-documenttype': {
+        'ui': ('question', {
+               'title': 'Type of search index documents',
+               'text': 'Labels of document types to include in a search index'}),
+        'type': EnsureChoice('all', 'datasets', 'files'),
+        'default': 'all',
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',

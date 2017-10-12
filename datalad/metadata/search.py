@@ -294,9 +294,10 @@ def _get_search_index(index_dir, ds, force_reindex):
 
     # load metadata of the base dataset and what it knows about all its subdatasets
     # (recursively)
+    old_idx_size = 0
+    old_ds_rpath = ''
     for res in _query_aggregated_metadata(
-            # TODO expose parameter
-            reporton='all',
+            reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
             # TODO expose? but this would likely only affect metadata in the
@@ -313,9 +314,21 @@ def _get_search_index(index_dir, ds, force_reindex):
         meta = res.get('metadata', {})
         meta = MetadataDict(meta)
         if rtype == 'dataset':
+            idx_size = idx.doc_count()
+            if old_ds_rpath:
+                lgr.info(
+                    'Added %s on dataset %s',
+                    single_or_plural(
+                        'document',
+                        'documents',
+                        idx_size - old_idx_size,
+                        include_count=True),
+                    old_ds_rpath)
+            old_idx_size = idx_size
+            old_ds_rpath = rpath
+
             # get any custom dataset mappings
             ds_defs = per_ds_defs.get(res['path'], {})
-            lgr.info('Adding information about Dataset %s', rpath)
             # now we merge all reported unique content properties (flattened representation
             # of content metadata) with the main metadata set, using the 'add' strategy
             # this way any existing metadata value of a dataset itself will be amended by
@@ -330,6 +343,16 @@ def _get_search_index(index_dir, ds, force_reindex):
         if 'parentds' in res:
             doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
         _add_document(idx, **doc_props)
+
+    if old_ds_rpath:
+        lgr.info(
+            'Added %s on dataset %s',
+            single_or_plural(
+                'document',
+                'documents',
+                idx.doc_count() - old_idx_size,
+                include_count=True),
+            old_ds_rpath)
 
     idx.commit()
 
@@ -446,6 +469,20 @@ class Search(Interface):
         duration(s) {'unit (http://purl.obolibrary.org/obo/UO_0000000)': 'http://purl.obolibrary.org/obo/UO_0000010', '@id': 'https://www.w3.org/TR/owl-time/#Duration'}
         name (http://schema.org/name)
         ...
+
+    *Performance considerations*
+
+    For dataset collections with many files (100k+) generating a comprehensive
+    search index comprised of documents for datasets and individual files can
+    take a considerable amount of time. If this becomes an issue, search index
+    generation can be limited to a particular type of document (see the
+    'metadata --reporton' option for possible values). The configuration
+    setting 'datalad.metadata.searchindex-documenttype' will be queried on
+    search index generation. It is recommended to place an appropriate
+    configuration into a dataset's configuration file (.datalad/config)::
+
+      [datalad "metadata"]
+        searchindex-documenttype = datasets
 
     .. seealso::
       - Description of the Whoosh query language:
