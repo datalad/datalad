@@ -32,6 +32,13 @@ from ...utils import optional_args
 #   instance
 # - no 'network' flavor, but just 'serve_path_via_http' instead?
 
+
+# Should there be remote location available to install/clone from?
+# => needs to be optional, since cloning would loose untracked/staged things
+#    as well as other branches. So it's possibly not reasonable for some of
+#    the test repos
+
+
 # - a location for annexed "remote" content
 # (see remote_file_fd, remote_file_path)
 

@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Items for test repository definitions
 """
+import logging
 import os
 import shlex
 from abc import ABCMeta, abstractmethod
@@ -30,24 +31,25 @@ from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
 from datalad.utils import auto_repr, assure_list, on_windows
 from .helpers import _excute_by_item
 
-
-# TODO: Commands need to notify the ItemRepos! Otherwise we don't know what belongs where!
-#       Same is true for instant file adding/committing
-# TODO: runner calls need to set cwd! By default it's the TestRepo's runner, so cwd is its root!
+lgr = logging.getLogger('datalad.tests.testrepos.items')
 
 
-# TODO: Commands for (special) remotes
+def log(*args, **kwargs):
+    """helper to log at a default level
 
-
+    since this is not even about actual datalad tests, not to speak of actual
+    datalad code, log at pretty low level.
+    """
+    lgr.log(5, *args, **kwargs)
 
 
 @auto_repr
 @add_metaclass(ABCMeta)
 class Item(object):
-    """Base class for test repository definition items
+    """(Partially abstract) base class for test repository definition items
     """
 
-    def __init__(self, path, runner=None):  # runner?
+    def __init__(self, path, runner=None):
         """
 
         Parameters
@@ -152,6 +154,8 @@ class ItemRepo(Item):
         # mode.
         # Or just raise? (Would be from within self.create(), since we need to
         # see what annex actually does.)
+
+        log("Processing definition of %s(%s)", self.__class__, path)
 
         if not annex and (annex_version or annex_direct or annex_init):
             raise InvalidTestRepoDefinitionError(
@@ -304,6 +308,8 @@ class ItemRepo(Item):
         """Creates the physical repository
         """
 
+        log("Creating %s(%s)", self.__class__, self.path)
+
         # Note: self.path is the directory we want to create in. But it's also
         # CWD of the default Runner. Therefore we need to make sure the
         # directory exists and is empty:
@@ -373,6 +379,8 @@ class ItemRepo(Item):
         Everything else is out of scope and needs to be tested by ItemRepo and
         the subclasses of TestRepo.
         """
+
+        log("Integrity check for %s(%s)", self.__class__, self.path)
 
         # object consistency
         if self.is_git:
@@ -512,6 +520,8 @@ class ItemFile(Item):
             disc, which means that we would make what actually happened the
             definition of what was supposed to happen.
         """
+
+        log("Processing definition of %s(%s)", self.__class__, path)
 
         # TODO: Use constraints (like EnsureChoice for 'state') for sanity
         # checks on the arguments?
@@ -685,6 +695,9 @@ class ItemFile(Item):
         return out.strip()
 
     def create(self):
+
+        log("Creating %s(%s)", self.__class__, self.path)
+
         if exists(self.path):
             raise TestRepoCreationError(
                 msg="Path {p} already exists.".format(p=self.path),
@@ -742,6 +755,7 @@ class ItemFile(Item):
             )
 
         if to_add:
+            log("Add %s(%s) to %s", self.__class__, self.path, self._repo)
             # TODO: This part needs attention for V6. See gh-1798
             add_cmd = ['git']
             if self._annexed:
@@ -777,6 +791,7 @@ class ItemFile(Item):
                     self._content = f.read()
 
         if self.is_unlocked:
+            log("Unlock %s(%s)", self.__class__, self.path)
             # unlock needs to be done before committing (at least in v6 it
             # would be 'typechanged' otherwise)
             # TODO: Double check the result for v5
@@ -789,6 +804,7 @@ class ItemFile(Item):
                             )
 
         if to_commit:
+            log("Committing %s(%s)", self.__class__, self.path)
             if not self._commit_msg:
                 self._commit_msg = "{it}: Added file {p} to {git_annex}" \
                                    "".format(it=self.__class__,
@@ -819,6 +835,8 @@ class ItemFile(Item):
         Everything else is out of scope and needs to be tested by ItemRepo and
         the subclasses of TestRepo.
         """
+
+        log("Integrity check for %s(%s)", self.__class__, self.path)
         # object consistency
         if self.is_untracked:
             assert(self.commits is [])
@@ -858,6 +876,9 @@ class ItemInfoFile(ItemFile):
                  commit_msg=None,
                  src=None,
                  locked=None):
+
+        log("Processing definition of %s(%s)", self.__class__, path)
+
         if not content:
             content = "git: {git}{ls}" \
                       "annex: {annex}{ls}" \
@@ -886,6 +907,8 @@ class ItemInfoFile(ItemFile):
             commit_msg=commit_msg, annexed=annexed, src=src, locked=locked)
 
 
+# TODO: Commands for (special) remotes
+
 @auto_repr
 class ItemCommand(Item):
     """Base class for commands to be included in TestRepo's definition
@@ -906,6 +929,7 @@ class ItemCommand(Item):
         cwd: str or None
         repo: ItemRepo or None
         """
+        log("Processing definition of %s", self.__class__)
 
         # if `cwd` wasn't specified, use root of `repo`
         if not cwd:
@@ -943,6 +967,7 @@ class ItemCommand(Item):
         used by subclasses to run the actual command, they should at least
         extend it to modify properties of involved Items.
         """
+        log("Executing %s in %s", self.__class__, self.path)
 
         _excute_by_item(cmd=self._cmd, item=self, cwd=self._cwd,
                         exc=TestRepoCreationError("Command failed")
@@ -959,6 +984,8 @@ class ItemCommit(ItemCommand):
     """
 
     def __init__(self, runner, item=None, cwd=None, msg=None, repo=None):
+
+        log("Processing definition of %s", self.__class__)
 
         if not repo:
             raise InvalidTestRepoDefinitionError(
@@ -996,6 +1023,9 @@ class ItemCommit(ItemCommand):
                                          cmd=commit_cmd, repo=repo)
 
     def create(self):
+
+        log("Executing %s in %s", self.__class__, self.path)
+
         # run the command:
         super(ItemCommit, self).create()
 
@@ -1026,6 +1056,8 @@ class ItemDropFile(ItemCommand):
 
     def __init__(self, runner, item=None, cwd=None, repo=None):
 
+        log("Processing definition of %s", self.__class__)
+
         if not repo:
             raise InvalidTestRepoDefinitionError(
                 msg="{it}: Parameter 'repo' is required. By default this could "
@@ -1051,6 +1083,9 @@ class ItemDropFile(ItemCommand):
                                            item=item, cwd=cwd, repo=repo)
 
     def create(self):
+
+        log("Executing %s in %s", self.__class__, self.path)
+
         # run the command:
         super(ItemDropFile, self).create()
 
