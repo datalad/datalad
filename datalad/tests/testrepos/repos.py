@@ -249,6 +249,25 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 # store absolute path for instantiation
                 item[1]['path'] = os.path.normpath(opj(self._path, r_path))
 
+            # check and convert 'repo' argument for files
+            # TODO: We already have that (kind of) for ItemCommand. May be melt
+            # in. Definitely do it, if we are to provide this also for ItemRepo
+            # as an option to instantly submodule-add
+            if issubclass(item[0], ItemFile):
+                r_repo = item[1].get('repo')
+                if not r_repo:
+                    raise InvalidTestRepoDefinitionError(
+                        msg="Missing argument 'repo' for {cl}:{ls}"
+                            "{cl}({args})".format(s=os.linesep,
+                                                  cl=item[0].__name__,
+                                                  args=item[1]),
+                            repo=self.__class__,
+                            item=item[0].__name__,
+                            index=index
+                            )
+                # convert to ItemRepo:
+                _path2item(item, index, 'repo')
+
             # END path conversion
             # For ItemRepo and ItemFile the relative path is kept in `r_path`
 
@@ -303,46 +322,56 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 repo=self.__class__
             )
 
-        # TODO: not sure yet whether or not we want to instantly and
-        # unconditionally create, but think so ATM
+        # Now, actually create the beast physically:
         self.create()
 
-        # TODO: Guess, we need to inspect the created structure to assign
-        # untracked files and unregistered (sub-)repos to their respective
-        # ItemRepos
-        for item in self._items:
-            # TODO: dict! item is key ATM!
-            if isinstance(item, ItemFile) and item.is_untracked:
-                # bing
-                pass
-            if isinstance(item, ItemRepo) and item.superproject is None:
-                # bing
-                pass
+        # There might be ItemRepo(s) besides the top-level one, that were never
+        # added as a submodule to another one. For recursive calls of
+        # assert_intact, we need all roots of this forrest. Furthermore, even
+        # ItemSelf might not be a root.
+        # We can discover them only now after all Items were created, since
+        # ItemCommands may have changed what could have been discovered during
+        # instantiation.
+        self._roots = [self._items[p] for p in self._items
+                       if isinstance(self._items[p], ItemRepo) and
+                       self._items[p].superproject is None]
 
+        # Note, that by now there's no limitation on whether or not there needs
+        # to be an item '.'. Theoretically everything should work with several
+        # hierarchies in parallel, self.path being there common root location.
+        # However, if there is an item '.', it must not be an ItemFile. If so,
+        # something went wrong.
+        if self._items.get('.') and isinstance(self._items['.'], ItemFile):
+            raise InvalidTestRepoDefinitionError(
+                msg="Item at root location {p} must not be a file: {cl}('.')"
+                    "".format(cl=self._items['.'].__class__,
+                              p=self.path),
+                item=self._items['.']
+            )
+
+    # properties pointing to ItemSelf (self.repo)!
     @property
     def path(self):
         return self.repo.path
 
     @property
     def url(self):
-        # TODO: Again: Just file-scheme or use sth like serve_via_http in addition?
-        return get_local_file_url(self.path)
+        return self.repo.url
 
-    # TODO
-    @property
-    def submodules(self):  # "recursion-limit"?
-        # just a draft: (invalid)
-        return [x for x in self._items if isinstance(x, ItemRepo)]
-        # and not "self"! and not unregistered
-        # and beneath self ...
-
-    @abstractmethod
     def assert_intact(self):
         """Assertions to run to check integrity of this test repository
 
-        Needs to be implemented by subclasses.
+        Should be enhanced by subclasses and is supposed to recursively call
+        assert_intact of its items
         """
-        pass
+
+        # all items are included:
+        # TODO: everything in self._items needs to be recursively accessible via self._roots
+
+        # check them recursively:
+        [item.assert_intact() for item in self._roots]
+
+        # TODO: Is there more we can test by default?
 
     def create(self):
         """Physically create the beast
@@ -379,12 +408,14 @@ class BasicGit(TestRepo_NEW):
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': False}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
-                                                   ItemFile.UNMODIFIED)}),
+                                                   ItemFile.UNMODIFIED),
+                                         'repo': '.'}),
                          (ItemFile, {'path': 'test.dat',
                                      'content': "123",
                                      'annexed': False,
                                      'state': (ItemFile.ADDED,
-                                               ItemFile.UNMODIFIED)}),
+                                               ItemFile.UNMODIFIED),
+                                     'repo': '.'}),
 
                          (ItemCommit, {'cwd': '.',
                                        'item': ['test.dat', 'INFO.txt'],
@@ -458,8 +489,8 @@ class BasicGit(TestRepo_NEW):
                        "ItemFile({p}).{att} is not None but: {v}"
                        "".format(p=file_.path, att=att, v=value))
             eq_(len(file_.commits), 1)
-            eq_(file_.commits[0][1],
-                "Adding a basic INFO file and rudimentary load file.")
+            eq_([c[1] for c in file_.commits],
+                ["Adding a basic INFO file and rudimentary load file."])
 
         # ###
         # The objects' inner consistency and testing against what is physically
@@ -493,12 +524,14 @@ class BasicMixed(TestRepo_NEW):
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': True}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
-                                                   ItemFile.UNMODIFIED)}),
+                                                   ItemFile.UNMODIFIED),
+                                         'repo': '.'}),
                          (ItemFile, {'path': 'test.dat',
                                      'content': "123",
                                      'annexed': False,
                                      'state': (ItemFile.ADDED,
-                                               ItemFile.UNMODIFIED)}),
+                                               ItemFile.UNMODIFIED),
+                                     'repo': '.'}),
 
                          (ItemCommit, {'cwd': '.',
                                        'item': ['test.dat', 'INFO.txt'],
@@ -510,7 +543,8 @@ class BasicMixed(TestRepo_NEW):
                                      'state': (ItemFile.ADDED,
                                                ItemFile.UNMODIFIED),
                                      'annexed': True,
-                                     'key': "SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat"
+                                     'key': "SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat",
+                                     'repo': '.'
                                      }),
                          (ItemCommit, {'cwd': '.',
                                        'item': 'test-annex.dat',

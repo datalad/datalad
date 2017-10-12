@@ -63,6 +63,11 @@ def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
         (commit SHA, commit message)
     """
 
+    # TODO: - We probably need the date, too, in order to sort
+    #       - or the parents
+    #       => depends on how we get to discover structure of history. Right
+    #       now, not everything can be set during creation.
+    #       - If we ever get to test it, we may also need author etc.
     lookup_sha_cmd = ['git', 'log', '-n', '1',
                       "--pretty=format:\"%H%n%B\""]
     out, err = _excute_by_item(cmd=lookup_sha_cmd, item=item, exc=exc,

@@ -70,7 +70,7 @@ class Item(object):
         return self._path
 
     @property
-    def local_url(self):
+    def url(self):
         """ same as `path` but as a file-scheme URL
 
         Something like: file:///that/is/where/my/item/lives
@@ -189,11 +189,10 @@ class ItemRepo(Item):
         self._annex_version = annex_version if annex else None
         self._annex_direct = annex_direct if annex else False
         self._annex_init = annex_init if annex else False
-        self._files = set()  # ... of ItemFile
-        self._submodules = set()  # ... of ItemRepo
-        self._commits = []
-        self._branches = []
-        self._remotes = []
+        self._items = set()  # ... of Item
+        self._commits = set()
+        self._branches = set()
+        self._remotes = set()
         self._super = None
 
     # TODO: May be let properties return anything only after creation?
@@ -269,19 +268,37 @@ class ItemRepo(Item):
         return self._remotes
 
     @property
-    def submodules(self):
-        return self._submodules
+    def submodules(self, return_paths=False):
+        items = [it for it in self._items
+                 if isinstance(it, ItemRepo) and it.superproject is self]
+        if return_paths:
+            return [os.path.relpath(it.path, self.path) for it in items]
+        else:
+            return items
 
     @property
     def superproject(self):
         return self._super
 
-    # TODO: This might change. May be we need a self._items and look for ItemFile in it. Consider untracked files!
-    # Also: Let it be Items instead of paths, and return paths only from TestRepo? Would be easier for internal access.
     @property
-    def files(self):
-        return  self._files
-        #return [os.path.relpath(f_.path, self.path) for f_ in self._files]
+    def files(self, return_paths=False):
+        """Get the files known to this repo
+
+        Parameters
+        ----------
+        return_paths: bool
+            whether to return the paths of the files. ItemFile instances
+            otherwise. Note, that paths are relative to ItemRepo's root.
+
+        Returns
+        -------
+        list of ItemFile or str
+        """
+        items = [it for it in self._items if isinstance(it, ItemFile)]
+        if return_paths:
+            return [os.path.relpath(it.path, self.path) for it in items]
+        else:
+            return items
 
     def create(self):
         """Creates the physical repository
@@ -388,8 +405,8 @@ class ItemRepo(Item):
             assert self.commits
             # Not necessarily vice versa? Could be just detached HEAD, I guess.
 
-        [assert_is_instance(f_, ItemFile) for f_ in self._files]
-        [assert_is_instance(r_, ItemRepo) for r_ in self._submodules]
+        [assert_is_instance(f_, ItemFile) for f_ in self.files]
+        [assert_is_instance(r_, ItemRepo) for r_ in self.submodules]
         # TODO: What about unregistered repos beneath? May be just part of TestRepo instance, not the ItemRepo.
 
         for it in self.files:
@@ -441,10 +458,10 @@ class ItemFile(Item):
     DELETED = 'D'
     RENAMED = 'R'
     COPIED = 'C'
-    TYPECHANGED = 'T'  # Note: This one is missing in git-status short format
+    TYPECHANGED = 'T'  # Note: This one is missing in git-status short format according to its manpage
     UPDATED_BUT_UNMERGED = 'U'
 
-    def __init__(self, path, runner=None,
+    def __init__(self, path, repo, runner=None,
                  content=None, state=None, commit_msg=None,
                  annexed=False, key=None, src=None, locked=None):
         """
@@ -488,10 +505,25 @@ class ItemFile(Item):
             whether or not the file should be locked by annex.
             Valid only if `annexed` is True.
             Note, that locked/unlocked isn't available in annex direct mode.
+        repo: ItemRepo
+            the repository this file is supposed to belong to (which is where it
+            would be added when giving the respective state)
+            This is required, since otherwise we would need to discover it from
+            disc, which means that we would make what actually happened the
+            definition of what was supposed to happen.
         """
 
         # TODO: Use constraints (like EnsureChoice for 'state') for sanity
         # checks on the arguments?
+
+        if not path.startswith(repo.path):
+            raise InvalidTestRepoDefinitionError(
+                msg="'path' is not beneath the path of 'repo' for {it}({p})."
+                    "".format(it=self.__class__,
+                              p=path
+                              ),
+                item=self.__class__
+            )
 
         if src and content:
             raise InvalidTestRepoDefinitionError(
@@ -565,6 +597,7 @@ class ItemFile(Item):
             )
 
         super(ItemFile, self).__init__(path=path, runner=runner)
+        self._repo = repo
         self._content = content
         self._state_index = state[0]
         self._state_worktree = state[1]
@@ -573,7 +606,7 @@ class ItemFile(Item):
         self._locked = locked  # TODO: consider direct mode. There's no lock ...
         self._annexed = annexed
         self._key = key
-        self._commits = []
+        self._commits = set()
         self._content_present = None  # to be set when actually adding the file
                                       # to annex
 
@@ -670,6 +703,9 @@ class ItemFile(Item):
                                                         ),
                     item=self.__class__
                 )
+
+        # file actually exists now, add to repo:
+        self._repo._items.add(self)
 
         # Furthermore, we can git-add, git-annex-add and commit the new file.
         # Anything more complex (like add, commit, change the content,
@@ -769,11 +805,12 @@ class ItemFile(Item):
 
             # get the commit's SHA for property:
             from .helpers import _get_last_commit_from_disc
-
-            self._commits.append(_get_last_commit_from_disc(
+            commit = _get_last_commit_from_disc(
                 item=self,
                 exc=TestRepoCreationError("Failed to look up commit SHA")
-            ))
+            )
+            self._commits.add(commit)
+            self._repo._commits.add(commit)
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -814,7 +851,7 @@ class ItemInfoFile(ItemFile):
 
     default_path = 'INFO.txt'  # needs to accessible by TestRepo.__init__
 
-    def __init__(self, class_, definition=None,
+    def __init__(self, class_, repo, definition=None,
                  path=None, runner=None, annexed=False, content=None,
                  # directly committed on creation:
                  state=(ItemFile.UNMODIFIED, ItemFile.UNMODIFIED),
@@ -845,7 +882,7 @@ class ItemInfoFile(ItemFile):
                          "".format(class_, os.path.basename(path))
 
         super(ItemInfoFile, self).__init__(
-            path=path, runner=runner, content=content, state=state,
+            path=path, repo=repo, runner=runner, content=content, state=state,
             commit_msg=commit_msg, annexed=annexed, src=src, locked=locked)
 
 
@@ -969,20 +1006,16 @@ class ItemCommit(ItemCommand):
                                                 "Failed to look up commit SHA")
                                             )
 
-        self._repo._commits.append(commit)
+        self._repo._commits.add(commit)
         for it in self._ref_items:
-            it._commits.append(commit)
+            it._commits.add(commit)
             it._state_index = ItemFile.UNMODIFIED
             # TODO: Does "git commit -- myfile" stage that file before?
             # If so: adjust it._state_worktree as well!
 
             # If ItemRepo didn't know about the committed items, it definitely
             # should now!
-            # TODO: Not sure yet, how to add those (may be just _items):
-            if isinstance(it, ItemFile):
-                self._repo._files.add(it)
-            elif isinstance(it, ItemRepo):
-                self._repo._submodules.add(it)
+            self._repo._items.add(it)
 
 
 @auto_repr
