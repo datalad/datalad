@@ -6,21 +6,5 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-
-from .ultimate_testrepos import *
-from .utils import with_tempfile
-
-
-@with_tempfile
-def test_BasicGit_instantiation(path):
-    tr = BasicGit(path)
-    tr.assert_intact()
-
-
-@with_tempfile
-def test_BasicMixed_instantiation(path):
-    tr = BasicMixed(path)
-    tr.assert_intact()
-
-
-
+"""Tests for testrepos module
+"""
