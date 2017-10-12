@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.metadata.search')
 
+import re
 import os
 from os.path import join as opj, exists
 from os.path import relpath
@@ -34,7 +35,6 @@ from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
-from datalad.support.network import is_url
 from datalad.support.json_py import dump2fileobj as jsondump2file
 from simplejson import load as jsonload
 from datalad.metadata.definitions import common_defs
@@ -56,6 +56,9 @@ if PY3:
 else:
     unicode_srctypes = string_types
     str_contructor = unicode
+
+# regex for a cheap test if something looks like a URL
+r_url = re.compile(r"^https?://")
 
 
 def _any2unicode(val):
@@ -91,8 +94,9 @@ def _meta2index_dict(meta, definitions, ds_defs):
 def _resolve_term(term, definitions, common_defs):
     termdef = common_defs.get(term, {}).get('def', None)
     if termdef is not None:
-        if is_url(termdef) and termdef.startswith('http'):
+        if r_url.match(termdef):
             # because is_url('schema:name') -> True
+            # and complains on DEBUG about irrelevant stuff (parsing diff)
             return termdef
         else:
             term = termdef
@@ -115,7 +119,7 @@ def _resolve_term(term, definitions, common_defs):
                     "Cannot resolve term prefix '%s', no definition found",
                     prefix)
                 return
-        if is_url(prefix_def):
+        if r_url.match(prefix_def):
             # proper URL, just concat to get full definition
             return u'{}{}'.format(prefix_def, term)
         else:
@@ -205,6 +209,10 @@ def _get_search_schema(ds):
         cand_keys = list(meta)
         cand_keys.extend(meta.get('unique_content_properties', []))
         for k in cand_keys:
+            if k in ('unique_content_properties', '@context'):
+                # those are just means for something else and irrelevant
+                # for searches
+                continue
             # check if we have any kind of definitions for this key
             if k not in definitions:
                 termdef = _resolve_term(k, definitions, common_defs)
