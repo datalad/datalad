@@ -144,7 +144,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 repo=self.__class__
             )
 
-        log("Processing definition of %s", self.__class__)
+        log("Processing definition of %s(%s)", self.__class__, path)
         for item, index in zip(self._item_definitions,
                                range(len(self._item_definitions))):
 
@@ -457,90 +457,6 @@ class BasicGit(TestRepo_NEW):
                                        'msg': "Adding a basic INFO file and "
                                               "rudimentary load file."})
                          ]
-
-    # def __init__(self, path=None, runner=None):
-    #     super(BasicGit, self).__init__(path=path, runner=runner)
-    #
-    # def assert_intact(self):
-    #     super(BasicGit, self).assert_intact()
-    #
-    #     # ###
-    #     # Assertions to test object properties against what is defined:
-    #     # ###
-    #     eq_(len(self._items), 3)  # ItemRepo and ItemFile only
-    #     assert_is_instance(self._items['.'], ItemSelf)
-    #     assert_is_instance(self._items['test.dat'], ItemFile)
-    #     assert_is_instance(self._items['INFO.txt'], ItemFile)
-    #
-    #     # the top-level item `self.repo`
-    #     assert(self.repo is self._items['.'])
-    #     assert(self.repo.is_annex is False)
-    #     assert(self.repo.is_git is True)
-    #
-    #     for att in ['annex_version',
-    #                 'is_direct_mode',
-    #                 'annex_is_initialized',
-    #                 'remotes',
-    #                 'submodules',
-    #                 'superproject']:
-    #         value = self.repo.__getattribute__(att)
-    #         assert(value is None,
-    #                "ItemSelf({p}).{att} is not None but: {v}"
-    #                "".format(p=self.repo.path, att=att, v=value))
-    #
-    #     eq_([c[1] for c in self.repo.commits],
-    #         ["Adding a basic INFO file and rudimentary load file."])
-    #     # TODO: eq_(self.repo.branches, ['master'])
-    #
-    #     # test.dat:
-    #     test_dat = self._items['test.dat']
-    #     assert_is_instance(test_dat, ItemFile)
-    #     eq_(test_dat.path, opj(self.path, 'test.dat'))
-    #     eq_(test_dat.content, "123")
-    #
-    #     # INFO.txt:
-    #     info_txt = self._items['INFO.txt']
-    #     eq_(info_txt.path, opj(self.path, 'INFO.txt'))
-    #     # Note: we can't compare the entire content of INFO.txt, since
-    #     # it contains versions of git, git-annex, datalad. But some parts can
-    #     # be expected and shouldn't change, so make assertions to indicate
-    #     # integrity of the file's content:
-    #     assert_is_instance(info_txt, ItemInfoFile)
-    #
-    #     # both objects make up `files` of ItemSelf:
-    #     eq_(set(self.repo.files), {test_dat, info_txt})
-    #
-    #     # for both files the following should be true:
-    #     for file_ in [test_dat, info_txt]:
-    #         file_.assert_intact()
-    #         assert(file_.is_clean is True)
-    #         for att in ['annexed', 'is_modified', 'is_staged', 'is_untracked']:
-    #             value = file_.__getattribute__(att)
-    #             assert(value is False,
-    #                    "ItemFile({p}).{att} is not False but: {v}"
-    #                    "".format(p=file_.path, att=att, v=value))
-    #         for att in ['annex_key', 'content_available', 'is_unlocked']:
-    #             value = file_.__getattribute__(att)
-    #             assert(value is None,
-    #                    "ItemFile({p}).{att} is not None but: {v}"
-    #                    "".format(p=file_.path, att=att, v=value))
-    #         eq_(len(file_.commits), 1)
-    #         eq_([c[1] for c in file_.commits],
-    #             ["Adding a basic INFO file and rudimentary load file."])
-    #
-    #     # ###
-    #     # The objects' inner consistency and testing against what is physically
-    #     # the case is done recursively via their respective assert_intact().
-    #     # Note, that this requires to call assert_intact of all ItemRepo
-    #     # instances in this TestRepo, that have no superproject.
-    #     # In most cases this will just be one call to the toplevel instance:
-    #     # ###
-    #     # TODO: The note above might change a little, once it is clear what to
-    #     # do about unregistered subs and untracked files.
-    #     # TODO: May be that part can be done by TestRepo anyway, if it gets more
-    #     # complicated. Then assert_intact wouldn't be abstract, but to be
-    #     # enhanced.
-    #     self.repo.assert_intact()
 
 
 @auto_repr
