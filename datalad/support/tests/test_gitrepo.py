@@ -621,7 +621,7 @@ def test_GitRepo_get_files(url, path):
     'file2': 'content3'
 
     })
-def test_GitRepo_get_files_history(path):
+def test_GitRepo__get_files_history(path):
 
     gr = GitRepo(path, create=True)
     gr.add('d1')
@@ -632,22 +632,22 @@ def test_GitRepo_get_files_history(path):
     gr.commit("commit d2")
 
     # commit containing files of d1
-    d1_commit = next(gr.get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd1', 'f1')]))
+    d1_commit = next(gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd1', 'f1')]))
     assert_equal(str(d1_commit.message), 'commit d1')
 
     # commit containing files of d2
-    d2_commit_gen = gr.get_files_history([opj(path, 'd2', 'f1'), opj(path, 'd2', 'f1')])
+    d2_commit_gen = gr._get_files_history([opj(path, 'd2', 'f1'), opj(path, 'd2', 'f1')])
     assert_equal(str(next(d2_commit_gen).message), 'commit d2')
     assert_raises(StopIteration, next, d2_commit_gen)  # no more commits with files of d2
 
     # union of commits containing passed objects
-    commits_union = gr.get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd2', 'f1'), opj(path, 'file')])
+    commits_union = gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd2', 'f1'), opj(path, 'file')])
     assert_equal(str(next(commits_union).message), 'commit d2')
     assert_equal(str(next(commits_union).message), 'commit d1')
     assert_raises(StopIteration, next, commits_union)
 
     # file2 not commited, so shouldn't exist in commit history
-    no_such_commits = gr.get_files_history([opj(path, 'file2')])
+    no_such_commits = gr._get_files_history([opj(path, 'file2')])
     assert_raises(StopIteration, next, no_such_commits)
 
 @with_testrepos(flavors=local_testrepo_flavors)

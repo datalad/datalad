@@ -845,7 +845,7 @@ class GitRepo(object):
             return content_str.splitlines()
         # TODO: keep splitlines?
 
-    def get_files_history(self, files, branch='HEAD'):
+    def _get_files_history(self, files, branch='HEAD'):
         """
 
         Parameters
