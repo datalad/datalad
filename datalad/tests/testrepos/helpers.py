@@ -78,3 +78,22 @@ def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
 
     return commit_sha, commit_msg
 
+def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
+    """convenience helper
+
+    look up the branches containing a given commit
+    Intended to be used when committing to determine what branch we are at.
+    Note, that git-status is to be avoided as far as possible, due to issues in
+    direct mode submodules and performance.
+
+    Returns
+    -------
+    list of str
+    """
+
+    lookup_branch_cmd = ['git', 'branch', '--contains', commit]
+    out, err = _excute_by_item(lookup_branch_cmd, item=item, exc=exc,
+                               runner=runner, cwd=cwd)
+    return [line[2:] for line in out.splitlines()]
+
+

@@ -27,9 +27,12 @@ from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
 from datalad.support.network import get_local_file_url
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
-    TestRepoCreationError
+    TestRepoCreationError, TestRepoAssertionError
 from datalad.utils import auto_repr, assure_list, on_windows
 from .helpers import _excute_by_item
+from .helpers import _get_last_commit_from_disc
+from .helpers import _get_branch_from_commit
+
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
 
@@ -167,6 +170,13 @@ class ItemRepo(Item):
         if annex and annex_init is None:
             annex_init = True
 
+        if annex and annex_init is False and not src:
+            raise InvalidTestRepoDefinitionError(
+                msg="A non-initialized annex must be created by cloning. "
+                    "'annex_init' must not be False while no 'src' is given.",
+                item=self.__class__
+            )
+
         if annex and annex_version and annex_direct and annex_version >= 6:
             raise InvalidTestRepoDefinitionError(
                 item=self.__class__,
@@ -194,9 +204,9 @@ class ItemRepo(Item):
         self._annex_direct = annex_direct if annex else False
         self._annex_init = annex_init if annex else False
         self._items = set()  # ... of Item
-        self._commits = set()  # ... of tuple (SHA, msg)
+        self._commits = set()  # ... of tuple (SHA, msg)  # For now
         self._branches = set()
-        self._remotes = set()
+        self._remotes = set()  # ... of tuple (name, url)  # For now
         self._super = None  # ItemRepo
 
     # TODO: May be let properties return anything only after creation?
@@ -255,6 +265,7 @@ class ItemRepo(Item):
     # TODO: How to represent commits? SHAs, messages are kind of obvious but
     # what about structure?
     # Just a plain list? A list per branch?
+    # right now, it's a set of tuples (sha, msg)
     @property
     def commits(self):
         return self._commits
@@ -338,7 +349,7 @@ class ItemRepo(Item):
 
         if self._src:
             # we just cloned
-            self.remotes.add('origin')
+            self.remotes.add(('origin', self._src))
 
         # we want to make it an annex
         if self._annex and self._annex_init:
@@ -369,8 +380,10 @@ class ItemRepo(Item):
                                     "Failed to switch to direct mode")
                                 )
 
-            # TODO: Verify annex_version and annex_direct from .git/config
-            # => might go into assert_intact
+            # Note, that we just created the repo. It has to be 'master'.
+            annex_branch = 'annex/direct/master' \
+                if self._annex_direct else 'git-annex'
+            self._branches.add(annex_branch)
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -393,6 +406,14 @@ class ItemRepo(Item):
             assert(not self.is_git)
             if self.annex_version or self.is_direct_mode:
                 assert(self.annex_is_initialized is True)
+            if not self.annex_is_initialized:
+                # This needs to be a clone
+                assert(self._src)
+                assert(('origin', self._src) in self.remotes)
+            else:
+                # TODO: V6 adjusted branch
+                any(b == 'git-annex' or 'annex/direct' in b
+                    for b in self.branches)
 
         if self._src:
             # Note: self._src indicates that we cloned the repo from somewhere.
@@ -402,39 +423,132 @@ class ItemRepo(Item):
             # also remove self._src.
             assert(self.remotes)
 
+        assert_is_instance(self.branches, set)
         [assert_is_instance(b, string_types) for b in self.branches]
+
+        if self.branches:
+            assert self.commits
+            # TODO: Not necessarily vice versa? Could be just detached HEAD, I guess
+
+        assert_is_instance(self.commits, set)
         for c in self.commits:
             assert_is_instance(c, tuple)
             eq_(len(c), 2)
             assert_is_instance(c[0], string_types)  # SHA
             assert_is_instance(c[1], string_types)  # message
 
-        if self.branches:
-            assert self.commits
-            # Not necessarily vice versa? Could be just detached HEAD, I guess.
-
+        assert_is_instance(self.files, list)
         [assert_is_instance(f_, ItemFile) for f_ in self.files]
-        [assert_is_instance(r_, ItemRepo) for r_ in self.submodules]
-        # TODO: What about unregistered repos beneath? May be just part of TestRepo instance, not the ItemRepo.
-
         for it in self.files:
             assert(it.path.startswith(self.path))
+            assert(it._repo is self)
             it.assert_intact()
             # Note: Not actually sure how this would look if there were files
             # moved from one repo to another within the testrepo setup. In case
             # we ever get there: Reconsider whether this should be true:
             [assert_in(commit, self.commits) for commit in it.commits]
 
+        assert_is_instance(self.submodules, list)
+        [assert_is_instance(r_, ItemRepo) for r_ in self.submodules]
         for it in self.submodules:
             assert(it.path.startswith(self.path))
+            assert(it.superproject is self)
             it.assert_intact()
             # TODO: For now, there is no place to easily check for commits that
             # changed submodules (not commits WITHIN them)
-            assert(it.superproject is self)
 
-
-##################
         # physical appearance:
+
+        from os.path import isdir, join as opj
+        # it's a valid repository:
+        assert(exists(self.path))
+        assert(isdir(self.path))
+        assert(exists(opj(self.path, '.git')))
+
+        if self.is_annex and self.annex_is_initialized:
+            # either .git is a dir and has an annex subdir or it's a file
+            # pointing to a dir with an annex subdir
+
+            # Note: This function is actually copied from AnnexRepo, but doesn't
+            # use anything from datalad
+            def git_file_has_annex(p):
+                """Return True if `p` contains a .git file, that points to a git
+                dir with a subdir 'annex'"""
+                _git = opj(p, '.git')
+                if not os.path.isfile(_git):
+                    return False
+                with open(_git, "r") as f:
+                    line = f.readline()
+                    if line.startswith("gitdir: "):
+                        return exists(opj(p, line[8:], 'annex'))
+                    else:
+                        raise TestRepoAssertionError(
+                            msg="Invalid .git-file {p}.".format(p=p)
+                        )
+
+            assert(exists(opj(self.path, '.git', 'annex')) or
+                   git_file_has_annex(self.path))
+
+        # TODO: Verify annex_version and annex_direct from .git/config
+
+        # branches
+        out, err = _excute_by_item(['git', 'branch', '-a'], item=self,
+                                   exc=TestRepoAssertionError(
+                                       "Failed to look up branches")
+                                   )
+
+        branches_from_disc = [line[2:].split()[0] for line in out.splitlines()]
+        eq_(set(branches_from_disc), self.branches)
+        # TODO: are branches pointing to and containing the right commits?
+
+        # state: tested on a per file basis?
+        #        may be some overall test? (ignore submodules)
+
+        # commits (partly done. If they involve a file this should have been tested by ItemFile.assert_intact)
+        #         Q: What else? submodules => same as above
+        #         Can there possibly be more?
+        # TODO: Test commit tree? Requires to represent that structure somehow
+
+        # submodules
+        out, err = _excute_by_item(['git', 'submodule'], item=self,
+                                   exc=TestRepoAssertionError(
+                                       "Failed to look up submodules")
+                                   )
+        submodules_from_disc = []
+        for line in out.splitlines():
+            st = line[0]
+            sha = line[1:41]
+            start_ref = line[42:].find('(')
+            path = line[42:start_ref]
+            ref = line[start_ref:].strip('(', ')') if start_ref > -1 else None
+            submodules_from_disc.append((st, sha, path, ref))
+        # TODO: We don't store everything in ItemRepo yet, so for now just look
+        # at the paths:
+        eq_(set([os.path.relpath(sm.path, self.path) for sm in self.submodules]),
+            set([sm[2] for sm in submodules_from_disc]))
+
+        # superproject
+        # No need to test physically, since we have tested that superproject
+        # points to self for all submodules and we just tested the other
+        # direction (submodules)
+
+        # remotes
+        out, err = _excute_by_item(['git', 'remote', '-v'], item=self,
+                                   exc=TestRepoAssertionError(
+                                       "Failed to look up remotes")
+                                   )
+        # Note: name, url, fetch|push
+        remote_entries = [(line.split()[0],
+                           line.split()[1],
+                           line.split()[2].strip('(', ')')
+                           )
+                          for line in out.splitlines()]
+        # TODO: that's two entries per remote (fetch and push url)
+        # Again, we don't store everything yet, so go for name and fetch url
+        # for now:
+        eq_(set([(rem[0], rem[1]) for rem in remote_entries
+                 if remote_entries[2] == 'fetch']),
+            set(self.remotes))
 
 
 @auto_repr
@@ -820,13 +934,31 @@ class ItemFile(Item):
                             )
 
             # get the commit's SHA for property:
-            from .helpers import _get_last_commit_from_disc
             commit = _get_last_commit_from_disc(
                 item=self,
                 exc=TestRepoCreationError("Failed to look up commit SHA")
             )
             self._commits.add(commit)
             self._repo._commits.add(commit)
+
+            # we may have just created a branch 'repo' should know about. In
+            # particular when this is the first commit ever and thereby
+            # "creating" 'master'.
+            # get the branch and notify repo, that it has that branch:
+            branches = _get_branch_from_commit(item=self, commit=commit[0],
+                                               exc=TestRepoCreationError(
+                                                   "Failed to look up branch")
+                                               )
+            if len(branches) > 1:
+                # we just simply committed. It couldn't rightfully end up in
+                # several branches
+                raise TestRepoCreationError(
+                    msg="Unexpectedly found commit {cmt} in multiple branches: "
+                        "{branches}".format(cmt="%s (%s)" % commit,
+                                            branches=branches),
+                    item=self.__class__
+                )
+            self._repo._branches.add(branches[0])
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -1030,7 +1162,6 @@ class ItemCommit(ItemCommand):
         super(ItemCommit, self).create()
 
         # now, get the commit and let the items know:
-        from .helpers import _get_last_commit_from_disc
         commit = _get_last_commit_from_disc(item=self,
                                             exc=TestRepoCreationError(
                                                 "Failed to look up commit SHA")
@@ -1047,6 +1178,24 @@ class ItemCommit(ItemCommand):
             # should now!
             self._repo._items.add(it)
 
+        # we may have just created a branch 'repo' should know about. In
+        # particular when this is the first commit ever and thereby "creating"
+        # 'master'.
+        # get the branch and notify repo, that it has that branch:
+        branches = _get_branch_from_commit(item=self, commit=commit[0],
+                                           exc=TestRepoCreationError(
+                                               "Failed to look up branch")
+                                           )
+        if len(branches) > 1:
+            # we just simply committed. It couldn't rightfully end up in several
+            # branches
+            raise TestRepoCreationError(
+                msg="Unexpectedly found commit {cmt} in multiple branches: "
+                    "{branches}".format(cmt="%s (%s)" % commit,
+                                        branches=branches),
+                item=self.__class__
+            )
+        self._repo._branches.add(branches[0])
 
 @auto_repr
 class ItemDropFile(ItemCommand):

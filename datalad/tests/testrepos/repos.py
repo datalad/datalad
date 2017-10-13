@@ -323,7 +323,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
             )
 
         # Now, actually create the beast physically:
-        log("Physically creating  %s", self.__class__)
+        log("Physically creating %s", self.__class__)
         self.create()
 
         # There might be ItemRepo(s) besides the top-level one, that were never

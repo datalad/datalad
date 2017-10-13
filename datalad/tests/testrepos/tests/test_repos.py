@@ -15,16 +15,18 @@ from datalad.tests.utils import with_tempfile, assert_raises, swallow_logs
 
 
 @with_tempfile
-def test_TestRepo_instantiation(path):
-    # we can't instantiate the base class due to missing definition:
-    assert_raises(InvalidTestRepoDefinitionError, TestRepo_NEW, path)
-
-
-@with_tempfile
-def test_BasicGit_instantiation(path):
+def test_TestRepo(path):
 
     # Note: Actually, the simple call of the constructor should execute a self
-    # test. Here we just use the most basic valid definition (BasicGit) of a
+    # test. So there is no need to test a subclass of TestRepo other then just
+    # trying to get an instance. Whatever assertion you can think of, should go
+    # right in the correct `assert_intact` in a generic way.
+
+    # Also note, that due to this concept, whenever we create new TestRepo
+    # subclasses we automatically test the code of TestRepo and the Item classes
+    # against this new setup.
+
+    # Here we just use the most basic valid definition (BasicGit) of a
     # TestRepo to test the implementation of TestRepo_NEW. Basically, this is
     # about making sure, that all parts were executed including the assertions
     # defined by TestRepo_NEW and the Item classes.
@@ -37,7 +39,7 @@ def test_BasicGit_instantiation(path):
                  (ItemFile, opj(path, 'test.dat')),
                  (ItemInfoFile, opj(path, 'INFO.txt')),
                  (ItemCommit, '')]:
-        # constructors were executed:
+        # 1. constructors were executed:
         cmp_str = "{class_}{path}".format(class_=item[0],
                                           path=("(%s)" % item[1])
                                           if item[1] else ""
@@ -45,9 +47,24 @@ def test_BasicGit_instantiation(path):
         cml.assert_logged("Processing definition of %s" % cmp_str,
                           level="Level 5",
                           regex=False)
+        if item[0] == BasicGit:
+            # additional constructor messages:
+            cml.assert_logged("Physically creating %s" % BasicGit,
+                              level="Level 5",
+                              regex=False)
+            cml.assert_logged("Check integrity of %s" % BasicGit,
+                              level="Level 5",
+                              regex=False)
 
-        # creation routines called:
-        if item[0] != BasicGit:
+        # 2. creation routines called:
+        if item[0] == BasicGit:
+            # BasicGit actually triggered inherited creation routine:
+            cml.assert_logged("Default creation routine by %s for %s" \
+                              % (TestRepo_NEW, BasicGit),
+                              level="Level 5",
+                              regex=False)
+        else:
+            # actual Items have their own create() called:
             cmp_str = "{create_exec} {it}{detail}".format(
                 create_exec="Executing"
                             if item[0] == ItemCommit
@@ -59,15 +76,21 @@ def test_BasicGit_instantiation(path):
             )
             cml.assert_logged(cmp_str, level="Level 5", regex=False)
 
-        else:
-            # BasicGit
-            cml.assert_logged("Default creation routine by %s for %s" \
-                              % (TestRepo_NEW, BasicGit),
+        # assertions were executed:
+        if item[0] == BasicGit:
+            # BasicGit triggered default assertions from TestRepo_NEW:
+            cml.assert_logged("Default integrity check by %s for %s" %
+                              (TestRepo_NEW, BasicGit),
                               level="Level 5",
                               regex=False)
 
-        # assertions were executed:
-        # TODO:
+        elif item[0] != ItemCommit:
+            # actual Items have their own assert_intact() called:
+            cml.assert_logged("Integrity check for %s(%s)" % (item[0], item[1]),
+                              level="Level 5",
+                              regex=False)
+        # no "else": ItemCommands have no assert_intact by design
+
 
 @with_tempfile
 def test_BasicMixed_instantiation(path):
