@@ -60,7 +60,7 @@ class TestRepoCreationError(TestRepoError):
                super(TestRepoCreationError, self).__str__()
 
 
-class TestRepoAssertionError(TestRepoError):
+class TestRepoAssertionError(TestRepoError, AssertionError):
     """Thrown if assert_* methods of testrepos.items or testrepos.repos
     encountered an error"""
 

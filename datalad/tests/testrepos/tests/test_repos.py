@@ -13,12 +13,15 @@ from datalad.tests.testrepos.repos import *
 from datalad.tests.utils import with_tempfile, assert_raises, swallow_logs
 
 
-
 @with_tempfile
 def test_TestRepo(path):
 
-    # Note: Actually, the simple call of the constructor should execute a self
-    # test. So there is no need to test a subclass of TestRepo other then just
+    # the base class has no definition:
+    assert_raises(InvalidTestRepoDefinitionError, TestRepo_NEW, path)
+
+    # Note: Actually, the simple call of the constructor of a subclass of
+    # TestRepo should execute a self test.
+    # So there is no need to test a subclass of TestRepo other then just
     # trying to get an instance. Whatever assertion you can think of, should go
     # right in the correct `assert_intact` in a generic way.
 
@@ -91,11 +94,26 @@ def test_TestRepo(path):
                               regex=False)
         # no "else": ItemCommands have no assert_intact by design
 
+    # just for demonstration change something in the actual repo:
+    from datalad.cmd import Runner
+    Runner(path).run(['git', 'checkout', '-b', 'new_branch'])
+
+    assert_raises(AssertionError, tr.assert_intact)
+
 
 @with_tempfile
 def test_BasicMixed_instantiation(path):
-    # We only need to instantiate it to test it!
+    # As far as BasicMixed is concerned, we only need to instantiate it to test
+    # it! See comment in test_TestRepo().
     tr = BasicMixed(path)
+
+    # Use the most basic annex to make sure datalad config is respected by
+    # ItemRepo
+    from datalad import cfg
+    version = cfg.obtain("datalad.repo.version")
+    direct = cfg.obtain("datalad.repo.direct")
+    eq_(tr.repo.annex_version, version)
+    eq_(tr.repo.is_direct_mode, direct)
 
 
 

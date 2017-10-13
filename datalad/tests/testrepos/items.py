@@ -158,7 +158,40 @@ class ItemRepo(Item):
         # Or just raise? (Would be from within self.create(), since we need to
         # see what annex actually does.)
 
+        # For now: check against datalad.config and raise if there's a
+        # contradiction. A TestRepo can still have a mechanism to declare itself
+        # invalid for certain configurations and avoid being created
+        # (and thereby getting here) altogether.
+        # The only issue might be that we cannot have mixed annex repo versions
+        # ATM. It's determined by datalad.repo.version for all repos.
+        from datalad import cfg
+        version_from_config = cfg.obtain("datalad.repo.version")
+        direct_from_config = cfg.obtain("datalad.repo.direct")
+        # just to be sure, check v6 vs direct mode conflict
+        if version_from_config >= 6 and direct_from_config:
+            raise InvalidTestRepoDefinitionError(
+                msg="Invalid datalad configuration. There is no direct mode, "
+                    "if you use annex repository version 6 or greater.",
+                item=self.__class__
+            )
+
         log("Processing definition of %s(%s)", self.__class__, path)
+
+        if annex_version is not None and annex_version != version_from_config:
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'annex_version' (v{vp})conflicts with datalad's "
+                    "configuration in \"datalad.repo.version\" (v{vc})"
+                    "".format(vp=annex_version, vc=version_from_config),
+                item=self.__class__
+            )
+
+        if annex_direct is not None and direct_from_config != annex_direct:
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'annex_direct' ({dp})conflicts with datalad's "
+                    "configuration in \"datalad.repo.direct\" ({dc})"
+                    "".format(dp=annex_direct, dc=direct_from_config),
+                item=self.__class__
+            )
 
         if not annex and (annex_version or annex_direct or annex_init):
             raise InvalidTestRepoDefinitionError(
@@ -166,9 +199,6 @@ class ItemRepo(Item):
                 msg="Parameters 'annex_version' or 'annex_direct' or "
                     "'annex_init' were specified, while 'annex' wasn't True."
             )
-
-        if annex and annex_init is None:
-            annex_init = True
 
         if annex and annex_init is False and not src:
             raise InvalidTestRepoDefinitionError(
@@ -183,7 +213,7 @@ class ItemRepo(Item):
                 msg="There is no direct mode, if you use annex repository "
                     "version 6 or greater."
             )
-        if not annex_init and (annex_version or annex_direct):
+        if annex_init is False and (annex_version or annex_direct):
             # Note, that this is about test repos! They are used within the
             # tests by actual datalad code. That code cannot respect what is
             # specified herein regarding the possible initialization of that
@@ -194,9 +224,17 @@ class ItemRepo(Item):
                     "specified, while 'annex_init' wasn't True."
             )
 
+        if annex and annex_init is None:
+            annex_init = True
+
         super(ItemRepo, self).__init__(path=path, runner=runner)
 
-        # TODO: datalad config!
+        # generally we have a valid definition now
+        # set unspecified parameters from datalad config
+        if annex_version is None:
+            annex_version = version_from_config
+        if annex_direct is None:
+            annex_direct = direct_from_config
 
         self._src = src
         self._annex = annex
@@ -350,6 +388,8 @@ class ItemRepo(Item):
         if self._src:
             # we just cloned
             self.remotes.add(('origin', self._src))
+            # TODO: We cloned a branch to add to self._branches!
+            # What's its name?
 
         # we want to make it an annex
         if self._annex and self._annex_init:
@@ -361,6 +401,8 @@ class ItemRepo(Item):
                             exc=TestRepoCreationError(
                                 "Failed to initialize annex")
                             )
+
+            self._branches.add('git-annex')
 
             # TODO: This is code from old test repos that still uses actual
             # datalad code (AnnexRepo in particular). Should be replaced.
@@ -379,11 +421,15 @@ class ItemRepo(Item):
                                 exc=TestRepoCreationError(
                                     "Failed to switch to direct mode")
                                 )
+                # We just created the repo. Go for 'master'.
+                # TODO: This might be different if cloned
+                self._branches.add('annex/direct/master')
 
-            # Note, that we just created the repo. It has to be 'master'.
-            annex_branch = 'annex/direct/master' \
-                if self._annex_direct else 'git-annex'
-            self._branches.add(annex_branch)
+            else:
+                # TODO: we didn't want direct mode (False) or didn't care (None).
+                # check whether it was enforced by annex and adjust attribute or
+                # raise
+                pass
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -510,7 +556,8 @@ class ItemRepo(Item):
         # TODO: Test commit tree? Requires to represent that structure somehow
 
         # submodules
-        out, err = _excute_by_item(['git', 'submodule'], item=self,
+        out, err = _excute_by_item(['git', '--work-tree=.', 'submodule'],
+                                   item=self,
                                    exc=TestRepoAssertionError(
                                        "Failed to look up submodules")
                                    )
