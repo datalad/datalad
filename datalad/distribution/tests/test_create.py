@@ -9,6 +9,10 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from os.path import join as opj
 from os.path import lexists
@@ -135,6 +139,7 @@ def test_create(path):
 
 
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_create_sub(path):
 
     ds = Dataset(path)
@@ -172,6 +177,7 @@ def test_create_sub(path):
 
 
 @with_tree(tree=_dataset_hierarchy_template)
+@known_failure_direct_mode  #FIXME
 def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
     # an existing directory tree
@@ -200,6 +206,8 @@ def test_create_subdataset_hierarchy_from_top(path):
 
 
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_nested_create(path):
     # to document some more organic usage pattern
     ds = Dataset(path).create()
@@ -289,6 +297,7 @@ def test_create_withplugin(path):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_create_text_no_annex(path):
     ds = create(path, text_no_annex=True)
     ok_clean_git(path)

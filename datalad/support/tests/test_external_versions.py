@@ -195,7 +195,12 @@ def test_system_ssh_version():
         ev = ExternalVersions()
         # TODO: figure out leaner way
         class _runner(object):
-            def run(self, cmd):
+            def run(self, cmd, expect_fail, expect_stderr):
                 return "", s
         with patch('datalad.support.external_versions._runner', _runner()):
             assert_equal(ev['cmd:system-ssh'], v)
+
+
+def test_humanize():
+    # doesn't provide __version__
+    assert ExternalVersions()['humanize']

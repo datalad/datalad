@@ -166,7 +166,9 @@ def yield_recursive(ds, path, action, recursion_limit):
             yield subd_res
 
 
-def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
+def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
+                          report_no_revision_change=True,
+                          report_untracked='all'):
     """
     Parameters
     ----------
@@ -202,10 +204,10 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
             # we might want to consider putting 'untracked' here
             # maybe that is a little faster, not tested yet
             ignore_subdatasets='none',
-            # we want to see any individual untracked file, this simplifies further
+            # by default, we want to see any individual untracked file, this simplifies further
             # processing dramatically, but may require subsequent filtering
             # in order to avoid flooding user output with useless info
-            report_untracked='all',
+            report_untracked=report_untracked,
             # no recursion, we needs to update `revision` for every subdataset
             # before we can `diff`
             recursive=False,
@@ -216,6 +218,11 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None):
         if r['status'] in ('impossible', 'error'):
             # something unexpected, tell daddy
             yield r
+            continue
+        # if asked, and no change in revision -- skip
+        if not report_no_revision_change \
+                and (r.get('revision_src') or r.get('revision')) \
+                and (r.get('revision_src') == r.get('revision')):
             continue
         r['status'] = ''
         modified.append(r)
@@ -410,6 +417,20 @@ class AnnotatePaths(Interface):
             when they are not installed, or their mount point directory doesn't
             exist. Disabling saves on command run time, if this information is
             not needed."""),
+        force_untracked_discovery=Parameter(
+            args=("--no-untracked-discovery",),
+            action='store_false',
+            dest='force_untracked_discovery',
+            doc="""Flag to disable discovery of untracked changes.
+                Disabling saves on command run time, if this information is
+                not needed."""),
+        force_no_revision_change_discovery=Parameter(
+            args=("--revision-change-discovery",),
+            action='store_false',
+            dest='force_no_revision_change_discovery',
+            doc="""Flag to disable discovery of changes which were not yet committed.
+            Disabling saves on command run time, if this information is
+            not needed."""),
         modified=Parameter(
             args=("--modified",),
             nargs='?',
@@ -439,6 +460,8 @@ class AnnotatePaths(Interface):
             nondataset_path_status='error',
             force_parentds_discovery=True,
             force_subds_discovery=True,
+            force_no_revision_change_discovery=True,
+            force_untracked_discovery=True,
             modified=None):
         # upfront check for the fastest possible response
         if not path and dataset is None:
@@ -455,7 +478,6 @@ class AnnotatePaths(Interface):
 
         # everything in one big loop to be able too yield as fast a possible
         # without any precomputing for all paths
-
         refds_path = Interface.get_refds_path(dataset)
         if modified is not None and (refds_path is None or not GitRepo.is_valid_repo(refds_path)):
             raise ValueError(
@@ -509,7 +531,7 @@ class AnnotatePaths(Interface):
         requested_paths = assure_list(path)
 
         if modified is not None:
-            # modification detection wwould silently kill all nondataset paths
+            # modification detection would silently kill all nondataset paths
             # but we have to complain about them, hence doing it here
             if requested_paths and refds_path:
                 for r in requested_paths:
@@ -524,8 +546,20 @@ class AnnotatePaths(Interface):
                         **dict(res_kwargs, **path_props))
                     res['status'] = nondataset_path_status
                     res['message'] = 'path not associated with reference dataset'
-                    reported_paths[path] = res
+                    reported_paths[r] = res
                     yield res
+
+            # preserve non-existing paths to be silently killed by modification
+            # detection and append them to requested_paths again after detection.
+            # TODO: This might be melted in with treatment of non dataset paths
+            # above. Re-appending those paths seems to be better than yielding
+            # directly to avoid code duplication, since both cases later on are
+            # dealt with again.
+            preserved_paths = []
+            if requested_paths:
+                [preserved_paths.append(r)
+                 for r in requested_paths
+                 if not lexists(r['path'] if isinstance(r, dict) else r)]
 
             # replace the requested paths by those paths that were actually
             # modified underneath or at a requested location
@@ -534,7 +568,13 @@ class AnnotatePaths(Interface):
                 requested_paths if requested_paths else [refds_path],
                 refds=Dataset(refds_path),
                 revision=modified,
+                report_no_revision_change=force_no_revision_change_discovery,
+                report_untracked='all' if force_untracked_discovery else 'no',
                 recursion_limit=recursion_limit)
+
+            from itertools import chain
+            # re-append the preserved paths:
+            requested_paths = chain(requested_paths, iter(preserved_paths))
 
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
@@ -709,6 +749,8 @@ class AnnotatePaths(Interface):
                         rec_paths,
                         refds=Dataset(refds_path),
                         revision=modified,
+                        report_no_revision_change=force_no_revision_change_discovery,
+                        report_untracked='all' if force_untracked_discovery else 'no',
                         recursion_limit=recursion_limit):
                     res = get_status_dict(**dict(r, **res_kwargs))
                     reported_paths[res['path']] = res

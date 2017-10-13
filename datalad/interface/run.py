@@ -20,8 +20,6 @@ from os.path import join as opj
 from os.path import curdir
 from os.path import normpath
 
-from datalad.cmd import Runner
-
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -37,7 +35,6 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import get_dataset_root
-from datalad.tests.utils import ok_clean_git
 
 lgr = logging.getLogger('datalad.interface.run')
 
@@ -115,6 +112,11 @@ class Run(Interface):
             purpose='tracking outcomes of a command')
         # not needed ATM
         #refds_path = ds.path
+
+        # delayed imports
+        from datalad.cmd import Runner
+        from datalad.tests.utils import ok_clean_git
+
         lgr.debug('tracking command output underneath %s', ds)
         try:
             # base assumption is that the animal smells superb

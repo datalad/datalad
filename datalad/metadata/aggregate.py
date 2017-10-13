@@ -216,7 +216,6 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
             # in this case we need to find the chain of submodules leading to it and
             # save then bottom-up
             testpath = dirname(subds_relpath)
-            sdohf
             while testpath:
                 repo = ds.subdatasets(contains=testpath, result_xfm='datasets', return_type='item-or-list')
                 repo.repo.add(relpath(subds_relpath, testpath), git=True)

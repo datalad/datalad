@@ -230,6 +230,8 @@ class RemoteNotAvailableError(CommandError):
     #       fatal: Could not read from remote repository.
     # or it's a GitPython call
     #   => ValueError "Remote named 'NotExistingRemote' didn't exist"
+    # and another one:
+    #   see GitRepo.remove_remote()
 
     def __init__(self, remote, **kwargs):
         """

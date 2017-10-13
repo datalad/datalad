@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import known_failure_direct_mode
+
 import logging
 from os.path import join as opj
 from datalad.utils import chpwd
@@ -88,6 +90,7 @@ def test_basics(path, nodspath):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_rerun(path, nodspath):
     ds = Dataset(path).create()
     sub = ds.create('sub')

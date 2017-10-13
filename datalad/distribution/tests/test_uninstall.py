@@ -9,6 +9,10 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from os.path import join as opj, split as psplit
 from os.path import exists, lexists
@@ -70,6 +74,7 @@ def test_uninstall_uninstalled(path):
 
 
 @with_tempfile()
+@known_failure_direct_mode  #FIXME
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
@@ -143,6 +148,7 @@ def test_uninstall_annex_file(path):
     ok_(not exists(opj(path, 'test-annex.dat')))
 
 
+@known_failure_v6  # FIXME: git files end up in annex, therefore drop result is different
 @with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_git_file(path):
     ds = Dataset(path)
@@ -174,6 +180,7 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
+@known_failure_v6  #FIXME  Note: Failure seems to somehow be depend on PY2/PY3
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
@@ -219,6 +226,7 @@ def test_uninstall_subdataset(src, dst):
             'keep': 'keep1', 'kill': 'kill1'}},
     'keep': 'keep2',
     'kill': 'kill2'})
+@known_failure_direct_mode  #FIXME
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
     subds = ds.create('deep', force=True)
@@ -267,7 +275,8 @@ def test_uninstall_dataset(path):
     ok_(not exists(ds.path))
 
 
-@with_tree({'one': 'test', 'two': 'test'})
+@with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
+@known_failure_direct_mode  #FIXME
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
     ds.add(os.curdir)
@@ -282,13 +291,22 @@ def test_remove_file_handle_only(path):
     path_two = opj(ds.path, 'two')
     ok_(exists(path_two))
     # remove one handle, should not affect the other
-    ds.remove('two', check=False)
+    ds.remove('two', check=False, message="custom msg")
+    eq_(ds.repo.repo.head.commit.message.rstrip(), "custom msg")
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
+    # remove file without specifying the dataset -- shouldn't fail
+    with chpwd(path):
+        remove('one', check=False)
+        ok_(not exists("one"))
+    # and we should be able to remove without saving
+    ds.remove('three', check=False, save=False)
+    ok_(ds.repo.is_dirty())
 
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
+@known_failure_direct_mode  #FIXME
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
@@ -349,6 +367,7 @@ def test_remove_dataset_hierarchy(path):
 
 
 @with_tempfile()
+@known_failure_direct_mode  #FIXME
 def test_careless_subdataset_uninstall(path):
     # nested datasets
     ds = Dataset(path).create()
@@ -367,6 +386,7 @@ def test_careless_subdataset_uninstall(path):
 
 
 @with_tempfile()
+@known_failure_direct_mode  #FIXME
 def test_kill(path):
     # nested datasets with load
     ds = Dataset(path).create()
@@ -440,6 +460,7 @@ def test_remove_recursive_2(tdir):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_failon_nodrop(path):
     # test to make sure that we do not wipe out data when checks are enabled
     # despite the general error behavior mode

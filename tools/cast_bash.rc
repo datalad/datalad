@@ -59,4 +59,4 @@ git config --global core.pager cat
 
 
 # cleanup at the end
-trap "cd ; datalad remove $SCREENCAST_HOME/demo -r --nocheck > /dev/null" EXIT
+trap "cd ; datalad remove $SCREENCAST_HOME/demo -r --nocheck > /dev/null 2>&1" EXIT

@@ -9,6 +9,10 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from os import chmod
 import stat
@@ -298,13 +302,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
 
     sub1 = Dataset(opj(src_path, "subm 1"))
-    sub2 = Dataset(opj(src_path, "subm 2"))
+    sub2 = Dataset(opj(src_path, "2"))
 
     for flat in False, True:
         target_path_ = target_dir_tpl = target_path + "-" + str(flat)
@@ -325,7 +330,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 ui=True)
 
         # raise if git repos were not created
-        for suffix in [sep + 'subm 1', sep + 'subm 2', '']:
+        for suffix in [sep + 'subm 1', sep + '2', '']:
             target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
@@ -368,6 +373,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -430,6 +437,7 @@ def test_failon_no_permissions(src_path, target_path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_replace_and_relative_sshpath(src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653
@@ -535,4 +543,4 @@ def test_target_ssh_inherit():
     #   https://github.com/datalad/datalad/issues/1274
     #yield _test_target_ssh_inherit, None      # no wanted etc
     #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files
+    yield known_failure_direct_mode(_test_target_ssh_inherit), 'backup'  # backup -- all data files  #FIXME

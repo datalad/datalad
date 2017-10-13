@@ -12,6 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from os.path import join as opj
 from datalad.utils import chpwd
 
@@ -43,6 +47,7 @@ def test_magic_number():
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@known_failure_v6  #FIXME
 def test_diff(path, norepo):
     with chpwd(norepo):
         assert_status('impossible', diff(on_failure='ignore'))
@@ -141,6 +146,7 @@ def test_diff(path, norepo):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_diff_recursive(path):
     ds = Dataset(path).create()
     sub = ds.create('sub')

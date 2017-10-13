@@ -78,6 +78,8 @@ from .exceptions import RemoteNotAvailableError
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
+from .exceptions import AccessDeniedError
+from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -195,6 +197,13 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if version is None:
             version = self.config.get("datalad.repo.version", None)
+            # we might get an empty string here
+            # TODO: if we use obtain() instead, we get an error complaining
+            # '' cannot be converted to int (via Constraint as defined for
+            # "datalad.repo.version" in common_cfg
+            # => Allow conversion to result in None?
+            if not version:
+                version = None
 
         if fix_it:
             self._init(version=version, description=description)
@@ -532,13 +541,20 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     submodules=False, path=path):
                     sm_dirty = True
             else:
-                raise InvalidGitRepositoryError
+                # uninitialized submodule
+                # it can't be dirty and we can't recurse any deeper:
+                continue
 
             if sm_dirty:
                 # the submodule itself is dirty
                 modified_subs.append(sm.path)
             else:
                 # the submodule itself is clean, recurse:
+                # TODO: This fails ATM with AttributeError, if sm is a GitRepo.
+                # we need get_status and this recursion method to be available
+                # to both classes. Issue: We need to be able to come back to
+                # AnnexRepo from GitRepo if there's again an annex beneath. But
+                # we can't import AnnexRepo in gitrepo.py.
                 modified_subs.extend(
                     sm_repo._submodules_dirty_direct_mode(
                         untracked=untracked, deleted=deleted,
@@ -588,6 +604,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # this is for use with older annex, which didn't exit non-zero
             # in case of the failure we are interested in
+
+            # TODO: If we are to keep this workaround (we probably rely on a
+            # newer annex anyway), we should not use swallow_logs, since we
+            # actually don't want to swallow it, but inspect it. Use a proper
+            # handler/filter for the logger instead to not create temp files via
+            # swallow_logs
 
             old_log_state = self.cmd_call_wrapper.log_outputs
             self.cmd_call_wrapper._log_opts['outputs'] = True
@@ -760,7 +782,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # purpose of the call to find this repository. Therefore
             # core.bare=False has no effect at all.
 
-            # Disabeld. See notes.
+            # Disabled. See notes.
             # git_options.extend(['-c', 'core.bare=False'])
             # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
             #                               git_options=git_options)
@@ -783,13 +805,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cmd.append("--git-dir")
 
             try:
-                with swallow_logs():
-                    toppath, err = GitRunner().run(
-                        cmd,
-                        cwd=path,
-                        log_stdout=True, log_stderr=True,
-                        expect_fail=True, expect_stderr=True)
-                    toppath = toppath.rstrip('\n\r')
+                toppath, err = GitRunner().run(
+                    cmd,
+                    cwd=path,
+                    log_stdout=True, log_stderr=True,
+                    expect_fail=True, expect_stderr=True)
+                toppath = toppath.rstrip('\n\r')
             except CommandError:
                 return None
             except OSError:
@@ -919,6 +940,41 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return remotes
 
+    def get_special_remotes(self):
+        """Get info about all known (not just enabled) special remotes.
+
+        Returns
+        -------
+        dict
+          Keys are special remore UUIDs, values are dicts with arguments
+          for `git-annex enableremote`. This includes at least the 'type'
+          and 'name' of a special remote. Each type of special remote
+          may require addition arguments that will be available in the
+          respective dictionary.
+        """
+        try:
+            stdout, stderr = self._git_custom_command(
+                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
+                expect_fail=True)
+        except CommandError as e:
+            if 'Not a valid object name git-annex:remote.log' in e.stderr:
+                # no special remotes configures
+                return {}
+            else:
+                # some unforseen error
+                raise e
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
+        for line in stdout.splitlines():
+            # be precise and split by spaces
+            fields = line.split(' ')
+            # special remote UUID
+            sr_id = fields[0]
+            # the rest are config args for enableremote
+            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            srs[sr_id] = sr_info
+        return srs
+
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
@@ -949,7 +1005,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
-        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
+        debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
         backend = ['--backend=%s' % backend] if backend else []
 
         git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
@@ -1238,32 +1294,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # options  might be the '--key' which should go last
         options = ['--json-progress'] + options
 
-        # Note: Currently swallowing logs, due to the workaround to report files
-        # not found, but don't fail and report about other files and use JSON,
-        # which are contradicting conditions atm. (See _run_annex_command_json)
-
-        # YOH:  oh -- this puts quite a bit of stress on the pipe since now
-        # annex runs in --debug mode spitting out shits load of information.
-        # Since nothing was hardcoded in tests, have no clue what was expected
-        # effect.  I will swallow the logs so they don't scare the user, but only
-        # in non debugging level of logging
-        cm = swallow_logs() \
-            if lgr.getEffectiveLevel() > logging.DEBUG \
-            else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        with cm:
-            # TODO: reproduce DK's bug on OSX, and either switch to
-            #  --batch mode (I don't think we have --progress support in long
-            #  alive batch processes ATM),
-            #
-            results = self._run_annex_command_json(
-                'get',
-                args=options,
-                # TODO: eventually make use of --batch mode
-                files=files,  # fetch_files
-                jobs=jobs,
-                expected_entries=expected_downloads)
+        # TODO: reproduce DK's bug on OSX, and either switch to
+        #  --batch mode (I don't think we have --progress support in long
+        #  alive batch processes ATM),
+        #
+        results = self._run_annex_command_json(
+            'get',
+            args=options,
+            # TODO: eventually make use of --batch mode
+            files=files,  # fetch_files
+            jobs=jobs,
+            expected_entries=expected_downloads)
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
         # and vomit an exception of incomplete download????
@@ -1320,7 +1363,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_paths
     def add(self, files, git=None, backend=None, options=None, commit=False,
-            msg=None, dry_run=False,
+            msg=None,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False,
             update=False):
@@ -1339,9 +1382,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           the list of files that were added, is created by default.
         backend:
         options:
-        dry_run : bool, optional
-          Calls git add with --dry-run -N --ignore-missing, to just output list
-          of files to be added
         update: bool
           --update option for git-add. From git's manpage:
            Update the index just where it already has an entry matching
@@ -1376,95 +1416,111 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
-        if dry_run:
 
-            git_options = ['--dry-run', '-N', '--ignore-missing']
+        def _get_to_be_added_recs(paths):
+            """Try to collect what actually is going to be added
+
+            This is used for progress information
+            """
+
+            if self.is_direct_mode():
+                # we already know we can't use --dry-run
+                return self._process_git_get_output(
+                    linesep.join(["'{}'".format(p) for p in paths]))
+            else:
+                # Note: if a path involves a submodule in direct mode, while we
+                # are not in direct mode at current level, we might still fail.
+                # Hence the except clause is still needed. However, this is
+                # unlikely, since direct mode usually should be used only, if it
+                # was enforced by FS and/or OS and therefore concerns the entire
+                # hierarchy.
+                _git_options = ['--dry-run', '-N', '--ignore-missing']
+                try:
+                    return super(AnnexRepo, self).add(
+                        files, git_options=_git_options, update=update)
+                except CommandError as e:
+                    if re.match(
+                            r'.*This operation must be run in a work tree.*git status.*failed in submodule',
+                            e.stderr,
+                            re.MULTILINE | re.DOTALL):
+
+                        lgr.warning(
+                            "Known bug in direct mode."
+                            "We can't use --dry-run when there are submodules in "
+                            "direct mode, because the internal call to git status "
+                            "fails. To be resolved by using (Dataset's) status "
+                            "instead of a git-add --dry-run altogether.")
+                        # fake the return for now
+                        return self._process_git_get_output(
+                            linesep.join(["'{}'".format(f) for f in files]))
+                    else:
+                        # unexpected failure
+                        raise e
+
+        # Theoretically we could have done for git as well, if it could have
+        # been batched
+        # Call git annex add for any to have full control of either to go
+        # to git or to annex
+        # 1. Figure out what actually will be added
+        to_be_added_recs = _get_to_be_added_recs(files)
+        # collect their sizes for the progressbar
+        expected_additions = {
+            rec['file']: self.get_file_size(rec['file'])
+            for rec in to_be_added_recs
+        }
+
+        # if None -- leave it to annex to decide
+        if git is not None:
+            if 'annex.version' in self.config and \
+                    self.config.getint("annex", "version") == 6:
+                # Note: For now ugly workaround to prevent unexpected
+                # outcome when adding to git. See:
+                # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
+                lgr.warning("Workaround: Wait for {} to add to git ({})."
+                            "".format(files, self))
+                time.sleep(1)
+
+            options += [
+                '-c',
+                'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
+            ]
+            if git:
+                # to maintain behaviour similar to git
+                options += ['--include-dotfiles']
+
+        if git and update:
+            # explicitly use git-add with --update instead of git-annex-add
+            # TODO: This might still need some work, when --update AND files
+            # are specified!
+            if self.is_direct_mode():
+                self.GIT_DIRECT_MODE_PROXY = True
             try:
                 return_list = super(AnnexRepo, self).add(
-                    files, git_options=git_options, update=update)
-            except CommandError as e:
-                if "fatal: This operation must be run in a work tree" \
-                   in e.stderr and \
-                   "fatal: 'git status --porcelain' failed in submodule" \
-                   in e.stderr:
-
-                    lgr.warning(
-                        "Known bug in direct mode."
-                        "We can't use --dry-run when there are submodules in "
-                        "direct mode, because the internal call to git status "
-                        "fails. To be resolved by using (Dataset's) status "
-                        "instead of a git-add --dry-run altogether.")
-                    # fake the return for now
-                    return_list = self._process_git_get_output(
-                        linesep.join(["'{}'".format(f) for f in files]))
-                else:
-                    # unexpected failure
-                    raise e
-        else:
-            # Theoretically we could have done for git as well, if it could have
-            # been batched
-            # Call git annex add for any to have full control of either to go
-            # to git or to annex
-            # 1. Figure out what actually will be added
-            to_be_added_recs = self.add(files, git=True, dry_run=True)
-            # collect their sizes for the progressbar
-            expected_additions = {
-                rec['file']: self.get_file_size(rec['file'])
-                for rec in to_be_added_recs
-            }
-
-            # if None -- leave it to annex to decide
-            if git is not None:
-                if 'annex.version' in self.config and \
-                        self.config.getint("annex", "version") == 6:
-                    # Note: For now ugly workaround to prevent unexpected
-                    # outcome when adding to git. See:
-                    # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
-                    lgr.warning("Workaround: Wait for {} to add to git ({})."
-                                "".format(files, self))
-                    time.sleep(1)
-
-                options += [
-                    '-c',
-                    'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
-                ]
-                if git:
-                    # to maintain behaviour similar to git
-                    options += ['--include-dotfiles']
-
-            if git and update:
-                # explicitly use git-add with --update instead of git-annex-add
-                # TODO: This might still need some work, when --update AND files
-                # are specified!
+                                           files,
+                                           # Note: committing is dealed with
+                                           # later on
+                                           commit=False,
+                                           msg=msg,
+                                           git=True,
+                                           git_options=git_options,
+                                           _datalad_msg=_datalad_msg,
+                                           update=update)
+            finally:
                 if self.is_direct_mode():
-                    self.GIT_DIRECT_MODE_PROXY = True
-                try:
-                    return_list = super(AnnexRepo, self).add(
-                                               files,
-                                               # Note: committing is dealed with
-                                               # later on
-                                               commit=False,
-                                               msg=msg,
-                                               git=True,
-                                               git_options=git_options,
-                                               _datalad_msg=_datalad_msg,
-                                               update=update)
-                finally:
-                    if self.is_direct_mode():
-                        # don't accidentally cause other git calls to be done
-                        # via annex-proxy
-                        self.GIT_DIRECT_MODE_PROXY = False
+                    # don't accidentally cause other git calls to be done
+                    # via annex-proxy
+                    self.GIT_DIRECT_MODE_PROXY = False
 
-            else:
-                return_list = list(self._run_annex_command_json(
-                    'add',
-                    args=options + files,
-                    backend=backend,
-                    expect_fail=True,
-                    jobs=jobs,
-                    expected_entries=expected_additions,
-                    expect_stderr=True
-                ))
+        else:
+            return_list = list(self._run_annex_command_json(
+                'add',
+                args=options + files,
+                backend=backend,
+                expect_fail=True,
+                jobs=jobs,
+                expected_entries=expected_additions,
+                expect_stderr=True
+            ))
 
         if commit:
             if msg is None:
@@ -1609,15 +1665,28 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
 
         if self.is_direct_mode():
+
+            # TODO:
+            # If anything there should be a CommandNotAvailableError now:
             lgr.debug("'%s' is in direct mode, "
                       "'annex unlock' not available", self)
             lgr.warning("In direct mode there is no 'unlock'. However if "
                         "the file's content is present, it is kind of "
                         "unlocked. Therefore just checking whether this is "
                         "the case.")
+            # TODO/FIXME:
+            # Note: the following isn't exactly nice, if `files` is a dir.
+            # For a "correct" result we would need to report all files within
+            # potential dir(s) in `files`, that are annexed and have content.
+            # Also note, that even now files in git might be reported "unlocked",
+            # since they have content. This might be a confusing result.
+            # On the other hand, this is solved on the level of Dataset.unlock
+            # by annotating those paths 'notneeded' beforehand.
             return [f for f in files if self.file_has_content(f)]
 
         else:
+
+            # TODO: catch and parse output if failed (missing content ...)
             std_out, std_err = \
                 self._run_annex_command('unlock', annex_options=files + options)
 
@@ -1798,7 +1867,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('initremote', annex_options=[name] + options)
         self.config.reload()
 
-    def enable_remote(self, name):
+    def enable_remote(self, name, env=None):
         """Enables use of an existing special remote
 
         Parameters
@@ -1807,7 +1876,20 @@ class AnnexRepo(GitRepo, RepoInterface):
             name, the special remote was created with
         """
 
-        self._run_annex_command('enableremote', annex_options=[name])
+        try:
+            self._run_annex_command(
+                'enableremote',
+                annex_options=[name],
+                expect_fail=True,
+                log_stderr=True,
+                env=env)
+        except CommandError as e:
+            if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
+                raise AccessDeniedError(e.stderr)
+            elif 'FailedConnectionException' in e.stderr:
+                raise AccessFailedError(e.stderr)
+            else:
+                raise e
         self.config.reload()
 
     def merge_annex(self, remote=None):
@@ -2538,9 +2620,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     else:
                         options = ["--allow-empty-message"]
 
-                # committing explicitly given paths in direct mode via proxy used to
-                # fail, because absolute paths are used. Using annex proxy this
-                # leads to an error (path outside repository)
+                # committing explicitly given paths in direct mode via proxy
+                # used to fail, because absolute paths are used. Using annex
+                # proxy this leads to an error (path outside repository)
                 if files:
                     files = assure_list(files)
                     if options is None:
@@ -2860,21 +2942,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         if options:
             annex_options.extend(shlex.split(options))
 
-        cm = swallow_logs() \
-            if lgr.getEffectiveLevel() > logging.DEBUG \
-            else nothing_cm()
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        with cm:
-            results = self._run_annex_command_json(
-                'copy',
-                args=annex_options,
-                files=files,  # copy_files,
-                jobs=jobs,
-                expected_entries=expected_copys
-                #log_stdout=True, log_stderr=not log_online,
-                #log_online=log_online, expect_stderr=True
-            )
+        results = self._run_annex_command_json(
+            'copy',
+            args=annex_options,
+            files=files,  # copy_files,
+            jobs=jobs,
+            expected_entries=expected_copys
+            #log_stdout=True, log_stderr=not log_online,
+            #log_online=log_online, expect_stderr=True
+        )
         results_list = list(results)
         # XXX this is the only logic different ATM from get
         # check if any transfer failed since then we should just raise an Exception

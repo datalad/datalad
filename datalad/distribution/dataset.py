@@ -38,7 +38,6 @@ from datalad.support.network import RI
 
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import swallow_logs
 from datalad.utils import get_dataset_root
 from datalad.distribution.utils import get_git_dir
 
@@ -76,7 +75,25 @@ def resolve_path(path, ds=None):
 
 @add_metaclass(Flyweight)
 class Dataset(object):
+    """Representation of a DataLad dataset/repository
 
+    This is the core data type of DataLad: a representation of a dataset.
+    At its core, datasets are (git-annex enabled) Git repositories. This
+    class provides all operations that can be performed on a dataset.
+
+    Creating a dataset instance is cheap, all actual operations are
+    delayed until they are actually needed. Creating multiple `Dataset`
+    class instances for the same Dataset location will automatically
+    yield references to the same object.
+
+    A dataset instance comprises of two major components: a `repo`
+    attribute, and a `config` attribute. The former offers access to
+    low-level functionality of the Git or git-annex repository. The
+    latter gives access to a dataset's configuration manager.
+
+    Most functionality is available via methods of this class, but also
+    as stand-alone functions with the same name in `datalad.api`.
+    """
     # Begin Flyweight
     _unique_instances = WeakValueDictionary()
 
@@ -128,6 +145,13 @@ class Dataset(object):
     # End Flyweight
 
     def __init__(self, path):
+        """
+        Parameters
+        ----------
+        path : str
+          Path to the dataset location. This location may or may not exist
+          yet.
+        """
         self._path = path
         self._repo = None
         self._id = None
@@ -174,29 +198,28 @@ class Dataset(object):
         # TODO: Still this is somewhat problematic. We can't invalidate strong
         # references
 
-        with swallow_logs():
-            for cls, ckw, kw in (
-                    # TODO: Do we really want allow_noninitialized=True here?
-                    # And if so, leave a proper comment!
-                    (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                    (GitRepo, {}, {})
-            ):
-                if cls.is_valid_repo(self._path, **ckw):
-                    try:
-                        lgr.debug("Detected %s at %s", cls, self._path)
-                        self._repo = cls(self._path, create=False, **kw)
-                        break
-                    except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                        lgr.debug(
+        for cls, ckw, kw in (
+                # TODO: Do we really want to allow_noninitialized=True here?
+                # And if so, leave a proper comment!
+                (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                (GitRepo, {}, {})
+        ):
+            if cls.is_valid_repo(self._path, **ckw):
+                try:
+                    lgr.log(5, "Detected %s at %s", cls, self._path)
+                    self._repo = cls(self._path, create=False, **kw)
+                    break
+                except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                    lgr.log(5,
                             "Oops -- guess on repo type was wrong?: %s",
                             exc_str(exc))
-                        pass
-                    # version problems come as RuntimeError: DO NOT CATCH!
+                    pass
+                # version problems come as RuntimeError: DO NOT CATCH!
         if self._repo is None:
             # Often .repo is requested to 'sense' if anything is installed
             # under, and if so -- to proceed forward. Thus log here only
             # at DEBUG level and if necessary "complaint upstairs"
-            lgr.debug("Failed to detect a valid repo at %s" % self.path)
+            lgr.log(5, "Failed to detect a valid repo at %s", self.path)
 
         return self._repo
 
@@ -237,6 +260,7 @@ class Dataset(object):
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None, edges=False):
+        """DEPRECATED: use `subdatasets()`"""
         # TODO wipe this function out completely once we are comfortable
         # with it. Internally we don't need or use it anymore.
         import inspect

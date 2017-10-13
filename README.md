@@ -9,9 +9,9 @@
 
 The full documentation is available at: http://docs.datalad.org
 
-# 1000ft overview
+# 10000ft overview
 
-DataLad aims to make data management and data distribution more accessible.
+DataLad makes data management and data distribution more accessible.
 To do that it stands on the shoulders of [Git] and [Git-annex] to deliver a
 decentralized system for data exchange. This includes automated ingestion of
 data from online portals, and exposing it in readily usable form as Git(-annex)
@@ -25,6 +25,17 @@ the focus is increasingly shifting towards robust and safe operation
 with a sensible API. Organization and configuration are still subject of 
 considerable reorganization and standardization.  However, DataLad is, 
 in fact, usable today and user feedback is always welcome.
+
+# Support
+
+[Neurostars](https://neurostars.org) is the preferred venue for DataLad
+support.  Forum login is possible with your existing Google, Twitter, or GitHub
+account.  Before posting a [new
+topic](https://neurostars.org/new-topic?tags=datalad), please check the
+[previous posts](https://neurostars.org/search?q=tags%3Adatalad) tagged with
+`#datalad`. To get help on a datalad-related issue, please consider to follow
+this [message
+template](https://neurostars.org/new-topic?body=-%20Please%20describe%20the%20problem.%0A-%20What%20steps%20will%20reproduce%20the%20problem%3F%0A-%20What%20version%20of%20DataLad%20are%20you%20using%20%28run%20%60datalad%20--version%60%29%3F%20On%20what%20operating%20system%20%28consider%20running%20%60datalad%20plugin%20wtf%60%29%3F%0A-%20Please%20provide%20any%20additional%20information%20below.%0A-%20Have%20you%20had%20any%20luck%20using%20DataLad%20before%3F%20%28Sometimes%20we%20get%20tired%20of%20reading%20bug%20reports%20all%20day%20and%20a%20lil'%20positive%20end%20note%20does%20wonders%29&tags=datalad).
 
 # DataLad 101
 
