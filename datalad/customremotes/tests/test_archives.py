@@ -8,11 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from ..archives import ArchiveAnnexCustomRemote
+from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
 from ...cmd import Runner, GitRunner
+from ...utils import _path_
 
 from . import _get_custom_runner
 
@@ -41,6 +47,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
+    assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
     annex.add(fn_archive, commit=True, msg="Added tarball")
@@ -76,9 +83,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
-    with swallow_logs(new_level=logging.WARN) as cm:
-        assert_raises(RuntimeError, annex.drop, fn_extracted)
-        in_("git-annex: drop: 1 failed", cm.out)
+    assert_false(annex.drop(fn_extracted)['success'])
 
     annex.add_url_to_file(fn_extracted, file_url)
     annex.drop(fn_extracted)
@@ -86,9 +91,9 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo(d2, d,
-                           runner=_get_custom_runner(d2),
-                           direct=direct)
+    cloned_annex = AnnexRepo.clone(d, d2,
+                                   runner=_get_custom_runner(d2),
+                                   direct=direct)
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
@@ -99,6 +104,17 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # as a result it would also fetch tarball
     assert_true(cloned_annex.file_has_content(fn_archive))
 
+    # Check if protocol was collected
+    if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE'):
+        assert_is_instance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol)
+        protocol_file = _path_(annex.path,
+                               '.git/bin/git-annex-remote-datalad-archive')
+        ok_file_has_content(protocol_file, "VERSION 1", re_=True, match=False)
+        ok_file_has_content(protocol_file, "GETAVAILABILITY", re_=True, match=False)
+        ok_file_has_content(protocol_file, "#!/bin/bash", re_=True, match=False)
+    else:
+        assert_false(isinstance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol))
+
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
@@ -107,6 +123,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
+@known_failure_direct_mode  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)

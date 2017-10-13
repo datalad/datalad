@@ -20,7 +20,7 @@ def check_run_and_get_output(cmd):
     runner = Runner()
     try:
         # suppress log output happen it was set to high values
-        with patch.dict('os.environ', {'DATALAD_LOGLEVEL': 'WARN'}):
+        with patch.dict('os.environ', {'DATALAD_LOG_LEVEL': 'WARN'}):
             output = runner.run(["datalad", "--help"])
     except CommandError as e:
         raise AssertionError("'datalad --help' failed to start normally. "

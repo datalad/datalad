@@ -18,10 +18,12 @@ from ..dochelpers import exc_str
 from .utils import assert_equal, assert_true, assert_raises
 from .utils import assert_re_in
 
+
 def test_basic():
     assert_equal(single_or_plural('a', 'b', 1), 'a')
     assert_equal(single_or_plural('a', 'b', 0), 'b')
     assert_equal(single_or_plural('a', 'b', 123), 'b')
+    assert_equal(single_or_plural('a', 'b', 123, include_count=True), '123 b')
 
 
 def test_borrow_doc():
@@ -163,3 +165,8 @@ def test_exc_str():
     assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
     assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
     assert_equal(estr_, estr1)
+
+    try:
+        raise NotImplementedError
+    except Exception as e:
+        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str:...\]", exc_str(e))

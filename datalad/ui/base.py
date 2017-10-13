@@ -13,15 +13,15 @@
 __docformat__ = 'restructuredtext'
 
 from abc import ABCMeta, abstractmethod
+from six import add_metaclass
 
 from ..utils import auto_repr
 
 
 @auto_repr
+@add_metaclass(ABCMeta)
 class InteractiveUI(object):
     """Semi-abstract class for interfaces to implement interactive UI"""
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def question(self, text,

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>DataLad Repository</title>
+        <link rel="icon" type="image/png" sizes="16x16" href=".git/datalad/web/assets/images/favicon-16x16.png?v=1">
+        <link rel="shortcut icon" href=".git/datalad/web/assets/images/favicon.ico?v=1">
+        <link rel="stylesheet" type="text/css" href=".git/datalad/web/assets/css/jquery.dataTables-1.10.12.css">
+        <style type="text/css">
+          body{ max-width: 1200px; margin: 2em auto; }
+	      .dataTables_filter { position: relative; clear: both; float: unset !important; }
+          #directory_filter > label { float: right; }
+          span.breadcrumb { font-size: 13pt; float: left; margin: 0.3em 1.3em .3em .3em; }
+          span.breadcrumb a { text-decoration: none; }
+          span.cwd { font-weight: bold; color: #777777; }
+          span.dir { font-weight: bold; color: #00A1CB; }
+          span.git { font-weight: bold; color: #00BA88; }
+          span.annex { font-weight: bold; color: #EC6C20; }
+          span.gittag { font-size: 70%; font-weight: normal;  vertical-align: super;}
+
+          td.dir { font-weight: bold; color: #00A1CB; }
+          td.git { font-weight: bold; color: #00BA88; }
+          td.uninitialized { font-weight: bold; color: #00BA88; text-decoration: line-through; }
+          td.annex { font-weight: bold; color: #EC6C20; }
+          td.link-broken { color:#E53B51; }
+          td.link { color: #FFD03C; }
+          td.file { color: #67CDDC; }
+
+          #installation { font-size: 90%; background-color: #fcfcfc; padding: 0em 0.5em 0.5em 0.5em; margin: 0em 0.5em 0.5em 0.5em; }
+          .command { font-family: monospace; font-weight: bold; color: darkgray; padding-left: 2em;}
+          .command-option { font-family: monospace; font-weight: bold; color: darkgray; }
+        </style>
+    </head>
+    <body>
+        <div>
+            <div style="float: left; width: 196px;">
+                <a href="http://www.datalad.org" alt="DataLad website">
+                    <img src=".git/datalad/web/assets/images/logo_wide.svg" width="196" alt="DataLad Repository">
+                </a>
+            </div>
+            <div style="float: right; min-width: 50%; max-width: 80%;" id="installation">
+            </div>
+        </div>
+
+        <div id="content"></div>
+	<noscript>
+	  <div style="border: 2px solid #E53B51; padding: 10px">
+	    <span style="font-weight:bold">Javascript is not enabled!</span>
+	  </div>
+	</noscript>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/jquery-2.2.4.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/jquery.dataTables-1.10.12.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/md5-2.3.0.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/main.js"></script>
+        <script>
+	  jQuery(document).ready(function() {
+	    var table = directory(jQuery, md5);  // construct table based on files in directory and their metadata
+	  });
+	</script>
+    </body>
+</html>

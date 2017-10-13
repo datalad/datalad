@@ -11,28 +11,38 @@
 """
 
 import logging
+import uuid
 
 from os import listdir
 from os.path import isdir
+from os.path import relpath
+from os.path import join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.annotate_paths import AnnotatePaths
+from datalad.interface.utils import eval_results
+from datalad.interface.base import build_doc
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import dataset_description
-from datalad.interface.common_opts import add_to_superdataset
+from datalad.interface.common_opts import location_description
+from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import shared_access_opt
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureKeyChoice
 from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import to_options
 from datalad.utils import getpwd
+from datalad.utils import get_dataset_root
+from datalad.utils import path_startswith
 
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
+from .subdatasets import Subdatasets
 
 
 __docformat__ = 'restructuredtext'
@@ -40,18 +50,23 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.create')
 
 
+@build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
 
     This command initializes a new :term:`dataset` at a given location, or the
     current directory. The new dataset can optionally be registered in an
     existing :term:`superdataset` (the new dataset's path needs to be located
-    within the superdataset for that, and the superdataset will be detected
-    automatically). It is recommended to provide a brief description to label
+    within the superdataset for that, and the superdataset needs to be given
+    explicitly). It is recommended to provide a brief description to label
     the dataset's nature *and* location, e.g. "Michael's music on black
     laptop". This helps humans to identify data locations in distributed
     scenarios.  By default an identifier comprised of user and machine name,
     plus path will be generated.
+
+    This command only creates a new dataset, it does not add any content to it,
+    even if the target directory already contains additional files or
+    directories.
 
     Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
     However, the result will not be a full dataset, and, consequently,
@@ -69,6 +84,14 @@ class Create(Interface):
       in the discovered superdataset.
     """
 
+    # in general this command will yield exactly one result
+    return_type = 'item-or-list'
+    # in general users expect to get an instance of the created dataset
+    result_xfm = 'datasets'
+    # result filter
+    result_filter = EnsureKeyChoice('action', ('create',)) & \
+                    EnsureKeyChoice('status', ('ok', 'notneeded'))
+
     _params_ = dict(
         path=Parameter(
             args=("path",),
@@ -81,28 +104,33 @@ class Create(Interface):
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            metavar='PATH',
+            doc="""specify the dataset to perform the create operation on. If
+            a dataset is give, a new subdataset will be created in it.""",
+            constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
-        description=dataset_description,
-        add_to_super=add_to_superdataset,
-        name=Parameter(
-            args=("--name",),
-            metavar='NAME',
-            doc="""name of the dataset within the namespace of it's superdataset.
-            By default its path relative to the superdataset is used. Used only
-            together with `add_to_super`.""",
-            constraints=EnsureStr() | EnsureNone()),
+        description=location_description,
+        # TODO could move into cfg_annex plugin
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
-        no_commit=Parameter(
-            args=("--no-commit",),
-            doc="""if set, do not commit automatically""",
+        text_no_annex=Parameter(
+            args=("--text-no-annex",),
+            doc="""if set, all text files in the future would be added to Git,
+            not annex. Achieved by adding an entry to `.gitattributes` file. See
+            http://git-annex.branchable.com/tips/largefiles/ and `no_annex`
+            DataLad plugin to establish even more detailed control over which
+            files are placed under annex control.""",
             action='store_true'),
+        save=nosave_opt,
+        # TODO could move into cfg_annex plugin
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -110,6 +138,7 @@ class Create(Interface):
             version. This should be left untouched, unless you know what
             you are doing""",
             constraints=EnsureDType(int) | EnsureNone()),
+        # TODO could move into cfg_annex plugin
         annex_backend=Parameter(
             args=("--annex-backend",),
             constraints=EnsureStr() | EnsureNone(),
@@ -118,83 +147,65 @@ class Create(Interface):
             For a list of supported backends see the git-annex
             documentation. The default is optimized for maximum compatibility
             of datasets across platforms (especially those with limited
-            path lengths)""",
-            nargs=1),
+            path lengths)"""),
+        # TODO could move into cfg_metadata plugin
         native_metadata_type=Parameter(
             args=('--native-metadata-type',),
             metavar='LABEL',
             action='append',
             constraints=EnsureStr() | EnsureNone(),
             doc="""Metadata type label. Must match the name of the respective
-            parser implementation in Datalad (e.g. "bids").[CMD:  This option
+            parser implementation in DataLad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
+        # TODO could move into cfg_access/permissions plugin
+        shared_access=shared_access_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
     )
 
     @staticmethod
-    @datasetmethod(name='create', dataset_argname='path')
+    @datasetmethod(name='create')
+    @eval_results
     def __call__(
             path=None,
             force=False,
             description=None,
-            add_to_super=False,
-            name=None,
+            dataset=None,
             no_annex=False,
-            no_commit=False,
+            save=True,
             annex_version=None,
             annex_backend='MD5E',
             native_metadata_type=None,
+            shared_access=None,
             git_opts=None,
             annex_opts=None,
-            annex_init_opts=None):
+            annex_init_opts=None,
+            text_no_annex=None
+    ):
 
-        if not isinstance(force, bool):
-            raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
-        if path:
-            if isinstance(path, Dataset):
-                ds = path
-            else:
-                # this means we are not bound to a Dataset instance.
-                # Therefore there is no difference between a relative path and
-                # an "explicit" path. Both are based on CWD, since there is no
-                # repo or dataset it is passed to. Hence `path` doesn't need to
-                # be resolved.
-                ds = Dataset(path)
-        else:
-            ds = Dataset(getpwd())
+        # two major cases
+        # 1. we got a `dataset` -> we either want to create it (path is None),
+        #    or another dataset in it (path is not None)
+        # 2. we got no dataset -> we want to create a fresh dataset at the
+        #    desired location, either at `path` or PWD
+        if path and dataset:
+            # Given a path and a dataset (path) not pointing to installed
+            # dataset
+            if not dataset.is_installed():
+                msg = "No installed dataset at %s found." % dataset.path
+                dsroot = get_dataset_root(dataset.path)
+                if dsroot:
+                    msg += " If you meant to add to the %s dataset, use that path " \
+                           "instead but remember that if dataset is provided, " \
+                           "relative paths are relative to the top of the " \
+                           "dataset." % dsroot
+                raise ValueError(msg)
 
-        # don't create in non-empty directory without `force`:
-        if isdir(ds.path) and listdir(ds.path) != [] and not force:
-            raise ValueError("Cannot create dataset in directory %s "
-                             "(not empty). Use option 'force' in order to "
-                             "ignore this and enforce creation." % ds.path)
-
-        if add_to_super:
-            sds = ds.get_superdataset()
-
-            if sds is not None:
-                return sds.create_subdataset(
-                    ds.path,
-                    force=force,
-                    name=name,
-                    description=description,
-                    no_annex=no_annex,
-                    annex_version=annex_version,
-                    annex_backend=annex_backend,
-                    git_opts=git_opts,
-                    annex_opts=annex_opts,
-                    annex_init_opts=annex_init_opts)
-            else:
-                if isinstance(add_to_super, bool):
-                    raise ValueError("No super dataset found for dataset %s" % ds)
-                elif add_to_super == 'auto':
-                    pass  # we are cool to just make it happen without add_to_super
-                else:
-                    raise ValueError("Do not know how to handle add_to_super=%s"
-                                     % repr(add_to_super))
-
+        # sanity check first
+        if git_opts:
+            lgr.warning(
+                "`git_opts` argument is presently ignored, please complain!")
         if no_annex:
             if description:
                 raise ValueError("Incompatible arguments: cannot specify "
@@ -209,48 +220,177 @@ class Create(Interface):
                                  "options for annex init and declaring no "
                                  "annex repo.")
 
-            lgr.info("Creating a new git repo at %s", ds.path)
-            vcs = GitRepo(ds.path, url=None, create=True,
-                          git_opts=git_opts)
+        if not isinstance(force, bool):
+            raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
+        annotated_paths = AnnotatePaths.__call__(
+            # nothing given explicitly, assume create fresh right here
+            path=path if path else getpwd() if dataset is None else None,
+            dataset=dataset,
+            recursive=False,
+            action='create',
+            # we need to know whether we have to check for potential
+            # subdataset collision
+            force_parentds_discovery=True,
+            # it is absolutely OK to have something that does not exist
+            unavailable_path_status='',
+            unavailable_path_msg=None,
+            # if we have a dataset given that actually exists, we want to
+            # fail if the requested path is not in it
+            nondataset_path_status='error' \
+                if isinstance(dataset, Dataset) and dataset.is_installed() else '',
+            on_failure='ignore')
+        path = None
+        for r in annotated_paths:
+            if r['status']:
+                # this is dealt with already
+                yield r
+                continue
+            if path is not None:
+                raise ValueError("`create` can only handle single target path or dataset")
+            path = r
+
+        if len(annotated_paths) and path is None:
+            # we got something, we complained already, done
+            return
+
+        # we know that we need to create a dataset at `path`
+        assert(path is not None)
+
+        # prep for yield
+        path.update({'logger': lgr, 'type': 'dataset'})
+        # just discard, we have a new story to tell
+        path.pop('message', None)
+        if 'parentds' in path:
+            subs = Subdatasets.__call__(
+                dataset=path['parentds'],
+                # any known
+                fulfilled=None,
+                recursive=False,
+                contains=path['path'],
+                result_xfm='relpaths')
+            if len(subs):
+                path.update({
+                    'status': 'error',
+                    'message': ('collision with known subdataset %s/ in dataset %s',
+                                subs[0], path['parentds'])})
+                yield path
+                return
+
+        # TODO here we need a further test that if force=True, we need to look if
+        # there is a superdataset (regardless of whether we want to create a
+        # subdataset or not), and if that superdataset tracks anything within
+        # this directory -- if so, we need to stop right here and whine, because
+        # the result of creating a repo here will produce an undesired mess
+
+        if git_opts is None:
+            git_opts = {}
+        if shared_access:
+            # configure `git --shared` value
+            git_opts['shared'] = shared_access
+
+        # important to use the given Dataset object to avoid spurious ID
+        # changes with not-yet-materialized Datasets
+        tbds = dataset if isinstance(dataset, Dataset) and dataset.path == path['path'] \
+            else Dataset(path['path'])
+
+        # don't create in non-empty directory without `force`:
+        if isdir(tbds.path) and listdir(tbds.path) != [] and not force:
+            path.update({
+                'status': 'error',
+                'message':
+                    'will not create a dataset in a non-empty directory, use '
+                    '`force` option to ignore'})
+            yield path
+            return
+
+        if no_annex:
+            lgr.info("Creating a new git repo at %s", tbds.path)
+            GitRepo(
+                tbds.path,
+                url=None,
+                create=True,
+                git_opts=git_opts)
         else:
             # always come with annex when created from scratch
-            lgr.info("Creating a new annex repo at %s", ds.path)
-            vcs = AnnexRepo(ds.path, url=None, create=True,
-                            backend=annex_backend,
-                            version=annex_version,
-                            description=description,
-                            git_opts=git_opts,
-                            annex_opts=annex_opts,
-                            annex_init_opts=annex_init_opts)
+            lgr.info("Creating a new annex repo at %s", tbds.path)
+            tbrepo = AnnexRepo(
+                tbds.path,
+                url=None,
+                create=True,
+                backend=annex_backend,
+                version=annex_version,
+                description=description,
+                git_opts=git_opts,
+                annex_opts=annex_opts,
+                annex_init_opts=annex_init_opts
+            )
+
+            if text_no_annex:
+                git_attributes_file = opj(tbds.path, '.gitattributes')
+                with open(git_attributes_file, 'a') as f:
+                    f.write('* annex.largefiles=(not(mimetype=text/*))\n')
+                tbrepo.add([git_attributes_file], git=True)
+                tbrepo.commit(
+                    "Instructed annex to add text files to git",
+                    _datalad_msg=True,
+                    files=[git_attributes_file]
+                )
 
         if native_metadata_type is not None:
             if not isinstance(native_metadata_type, list):
                 native_metadata_type = [native_metadata_type]
             for nt in native_metadata_type:
-                ds.config.add('datalad.metadata.nativetype', nt)
+                tbds.config.add('datalad.metadata.nativetype', nt)
 
-        # record the ID of this repo for the afterlife
+        # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
-        if id_var in ds.config:
+        if id_var in tbds.config:
             # make sure we reset this variable completely, in case of a re-create
-            ds.config.unset(id_var, where='dataset')
-        ds.config.add(id_var, ds.id, where='dataset')
+            tbds.config.unset(id_var, where='dataset')
+        tbds.config.add(
+            id_var,
+            tbds.id if tbds.id is not None else uuid.uuid1().urn.split(':')[-1],
+            where='dataset')
 
-        # save everthing
-        ds.repo.add('.datalad', git=True)
+        # make sure that v6 annex repos never commit content under .datalad
+        with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
+            # TODO this will need adjusting, when annex'ed aggregate meta data
+            # comes around
+            gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
+            gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')
+            gitattr.write('** annex.largefiles=nothing\n')
 
-        if not no_commit:
-            vcs.commit(msg="Initial commit",
-                       options=to_options(allow_empty=True),
-                       _datalad_msg=True)
+        # save everything, we need to do this now and cannot merge with the
+        # call below, because we may need to add this subdataset to a parent
+        # but cannot until we have a first commit
+        tbds.add('.datalad', to_git=True, save=save,
+                 message='[DATALAD] new dataset')
 
-        return ds
+        # the next only makes sense if we saved the created dataset,
+        # otherwise we have no committed state to be registered
+        # in the parent
+        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
+            # we created a dataset in another dataset
+            # -> make submodule
+            for r in dataset.add(
+                    tbds.path,
+                    save=True,
+                    return_type='generator',
+                    result_filter=None,
+                    result_xfm=None,
+                    on_failure='ignore'):
+                yield r
+
+        path.update({'status': 'ok'})
+        yield path
 
     @staticmethod
-    def result_renderer_cmdline(res, args):
+    def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        if res is None:
+        if res.get('action', None) == 'create' and \
+               res.get('status', None) == 'ok' and \
+               res.get('type', None) == 'dataset':
+            ui.message("Created dataset at {}.".format(res['path']))
+        else:
             ui.message("Nothing was created")
-        elif isinstance(res, Dataset):
-            ui.message("Created dataset at %s." % res.path)

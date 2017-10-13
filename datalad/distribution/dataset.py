@@ -10,38 +10,40 @@
 """
 
 import logging
-
 from os.path import abspath
+from os.path import curdir
+from os.path import exists
 from os.path import join as opj
-from os.path import normpath
+from os.path import normpath, isabs
+from os.path import pardir
 from os.path import realpath
 from os.path import relpath
-from os.path import commonprefix
-from os.path import sep
-from six import string_types
+from weakref import WeakValueDictionary
 from six import PY2
-from functools import wraps
-import uuid
+from six import string_types
+from six import add_metaclass
+import wrapt
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
-from datalad.support.constraints import Constraint
-from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import swallow_logs
-from datalad.utils import getpwd
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.config import ConfigManager
+from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.dochelpers import exc_str
-from datalad.support.dsconfig import ConfigManager
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import Constraint
+from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.repo import Flyweight
+from datalad.support.network import RI
+
+from datalad.utils import getpwd
+from datalad.utils import optional_args, expandpath, is_explicit_path
+from datalad.utils import get_dataset_root
+from datalad.distribution.utils import get_git_dir
+
 
 lgr = logging.getLogger('datalad.dataset')
-
 lgr.log(5, "Importing dataset")
-
-
-def _with_sep(path):
-    """Little helper to guarantee that path ends with /"""
-    return path + sep if not path.endswith(sep) else path
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -61,20 +63,96 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
+    # TODO: normpath?!
     if is_explicit_path(path):
         return abspath(path)
-    if ds is None:
-        # no dataset given, use CWD as reference
-        return abspath(path)
-    else:
-        return normpath(opj(ds.path, path))
+    # no dataset given, use CWD as reference
+    # note: abspath would disregard symlink in CWD
+    top_path = getpwd() \
+        if ds is None else ds.path if isinstance(ds, Dataset) else ds
+    return normpath(opj(top_path, path))
 
 
+@add_metaclass(Flyweight)
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id', '_cfg']
+    """Representation of a DataLad dataset/repository
+
+    This is the core data type of DataLad: a representation of a dataset.
+    At its core, datasets are (git-annex enabled) Git repositories. This
+    class provides all operations that can be performed on a dataset.
+
+    Creating a dataset instance is cheap, all actual operations are
+    delayed until they are actually needed. Creating multiple `Dataset`
+    class instances for the same Dataset location will automatically
+    yield references to the same object.
+
+    A dataset instance comprises of two major components: a `repo`
+    attribute, and a `config` attribute. The former offers access to
+    low-level functionality of the Git or git-annex repository. The
+    latter gives access to a dataset's configuration manager.
+
+    Most functionality is available via methods of this class, but also
+    as stand-alone functions with the same name in `datalad.api`.
+    """
+    # Begin Flyweight
+    _unique_instances = WeakValueDictionary()
+
+    @classmethod
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            raise AttributeError
+
+        # Custom handling for few special abbreviations
+        path_ = path
+        if path == '^':
+            # get the topmost dataset from current location. Note that 'zsh'
+            # might have its ideas on what to do with ^, so better use as -d^
+            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+        elif path == '///':
+            # TODO: logic/UI on installing a central dataset could move here
+            # from search?
+            path_ = LOCAL_CENTRAL_PATH
+        if path != path_:
+            lgr.debug("Resolved dataset alias %r to path %r", path, path_)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path_ = RI(path_).localpath
+
+        # we want an absolute path, but no resolved symlinks
+        if not isabs(path_):
+            path_ = opj(getpwd(), path_)
+
+        # use canonical paths only:
+        path_ = normpath(path_)
+        kwargs['path'] = path_
+        return path_, args, kwargs
+    # End Flyweight
 
     def __init__(self, path):
-        self._path = abspath(path)
+        """
+        Parameters
+        ----------
+        path : str
+          Path to the dataset location. This location may or may not exist
+          yet.
+        """
+        self._path = path
         self._repo = None
         self._id = None
         self._cfg = None
@@ -83,7 +161,18 @@ class Dataset(object):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        return self.path == other.path
+        if not hasattr(other, 'path'):
+            return False
+        return realpath(self.path) == realpath(other.path)
+
+    def close(self):
+        """Perform operations which would close any possible process using this Dataset
+        """
+        repo = self._repo
+        self._repo = None
+        if repo:
+            # might take care about lingering batched processes etc
+            del repo
 
     @property
     def path(self):
@@ -102,29 +191,36 @@ class Dataset(object):
         -------
         GitRepo
         """
-        if self._repo is None:
-            with swallow_logs():
-                for cls, ckw, kw in (
-                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                        (GitRepo, {}, {})
-                ):
-                    if cls.is_valid_repo(self._path, **ckw):
-                        try:
-                            lgr.debug("Detected %s at %s", cls, self._path)
-                            self._repo = cls(self._path, create=False, **kw)
-                            break
-                        except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError) as exc:
-                            lgr.debug("Oops -- guess on repo type was wrong?: %s", exc_str(exc))
-                            pass
-                if self._repo is None:
-                    lgr.info("Failed to detect a valid repo at %s" % self.path)
 
-        elif not isinstance(self._repo, AnnexRepo):
-            # repo was initially set to be self._repo but might become AnnexRepo
-            # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.get_branches():
-                # we acquired git-annex branch
-                self._repo = AnnexRepo(self._repo.path, create=False)
+        # Note: lazy loading was disabled, since this is provided by the
+        # flyweight pattern already and a possible invalidation of an existing
+        # instance has to be done therein.
+        # TODO: Still this is somewhat problematic. We can't invalidate strong
+        # references
+
+        for cls, ckw, kw in (
+                # TODO: Do we really want to allow_noninitialized=True here?
+                # And if so, leave a proper comment!
+                (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                (GitRepo, {}, {})
+        ):
+            if cls.is_valid_repo(self._path, **ckw):
+                try:
+                    lgr.log(5, "Detected %s at %s", cls, self._path)
+                    self._repo = cls(self._path, create=False, **kw)
+                    break
+                except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                    lgr.log(5,
+                            "Oops -- guess on repo type was wrong?: %s",
+                            exc_str(exc))
+                    pass
+                # version problems come as RuntimeError: DO NOT CATCH!
+        if self._repo is None:
+            # Often .repo is requested to 'sense' if anything is installed
+            # under, and if so -- to proceed forward. Thus log here only
+            # at DEBUG level and if necessary "complaint upstairs"
+            lgr.log(5, "Failed to detect a valid repo at %s", self.path)
+
         return self._repo
 
     @property
@@ -138,15 +234,12 @@ class Dataset(object):
         Returns
         -------
         str
-          This is either a stored UUID, or if there is none: the UUID of the
-          dataset's annex, or a new generated UUID.
+          This is either a stored UUID, or `None`.
         """
         if self._id is None:
             # if we have one on record, stick to it!
+            self.config.reload()
             self._id = self.config.get('datalad.dataset.id', None)
-            if self._id is None:
-                # fall back on self-made ID
-                self._id = uuid.uuid1().urn.split(':')[-1]
         return self._id
 
     @property
@@ -158,231 +251,38 @@ class Dataset(object):
         ConfigManager
         """
         if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            if self.repo is None:
+                # associate with this dataset and read the entire config hierarchy
+                self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            else:
+                self._cfg = self.repo.config
         return self._cfg
 
-    def register_sibling(self, name, url, publish_url=None, verify=None):
-        """Register the location of a sibling dataset under a given name.
-
-        Optionally, different URLs can be given for retrieving information from
-        the sibling and for publishing information to it.
-        This is a cheap operation that does not confirm that at the given
-        location an actual sibling dataset is available, unless verify is set.
-        The value "dataset" verifies, that at the given URL an accessible
-        dataset is available and the value "sibling" furthermore verifies, that
-        this dataset shares at least one commit with self.
-
-        Parameters
-        ----------
-        name
-        url
-        publish_url
-        verify
-          None | "dataset" | "sibling"
-        """
-        repo = self.repo
-
-        if verify is not None:
-            raise NotImplementedError("TODO: verify not implemented yet")
-
-        if name not in repo.get_remotes():
-            # Add remote
-            repo.add_remote(name, url)
-            if publish_url is not None:
-                # set push url:
-                repo._git_custom_command('', ["git", "remote",
-                                              "set-url",
-                                              "--push", name,
-                                              publish_url])
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-                     (name, url, publish_url if publish_url else url))
-        else:
-            lgr.warning("Remote '%s' already exists. Ignore.")
-            raise ValueError("'%s' already exists. Couldn't register sibling.")
-
-    # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None):
-
-        """Get names/paths of all known dataset_datasets (subdatasets),
-        optionally matching a specific name pattern.
-
-
-        Parameters
-        ----------
-        pattern : None
-          Not implemented
-        fulfilled : None or bool
-          If not None, return either only present or absent datasets.
-        absolute : bool
-          If True, absolute paths will be returned.
-        recursive : bool
-          If True, recurse into all subdatasets and report them too.
-        recursion_limit: int or None
-          If not None, set the number of subdataset levels to recurse into.
-        Returns
-        -------
-        list(Dataset paths) or None
-          None is return if there is not repository instance yet. For an
-          existing repository with no subdatasets an empty list is returned.
-        """
-
-        if recursion_limit is not None and (recursion_limit <= 0):
-            return []
-
-        if pattern is not None:
-            raise NotImplementedError
-
-        repo = self.repo
-        if repo is None:
-            return []
-
-        # check whether we have anything in the repo. if not go home early
-        if not repo.repo.head.is_valid():
-            return []
-
-        try:
-            submodules = repo.get_submodules()
-        except InvalidGitRepositoryError:
-            # this happens when we access a repository with a submodule that
-            # has no commits, hence doesn't appear in the index and
-            # 'git submodule status' also doesn't list it
-            return []
-
-        # filter if desired
-        if fulfilled is None:
-            submodules = [sm.path for sm in submodules]
+                        recursive=False, recursion_limit=None, edges=False):
+        """DEPRECATED: use `subdatasets()`"""
+        # TODO wipe this function out completely once we are comfortable
+        # with it. Internally we don't need or use it anymore.
+        import inspect
+        lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
+        from datalad.api import subdatasets
+        if edges:
+            return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
+                     r['path'] if absolute else relpath(r['path'], start=self.path))
+                    for r in subdatasets(
+                        dataset=self,
+                        fulfilled=fulfilled,
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        bottomup=True)]
         else:
-            submodules = [sm.path for sm in submodules
-                          if sm.module_exists() == fulfilled]
-
-        # expand list with child submodules. keep all paths relative to parent
-        # and convert jointly at the end
-        if recursive and (recursion_limit is None or recursion_limit > 1):
-            rsm = []
-            for sm in submodules:
-                rsm.append(sm)
-                sdspath = opj(self._path, sm)
-                rsm.extend(
-                    [opj(sm, sdsh)
-                     for sdsh in Dataset(sdspath).get_subdatasets(
-                         pattern=pattern, fulfilled=fulfilled, absolute=False,
-                         recursive=recursive,
-                         recursion_limit=(recursion_limit - 1)
-                         if recursion_limit is not None else None)])
-            submodules = rsm
-
-        if absolute:
-            return [opj(self._path, sm) for sm in submodules]
-        else:
-            return submodules
-
-    def create_subdataset(self, path,
-                          name=None,
-                          force=False,
-                          description=None,
-                          no_annex=False,
-                          annex_version=None,
-                          annex_backend='MD5E',
-                          native_metadata_type=None,
-                          git_opts=None,
-                          annex_opts=None,
-                          annex_init_opts=None):
-        """Create a subdataset within this dataset
-
-        Creates a new dataset at `path` and adds it as a subdataset to `self`.
-        `path` is required to point to a location inside the dataset `self`.
-
-        Parameters
-        ----------
-        path: str
-          path to the subdataset to be created
-        name: str
-          name of the subdataset
-        force: bool
-          enforce creation of a subdataset in a non-empty directory
-        description: str
-          a human-readable description of the dataset, that helps to identify it.
-          Note: Doesn't work with `no_annex`
-        no_annex: bool
-          whether or not to create a pure git repository
-        annex_version: str
-          version of annex repository to be used
-        annex_backend: str
-          backend to be used by annex for computing file keys
-        native_metadata_type : list(str), optional
-          meta data type labels
-        git_opts: list of str
-          cmdline options to be passed to the git executable
-        annex_opts: list of str
-          cmdline options to be passed to git-annex
-        annex_init_opts: list of str
-          cmdline options to be passed to git-annex-init
-
-        Returns
-        -------
-        Dataset
-          the newly created dataset
-        """
-
-        # get absolute path (considering explicit vs relative):
-        path = resolve_path(path, self)
-        if not realpath(path).startswith(_with_sep(realpath(self.path))):  # realpath OK
-            raise ValueError("path %s outside dataset %s" % (path, self))
-
-        subds = Dataset(path)
-
-        # create the dataset
-        subds.create(force=force,
-                     description=description,
-                     no_annex=no_annex,
-                     annex_version=annex_version,
-                     annex_backend=annex_backend,
-                     native_metadata_type=native_metadata_type,
-                     git_opts=git_opts,
-                     annex_opts=annex_opts,
-                     annex_init_opts=annex_init_opts,
-                     # Note:
-                     # adding to the superdataset is what we are doing herein!
-                     # add_to_super=True would lead to calling ourselves again
-                     # and again
-                     # While this is somewhat ugly, the issue behind this is a
-                     # necessarily slightly different logic of `create` in
-                     # comparison to other toplevel functions, which operate on
-                     # an existing dataset and possibly on subdatasets.
-                     # With `create` we suddenly need to operate on a
-                     # superdataset, if add_to_super is True.
-                     add_to_super=False)
-
-        # add it as a submodule
-        # TODO: clean that part and move it in here (Dataset)
-        #       or call install to add the thing inplace
-        from .install import _install_subds_inplace
-        return _install_subds_inplace(
-            ds=self, path=subds.path,
-            relativepath=relpath(realpath(subds.path), realpath(self.path)),  # realpath OK
-            name=name
-        )
-
-#    def get_file_handles(self, pattern=None, fulfilled=None):
-#        """Get paths to all known file_handles, optionally matching a specific
-#        name pattern.
-#
-#        If fulfilled is True, only paths to fullfiled handles are returned,
-#        if False, only paths to unfulfilled handles are returned.
-#
-#        Parameters
-#        ----------
-#        pattern: str
-#        fulfilled: bool
-#
-#        Returns
-#        -------
-#        list of str
-#          (paths)
-#        """
-#        raise NotImplementedError("TODO")
+            return subdatasets(
+                dataset=self,
+                fulfilled=fulfilled,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                bottomup=True,
+                result_xfm='{}paths'.format('' if absolute else 'rel'))
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
@@ -407,65 +307,83 @@ class Dataset(object):
         -------
         bool
         """
-        return self.path is not None and self.repo is not None
+        # do early check manually if path exists to not even ask git at all
+        exists_now = exists(self.path)
 
-    def get_superdataset(self):
+        was_once_installed = None
+        if exists_now:
+            was_once_installed = self.path is not None and \
+                                 self.repo is not None
+
+        if not exists_now or \
+                (was_once_installed and not GitRepo.is_valid_repo(self.path)):
+            # repo gone now, reset
+            self._repo = None
+            return False
+        else:
+            return was_once_installed
+
+    def get_superdataset(self, datalad_only=False, topmost=False,
+                         registered_only=False):
         """Get the dataset's superdataset
+
+        Parameters
+        ----------
+        datalad_only : bool, optional
+          Either to consider only "datalad datasets" (with non-None
+          id), or (if False, which is default) - any git repository
+        topmost : bool, optional
+          Return the topmost super-dataset. Might then be the current one.
+        registered_only : bool, optional
+          Test whether any discovered superdataset actually contains the
+          dataset in question as a registered subdataset (as opposed to
+          just being located in a subdirectory without a formal relationship).
 
         Returns
         -------
         Dataset or None
         """
-
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
+        path = self.path
+        sds_path = path if topmost else None
+        while path:
+            # normalize the path after adding .. so we guaranteed to not
+            # follow into original directory if path itself is a symlink
+            par_path = normpath(opj(path, pardir))
+            sds_path_ = get_dataset_root(par_path)
+            if sds_path_ is None:
+                # no more parents, use previous found
+                break
 
-        from os import pardir
-        sds_path = GitRepo.get_toppath(opj(self.path, pardir))
+            sds = Dataset(sds_path_)
+            if datalad_only:
+                # test if current git is actually a dataset?
+                # can't use ATM since we just autogenerate and ID, see
+                # https://github.com/datalad/datalad/issues/986
+                # if not sds.id:
+                if not sds.config.get('datalad.dataset.id', None):
+                    break
+            if registered_only:
+                if path not in sds.subdatasets(
+                        recursive=False, result_xfm='paths'):
+                    break
+
+            # That was a good candidate
+            sds_path = sds_path_
+            path = par_path
+            if not topmost:
+                # no looping
+                break
+
         if sds_path is None:
+            # None was found
             return None
-        else:
-            if realpath(self.path) != self.path:
-                # we had symlinks in the path but sds_path would have not
-                # so let's get "symlinked" version of the superdataset path
-                sds_relpath = relpath(sds_path, realpath(self.path))
-                sds_path = normpath(opj(self.path, sds_relpath))
-            return Dataset(sds_path)
 
-    def get_containing_subdataset(self, path, recursion_limit=None):
-        """Get the (sub-)dataset containing `path`
+        # No postprocessing now should be necessary since get_toppath
+        # tries its best to not resolve symlinks now
 
-        Parameters
-        ----------
-        path : str
-          Path to determine the containing (sub-)dataset for
-        recursion_limit: int
-          limit the subdatasets to take into account to the given number of
-          hierarchy levels
-
-        Returns
-        -------
-        Dataset
-        """
-
-        if recursion_limit is not None and (recursion_limit < 1):
-            lgr.warning("recursion limit < 1 (%s) always results in self.")
-            return self
-
-        if is_explicit_path(path):
-            path = resolve_path(path, self)
-            if not path.startswith(self.path):
-                # TODO: - have dedicated exception
-                raise ValueError("path {0} not in dataset {1}.".format(path, self))
-            path = relpath(path, self.path)
-
-        for subds in self.get_subdatasets(recursive=True,
-                                          recursion_limit=recursion_limit,
-                                          absolute=False):
-            common = commonprefix((_with_sep(subds), _with_sep(path)))
-            if common.endswith(sep) and common == _with_sep(subds):
-                return Dataset(path=opj(self.path, common))
-        return self
+        return Dataset(sds_path)
 
 
 @optional_args
@@ -484,16 +402,16 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     if not name:
         name = f.func_name if PY2 else f.__name__
 
-    @wraps(f)
-    def apply_func(*args, **kwargs):
-        """Wrapper function to assign arguments of the bound function to
-        original function.
+    @wrapt.decorator
+    def apply_func(wrapped, instance, args, kwargs):
+        # Wrapper function to assign arguments of the bound function to
+        # original function.
+        #
+        # Note
+        # ----
+        # This wrapper is NOT returned by the decorator, but only used to bind
+        # the function `f` to the Dataset class.
 
-        Note
-        ----
-        This wrapper is NOT returned by the decorator, but only used to bind
-        the function `f` to the Dataset class.
-        """
         kwargs = kwargs.copy()
         from inspect import getargspec
         orig_pos = getargspec(f).args
@@ -501,28 +419,28 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or dataset_argname in kwargs:
+        if len(args) >= len(orig_pos):
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
                                                       if a != dataset_argname]))
-        kwargs[dataset_argname] = args[0]
+        if dataset_argname in kwargs:
+            raise TypeError("{}() got an unexpected keyword argument {}"
+                            "".format(name, dataset_argname))
+        kwargs[dataset_argname] = instance
         ds_index = orig_pos.index(dataset_argname)
-        for i in range(1, len(args)):
-            if i <= ds_index:
-                kwargs[orig_pos[i-1]] = args[i]
-            elif i > ds_index:
+        for i in range(0, len(args)):
+            if i < ds_index:
                 kwargs[orig_pos[i]] = args[i]
+            elif i >= ds_index:
+                kwargs[orig_pos[i+1]] = args[i]
         return f(**kwargs)
 
-    setattr(Dataset, name, apply_func)
-    # So we could post-hoc later adjust the documentation string which is assigned
-    # within .api
-    apply_func.__orig_func__ = f
+    setattr(Dataset, name, apply_func(f))
     return f
 
 
-# Note: Cannot be defined with constraints.py, since then dataset.py needs to
+# Note: Cannot be defined within constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
@@ -535,8 +453,6 @@ class EnsureDataset(Constraint):
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
-    # commandline doc!
     def short_description(self):
         return "Dataset"
 
@@ -556,7 +472,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     dataset : None or path or Dataset
       Some value identifying a dataset or `None`. In the latter case
       a dataset will be searched based on the process working directory.
-    check_installed : boold, optional
+    check_installed : bool, optional
       If True, an optional check whether the resolved dataset is
       properly installed will be performed.
     purpose : str, optional
@@ -572,14 +488,14 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        dspath = GitRepo.get_toppath(getpwd())
+        dspath = get_dataset_root(getpwd())
         if not dspath:
-            raise InsufficientArgumentsError("No dataset found")
+            raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
     lgr.debug("Resolved dataset{0}: {1}".format(
-        'for {}'.format(purpose) if purpose else '',
+        ' for {}'.format(purpose) if purpose else '',
         dataset))
 
     if check_installed and not dataset.is_installed():

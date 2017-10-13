@@ -13,27 +13,34 @@ lgr = logging.getLogger('datalad.network')
 lgr.log(5, "Importing support.network")
 import calendar
 import email.utils
-import gzip
 import os
+import pickle
 import re
-import shutil
 import time
 import iso8601
 
+from hashlib import md5
 from collections import OrderedDict
 from os.path import abspath, isabs
+from os.path import join as opj
+from os.path import dirname
+from ntpath import splitdrive as win_splitdrive
 
 from six import string_types
 from six import iteritems
-from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.parse import urlsplit
+from six.moves.urllib.request import Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, ParseResult
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
 from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
+from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
+from datalad.utils import assure_dir
 from datalad.consts import DATASETS_TOPURL
+from datalad import cfg
 
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
@@ -48,8 +55,8 @@ def get_response_disposition_filename(s):
         return None
     # If the response has Content-Disposition, try to get filename from it
     cd = map(
-            lambda x: x.strip().split('=', 1) if '=' in x else [x.strip(), ''],
-            s.split(';')
+        lambda x: x.strip().split('=', 1) if '=' in x else [x.strip(), ''],
+        s.split(';')
     )
     # unify the key to be lower case and make it into a dict
     cd = dict([[x[0].lower()] + x[1:] for x in cd])
@@ -79,7 +86,7 @@ def get_url_disposition_filename(url, headers=None):
             r.close()
 
 
-def get_url_straight_filename(url, strip=[], allowdir=False):
+def get_url_straight_filename(url, strip=None, allowdir=False):
     """Get file/dir name of the last path component of the URL
 
     Parameters
@@ -110,13 +117,13 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
         return None
 
 
-def get_url_filename(url, headers=None, strip=[]):
+def get_url_filename(url, headers=None, strip=None):
     """Get filename from the url, first consulting server about Content-Disposition
     """
     filename = get_url_disposition_filename(url, headers)
     if filename:
         return filename
-    return get_url_straight_filename(url, strip=[])
+    return get_url_straight_filename(url, strip=strip)
 
 
 def get_url_response_stamp(url, response_info):
@@ -150,12 +157,13 @@ def get_tld(url):
 
 
 from email.utils import parsedate_tz, mktime_tz
+
+
 def rfc2822_to_epoch(datestr):
     """Given rfc2822 date/time format, return seconds since epoch"""
     return mktime_tz(parsedate_tz(datestr))
 
 
-import calendar
 def iso8601_to_epoch(datestr):
     """Given ISO 8601 date/time format, return in seconds since epoch
 
@@ -191,6 +199,7 @@ def is_url_quoted(url):
         url_ = urlunquote(url)
         return url != url_
     except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
+        # MIH: ValueError?
         return False
 
 
@@ -274,11 +283,24 @@ class SimpleURLStamper(object):
 
 def _guess_ri_cls(ri):
     """Factory function which would determine which type of a ri a provided string is"""
+    TYPES = {
+        'url': URL,
+        'ssh':  SSHRI,
+        'file': PathRI,
+        'datalad': DataLadRI
+    }
+    # go in exotic mode if this is an absolute windows path
+    win_split = win_splitdrive(ri)
+    # we need a drive and a path, otherwise this could be a false positive
+    if win_split[0] and win_split[1]:
+        # OMG we got something from windows
+        lgr.log(5, "Detected file ri")
+        return TYPES['file']
+
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
     fields = URL._pr_to_fields(urlparse(ri))
     lgr.log(5, "Parsed ri %s into fields %s" % (ri, fields))
-
     type_ = 'url'
     # Special treatments
     # file:///path should stay file:
@@ -306,12 +328,6 @@ def _guess_ri_cls(ri):
         # e.g. //a/path
         type_ = 'datalad'
 
-    TYPES = {
-        'url': URL,
-        'ssh':  SSHRI,
-        'file': PathRI,
-        'datalad': DataLadRI
-    }
     cls = TYPES[type_]
     # just parse the ri according to regex matchint ssh "ri" specs
     lgr.log(5, "Detected %s ri" % type_)
@@ -358,6 +374,10 @@ class RI(object):
             # RI class was used as a factory
             cls = _guess_ri_cls(ri)
 
+        if cls is RI:
+            # should we fail or just pretend we are nothing??? ;-) XXX
+            raise ValueError("Could not deduce RI type for %r" % (ri,))
+
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
         ri_obj._str = ri
@@ -389,8 +409,8 @@ class RI(object):
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()
             if ri != ri_:
-                lgr.warning("Parsed version of %s %r differs from original %r",
-                            self.__class__.__name__, ri_, ri)
+                lgr.debug("Parsed version of %s %r differs from original %r",
+                          self.__class__.__name__, ri_, ri)
 
     @classmethod
     def _get_blank_fields(cls, **fields):
@@ -492,6 +512,13 @@ class RI(object):
             return super(RI, self).__getattribute__(item)
         else:
             return self._fields[item]
+
+    def __setattr__(self, item, value):
+        if item.startswith('_') or item not in self._FIELDS:
+            super(RI, self).__setattr__(item, value)
+        else:
+            self._fields[item] = value
+            self._str = None
 
 
 class URL(RI):
@@ -624,11 +651,10 @@ class URL(RI):
             raise ValueError(
                 "Non 'file://' URL cannot be resolved to a local path")
         hostname = self.hostname
-        if not (hostname in (None, '', 'localhost', '::1') \
+        if not (hostname in (None, '', 'localhost', '::1')
                 or hostname.startswith('127.')):
             raise ValueError("file:// URL does not point to 'localhost'")
         return self.path
-
 
 
 class PathRI(RI):
@@ -695,14 +721,15 @@ class SSHRI(RI, RegexBasedURLMixin):
         # escape path so we have direct representation of the path to work with
         fields['path'] = unescape_ssh_path(fields['path'])
 
-    def as_str(self):
+    def as_str(self, escape=False):
         fields = self.fields  # copy so we could escape symbols
         url_fmt = '{hostname}'
         if fields['username']:
             url_fmt = "{username}@" + url_fmt
         if fields['path']:
             url_fmt += ':{path}'
-        fields['path'] = escape_ssh_path(fields['path'])
+        if escape:
+            fields['path'] = escape_ssh_path(fields['path'])
         return url_fmt.format(**fields)
 
     # TODO:
@@ -788,7 +815,7 @@ def is_url(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI))
 
@@ -802,7 +829,7 @@ def is_datalad_compat_ri(ri):
     if not isinstance(ri, RI):
         try:
             ri = RI(ri)
-        except:
+        except:  # MIH: MemoryError?
             return False
     return isinstance(ri, (URL, SSHRI, DataLadRI))
 
@@ -824,8 +851,8 @@ def is_ssh(ri):
     # string or RI only, but with everything RI itself can deal with:
     _ri = RI(ri) if not isinstance(ri, RI) else ri
 
-    return isinstance(_ri, SSHRI) or \
-           (isinstance(_ri, URL) and _ri.scheme == 'ssh')
+    return isinstance(_ri, SSHRI) \
+        or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
 #### windows workaround ###
@@ -847,5 +874,69 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
+
+
+def get_url_cache_filename(url, name=None):
+    """Return a filename where to cache online doc from a url"""
+    if not name:
+        name = "misc"
+    cache_dir = opj(cfg.obtain('datalad.locations.cache'), name)
+    doc_fname = opj(
+        cache_dir,
+        '{}-{}.p{}'.format(
+            urlsplit(url).netloc,
+            md5(url.encode('utf-8')).hexdigest(),
+            pickle.HIGHEST_PROTOCOL)
+    )
+    return doc_fname
+
+
+def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
+    """Loader of a document from a url, which caches loaded instance on disk
+
+    Doesn't do anything smart about http headers etc which could provide
+    information for cache/proxy servers for how long to retain etc
+
+    TODO: theoretically it is not network specific at all -- and just a memoize
+    pattern, but may be some time we would make it treat headers etc correctly.
+    And ATM would support any URL we support via providers/downloaders
+
+    Parameters
+    ----------
+    fetcher: callable, optional
+       Function to call with url if needed to be refetched
+    maxage: float, optional
+       Age in days to retain valid for.  <0 - would retain forever.  If None -
+       would consult the config, 0 - would force to reload
+    """
+    doc_fname = get_url_cache_filename(url, name)
+    if maxage is None:
+        maxage = float(cfg.get('datalad.locations.cache-maxage'))
+
+    doc = None
+    if os.path.exists(doc_fname) and maxage != 0:
+
+        fage = (time.time() - os.stat(doc_fname).st_mtime)/(24. * 3600)
+        if maxage < 0 or fage < maxage:
+            try:
+                lgr.debug("use cached request result to '%s' from %s", url, doc_fname)
+                doc = pickle.load(open(doc_fname, 'rb'))
+            except Exception as e:  # it is OK to ignore any error and fall back on the true source
+                lgr.warning(
+                    "cannot load cache from '%s', fall back to download: %s",
+                    doc_fname, exc_str(e))
+
+    if doc is None:
+        if fetcher is None:
+            from datalad.downloaders.providers import Providers
+            providers = Providers.from_config_files()
+            fetcher = providers.fetch
+
+        doc = fetcher(url)
+        assure_dir(dirname(doc_fname))
+        # use pickle to store the entire request result dict
+        pickle.dump(doc, open(doc_fname, 'wb'))
+        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
+    return doc
 
 lgr.log(5, "Done importing support.network")

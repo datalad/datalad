@@ -1,4 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -10,12 +11,17 @@
 
 """
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+import inspect
 import os
 import shutil
 import sys
 import logging
 from mock import patch
 from six import PY3
+from six import text_type
+import six.moves.builtins as __builtin__
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -27,6 +33,7 @@ from ..utils import updated
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import getpwd, chpwd
+from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
 from ..utils import line_profile
@@ -40,25 +47,71 @@ from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
 from ..utils import _path_
+from ..utils import get_timestamp_suffix
+from ..utils import get_trace
+from ..utils import get_dataset_root
+from ..utils import better_wraps
+from ..utils import path_startswith
+from ..utils import safe_print
+from ..utils import generate_chunks
+from ..utils import disable_logger
+
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from datalad.tests.utils import nok_
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
+from .utils import assure_unicode
+from .utils import assure_bool
+from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+from .utils import probe_known_failure, skip_known_failure, known_failure, known_failure_v6, known_failure_direct_mode
 
 
 def test_get_func_kwargs_doc():
-    from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
-    eq_(get_func_kwargs_doc(pipeline), output)
+    def some_func(arg1, kwarg1=None, kwarg2="bu"):
+        return
+    eq_(get_func_kwargs_doc(some_func), ['arg1', 'kwarg1', 'kwarg2'])
+
+
+def test_better_wraps():
+    from functools import wraps
+    from inspect import getargspec
+
+    def wraps_decorator(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return new_func
+
+    def better_decorator(func):
+        @better_wraps(func)
+        def new_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return new_func
+
+    @wraps_decorator
+    def function1(a, b, c):
+        return "function1"
+
+    @better_decorator
+    def function2(a, b, c):
+        return "function2"
+
+    eq_("function1", function1(1, 2, 3))
+    eq_(getargspec(function1)[0], [])
+    eq_("function2", function2(1, 2, 3))
+    eq_(getargspec(function2)[0], ['a', 'b', 'c'])
 
 
 @with_tempfile(mkdir=True)
@@ -100,16 +153,82 @@ def test_swallow_outputs():
         eq_(cm.err, 'out error')  # the same value if multiple times
 
 
-def test_swallow_logs():
+@with_tempfile
+def test_swallow_logs(logfile):
     lgr = logging.getLogger('datalad')
     with swallow_logs(new_level=9) as cm:
         eq_(cm.out, '')
         lgr.log(8, "very heavy debug")
         eq_(cm.out, '')  # not even visible at level 9
         lgr.log(9, "debug1")
-        eq_(cm.out, 'debug1\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')  # not even visible at level 9
+    with swallow_logs(new_level=9, file_=logfile) as cm:
+        eq_(cm.out, '')
+        lgr.info("next info")
+    from datalad.tests.utils import ok_file_has_content
+    ok_file_has_content(logfile, "[INFO] next info", strip=True)
+
+
+def test_swallow_logs_assert():
+    lgr = logging.getLogger('datalad.tests')
+    with swallow_logs(new_level=9) as cm:
+        # nothing was logged so should fail
+        assert_raises(AssertionError, cm.assert_logged)
+        lgr.info("something")
+        cm.assert_logged("something")
+        cm.assert_logged(level="INFO")
+        cm.assert_logged("something", level="INFO")
+
+        # even with regex = False should match above
+        cm.assert_logged("something", regex=False)
+        cm.assert_logged(level="INFO", regex=False)
+        cm.assert_logged("something", level="INFO", regex=False)
+
+        # different level
+        assert_raises(AssertionError,
+                      cm.assert_logged, "something", level="DEBUG")
+        assert_raises(AssertionError, cm.assert_logged, "else")
+
+        cm.assert_logged("some.hing", level="INFO")  # regex ;-)
+        # does match
+        assert_raises(AssertionError,
+                      cm.assert_logged, "ome.hing", level="INFO")
+        # but we can change it
+        cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we can continue doing checks after we left the cm block
+    cm.assert_logged("some.hing", level="INFO", match=False)
+    # and we indeed logged something
+    cm.assert_logged(match=False)
+
+
+def test_disable_logger():
+
+    # get a logger hierarchy:
+    lgr_top = logging.getLogger('datalad')
+    lgr_middle = logging.getLogger('datalad.tests')
+    lgr_bottom = logging.getLogger('datalad.tests.utils')
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger():  # default: 'datalad':
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # nothing logged:
+        assert_raises(AssertionError, cml.assert_logged)
+
+    # again, but pass in the logger at mid level:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        with disable_logger(lgr_middle):
+            lgr_top.debug("log sth at top level")
+            lgr_middle.debug("log sth at mid level")
+            lgr_bottom.debug("log sth at bottom level")
+        # top level unaffected:
+        cml.assert_logged("log sth at top level", level="DEBUG", regex=False)
+        # but both of the lower ones don't log anything:
+        assert_raises(AssertionError, cml.assert_logged, "log sth at mid level")
+        assert_raises(AssertionError, cml.assert_logged, "log sth at bottom level")
 
 
 def _check_setup_exceptionhook(interactive):
@@ -165,6 +284,7 @@ def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
 
+
 def test_updated():
     d = {}
     eq_(updated(d, {1: 2}), {1: 2})
@@ -183,6 +303,7 @@ def test_updated():
 
 def test_get_local_file_url_windows():
     raise SkipTest("TODO")
+
 
 @assert_cwd_unchanged
 def test_getpwd_basic():
@@ -254,6 +375,12 @@ def test_auto_repr():
     assert_equal(buga().some(), "some")
 
 
+def test_assure_list_copy():
+    l = [1]
+    assert assure_list(l) is l
+    assert assure_list(l, copy=True) is not l
+
+
 def test_assure_list_from_str():
     assert_equal(assure_list_from_str(''), None)
     assert_equal(assure_list_from_str([]), None)
@@ -272,6 +399,28 @@ def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(
         dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_assure_bool():
+    for values, t in [
+        (['True', 1, '1', 'yes', 'on'], True),
+        (['False', 0, '0', 'no', 'off'], False)
+    ]:
+        for v in values:
+            eq_(assure_bool(v), t)
+    assert_raises(ValueError, assure_bool, "unknown")
+
+
+def test_generate_chunks():
+    ok_generator(generate_chunks([1], 1))
+    eq_(list(generate_chunks([1], 1)), [[1]])
+    eq_(list(generate_chunks([1], 2)), [[1]])
+    eq_(list(generate_chunks([1, 2, 3], 2)), [[1, 2], [3]])
+    # type is preserved
+    eq_(list(generate_chunks((1, 2, 3), 2)), [(1, 2), (3,)])
+    # no hangers
+    eq_(list(generate_chunks((1, 2, 3, 4), 2)), [(1, 2), (3, 4)])
+    assert_raises(AssertionError, list, generate_chunks([1], 0))
 
 
 def test_any_re_search():
@@ -391,7 +540,7 @@ def test_knows_annex(here, there):
     assert_false(knows_annex(here))
     AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    GitRepo(path=there, url=here, create=True)
+    GitRepo.clone(path=there, url=here, create=True)
     assert_true(knows_annex(there))
 
 
@@ -420,3 +569,275 @@ def test_path_():
     else:
         p = 'a/b/c'
         assert(_path_(p) is p)  # nothing is done to it whatsoever
+        eq_(_path_(p, 'd'), 'a/b/c/d')
+
+
+def test_get_timestamp_suffix():
+    # we need to patch temporarily TZ
+    import time
+    try:
+        with patch.dict('os.environ', {'TZ': 'GMT'}):
+            time.tzset()
+            assert_equal(get_timestamp_suffix(0), '-1970-01-01T00:00:00+0000')  # skynet DOB
+            assert_equal(get_timestamp_suffix(0, prefix="+"), '+1970-01-01T00:00:00+0000')
+            # yoh found no way to mock things out and didn't want to provide
+            # explicit call to anything to get current time with the timezone, so disabling
+            # this test for now besides that it should return smth sensible ;)
+            #with patch.object(time, 'localtime', lambda: 1):
+            #    assert_equal(get_timestamp_suffix(), '-1970-01-01T00:00:01+0000')  # skynet is 1 sec old
+            assert(get_timestamp_suffix().startswith('-'))
+    finally:
+        time.tzset()
+
+
+def test_memoized_generator():
+    called = [0]
+
+    def g1(n):
+        """a generator"""
+        called[0] += 1
+        for i in range(n):
+            yield i
+
+    from ..utils import saved_generator
+    ok_generator(g1(3))
+    g1_, g2_ = saved_generator(g1(3))
+    ok_generator(g1_)
+    ok_generator(g2_)
+    target = list(g1(3))
+    eq_(called[0], 1)
+    eq_(target, list(g1_))
+    eq_(called[0], 2)
+    eq_(target, list(g2_))
+    eq_(called[0], 2)  # no new call to make a generator
+    # but we can't (ab)use 2nd time
+    eq_([], list(g2_))
+
+
+def test_assure_unicode():
+    ok_(isinstance(assure_unicode("m"), text_type))
+    ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
+    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
+    eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+
+
+@with_tempfile(mkdir=True)
+def test_path_prefix(tdir):
+    eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
+    # so we are under /d1/d2 so path prefix is ..
+    eq_(get_path_prefix('/d1/d2', '/d1/d2/d3'), '..')
+    eq_(get_path_prefix('/d1/d2/d3', '/d1/d2'), 'd3')
+    # but if outside -- full path
+    eq_(get_path_prefix('/d1/d2', '/d1/d20/d3'), '/d1/d2')
+    with chpwd(tdir):
+        eq_(get_path_prefix('.'), '')
+        eq_(get_path_prefix('d1'), 'd1')
+        eq_(get_path_prefix('d1', 'd2'), opj(tdir, 'd1'))
+        eq_(get_path_prefix('..'), '..')
+
+
+def test_get_trace():
+    assert_raises(ValueError, get_trace, [], 'bumm', 'doesntmatter')
+    eq_(get_trace([('A', 'B')], 'A', 'A'), None)
+    eq_(get_trace([('A', 'B')], 'A', 'B'), [])
+    eq_(get_trace([('A', 'B')], 'A', 'C'), None)
+    eq_(get_trace([('A', 'B'),
+                   ('B', 'C')], 'A', 'C'), ['B'])
+    # order of edges doesn't matter
+    eq_(get_trace([
+        ('B', 'C'),
+        ('A', 'B')
+        ], 'A', 'C'), ['B'])
+    # mixed rubbish
+    eq_(get_trace([
+        (1, 3),
+        ('B', 'C'),
+        (None, ('schwak', 7)),
+        ('A', 'B'),
+        ], 'A', 'C'), ['B'])
+    # long
+    eq_(get_trace([
+        ('B', 'C'),
+        ('A', 'B'),
+        ('distract', 'me'),
+        ('C', 'D'),
+        ('D', 'E'),
+        ], 'A', 'E'), ['B', 'C', 'D'])
+
+
+@with_tempfile(mkdir=True)
+def test_get_dataset_root(path):
+    eq_(get_dataset_root('/nonexistent'), None)
+    with chpwd(path):
+        repo = AnnexRepo(os.curdir, create=True)
+        subdir = opj('some', 'deep')
+        fname = opj(subdir, 'dummy')
+        os.makedirs(subdir)
+        with open(fname, 'w') as f:
+            f.write('some')
+        repo.add(fname)
+        # we can find this repo
+        eq_(get_dataset_root(os.curdir), os.curdir)
+        # and we get the type of path that we fed in
+        eq_(get_dataset_root(abspath(os.curdir)), abspath(os.curdir))
+        # subdirs are no issue
+        eq_(get_dataset_root(subdir), os.curdir)
+        # even more subdirs are no issue
+        eq_(get_dataset_root(opj(subdir, subdir)), os.curdir)
+        # non-dir paths are no issue
+        eq_(get_dataset_root(fname), os.curdir)
+
+
+def test_path_startswith():
+    ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/'))
+    ok_(path_startswith('/aaa/b/c', '/aaa'))
+    nok_(path_startswith('/aaa/b/c', '/aa'))
+    nok_(path_startswith('/a/b', '/a/c'))
+    nok_(path_startswith('/a/b/c', '/a/c'))
+
+
+def test_safe_print():
+    """Just to test that we are getting two attempts to print"""
+
+    called = [0]
+    def _print(s):
+        assert_equal(s, "bua")
+        called[0] += 1
+        if called[0] == 1:
+            raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
+
+    with patch.object(__builtin__, 'print', _print):
+        safe_print("bua")
+    assert_equal(called[0], 2)
+
+
+def test_probe_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.probe"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @probe_known_failure
+    def not_failing():
+        pass
+
+    @probe_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if switch:
+        # if probing is enabled the failing is considered to be expected and
+        # therefore the decorated function doesn't actually fail:
+        failing()
+        # in opposition a function that doesn't fail raises an AssertionError:
+        assert_raises(AssertionError, not_failing)
+    else:
+        # if probing is disabled it should just fail/pass as is:
+        assert_raises(AssertionError, failing)
+        not_failing()
+
+
+def test_skip_known_failure():
+
+    # Note: we can't test the switch "datalad.tests.knownfailures.skip"
+    # directly, since it was evaluated in the decorator already. So we need
+    # to have different assertions in this test based on config and have it
+    # tested across builds, which use different settings for that switch.
+
+    @skip_known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+    switch = cfg.obtain("datalad.tests.knownfailures.skip")
+
+    if switch:
+        # if skipping is enabled, we shouldn't see the exception:
+        failing()
+    else:
+        # if it's disabled, failing() is executed and therefore exception
+        # is raised:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure():
+
+    @known_failure
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if skip:
+        # skipping takes precedence over probing
+        failing()
+    elif probe:
+        # if we probe a known failure it's okay to fail:
+        failing()
+    else:
+        # not skipping and not probing results in the original failure:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_v6():
+
+    @known_failure_v6
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    v6 = cfg.obtain("datalad.repo.version") == 6
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if v6:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_direct_mode():
+
+    @known_failure_direct_mode
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if direct:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
+        assert_raises(AssertionError, failing)

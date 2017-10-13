@@ -1,0 +1,28 @@
+{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "doap": "http://usefulinc.com/ns/doap#",
+    "Author": {"@id": "schema:author"},
+    "Audience": {"@id": "doap:audience"},
+    "Citation": {"@id": "schema:citation"},
+    "Contributors": {"@id": "schema:contributor"},
+    "Description": {"@id": "schema:description"},
+    "Homepage": {"@id": "doap:homepage"},
+    "IssueTracker": {"@id": "doap:bug-database"},
+    "Keywords": {"@id": "schema:keywords"},
+    "License": {"@id": "http://www.w3.org/1999/xhtml/vocab#license"},
+    "Location": {"@id": "schema:location"},
+    "Maintainer": {"@id": "doap:maintainer"},
+    "Name": {"@id": "schema:name"},
+    "ShortDescription": {"@id": "doap:shortdesc"},
+    "Type": {"@id": "schema:type"},
+    "Version": {"@id": "doap:Version"},
+    "conformsTo": {"@id": "dcterms:conformsTo"},
+    "fundedBy": {"@id": "foaf:fundedBy"},
+    "hasPart": {"@id": "dcterms:hasPart"},
+    "isPartOf": {"@id": "dcterms:isPartOf"},
+    "isVersionOf": {"@id": "dcterms:isVersionOf"},
+    "modified": {"@id": "dcterms:modified"},
+    "sameAs": {"@id": "schema:sameAs"}
+  }
+}

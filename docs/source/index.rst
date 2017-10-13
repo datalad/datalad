@@ -1,9 +1,11 @@
-Datalad |---| data management and distribution suite: Documentation
+DataLad |---| data management and distribution suite: Documentation
 *******************************************************************
 
 .. toctree::
    :maxdepth: 1
 
+   gettingstarted
+   changelog
    acknowledgements
 
 Concepts and technologies
@@ -14,8 +16,11 @@ Concepts and technologies
 
    background
    related
-   metadata
+   basics
    usecases/index
+   metadata
+   customization
+   faq
    glossary
 
 Commands and API
@@ -26,6 +31,7 @@ Commands and API
 
    cmdline
    modref
+   config
 
 Automated data distributions
 ============================

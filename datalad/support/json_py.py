@@ -18,7 +18,6 @@ from simplejson import load as jsonload
 from simplejson import dump as jsondump
 # simply mirrored for now
 from simplejson import loads
-from simplejson import dumps
 from simplejson import JSONDecodeError
 
 
@@ -28,6 +27,7 @@ json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False, encoding='
 # Let's just reuse top level one for now
 from ..log import lgr
 from ..dochelpers import exc_str
+
 
 def dump(obj, fname):
     with open(fname, 'wb') as f:
@@ -62,7 +62,7 @@ def load(fname, fixup=True, **kw):
         s_orig = s = f.read()
 
     for o, r in {
-        u"\xa0" : " ",  # non-breaking space
+        u"\xa0": " ",  # non-breaking space
     }.items():
         s = s.replace(o, r)
 

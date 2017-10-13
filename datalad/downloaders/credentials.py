@@ -95,25 +95,41 @@ class Credential(object):
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
 
-    def _ask_field_value(self, f):
+    def _ask_field_value(self, f, instructions=None):
+        msg = instructions if instructions else \
+            ("You need to authenticate with %r credentials." % self.name +
+                  (" %s provides information on how to gain access"
+                   % self.url if self.url else ''))
+
         return ui.question(
             f,
-            title="You need to authenticate with %r credentials." % self.name +
-                  " %s provides information on how to gain access"
-                  % self.url if self.url else '',
+            title=msg,
             hidden=self._is_field_hidden(f))
 
-    def _ask_and_set(self, f):
-        v = self._ask_field_value(f)
+    def _ask_and_set(self, f, instructions=None):
+        v = self._ask_field_value(f, instructions=instructions)
         self.set(**{f: v})
         return v
 
-    def enter_new(self):
-        """Enter new values for the credential fields"""
+    def enter_new(self, instructions=None, **kwargs):
+        """Enter new values for the credential fields
+
+        Parameters
+        ----------
+        instructions : str, optional
+          If given, the auto-generated instructions based on a login-URL are
+          replaced by the given string
+        **kwargs
+          Any given key value pairs with non-None values are used to set the
+          field `key` to the given value, without asking for user input
+        """
         # Use ui., request credential fields corresponding to the type
         for f in self._FIELDS:
-            if not self._is_field_optional(f):
-                self._ask_and_set(f)
+            if kwargs.get(f, None):
+                # use given value, don't ask
+                self.set(**{f: kwargs[f]})
+            elif not self._is_field_optional(f):
+                self._ask_and_set(f, instructions=instructions)
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
@@ -144,7 +160,7 @@ class Credential(object):
                              % (f, self._FIELDS.keys()))
         try:
             return self._keyring.get(self.name, f)
-        except:
+        except:  # MIH: what could even happen? _keyring not a dict?
             return default
 
     def delete(self):
@@ -177,7 +193,7 @@ class AWS_S3(Credential):
         if not exp:
             return True
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - calendar.timegm(time.localtime()))/3600.
+        expire_in = (exp_epoch - calendar.timegm(time.localtime())) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
@@ -210,7 +226,7 @@ class CompositeCredential(Credential):
         # the rest with index suffix, but storing themselves in the same keyring
         for iC, C in enumerate(self._CREDENTIAL_CLASSES[1:]):
             credentials.append(
-                C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self._keyring)
+                C(name="%s:%d" % (self.name, iC + 1), url=None, keyring=self._keyring)
             )
         self._credentials = credentials
 
@@ -229,8 +245,6 @@ class CompositeCredential(Credential):
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
-        name = self.name
-
         # Start from the tail until we have credentials set
         idx = len(self._credentials) - 1
         for c in self._credentials[::-1]:
@@ -250,7 +264,7 @@ class CompositeCredential(Credential):
         for c, adapter, next_c in zip(
                 self._credentials[idx:],
                 self._CREDENTIAL_ADAPTERS[idx:],
-                self._credentials[idx+1:]):
+                self._credentials[idx + 1:]):
             fields = c()
             next_fields = adapter(**fields)
             next_c.set(**next_fields)

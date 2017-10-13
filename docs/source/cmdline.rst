@@ -22,15 +22,18 @@ Dataset operations
    :maxdepth: 1
 
    generated/man/datalad-add
-   generated/man/datalad-add-sibling
    generated/man/datalad-create
-   generated/man/datalad-create-publication-target-sshwebserver
+   generated/man/datalad-create-sibling
+   generated/man/datalad-create-sibling-github
+   generated/man/datalad-drop
+   generated/man/datalad-plugin
+   generated/man/datalad-get
    generated/man/datalad-install
-   generated/man/datalad-modify-subdataset-urls
    generated/man/datalad-publish
-   generated/man/datalad-uninstall
-   generated/man/datalad-update
+   generated/man/datalad-remove
    generated/man/datalad-save
+   generated/man/datalad-update
+   generated/man/datalad-uninstall
    generated/man/datalad-unlock
 
 Meta data handling
@@ -39,7 +42,8 @@ Meta data handling
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-search-datasets
+   generated/man/datalad-search
+   generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
 
 Miscellaneous commands
@@ -52,7 +56,21 @@ Miscellaneous commands
    generated/man/datalad-clean
    generated/man/datalad-crawl
    generated/man/datalad-crawl-init
-   generated/man/datalad-create-test-dataset
    generated/man/datalad-download-url
    generated/man/datalad-ls
+   generated/man/datalad-run
    generated/man/datalad-test
+
+Plumbing commands
+=================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-annotate-paths
+   generated/man/datalad-clone
+   generated/man/datalad-create-test-dataset
+   generated/man/datalad-diff
+   generated/man/datalad-sshrun
+   generated/man/datalad-siblings
+   generated/man/datalad-subdatasets

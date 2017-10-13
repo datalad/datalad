@@ -16,14 +16,87 @@ functions it provides.
 High-level user interface
 =========================
 
+Dataset operations
+------------------
+
 .. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
-   api
+   api.Dataset
+   api.add
+   api.create
+   api.create_sibling
+   api.create_sibling_github
+   api.drop
+   api.plugin
+   api.get
+   api.install
+   api.publish
+   api.remove
+   api.save
+   api.update
+   api.uninstall
+   api.unlock
 
-Plumbing
-========
+Meta data handling
+------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.search
+   api.aggregate_metadata
+
+Plumbing commands
+-----------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.annotate_paths
+   api.clean
+   api.clone
+   api.create_test_dataset
+   api.diff
+   api.download_url
+   api.ls
+   api.sshrun
+   api.siblings
+   api.subdatasets
+
+Miscellaneous commands
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.add_archive_content
+   api.crawl
+   api.crawl_init
+   api.test
+
+Plugins
+-------
+
+DataLad can be customized by plugins. The following plugins are shipped
+with DataLad.
+
+.. currentmodule:: datalad.plugin
+.. autosummary::
+   :toctree: generated
+
+   add_readme
+   export_tarball
+   no_annex
+   wtf
+
+
+Support functionality
+=====================
 
 .. currentmodule:: datalad
 .. autosummary::
@@ -32,7 +105,6 @@ Plumbing
    auto
    cmd
    consts
-   db
    log
    utils
    version
@@ -60,7 +132,6 @@ Crawler
    :toctree: generated
 
    crawler.base
-   crawler.db
    crawler.pipeline
 
 Test infrastructure

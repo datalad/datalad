@@ -1,0 +1,62 @@
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+#ex: set sts=4 ts=4 sw=4 et:
+# This file contains bash configuration variables to be used for generating
+# asciinema demos to guarantee consistent appearance.
+
+: ${do_colors:=1}
+
+if [ ! -z "$do_colors" ]; then
+    # Lets color PSes
+    black='\[\e[0;30m\]'
+    Black='\[\e[1;30m\]'
+    red='\[\e[0;31m\]'
+    Red='\[\e[1;31m\]'
+    green='\[\e[0;32m\]'
+    Green='\[\e[1;32m\]'
+    yellow='\[\e[0;33m\]'
+    Yellow='\[\e[1;33m\]'
+    blue='\[\e[0;34m\]'
+    Blue='\[\e[1;34m\]'
+    cyan='\[\e[0;36m\]'
+    Cyan='\[\e[1;36m\]'
+    white='\[\e[0;37m\]'
+    White='\[\e[1;37m\]'
+    NC='\[\e[0m\]' #no color
+fi
+
+# Color the working directory to help highlighting boundaries of the commands
+# execution/output
+export PS1="${Cyan}\w${NC} % "
+export PS2="> "
+export PS3=
+export PS4=+
+
+# make a fake temporary home dir and go into it
+SCREENCAST_HOME=${SCREENCAST_HOME:-/demo}
+if [ ! -e "$SCREENCAST_HOME" ]; then
+    mkdir -p ${SCREENCAST_HOME} || {
+        echo "FAILED to create $SCREENCAST_HOME" >&2
+        exit 1;  # we need demo directory!
+    }
+fi
+HOME=$SCREENCAST_HOME
+export HOME
+cd
+
+if ! hash datalad 2>/dev/null; then
+    # assume layout of the "master" but should be working fine if datalad
+    # is system wide or virtualenv installed in the session
+    export PATH=~/datalad/bin:$PATH
+    export PYTHONPATH=~/datalad
+fi
+
+# Basic git setup
+git config --global user.name "DataLad Demo"
+git config --global user.email demo@datalad.org
+
+# pager by default is not helpful in demo
+git config --global core.pager cat
+
+
+# cleanup at the end
+trap "cd ; datalad remove $SCREENCAST_HOME/demo -r --nocheck > /dev/null 2>&1" EXIT

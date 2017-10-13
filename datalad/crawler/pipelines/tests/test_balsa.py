@@ -7,6 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from ..balsa import pipeline as ofpipeline, superdataset_pipeline
 import os
@@ -51,8 +55,7 @@ def test_smoke_pipelines():
     yield _test_smoke_pipelines, superdataset_pipeline, []
 
 
-@with_tree(tree={
-
+TEST_TREE1 = {
     'study': {
         'show': {
             'WG33': {
@@ -119,12 +122,14 @@ def test_smoke_pipelines():
         }
     },
 
-    },
-    archives_leading_dir=False
-)
+}
+
+@with_tree(tree=TEST_TREE1, archives_leading_dir=False)
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_balsa_extract_meta(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
@@ -198,6 +203,8 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
@@ -221,7 +228,7 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     commits = {b: list(repo.get_branch_commits(b)) for b in branches}
     eq_(len(commits['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
-    eq_(len(commits['master']), 4)  # all commits out there -- init + 2*(incoming, processed, merge)
+    eq_(len(commits['master']), 6)  # all commits out there -- init ds + init crawler + 1*(incoming, processed, merge)
 
     with chpwd(outd):
         eq_(set(glob('*')), {'dir1', 'file1.nii'})
@@ -251,7 +258,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
 
 @with_tree(tree={
-
     'study': {
         'show': {
             'WG33': {
@@ -260,7 +266,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/RIBX">dir1 / file2.nii</a>
                                     <a href="/file/show/GSRD">file1b.nii</a>
-
                                     %s
                                   </body></html>""" % _PLUG_HERE,
             },
@@ -274,7 +279,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
         }
     },
-
     'file': {
         'show': {
             'JX5V': {
@@ -294,7 +298,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             }
 
         },
-
         'download': {
             'file1.nii': "content of file1.nii is different",
             'file1b.nii': "content of file1b.nii",
@@ -309,6 +312,8 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_balsa_pipeline2(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
@@ -344,7 +349,8 @@ def test_balsa_pipeline2(ind, topurl, outd, clonedir):
         './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/meta/balsa.json',
-        './file1.nii', './dir1/file2.nii',
+        './file1.nii',
+        './dir1/file2.nii',
     }
 
     eq_(set(all_files), target_files)

@@ -12,6 +12,7 @@ import glob
 import inspect
 import shutil
 import stat
+from json import dumps
 import os
 import re
 import tempfile
@@ -33,12 +34,15 @@ from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
+from os.path import relpath
 
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
     raises, ok_, eq_, make_decorator
 
+from nose.tools import assert_set_equal
+from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -59,6 +63,9 @@ _TEMP_PATHS_CLONES = set()
 neq_ = assert_not_equal
 nok_ = assert_false
 
+lgr = logging.getLogger("datalad.tests.utils")
+
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
@@ -76,6 +83,19 @@ def skip_if_scrapy_without_selector():
         raise SkipTest(
             "scrapy misses Selector (too old? version: %s)"
             % getattr(scrapy, '__version__'))
+
+
+def skip_if_url_is_not_available(url, regex=None):
+    # verify that dataset is available
+    from datalad.downloaders.providers import Providers
+    from datalad.downloaders.base import DownloadError
+    providers = Providers.from_config_files()
+    try:
+        content = providers.fetch(url)
+        if regex and re.search(regex, content):
+            raise SkipTest("%s matched %r -- skipping the test" % (url, regex))
+    except DownloadError:
+        raise SkipTest("%s failed to download" % url)
 
 
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
@@ -139,50 +159,103 @@ from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
 
-def ok_clean_git_annex_proxy(path):
-    """Helper to check, whether an annex in direct mode is clean
-    """
-    # TODO: May be let's make a method of AnnexRepo for this purpose
-
-    ar = AnnexRepo(path)
-    cwd = getpwd()
-    chpwd(path)
-
-    try:
-        out = ar.proxy(['git', 'status'])
-    except CommandNotAvailableError as e:
-        raise SkipTest
-    finally:
-        chpwd(cwd)
-
-    assert_in(
-        "nothing to commit", out[0],
-        msg="git-status output via proxy not plausible: %s" % out[0]
-    )
-
-
-def ok_clean_git(path, annex=True, untracked=[]):
+def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
+                 untracked=[], ignore_submodules=False):
     """Verify that under given path there is a clean git repository
 
     it exists, .git exists, nothing is uncommitted/dirty/staged
+
+    Note
+    ----
+    Parameters head_modified and index_modified currently work
+    in pure git or indirect mode annex only and are ignored otherwise!
+    Implementation is yet to do!
+
+    Parameters
+    ----------
+    path: str or Repo
+      in case of a str: path to the repository's base dir;
+      Note, that passing a Repo instance prevents detecting annex. This might be
+      useful in case of a non-initialized annex, a GitRepo is pointing to.
+    annex: bool or None
+      explicitly set to True or False to indicate, that an annex is (not)
+      expected; set to None to autodetect, whether there is an annex.
+      Default: None.
+    ignore_submodules: bool
+      if True, submodules are not inspected
     """
-    ok_(exists(path))
-    ok_(exists(join(path, '.git')))
-    if annex:
-        ok_(exists(join(path, '.git', 'annex')))
-    repo = git.Repo(path)
+    # TODO: See 'Note' in docstring
 
-    if repo.index.entries.keys():
-        ok_(repo.head.is_valid())
+    if isinstance(path, AnnexRepo):
+        if annex is None:
+            annex = True
+        # if `annex` was set to False, but we find an annex => fail
+        assert_is(annex, True)
+        r = path
+    elif isinstance(path, GitRepo):
+        if annex is None:
+            annex = False
+        # explicitly given GitRepo instance doesn't make sense with 'annex' True
+        assert_is(annex, False)
+        r = path
+    else:
+        # 'path' is an actual path
+        try:
+            r = AnnexRepo(path, init=False, create=False)
+            if annex is None:
+                annex = True
+            # if `annex` was set to False, but we find an annex => fail
+            assert_is(annex, True)
+        except Exception:
+            # Instantiation failed => no annex
+            try:
+                r = GitRepo(path, init=False, create=False)
+            except Exception:
+                raise AssertionError("Couldn't find an annex or a git "
+                                     "repository at {}.".format(path))
+            if annex is None:
+                annex = False
+            # explicitly given GitRepo instance doesn't make sense with
+            # 'annex' True
+            assert_is(annex, False)
 
-        # get string representations of diffs with index to ease
-        # troubleshooting
-        index_diffs = [str(d) for d in repo.index.diff(None)]
-        head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+    eq_(sorted(r.untracked_files), sorted(untracked))
 
-        eq_(sorted(repo.untracked_files), sorted(untracked))
-        eq_(index_diffs, [])
-        eq_(head_diffs, [])
+    if annex and r.is_direct_mode():
+        if head_modified or index_modified:
+            lgr.warning("head_modified and index_modified are not quite valid "
+                        "concepts in direct mode! Looking for any change "
+                        "(staged or not) instead.")
+            status = r.get_status(untracked=False, submodules=not ignore_submodules)
+            modified = []
+            for s in status:
+                modified.extend(status[s])
+            eq_(sorted(head_modified + index_modified),
+                sorted(f for f in modified))
+        else:
+            ok_(not r.is_dirty(untracked_files=not untracked,
+                               submodules=not ignore_submodules))
+    else:
+        repo = r.repo
+
+        if repo.index.entries.keys():
+            ok_(repo.head.is_valid())
+
+            if not head_modified and not index_modified:
+                # get string representations of diffs with index to ease
+                # troubleshooting
+                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+                index_diffs = [str(d) for d in repo.index.diff(None)]
+                eq_(head_diffs, [])
+                eq_(index_diffs, [])
+            else:
+                if head_modified:
+                    # we did ask for interrogating changes
+                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                    eq_(head_modified_, head_modified)
+                if index_modified:
+                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                    eq_(index_modified_, index_modified)
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -292,6 +365,7 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+
 def ok_git_config_not_empty(ar):
     """Helper to verify that nothing rewritten the config file"""
     # TODO: we don't support bare -- do we?
@@ -303,13 +377,13 @@ def ok_annex_get(ar, files, network=True):
 
     get passes through stderr from the ar to the user, which pollutes
     screen while running tests
+
+    Note: Currently not true anymore, since usage of --json disables
+    progressbars
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.get(files)
-        if network:
-            # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -318,8 +392,13 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+
 def ok_generator(gen):
     assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+
+assert_is_generator = ok_generator  # just an alias
+
 
 def ok_archives_caches(repopath, n=1, persistent=None):
     """Given a path to repository verify number of archives
@@ -342,18 +421,30 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n2,
                  msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
-def ok_file_has_content(path, content, strip=False):
+
+def ok_exists(path):
+    assert exists(path), 'path %s does not exist' % path
+
+
+def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
     """Verify that file exists and has expected content"""
-    assert(exists(path))
+    ok_exists(path)
     with open(path, 'r') as f:
         content_ = f.read()
+
         if strip:
             content_ = content_.strip()
-        assert_equal(content_, content)
+
+        if re_:
+            assert_re_in(content, content_, **kwargs)
+        else:
+            assert_equal(content, content_, **kwargs)
+
 
 #
 # Decorators
 #
+
 
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
@@ -484,7 +575,7 @@ def with_tempfile(t, **tkwargs):
     ----------
 
     To change the used directory without providing keyword argument 'dir' set
-    DATALAD_TESTS_TEMPDIR.
+    DATALAD_TESTS_TEMP_DIR.
 
     Examples
     --------
@@ -543,6 +634,8 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    if GitRepo(tdir).is_with_annex():
+        AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
@@ -750,8 +843,146 @@ def skip_ssh(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
-        if not os.environ.get('DATALAD_TESTS_SSH'):
+        from datalad import cfg
+        test_ssh = cfg.get("datalad.tests.ssh", '')
+        if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+# ### ###
+# START known failure decorators
+# ### ###
+
+def probe_known_failure(func):
+    """Test decorator allowing the test to pass when it fails and vice versa
+
+    Setting config datalad.tests.knownfailures.probe to True tests, whether or
+    not the test is still failing. If it's not, an AssertionError is raised in
+    order to indicate that the reason for failure seems to be gone.
+    """
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        from datalad import cfg
+        if cfg.obtain("datalad.tests.knownfailures.probe"):
+            assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
+            # Note: Since assert_raises lacks a `msg` argument, a comment
+            # in the same line is helpful to determine what's going on whenever
+            # this assertion fails and we see a trace back. Otherwise that line
+            # wouldn't be very telling.
+        else:
+            return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_known_failure(func):
+    """Test decorator allowing to skip a test that is known to fail
+
+    Setting config datalad.tests.knownfailures.skip to a bool enables/disables
+    skipping.
+    """
+    from datalad import cfg
+
+    @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
+             msg="Skip test known to fail")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure(func):
+    """Test decorator marking a test as known to fail
+
+    This combines `probe_known_failure` and `skip_known_failure` giving the
+    skipping precedence over the probing.
+    """
+
+    @skip_known_failure
+    @probe_known_failure
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure_v6(func):
+    """Test decorator marking a test as known to fail in a v6 test run
+
+    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
+    the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    version = cfg.obtain("datalad.repo.version")
+    if version and version == 6:
+
+        @known_failure
+        @wraps(func)
+        def v6_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return v6_func
+
+    return func
+
+
+def known_failure_direct_mode(func):
+    """Test decorator marking a test as known to fail in a direct mode test run
+
+    If datalad.repo.direct is set to True behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    if direct:
+
+        @known_failure
+        @wraps(func)
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+
+    return func
+
+
+# ### ###
+# END known failure decorators
+# ### ###
+
+
+def skip_v6(func):
+    """Skips tests if datalad is configured to use v6 mode
+    (DATALAD_REPO_VERSION=6)
+    """
+
+    from datalad import cfg
+    version = cfg.obtain("datalad.repo.version")
+
+    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_direct_mode(func):
+    """Skips tests if datalad is configured to use direct mode
+    (set DATALAD_REPO_DIRECT)
+    """
+
+    from datalad import cfg
+
+    @skip_if(cfg.obtain("datalad.repo.direct"),
+             msg="Skip test in direct mode test run")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
@@ -801,6 +1032,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
     return newfunc
 
+
 @optional_args
 def run_under_dir(func, newdir='.'):
     """Decorator to run tests under another directory
@@ -841,6 +1073,109 @@ def assert_re_in(regex, c, flags=0, match=True, msg=None):
     )
 
 
+def assert_dict_equal(d1, d2):
+    msgs = []
+    if set(d1).difference(d2):
+        msgs.append(" keys in the first dict but not in the second: %s"
+                    % list(set(d1).difference(d2)))
+    if set(d2).difference(d1):
+        msgs.append(" keys in the second dict but not in the first: %s"
+                    % list(set(d2).difference(d1)))
+    for k in set(d1).intersection(d2):
+        same = True
+        try:
+            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+        except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
+            same = False
+
+        if not same:
+            msgs.append(" [%r] differs: %r != %r" % (k, d1[k], d2[k]))
+
+        if len(msgs) > 10:
+            msgs.append("and more")
+            break
+    if msgs:
+        raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
+    # do generic comparison just in case we screwed up to detect difference correctly above
+    eq_(d1, d2)
+
+
+def assert_status(label, results):
+    """Verify that each status dict in the results has a given status label
+
+    `label` can be a sequence, in which case status must be one of the items
+    in this sequence.
+    """
+    label = assure_list(label)
+    results = assure_list(results)
+    for i, r in enumerate(results):
+        try:
+            assert_in('status', r)
+            assert_in(r['status'], label)
+        except AssertionError:
+            raise AssertionError('Test {}/{}: expected status {} not found in:\n{}'.format(
+                i + 1,
+                len(results),
+                label,
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+
+
+def assert_message(message, results):
+    """Verify that each status dict in the results has a message
+
+    This only tests the message template string, and not a formatted message
+    with args expanded.
+    """
+    for r in assure_list(results):
+        assert_in('message', r)
+        m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
+        assert_equal(m, message)
+
+
+def assert_result_count(results, n, **kwargs):
+    """Verify specific number of results (matching criteria, if any)"""
+    count = 0
+    results = assure_list(results)
+    for r in results:
+        if not len(kwargs):
+            count += 1
+        elif all(k in r and r[k] == v for k, v in kwargs.items()):
+            count += 1
+    if not n == count:
+        raise AssertionError(
+            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+                count,
+                n,
+                kwargs,
+                len(results),
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+
+
+def assert_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is found in
+    one of the results"""
+    found = False
+    for r in assure_list(results):
+        if all(k in r and r[k] == v for k, v in kwargs.items()):
+            found = True
+    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
+
+
+def assert_not_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is not in any
+    of the results"""
+    for r in assure_list(results):
+        assert any(k not in r or r[k] != v for k, v in kwargs.items())
+
+
+def assert_result_values_equal(results, prop, values):
+    """Verify that the values of all results for a given key in the status dicts
+    match the given sequence"""
+    assert_equal(
+        [r[prop] for r in results],
+        values)
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
@@ -862,6 +1197,7 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
 
 def skip_httpretty_on_problematic_pythons(func):
     """As discovered some httpretty bug causes a side-effect
@@ -893,6 +1229,15 @@ def with_batch_direct(t):
 
     return newfunc
 
+
+def dump_graph(graph, flatten=False):
+    if flatten:
+        from datalad.metadata import flatten_metadata_graph
+        graph = flatten_metadata_graph(graph)
+    return dumps(
+        graph,
+        indent=1,
+        default=lambda x: 'non-serializable object skipped')
 
 
 # List of most obscure filenames which might or not be supported by different
@@ -933,7 +1278,7 @@ def get_most_obscure_supported_name(tdir):
 
 
 @optional_args
-def with_testsui(t, responses=None):
+def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
@@ -941,7 +1286,7 @@ def with_testsui(t, responses=None):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
-            ui.set_backend('tests')
+            ui.set_backend('tests' if interactive else 'tests-noninteractive')
             if responses:
                 ui.add_responses(responses)
             ret = t(*args, **kwargs)
@@ -952,9 +1297,81 @@ def with_testsui(t, responses=None):
         finally:
             ui.set_backend(old_backend)
 
+    if not interactive and responses is not None:
+        raise ValueError("Non-interactive UI cannot provide responses")
+
     return newfunc
+
 with_testsui.__test__ = False
+
+
+def assert_no_errors_logged(func, skip_re=None):
+    """Decorator around function to assert that no errors logged during its execution"""
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        with swallow_logs(new_level=logging.ERROR) as cml:
+            out = func(*args, **kwargs)
+            if cml.out:
+                if not (skip_re and re.search(skip_re, cml.out)):
+                    raise AssertionError(
+                        "Expected no errors to be logged, but log output is %s"
+                        % cml.out
+                    )
+        return out
+
+    return new_func
+
+
+def get_mtimes_and_digests(target_path):
+    """Return digests (md5) and mtimes for all the files under target_path"""
+    from datalad.utils import find_files
+    from datalad.support.digests import Digester
+    digester = Digester(['md5'])
+
+    # bother only with existing ones for this test, i.e. skip annexed files without content
+    target_files = [
+        f for f in find_files('.*', topdir=target_path, exclude_vcs=False, exclude_datalad=False)
+        if exists(f)
+    ]
+    # let's leave only relative paths for easier analysis
+    target_files_ = [relpath(f, target_path) for f in target_files]
+
+    digests = {frel: digester(f) for f, frel in zip(target_files, target_files_)}
+    mtimes = {frel: os.stat(f).st_mtime for f, frel in zip(target_files, target_files_)}
+    return digests, mtimes
+
+
 
 #
 # Context Managers
 #
+
+
+#
+# Test tags
+#
+# To be explicit, and not "loose" some tests due to typos, decided to make
+# explicit decorators for common types
+
+from nose.plugins.attrib import attr
+
+
+def integration(f):
+    """Mark test as an "integration" test which generally is not needed to be run
+    
+    Generally tend to be slower
+    """
+    return attr('integration')(f)
+
+
+def slow(f):
+    """Mark test as a slow, although not necessarily integration or usecase test
+    """
+    return attr('slow')(f)
+
+
+def usecase(f):
+    """Mark test as a usecase user ran into and which (typically) caused bug report
+    to be filed/troubleshooted
+    """
+    return attr('usecase')(f)

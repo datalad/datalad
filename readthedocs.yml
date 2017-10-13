@@ -1,0 +1,11 @@
+formats:
+    - epub
+    - pdf
+
+requirements_file: requirements.txt
+
+python:
+   version: 2
+
+python:
+   setup_py_install: true

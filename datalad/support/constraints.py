@@ -172,7 +172,9 @@ class EnsureBool(Constraint):
                 return False
             elif value in ('1', 'yes', 'on', 'enable', 'true'):
                 return True
-        raise ValueError("value must be converted to boolean")
+        raise ValueError(
+            "value '{}' must be convertible to boolean".format(
+                value))
 
     def long_description(self):
         return 'value must be convertible to type bool'
@@ -231,6 +233,21 @@ class EnsureNone(Constraint):
         return 'value must be `None`'
 
 
+class EnsureCallable(Constraint):
+    """Ensure an input is of value `None`"""
+    def __call__(self, value):
+        if hasattr(value, '__call__'):
+            return value
+        else:
+            raise ValueError("value must be a callable")
+
+    def short_description(self):
+        return 'callable'
+
+    def long_description(self):
+        return 'value must be a callable'
+
+
 class EnsureChoice(Constraint):
     """Ensure an input is element of a set of possible values"""
 
@@ -253,7 +270,36 @@ class EnsureChoice(Constraint):
         return 'value must be one of %s' % (str(self._allowed),)
 
     def short_description(self):
-        return '{%s}' % ', '.join([str(c) for c in self._allowed])
+        return '{%s}' % ', '.join([repr(c) for c in self._allowed])
+
+
+class EnsureKeyChoice(EnsureChoice):
+    """Ensure value under a key in an input is in a set of possible values"""
+
+    def __init__(self, key, values):
+        """
+        Parameters
+        ----------
+        key : str
+          The to-be-tested values are looked up under the given key in
+          a dict-like input object.
+        values : tuple
+           Possible accepted values.
+        """
+        self._key = key
+        super(EnsureKeyChoice, self).__init__(*values)
+
+    def __call__(self, value):
+        if self._key not in value:
+            raise ValueError("value not dict-like")
+        super(EnsureKeyChoice, self).__call__(value[self._key])
+        return value
+
+    def long_description(self):
+        return "value in '%s' must be one of %s" % (self._key, str(self._allowed),)
+
+    def short_description(self):
+        return '%s:{%s}' % (self._key, ', '.join([str(c) for c in self._allowed]))
 
 
 class EnsureRange(Constraint):
@@ -289,7 +335,7 @@ class EnsureRange(Constraint):
         return 'value must be in range [%s, %s]' % (min_str, max_str)
 
     def short_description(self):
-        None
+        return None
 
 
 class AltConstraints(Constraint):

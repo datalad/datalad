@@ -12,7 +12,11 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.tests.utils import known_failure_v6
+
+
 import logging
+import os
 from os import unlink
 from os.path import exists, join as opj, pardir, basename, lexists
 from glob import glob
@@ -30,12 +34,18 @@ from ...support.exceptions import FileNotInRepositoryError
 from ...support.exceptions import CommandError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...tests.utils import swallow_logs
+from ...tests.utils import integration
 from ...utils import chpwd, getpwd, rmtemp
 from ...utils import find_files
 from ...utils import rmtree
-from ... import lgr
+from datalad.log import lgr
 from ...api import add_archive_content, clean
+from datalad.support.external_versions import external_versions
+from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+from datalad.consts import ARCHIVES_SPECIAL_REMOTE
 
+from datalad.tests.utils import create_tree
+from datalad.tests.utils import ok_clean_git
 
 treeargs = dict(
     tree=(
@@ -86,6 +96,11 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         leading_dirs_depth=2,
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
+
+    if external_versions['cmd:annex'] >= '6.20170208':
+        # should have fixed remotes
+        eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
+            '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
     all_files = sorted(find_files('.'))
     target_files = {
@@ -146,6 +161,8 @@ tree4uargs = dict(
 )
 
 
+@known_failure_v6   # FIXME
+#  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
@@ -188,17 +205,17 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # But that other one carries updated file, so should fail due to overwrite
     with assert_raises(RuntimeError) as cme:
-        add_archive_content(opj('1u', '1.tar.gz'))
+        add_archive_content(opj('1u', '1.tar.gz'), use_current_dir=True)
 
     # TODO: somewhat not precise since we have two possible "already exists"
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
     add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite', use_current_dir=True)
-    d1_basic_checks()
     add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
     add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
     add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+
     # rudimentary test
     assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
                  ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
@@ -261,7 +278,7 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # We should be able to drop everything since available online
     with swallow_outputs():
-        clean(annex=repo)
+        clean(dataset=repo.path)
     repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
@@ -274,12 +291,13 @@ def test_add_archive_content(path_orig, url, repo_path):
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, options=['--key'])
     unlink(opj(path_orig, '1.tar.gz'))
-    with swallow_logs(new_level=logging.ERROR) as cml:
-        assert_raises(CommandError, repo.drop, key_1tar, options=['--key'])
-        assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
-        assert_in('Could only verify the existence of 0 out of 1 necessary copies', cml.out)
+    res = repo.drop(key_1tar, options=['--key'])
+    assert_equal(res['success'], False)
+    assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
+    assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
+@integration
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
@@ -303,9 +321,6 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0)
 
     chpwd(orig_pwd)  # just to avoid warnings ;)
-
-# looking for the future tagging of lengthy tests
-test_add_archive_content.tags = ['integration']
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
@@ -367,7 +382,12 @@ class TestAddArchiveOptions():
         self.annex.remove('1.tar', force=True)
         self.annex.add(f123)
         self.annex.commit(msg="renamed")
-        add_archive_content(f123, annex=self.annex, add_archive_leading_dir=True, strip_leading_dirs=True)
+        add_archive_content(
+            f123,
+            annex=self.annex,
+            add_archive_leading_dir=True,
+            strip_leading_dirs=True
+        )
         ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
     def test_add_delete_after_and_drop(self):
@@ -381,7 +401,11 @@ class TestAddArchiveOptions():
         with assert_raises(Exception), \
                 swallow_logs():
             self.annex.whereis(key1, key=True, output='full')
+        commits_prior = list(self.annex.get_branch_commits('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
+        commits_after = list(self.annex.get_branch_commits('git-annex'))
+        # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
+        assert_equal(len(commits_after), len(commits_prior) + 2)
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
@@ -392,3 +416,73 @@ class TestAddArchiveOptions():
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 1)  # in archive
+
+        # there should be no .datalad temporary files hanging around
+        self.assert_no_trash_left_behind()
+
+    def test_add_delete_after_and_drop_subdir(self):
+        os.mkdir(opj(self.annex.path, 'subdir'))
+        mv_out = self.annex._git_custom_command(
+            [],
+            ['git', 'mv', '1.tar', 'subdir']
+        )
+        self.annex.commit("moved into subdir")
+        with chpwd(self.annex.path):
+            # was failing since deleting without considering if tarball
+            # was extracted in that tarball directory
+            commits_prior_master = list(self.annex.get_branch_commits())
+            commits_prior = list(self.annex.get_branch_commits('git-annex'))
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True)
+            ok_clean_git(self.annex.path)
+            commits_after_master = list(self.annex.get_branch_commits())
+            commits_after = list(self.annex.get_branch_commits('git-annex'))
+            # There should be a single commit for all additions +1 to
+            # initiate datalad-archives gh-1258
+            assert_equal(len(commits_after), len(commits_prior) + 2)
+            assert_equal(len(commits_after_master), len(commits_prior_master))
+            assert(add_out is self.annex)
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
+
+            # and if we add some untracked file, redo, there should be no changes
+            # to master and file should remain not committed
+            create_tree(self.annex.path, {'dummy.txt': '123'})
+            assert_true(self.annex.dirty)  # untracked file
+            add_out = add_archive_content(
+                opj('subdir', '1.tar'),
+                delete_after=True,
+                drop_after=True,
+                allow_dirty=True)
+            ok_clean_git(self.annex.path, untracked=['dummy.txt'])
+            assert_equal(len(list(self.annex.get_branch_commits())),
+                         len(commits_prior_master))
+
+            # there should be no .datalad temporary files hanging around
+            self.assert_no_trash_left_behind()
+
+    def assert_no_trash_left_behind(self):
+        assert_equal(
+            list(find_files('\.datalad..*', self.annex.path, dirs=True)),
+            []
+        )
+
+    def test_override_existing_under_git(self):
+        create_tree(self.annex.path, {'1.dat': 'load2'})
+        self.annex.add('1.dat', git=True)
+        self.annex.commit('added to git')
+        add_archive_content(
+            '1.tar', annex=self.annex, strip_leading_dirs=True,
+        )
+        # and we did not bother adding it to annex (for now) -- just skipped
+        # since we have it and it is the same
+        ok_file_under_git(self.annex.path, '1.dat', annexed=False)
+
+        # but if we say 'overwrite' -- we would remove and replace
+        add_archive_content(
+            '1.tar', annex=self.annex, strip_leading_dirs=True, delete=True
+            , existing='overwrite'
+        )
+        ok_file_under_git(self.annex.path, '1.dat', annexed=True)

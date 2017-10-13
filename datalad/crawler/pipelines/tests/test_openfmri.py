@@ -7,6 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from glob import glob
 from os.path import join as opj
@@ -29,6 +33,7 @@ from ....api import clean
 from ....utils import chpwd
 from ....utils import find_files
 from ....utils import swallow_logs
+from ....tests.utils import integration
 from ....tests.utils import with_tree
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
@@ -60,7 +65,7 @@ def check_dropall_get(repo):
     ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
     # --force since it would fail to verify presence in case we remove archives keys... TODO
     repo._annex_custom_command([], ["git", "annex", "drop", "--all", "--force"])
-    clean(annex=repo)  # remove possible extracted archives
+    clean(dataset=repo.path)  # remove possible extracted archives
     with assert_raises(AssertionError):
         ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
     repo.get('.')
@@ -144,7 +149,7 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     annex = Annexificator(
         dataset_path,
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
+        largefiles="exclude=*.txt and exclude=README")
 
     pipeline = [
         crawl_url(dataset_url),
@@ -179,6 +184,8 @@ _versioned_files = """
                             <a href="ds666-beh_R1.0.1.tar.gz">Beh data on AWS version 2</a>
 """
 
+
+@integration
 @with_tree(tree={
     'ds666': {
         # there could also be a case of a file with "unique" name without versioned counterpart
@@ -201,6 +208,8 @@ _versioned_files = """
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     index_html = opj(ind, 'ds666', 'index.html')
 
@@ -262,15 +271,16 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     eq_(len(commits_l['incoming']), 3)
     eq_(len(commits['incoming-processed']), 6)
     eq_(len(commits_l['incoming-processed']), 4)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 10)  # all commits out there -- init + 3*(incoming, processed, merge)
-    eq_(len(commits_l['master']), 4)
+    eq_(len(commits['master']), 13)  # all commits out there -- dataset init, crawler init + 3*(incoming, processed, meta data aggregation, merge)
+    eq_(len(commits_l['master']), 7)
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
     # +1 because original "release" was assumed to be 1.0.0
-    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1', '1.0.1'])
-    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][-2].hexsha)  # next to the last one
-    eq_(repo.repo.tags[-1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
+    repo_tags = repo.get_tags()
+    eq_(repo.get_tags(output='name'), ['1.0.0', '1.0.0+1', '1.0.1'])
+    eq_(repo_tags[0]['hexsha'], commits_l['master'][-5].hexsha)  # next to the last one
+    eq_(repo_tags[-1]['hexsha'], commits_l['master'][0].hexsha)  # the last one
 
     def hexsha(l):
         return l.__class__(x.hexsha for x in l)
@@ -287,26 +297,26 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
                                                  commits_l['incoming-processed'][1].hexsha))
 
     with chpwd(outd):
-        eq_(set(glob('*')), {'changelog.txt', 'README.txt', 'sub-1'})
+        eq_(set(glob('*')), {'changelog.txt', 'sub-1'})
         all_files = sorted(find_files('.'))
 
     t1w_fpath = opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat')
     ok_file_has_content(t1w_fpath, "mighty load 1.0.1")
     ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
-    ok_file_under_git(opj(outd, 'README.txt'), annexed=False)
     ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {
         './.datalad/config',
+        './.datalad/meta/meta.json',
         './.datalad/crawl/crawl.cfg',
         # no more!
         # './.datalad/config.ttl', './.datalad/datalad.ttl',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/crawl/versions/incoming.json',
-        './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
+        './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
     target_incoming_files = {
         '.gitattributes',  # we marked default backend right in the incoming
-        'README.txt', 'changelog.txt',
+        'changelog.txt',
         'ds666.tar.gz',
         'ds666-beh_R1.0.1.tar.gz', 'ds666_R1.0.0.tar.gz', 'ds666_R1.0.1.tar.gz', 'ds666_R2.0.0.tar.gz',
         '.datalad/crawl/statuses/incoming.json',
@@ -328,7 +338,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     # actually we do manage to add_git 1 (README) since it is generated committed directly to git
     # BUT now fixed -- if not committed (was the same), should be marked as skipped
     # Nothing was committed so stats leaked all the way up
-    eq_(out[0]['datalad_stats'], ActivityStats(files=6, skipped=6, urls=5))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=5, skipped=5, urls=5))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     # rerun pipeline when new content is available
@@ -358,7 +368,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     # but for some reason downloaded_size fluctuates.... why? probably archiving...?
     total_stats.downloaded_size = 0
     eq_(total_stats,
-        ActivityStats(files=9, skipped=6, downloaded=1, renamed=1, urls=6,
+        ActivityStats(files=8, skipped=5, downloaded=1, renamed=1, urls=6,
                       add_annex=2,  # add_git=1, # README
                       versions=['2.0.0'],
                       merges=[['incoming', 'incoming-processed']]))
@@ -400,7 +410,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     from datalad.api import crawl
 
     # make a brand new clone
-    GitRepo(clonedir, outd)
+    GitRepo.clone(outd, clonedir)
 
     def _pipeline(*args, **kwargs):
         """Helper to mock openfmri.pipeline invocation so it looks at our 'server'"""
@@ -411,9 +421,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         output, stats = crawl()  # we should be able to recrawl without doing anything
         ok_(stats, ActivityStats(files=6, skipped=6, urls=5))
 
-test_openfmri_pipeline1.tags = ['integration']
 
-
+@integration
 @with_tree(tree={
     'ds666': {
         'index.html': """<html><body>
@@ -430,6 +439,8 @@ test_openfmri_pipeline1.tags = ['integration']
 )
 @serve_path_via_http
 @with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 
@@ -465,8 +476,9 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(len(commits_l['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
     eq_(len(commits_l['incoming-processed']), 2)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 4)  # all commits out there, init, incoming, incoming-processed, merge
-    eq_(len(commits_l['master']), 2)  #  init, merge
+    # to avoid 'dataset init' commit create() needs save=False
+    eq_(len(commits['master']), 7)  # all commits out there, backend, dataset init, crawler, init, incoming, incoming-processed, meta data aggregation, merge
+    eq_(len(commits_l['master']), 5)  # backend, dataset init, init, meta data aggregation, merge
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):
@@ -475,7 +487,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    eq_(out[0]['datalad_stats'], ActivityStats(files=3, skipped=3, urls=2))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=2, skipped=2, urls=2))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     os.rename(opj(ind, 'ds666', 'ds666_R2.0.0.tar.gz'), opj(ind, 'ds666', 'ds666.tar.gz'))
@@ -487,15 +499,14 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     stats_total = out[0]['datalad_stats'].get_total()
     stats_total.downloaded_size = 0
     eq_(stats_total,
-        ActivityStats(files=5, overwritten=1, skipped=2, downloaded=1,
+        ActivityStats(files=4, overwritten=1, skipped=1, downloaded=1,
                       merges=[['incoming', 'incoming-processed']],
                       versions=['1.0.0'],
                       renamed=1, urls=2, add_annex=2))
     # in reality there is also 1.0.0+1 tag since file changed but no version suffix
-    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1'])
+    eq_(repo.get_tags(output='name'), ['1.0.0', '1.0.0+1'])
 
     check_dropall_get(repo)
-test_openfmri_pipeline2.tags = ['integration']
 
 
 from ..openfmri_s3 import collection_pipeline, pipeline

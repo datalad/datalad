@@ -41,8 +41,8 @@ class HelpAction(argparse.Action):
                 if not os.path.exists(manfile):
                     raise IOError("manfile is not found")
                 with gzip.open(manfile) as f:
-                    man_th = [line for line in f if line.startswith(".TH")][0]
-                man_version = man_th.split(' ')[5].strip(" '\"\t\n")
+                    man_th = [line for line in f if line.startswith(b".TH")][0]
+                man_version = man_th.split(b' ')[5].strip(b" '\"\t\n").decode('utf-8')
 
                 # don't show manpage if man_version not equal to current datalad_version
                 if __version__ != man_version:
@@ -61,7 +61,7 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         # for main command -- should be different sections. And since we are in
-        # heavy output messaging mode...
+        # heavy output massaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
@@ -96,27 +96,14 @@ class LogLevelAction(argparse.Action):
         from ..log import LoggerHelper
         LoggerHelper().set_level(level=values)
 
-class PBSAction(argparse.Action):
-    """Action to schedule actual command execution via PBS (e.g. Condor)"""
-    def __call__(self, parser, namespace, values, option_string=None):
-        pbs = values[0]
-        import pdb; pdb.set_trace()
-        i = 1
 
-
-def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
-    from . import common_args
-    for i, args in enumerate((pos, opt)):
-        if args is None:
-            continue
-        for arg in args:
-            arg_tmpl = getattr(common_args, arg)
-            arg_kwargs = arg_tmpl[2].copy()
-            arg_kwargs.update(kwargs)
-            if i:
-                parser.add_argument(*arg_tmpl[i], **arg_kwargs)
-            else:
-                parser.add_argument(arg_tmpl[i], **arg_kwargs)
+# MIH: Disabled. Non-functional, untested.
+#class PBSAction(argparse.Action):
+#    """Action to schedule actual command execution via PBS (e.g. Condor)"""
+#    def __call__(self, parser, namespace, values, option_string=None):
+#        pbs = values[0]
+#        import pdb; pdb.set_trace()
+#        i = 1
 
 
 def parser_add_common_opt(parser, opt, names=None, **kwargs):
@@ -134,7 +121,8 @@ def strip_arg_from_argv(args, value, opt_names):
     """Strip an originally listed option (with its value) from the list cmdline args
     """
     # Yarik doesn't know better
-    args = args or sys.argv
+    if args is None:
+        args = sys.argv
     # remove present pbs-runner option
     args_clean = []
     skip = 0
@@ -143,7 +131,7 @@ def strip_arg_from_argv(args, value, opt_names):
             # we skip only one as instructed
             skip -= 1
             continue
-        if not (arg in opt_names and i < len(args)-1 and args[i + 1] == value):
+        if not (arg in opt_names and i < len(args) - 1 and args[i + 1] == value):
             args_clean.append(arg)
         else:
             # we need to skip this one and next one
@@ -178,6 +166,7 @@ queue
         lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
     finally:
         os.unlink(f.name)
+
 
 class RegexpType(object):
     """Factory for creating regular expression types for argparse
@@ -215,8 +204,7 @@ def get_repo_instance(path=curdir, class_=None):
     RuntimeError, in case cwd is not inside a known repository.
     """
 
-    from os.path import join as opj, ismount, exists, abspath, expanduser, \
-        expandvars, normpath, isabs
+    from os.path import ismount, exists, normpath, isabs
     from git.exc import InvalidGitRepositoryError
     from ..utils import expandpath
     from ..support.gitrepo import GitRepo

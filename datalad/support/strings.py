@@ -14,6 +14,7 @@ from collections import OrderedDict
 from six import binary_type, text_type
 import re
 
+
 def get_replacement_dict(rules):
     """Given a string with replacement rules, produces a dict of from: to"""
 

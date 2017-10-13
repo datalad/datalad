@@ -13,117 +13,134 @@ Should not be imported until we know that interface needs it
 
 import sys
 
+
 #
 # Haven't found an ideal progress bar yet, so to make things modular etc
 # we will provide our interface and adapters for few popular ones
 #
 
+
 class ProgressBarBase(object):
-    def __init__(self):
-        self._prev_value = 0
+    """Base class for any progress bar"""
+
+    def __init__(self, total=None, fill_text=None, out=None, label=None, initial=0):
+        self._current = initial
+        self.total = total
+
+    def refresh(self):
+        """Force update"""
+        pass
 
     def update(self, size, increment=False):
         if increment:
-            self._prev_value += size
+            self._current += size
         else:
-            self._prev_value = size
+            self._current = size
 
-    def start(self):
-        pass
+    @property
+    def current(self):
+        return self._current
+
+    @current.setter
+    def current(self, value):
+        assert value >= 0, "Total cannot be negative"
+        self._current = value
+
+    def start(self, initial=0):
+        self._current = initial
 
     def finish(self):
-        self._prev_value = 0
+        pass
 
-progressbars = {}
-try:
-    from progressbar import Bar, ETA, FileTransferSpeed, \
-        Percentage, ProgressBar, RotatingMarker
+    def set_desc(self, value):
+        pass  # to override in subclass on how to handle description
 
-    # TODO: might better delegate to an arbitrary bar?
-    class BarWithFillText(Bar):
-        """A progress bar widget which fills the bar with the target text"""
 
-        def __init__(self, fill_text, **kwargs):
-            super(BarWithFillText, self).__init__(**kwargs)
-            self.fill_text = fill_text
+class SilentProgressBar(ProgressBarBase):
+    def __init__(self, label='', fill_text=None, total=None, unit='B', out=sys.stdout):
+        super(SilentProgressBar, self).__init__(total=total)
 
-        def update(self, pbar, width):
-            orig = super(BarWithFillText, self).update(pbar, width)
-            # replace beginning with the title
-            if len(self.fill_text) > width:
-                # TODO:  make it fancier! That we also at the same time scroll it from
-                # the left so it does end up at the end with the tail but starts with
-                # the beginning
-                fill_text = '...' + self.fill_text[-(width-4):]
-            else:
-                fill_text = self.fill_text
-            fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
-            return fill_text + " " + orig[len(fill_text)+1:]
 
-    class progressbarProgressBar(ProgressBarBase):
-        """Adapter for progressbar.ProgressBar"""
-
-        backend = 'progressbar'
-
-        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
-            super(progressbarProgressBar, self).__init__()
-            assert(unit == 'B')  # none other "supported" ATM
-            bar = dict(marker=RotatingMarker())
-            # TODO: RF entire messaging to be able to support multiple progressbars at once
-            widgets = ['%s: ' % label,
-                       BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
-                       Percentage(), ' ',
-                       ETA(), ' ',
-                       FileTransferSpeed()]
-            self._pbar = ProgressBar(widgets=widgets, maxval=maxval, fd=out).start()
-
-        def update(self, size, increment=False):
-            self._pbar.update(self._prev_value + size if increment else size)
-            super(progressbarProgressBar, self).update(size, increment=increment)
-
-        def start(self):
-            super(progressbarProgressBar, self).start()
-            self._pbar.start()
-
-        def finish(self):
-            if self._pbar:
-                self._pbar.finish()
-            super(progressbarProgressBar, self).finish()
-
-    progressbars['progressbar'] = progressbarProgressBar
-except ImportError:  # pragma: no cover
-    pass
+progressbars = {'silent':  SilentProgressBar}
 
 try:
     from tqdm import tqdm
+    from datalad.support.external_versions import external_versions
+    from datalad.utils import updated
 
     class tqdmProgressBar(ProgressBarBase):
         """Adapter for tqdm.ProgressBar"""
 
         backend = 'tqdm'
 
-        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
-            super(tqdmProgressBar, self).__init__()
-            self._pbar_params = dict(desc=label, unit=unit, unit_scale=True, total=maxval, file=out)
+        # TQDM behaved a bit suboptimally with older versions -- either was
+        # completely resetting time/size in global pbar, or not updating
+        # "slave" pbars, so we had to
+        # set miniters to 1, and mininterval to 0, so it always updates
+        # amd smoothing to 0 so it produces at least consistent average.
+        # But even then it is somewhat flawed.
+        # Newer versions seems to behave more consistently so do not require
+        # those settings
+        _default_pbar_params = \
+            dict(smoothing=0, miniters=1, mininterval=0) \
+            if external_versions['tqdm'] < '4.10.0' \
+            else dict(mininterval=0)
+
+        def __init__(self, label='', fill_text=None,
+                     total=None, unit='B', out=sys.stdout, leave=False):
+            super(tqdmProgressBar, self).__init__(total=total)
+            self._pbar_params = updated(
+                self._default_pbar_params,
+                dict(desc=label, unit=unit,
+                     unit_scale=True, total=total, file=out,
+                     leave=leave
+                     ))
             self._pbar = None
 
         def _create(self):
             if self._pbar is None:
-                # set miniters to 1, and mininterval to 0, so it always updates
-                self._pbar = tqdm(miniters=1, mininterval=0, **self._pbar_params)
+                self._pbar = tqdm(**self._pbar_params)
 
         def update(self, size, increment=False):
             self._create()
-            inc = size - self._prev_value
-            self._pbar.update(size if increment else inc)
+            inc = size - self.current
+            try:
+                self._pbar.update(size if increment else inc)
+            except ValueError:
+                # Do not crash entire process because of some glitch with
+                # progressbar update
+                # TODO: issue a warning?
+                pass
             super(tqdmProgressBar, self).update(size, increment=increment)
 
         def start(self):
             super(tqdmProgressBar, self).start()
             self._create()
 
-        def finish(self):
-            # be tollerant to bugs in those
+        def refresh(self):
+            super(tqdmProgressBar, self).refresh()
+            # older tqdms might not have refresh yet but I think we can live
+            # without it for a bit there
+            if hasattr(tqdm, 'refresh'):
+                self._pbar.refresh()
+
+        def finish(self, clear=False):
+            """
+
+            Parameters
+            ----------
+            clear : bool, optional
+              Explicitly clear the progress bar. Note that we are
+              creating them with leave=False so they should disappear on their
+              own and explicit clear call should not be necessary
+
+            Returns
+            -------
+
+            """
+            if clear:
+                self.clear()
+            # be tolerant to bugs in those
             try:
                 if self._pbar is not None:
                     self._pbar.close()
@@ -135,9 +152,38 @@ try:
                 #lgr.debug("Finishing tqdmProgresBar thrown %s", str_exc(exc))
                 pass
 
+        def clear(self):
+            try:
+                self._pbar.clear()
+            except:
+                # if has none -- we can't do anything about it for now ;)
+                # 4.7.4 seems to have it
+                pass
+
+        def set_desc(self, value):
+            self._pbar.desc = value
+
+
     progressbars['tqdm'] = tqdmProgressBar
 except ImportError:  # pragma: no cover
     pass
 
-assert len(progressbars), "We need tqdm or progressbar library to report progress"
+assert len(progressbars), "We need tqdm library to report progress"
 
+
+class AnnexSpecialRemoteProgressBar(ProgressBarBase):
+    """Hook up to the special remote and report progress back to annex"""
+
+    def __init__(self, *args, **kwargs):
+        # not worth passing anything since we don't care about anything
+        remote = kwargs.get('remote')
+        super(AnnexSpecialRemoteProgressBar, self).__init__()
+        self.remote = remote
+
+    def update(self, *args, **kwargs):
+        super(AnnexSpecialRemoteProgressBar, self).update(*args, **kwargs)
+        # now use stored value
+        if self.remote:
+            self.remote.progress(self.current)
+
+progressbars['annex-remote'] = AnnexSpecialRemoteProgressBar

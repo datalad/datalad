@@ -6,7 +6,7 @@ datalad metadata
 This is a documentation on datalad's approach to metadata. Especially on how
 the metadata representation currently looks like.
 
-Datalad uses RDF to represent metadata. However, this kind of representation is
+DataLad uses RDF to represent metadata. However, this kind of representation is
 required by datalad within collections only. A dataset may or may not contain
 metadata, which is prepared that way. A collection's metadata about a dataset
 can be imported from any location (within or not within the dataset itself) and

@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import exists, join as opj, basename, abspath
+from os.path import exists, join as opj
 from collections import OrderedDict
 from operator import itemgetter
 
@@ -19,12 +19,14 @@ import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 lgr.log(5, "Importing datalad.customremotes.archive")
 
+from ..dochelpers import exc_str
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..utils import getpwd
 from ..utils import unique
 from .base import AnnexCustomRemote
+from .main import main as super_main
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -141,7 +143,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             ((akey, afile), self.get_contentlocation(
                 akey,
                 absolute=True, verify_exists=False
-                ))
+            ))
             for akey, afile in akey_afiles
         )
 
@@ -231,7 +233,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
+            self.send("CHECKURL-CONTENTS", size)  # , basename(afile))
 
             # so it was a good successful one -- record
             self._last_url = url
@@ -303,17 +305,15 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             Indicates that no location is known for a key.
         """
         self.send("WHEREIS-FAILURE")
-        """
-        although more logical is to report back success, it leads to imho more confusing
-        duplication. See
-        http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
+        # although more logical is to report back success, it leads to imho more confusing
+        # duplication. See
+        # http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
 
-        try:
-            key, file = self._get_akey_afile(key)
-            self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
-        except ValueError:
-            self.send("WHEREIS-FAILURE")
-        """
+        # try:
+        #     key, file = self._get_akey_afile(key)
+        #     self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
+        # except ValueError:
+        #     self.send("WHEREIS-FAILURE")
 
     def _transfer(self, cmd, key, path):
 
@@ -357,15 +357,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             except Exception as exc:
                 # from celery.contrib import rdb
                 # rdb.set_trace()
-                from datalad.dochelpers import exc_str
                 exc_ = exc_str(exc)
                 self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
                 continue
 
-        self.error("Failed to fetch any archive containing {key}. Tried: {akeys}".format(**locals()))
+        self.error("Failed to fetch any archive containing {key}. Tried: {akeys_tried}".format(**locals()))
 
 
-from .main import main as super_main
 def main():
     """cmdline entry point"""
     super_main(backend="archive")

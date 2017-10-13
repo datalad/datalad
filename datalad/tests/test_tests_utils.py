@@ -17,7 +17,7 @@ import logging
 try:
     # optional direct dependency we might want to kick out
     import bs4
-except ImportError:
+except ImportError:  # pragma: no cover
     bs4 = None
 
 from glob import glob
@@ -41,13 +41,16 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
 from .utils import ok_generator
+from .utils import assert_dict_equal
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
+from .utils import skip_if_no_module
 from .utils import run_under_dir
 from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
+from .utils import with_testsui
 
 #
 # Test with_tempfile, especially nested invocations
@@ -61,7 +64,7 @@ def _with_tempfile_decorated_dummy(path):
 def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
         filename = _with_tempfile_decorated_dummy()
         ok_startswith(filename, target)
 
@@ -101,6 +104,7 @@ def test_nested_with_tempfile_parametrized_surrounded():
 @with_tempfile(content="testtest")
 def test_with_tempfile_content(f):
     ok_file_has_content(f, "testtest")
+    ok_file_has_content(f, "test*", re_=True)
 
 
 def test_with_tempfile_content_raises_on_mkdir():
@@ -135,6 +139,22 @@ def test_with_testrepos():
                 not exists(opj(repo, '.git', 'remove-me')))
 
 
+def test_get_resolved_values():
+    from datalad.tests.utils import _get_resolved_flavors
+    flavors = ['networkish', 'local']
+    eq_(([] if os.environ.get('DATALAD_TESTS_NONETWORK') else ['networkish'])
+        + ['local'],
+        _get_resolved_flavors(flavors))
+
+    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        eq_(_get_resolved_flavors(flavors), ['local'])
+
+        # and one more to see the exception being raised if nothing to teston
+        @with_testrepos(flavors=['network'])
+        def magical():
+            raise AssertionError("Must not be ran")
+        assert_raises(SkipTest, magical)
+
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
 
@@ -149,7 +169,7 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         ok_(not os.path.exists(dnames[0]))  # got removed
 
 
@@ -183,7 +203,7 @@ def test_get_most_obscure_supported_name():
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):  # pragma: no cover
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []
@@ -196,7 +216,7 @@ def test_keeptemp_via_env_variable():
     with patch.dict('os.environ', {}):
         check()
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_KEEPTEMP': '1'}):
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_KEEP': '1'}):
         check()
 
     eq_(len(files), 2)
@@ -209,7 +229,7 @@ def test_keeptemp_via_env_variable():
 @with_tempfile
 def test_ok_symlink_helpers(tmpfile):
 
-    if on_windows:
+    if on_windows:  # pragma: no cover
         raise SkipTest("no sylmlinks on windows")
 
     assert_raises(AssertionError, ok_symlink, tmpfile)
@@ -256,7 +276,7 @@ def test_nok_startswith():
 def test_ok_generator():
     def func(a, b=1):
         return a+b
-    def gen(a, b=1):
+    def gen(a, b=1):  # pragma: no cover
         yield a+b
     # not sure how to determine if xrange is a generator
     if PY2:
@@ -349,16 +369,16 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 
 @with_tempfile(mkdir=True)
-def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
+def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
 
     # First verify that filesystem layer can encode this filename
     # verify first that we could encode file name in this environment
     try:
         filesysencoding = sys.getfilesystemencoding()
         test_fpath_encoded = test_fpath.encode(filesysencoding)
-    except UnicodeEncodeError:
+    except UnicodeEncodeError:  # pragma: no cover
         raise SkipTest("Environment doesn't support unicode filenames")
-    if test_fpath_encoded.decode(filesysencoding) != test_fpath:
+    if test_fpath_encoded.decode(filesysencoding) != test_fpath:  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
@@ -391,7 +411,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         html = u.read().decode()
         assert(test_txt == html)
 
-    if bs4 is None:
+    if bs4 is None:  # pragma: no cover
         raise SkipTest("bs4 is absent")
     test_path_and_url()
 
@@ -476,11 +496,24 @@ def test_skip_if_no_network():
             eq_(skip_if_no_network(), None)
 
 
+def test_skip_if_no_module():
+
+    def testish():
+        skip_if_no_module("nonexistingforsuremodule")
+        raise ValueError
+    assert_raises(SkipTest, testish)
+
+    def testish2():
+        skip_if_no_module("datalad")
+        return "magic"
+    eq_(testish2(), "magic")
+
+
 def test_skip_if():
 
     with assert_raises(SkipTest):
         @skip_if(True)
-        def f():
+        def f():  # pragma: no cover
             raise AssertionError("must have not been ran")
         f()
 
@@ -510,3 +543,44 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
+
+
+def test_assert_dict_equal():
+    assert_dict_equal({}, {})
+    assert_dict_equal({"a": 3}, {"a": 3})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {1: 4})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4, 1: 3})
+    assert_raises(AssertionError, assert_dict_equal, {1: 3}, {2: 4, 1: 'a'})
+    try:
+        import numpy as np
+    except:  # pragma: no cover
+        raise SkipTest("need numpy for this tiny one")
+    # one is scalar another one array
+    assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
+    assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
+
+
+def test_testsui():
+    # just one for now to test conflicting arguments
+    with assert_raises(ValueError):
+        @with_testsui(responses='some', interactive=False)
+        def some_func():   # pragma: no cover
+            pass
+
+    from datalad.ui import ui
+
+    @with_testsui(responses=['yes', "maybe so"])
+    def func2(x):
+        assert x == 1
+        eq_(ui.yesno("title"), True)
+        eq_(ui.question("title2"), "maybe so")
+        assert_raises(AssertionError, ui.question, "asking more than we know")
+        return x*2
+    eq_(func2(1), 2)
+
+    @with_testsui(interactive=False)
+    def func3(x):
+        assert_false(ui.is_interactive)
+        return x*3
+    eq_(func3(2), 6)

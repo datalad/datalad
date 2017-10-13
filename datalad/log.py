@@ -16,6 +16,7 @@ import logging.handlers
 from os.path import basename, dirname
 
 from .utils import is_interactive
+from .support import ansi_colors as colors
 
 __all__ = ['ColorFormatter']
 
@@ -40,7 +41,7 @@ class TraceBack(object):
     """Customized traceback to be included in debug messages
     """
 
-    def __init__(self, collide=False):
+    def __init__(self, limit=100, collide=False):
         """Initialize TraceBack metric
 
         Parameters
@@ -50,7 +51,8 @@ class TraceBack(object):
           replaced with ...
         """
         self.__prev = ""
-        self.__collide = collide
+        self.limit = limit
+        self.collide = collide
 
         # delayed imports and preparing the regex substitution
         if collide:
@@ -63,9 +65,19 @@ class TraceBack(object):
         self._extract_stack = traceback.extract_stack
 
     def __call__(self):
-        ftb = self._extract_stack(limit=100)[:-2]
-        entries = [[mbasename(x[0]), str(x[1])] for x in ftb if mbasename(x[0]) != 'logging.__init__']
+        ftb = self._extract_stack(limit=200)[:-2]
+        entries = [[mbasename(x[0]), str(x[1])]
+                   for x in ftb if mbasename(x[0]) != 'logging.__init__']
         entries = [e for e in entries if e[0] != 'unittest']
+
+        if len(entries) > self.limit:
+            sftb = '...>'
+            entries = entries[-self.limit:]
+        else:
+            sftb = ''
+
+        if not entries:
+            return ""
 
         # lets make it more consize
         entries_out = [entries[0]]
@@ -74,9 +86,12 @@ class TraceBack(object):
                 entries_out[-1][1] += ',%s' % entry[1]
             else:
                 entries_out.append(entry)
-        sftb = '>'.join(['%s:%s' % (mbasename(x[0]),
-                                    x[1]) for x in entries_out])
-        if self.__collide:
+
+        sftb += '>'.join(
+            ['%s:%s' % (mbasename(x[0]), x[1]) for x in entries_out]
+        )
+
+        if self.collide:
             # lets remove part which is common with previous invocation
             prev_next = sftb
             common_prefix = os.path.commonprefix((self.__prev, sftb))
@@ -95,45 +110,28 @@ class TraceBack(object):
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
 
-    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
-
-    RESET_SEQ = "\033[0m"
-    COLOR_SEQ = "\033[1;%dm"
-    BOLD_SEQ = "\033[1m"
-
-    COLORS = {
-        'WARNING': YELLOW,
-        'INFO': WHITE,
-        'DEBUG': BLUE,
-        'CRITICAL': YELLOW,
-        'ERROR': RED
-    }
-
     def __init__(self, use_color=None, log_name=False, log_pid=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
-        msg = self.formatter_msg(self._get_format(log_name, log_pid), self.use_color)
-        self._tb = TraceBack(collide=os.environ.get('DATALAD_LOGTRACEBACK', '') == 'collide') \
-            if os.environ.get('DATALAD_LOGTRACEBACK', False) else None
+        msg = colors.format_msg(self._get_format(log_name, log_pid),
+                                self.use_color)
+        log_env = os.environ.get('DATALAD_LOG_TRACEBACK', '')
+        collide = log_env == 'collide'
+        limit = 100 if collide else int(log_env) if log_env.isdigit() else 100
+        self._tb = TraceBack(collide=collide, limit=limit) if log_env else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
-        # TODO: config log.timestamp=True
-        return (("" if not int(os.environ.get("DATALAD_LOG_TIMESTAMP", True)) else "$BOLD%(asctime)-15s$RESET ") +
+        from datalad import cfg
+        from datalad.config import anything2bool
+        show_timestamps = anything2bool(cfg.get('datalad.log.timestamp', False))
+        return (("" if not show_timestamps else "$BOLD%(asctime)-15s$RESET ") +
                 ("%(name)-15s " if log_name else "") +
                 ("{%(process)d}" if log_pid else "") +
                 "[%(levelname)s] "
-                "%(message)s "
-                "($BOLD%(filename)s$RESET:%(lineno)d)")
-
-    def formatter_msg(self, fmt, use_color=False):
-        if use_color:
-            fmt = fmt.replace("$RESET", self.RESET_SEQ).replace("$BOLD", self.BOLD_SEQ)
-        else:
-            fmt = fmt.replace("$RESET", "").replace("$BOLD", "")
-        return fmt
+                "%(message)s ")
 
     def format(self, record):
         if record.msg.startswith('| '):
@@ -142,9 +140,11 @@ class ColorFormatter(logging.Formatter):
             return record.msg
 
         levelname = record.levelname
-        if self.use_color and levelname in self.COLORS:
-            fore_color = 30 + self.COLORS[levelname]
-            levelname_color = self.COLOR_SEQ % fore_color + "%-7s" % levelname + self.RESET_SEQ
+
+        if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
+            fore_color = colors.LOG_LEVEL_COLORS[levelname]
+            levelname_color = (colors.COLOR_SEQ % fore_color) + \
+                              ("%-7s" % levelname) + colors.RESET_SEQ
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:
@@ -170,8 +170,9 @@ class LoggerHelper(object):
         self.logtarget = logtarget
         self.lgr = logging.getLogger(logtarget if logtarget is not None else name)
 
-    def _get_environ(self, var, default=None):
-        return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)
+    def _get_config(self, var, default=None):
+        from datalad import cfg
+        return cfg.get(self.name.lower() + '.log.' + var, default)
 
     def set_level(self, level=None, default='INFO'):
         """Helper to set loglevel for an arbitrary logger
@@ -181,7 +182,7 @@ class LoggerHelper(object):
         """
         if level is None:
             # see if nothing in the environment
-            level = self._get_environ('LOGLEVEL')
+            level = self._get_config('level')
         if level is None:
             level = default
 
@@ -193,6 +194,12 @@ class LoggerHelper(object):
             log_level = getattr(logging, level.upper())
 
         self.lgr.setLevel(log_level)
+        # and set other related/used loggers to the same level to prevent their
+        # talkativity, if they are not yet known to this python session, so we
+        # have little chance to "override" possibly set outside levels
+        for dep in ('git',):
+            if dep not in logging.Logger.manager.loggerDict:
+                logging.getLogger(dep).setLevel(log_level)
 
     def get_initialized_logger(self, logtarget=None):
         """Initialize and return the logger
@@ -211,7 +218,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_environ('LOGTARGET', logtarget or 'stderr')
+        logtarget = self._get_config('target', logtarget or 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
@@ -230,12 +237,33 @@ class LoggerHelper(object):
             use_color = False
             # I had decided not to guard this call and just raise exception to go
             # out happen that specified file location is not writable etc.
+
+        for names_filter in 'names', 'namesre':
+            names = self._get_config(names_filter, '')
+            if names:
+                import re
+                # add a filter which would catch those
+                class LogFilter(object):
+                    """A log filter to filter based on the log target name(s)"""
+                    def __init__(self, names):
+                        self.target_names = set(n for n in names.split(',')) \
+                            if names_filter == 'names' \
+                            else re.compile(names)
+                    if names_filter == 'names':
+                        def filter(self, record):
+                            return record.name in self.target_names
+                    else:
+                        def filter(self, record):
+                            return self.target_names.match(record.name)
+
+                loghandler.addFilter(LogFilter(names))
+
         # But now improve with colors and useful information such as time
         loghandler.setFormatter(
             ColorFormatter(use_color=use_color,
                            # TODO: config log.name, pid
-                           log_name=self._get_environ("LOGNAME", False),
-                           log_pid=self._get_environ("LOGPID", False),
+                           log_name=self._get_config("name", False),
+                           log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)

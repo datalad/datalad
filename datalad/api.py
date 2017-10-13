@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
+# Should have no spurious imports/definitions at the module level
 from .distribution.dataset import Dataset
 
 
@@ -16,55 +17,63 @@ def _generate_func_api():
        API from them
     """
     from importlib import import_module
-    from .interface.base import update_docstring_with_parameters
+    from inspect import isgenerator
+    from collections import namedtuple
+    from functools import wraps
+
     from .interface.base import get_interface_groups
     from .interface.base import get_api_name
-    from .interface.base import alter_interface_docs_for_api
+    from .interface.base import get_allargs_as_kwargs
+
+    def _kwargs_to_namespace(call, args, kwargs):
+        """
+        Given a __call__, args and kwargs passed, prepare a cmdlineargs-like
+        thing
+        """
+        kwargs_ = get_allargs_as_kwargs(call, args, kwargs)
+        # Get all arguments removing those possible ones used internally and
+        # which shouldn't be exposed outside anyways
+        [kwargs_.pop(k) for k in kwargs_ if k.startswith('_')]
+        namespace = namedtuple("smth", kwargs_.keys())(**kwargs_)
+        return namespace
+
+    def call_gen(call, renderer):
+        """Helper to generate a call_ for call, to use provided renderer"""
+
+        @wraps(call)
+        def call_(*args, **kwargs):
+            ret1 = ret = call(*args, **kwargs)
+            if isgenerator(ret):
+                # At first I thought we might just rerun it for output
+                # at the end, but that wouldn't work if command actually
+                # has a side-effect, i.e. actually doing something
+                # so we actually need to memoize all generated output and output
+                # it instead
+                from datalad.utils import saved_generator
+                ret, ret1 = saved_generator(ret)
+
+            renderer(ret, _kwargs_to_namespace(call, args, kwargs))
+            return ret1
+
+        # TODO: see if we could proxy the "signature" of function
+        # call from the original one
+        call_.__doc__ += \
+            "\nNote\n----\n\n" \
+            "This version of a function uses cmdline results renderer before " \
+            "returning the result"
+        return call_
 
     for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance
             mod = import_module(intfspec[0], package='datalad')
             intf = getattr(mod, intfspec[1])
-            spec = getattr(intf, '_params_', dict())
-
-            # FIXME no longer using an interface class instance
-            # convert the parameter SPEC into a docstring for the function
-            update_docstring_with_parameters(
-                intf.__call__, spec,
-                prefix=alter_interface_docs_for_api(
-                    intf.__doc__),
-                suffix=alter_interface_docs_for_api(
-                    intf.__call__.__doc__)
-            )
-            globals()[get_api_name(intfspec)] = intf.__call__
+            api_name = get_api_name(intfspec)
+            globals()[api_name] = intf.__call__
 
 
-def _fix_datasetmethod_docs():
-    """Fix up dataset methods docstrings which didn't get proper docs
-    """
-    from six import PY2
-    for attr in dir(Dataset):
-        try:
-            func = getattr(Dataset, attr)
-            orig_func = getattr(func, '__orig_func__')
-        except AttributeError:
-            continue
-        if PY2:
-            func = func.__func__
-        orig__doc__ = func.__doc__
-        if orig__doc__ and orig__doc__.strip():  # pragma: no cover
-            raise RuntimeError(
-                "No meaningful docstring should have been assigned before now. Got %r"
-                % orig__doc__
-            )
-        func.__doc__ = orig_func.__doc__
-
-
-# Invoke above helpers
+# Invoke above helper
 _generate_func_api()
-_fix_datasetmethod_docs()
 
 # Be nice and clean up the namespace properly
 del _generate_func_api
-del _fix_datasetmethod_docs

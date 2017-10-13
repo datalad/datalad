@@ -9,38 +9,73 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
-lgr.log(5, "Instantiating config")
+
+# If there is a bundled git, make sure GitPython uses it too:
+from datalad.cmd import GitRunner
+GitRunner._check_git_path()
+if GitRunner._GIT_PATH:
+    import os
+    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
+        os.path.join(GitRunner._GIT_PATH, 'git')
+
 from .config import ConfigManager
 cfg = ConfigManager()
 
-lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
-
+from .log import lgr
 import atexit
-atexit.register(ssh_manager.close, allow_fail=False)
+from datalad.utils import on_windows
+
+if not on_windows:
+    lgr.log(5, "Instantiating ssh manager")
+    from .support.sshconnector import SSHManager
+    ssh_manager = SSHManager()
+    atexit.register(ssh_manager.close, allow_fail=False)
+else:
+    ssh_manager = None
+
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError as e:
+    if on_windows:
+        from datalad.dochelpers import exc_str
+        lgr.warning(
+            "'colorama' Python module missing, terminal output may look garbled [%s]",
+            exc_str(e))
+    pass
+
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
 
 
-def test(package='datalad', **kwargs):
-    """A helper to run datalad's tests.  Requires numpy and nose
-
-    See numpy.testing.Tester -- **kwargs are passed into the
-    Tester().test call
+def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
+    """A helper to run datalad's tests.  Requires nose
     """
-    try:
-        from numpy.testing import Tester
-        Tester(package=package).test(**kwargs)
-        # we don't have any benchmarks atm
-        # bench = Tester().bench
-    except ImportError:
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+    argv = [] #module]
+    # could make it 'smarter' but decided to be explicit so later we could
+    # easily migrate to another runner without changing any API here
+    if verbose:
+        argv.append('-v')
+    if nocapture:
+        argv.append('-s')
+    if pdb:
+        argv.append('--pdb')
+    if stop:
+        argv.append('--stop')
+    from datalad.support.third.nosetester import NoseTester
+    tester = NoseTester(module)
+    tester.package_name = module.split('.', 1)[0]
+    tester.test(extra_argv=argv)
+
 test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
@@ -49,8 +84,9 @@ test.__test__ = False
 # To store settings which setup_package changes and teardown_package should return
 _test_states = {
     'loglevel': None,
-    'DATALAD_LOGLEVEL': None,
+    'DATALAD_LOG_LEVEL': None,
 }
+
 
 def setup_package():
     import os
@@ -69,32 +105,39 @@ def setup_package():
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
 
-    DATALAD_LOGLEVEL = os.environ.get('DATALAD_LOGLEVEL', None)
-    if DATALAD_LOGLEVEL is None:
+    DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
+    if DATALAD_LOG_LEVEL is None:
         # very very silent.  Tests introspecting logs should use
         # swallow_logs(new_level=...)
         _test_states['loglevel'] = lgr.getEffectiveLevel()
         lgr.setLevel(100)
 
         # And we should also set it within environ so underlying commands also stay silent
-        _test_states['DATALAD_LOGLEVEL'] = DATALAD_LOGLEVEL
-        os.environ['DATALAD_LOGLEVEL'] = '100'
+        _test_states['DATALAD_LOG_LEVEL'] = DATALAD_LOG_LEVEL
+        os.environ['DATALAD_LOG_LEVEL'] = '100'
     else:
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
+
+    # Set to non-interactive UI
+    from datalad.ui import ui
+    _test_states['ui_backend'] = ui.backend
+    # obtain() since that one consults for the default value
+    ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
 
 def teardown_package():
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
-
+    from datalad.ui import ui
+    ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
-        if _test_states['DATALAD_LOGLEVEL'] is None:
-            os.environ.pop('DATALAD_LOGLEVEL')
+        if _test_states['DATALAD_LOG_LEVEL'] is None:
+            os.environ.pop('DATALAD_LOG_LEVEL')
         else:
-            os.environ['DATALAD_LOGLEVEL'] = _test_states['DATALAD_LOGLEVEL']
+            os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     from datalad.tests.utils import rmtemp
@@ -105,5 +148,9 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
+
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")

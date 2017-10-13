@@ -18,15 +18,18 @@ __docformat__ = 'restructuredtext'
 import mimetypes
 
 from os.path import splitext
+from datalad.support.network import urlquote
 
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
-from .keyring_ import keyring
-
 from ..dochelpers import exc_str
 from .exceptions import DownloadError, AccessDeniedError
+
+from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.parse import urlparse, urlunparse
+
 
 try:
     import boto
@@ -115,7 +118,7 @@ class VersionedFilesPool(object):
         k.key = filename
         #k.set_contents_from_filename('/home/yoh/.emacs')
         base, ext = splitext(filename)
-        content_type = None
+        #content_type = None
         mtype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         headers = {'Content-Type': mtype}
 
@@ -136,10 +139,11 @@ class VersionedFilesPool(object):
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
+    e.name_urlquoted = urlquote(e.name)
     if schema == 'http':
-        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}"
+        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name_urlquoted}"
     elif schema == 's3':
-        fmt = "s3://{e.bucket.name}/{e.name}"
+        fmt = "s3://{e.bucket.name}/{e.name_urlquoted}"
     else:
         raise ValueError(schema)
     if versioned:
@@ -157,7 +161,8 @@ def prune_and_delete_bucket(bucket):
     #for key in b.list_versions(''):
     #    b.delete_key(key)
     bucket.delete()
-    lgr.info("Bucket %s was removed"  % bucket.name)
+    lgr.info("Bucket %s was removed" % bucket.name)
+
 
 def set_bucket_public_access_policy(bucket):
     # we need to enable permissions for making content available
@@ -173,6 +178,7 @@ def set_bucket_public_access_policy(bucket):
       ]
     }""" % bucket.name)
 
+
 def gen_test_bucket(bucket_name):
     conn = _get_bucket_connection(S3_ADMIN_CREDENTIAL)
     # assure we have none
@@ -180,13 +186,14 @@ def gen_test_bucket(bucket_name):
         bucket = conn.get_bucket(bucket_name)
         lgr.info("Deleting existing bucket %s" % bucket.name)
         prune_and_delete_bucket(bucket)
-    except:
+    except:  # MIH: MemoryError?
         # so nothing to worry about
         pass
     finally:
         pass
 
     return conn.create_bucket(bucket_name)
+
 
 def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
 
@@ -209,7 +216,7 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
     files("2versions-nonversioned1.txt_sameprefix")
     for v in range(3):
         files("3versions-allversioned.txt")
-    files("3versions-allversioned.txt_sameprefix") # to test possible problems
+    files("3versions-allversioned.txt_sameprefix")  # to test possible problems
 
     # File which was created and then removed
     bucket.delete_key(files("1version-removed.txt"))
@@ -228,11 +235,14 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
 
     return bucket
 
+
 def gen_bucket_test0_versioned():
     return _gen_bucket_test0('datalad-test0-versioned', versioned=True)
 
+
 def gen_bucket_test0_nonversioned():
     return _gen_bucket_test0('datalad-test0-nonversioned', versioned=False)
+
 
 def gen_bucket_test1_dirs():
     bucket_name = 'datalad-test1-dirs-versioned'
@@ -251,9 +261,6 @@ def gen_bucket_test1_dirs():
     # and then delete it and place it back
     files("d1", load="smth")
 
-
-from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, urlencode
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
                       s3conn=None):
@@ -295,7 +302,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
         # url is s3.amazonaws.com/bucket/PATH
         s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
-        s3_bucket = url_rec.netloc # must be
+        s3_bucket = url_rec.netloc  # must be
         # and for now implement magical conversion to URL
         # TODO: wouldn't work if needs special permissions etc
         # actually for now
@@ -330,22 +337,24 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             all_keys = bucket.list_versions(fpath)
             # Filter and sort them so the newest one on top
             all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))
-                        if (isinstance(x, Key)    # ignore DeleteMarkers
-                            and (x.name == fpath) # match exact name, not just prefix
+                        if ((x.name == fpath)  # match exact name, not just prefix
                             )
                         ][::-1]
             # our current assumptions
-            assert(all_keys)
             assert(all_keys[0].is_latest)
+            # and now filter out delete markers etc
+            all_keys = [x for x in all_keys if isinstance(x, Key)]  # ignore DeleteMarkers
+            assert(all_keys)
+
             for key in all_keys:
                 version_id = key.version_id
                 query = ((url_rec.query + "&") if url_rec.query else "") \
-                        + "versionId=%s" % version_id
+                    + "versionId=%s" % version_id
                 url_versioned = urlunparse(url_rec._replace(query=query))
                 all_versions.append(url_versioned)
                 if verify:
                     # it would throw HTTPError exception if not accessible
-                    _ = urlopen(Request(url))
+                    _ = urlopen(Request(url_versioned))
                 was_versioned = True
                 if not return_all:
                     break

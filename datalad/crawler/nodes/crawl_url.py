@@ -9,20 +9,11 @@
 """Basic crawler for the web
 """
 
-import re
-from distutils.version import LooseVersion
 
-import os
-from os import unlink
-from os.path import splitext, dirname, basename, curdir
-from os.path import lexists
-from os.path import join as opj
+from os.path import splitext, dirname, basename
 
-from six import iteritems
 from ...utils import updated
-from ...utils import find_files
 from ...dochelpers import exc_str
-from ...support.versions import get_versions
 from ...downloaders.base import DownloadError, UnhandledRedirectError
 from ...downloaders.providers import Providers
 
@@ -129,26 +120,22 @@ class crawl_url(object):
         return self._visit_url(data[self._input], data)
 
 
-
-
-"""
-    for extractors, actions in conditionals:
-        extractors = assure_tuple_or_list(extractors)
-        actions = assure_tuple_or_list(actions)
-        seen_urls = set()
-        for extractor in extractors:
-            for url, meta_ in extractor(parent_url, meta=meta):
-                if url in seen_urls:
-                    continue
-                file = None
-                # progress through actions while possibly augmenting the url, file, and/or meta_
-                for action in actions:
-                    # TODO: may be we should return a dict with whatever that action
-                    # found necessary to change, update local state and pass into
-                    url, file, meta_ = \
-                        action(parent_url=parent_url, url=url, file=file, meta=meta_)
-                seen_urls.add(url)
-"""
+#    for extractors, actions in conditionals:
+#        extractors = assure_tuple_or_list(extractors)
+#        actions = assure_tuple_or_list(actions)
+#        seen_urls = set()
+#        for extractor in extractors:
+#            for url, meta_ in extractor(parent_url, meta=meta):
+#                if url in seen_urls:
+#                    continue
+#                file = None
+#                # progress through actions while possibly augmenting the url, file, and/or meta_
+#                for action in actions:
+#                    # TODO: may be we should return a dict with whatever that action
+#                    # found necessary to change, update local state and pass into
+#                    url, file, meta_ = \
+#                        action(parent_url=parent_url, url=url, file=file, meta=meta_)
+#                seen_urls.add(url)
 
 # TODO: probably might sense to RF into just a generic TSV file parser
 def parse_checksums(digest=None):

@@ -19,7 +19,7 @@ import os
 import shlex
 import tempfile
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename, abspath
+from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
 from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
@@ -28,10 +28,11 @@ from os.path import dirname
 from os.path import normpath
 
 from .base import Interface
+from datalad.interface.base import build_doc
 from .common_opts import allow_dirty
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
+from ..support.constraints import EnsureStr, EnsureNone
 
 from ..support.annexrepo import AnnexRepo
 from ..support.strings import apply_replacement_rules
@@ -41,8 +42,9 @@ from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 
+from datalad.customremotes.base import init_datalad_remote
+
 from six import string_types
-from six.moves.urllib.parse import urlparse
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
@@ -56,6 +58,7 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 # all but by default to print only the one associated with this given action
 
 
+@build_doc
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
@@ -68,6 +71,8 @@ class AddArchiveContent(Interface):
         annex-repo$ datalad add-archive-content my_big_tarball.tar.gz
 
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
     _params_ = dict(
         delete=Parameter(
             args=("-d", "--delete"),
@@ -212,7 +217,7 @@ class AddArchiveContent(Interface):
             annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
                 # if not absolute -- relative to wd and thus
-                archive_path = normpath(opj(pwd, archive))
+                archive_path = normpath(opj(realpath(pwd), archive))
                 # abspath(archive) is not "good" since dereferences links in the path
                 # archive_path = abspath(archive)
         elif not isabs(archive):
@@ -288,14 +293,12 @@ class AddArchiveContent(Interface):
 
         # TODO: check if may be it was already added
         if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
-            lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
-            annex.init_remote(
-                ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
-                 'autoenable=true'])
+            init_datalad_remote(annex, ARCHIVES_SPECIAL_REMOTE, autoenable=True)
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
+        precommitted = False
+        delete_after_rpath = None
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
@@ -305,13 +308,13 @@ class AddArchiveContent(Interface):
                     annex_options = shlex.split(annex_options)
 
             leading_dir = earchive.get_leading_directory(
-                    depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
+                depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
                 if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # we need to create a temporary directory at the top level which would later be
             # removed
-            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex_path)) \
+            prefix_dir = basename(tempfile.mktemp(prefix=".datalad", dir=annex_path)) \
                 if delete_after \
                 else None
 
@@ -329,7 +332,7 @@ class AddArchiveContent(Interface):
                         lgr.warning("Path %s points to non-existing file %s" % (extracted_path, link_path))
                         stats.skipped += 1
                         continue
-                    # TODO: check if points outside of the archive -- warning and skip
+                        # TODO: check if points outside of the archive -- warning and skip
 
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
@@ -357,28 +360,49 @@ class AddArchiveContent(Interface):
 
                 if prefix_dir:
                     target_file = opj(prefix_dir, target_file)
+                    # but also allow for it in the orig
+                    target_file_orig = opj(prefix_dir, target_file_orig)
+
+                target_file_path_orig = opj(annex.path, target_file_orig)
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
-                if lexists(target_file):
-                    if md5sum(target_file) == md5sum(extracted_path):
-                        # must be having the same content, we should just add possibly a new extra URL
-                        pass
+                target_file_path = opj(extract_rpath, target_file) \
+                    if extract_rpath else target_file
+
+                target_file_path = opj(annex.path, target_file_path)
+
+                if lexists(target_file_path):
+                    handle_existing = True
+                    if md5sum(target_file_path) == md5sum(extracted_path):
+                        if not annex.is_under_annex(extracted_path):
+                            # if under annex -- must be having the same content,
+                            # we should just add possibly a new extra URL
+                            # but if under git -- we cannot/should not do
+                            # anything about it ATM
+                            if existing != 'overwrite':
+                                continue
+                        else:
+                            handle_existing = False
+                    if not handle_existing:
+                        pass  # nothing... just to avoid additional indentation
                     elif existing == 'fail':
                         raise RuntimeError(
                             "File {} already exists, but new (?) file {} was instructed "
-                            "to be placed there while overwrite=False".format(target_file, extracted_file))
+                            "to be placed there while overwrite=False".format
+                                (target_file_path, extracted_file)
+                        )
                     elif existing == 'overwrite':
                         stats.overwritten += 1
                         # to make sure it doesn't conflict -- might have been a tree
-                        rmtree(target_file)
+                        rmtree(target_file_path)
                     else:
-                        target_file_orig_ = target_file
+                        target_file_path_orig_ = target_file_path
 
                         # To keep extension intact -- operate on the base of the filename
-                        p, fn = os.path.split(target_file)
+                        p, fn = os.path.split(target_file_path)
                         ends_with_dot = fn.endswith('.')
                         fn_base, fn_ext = file_basename(fn, return_ext=True)
 
@@ -391,19 +415,19 @@ class AddArchiveContent(Interface):
                         # keep incrementing index in the suffix until file doesn't collide
                         suf, i = '', 0
                         while True:
-                            target_file_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
-                            if not lexists(target_file_new):
+                            target_file_path_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
+                            if not lexists(target_file_path_new):
                                 break
-                            lgr.debug("File %s already exists" % target_file_new)
+                            lgr.debug("File %s already exists" % target_file_path_new)
                             i += 1
                             suf = '.%d' % i
-                        target_file = target_file_new
+                        target_file_path = target_file_path_new
                         lgr.debug("Original file %s will be saved into %s"
-                                  % (target_file_orig_, target_file))
+                                  % (target_file_path_orig_, target_file_path))
                         # TODO: should we reserve smth like
                         # stats.clobbed += 1
 
-                if target_file != target_file_orig:
+                if target_file_path != target_file_path_orig:
                     stats.renamed += 1
 
                 #target_path = opj(getpwd(), target_file)
@@ -415,11 +439,10 @@ class AddArchiveContent(Interface):
                     pass
 
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
-                          target_file, url, annex_options)
+                          target_file_path, url, annex_options)
 
-                target_file_rpath = opj(extract_rpath, target_file) if extract_rpath else target_file
                 out_json = annex.add_url_to_file(
-                    target_file_rpath,
+                    target_file_path,
                     url, options=annex_options,
                     batch=True)
 
@@ -431,12 +454,12 @@ class AddArchiveContent(Interface):
                         stats.dropped += 1
                     stats.add_annex += 1
                 else:
-                    lgr.debug("File {} was added to git, not adding url".format(target_file))
+                    lgr.debug("File {} was added to git, not adding url".format(target_file_path))
                     stats.add_git += 1
 
                 if delete_after:
-                    # forcing since it is only staged, not yet committed
-                    annex.remove(target_file_rpath, force=True)  # TODO: batch!
+                    # delayed removal so it doesn't interfer with batched processes since any pure
+                    # git action invokes precommit which closes batched processes. But we like to count
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
@@ -463,23 +486,42 @@ class AddArchiveContent(Interface):
 
             if outside_stats:
                 outside_stats += stats
+            if delete_after:
+                # force since not committed. r=True for -r (passed into git call
+                # to recurse)
+                delete_after_rpath = opj(extract_rpath, prefix_dir) if extract_rpath else prefix_dir
+                lgr.debug(
+                    "Removing extracted and annexed files under %s",
+                    delete_after_rpath
+                )
+                annex.remove(delete_after_rpath, r=True, force=True)
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
-                annex.commit(
-                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full')),
-                    _datalad_msg=True
-                )
-                commit_stats.reset()
+                annex.precommit()  # so batched ones close and files become annex symlinks etc
+                precommitted = True
+                if annex.is_dirty(untracked_files=False):
+                    annex.commit(
+                        "Added content extracted from %s %s\n\n%s" %
+                        (origin, archive, commit_stats.as_str(mode='full')),
+                        _datalad_msg=True
+                    )
+                    commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
-            annex.precommit()
+            # if haven't done yet.  explicitly checked to avoid any possible
+            # "double-action"
+            if not precommitted:
+                annex.precommit()
 
-            if delete_after:
-                prefix_path = opj(annex_path, prefix_dir)
-                if exists(prefix_path):  # probably would always be there
-                    lgr.info("Removing temporary directory under which extracted files were annexed: %s",
-                             prefix_path)
-                    rmtree(prefix_path)
+            if delete_after_rpath:
+                delete_after_path = opj(annex_path, delete_after_rpath)
+                if exists(delete_after_path):  # should not be there
+                    # but for paranoid yoh
+                    lgr.warning(
+                        "Removing temporary directory under which extracted "
+                        "files were annexed and should have been removed: %s",
+                        delete_after_path)
+                    rmtree(delete_after_path)
 
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure

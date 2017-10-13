@@ -92,6 +92,7 @@ we outline the workflow used by the developers:
     - `bf-` for bug fixes
     - `rf-` for refactoring
     - `doc-` for documentation contributions (including in the code docstrings).
+    - `bm-` for changes to benchmarks
     We recommend to not work in the ``master`` branch!
 
 4. Work on this copy on your computer using Git to do the version control. When
@@ -101,7 +102,7 @@ we outline the workflow used by the developers:
           git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could
+   `NF`, `BF`, `RF`, `DOC`, `BM` similar to the branch name prefixes, but you could
    also use `TST` for commits concerned solely with tests, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
@@ -152,7 +153,7 @@ some of which you could also install from PyPi using pip  (prior installation of
 might be necessary)
 
 ```sh
-pip install -r requirements.txt
+pip install -r requirements-devel.txt
 ```
 
 and you will need to install recent git-annex using appropriate for your
@@ -245,6 +246,35 @@ Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in
 be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
+### CI setup
+
+We are using Travis-CI and have [buildbot setup](https://github.com/datalad/buildbot) which also
+exercises our tests battery for every PR and on the master.  Note that buildbot runs tests only submitted
+by datalad developers, or if a PR acquires 'buildbot' label.
+
+In case if you want to enter buildbot's environment
+
+1. Login to our development server (`smaug`)
+
+2. Find container ID associated with the environment you are interested in, e.g.
+
+       ```docker ps | grep nd16.04```
+
+3. Enter that docker container environment using
+
+       ```docker exec -it <CONTAINER ID> /bin/bash```
+
+4. Become buildbot user
+
+       ```su - buildbot```
+
+5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
+   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+
+And now you should be in the same environment as the very last tested PR.
+Note that the same path/venv is reused for all the PRs, so you might want
+first to check using `git show` under the `build/` directory if it corresponds
+to the commit you are interested to troubleshoot.
 
 ### Coverage
 
@@ -326,14 +356,33 @@ Various hints for developers
 ### Useful Environment Variables
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
-- *DATALAD_LOGLEVEL*: 
+- *DATALAD_LOG_LEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_TESTS_KEEPTEMP*: 
-  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- *DATALAD_LOG_CMD_OUTPUTS*:
+  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
+- *DATALAD_LOG_CMD_ENV*:
+  If contains a digit (e.g. 1), would log entire environment passed into
+  the Runner.run's popen call.  Otherwise could be a comma separated list
+  of environment variables to log
+- *DATALAD_LOG_CMD_STDIN*:
+  Either to log stdin for the command
+- *DATALAD_LOG_CMD_CWD*:
+  Either to log cwd where command to be executed
+- *DATALAD_LOG_PID*
+  To instruct datalad to log PID of the process
+- *DATALAD_LOG_TARGET*
+  Where to log: `stderr` (default), `stdout`, or another filename
+- *DATALAD_LOG_TIMESTAMP*:
+  Used to add timestamp to datalad logs
+- *DATALAD_LOG_TRACEBACK*:
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
+  This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
-- *DATALAD_TESTS_TEMPDIR*: 
+- *DATALAD_TESTS_TEMP_KEEP*: 
+  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- *DATALAD_TESTS_TEMP_DIR*: 
   Create a temporary directory at location specified by this flag.
   It is used by tests to create a temporary git directory while testing git annex archives etc
 - *DATALAD_TESTS_NONETWORK*: 
@@ -341,29 +390,49 @@ Refer datalad/config.py for information on how to add these environment variable
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
-- *DATALAD_LOGTRACEBACK*: 
-  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
-  This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
-- *DATALAD_USECASSETTE*:
+- *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
+- *DATALAD_TESTS_PROTOCOLREMOTE*:
+  Binary flag to specify whether to test protocol interactions of custom remote with annex
+- *DATALAD_TESTS_RUNCMDLINE*:
+  Binary flag to specify if shell testing using shunit2 to be carried out
+- *DATALAD_TESTS_TEMP_FS*:
+  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
+- *DATALAD_TESTS_TEMP_FSSIZE*:
+  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
+- *DATALAD_TESTS_NONLO*:
+  Specifies network interfaces to bring down/up for testing. Currently used by travis.
+- *DATALAD_API_ALWAYSRENDER*: 
+  Would make api functions always use a version with cmdline output renderer
+  (i.e. the one with `_` suffix)
 - *DATALAD_CMD_PROTOCOL*: 
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
-- *DATALAD_PROTOCOL_REMOTE*:
-  Binary flag to specify whether to test protocol interactions of custom remote with annex
-- *DATALAD_LOG_TIMESTAMP*:
-  Used to add timestamp to datalad logs
-- *DATALAD_RUN_CMDLINE_TESTS*:
-  Binary flag to specify if shell testing using shunit2 to be carried out
-- *DATALAD_TEMP_FS*:
-  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
-- *DATALAD_TEMP_FS_SIZE*:
-  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
-- *DATALAD_NONLO*:
-  Specifies network interfaces to bring down/up for testing. Currently used by travis.
+
+
+# Changelog section
+
+For the upcoming release use this template
+
+## 0.9.3 (??? ??, 2017) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+

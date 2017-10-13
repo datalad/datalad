@@ -11,27 +11,27 @@
 
 import os
 import shutil
-from os.path import join as opj, abspath, normpath
+from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.api import create
-from datalad.utils import chpwd, getpwd
+from datalad.api import install
+from datalad.api import get
+from datalad.consts import LOCAL_CENTRAL_PATH
+from datalad.utils import chpwd, getpwd, rmtree
+from datalad.utils import _path_
+from datalad.utils import get_dataset_root
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
-from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
+from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
-from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
-from datalad.tests.utils import ok_generator
-from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
+from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import PathOutsideRepositoryError
 
-from datalad.api import install
 
 def test_EnsureDataset():
 
@@ -81,44 +81,9 @@ def test_resolve_path(somedir):
 
 # TODO: test remember/recall more extensive?
 
-@with_testrepos(flavors=['local', 'local-url'])
-@with_tempfile(mkdir=True)
-def test_register_sibling(remote, path):
-    AnnexRepo(path)
-    ds = Dataset(path)
-    ds.register_sibling('my_sibling', remote)
-    assert_in('my_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_sibling'), remote)
-
-    ds.register_sibling('my_other_sibling', remote,
-                        publish_url='http://fake.pushurl.com')
-    assert_in('my_other_sibling', ds.repo.get_remotes())
-    eq_(ds.repo.get_remote_url('my_other_sibling'), remote)
-    # TODO: GitRepo method for push-url!
-
-    # TODO: Validation!
-
-
-@with_testrepos('.*nested_submodule.*', flavors=['local'])
-def test_get_subdatasets(path):
-    ds = Dataset(path)
-    eq_(set(ds.get_subdatasets()), {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True)),
-        {'sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1',
-         'sub dataset1/sub sub dataset1/subm 2', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2', 'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=0)),
-        set([]))
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=1)),
-        {'sub dataset1'})
-    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=2)),
-        {'sub dataset1', 'sub dataset1/sub sub dataset1', 'sub dataset1/subm 1',
-         'sub dataset1/subm 2'})
-
-    # TODO:  More Flavors!
-
 
 # TODO: There's something wrong with the nested testrepo!
+# Fear mongering detected!
 @with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
 def test_is_installed(src, path):
@@ -126,11 +91,12 @@ def test_is_installed(src, path):
     assert_false(ds.is_installed())
 
     # get a clone:
-    AnnexRepo(path, src)
+    AnnexRepo.clone(src, path)
     ok_(ds.is_installed())
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
+    subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
@@ -138,8 +104,11 @@ def test_is_installed(src, path):
     # from datalad.cmd import Runner
     # Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
     with chpwd(path):
-        install('subm 1')
+        get('subm 1')
     ok_(subds.is_installed())
+    # wipe it out
+    rmtree(ds.path)
+    assert_false(ds.is_installed())
 
 
 @with_tempfile(mkdir=True)
@@ -182,59 +151,60 @@ def test_repo_cache(path):
 
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
-    from datalad.api import install
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
     ds = ds.create()
     assert_true(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.install(path='test')
+    ds.add(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
+    # Assuming that tmp location was not under a super-dataset
+    eq_(ds.get_superdataset(), None)
+    eq_(ds.get_superdataset(topmost=True), ds)
 
     # add itself as a subdataset (crazy, isn't it?)
-    subds = ds.install('subds', source=path)
+    subds = ds.install('subds', source=path,
+        result_xfm='datasets', return_type='item-or-list')
     assert_true(subds.is_installed())
-    subdss = ds.get_subdatasets()
+    eq_(subds.get_superdataset(), ds)
+    eq_(subds.get_superdataset(topmost=True), ds)
+
+    subdss = ds.subdatasets()
     eq_(len(subdss), 1)
-    eq_(os.path.join(path, subdss[0]), subds.path)
-    eq_(subds.path, ds.get_subdatasets(absolute=True)[0])
-    eq_(subdss, ds.get_subdatasets(recursive=True))
-    eq_(subdss, ds.get_subdatasets(fulfilled=True))
-    # don't have that right now
-    assert_raises(NotImplementedError, ds.get_subdatasets, pattern='sub*')
+    eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
+    eq_(subdss, ds.subdatasets(recursive=True))
+    eq_(subdss, ds.subdatasets(fulfilled=True))
     ds.save("with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
-    eq_(ds.get_subdatasets(), [])
+    eq_(ds.subdatasets(), [])
+
+    # very nested subdataset to test topmost
+    subsubds = subds.install(
+        _path_('d1/subds'), source=path,
+        result_xfm='datasets', return_type='item-or-list')
+    assert_true(subsubds.is_installed())
+    eq_(subsubds.get_superdataset(), subds)
+    eq_(subsubds.get_superdataset(topmost=True), ds)
+
+    # verify that '^' alias would work
+    with chpwd(subsubds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
+        # and while in the dataset we still can resolve into central one
+        dscentral = Dataset('///')
+        eq_(dscentral.path, LOCAL_CENTRAL_PATH)
+
+    with chpwd(ds.path):
+        dstop = Dataset('^')
+        eq_(dstop, ds)
+
     # TODO actual submodule checkout is still there
-
-
-@with_tree(tree={'test.txt': 'whatever'})
-def test_get_containing_subdataset(path):
-
-    ds = create(path, force=True)
-    ds.install(path='test.txt')
-    ds.save("Initial commit")
-    subds = ds.create_subdataset("sub")
-
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-    eq_(ds.get_containing_subdataset("some").path, ds.path)
-    # make sure the subds is found, even when it is not present, but still
-    # known
-    shutil.rmtree(subds.path)
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-
-    outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
-    assert_raises(ValueError, ds.get_containing_subdataset,
-                  opj(os.curdir, outside_path))
-    assert_raises(ValueError, ds.get_containing_subdataset,
-                  abspath(outside_path))
 
 
 @with_tempfile(mkdir=True)
@@ -263,19 +233,40 @@ def test_require_dataset(path):
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
     ds = Dataset(path)
+    assert_equal(ds.id, None)
+    ds.create()
     dsorigid = ds.id
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
     assert_equal(len(ds.id), 36)
-    # creating a new object for the same path (no ID on record)
-    # does not yields the same ID
+    # creating a new object for the same path
+    # yields the same ID
+
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
-    assert_true(ds.id != newds.id)
+    assert_equal(ds.id, newds.id)
     # recreating the dataset does NOT change the id
-    ds.create(no_annex=True)
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
+    ds.create(no_annex=True, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
+    AnnexRepo._unique_instances.clear()
     ds.create(force=True)
     assert_equal(ds.id, dsorigid)
     # dataset ID and annex UUID have nothing to do with each other
@@ -283,6 +274,12 @@ def test_dataset_id(path):
     assert_true(ds.repo.uuid != ds.id)
     # creating a new object for the same dataset with an ID on record
     # yields the same ID
+    #
+    # Note: Since we switched to singletons, a reset is required in order to
+    # make sure we get a new object
+    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
+    # dict isn't a nice approach. May be create needs a fix/RF?
+    Dataset._unique_instances.clear()
     newds = Dataset(path)
     assert_false(ds is newds)
     assert_equal(ds.id, newds.id)
@@ -290,3 +287,29 @@ def test_dataset_id(path):
     # this is also not the ID
     annexds = Dataset(opj(path, 'scratch')).create()
     assert_true(annexds.id != annexds.repo.uuid)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_Dataset_flyweight(path1, path2):
+
+    ds1 = Dataset(path1)
+    assert_is_instance(ds1, Dataset)
+    # instantiate again:
+    ds2 = Dataset(path1)
+    assert_is_instance(ds2, Dataset)
+    # the very same object:
+    ok_(ds1 is ds2)
+
+    # reference the same via relative path:
+    with chpwd(path1):
+        ds3 = Dataset(relpath(path1, start=path2))
+        ok_(ds1 == ds3)
+        ok_(ds1 is ds3)
+
+    # reference the same via symlink:
+    with chpwd(path2):
+        os.symlink(path1, 'linked')
+        ds3 = Dataset('linked')
+        ok_(ds3 == ds1)
+        ok_(ds3 is not ds1)

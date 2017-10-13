@@ -10,23 +10,16 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
-import re
-from os.path import exists, join as opj, basename, abspath
-
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-
 import logging
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
-from ..cmd import link_file_load, Runner
-from ..support.exceptions import CommandError
-from ..utils import swallow_logs, swallow_outputs
+from ..utils import disable_logger
 from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 
 from ..downloaders.providers import Providers
 from ..downloaders.base import TargetFileAbsent
+from .main import main as super_main
 
 
 class DataladAnnexCustomRemote(AnnexCustomRemote):
@@ -74,11 +67,11 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
 
         try:
-            with swallow_logs():
+            with disable_logger():
                 status = self._providers.get_status(url)
             size = str(status.size) if status.size is not None else 'UNKNOWN'
-            resp = ["CHECKURL-CONTENTS", size] + \
-                   ([status.filename] if status.filename else [])
+            resp = ["CHECKURL-CONTENTS", size] \
+                + ([status.filename] if status.filename else [])
         except Exception as exc:
             self.debug("Failed to check url %s: %s" % (url, exc_str(exc)))
             resp = ["CHECKURL-FAILURE"]
@@ -104,7 +97,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in self.get_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
-                with swallow_logs():
+                with disable_logger():
                     status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     resp = "CHECKPRESENT-SUCCESS"
@@ -163,8 +156,10 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
         for url in urls:
             try:
-                downloaded_path = self._providers.download(url, path=path, overwrite=True)
-                lgr.info("Succesfully downloaded %s into %s" % (url, downloaded_path))
+                downloaded_path = self._providers.download(
+                    url, path=path, overwrite=True
+                )
+                lgr.info("Successfully downloaded %s into %s" % (url, downloaded_path))
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
@@ -174,7 +169,6 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                   "Failed to download from any of %d locations" % len(urls))
 
 
-from .main import main as super_main
 def main():
     """cmdline entry point"""
     super_main(backend="datalad")

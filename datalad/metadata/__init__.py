@@ -10,22 +10,22 @@
 
 
 import os
+import re
 from six import PY2
 if PY2:
     import cPickle as pickle
 else:
     import pickle
-from hashlib import md5
-from six.moves.urllib.parse import urlsplit
+
 from six import string_types
-from os.path import join as opj, exists, relpath
+from os.path import join as opj, exists
+from os.path import dirname
 from importlib import import_module
-from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
+from datalad.utils import assure_dir
 from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
-from datalad import cfg as dlcfg
 
 
 # common format
@@ -47,43 +47,56 @@ def get_metadata_type(ds, guess=False):
 
     Returns
     -------
-    list(str) or None
-      Metadata type labels or `None` if no type setting is found and and
+    list(str)
+      Metadata type labels or an empty list if no type setting is found and
       optional auto-detection yielded no results
     """
-    cfg = ds.config
-    if cfg and cfg.has_section('metadata'):
-        if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype').split()
+    cfg_ = ds.config
+    # TODO give cfg name datalad prefix
+    if cfg_ and cfg_.has_section('metadata'):
+        if cfg_.has_option('metadata', 'nativetype'):
+            return cfg_.get_value('metadata', 'nativetype').split()
     mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
-        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p in ('tests', 'base'))]):
+            if mtype == 'aggregate':
+                # skip, runs anyway, but later
+                continue
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
-            if pmod.has_metadata(ds):
+            if pmod.MetadataParser(ds).has_metadata():
+                lgr.debug('Predicted presence of "%s" meta data', mtype)
                 mtypes.append(mtype)
-    return mtypes if len(mtypes) else None
+            else:
+                lgr.debug('No evidence for "%s" meta data', mtype)
+    return mtypes
 
 
 def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
 
-    return {
-        "@context": "http://schema.org/",
-        "@id": ds_identifier,
-        "type": "Dataset",
+    meta = {
+        "@context": {
+            "@vocab": "http://schema.org/",
+            "doap": "http://usefulinc.com/ns/doap#",
+        },
         # increment when changes to meta data representation are done
         "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
     }
+    if ds_identifier is not None:
+        meta["@id"] = ds_identifier
+    return meta
 
 
-def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
+def _get_implicit_metadata(ds, ds_identifier=None):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
-    encoded in the dataset repository itself.
+    encoded in the dataset repository itself. This does not include information
+    on submodules, however. Meta data on subdatasets is provided by a dedicated
+    parser implementation for "aggregate" meta data.
 
     Returns
     -------
@@ -91,14 +104,16 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     """
     if ds_identifier is None:
         ds_identifier = ds.id
-    if subdatasets is None:
-        subdatasets = []
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
     if not ds.repo:
         # everything else comes from a repo
         return meta
+
+    if ds.id:
+        # it has an ID, so we consider it a proper dataset
+        meta['type'] = "Dataset"
 
     # shortcut
     repo = ds.repo.repo
@@ -107,18 +122,38 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
         # maybe use something like git-describe instead -- but tag-references
         # might changes...
         meta['version'] = repo.head.commit.hexsha
+    _add_annex_metadata(ds.repo, meta)
+    return meta
 
+
+def _sanitize_annex_description(desc):
+    """Sanitize annex description of the remote
+
+    Should not depict name of the local remote (enabled if within [])
+    or status (e.g. [datalad-archives] would be for enabled datalad-archives)
+
+    Assumption is that no [ or ] used within remote name, which is hopefully
+    a safe one
+    """
+    # [datalad-archives] -> datalad-archives
+    desc = re.sub('^\[(.*)\]$', r'\1', desc)
+    # some description [local-remote] -> some description
+    desc = re.sub('^(.*) \[.*\]$', r'\1', desc)
+    return desc
+
+
+def _add_annex_metadata(repo, meta):
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
     # need annex repo instance
     # TODO refactor to use ds.uuid when #701 is addressed
-    if hasattr(ds.repo, 'repo_info'):
+    if hasattr(repo, 'repo_info'):
         # get all other annex ids, and filter out this one, origin and
         # non-specific remotes
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
-            repo_info = ds.repo.repo_info()
+            repo_info = repo.repo_info(fast=True)
         annex_meta = []
         for src in ('trusted repositories',
                     'semitrusted repositories',
@@ -130,31 +165,14 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
                     continue
                 anx_meta = {'@id': anxid}
                 if 'description' in anx:
-                    anx_meta['description'] = anx['description']
+                    anx_meta['description'] = \
+                        _sanitize_annex_description(anx['description'])
                 # XXX maybe report which one is local? Available in anx['here']
                 # XXX maybe report the type of annex remote?
                 annex_meta.append(anx_meta)
-            if len(annex_meta) == 1:
-                annex_meta = annex_meta[0]
-            meta['availableFrom'] = annex_meta
-
-    ## metadata on all subdataset
-    subdss = []
-    # we only want immediate subdatasets
-    for subds in subdatasets:
-        subds_id = subds.id
-        submeta = {
-            'location': relpath(subds.path, ds.path),
-            'type': 'Dataset'}
-        if not subds_id.startswith('_:'):
-            submeta['@id'] = subds_id
-        subdss.append(submeta)
-    if len(subdss):
-        if len(subdss) == 1:
-            subdss = subdss[0]
-        meta['dcterms:hasPart'] = subdss
-
-    return meta
+        if len(annex_meta) == 1:
+            annex_meta = annex_meta[0]
+        meta['availableFrom'] = annex_meta
 
 
 def is_implicit_metadata(meta):
@@ -169,6 +187,7 @@ def _simplify_meta_data_structure(meta):
     if isinstance(meta, list) and len(meta) == 1:
         # simplify structure
         meta = meta[0]
+    # XXX condition below is outdated (DOAP...), still needed?
     if isinstance(meta, dict) \
             and sorted(meta.keys()) == ['@context', '@graph'] \
             and meta.get('@context') == 'http://schema.org/':
@@ -185,26 +204,6 @@ def _simplify_meta_data_structure(meta):
     return meta
 
 
-def _adjust_subdataset_location(meta, subds_relpath):
-    # find implicit meta data for all contained subdatasets
-    for m in meta:
-        # skip non-implicit
-        if not is_implicit_metadata(m):
-            continue
-        # prefix all subdataset location information with the relpath of this
-        # subdataset
-        if 'dcterms:hasPart' in m:
-            parts = m['dcterms:hasPart']
-            if not isinstance(parts, list):
-                parts = [parts]
-            for p in parts:
-                if not 'location' in p:
-                    continue
-                loc = p.get('location', subds_relpath)
-                if loc != subds_relpath:
-                    p['location'] = opj(subds_relpath, loc)
-
-
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                  ignore_cache=False):
@@ -216,124 +215,60 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
 
-    # pregenerate Dataset objects for all relevants subdataset
-    # needed to get consistent IDs across the entire meta data graph
-    # we need these, even if we `ignore_subdatasets`, as we still want
-    # to list the parts of this dataset, even without additional meta data
-    # about it
-    subdss = [Dataset(opj(ds.path, p)) for p in ds.get_subdatasets(recursive=False)]
-    # start with the implicit meta data, currently there is no cache for
-    # this type of meta data, as it will change with every clone.
-    # In contrast, native meta data is cached.
-    implicit_meta = _get_implicit_metadata(
-        ds, ds_identifier, subdatasets=subdss)
-    # create a lookup dict to find parts by subdataset mountpoint
-    has_part = implicit_meta.get('dcterms:hasPart', [])
-    if not isinstance(has_part, list):
-        has_part = [has_part]
-    has_part = {hp['location']: hp for hp in has_part}
-
-    meta.append(implicit_meta)
-
     # from cache?
     if ignore_cache or not exists(main_meta_fname):
+        # start with the implicit meta data, currently there is no cache for
+        # this type of meta data, as it will change with every clone.
+        # In contrast, native meta data is cached.
+        implicit_meta = _get_implicit_metadata(ds, ds_identifier)
+        meta.append(implicit_meta)
+        # and any native meta data
         meta.extend(
             get_native_metadata(
                 ds,
                 guess_type=guess_type,
                 ds_identifier=ds_identifier))
     else:
+        # from cache
         cached_meta = jsonload(main_meta_fname)
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
         else:
             meta.append(cached_meta)
+        # cached meta data doesn't have version info for the top-level
+        # dataset -> look for the item and update it
+        for m in meta:
+            if not is_implicit_metadata(m):
+                continue
+            if m.get('@id', None) == ds_identifier:
+                m.update(_get_implicit_metadata(ds, ds_identifier))
+                break
 
     if ignore_subdatasets:
         # all done now
         return meta
 
-    # for any subdataset that is actually registered (avoiding stale copies)
-    for subds in subdss:
-        subds_path = relpath(subds.path, ds.path)
-        if ignore_cache and subds.is_installed():
-            # simply pull meta data from actual subdataset and go to next part
-            subds_meta = get_metadata(
-                subds, guess_type=guess_type,
-                ignore_subdatasets=False,
-                ignore_cache=True)
-            _adjust_subdataset_location(subds_meta, subds_path)
-            meta.extend(subds_meta)
-            continue
-
-        # we need to look for any aggregated meta data
-        subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
-        if not exists(subds_meta_fname):
-            # nothing -> skip
-            lgr.info(
-                'no cached meta data for subdataset at {}, ignoring'.format(
-                    subds_path))
-            continue
-
-        # load aggregated meta data
-        subds_meta = jsonload(subds_meta_fname)
-        # we cannot simply append, or we get weired nested graphs
-        # proper way would be to expand the JSON-LD, extend the list and
-        # compact/flatten at the end. However assuming a single context
-        # we can cheat.
-        subds_meta = _simplify_meta_data_structure(subds_meta)
-        _adjust_subdataset_location(subds_meta, subds_path)
-
-        # make sure we have a meaningful @id for any subdataset in hasPart,
-        # regardless of whether it is installed or not. This is needed to
-        # be able to connect super and subdatasets in the graph of a new clone
-        # we a new UUID
-        if not subds.is_installed():
-            # the ID for this one is not identical to the one referenced
-            # in the aggregated meta -> sift through all meta data sets
-            # look for a meta data set that knows about being part
-            # of this dataset, so we can use its @id
-            for md in subds_meta:
-                cand_id = md.get('dcterms:isPartOf', None)
-                if cand_id == ds_identifier and '@id' in md:
-                    has_part[subds_path]['@id'] = md['@id']
-                    break
-
-        # hand over subdataset meta data
-        meta.extend(subds_meta)
-
-    # reassign modified 'hasPart; term
-    parts = list(has_part.values())
-    if len(parts) == 1:
-        parts = parts[0]
-    if len(parts):
-        implicit_meta['dcterms:hasPart'] = parts
+    from datalad.metadata.parsers.aggregate import MetadataParser as AggregateParser
+    agg_parser = AggregateParser(ds)
+    if agg_parser.has_metadata():
+        agg_meta = agg_parser.get_metadata(ds_identifier)
+        # try hard to keep things a simple non-nested list
+        if isinstance(agg_meta, list):
+            meta.extend(agg_meta)
+        else:
+            meta.append(agg_meta)
 
     return meta
 
 
 def _cached_load_document(url):
+    """Loader of pyld document from a url, which caches loaded instance on disk
+    """
+    from datalad.support.network import get_cached_url_content
     from pyld.jsonld import load_document
-    cache_dir = opj(
-        dlcfg.dirs.user_cache_dir,
-        'schema')
-    doc_fname = opj(
-        cache_dir,
-        '{}-{}'.format(
-            urlsplit(url).netloc,
-            md5(url.encode('utf-8')).hexdigest()))
-
-    if os.path.exists(doc_fname):
-        lgr.debug("use cached request result to '{}' from {}".format(url, doc_fname))
-        doc = pickle.load(open(doc_fname))
-    else:
-        doc = load_document(url)
-        if not exists(cache_dir):
-            os.makedirs(cache_dir)
-        # use pickle to store the entire request result dict
-        pickle.dump(doc, open(doc_fname, 'w'))
-        lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
-    return doc
+    return get_cached_url_content(
+        url, name='schema', fetcher=load_document, maxage=1
+    )
 
 
 def flatten_metadata_graph(obj):
@@ -375,14 +310,24 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     # keep local, who knows what some parsers might pull in
     from . import parsers
     for nativetype in nativetypes:
+        if nativetype == 'aggregate':
+            # this is special and needs to be ignored here, even if it was
+            # configured. reason: this parser runs anyway in get_metadata()
+            continue
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
         try:
-            native_meta = pmod.get_metadata(ds, ds_identifier)
+            native_meta = pmod.MetadataParser(ds).get_metadata(ds_identifier)
         except Exception as e:
             lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
             continue
-        # TODO here we could apply a "patch" to the native metadata, if desired
-        meta.append(native_meta)
+        if native_meta:
+            # TODO here we could apply a "patch" to the native metadata, if desired
+
+            # try hard to keep things a simple non-nested list
+            if isinstance(native_meta, list):
+                meta.extend(native_meta)
+            else:
+                meta.append(native_meta)
 
     return meta

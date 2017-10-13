@@ -16,30 +16,41 @@ from six import PY2
 import six.moves.builtins as __builtin__
 builtins_name = '__builtin__' if PY2 else 'builtins'
 
+import logging
+import os
+
+from os.path import dirname, lexists, realpath
+from os.path import exists
+from os.path import isabs
+from os.path import join as opj
+from git.exc import InvalidGitRepositoryError
+
+from .utils import getpwd
+from .dochelpers import exc_str
+from .support.annexrepo import AnnexRepo
+from .cmdline.helpers import get_repo_instance
+
+lgr = logging.getLogger("datalad.auto")
+
+h5py = None
 try:
     import h5py
 except ImportError:
-    h5py = None
-
-import logging
-
-from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
-from git.exc import InvalidGitRepositoryError
-
-from .dochelpers import exc_str
-from .support.annexrepo import AnnexRepo
-from .support.gitrepo import GitRepo
-from .support.exceptions import CommandError
-from .cmd import Runner
-from .cmdline.helpers import get_repo_instance
-
-from .utils import swallow_outputs
-lgr = logging.getLogger("datalad.auto")
-
+    pass
+except Exception as exc:
+    # could happen due to misbehaving handlers provided by git module
+    # see https://github.com/gitpython-developers/GitPython/issues/600
+    # we could overload the handler by providing a blank one, but I do not
+    # think it is worthwhile at this point.  So let's just issue a warning
+    lgr.warning(
+        "Failed to import h5py, so no automagic handling for it atm: %s",
+        exc_str(exc)
+    )
 
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""
     pass
+
 
 class AutomagicIO(object):
     """Class to proxy commonly used API for accessing files so they get automatically fetched
@@ -50,6 +61,7 @@ class AutomagicIO(object):
     def __init__(self, autoget=True, activate=False):
         self._active = False
         self._builtin_open = __builtin__.open
+        self._builtin_exists = os.path.exists
         if h5py:
             self._h5py_File = h5py.File
         else:
@@ -57,6 +69,8 @@ class AutomagicIO(object):
         self._autoget = autoget
         self._in_open = False
         self._log_online = True
+        from mock import patch
+        self._patch = patch
         if activate:
             self.activate()
 
@@ -80,14 +94,13 @@ class AutomagicIO(object):
 
         """
         # wrap it all for resilience to errors -- proxying must do no harm!
-        from mock import patch
         try:
             if self._in_open:
                 raise _EarlyExit
             self._in_open = True  # just in case someone kept alias/assignment
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
-            with patch(origname, origfunc):
+            with self._patch(origname, origfunc):
                 lgr.log(2, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
@@ -117,7 +130,7 @@ class AutomagicIO(object):
             pass
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
-            with patch(origname, origfunc):
+            with self._patch(origname, origfunc):
                 lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, exc_str(e))
         finally:
             self._in_open = False
@@ -131,6 +144,13 @@ class AutomagicIO(object):
     def _proxy_h5py_File(self, *args, **kwargs):
         return self._proxy_open_name_mode('h5py.File', self._h5py_File,
                                           *args, **kwargs)
+
+    def _proxy_exists(self, path):
+        # TODO: decide either it should may be retrieved right away.
+        # For now, as long as it is a symlink pointing to under .git/annex
+        if exists(path):
+            return True
+        return lexists(path) and 'annex/objects' in realpath(path)
 
     def _dataset_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
@@ -154,19 +174,25 @@ class AutomagicIO(object):
             # not an annex -- can do nothing
             return
 
+        # since Git/AnnexRepo functionality treats relative paths relative to the
+        # top of the repository and might be outside, get a full path
+        if not isabs(filepath):
+            filepath = opj(getpwd(), filepath)
+
         # "quick" check first if under annex at all
         try:
             # might fail.  TODO: troubleshoot when it does e.g.
             # datalad/tests/test_auto.py:test_proxying_open_testrepobased
             under_annex = annex.is_under_annex(filepath, batch=True)
-        except:
+        except:  # MIH: really? what if MemoryError
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.get(filepath, log_online=self._log_online)
+            annex.get(filepath)
 
     def activate(self):
+        lgr.info("Activating DataLad's AutoMagicIO")
         # Some beasts (e.g. tornado used by IPython) override outputs, and
         # provide fileno which throws exception.  In such cases we should not log online
         self._log_online = hasattr(sys.stdout, 'fileno') and hasattr(sys.stderr, 'fileno')
@@ -174,13 +200,14 @@ class AutomagicIO(object):
             if self._log_online:
                 sys.stdout.fileno()
                 sys.stderr.fileno()
-        except:
+        except:  # MIH: IOError?
             self._log_online = False
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
             return
         # overloads
         __builtin__.open = self._proxy_open
+        os.path.exists = self._proxy_exists
         if h5py:
             h5py.File = self._proxy_h5py_File
         self._active = True
@@ -192,13 +219,14 @@ class AutomagicIO(object):
         __builtin__.open = self._builtin_open
         if h5py:
             h5py.File = self._h5py_File
+        os.path.exists = self._builtin_exists
         self._active = False
 
     def __del__(self):
         try:
             if self._active:
                 self.deactivate()
-        except:
+        except:  # MIH: IOError?
             pass
         try:
             super(self.__class__, self).__del__()

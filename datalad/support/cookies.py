@@ -10,6 +10,7 @@
 
 import atexit
 import shelve
+import pickle
 import appdirs
 import os.path
 from six import PY2
@@ -50,7 +51,8 @@ class CookiesDB(object):
 
         lgr.debug("Opening cookies DB %s", filename)
         try:
-            db = self._cookies_db = shelve.open(filename, writeback=True)
+            db = self._cookies_db = shelve.open(filename, writeback=True,
+                                                protocol=2)
             atexit.register(db.close)
         except Exception as exc:
             lgr.warning("Failed to open cookies DB %s: %s", filename, exc_str(exc))

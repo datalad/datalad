@@ -1,0 +1,33 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*-
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+set -e
+set -u
+
+topdir=$(dirname `which $0 | xargs readlink -f `)/../..
+
+cd $topdir
+
+exitcode=0
+
+export DATALAD_TESTS_RUNCMDLINE=1
+export PS4=+
+# no more sed but kept for future needs
+# set -o pipefail   # so that | sed   doesn't mask failures of $t
+for t in `grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null`; do
+    if [ ! -z "${DATALAD_REPO_DIRECT:-}" ] && grep -q SKIP_IN_DIRECT "$t"; then
+        echo -e "\n\nI: not running $t in direct mode";
+        continue
+    fi
+    echo -e "\n\nI: running $t"
+    bash "$t" && status=ok || { exitcode=$?; status=failed; }
+    echo "I: done running $t: $status"
+done
+exit $exitcode

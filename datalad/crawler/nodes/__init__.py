@@ -8,13 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Nodes for the pipelines
 
-Each node must be a callable accepting data and must yield (thus be a generator)
-"derived" data.  Many nodes, despite being classes, named in lower case for uniform
-appearance within pipeline definitions.  Some (e.g. Sink) uses typical agreement on
-camel casing class names -- such nodes are typically instantiated outside of the
-pipeline definition so they could be retrospected later on
+Each node must be a callable accepting data and must yield (thus be a
+generator) "derived" data.  Many nodes, despite being classes, named in lower
+case for uniform appearance within pipeline definitions.  Some (e.g. Sink) uses
+typical agreement on camel casing class names -- such nodes are typically
+instantiated outside of the pipeline definition so they could be retrospected
+later on
 """
 
-"""
-Many nodes feel like class is a bit too heavy for them since by relying on
-"""
+# XXX Many nodes feel like class is a bit too heavy for them since by relying
+# on

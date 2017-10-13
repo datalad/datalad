@@ -10,19 +10,8 @@
 (http://specs.frictionlessdata.io/data-packages)
 """
 
-from os.path import exists, join as opj
 from datalad.support.json_py import load as jsonload
-from .. import _get_base_dataset_metadata
-
-_metadata_fname = 'datapackage.json'
-
-
-def has_metadata(ds):
-    fname = opj(ds.path, _metadata_fname)
-    try:
-        return exists(fname) and 'name' in jsonload(fname)
-    except:
-        return False
+from datalad.metadata.parsers.base import BaseMetadataParser
 
 
 def _compact_author(obj):
@@ -47,45 +36,31 @@ def _compact_license(obj):
         return obj
 
 
-def get_metadata(ds, ds_identifier):
-    """Extract metadata from a frictionless data package.
+class MetadataParser(BaseMetadataParser):
+    _core_metadata_filenames = ['datapackage.json']
 
-    Parameters
-    ----------
-    ds : dataset instance
-      Dataset to extract metadata from.
+    def _get_metadata(self, ds_identifier, meta, full):
+        foreign = jsonload(
+            self.get_core_metadata_filenames()[0])
 
-    Returns
-    -------
-    dict
-      JSON-LD compliant
-    """
-    if not has_metadata(ds):
-        raise ValueError(
-            "no data package metadata found at {}".format(ds.path))
+        for term in (
+                'name', 'title', 'description', 'keywords', 'version',
+                'homepage'):
+            if term in foreign:
+                meta[term] = foreign[term]
+        if 'author' in foreign:
+            meta['author'] = _compact_author(foreign['author'])
+        if 'contributors' in foreign:
+            meta['contributors'] = [_compact_author(c)
+                                    for c in foreign['contributors']]
+        # two license terms were supported at some point
+        if 'license' in foreign:
+            meta['license'] = _compact_license(foreign['license'])
+        if 'licenses' in foreign:
+            meta['license'] = [_compact_license(l) for l in foreign['licenses']]
 
-    foreign = jsonload(opj(ds.path, _metadata_fname))
+        meta['dcterms:conformsTo'] = [
+            'http://specs.frictionlessdata.io/data-packages',
+            'http://docs.datalad.org/metadata.html#v0-1']
 
-    meta = _get_base_dataset_metadata(ds_identifier)
-
-    for term in (
-            'name', 'title', 'description', 'keywords', 'version',
-            'homepage'):
-        if term in foreign:
-            meta[term] = foreign[term]
-    if 'author' in foreign:
-        meta['author'] = _compact_author(foreign['author'])
-    if 'contributors' in foreign:
-        meta['contributors'] = [_compact_author(c)
-                                for c in foreign['contributors']]
-    # two license terms were supported at some point
-    if 'license' in foreign:
-        meta['license'] = _compact_license(foreign['license'])
-    if 'licenses' in foreign:
-        meta['license'] = [_compact_license(l) for l in foreign['licenses']]
-
-    meta['dcterms:conformsTo'] = [
-        'http://specs.frictionlessdata.io/data-packages',
-        'http://docs.datalad.org/metadata.html#v0-1']
-
-    return meta
+        return meta

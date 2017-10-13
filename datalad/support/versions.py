@@ -13,15 +13,10 @@ import re
 from distutils.version import LooseVersion
 import time
 
-import os
-from os import unlink
-from os.path import splitext, dirname, basename, curdir
-from os.path import lexists
-from os.path import join as opj
+from os.path import basename
 
 from collections import OrderedDict
 from collections import defaultdict
-from six import iteritems
 
 from logging import getLogger
 lgr = getLogger('datalad.support.versions')
@@ -79,7 +74,6 @@ def get_versions(vfpath_statuses, regex, overlay=True,
         raise NotImplementedError(overlay)
         # we should add a check that if there is a gap in versions for some file
         # then we must ... puke?
-
 
     # collect all versioned files for now in non-ordered dict
     # vfpaths = {}  # file -> [versions]
@@ -169,5 +163,3 @@ def _get_default_version(entry, default, status):
         return time.strftime(default, time.localtime(status.mtime))
     else:  # just the default
         return default
-
-

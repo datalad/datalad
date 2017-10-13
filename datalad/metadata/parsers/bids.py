@@ -8,59 +8,58 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
-from os.path import exists, join as opj
+from io import open
+from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
-from .. import _get_base_dataset_metadata
+from datalad.dochelpers import exc_str
+from datalad.metadata.parsers.base import BaseMetadataParser
 
-# XXX Could become a class attribute
-_metadata_fname = 'dataset_description.json'
+import logging
+lgr = logging.getLogger('datalad.meta.bids')
 
+class MetadataParser(BaseMetadataParser):
+    _core_metadata_filenames = ['dataset_description.json']
 
-# XXX Could become a class method
-def has_metadata(ds):
-    return exists(opj(ds.path, _metadata_fname))
+    def _get_metadata(self, ds_identifier, meta, full):
+        bids = jsonload(
+            self.get_core_metadata_filenames()[0])
 
+        # TODO maybe normalize labels of standard licenses to definition URIs
+        # perform mapping
+        for bidsterm, dataladterm in (('Name', 'name'),
+                                      ('License', 'license'),
+                                      ('Authors', 'author'),
+                                      ('ReferencesAndLinks', 'citation'),
+                                      ('Funding', 'foaf:fundedBy'),
+                                      ('Description', 'description')):
+            if bidsterm in bids:
+                meta[dataladterm] = bids[bidsterm]
 
-# XXX Could become a class method
-# XXX consider RFing into get_metadata(ds) and then centrally updating base_metadata
-#     with returned meta, or do we foresee some meta without that base?
-def get_metadata(ds, ds_identifier):
-    """Extract metadata from BIDS datasets.
+        README_fname = opj(self.ds.path, 'README')
+        if not meta.get('description') and exists(README_fname):
+            # BIDS uses README to provide description, so if was not
+            # explicitly provided to possibly override longer README, let's just
+            # load README
+            try:
+                desc = open(README_fname, encoding="utf-8").read()
+            except UnicodeDecodeError as exc:
+                lgr.warning(
+                    "Failed to decode content of %s. "
+                    "Re-loading allowing for UTF-8 errors with replacement: %s"
+                    % (README_fname, exc_str(exc))
+                )
+                desc = open(README_fname, encoding="utf-8", errors="replace").read()
 
-    Parameters
-    ----------
-    ds : dataset instance
-      Dataset to extract metadata from.
+            meta['description'] = desc.strip()
 
-    Returns
-    -------
-    dict
-      JSON-LD compliant
-    """
-    if not has_metadata(ds):
-        raise ValueError("no BIDS metadata found at {}".format(ds.path))
+        compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
 
-    bids = jsonload(opj(ds.path, _metadata_fname))
-
-    meta = _get_base_dataset_metadata(ds_identifier)
-
-    # TODO maybe normalize labels of standard licenses to definition URIs
-    # perform mapping
-    for bidsterm, dataladterm in (('Name', 'name'),
-                                  ('License', 'license'),
-                                  ('Authors', 'author'),
-                                  ('ReferencesAndLinks', 'citation'),
-                                  ('Funding', 'foaf:fundedBy'),
-                                  ('Description', 'description')):
-        if bidsterm in bids:
-            meta[dataladterm] = bids[bidsterm]
-    compliance = ["http://docs.datalad.org/metadata.html#v0-1"]
-    # special case
-    if 'BIDSVersion' in bids:
-        compliance.append(
-            'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
-                bids['BIDSVersion']))
-    else:
-        compliance.append('http://bids.neuroimaging.io')
-    meta['dcterms:conformsTo'] = compliance
-    return meta
+        # special case
+        if bids.get('BIDSVersion'):
+            compliance.append(
+                'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
+                    bids['BIDSVersion'].strip()))
+        else:
+            compliance.append('http://bids.neuroimaging.io')
+        meta['dcterms:conformsTo'] = compliance
+        return meta

@@ -11,21 +11,17 @@
 """
 
 
-import re
-import os
-from os.path import exists, join as opj, isdir
-from six.moves.urllib.parse import urljoin, urlsplit
+from six.moves.urllib.parse import urlsplit
 
-from ..ui import ui
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
-from ..dochelpers import borrowkwargs, exc_str
+from ..dochelpers import borrowkwargs
 from ..support.network import get_url_straight_filename
 from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
-from .base import DownloadError, AccessDeniedError, TargetFileAbsent
+from .base import DownloadError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
 from ..support.s3 import get_bucket
 from ..support.status import FileStatus
@@ -106,17 +102,19 @@ class S3DownloaderSession(DownloaderSession):
             if pbar:
                 try:
                     pbar.update(downloaded)
-                except:
+                except:  # MIH: what does it do? MemoryError?
                     pass  # do not let pbar spoil our fun
 
         headers = {}
-        kwargs = dict(headers=headers, cb=pbar_callback)
+        # report for every % for files > 10MB, otherwise every 10%
+        kwargs = dict(headers=headers, cb=pbar_callback,
+                      num_cb=100 if self.key.size > 10*(1024**2) else 10)
         if size:
             headers['Range'] = 'bytes=0-%d' % (size - 1)
         if f:
             # TODO: May be we could use If-Modified-Since
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-            self.key.get_contents_to_file(f, num_cb=0, **kwargs)
+            self.key.get_contents_to_file(f, **kwargs)
         else:
             return self.key.get_contents_as_string(encoding='utf-8', **kwargs)
 
@@ -150,7 +148,6 @@ class S3Downloader(BaseDownloader):
         # deal with non key=value
         return rec.netloc, rec.path.lstrip('/'), assure_dict_from_str(rec.query, sep='&') or {}
 
-
     def _establish_session(self, url, allow_old=True):
         """
 
@@ -168,7 +165,10 @@ class S3Downloader(BaseDownloader):
         bucket_name = self._parse_url(url)[0]
         if allow_old and self._bucket:
             if self._bucket.name == bucket_name:
-                lgr.debug("S3 session: Reusing previous bucket")
+                lgr.debug(
+                    "S3 session: Reusing previous connection to bucket %s",
+                    bucket_name
+                )
                 return True  # we used old
             else:
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
@@ -188,7 +188,7 @@ class S3Downloader(BaseDownloader):
         try:
             key = self._bucket.get_key(url_filepath, version_id=params.get('versionId', None))
         except S3ResponseError as e:
-            raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
+            raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         if key is None:
             raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
@@ -212,7 +212,6 @@ class S3Downloader(BaseDownloader):
             headers=headers,
             key=key
         )
-
 
     @classmethod
     def get_key_headers(cls, key, dateformat='rfc2822'):

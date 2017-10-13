@@ -1,0 +1,118 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+# Helper to generate a Docker instance mapping user uder docker into your USER/UID/GID
+# and allowing to run tox within that clean automatically generated according to
+# README.md's apt-get lines environment
+#
+set -e
+export PS4=+
+#set -x
+set -u
+
+DL_DIST=${1:-jessie}
+
+topdir=$(readlink -f `dirname $0`)
+cd `dirname $0`
+dockerfile=$topdir/start_website_in_docker-Dockerfile
+# echo "D: $DL_APT"
+sed -e "s,DL_DIST,$DL_DIST,g" \
+    -e "s,DL_USER,$USER,g" \
+    -e "s,DL_UID,`id -u`,g" \
+    -e "s,DL_GID,`id -g`,g" \
+    -e "s,DL_GIT_USER_EMAIL,`git config --get user.email`,g" \
+    -e "s,DL_GIT_USER_NAME,`git config --get user.name`,g" \
+    $dockerfile.in >| $dockerfile
+
+#DL_APT=$(grep '^\(apt-get\|pip\)' ./../../README.md)
+
+{
+    # grep '^apt-get ' $topdir/../../README.md | sed -e 's|python-{|python{,3}-{|g'; \
+    echo "eatmydata apt-get install -q -y build-essential datalad python-pip python-virtualenv;"
+    echo "eatmydata apt-get install -q -y libffi-dev libssl-dev python-dev;"
+    # Install dependencies and remove system wide datalad
+    echo "eatmydata dpkg --purge datalad python-datalad;"
+} | while read aptline; do
+    sed -i -e "s|\(\(.*\)DL_APT\(.*\)\)|\2$aptline\3\n\1|g" $dockerfile
+    :
+done
+sed -e '/DL_APT/d' -i $dockerfile
+
+echo "I: copy authorized keys so they become avail inside"
+cp ~/.ssh/authorized_keys $topdir/conf/
+
+tag_=website_${USER}_${DL_DIST}
+tag=datalad:${tag_}
+echo "I: tag $tag"
+if docker images | grep -q datalad.*${tag_}; then
+    echo "I: tag already exists -- skipping rebuilding"
+else
+    docker build -t $tag -f $dockerfile . #&& rm Dockerfile
+    #docker build --no-cache=True -t $tag -f $dockerfile . #&& rm Dockerfile
+fi
+
+topgitdir=`readlink -f ${topdir}/../..`
+echo "I: top git dir $topgitdir"
+
+#set -x
+docker_id=`docker ps | awk "/\\<$tag\\>/{print \\$1}"`
+echo "D: looking for a docker with tag '$tag': $docker_id"
+if [ -z "$docker_id" ]; then
+  stopped_docker_id=`docker ps -a | awk "/\\<$tag\\>/{print \\$1}"`
+  if [ -z "$stopped_docker_id" ]; then
+    echo "I: Starting new container with apache running"
+    docker_id=`docker run -d \
+     -v $topgitdir:/home/$USER/datalad \
+     -p 127.0.0.1:8081:80 \
+     -p 127.0.0.1:2221:22 \
+     $tag`
+    echo "Started container $docker_id"
+
+    # ATM pip freaks out with obnoxious message 
+    #  of parse error at "'__placeh'". So we better upgrade pip while at it
+    #  see https://github.com/pypa/pip/issues/3659
+    echo "I: upgrading pip to avoid obnoxious problems"
+    docker exec $docker_id bash -c "pip install -U pip --force-reinstall"
+
+    echo "I: installing datalad inside (in development mode)"
+    # crap -- in sid image finishes with
+    #  Segmentation fault (core dumped)
+    # yoh@8c3178bd7ea7:~/datalad$ echo $?
+    # 139
+    docker exec $docker_id bash -c "cd datalad; pip install -e ."
+  else
+    echo "I: starting previous docker container $stopped_docker_id"
+    docker_id=`docker start $stopped_docker_id`
+    echo "Started container $docker_id"
+  fi
+else
+    echo "Using running container $docker_id"
+fi
+
+docker_git_version=`docker exec $docker_id git --version 2>&1 | cut -d ' ' -f 3`
+if dpkg --compare-versions $docker_git_version lt 2.4; then
+    echo "I: too old of a git, let's symlink the one from git-annex-standalone"
+    for f in git git-receive-pack git-upload-pack; do
+        docker exec $docker_id ln -sf /usr/lib/git-annex.linux/$f /usr/local/bin/$f
+    done
+fi
+
+cat <<EOF
+-------------------------
+You now should be able to upload to this host under ssh://localhost:2221:/var/www/html,
+which should then be made available under http://localhost:8081 .
+It is recommended to create ~/.ssh/config entry
+
+Host dataladlocalhost
+ Port 2221
+ Hostname localhost
+ StrictHostKeyChecking no
+
+EOF

@@ -19,6 +19,7 @@ __docformat__ = 'restructuredtext'
 from os.path import isdir, curdir
 
 from .base import Interface
+from datalad.interface.base import build_doc
 from ..ui import ui
 from ..utils import assure_list_from_str
 from ..dochelpers import exc_str
@@ -29,8 +30,9 @@ from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
 
 
+@build_doc
 class DownloadURL(Interface):
-    """Download a content from a URL using DataLad's downloader
+    """Download content
 
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication detail maintained by
@@ -40,6 +42,8 @@ class DownloadURL(Interface):
 
       $ datalad download http://example.com/file.dat s3://bucket/file2.dat
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         urls=Parameter(
@@ -72,7 +76,7 @@ class DownloadURL(Interface):
           downloaded successfully files
         """
 
-        from ..downloaders import Providers
+        from ..downloaders.providers import Providers
 
         urls = assure_list_from_str(urls)
 
@@ -105,4 +109,3 @@ class DownloadURL(Interface):
         if failed_urls:
             raise RuntimeError("%d url(s) failed to download" % len(failed_urls))
         return downloaded_paths
-

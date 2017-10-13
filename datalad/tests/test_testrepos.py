@@ -7,12 +7,18 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import known_failure_direct_mode
+
 import git
 import os
 
+from datalad.tests.utils import integration
+from datalad.tests.utils import usecase
 from .utils import eq_, ok_, with_testrepos, with_tempfile
 from datalad.cmd import Runner
 from .utils import local_testrepo_flavors
+from .utils_testdatasets import make_studyforrest_mockup
+
 
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_having_annex(path):
@@ -46,3 +52,11 @@ def test_clone(src, tempdir):
     #                                   % locals())
     #eq_(status1, 0, msg="Status: %d  Output was: %r" % (status1, output1))
     #ok_("get test-annex.dat" in output1)
+
+
+@usecase
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_make_studyforrest_mockup(path):
+    # smoke test
+    make_studyforrest_mockup(path)

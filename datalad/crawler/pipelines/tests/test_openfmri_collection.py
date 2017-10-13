@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from datalad.tests.utils import known_failure_direct_mode
+
 import os
 from glob import glob
 from os.path import join as opj, exists
@@ -53,6 +55,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 )
 @serve_path_via_http
 @with_tempfile
+@known_failure_direct_mode  #FIXME
 def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
 
     list(initiate_dataset(
@@ -70,7 +73,8 @@ def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']
-    eq_(Dataset(outd).get_subdatasets(fulfilled=True), subdatasets)
+    eq_(Dataset(outd).subdatasets(fulfilled=True, result_xfm='relpaths'),
+        subdatasets)
 
     # Check that crawling configuration was created for every one of those
     for sub in subdatasets:

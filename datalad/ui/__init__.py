@@ -18,6 +18,7 @@ lgr = getLogger('datalad.ui')
 lgr.log(5, "Starting importing ui")
 
 from .dialog import ConsoleLog, DialogUI, UnderAnnexUI
+from .dialog import SilentConsoleLog
 from .dialog import UnderTestsUI
 from ..utils import is_interactive
 
@@ -26,6 +27,7 @@ from ..utils import is_interactive
 # TODO:  GitAnnexUI where interactive queries (such as question) should get to the
 # user by proxying some other appropriate (cmdline or GUI) UI, while others, such
 # as reporting on progress etc -- should get back to the annex
+
 
 # TODO: singleton
 class _UI_Switcher(object):
@@ -44,11 +46,12 @@ class _UI_Switcher(object):
         if backend is None:
             backend = 'console' if not is_interactive() else 'dialog'
         self._ui = {
-                'console': ConsoleLog,
-                'dialog': DialogUI,
-                'annex': UnderAnnexUI,
-                'tests': UnderTestsUI,
-            }[backend]()
+            'console': ConsoleLog,
+            'dialog': DialogUI,
+            'annex': UnderAnnexUI,
+            'tests': UnderTestsUI,
+            'tests-noninteractive': SilentConsoleLog,
+        }[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend
 

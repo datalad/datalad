@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+# ORDER MATTERS FOLKS!
 
 # the following should be series of import definitions for interface implementations
 # that shall be exposed in the Python API and the cmdline interface
@@ -23,27 +24,33 @@ _group_dataset = (
         # src module can be relative, but has to be relative to the main 'datalad' package
         ('datalad.distribution.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
+        ('datalad.distribution.get', 'Get'),
         ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
-        ('datalad.distribution.uninstall', 'Uninstall'),
+        ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
+        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
+        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
-        ('datalad.distribution.create_publication_target_sshwebserver',
-         'CreatePublicationTargetSSHWebserver',
-         'create-publication-target-sshwebserver'),
-        ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
-         'modify-subdataset-urls'),
+        ('datalad.distribution.create_sibling',
+         'CreateSibling',
+         'create-sibling'),
+        ('datalad.distribution.create_sibling_github',
+         'CreateSiblingGithub',
+         'create-sibling-github'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
+        ('datalad.plugin', 'Plugin', 'plugin'),
     ])
 
 _group_metadata = (
     'Commands for meta data handling',
     [
-        ('datalad.metadata.search_datasets', 'SearchDatasets',
-         'search-datasets', 'search_datasets'),
+        ('datalad.metadata.search', 'Search',
+         'search', 'search'),
+        ('datalad.metadata.metadata', 'Metadata',
+         'metadata'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
     ])
@@ -59,7 +66,18 @@ _group_misc = (
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
-        # very optional ones
+        ('datalad.interface.run', 'Run', 'run'),
+    ])
+
+_group_plumbing = (
+    'Plumbing commands',
+    [
+        ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.interface.diff', 'Diff', 'diff'),
+        ('datalad.distribution.siblings', 'Siblings', 'siblings'),
+        ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
+        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])

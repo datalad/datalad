@@ -32,3 +32,7 @@ trailing-spaces:
 code-analysis:
 	flake8 $(MODULE) | grep -v __init__ | grep -v external
 	pylint -E -i y $(MODULE)/ # -d E1103,E0611,E1101
+
+update-changelog:
+	@echo ".. This file is auto-converted from CHANGELOG.md (make update-changelog) -- do not edit\n\nChange log\n**********" > docs/source/changelog.rst
+	pandoc -t rst CHANGELOG.md >> docs/source/changelog.rst

@@ -16,17 +16,17 @@ import msgpack
 import os
 import time
 
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 from os.path import exists, join as opj, isdir
 from six import PY2
 from six import binary_type, PY3
+from six import add_metaclass
 
 
 from .. import cfg
 from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
-from ..dochelpers import borrowkwargs
 from .credentials import CREDENTIAL_TYPES
 
 from logging import getLogger
@@ -56,13 +56,12 @@ class DownloaderSession(object):
 
 
 @auto_repr
+@add_metaclass(ABCMeta)
 class BaseDownloader(object):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
     _DOWNLOAD_SIZE_TO_VERIFY_AUTH = 10000
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, credential=None, authenticator=None):
         """
@@ -221,8 +220,10 @@ class BaseDownloader(object):
     def _verify_download(self, url, downloaded_size, target_size, file_=None, content=None):
         """Verify that download finished correctly"""
 
-        if (self.authenticator and downloaded_size < self._DOWNLOAD_SIZE_TO_VERIFY_AUTH) and \
-            hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re:
+        if (self.authenticator
+                and downloaded_size < self._DOWNLOAD_SIZE_TO_VERIFY_AUTH) \
+                and hasattr(self.authenticator, 'failure_re') \
+                and self.authenticator.failure_re:
             assert hasattr(self.authenticator, 'check_for_auth_failure'), \
                 "%s has failure_re defined but no check_for_auth_failure" \
                 % self.authenticator
@@ -296,7 +297,7 @@ class BaseDownloader(object):
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
                 t0 = time.time()
                 downloader_session.download(fp, pbar, size=size)
                 downloaded_time = time.time() - t0
@@ -369,7 +370,7 @@ class BaseDownloader(object):
                 import dbm
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
-            cache_dir = opj(cfg.dirs.user_cache_dir)
+            cache_dir = cfg.obtain('datalad.locations.cache')
             if not exists(cache_dir):
                 os.makedirs(cache_dir)
             cache_path = opj(cache_dir, 'crawl_cache.dbm')
@@ -401,7 +402,7 @@ class BaseDownloader(object):
         lgr.log(3, "_fetch(%r, cache=%r, size=%r, allow_redirects=%r)",
                 url, cache, size, allow_redirects)
         if cache is None:
-            cache = cfg.getboolean('crawl', 'cache', False)
+            cache = cfg.obtain('datalad.crawl.cache', default=False)
 
         if cache:
             cache_key = msgpack.dumps(url)
@@ -426,7 +427,7 @@ class BaseDownloader(object):
         # FETCH CONTENT
         try:
             # Consider to improve to make it animated as well, or shorten here
-            #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+            #pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
             content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)
@@ -502,8 +503,9 @@ class BaseDownloader(object):
         # and not some page saying to login, that is why we need to fetch some content
         # in those cases, and not just check the headers
         download_size = self._DOWNLOAD_SIZE_TO_VERIFY_AUTH \
-            if self.authenticator and \
-                hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re \
+            if self.authenticator \
+            and hasattr(self.authenticator, 'failure_re') \
+            and self.authenticator.failure_re \
             else 0
 
         _, headers = self._fetch(url, cache=False, size=download_size)
@@ -540,7 +542,9 @@ class BaseDownloader(object):
 
 
 # Exceptions.  might migrate elsewhere
+# MIH: Completely non-obvious why this is here
 from ..support.exceptions import *
+
 
 #
 # Authenticators    XXX might go into authenticators.py
@@ -563,11 +567,12 @@ class Authenticator(object):
         if self.requires_authentication:
             raise NotImplementedError("Authentication for %s not yet implemented" % self.__class__)
 
+
 class NotImplementedAuthenticator(Authenticator):
     pass
+
 
 class NoneAuthenticator(Authenticator):
     """Whenever no authentication is necessary and that is stated explicitly"""
     requires_authentication = False
     pass
-

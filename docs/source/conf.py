@@ -15,11 +15,24 @@
 import sys
 import os
 import shlex
+from os.path import join as opj, exists
+from os import pardir
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+
+# generate missing pieces
+for setup_py_path in (opj(pardir, 'setup.py'),  # travis
+                      opj(pardir, pardir, 'setup.py')):  # RTD
+    if exists(setup_py_path):
+        try:
+            for cmd in 'manpage', 'cfginfo', 'examples':
+                os.system('{} build_{}'.format(setup_py_path, cmd))
+        except:
+            # shut up and do your best
+            pass
 
 # -- General configuration ------------------------------------------------
 
@@ -62,8 +75,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'datalad'
-copyright = u'2016, Datalad team'
-author = u'Datalad team'
+copyright = u'2016, DataLad team'
+author = u'DataLad team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -158,7 +171,7 @@ html_static_path = ['_static']
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
-#html_extra_path = []
+html_extra_path = ['_extras']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -239,7 +252,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   (master_doc, 'datalad.tex', u'datalad Documentation',
-   u'Datalad team', 'manual'),
+   u'DataLad team', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

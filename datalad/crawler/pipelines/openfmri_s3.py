@@ -31,7 +31,9 @@ lgr = getLogger("datalad.crawler.pipelines.openfmri")
 # for crawling any S3 bucket.
 # Right away think about having an 'incoming' branch and handling of versioned files
 sub_s3_to_http = sub({
-        'url': {'^s3://openfmri/': 'http://openfmri.s3.amazonaws.com/'}
+        'url': {'^s3://openfmri/': 'http://openfmri.s3.amazonaws.com/',
+                '^s3://openneuro/': 'http://openneuro.s3.amazonaws.com/',
+                }
     },
     ok_missing=True
 )
@@ -45,7 +47,7 @@ def collection_pipeline(prefix=None):
         create=False,  # must be already initialized etc
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        # largefiles="exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"
     )
 
     return [
@@ -73,25 +75,27 @@ def collection_pipeline(prefix=None):
 
 # TODO: make a unittest for all of this on a simple bucket
 
-def pipeline(prefix=None):
+def pipeline(prefix=None, bucket='openfmri', tag=True, skip_problematic=False):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
     lgr.info("Creating a pipeline for the openfmri bucket")
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        special_remotes=[DATALAD_SPECIAL_REMOTE],
-        backend='MD5E'
+        #special_remotes=[DATALAD_SPECIAL_REMOTE],
+        backend='MD5E',
+        skip_problematic=skip_problematic,
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
-        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+        # largefiles="exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"
     )
 
     return [
-        crawl_s3('openfmri', prefix=prefix, strategy='commit-versions', repo=annex.repo, recursive=True),
+        crawl_s3(bucket=bucket, prefix=prefix, strategy='commit-versions',
+                 repo=annex.repo, recursive=True, exclude='\.git/'),
         sub_s3_to_http,
         switch('datalad_action',
                {
-                   'commit': annex.finalize(tag=True),
+                   'commit': annex.finalize(tag=tag),
                    'remove': annex.remove,
                    'annex':  annex,
                })
