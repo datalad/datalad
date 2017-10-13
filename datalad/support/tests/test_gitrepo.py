@@ -678,17 +678,17 @@ def test_GitRepo__get_files_history(path):
 
     # commit containing files of d1
     d1_commit = next(gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd1', 'f1')]))
-    assert_equal(str(d1_commit.message), 'commit d1')
+    assert_equal(str(d1_commit.message), 'commit d1\n')
 
     # commit containing files of d2
     d2_commit_gen = gr._get_files_history([opj(path, 'd2', 'f1'), opj(path, 'd2', 'f1')])
-    assert_equal(str(next(d2_commit_gen).message), 'commit d2')
+    assert_equal(str(next(d2_commit_gen).message), 'commit d2\n')
     assert_raises(StopIteration, next, d2_commit_gen)  # no more commits with files of d2
 
     # union of commits containing passed objects
     commits_union = gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd2', 'f1'), opj(path, 'file')])
-    assert_equal(str(next(commits_union).message), 'commit d2')
-    assert_equal(str(next(commits_union).message), 'commit d1')
+    assert_equal(str(next(commits_union).message), 'commit d2\n')
+    assert_equal(str(next(commits_union).message), 'commit d1\n')
     assert_raises(StopIteration, next, commits_union)
 
     # file2 not commited, so shouldn't exist in commit history
