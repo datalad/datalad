@@ -30,14 +30,7 @@ from datalad.tests.utils import eq_, assert_is_instance, assert_in
 from datalad.utils import assure_list
 from datalad.utils import auto_repr
 
-from .utils import remote_file_path
-
-# new TestRepo* classes:
-# - always a "tmp" location or configurable via "datalad.tests.<something>"?
-# - assert_unchanged() method
-# - properties to
-# - (annex) init optional? don't think so (well, might be useful for testing). But: Should be possible to have an
-#   uninitialized submodule and a corresponding property
+from .utils import get_remote_file
 
 
 lgr = logging.getLogger('datalad.tests.testrepos.repos')
@@ -62,20 +55,15 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
     # update if used persistently
     version = '0.1'  # TODO: version for abstract class? May be none at all
 
+    # old name to be used by a transition decorator to ease RF'ing
+    RF_str = None
     # definition to be done by subclasses
     _item_definitions = []
     # list of tuples: Item's class and kwargs for constructor
     # Note:
     # - item references are paths
     # - 'path' and 'cwd' arguments are relative to TestRepo's root
-    # - toplevel repo: path = None ???
-
-    # example:
-    # _item_list = [(ItemRepo, {'path': 'somewhere', 'annex': False, ...})
-    #           (ItemFile, {'path': os.path.join('somewhere', 'beneath'),
-    #                       'content': 'some content for the file',
-    #                       'untracked': True})
-    #          ]
+    # TODO: a lot of doc
 
     def __init__(self, path=None, runner=None):
 
@@ -440,6 +428,9 @@ class BasicGit(TestRepo_NEW):
 
     version = '0.1'
 
+    # old name to be used by a transition decorator to ease RF'ing
+    RF_str = 'basic_git'
+
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': False}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
@@ -473,6 +464,9 @@ class BasicMixed(TestRepo_NEW):
 
     version = '0.1'
 
+    # old name to be used by a transition decorator to ease RF'ing
+    RF_str = 'basic_annex'
+
     _item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': True}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
@@ -491,7 +485,7 @@ class BasicMixed(TestRepo_NEW):
                                               "rudimentary load file for annex "
                                               "testing"}),
                          (ItemFile, {'path': 'test-annex.dat',
-                                     'src': get_local_file_url(remote_file_path),
+                                     'src': get_local_file_url(get_remote_file('test-annex.dat')),
                                      'state': (ItemFile.ADDED,
                                                ItemFile.UNMODIFIED),
                                      'annexed': True,
