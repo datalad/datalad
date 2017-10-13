@@ -12,7 +12,7 @@ import logging
 import os
 import shlex
 from abc import ABCMeta, abstractmethod
-from os.path import exists
+from os.path import exists, lexists
 
 from nose.tools import assert_is_instance, eq_, assert_in, assert_raises
 from six import add_metaclass, string_types
@@ -597,6 +597,9 @@ class ItemRepo(Item):
                  if remote_entries[2] == 'fetch']),
             set(self.remotes))
 
+        # TODO: files: locked/unlock must be bool if repo is not in direct mode
+        # and file is annexed. ItemFile doesn't know about direct mode.
+
 
 @auto_repr
 class ItemSelf(ItemRepo):
@@ -812,11 +815,11 @@ class ItemFile(Item):
 
     @property
     def is_unlocked(self):
-        return self._locked is False  # not `None`!
+        return (not self._locked) if self._locked is not None else None
 
     @property
     def is_locked(self):
-        return self._locked is True # not `None`!
+        return self._locked
 
     @property
     def content_available(self):
@@ -840,7 +843,7 @@ class ItemFile(Item):
             (str, str)
             First element is the commit's SHA, the second its message
         """
-        return self._commits
+        return [c for c in self._commits]
 
     def _get_annex_key_from_disc(self, exc=None):
         """get the key of the file as git-annex reports it
@@ -1016,19 +1019,85 @@ class ItemFile(Item):
         """
 
         log("Integrity check for %s(%s)", self.__class__, self.path)
-        # object consistency
-        if self.is_untracked:
-            assert(self.commits is [])
-            assert(self.annexed is False)
 
-        if self.annexed is False:
-            assert(self.annex_key is None)
-            assert(self.content_available is None)
-            assert(not self.is_untracked)
+        # object consistency
 
         assert(os.path.isabs(self.path))
+        assert_is_instance(self.content, string_types)
+        assert_is_instance(self.annexed, bool)
+        assert_is_instance(self.is_untracked, bool)
+        assert_is_instance(self.is_staged, bool)
+        assert_is_instance(self.is_modified, bool)
+        assert_is_instance(self.is_clean, bool)
+
+        states = [ItemFile.UNTRACKED,
+                  ItemFile.UNMODIFIED,
+                  ItemFile.MODIFIED,
+                  ItemFile.ADDED,
+                  ItemFile.DELETED,
+                  ItemFile.RENAMED,
+                  ItemFile.COPIED,
+                  ItemFile.TYPECHANGED,
+                  ItemFile.UPDATED_BUT_UNMERGED]
+        assert(self._state_index in states)
+        assert(self._state_worktree in states)
+
+        if self.is_untracked:
+            assert(self.is_staged is False)
+            assert(self.is_modified is False)
+            assert(self.is_clean is False)
+            assert(self.is_locked is None)
+            assert(self.is_unlocked is None)
+
+            assert(not self.commits)
+            assert(self.annexed is False)
+            assert(self.annex_key is None)
+            assert(self.content_available is None)
+
+        if self.is_modified or self.is_staged:
+            assert(self.is_clean is False)
+            assert(self.is_untracked is False)
+
+        if self.is_clean:
+            assert(self.is_untracked is False)
+            assert(self.is_staged is False)
+            assert(self.is_modified is False)
+
+        # if it's neither untracked nor staged as a new file, there needs to be
+        # a commit and vice versa:
+        assert((self._state_index in [ItemFile.UNMODIFIED,
+                                 ItemFile.MODIFIED,
+                                 ItemFile.DELETED,
+                                 ItemFile.RENAMED,
+                                 ItemFile.COPIED,
+                                 ItemFile.TYPECHANGED,
+                                 ItemFile.UPDATED_BUT_UNMERGED]
+                and isinstance(self.commits, list)
+                ) or
+               (self._state_index in [ItemFile.UNTRACKED, ItemFile.ADDED]
+                and not self.commits
+                )
+               )
+
+        if self.is_locked or self.is_unlocked \
+                or self.annex_key or self.content_available:
+            assert self.annexed
+
+        if self.annexed:
+            assert(self.is_untracked is False)
+            assert_is_instance(self.annex_key, string_types)
+            assert_is_instance(self.content_available, bool)
+            assert_is_instance(self.commits, list)
+
+        # Note: `None` if "locked/unlocked" isn't a valid concept (plain git,
+        # untracked, direct mode):
+        assert(not(self.is_locked and self.is_unlocked))
+        assert(not(self.is_locked is False and self.is_unlocked is False))
 
         # physical appearance:
+
+        assert(lexists(self.path))
+
         if self.content_available or not self.annexed:
             with open(self.path, 'r') as f:
                 content_from_disc = f.read()
@@ -1036,11 +1105,13 @@ class ItemFile(Item):
 
         if self.is_locked:
             assert_raises(EnvironmentError, open, self.path, 'w')
-        # TODO:
-        # - commits
-        # - annex key
-        # - state? This might need annex-proxy and ignore-submodules, but since
-        #   we have a certain file to specify it might work
+
+        # TODO: if not self.is_untracked: git knows it
+        # TODO: if self.annexed: annex finds it and provides a key
+        # TODO: compare commits
+        # TODO: - state? This might need annex-proxy and ignore-submodules, but
+        #         since we have a certain file to specify it might work
+        #       - see corresponding note in ItemRepo
 
 
 @auto_repr
