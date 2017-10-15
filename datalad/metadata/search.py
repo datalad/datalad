@@ -162,6 +162,8 @@ def _get_search_schema(ds):
 
     lgr.info('Scanning for metadata keys')
     # quick 1st pass over all dataset to gather the needed schema fields
+	# sanitization of / should ideally be done while saving, but that would require
+	# fixes in whoosh I guess
     sanitize_key = lambda k: k.replace(' ', '_').replace('/', '_')
     for res in _query_aggregated_metadata(
             reporton='datasets',
@@ -188,6 +190,8 @@ def _get_search_schema(ds):
                 count = 0
                 uk = k
                 while uk in definitions:
+                    if definitions[uk] == v:
+                        break  # already exists and matches
                     count += 1
                     uk = '{}_{}'.format(k, count)
                 ds_defs[k] = k = uk
