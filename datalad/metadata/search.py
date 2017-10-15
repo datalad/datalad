@@ -162,6 +162,7 @@ def _get_search_schema(ds):
 
     lgr.info('Scanning for metadata keys')
     # quick 1st pass over all dataset to gather the needed schema fields
+    sanitize_key = lambda k: k.replace(' ', '_').replace('/', '_')
     for res in _query_aggregated_metadata(
             reporton='datasets',
             ds=ds,
@@ -171,6 +172,7 @@ def _get_search_schema(ds):
         ds_defs = {}
         meta = res.get('metadata', {})
         for k, v in meta.get('@context', {}).items():
+            k = sanitize_key(k)
             if k not in definitions or definitions[k] == v:
                 # this is new, but unique, or uniformly defined
                 definitions[k] = v
@@ -208,6 +210,7 @@ def _get_search_schema(ds):
         cand_keys = list(meta)
         cand_keys.extend(meta.get('unique_content_properties', []))
         for k in cand_keys:
+            k = sanitize_key(k)
             if k in ('unique_content_properties', '@context'):
                 # those are just means for something else and irrelevant
                 # for searches
