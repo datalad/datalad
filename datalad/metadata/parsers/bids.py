@@ -114,8 +114,14 @@ class MetadataParser(BaseMetadataParser):
     def _get_content_metadata(self):
         participants_fname = opj(self.ds.path, 'participants.tsv')
         if exists(participants_fname):
-            for r in yield_participant_info(participants_fname):
-                yield r
+            try:
+                for r in yield_participant_info(participants_fname):
+                    yield r
+            except Exception as exc:
+                lgr.warning(
+                    "Failed to load participants info due to: %s. Skipping the rest of file",
+                    exc_str(exc)
+                )
 
 
 def yield_participant_info(fname):
