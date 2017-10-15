@@ -181,15 +181,14 @@ def _get_search_schema(ds):
                 # might be different when some aggregated metadata was
                 # generated with an old version of datalad
                 # in this case we should actually load the old vocabulary
-                set.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
+                #set.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
                 # and perform the mapping to the current one in here
                 count = 0
                 uk = k
                 while uk in definitions:
                     count += 1
                     uk = '{}_{}'.format(k, count)
-                ds_defs[k] = uk
-                k = uk
+                ds_defs[k] = k = uk
             definitions[k] = v
             # we register a field for any definition in the context.
             # while this has the potential to needlessly blow up the
@@ -227,12 +226,14 @@ def _get_search_schema(ds):
                 schema_fields[k] = wf.TEXT(stored=True)
             else:
                 if isinstance(definitions[k], dict):
-                    definitions[k] = \
-                        {k if k == '@id' else '{} ({})'.format(
-                            k,
-                            _resolve_term(k, definitions, common_defs)) :
-                         _resolve_term(v, definitions, common_defs)
-                         for k, v in definitions[k].items()}
+                    definitions[k] = {
+                        k_ if k_ == '@id' else '{} ({})'.format(
+                           k_,
+                           _resolve_term(k_, definitions, common_defs))
+                        : _resolve_term(v, definitions, common_defs)
+                        for k_, v in definitions[k].items()
+                        if v  # skip if value is empty
+                    }
 
     schema = wf.Schema(**schema_fields)
     return schema, definitions, per_ds_defs
