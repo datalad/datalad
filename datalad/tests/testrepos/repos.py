@@ -15,6 +15,8 @@ import os
 
 from abc import ABCMeta, abstractmethod
 from os.path import join as opj
+from collections import OrderedDict
+
 
 from six import add_metaclass
 
@@ -24,12 +26,12 @@ from datalad.support.network import get_local_file_url
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
     TestRepoCreationError
 from datalad.tests.testrepos.items import Item, ItemRepo, ItemSelf, ItemFile, \
-    ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile
+    ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile, ItemAddSubmodule
 from datalad.tests.utils import eq_, assert_is_instance, assert_in
 
 from datalad.utils import assure_list
 from datalad.utils import auto_repr
-
+from datalad.dochelpers import exc_str
 from .utils import get_remote_file
 
 
@@ -58,14 +60,22 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = None
     # definition to be done by subclasses
-    _item_definitions = []
+    _cls_item_definitions = []
     # list of tuples: Item's class and kwargs for constructor
     # Note:
     # - item references are paths
     # - 'path' and 'cwd' arguments are relative to TestRepo's root
     # TODO: a lot of doc
 
-    def __init__(self, path=None, runner=None):
+    def __init__(self, path, runner=None):
+        """
+
+        Parameters
+        ----------
+        path: str
+            absolute path of the location to create this instance at
+        runner: Runner or None
+        """
 
         # TODO: Probably the same mechanism has to be applied for
         # ItemFile(src=...) in order to be able to assign predefined
@@ -94,7 +104,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 for r in ref_it:
                     try:
                         def_item[1][kw].append(self._items[r])
-                    except KeyError:
+                    except KeyError as e:
                         raise InvalidTestRepoDefinitionError(
                             "Item {it} referenced before definition:"
                             "{ls}{cl}({args})"
@@ -122,8 +132,13 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
         self._runner = runner or GitRunner(cwd=path)
         self.repo = None
-        self._items = {}
+        self._items = OrderedDict()
         self._execution = []
+
+        # Make sure we operate on a copy per instance, since we manipulate the
+        # definitions on a per instance basis (paths for example)!
+        from copy import deepcopy
+        self._item_definitions = deepcopy(self._cls_item_definitions)
 
         # Make sure, we have a definition:
         if not self._item_definitions:
@@ -135,6 +150,88 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         log("Processing definition of %s(%s)", self.__class__, path)
         for item, index in zip(self._item_definitions,
                                range(len(self._item_definitions))):
+
+            # special case: Another subclass of TestRepo
+            if issubclass(item[0], TestRepo_NEW):
+                # TODO: pass runner?
+
+                # can't be another instance of what we are currently defining:
+                if item[0] == self.__class__:
+                    raise InvalidTestRepoDefinitionError(
+                        msg="Can't use {cls} within its own definition:{ls}"
+                            "{cl}({args})".format(ls=os.linesep,
+                                                  cl=item[0].__name__,
+                                                  args=item[1]
+                                                  ),
+                        repo=self.__class__,
+                        item=item[0].__name__,
+                        index=index
+                        )
+
+                # 1. do the path conversion
+                # Note, that 'item' is another TestRepo. It's 'path' argument
+                # needs to be absolute and we currently are within the
+                # definition of a TestRepo using it as an "item". Therefore
+                # paths are relative to self.path here.
+                r_path = item[1].get('path', None)
+                if not r_path:
+                    raise InvalidTestRepoDefinitionError(
+                        msg="Missing argument 'path' for {cl}:{ls}"
+                            "{cl}({args})".format(ls=os.linesep,
+                                                  cl=item[0].__name__,
+                                                  args=item[1]),
+                        repo=self.__class__,
+                        item=item[0].__name__,
+                        index=index
+                        )
+
+                item[1]['path'] = os.path.normpath(opj(self._path, r_path))
+                # 2. instantiate it:
+                try:
+                    testrepo = item[0](**item[1])
+                except InvalidTestRepoDefinitionError as e:
+                    # add information the item's class can't know:
+                    e.repo = self.__class__
+                    e.index = index
+                    raise e
+
+                # 3. deal with ItemSelf
+                # if r_path was '.', we simply inherit ItemSelf - no need to
+                # change anything, it will be included automatically when
+                # getting the sub's items. Otherwise we need to replace ItemSelf
+                # in the sub's definition by an ItemRepo. For consistency
+                # replace in its execution list, too.
+                if r_path != '.':
+                    item_self = testrepo.repo
+                    assert_is_instance(item_self, ItemSelf)
+                    item_self_idx = testrepo._execution.index(item_self)
+                    item_self_key = os.path.relpath(item_self.path, testrepo.path)
+                    assert(testrepo._items[item_self_key] is testrepo.repo)
+                    new_item = ItemRepo(item_self.path,
+                                        src=item_self._src,
+                                        runner=item_self._runner,
+                                        annex=ItemSelf._annex,
+                                        annex_version=item_self._annex_version,
+                                        annex_direct=item_self._annex_direct,
+                                        annex_init=item_self._annex_init)
+                    testrepo.repo = new_item
+                    testrepo._items[item_self_key] = new_item
+                    testrepo._execution.insert(item_self_idx, new_item)
+                    testrepo._execution.remove(item_self)
+                else:
+                    self.repo = testrepo.repo
+
+                # 4. get its items, add them here using corrected relative path
+                # and be done
+
+                # Note, that we do NOT include those items in our execution
+                # list, since they were created already by instantiation of the
+                # sub TestRepo!
+                for sub_it in testrepo._items:
+                    sub_r_path = os.path.relpath(testrepo._items[sub_it].path,
+                                                 self._path)
+                    self._items[sub_r_path] = testrepo._items[sub_it]
+                continue
 
             if not (issubclass(item[0], Item) and isinstance(item[1], dict)):
                 raise InvalidTestRepoDefinitionError(
@@ -327,7 +424,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
         # Note, that by now there's no limitation on whether or not there needs
         # to be an item '.'. Theoretically everything should work with several
-        # hierarchies in parallel, self.path being there common root location.
+        # hierarchies in parallel, self.path being their common root location.
         # However, if there is an item '.', it must not be an ItemFile. If so,
         # something went wrong.
         if self._items.get('.') and isinstance(self._items['.'], ItemFile):
@@ -371,9 +468,15 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         # TODO: come up with a better idea than just testing length. Note, that
         # execution can't be a dict and definition does not contain actual
         # instances
-        eq_(len(self._item_definitions), len(self._execution))
-        eq_(set(self._items[p] for p in self._items),
-            set(it for it in self._execution if not isinstance(it, ItemCommand)))
+        # Note: The original assumption isn't actually true anymore, since we
+        # allow for other TestRepos to be sucked in. Those create based on their
+        # own execution list, so we don't enhance our execution list but have
+        # those TestRepos in our definition
+        # Therefore: Don't know yet, what to assert instead - outcommenting
+        # for now:
+        #eq_(len(self._item_definitions), len(self._execution))
+        #eq_(set(self._items[p] for p in self._items),
+        #    set(it for it in self._execution if not isinstance(it, ItemCommand)))
 
         # all items are recursively accessible via self._roots:
         def get_items_recursively(item):
@@ -431,7 +534,7 @@ class BasicGit(TestRepo_NEW):
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = 'basic_git'
 
-    _item_definitions = [(ItemSelf, {'path': '.',
+    _cls_item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': False}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
                                                    ItemFile.UNMODIFIED),
@@ -467,7 +570,7 @@ class BasicMixed(TestRepo_NEW):
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = 'basic_annex'
 
-    _item_definitions = [(ItemSelf, {'path': '.',
+    _cls_item_definitions = [(ItemSelf, {'path': '.',
                                      'annex': True}),
                          (ItemInfoFile, {'state': (ItemFile.ADDED,
                                                    ItemFile.UNMODIFIED),
@@ -522,5 +625,35 @@ class BasicAnnexDirty(BasicAnnex):
 
 
 # v6 adjusted branch ...
+
+
+class MixedSubmodules(TestRepo_NEW):
+    """Hierarchy of repositories with files in git and in annex
+
+    It consists of three instances of BasicMixed and does so to resemble the
+    old `SubmoduleDataset`. Whenever tests are rewritten to not explicitly rely
+    on this one, it might go in favor of a more general one.
+
+    RF'ing note: This resembles the old `SubmoduleDataset`. The only difference
+    is the content of INFO.txt, which is now more detailed. In particular it
+    includes the entire definition of this test repository.
+    """
+
+    # Note: Since we need to specify `BasicMixed` explicitly here,
+    # there is no value in deriving from it.
+    # TODO: Wrong, we get ItemSelf this way for example!
+
+
+    # TODO: Allow for TestRepo to be used in definitions!
+    _cls_item_definitions = \
+                        [(BasicMixed, {'path': '.'}),]
+                         #(BasicMixed, {'path': 'subm 1'}),  # Nope: Clone!
+                         #(BasicMixed, {'path': '2'}),]  # Nope: Clone!
+                         #(ItemAddSubmodule, {}),
+
+                         #(ItemAddSubmodule, {}),
+                         #(ItemCommit, {})]
+
+
 
 # Datasets (.datalad/config, .datalad/metadata ...) ?

@@ -116,4 +116,9 @@ def test_BasicMixed_instantiation(path):
     eq_(tr.repo.is_direct_mode, direct)
 
 
+@with_tempfile
+def test_MixedSubmodules_instantiation(path):
+    tr = MixedSubmodules(path)
+
+
 
