@@ -199,25 +199,17 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 # if r_path was '.', we simply inherit ItemSelf - no need to
                 # change anything, it will be included automatically when
                 # getting the sub's items. Otherwise we need to replace ItemSelf
-                # in the sub's definition by an ItemRepo. For consistency
-                # replace in its execution list, too.
+                # in the sub's definition by an ItemRepo.
                 if r_path != '.':
                     item_self = testrepo.repo
                     assert_is_instance(item_self, ItemSelf)
-                    item_self_idx = testrepo._execution.index(item_self)
-                    item_self_key = os.path.relpath(item_self.path, testrepo.path)
-                    assert(testrepo._items[item_self_key] is testrepo.repo)
-                    new_item = ItemRepo(item_self.path,
-                                        src=item_self._src,
-                                        runner=item_self._runner,
-                                        annex=ItemSelf._annex,
-                                        annex_version=item_self._annex_version,
-                                        annex_direct=item_self._annex_direct,
-                                        annex_init=item_self._annex_init)
-                    testrepo.repo = new_item
-                    testrepo._items[item_self_key] = new_item
-                    testrepo._execution.insert(item_self_idx, new_item)
-                    testrepo._execution.remove(item_self)
+
+                    # Note: Replacement requirements include all references to
+                    # that ItemSelf!
+                    # just hack the object, so it's not considered to be an
+                    # ItemSelf by isinstance anymore (note, that ItemSelf
+                    # actually is just an ItemRepo with a different class name):
+                    item_self.__class__ = ItemRepo
                 else:
                     self.repo = testrepo.repo
 
@@ -646,9 +638,9 @@ class MixedSubmodules(TestRepo_NEW):
 
     # TODO: Allow for TestRepo to be used in definitions!
     _cls_item_definitions = \
-                        [(BasicMixed, {'path': '.'}),]
-                         #(BasicMixed, {'path': 'subm 1'}),  # Nope: Clone!
-                         #(BasicMixed, {'path': '2'}),]  # Nope: Clone!
+                        [(BasicMixed, {'path': '.'}),
+                         (BasicMixed, {'path': 'subm 1'}),  # Nope: Clone!
+                         (BasicMixed, {'path': '2'}),]  # Nope: Clone!
                          #(ItemAddSubmodule, {}),
 
                          #(ItemAddSubmodule, {}),
