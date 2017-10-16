@@ -635,17 +635,16 @@ class MixedSubmodules(TestRepo_NEW):
     # there is no value in deriving from it.
     # TODO: Wrong, we get ItemSelf this way for example!
 
-
-    # TODO: Allow for TestRepo to be used in definitions!
-    _cls_item_definitions = \
-                        [(BasicMixed, {'path': '.'}),
-                         (BasicMixed, {'path': 'subm 1'}),  # Nope: Clone!
-                         (BasicMixed, {'path': '2'}),]  # Nope: Clone!
-                         #(ItemAddSubmodule, {}),
-
-                         #(ItemAddSubmodule, {}),
-                         #(ItemCommit, {})]
-
+    _cls_item_definitions = [
+        (BasicMixed, {'path': '.'}),
+        (BasicMixed, {'path': 'subm 1'}),  # TODO: Clone!
+        (BasicMixed, {'path': '2'}),  # TODO: Clone!
+        (ItemAddSubmodule, {'cwd': '.',
+                            'repo': '.',
+                            'item': ['subm 1', '2'],
+                            'commit': True,
+                            'commit_msg': "Adding submodules 'subm 1' and '2'"})
+    ]
 
 
 # Datasets (.datalad/config, .datalad/metadata ...) ?

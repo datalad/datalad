@@ -12,7 +12,7 @@ import logging
 import os
 import shlex
 from abc import ABCMeta, abstractmethod
-from os.path import exists, lexists
+from os.path import exists, lexists, join as opj
 
 from nose.tools import assert_is_instance, eq_, assert_in, assert_raises
 from six import add_metaclass, string_types
@@ -249,7 +249,6 @@ class ItemRepo(Item):
         self._remotes = set()  # ... of tuple (name, url)  # For now
         self._super = None  # ItemRepo
 
-    # TODO: May be let properties return anything only after creation?
     @property
     def is_annex(self):
         """Whether or not the repository is an annex
@@ -335,8 +334,7 @@ class ItemRepo(Item):
     def superproject(self):
         return self._super
 
-    @property
-    def files(self, return_paths=False):
+    def get_files(self, return_paths=False):
         """Get the files known to this repo
 
         Parameters
@@ -354,6 +352,10 @@ class ItemRepo(Item):
             return [os.path.relpath(it.path, self.path) for it in items]
         else:
             return items
+
+    @property
+    def files(self):
+        return self.get_files(return_paths=False)
 
     def create(self):
         """Creates the physical repository
@@ -542,6 +544,8 @@ class ItemRepo(Item):
 
         # TODO: Verify annex_version and annex_direct from .git/config
 
+        # TODO: files! listdir ... But: ignore .git/, .gitmodules, ...
+
         # branches
         out, err = _excute_by_item(['git', 'branch', '-a'], item=self,
                                    exc=TestRepoAssertionError(
@@ -571,8 +575,9 @@ class ItemRepo(Item):
             st = line[0]
             sha = line[1:41]
             start_ref = line[42:].find('(')
-            path = line[42:start_ref]
-            ref = line[start_ref:].strip('(', ')') if start_ref > -1 else None
+            path = line[42:42+start_ref-1]
+            ref = line[42+start_ref:].lstrip('(').rstrip(')') \
+                if start_ref > -1 else None
             submodules_from_disc.append((st, sha, path, ref))
         # TODO: We don't store everything in ItemRepo yet, so for now just look
         # at the paths:
@@ -1272,7 +1277,7 @@ class ItemCommit(ItemCommand):
 
         # build command call:
         commit_cmd = ['git', '--work-tree=.', 'commit',
-                      '-m', '"%s"' % msg]
+                      '-m', '%s' % msg]
         # Note, that items will be appended by super class
 
         super(ItemCommit, self).__init__(runner=runner, item=item, cwd=cwd,
@@ -1441,7 +1446,7 @@ class ItemAddSubmodule(ItemCommand):
         super(ItemAddSubmodule, self).__init__(cmd, runner=runner, item=item,
                                                cwd=cwd, repo=repo)
         # Cut self._cmd back (see the note above)
-        self._cmd = cmd
+        self._cmd = self._cmd[:4]
 
         self._commit = commit
         self._commit_msg = commit_msg
@@ -1452,8 +1457,16 @@ class ItemAddSubmodule(ItemCommand):
 
         for it in self._ref_items:
 
+            # we need to use the relative path for the path to add as submodule
+            # and its "url" as well.
+            import posixpath
+            from datalad.utils import posix_relpath
+
+            r_path = os.path.relpath(it.path, self._repo.path)
+            url = posixpath.join(os.curdir, posix_relpath(it.path, self._cwd))
+
             # build actual command call and execute
-            cmd = self._cmd + [it.path, it.path]
+            cmd = self._cmd + [url, r_path]
             _excute_by_item(cmd=cmd, item=self, runner=self._runner,
                             cwd=self._cwd,
                             exc=TestRepoCreationError(
@@ -1490,9 +1503,11 @@ class ItemAddSubmodule(ItemCommand):
             else:
                 msg = self._commit_msg
 
+            # TODO: explict list of subs + .gitmodules
+
             cmd = ['git', '--work-tree=.', 'commit', '-m', msg]
             _excute_by_item(cmd=cmd, item=self, runner=self._runner,
-                            cwd=self.cwd,
+                            cwd=self._cwd,
                             exc=TestRepoCreationError(
                                 msg="Failed to commit submodules:" +
                                     list_of_subs,
