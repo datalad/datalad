@@ -116,6 +116,8 @@ class ItemRepo(Item):
     parameters and should modify their properties accordingly.
     """
 
+    # TODO: add an optional 'name' to use by ItemAddSubmodule
+
     def __init__(self, path, src=None, runner=None,
                  annex=True, annex_version=None, annex_direct=None,
                  annex_init=None):
@@ -504,6 +506,9 @@ class ItemRepo(Item):
             # changed submodules (not commits WITHIN them)
 
         # physical appearance:
+
+        # TODO: Is it reasonable to record mtime of self.path, self.path/.git, etc.?
+        # Consider Yarik's comment on that in PR #1899!
 
         from os.path import isdir, join as opj
         # it's a valid repository:
@@ -1220,6 +1225,7 @@ class ItemCommand(Item):
         log("Executing %s in %s", self.__class__, self.path)
 
         _excute_by_item(cmd=self._cmd, item=self, cwd=self._cwd,
+                        runner=self._runner,
                         exc=TestRepoCreationError("Command failed")
                         )
 
@@ -1315,6 +1321,7 @@ class ItemCommit(ItemCommand):
             )
         self._repo._branches.add(branches[0])
 
+
 @auto_repr
 class ItemDropFile(ItemCommand):
     """Item to include an explicit call to git-annex-drop in TestRepo's
@@ -1336,8 +1343,8 @@ class ItemDropFile(ItemCommand):
         if not (isinstance(repo, ItemRepo) and repo.is_annex):
             raise InvalidTestRepoDefinitionError(
                 msg="{it}: Parameter 'repo' is not an ItemRepo or not an annex:"
-                    " {repo}({p}).".format(it=self.__class__,
-                                           repo=str(repo)),
+                    " {repo}".format(it=self.__class__,
+                                      repo=str(repo)),
                 item=self.__class__
             )
 
@@ -1359,6 +1366,141 @@ class ItemDropFile(ItemCommand):
         # notify files:
         for it in self._ref_items:
             it._content_present = False
+
+
+@auto_repr
+class ItemAddSubmodule(ItemCommand):
+
+    def __init__(self, runner, item=None, cwd=None, repo=None,
+                 commit=False, commit_msg=None):
+        """Add ItemRepo(s) as submodule(s) to another one in-place.
+
+        Note, that the ItemRepo to add has to exist as such already - you can't
+        directly clone from an arbitrary URL with this command. If you need to
+        clone from a remote location, do so when creating the ItemRepo.
+
+        Parameters
+        ----------
+        runner: Runner
+        item: ItemRepo or list of ItemRepo or None
+            repo(s) to add as submodules
+        cwd: str or None
+        repo: ItemRepo
+            repo to add the submodules to
+        commit: bool
+            whether or not to commit the addition afterwards
+        commit_msg: str
+            message to use for committing if `commit` was True
+        """
+
+        log("Processing definition of %s", self.__class__)
+
+        if not repo:
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is required. By default this could "
+                    "also be derived from 'cwd' by the TestRepo (sub-)class, "
+                    "but apparently this didn't happen."
+                    "".format(it=self.__class__),
+                item=self.__class__
+            )
+
+        if not isinstance(repo, ItemRepo):
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is not an ItemRepo:"
+                    " {repo}".format(it=self.__class__,
+                                     repo=str(repo)),
+                item=self.__class__
+            )
+
+        if not item:
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'item' required to specify the repository "
+                    "to be added as a submodule. It's expected to be an "
+                    "ItemRepo or a list thereof."
+                    "".format(it=self.__class__),
+                item=self.__class__
+            )
+
+        item = assure_list(item)
+
+        for it in item:
+            if not isinstance(it, ItemRepo):
+                raise InvalidTestRepoDefinitionError(
+                    msg="Item in parameter 'item' is not an ItemRepo: {it}"
+                        "".format(it=str(it)),
+                    item=self.__class__
+                )
+
+        # Note: We need several calls - can't append items to the command call
+        # via '--'. That means, when we pass `item` to super's constructor, the
+        # command call build therein is wrong. Since we need to override
+        # `create()` anyway and change the actual call for each item, the
+        # wrongly built `self._cmd` doesn't actually matter. Just be aware of
+        # it, when changing this implementation.
+        cmd = ['git', '--work-tree=.', 'submodule', 'add']
+        super(ItemAddSubmodule, self).__init__(cmd, runner=runner, item=item,
+                                               cwd=cwd, repo=repo)
+        # Cut self._cmd back (see the note above)
+        self._cmd = cmd
+
+        self._commit = commit
+        self._commit_msg = commit_msg
+
+    def create(self):
+
+        log("Executing %s in %s", self.__class__, self.path)
+
+        for it in self._ref_items:
+
+            # build actual command call and execute
+            cmd = self._cmd + [it.path, it.path]
+            _excute_by_item(cmd=cmd, item=self, runner=self._runner,
+                            cwd=self._cwd,
+                            exc=TestRepoCreationError(
+                                msg="submodule-add failed for {it}({p})"
+                                    "".format(it=it, p=it.path),
+                                item=self)
+                            )
+
+            # notify items:
+            it._super = self._repo
+            self._repo._items.add(it)
+
+        if self._commit:
+            # used in commit- and error-message
+            list_of_subs = "{space}{subs}" \
+                           "".format(
+                            space=single_or_plural(" ", os.linesep,
+                                                   len(self._ref_items)),
+                            subs=os.linesep.join(
+                                         ["%s(%s)" % (it, it.path)
+                                          for it in self._ref_items]
+                                 )
+                            )
+
+            if not self._commit_msg:
+                # build default message:
+                msg = "{cmd}: Added {sub_s}:".format(cmd=self,
+                                                     sub_s=single_or_plural(
+                                                         "submodule",
+                                                         "submodules",
+                                                         len(self._ref_items))
+                                                     )
+                msg += list_of_subs
+            else:
+                msg = self._commit_msg
+
+            cmd = ['git', '--work-tree=.', 'commit', '-m', msg]
+            _excute_by_item(cmd=cmd, item=self, runner=self._runner,
+                            cwd=self.cwd,
+                            exc=TestRepoCreationError(
+                                msg="Failed to commit submodules:" +
+                                    list_of_subs,
+                                item=self)
+                            )
+            self._repo._commits.add(_get_last_commit_from_disc(
+                item=self,
+                exc=TestRepoCreationError("Failed to look up commit SHA")))
 
 
 @auto_repr
@@ -1385,12 +1527,4 @@ class ItemAddFile(ItemCommand):  #file(s)
     # + optional commit
     def __init__(self, cwd, runner):
         super(ItemAddFile, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
-
-
-@auto_repr
-class ItemAddSubmodule(ItemCommand):
-
-    # + optional commit
-    def __init__(self, cwd, runner):
-        super(ItemAddSubmodule, self).__init__(cwd=cwd, cmd=cmd, runner=runner)
 
