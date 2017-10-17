@@ -252,7 +252,8 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                         "violating this constraint:{ls}{cl}({args})"
                         "".format(ls=os.linesep,
                                   cl=item[0],
-                                  args=item[1]
+                                  args=item[1],
+                                  idx=index
                                   ),
                     repo=self.__class__,
                     item=item[0].__name__,
@@ -524,10 +525,31 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
                 e.repo = self.__class__
                 e.index = index
                 raise e
-            for it in new_items:
-                # TODO: insert in _items dict, but check for conflicts and make sure to use correct path as a key
-                pass
-
+            if new_items:
+                for it in new_items:
+                    r_path = os.path.relpath(it.path, self.path)
+                    if r_path in self._items:
+                        if it is not self._items[r_path]:
+                            # we already got sth at this location and it's not
+                            # the same thing
+                            raise TestRepoCreationError(
+                                msg="While creating {it}({p}) received new item "
+                                    "{new}({p_new}), but already got something at "
+                                    "this location and it's not the same object "
+                                    "({old})".format(it=item,
+                                                     p=item.path,
+                                                     new=it,
+                                                     p_new=it.path,
+                                                     old=self._items[r_path]),
+                                item=item.__class__,
+                                repo=self.__class__,
+                                index=index
+                            )
+                        else:
+                            # we know it already for some reason
+                            continue
+                    else:
+                        self._items[r_path] = it
 
 #
 # Definition of persistent files to be used by TestRepo's subclasses for
@@ -642,23 +664,24 @@ class BasicGit(TestRepo_NEW):
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = 'basic_git'
 
-    _cls_item_definitions = [(ItemSelf, {'path': '.',
-                                     'annex': False}),
-                         (ItemInfoFile, {'state': (ItemFile.ADDED,
-                                                   ItemFile.UNMODIFIED),
-                                         'repo': '.'}),
-                         (ItemFile, {'path': 'test.dat',
-                                     'content': "123",
-                                     'annexed': False,
-                                     'state': (ItemFile.ADDED,
-                                               ItemFile.UNMODIFIED),
-                                     'repo': '.'}),
+    _cls_item_definitions = [
+        (ItemSelf, {'path': '.',
+                    'annex': False}),
+        (ItemInfoFile, {'state': (ItemFile.ADDED,
+                                  ItemFile.UNMODIFIED),
+                        'repo': '.'}),
+        (ItemFile, {'path': 'test.dat',
+                    'content': "123",
+                    'annexed': False,
+                    'state': (ItemFile.ADDED,
+                              ItemFile.UNMODIFIED),
+                    'repo': '.'}),
 
-                         (ItemCommit, {'cwd': '.',
-                                       'item': ['test.dat', 'INFO.txt'],
-                                       'msg': "Adding a basic INFO file and "
-                                              "rudimentary load file."})
-                         ]
+        (ItemCommit, {'cwd': '.',
+                      'item': ['test.dat', 'INFO.txt'],
+                      'msg': "Adding a basic INFO file and "
+                             "rudimentary load file."})
+    ]
 
 
 @auto_repr
@@ -678,37 +701,37 @@ class BasicMixed(TestRepo_NEW):
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = 'basic_annex'
 
-    _cls_item_definitions = [(ItemSelf, {'path': '.',
-                                     'annex': True}),
-                         (ItemInfoFile, {'state': (ItemFile.ADDED,
-                                                   ItemFile.UNMODIFIED),
-                                         'repo': '.'}),
-                         (ItemFile, {'path': 'test.dat',
-                                     'content': "123",
-                                     'annexed': False,
-                                     'state': (ItemFile.ADDED,
-                                               ItemFile.UNMODIFIED),
-                                     'repo': '.'}),
-
-                         (ItemCommit, {'cwd': '.',
-                                       'item': ['test.dat', 'INFO.txt'],
-                                       'msg': "Adding a basic INFO file and "
-                                              "rudimentary load file for annex "
-                                              "testing\nsome\nadditional\nlines"}),
-                         (ItemFile, {'path': 'test-annex.dat',
-                                     'src': get_local_file_url(get_persistent_file('test-annex.dat')),
-                                     'state': (ItemFile.ADDED,
-                                               ItemFile.UNMODIFIED),
-                                     'annexed': True,
-                                     'key': "SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat",
-                                     'repo': '.'
-                                     }),
-                         (ItemCommit, {'cwd': '.',
-                                       'item': 'test-annex.dat',
-                                       'msg': "Adding a rudimentary git-annex load file"}),
-                         (ItemDropFile, {'cwd': '.',
-                                         'item': 'test-annex.dat'})
-                         ]
+    _cls_item_definitions = [
+        (ItemSelf, {'path': '.',
+                    'annex': True}),
+        (ItemInfoFile, {'state': (ItemFile.ADDED,
+                                  ItemFile.UNMODIFIED),
+                        'repo': '.'}),
+        (ItemFile, {'path': 'test.dat',
+                    'content': "123",
+                    'annexed': False,
+                    'state': (ItemFile.ADDED,
+                              ItemFile.UNMODIFIED),
+                    'repo': '.'}),
+        (ItemCommit, {'cwd': '.',
+                      'item': ['test.dat', 'INFO.txt'],
+                      'msg': "Adding a basic INFO file and "
+                             "rudimentary load file for annex "
+                             "testing\nsome\nadditional\nlines"}),
+        (ItemFile, {'path': 'test-annex.dat',
+                    'src': get_local_file_url(get_persistent_file('test-annex.dat')),
+                    'state': (ItemFile.ADDED,
+                              ItemFile.UNMODIFIED),
+                    'annexed': True,
+                    'key': "SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat",
+                    'repo': '.'
+                    }),
+        (ItemCommit, {'cwd': '.',
+                      'item': 'test-annex.dat',
+                      'msg': "Adding a rudimentary git-annex load file"}),
+        (ItemDropFile, {'cwd': '.',
+                        'item': 'test-annex.dat'})
+    ]
 
 
 class BasicAnnex(TestRepo_NEW):
@@ -759,11 +782,11 @@ class MixedSubmodulesOldOneLevel(TestRepo_NEW):
         [
             # Here we specify a clone of a persistent instance of BasicMixed:
             (ItemRepo, {'path': 'subm 1',
-                        'src': get_persistent_testrepo(BasicMixed).path,
+                        'src': get_persistent_testrepo(BasicMixed).repo,
                         'annex': True,
                         'annex_init': True}),
             (ItemRepo, {'path': '2',
-                        'src': get_persistent_testrepo(BasicMixed).path,
+                        'src': get_persistent_testrepo(BasicMixed).repo,
                         'annex': True,
                         'annex_init': True}),
             # Add both ItemRepos as submodules and commit:
@@ -802,12 +825,12 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
         (MixedSubmodulesOldOneLevel, {'path': '.'}),
 
         (ItemRepo, {'path': 'sub dataset1',
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).path,
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
                     'annex': True,
                     'annex_init': True}),
         # Now, one level deeper:
         (ItemRepo, {'path': opj('sub dataset1', 'sub sub dataset1'),
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).path,
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
                     'annex': True,
                     'annex_init': True}),
         (ItemAddSubmodule, {'cwd': 'sub dataset1',
@@ -821,7 +844,7 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
                             'item': 'sub dataset1',
                             'commit': True,
                             'commit_msg': "Added subdatasets."}),
-        (ItemCommand, {''})#cmd, runner=None, item=None, cwd=None, repo=None
+        #(ItemCommand, {''})#cmd, runner=None, item=None, cwd=None, repo=None
 
 
 

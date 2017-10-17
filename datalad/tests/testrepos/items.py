@@ -12,7 +12,9 @@ import logging
 import os
 import shlex
 from abc import ABCMeta, abstractmethod
-from os.path import exists, lexists, join as opj
+from os.path import exists, lexists, join as opj, isdir
+
+from copy import deepcopy
 
 from nose.tools import assert_is_instance, eq_, assert_in, assert_raises
 from six import add_metaclass, string_types
@@ -33,6 +35,7 @@ from .helpers import _excute_by_item
 from .helpers import _get_last_commit_from_disc
 from .helpers import _get_branch_from_commit
 from .helpers import _get_remotes_from_config
+from .helpers import _get_submodules_from_disc
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
 
@@ -83,6 +86,14 @@ class Item(object):
         return get_local_file_url(self._path)
     # TODO: use serve_path_via_http in an additional property?
 
+    # TODO: abstractmethod is insufficient. The way Items call it, is actually
+    # wrong currently, since derived classes wouldn't call super's one when
+    # executing super's constructor! Implement a way to make sure, this is done
+    # correctly.
+    @abstractmethod
+    def _check_definition(self, *args, **kwargs):
+        pass
+
     @abstractmethod
     def create(self):
         """Let the actual thing defined by this item come to life
@@ -120,8 +131,12 @@ class ItemRepo(Item):
 
     def __init__(self, path, src=None, runner=None,
                  annex=True, annex_version=None, annex_direct=None,
-                 annex_init=None):
-        """
+                 annex_init=None, subm_init=True, check_definition=True):
+        """Initializes a new ItemRepo
+
+        By default this comes with an extensive check on whether or not this
+        ItemRepo's definition is valid and resulting in a ItemRepo physically
+        creatable by its `create()` method.
 
         Parameters
         ----------
@@ -147,6 +162,11 @@ class ItemRepo(Item):
             is True. By default it is set to True, if `annex` is True. Set to
             False if you want to clone an annex and not annex-init that clone.
             It doesn't make sense in other cases.
+        subm_init: bool
+            whether or not to initialize submodules after cloning
+        check_definition: bool
+            whether or not to check for valid definition of the item. Disable
+            only if you know what you are doing.
         """
         # TODO: What to do if annex settings are contradicting whatever is
         # enforced by git-annex or our test config?
@@ -169,7 +189,117 @@ class ItemRepo(Item):
         from datalad import cfg
         version_from_config = cfg.obtain("datalad.repo.version")
         direct_from_config = cfg.obtain("datalad.repo.direct")
+
+        if check_definition:
+            self._check_definition(path=path, src=src, runner=runner,
+                                   annex=annex, annex_version=annex_version,
+                                   annex_direct=annex_direct,
+                                   annex_init=annex_init, subm_init=subm_init,
+                                   version_from_config=version_from_config,
+                                   direct_from_config=direct_from_config)
+
+        if annex and annex_init is None:
+            annex_init = True
+
+        super(ItemRepo, self).__init__(path=path, runner=runner)
+
+        # generally we have a valid definition now
+        # set unspecified parameters from datalad config
+        if annex_version is None:
+            annex_version = version_from_config
+        if annex_direct is None:
+            annex_direct = direct_from_config
+
+        self._src = src
+        self._init_subs = subm_init
+        self._annex = annex
+        self._annex_version = annex_version if annex else None
+        self._annex_direct = annex_direct if annex else False
+        self._annex_init = annex_init if annex else False
+        self._items = set()  # ... of Item
+        self._commits = set()  # ... of tuple (SHA, msg)  # For now
+        self._branches = set()
+        self._remotes = set()  # ... of tuple (name, url)  # For now
+        self._super = None  # ItemRepo
+        self._created_items = set()  # additional items instantiated during creation
+        self._is_initialized = False
+
+    def _update_from_src(self, src=None):
+        """update all information self retrieved the moment it was cloned from
+        self._src
+        """
+        if src is None:
+            src = self._src
+
+        # we cloned, so we have a remote 'origin':
+        self._remotes.add(('origin', src.url))
+
+        self._annex = src.is_annex
+
+        # TODO: For now get almost everything, but actually depends on cloned branch! (+annex-init)
+
+        # submodules:
+        for sub in [sm for sm in src.submodules if sm.superproject is src]:
+            # Note, that at this point this currently is a non-initialized
+            # submodule. There are no branches, etc. to assign yet.
+            new_sub = ItemRepo(
+                path=opj(self.path, os.path.relpath(sub.path, src.path)),
+                src=sub,
+                annex=sub.is_annex,
+                annex_version=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
+                annex_direct=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
+                annex_init=sub._annex_init,  # TODO: double check! ATM inherit from its source!
+                subm_init=self._init_subs,  # TODO: double check! ATM inherit from self!
+                check_definition=False
+            )
+            new_sub._super = self
+            self._items.add(new_sub)
+            self._created_items.add(new_sub)
+
+            # Note: submodule init has to set _is_initialized and remotes for that item!
+
+        # files:
+        for f_ in src.files:
+            new_file = ItemFile(
+                path=opj(self.path, os.path.relpath(f_.path, src.path)),
+                repo=self,
+                content=f_._content,
+                src=f_._src,
+                state=(f_._state_index, f_._state_worktree),
+                annexed=f_.annexed,
+                key=f_.annex_key,
+                check_definition=False)
+            # we are in a fresh clone. Annexed files have no content present:
+            new_file._content_present = False if f_.annexed else None
+            # TODO: double check 'lock'; also for ItemFile.__init__ and ItemFile.create()!
+            # locked state depends on v6:
+            # if original repo and new one are annex V6 and we initialize
+            # annex accordingly, the committed lock-state probably is inherited
+            # for now ignore and set to None
+            new_file._locked=None
+            # TODO: double check commits, once we have full representation of
+            # connections between branches and commits. We can have commits we
+            # actually retrieved by cloning only.
+            new_file._commits = deepcopy(f_.commits)
+
+            self._items.add(new_file)
+            self._created_items.add(new_file)
+
+        # commits:
+        self._commits = self._commits.union(src.commits)
+
+        # branches:
+        self._branches = self._branches.union(src.branches)
+
+    def _check_definition(self, path, src, runner, annex, annex_version,
+                          annex_direct, annex_init, subm_init,
+                          version_from_config, direct_from_config):
+
+        log("Processing definition of %s(%s)", self.__class__, path)
+
         # just to be sure, check v6 vs direct mode conflict
+        # TODO: Actually, this is per test build - no need to test for every
+        # repo; Move somewhere else
         if version_from_config >= 6 and direct_from_config:
             raise InvalidTestRepoDefinitionError(
                 msg="Invalid datalad configuration. There is no direct mode, "
@@ -177,7 +307,12 @@ class ItemRepo(Item):
                 item=self.__class__
             )
 
-        log("Processing definition of %s(%s)", self.__class__, path)
+        if src is not None and not isinstance(src, ItemRepo):
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'src' is expected to be an ItemRepo but was: "
+                    "{src}".format(src=src),
+                item=self.__class__
+            )
 
         if annex_version is not None and annex_version != version_from_config:
             raise InvalidTestRepoDefinitionError(
@@ -225,29 +360,6 @@ class ItemRepo(Item):
                 msg="Parameters 'annex_version' or 'annex_direct' were "
                     "specified, while 'annex_init' wasn't True."
             )
-
-        if annex and annex_init is None:
-            annex_init = True
-
-        super(ItemRepo, self).__init__(path=path, runner=runner)
-
-        # generally we have a valid definition now
-        # set unspecified parameters from datalad config
-        if annex_version is None:
-            annex_version = version_from_config
-        if annex_direct is None:
-            annex_direct = direct_from_config
-
-        self._src = src
-        self._annex = annex
-        self._annex_version = annex_version if annex else None
-        self._annex_direct = annex_direct if annex else False
-        self._annex_init = annex_init if annex else False
-        self._items = set()  # ... of Item
-        self._commits = set()  # ... of tuple (SHA, msg)  # For now
-        self._branches = set()
-        self._remotes = set()  # ... of tuple (name, url)  # For now
-        self._super = None  # ItemRepo
 
     @property
     def is_annex(self):
@@ -322,7 +434,7 @@ class ItemRepo(Item):
         return self._remotes
 
     @property
-    def submodules(self, return_paths=False):
+    def submodules(self, return_paths=False):  # doesn't work; see files
         items = [it for it in self._items
                  if isinstance(it, ItemRepo) and it.superproject is self]
         if return_paths:
@@ -381,20 +493,23 @@ class ItemRepo(Item):
 
         # create the git repository:
         create_cmd = ['git']
-        create_cmd.extend(['clone', self._src, os.curdir]
+        create_cmd.extend(['clone', self._src.url, os.curdir]
                           if self._src else ['init'])
 
         _excute_by_item(cmd=create_cmd, item=self,
                         exc=TestRepoCreationError(
                             "Failed to create git repository")
                         )
+        self._is_initialized = True
 
         if self._src:
             # we just cloned
-            self.remotes.add(('origin', self._src))
-            # we got a branch, commits and files in that clone
-            # and need to retrieve those infos from FS
-            # But: Might be influenced by annex-init, so do it afterwards
+            self._update_from_src()
+            if self.submodules and self._init_subs:
+                # TODO: submodule update --init --recursive?
+                # Those ItemRepos need to be (recursively?) updated in return;
+                # see _update_from_src()
+                pass
 
         # we want to make it an annex
         if self._annex and self._annex_init:
@@ -458,7 +573,16 @@ class ItemRepo(Item):
             )
             [self._branches.add(b) for b in branches]
             [self._commits.add(c) for c in commits]
-            # TODO: files!
+            submodules = _get_submodules_from_disc(
+                item=self, exc=TestRepoCreationError(
+                    msg="Failed to lookup submodules on fresh clone"
+                )
+            )
+            # TODO: How to store those discovered submodules? We can't easily
+            # get an ItemRepo from them
+            # TODO: files! submodules!
+
+        return self._created_items
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -490,7 +614,7 @@ class ItemRepo(Item):
                 any(b == 'git-annex' or 'annex/direct' in b
                     for b in self.branches)
 
-        if self._src:
+        if self._src and self._is_initialized:
             # Note: self._src indicates that we cloned the repo from somewhere.
             # Therefore we have 'origin'. Theoretically there could be an
             # ItemCommand that removed that remote, but left self._src.
@@ -537,13 +661,74 @@ class ItemRepo(Item):
         # TODO: Is it reasonable to record mtime of self.path, self.path/.git, etc.?
         # Consider Yarik's comment on that in PR #1899!
 
-        from os.path import isdir, join as opj
-        # it's a valid repository:
         assert(exists(self.path))
         assert(isdir(self.path))
-        assert(exists(opj(self.path, '.git')))
 
-        if self.is_annex and self.annex_is_initialized:
+        if self._is_initialized:
+            # it's a valid repository:
+            assert(exists(opj(self.path, '.git')))
+
+            # TODO: files! listdir ... But: ignore .git/, .gitmodules, ...
+
+            # branches
+            out, err = _excute_by_item(['git', 'branch', '-a'], item=self,
+                                       exc=TestRepoAssertionError(
+                                           "Failed to look up branches")
+                                       )
+
+            branches_from_disc = [line[2:].split()[0] for line in out.splitlines()]
+            eq_(set(branches_from_disc), self.branches)
+            # TODO: are branches pointing to and containing the right commits?
+
+            # state: tested on a per file basis?
+            #        may be some overall test? (ignore submodules)
+
+            # commits (partly done. If they involve a file this should have been tested by ItemFile.assert_intact)
+            #         Q: What else? submodules => same as above
+            #         Can there possibly be more?
+            # TODO: Test commit tree? Requires to represent that structure somehow
+
+            # submodules
+            submodules_from_disc = _get_submodules_from_disc(
+                item=self,
+                exc=TestRepoAssertionError("Failed to look up submodules")
+            )
+            # TODO: We don't store everything in ItemRepo yet, so for now just look
+            # at the paths:
+            eq_(set([os.path.relpath(sm.path, self.path) for sm in self.submodules]),
+                set([sm[2] for sm in submodules_from_disc]))
+
+            # superproject
+            # No need to test physically, since we have tested that superproject
+            # points to self for all submodules and we just tested the other
+            # direction (submodules)
+
+            # remotes
+            # TODO: Generally represent remotes in ItemRepo in full and have some in actual TestRepos
+            try:
+                remotes_from_disc = _get_remotes_from_config(self)
+            except Exception as e:
+                raise TestRepoAssertionError(
+                    msg="Failed to read remotes for {r}({p}): {exc}"
+                        "".format(r=self.__class,
+                                  p=self.path,
+                                  exc=exc_str(e)),
+                    item=self.__class__
+                )
+
+            # just names for now (see TODO)
+            eq_(set([r[0] for r in remotes_from_disc]),
+                set([r[0] for r in self.remotes]))
+
+            # TODO: files: locked/unlock must be bool if repo is not in direct mode
+            # and file is annexed. ItemFile doesn't know about direct mode.
+
+        else:
+            # not initialized
+            assert(not exists(opj(self.path, '.git')))
+
+
+        if self.is_annex and self._is_initialized and self.annex_is_initialized:
             # either .git is a dir and has an annex subdir or it's a file
             # pointing to a dir with an annex subdir
 
@@ -567,72 +752,9 @@ class ItemRepo(Item):
             assert(exists(opj(self.path, '.git', 'annex')) or
                    git_file_has_annex(self.path))
 
-        # TODO: Verify annex_version and annex_direct from .git/config
+            # TODO: Verify annex_version and annex_direct from .git/config
 
-        # TODO: files! listdir ... But: ignore .git/, .gitmodules, ...
 
-        # branches
-        out, err = _excute_by_item(['git', 'branch', '-a'], item=self,
-                                   exc=TestRepoAssertionError(
-                                       "Failed to look up branches")
-                                   )
-
-        branches_from_disc = [line[2:].split()[0] for line in out.splitlines()]
-        eq_(set(branches_from_disc), self.branches)
-        # TODO: are branches pointing to and containing the right commits?
-
-        # state: tested on a per file basis?
-        #        may be some overall test? (ignore submodules)
-
-        # commits (partly done. If they involve a file this should have been tested by ItemFile.assert_intact)
-        #         Q: What else? submodules => same as above
-        #         Can there possibly be more?
-        # TODO: Test commit tree? Requires to represent that structure somehow
-
-        # submodules
-        out, err = _excute_by_item(['git', '--work-tree=.', 'submodule'],
-                                   item=self,
-                                   exc=TestRepoAssertionError(
-                                       "Failed to look up submodules")
-                                   )
-        submodules_from_disc = []
-        for line in out.splitlines():
-            st = line[0]
-            sha = line[1:41]
-            start_ref = line[42:].find('(')
-            path = line[42:42+start_ref-1]
-            ref = line[42+start_ref:].lstrip('(').rstrip(')') \
-                if start_ref > -1 else None
-            submodules_from_disc.append((st, sha, path, ref))
-        # TODO: We don't store everything in ItemRepo yet, so for now just look
-        # at the paths:
-        eq_(set([os.path.relpath(sm.path, self.path) for sm in self.submodules]),
-            set([sm[2] for sm in submodules_from_disc]))
-
-        # superproject
-        # No need to test physically, since we have tested that superproject
-        # points to self for all submodules and we just tested the other
-        # direction (submodules)
-
-        # remotes
-        # TODO: Generally represent remotes in ItemRepo in full and have some in actual TestRepos
-        try:
-            remotes_from_disc = _get_remotes_from_config(self)
-        except Exception as e:
-            raise TestRepoAssertionError(
-                msg="Failed to read remotes for {r}({p}): {exc}"
-                    "".format(r=self.__class,
-                              p=self.path,
-                              exc=exc_str(e)),
-                item=self.__class__
-            )
-
-        # just names for now (see TODO)
-        eq_(set([r[0] for r in remotes_from_disc]),
-            set([r[0] for r in self.remotes]))
-
-        # TODO: files: locked/unlock must be bool if repo is not in direct mode
-        # and file is annexed. ItemFile doesn't know about direct mode.
 
 
 @auto_repr
@@ -669,7 +791,8 @@ class ItemFile(Item):
 
     def __init__(self, path, repo, runner=None,
                  content=None, state=None, commit_msg=None,
-                 annexed=False, key=None, src=None, locked=None):
+                 annexed=False, key=None, src=None, locked=None,
+                 check_definition=True):
         """
 
         Parameters
@@ -717,7 +840,34 @@ class ItemFile(Item):
             This is required, since otherwise we would need to discover it from
             disc, which means that we would make what actually happened the
             definition of what was supposed to happen.
+        check_definition: bool
+            whether or not to check for valid definition of the item. Disable
+            only if you know what you are doing.
         """
+
+        if check_definition:
+            self._check_definition(path=path, repo=repo, runner=runner,
+                                   content=content, state=state,
+                                   commit_msg=commit_msg, annexed=annexed,
+                                   key=key, src=src, locked=locked)
+
+        super(ItemFile, self).__init__(path=path, runner=runner)
+        self._repo = repo
+        self._content = content
+        self._state_index = state[0]
+        self._state_worktree = state[1]
+        self._commit_msg = commit_msg
+        self._src = src
+        self._locked = locked  # TODO: consider direct mode. There's no lock ...
+        self._annexed = annexed
+        self._key = key
+        self._commits = set()
+        self._content_present = None  # to be set when actually adding the file
+                                      # to annex
+
+    def _check_definition(self, path, repo, runner,
+                          content, state, commit_msg,
+                          annexed, key, src, locked):
 
         log("Processing definition of %s(%s)", self.__class__, path)
 
@@ -803,20 +953,6 @@ class ItemFile(Item):
                               state=state),
                 item=self.__class__
             )
-
-        super(ItemFile, self).__init__(path=path, runner=runner)
-        self._repo = repo
-        self._content = content
-        self._state_index = state[0]
-        self._state_worktree = state[1]
-        self._commit_msg = commit_msg
-        self._src = src
-        self._locked = locked  # TODO: consider direct mode. There's no lock ...
-        self._annexed = annexed
-        self._key = key
-        self._commits = set()
-        self._content_present = None  # to be set when actually adding the file
-                                      # to annex
 
     @property
     def annexed(self):
@@ -1202,7 +1338,8 @@ class ItemCommand(Item):
     and therefore can't set their properties accordingly.
     """
 
-    def __init__(self, cmd, runner=None, item=None, cwd=None, repo=None):
+    def __init__(self, cmd, runner=None, item=None, cwd=None, repo=None,
+                 check_definition=True):
         """
 
         Parameters
@@ -1213,7 +1350,10 @@ class ItemCommand(Item):
         cwd: str or None
         repo: ItemRepo or None
         """
-        log("Processing definition of %s", self.__class__)
+
+        if check_definition:
+            ItemCommand._check_definition(self, cmd=cmd, runner=runner,
+                                          item=item, cwd=cwd, repo=repo)
 
         # if `cwd` wasn't specified, use root of `repo`
         if not cwd:
@@ -1223,17 +1363,8 @@ class ItemCommand(Item):
 
         if isinstance(cmd, string_types):
             self._cmd = shlex.split(cmd, posix=not on_windows)
-        elif isinstance(cmd, list):
-            self._cmd = cmd
         else:
-            raise InvalidTestRepoDefinitionError(
-                msg="Parameter 'cmd' is expected to be a list or a string."
-                    "Found {type}: {cmd}"
-                    "".format(type=type(cmd),
-                              cmd=cmd
-                              ),
-                item=ItemCommand
-            )
+            self._cmd = cmd
 
         self._ref_items = assure_list(item)
         self._cwd = cwd
@@ -1243,6 +1374,19 @@ class ItemCommand(Item):
         if self._ref_items:
             self._cmd.append('--')
             self._cmd.extend([it.path for it in self._ref_items])
+
+    def _check_definition(self, cmd, runner, item, cwd, repo):
+
+        log("Processing definition of %s", self.__class__)
+        if not isinstance(cmd, string_types + (list,)):
+            raise InvalidTestRepoDefinitionError(
+                msg="Parameter 'cmd' is expected to be a list or a string."
+                    "Found {type}: {cmd}"
+                    "".format(type=type(cmd),
+                              cmd=cmd
+                              ),
+                item=ItemCommand
+            )
 
     def create(self):
         """Default implementation to run `self._cmd`
@@ -1268,20 +1412,15 @@ class ItemCommit(ItemCommand):
     or the ItemRepo they belong to.
     """
 
-    def __init__(self, runner, item=None, cwd=None, msg=None, repo=None):
-
-        log("Processing definition of %s", self.__class__)
-
-        if not repo:
-            raise InvalidTestRepoDefinitionError(
-                msg="{it}: Parameter 'repo' is required. By default this could "
-                    "also be derived from 'cwd' by the TestRepo (sub-)class, "
-                    "but apparently this didn't happen."
-                    "".format(it=self.__class__),
-                item=self.__class__
-            )
+    def __init__(self, runner, item=None, cwd=None, msg=None, repo=None,
+                 check_definition=True):
 
         item = assure_list(item)
+
+        if check_definition:
+            self._check_definition(runner=runner, item=item, cwd=cwd, msg=msg,
+                                   repo=repo)
+
         # build default commit message:
         if not msg:
             if item:
@@ -1306,6 +1445,18 @@ class ItemCommit(ItemCommand):
 
         super(ItemCommit, self).__init__(runner=runner, item=item, cwd=cwd,
                                          cmd=commit_cmd, repo=repo)
+
+    def _check_definition(self, runner, item, cwd, msg, repo):
+        log("Processing definition of %s", self.__class__)
+
+        if not repo:
+            raise InvalidTestRepoDefinitionError(
+                msg="{it}: Parameter 'repo' is required. By default this could "
+                    "also be derived from 'cwd' by the TestRepo (sub-)class, "
+                    "but apparently this didn't happen."
+                    "".format(it=self.__class__),
+                item=self.__class__
+            )
 
     def create(self):
 
@@ -1357,7 +1508,21 @@ class ItemDropFile(ItemCommand):
     definition
     """
 
-    def __init__(self, runner, item=None, cwd=None, repo=None):
+    def __init__(self, runner, item=None, cwd=None, repo=None,
+                 check_definition=True):
+
+        item = assure_list(item)
+
+        if check_definition:
+            self._check_definition(runner=runner, item=item, cwd=cwd, repo=repo)
+
+        # build command call:
+        drop_cmd = ['git', 'annex', 'drop']
+
+        super(ItemDropFile, self).__init__(cmd=drop_cmd, runner=runner,
+                                           item=item, cwd=cwd, repo=repo)
+
+    def _check_definition(self, runner, item, cwd, repo):
 
         log("Processing definition of %s", self.__class__)
 
@@ -1377,14 +1542,6 @@ class ItemDropFile(ItemCommand):
                 item=self.__class__
             )
 
-        item = assure_list(item)
-
-        # build command call:
-        drop_cmd = ['git', 'annex', 'drop']
-
-        super(ItemDropFile, self).__init__(cmd=drop_cmd, runner=runner,
-                                           item=item, cwd=cwd, repo=repo)
-
     def create(self):
 
         log("Executing %s in %s", self.__class__, self.path)
@@ -1401,7 +1558,8 @@ class ItemDropFile(ItemCommand):
 class ItemAddSubmodule(ItemCommand):
 
     def __init__(self, runner, item=None, cwd=None, repo=None,
-                 commit=False, commit_msg=None):
+                 commit=False, commit_msg=None,
+                 check_definition=True):
         """Add ItemRepo(s) as submodule(s) to another one in-place.
 
         Note, that the ItemRepo to add has to exist as such already - you can't
@@ -1421,6 +1579,29 @@ class ItemAddSubmodule(ItemCommand):
         commit_msg: str
             message to use for committing if `commit` was True
         """
+
+        item = assure_list(item)
+
+        if check_definition:
+            self._check_definition(runner=runner, item=item, cwd=cwd, repo=repo,
+                                   commit=commit, commit_msg=commit_msg)
+
+        # Note: We need several calls - can't append items to the command call
+        # via '--'. That means, when we pass `item` to super's constructor, the
+        # command call build therein is wrong. Since we need to override
+        # `create()` anyway and change the actual call for each item, the
+        # wrongly built `self._cmd` doesn't actually matter. Just be aware of
+        # it, when changing this implementation.
+        cmd = ['git', '--work-tree=.', 'submodule', 'add']
+        super(ItemAddSubmodule, self).__init__(cmd, runner=runner, item=item,
+                                               cwd=cwd, repo=repo)
+        # Cut self._cmd back (see the note above)
+        self._cmd = self._cmd[:4]
+
+        self._commit = commit
+        self._commit_msg = commit_msg
+
+    def _check_definition(self, runner, item, cwd, repo, commit, commit_msg):
 
         log("Processing definition of %s", self.__class__)
 
@@ -1450,8 +1631,6 @@ class ItemAddSubmodule(ItemCommand):
                 item=self.__class__
             )
 
-        item = assure_list(item)
-
         for it in item:
             if not isinstance(it, ItemRepo):
                 raise InvalidTestRepoDefinitionError(
@@ -1459,21 +1638,6 @@ class ItemAddSubmodule(ItemCommand):
                         "".format(it=str(it)),
                     item=self.__class__
                 )
-
-        # Note: We need several calls - can't append items to the command call
-        # via '--'. That means, when we pass `item` to super's constructor, the
-        # command call build therein is wrong. Since we need to override
-        # `create()` anyway and change the actual call for each item, the
-        # wrongly built `self._cmd` doesn't actually matter. Just be aware of
-        # it, when changing this implementation.
-        cmd = ['git', '--work-tree=.', 'submodule', 'add']
-        super(ItemAddSubmodule, self).__init__(cmd, runner=runner, item=item,
-                                               cwd=cwd, repo=repo)
-        # Cut self._cmd back (see the note above)
-        self._cmd = self._cmd[:4]
-
-        self._commit = commit
-        self._commit_msg = commit_msg
 
     def create(self):
 
