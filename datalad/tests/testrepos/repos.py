@@ -32,7 +32,11 @@ from datalad.tests.utils import eq_, assert_is_instance, assert_in
 from datalad.utils import assure_list
 from datalad.utils import auto_repr
 from datalad.dochelpers import exc_str
-from .utils import get_remote_file
+import tempfile
+from .. import _TEMP_PATHS_GENERATED
+from ..utils import get_tempfile_kwargs
+import os
+
 
 
 lgr = logging.getLogger('datalad.tests.testrepos.repos')
@@ -509,6 +513,101 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 
 
 #
+# Definition of persistent files to be used by TestRepo's subclasses for
+# annex-addurl'ing stuff
+#
+
+# To be enhanced if needed. See BasicMixed testrepo for an example on how it
+# is used.
+# Each file is a tuple of a content str and a path. The paths are relative to
+# the _persistent_store
+remote_file_list = [('test-annex.dat', "content to be annex-addurl'd")]
+
+
+#
+# Tools for getting and lazily creating persistent files and TestRepos
+#
+
+# Note: Would be nice to have that in a different file, but ATM I don't see
+# another way to avoid circular import yet, since TestRepo's subclasses need to
+# access persistent locations to annex-addurl/clone from.
+
+
+def _make_persistent_store():
+    """create a temp directory, where to store files and repos persistently
+    across tests; this is needed for files, that should be annex-addurl'd by
+    definition of a TestRepo for example and for persistent TestRepos.
+    """
+    # TODO: We might want to be able to configure a non-temporary location for
+    # this store to be persistent even across test runs
+
+    # TODO: prefix='testrepo': Somehow failed when prefix was changed. Need to
+    # dig into it at some point.
+    path = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+    _TEMP_PATHS_GENERATED.append(path)
+    # subdirs for files and testrepos
+    os.makedirs(opj(path, 'files'))
+    os.makedirs(opj(path, 'testrepos'))
+    return path
+
+_persistent_store = _make_persistent_store()
+_persistent_repo_store = dict()
+
+
+def get_persistent_file(path):
+    """Get the actual (temp) path to a file, defined by `path` in
+    `remote_file_list`
+
+    Creates that file if it wasn't created yet.
+    """
+
+    entry = [f for f in remote_file_list if f[0] == path]
+    if len(entry) == 0:
+        raise InvalidTestRepoDefinitionError(
+            msg="Persistent file {p} referenced but not found in "
+                "remote_file_list".format(p=path))
+    if len(entry) != 1:
+        raise InvalidTestRepoDefinitionError(
+            msg="Ambiguous definition of persisten file {p}".format(p=path)
+        )
+    entry = entry[0]
+    real_path = opj(_persistent_store, 'files', path)
+    if not os.path.exists(real_path):
+        # check for possible subdirs to make:
+        dir_ = os.path.dirname(real_path)
+        if not os.path.exists(dir_):
+            os.makedirs(dir_)
+        with open(real_path, "w") as f:
+            f.write(entry[1])
+
+    return real_path
+
+
+def get_persistent_testrepo(cls):
+    """Get persistent instance of `cls`
+
+    Creates that TestRepo if required and checks its integrity via assert_intact
+    before delivering
+    """
+
+    if not issubclass(cls, TestRepo_NEW):
+        raise InvalidTestRepoDefinitionError(
+            msg="{cl} is not a subclass of TestRepo".format(cl=cls)
+        )
+
+    if cls.__name__ not in _persistent_repo_store:
+        # Note: instead of lower() we might want to base the path on CamelCase
+        # conversion like camel_case
+        _persistent_repo_store[cls.__name__] = \
+            cls(path=opj(_persistent_store, 'testrepos', cls.__name__.lower()))
+    else:
+        _persistent_repo_store[cls.__name__].assert_intact()
+    return _persistent_repo_store[cls.__name__]
+# apparently required to make nose not try to run it:
+get_persistent_testrepo.__test__ = False
+
+
+#
 #  Actual test repositories:
 #
 
@@ -578,9 +677,9 @@ class BasicMixed(TestRepo_NEW):
                                        'item': ['test.dat', 'INFO.txt'],
                                        'msg': "Adding a basic INFO file and "
                                               "rudimentary load file for annex "
-                                              "testing"}),
+                                              "testing\nsome\nadditional\nlines"}),
                          (ItemFile, {'path': 'test-annex.dat',
-                                     'src': get_local_file_url(get_remote_file('test-annex.dat')),
+                                     'src': get_local_file_url(get_persistent_file('test-annex.dat')),
                                      'state': (ItemFile.ADDED,
                                                ItemFile.UNMODIFIED),
                                      'annexed': True,
@@ -595,8 +694,6 @@ class BasicMixed(TestRepo_NEW):
                          ]
 
 
-
-
 class BasicAnnex(TestRepo_NEW):
     pass
 
@@ -604,8 +701,6 @@ class BasicAnnex(TestRepo_NEW):
 # 4 times: untracked, modified, staged, all of them
 class BasicGitDirty(BasicGit):
     pass
-
-
 
 
 # see above (staged: annex, git, both)
@@ -622,28 +717,36 @@ class BasicAnnexDirty(BasicAnnex):
 class MixedSubmodules(TestRepo_NEW):
     """Hierarchy of repositories with files in git and in annex
 
-    It consists of three instances of BasicMixed and does so to resemble the
-    old `SubmoduleDataset`. Whenever tests are rewritten to not explicitly rely
-    on this one, it might go in favor of a more general one.
+    It consists of three instances of BasicMixed (one at top-level and two as
+    direct submodules) and does so to resemble the old `SubmoduleDataset`.
 
     RF'ing note: This resembles the old `SubmoduleDataset`. The only difference
     is the content of INFO.txt, which is now more detailed. In particular it
-    includes the entire definition of this test repository.
+    includes the entire definition of this test repository. Whenever tests are
+    rewritten to not explicitly rely on this one, it might go in favor of a more
+    general one.
     """
 
-    # Note: Since we need to specify `BasicMixed` explicitly here,
-    # there is no value in deriving from it.
-    # TODO: Wrong, we get ItemSelf this way for example!
+    version = '0.1'
+
+    # old name to be used by a transition decorator to ease RF'ing
+    RF_str = 'submodule_annex'
 
     _cls_item_definitions = [
         (BasicMixed, {'path': '.'}),
-        (BasicMixed, {'path': 'subm 1'}),  # TODO: Clone!
-        (BasicMixed, {'path': '2'}),  # TODO: Clone!
+        (ItemRepo, {'path': 'subm 1',
+                    'src': get_persistent_testrepo(BasicMixed).path,
+                    'annex': True,
+                    'annex_init': True}),
+        (ItemRepo, {'path': '2',
+                    'src': get_persistent_testrepo(BasicMixed).path,
+                    'annex': True,
+                    'annex_init': True}),
         (ItemAddSubmodule, {'cwd': '.',
                             'repo': '.',
                             'item': ['subm 1', '2'],
                             'commit': True,
-                            'commit_msg': "Adding submodules 'subm 1' and '2'"})
+                            'commit_msg': "Adding submodules 'subm 1' and '2'"}),
     ]
 
 

@@ -16,52 +16,9 @@ import tempfile
 
 from .. import _TEMP_PATHS_GENERATED
 from ..utils import get_tempfile_kwargs
-
 from ...utils import better_wraps
 from ...utils import optional_args
-
-
-# To be enhanced if needed. See BasicMixed testrepo for an example on how it
-# is used.
-# Each file is a tuple of a content str and a path. The paths are relative to
-# the _file_store
-remote_file_list = [("content to be annex-addurl'd", 'test-annex.dat')]
-
-
-def _make_file_store():
-    """create a temp directory, where to store file persistently across tests;
-    this needed for files, that should be annex-addurl'd for example
-    """
-    path = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='testrepo'))
-    _TEMP_PATHS_GENERATED.append(path)
-    return path
-
-_file_store = _make_file_store()
-
-
-def _make_remote_files():
-    """reads `remote_file_list` and creates temp files with the defined content.
-    Those files are persistent across tests and are intended to be used with
-    annex-addurl during testrepo creation
-    """
-
-    for entry in remote_file_list:
-        path = opj(_file_store, entry[1])
-        # check for possible subdirs to make:
-        dir_ = os.path.dirname(path)
-        if not os.path.exists(dir_):
-            os.makedirs(dir_)
-        with open(path, "w") as f:
-            f.write(entry[0])
-
-_make_remote_files()
-
-
-def get_remote_file(path):
-    """Get the actual temp path to a file, defined by `path` in
-    `remote_file_list`
-    """
-    return opj(_file_store, path)
+from .repos import *
 
 
 # TODO: - use the power!

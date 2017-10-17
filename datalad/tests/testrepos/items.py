@@ -392,8 +392,9 @@ class ItemRepo(Item):
         if self._src:
             # we just cloned
             self.remotes.add(('origin', self._src))
-            # TODO: We cloned a branch to add to self._branches!
-            # What's its name?
+            # we got a branch, commits and files in that clone
+            # and need to retrieve those infos from FS
+            # But: Might be influenced by annex-init, so do it afterwards
 
         # we want to make it an annex
         if self._annex and self._annex_init:
@@ -427,15 +428,37 @@ class ItemRepo(Item):
                                 exc=TestRepoCreationError(
                                     "Failed to switch to direct mode")
                                 )
-                # We just created the repo. Go for 'master'.
-                # TODO: This might be different if cloned
-                self._branches.add('annex/direct/master')
-
+                if not self._src:
+                    # We just created the repo (not cloned). Go for 'master'.
+                    self._branches.add('annex/direct/master')
             else:
                 # TODO: we didn't want direct mode (False) or didn't care (None).
                 # check whether it was enforced by annex and adjust attribute or
                 # raise
                 pass
+
+        if self._src:
+            # TODO: This is ugly. We need a better way to get everything from a
+            # clone. In particular, this way we make what happened when cloning
+            # the defined SHOULD-BE state of that clone. This is okay-ish for
+            # the purpose of checking later on, whether or not an actual test
+            # changed anything (we have a defined BEFORE stat), but it prevents
+            # us from noticing, that cloning went wrong (or at least unexpected)
+            # in the first place.
+
+            # we cloned it and need to get info on branches, commits, files
+            from .helpers import _get_branches_from_disc, _get_commits_from_disc
+            branches = _get_branches_from_disc(
+                item=self, exc=TestRepoCreationError(
+                    msg="Failed to lookup branches on fresh clone")
+            )
+            commits = _get_commits_from_disc(
+                item=self, exc=TestRepoCreationError(
+                    msg="Failed to lookup commits on fresh clone")
+            )
+            [self._branches.add(b) for b in branches]
+            [self._commits.add(c) for c in commits]
+            # TODO: files!
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in

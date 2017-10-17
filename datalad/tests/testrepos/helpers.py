@@ -70,14 +70,35 @@ def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
     #       now, not everything can be set during creation.
     #       - If we ever get to test it, we may also need author etc.
     lookup_sha_cmd = ['git', 'log', '-n', '1',
-                      "--pretty=format:\"%H%n%B\""]
+                      "--pretty=format:%H%n%B"]
     out, err = _excute_by_item(cmd=lookup_sha_cmd, item=item, exc=exc,
                                runner=runner, cwd=cwd)
-    lines = out.strip('\"').splitlines()
+    lines = out.splitlines()
     commit_sha = lines[0]
-    commit_msg = linesep.join(lines[1:]).strip().strip('\"')
+    commit_msg = linesep.join(lines[1:])
 
     return commit_sha, commit_msg
+
+
+def _get_commits_from_disc(item, exc=None, runner=None, cwd=None):
+
+    lookup_commits_cmd = ['git', 'log', "--pretty=format:%H%n%B"]
+    out, err = _excute_by_item(cmd=lookup_commits_cmd, item=item, exc=exc,
+                               runner=runner, cwd=cwd)
+
+    lines = out.splitlines()
+    commits = []
+    line_idx = 0
+    while line_idx in range(len(lines)):
+        commit_sha = lines[line_idx]
+        try:
+            next_empty = lines[line_idx:].index('')
+        except ValueError:
+            next_empty = len(lines)
+        commit_msg = linesep.join(lines[line_idx+1:next_empty])
+        commits.append((commit_sha, commit_msg))
+        line_idx = next_empty + 1
+    return commits
 
 
 def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
@@ -97,6 +118,14 @@ def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
     out, err = _excute_by_item(lookup_branch_cmd, item=item, exc=exc,
                                runner=runner, cwd=cwd)
     return [line[2:] for line in out.splitlines()]
+
+
+def _get_branches_from_disc(item, exc=None, runner=None, cwd=None):
+
+    branch_cmd = ['git', 'branch', '-a']
+    out, err = _excute_by_item(branch_cmd, item=item, exc=exc,
+                               runner=runner, cwd=cwd)
+    return [line[2:].split()[0] for line in out.splitlines()]
 
 
 def _get_remotes_from_config(repo):
