@@ -32,7 +32,7 @@ from datalad.utils import auto_repr, assure_list, on_windows
 from .helpers import _excute_by_item
 from .helpers import _get_last_commit_from_disc
 from .helpers import _get_branch_from_commit
-
+from .helpers import _get_remotes_from_config
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
 
@@ -418,6 +418,8 @@ class ItemRepo(Item):
                 # and manage to handle all http urls and requests:
                 init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
                                     'datalad', autoenable=True)
+                # TODO: self._remotes.add(('datalad', {'annex-externaltype': 'datalad'}))
+                self._remotes.add(('datalad', ''))
 
             if self._annex_direct:
                 annex_cmd = ['git', 'annex', 'direct']
@@ -590,22 +592,21 @@ class ItemRepo(Item):
         # direction (submodules)
 
         # remotes
-        out, err = _excute_by_item(['git', 'remote', '-v'], item=self,
-                                   exc=TestRepoAssertionError(
-                                       "Failed to look up remotes")
-                                   )
-        # Note: name, url, fetch|push
-        remote_entries = [(line.split()[0],
-                           line.split()[1],
-                           line.split()[2].strip('(', ')')
-                           )
-                          for line in out.splitlines()]
-        # TODO: that's two entries per remote (fetch and push url)
-        # Again, we don't store everything yet, so go for name and fetch url
-        # for now:
-        eq_(set([(rem[0], rem[1]) for rem in remote_entries
-                 if remote_entries[2] == 'fetch']),
-            set(self.remotes))
+        # TODO: Generally represent remotes in ItemRepo in full and have some in actual TestRepos
+        try:
+            remotes_from_disc = _get_remotes_from_config(self)
+        except Exception as e:
+            raise TestRepoAssertionError(
+                msg="Failed to read remotes for {r}({p}): {exc}"
+                    "".format(r=self.__class,
+                              p=self.path,
+                              exc=exc_str(e)),
+                item=self.__class__
+            )
+
+        # just names for now (see TODO)
+        eq_(set([r[0] for r in remotes_from_disc]),
+            set([r[0] for r in self.remotes]))
 
         # TODO: files: locked/unlock must be bool if repo is not in direct mode
         # and file is annexed. ItemFile doesn't know about direct mode.

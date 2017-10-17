@@ -10,6 +10,7 @@
 """
 
 from os import linesep
+from os.path import join as opj
 from ...support.exceptions import CommandError
 from ...dochelpers import exc_str
 
@@ -78,6 +79,7 @@ def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
 
     return commit_sha, commit_msg
 
+
 def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
     """convenience helper
 
@@ -97,3 +99,34 @@ def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
     return [line[2:] for line in out.splitlines()]
 
 
+def _get_remotes_from_config(repo):
+    """
+
+    Parameters
+    ----------
+    repo: ItemRepo
+
+    Returns
+    -------
+    tuple
+        (name, dict)
+        name of the remote, key-value dict of all options in the remote's
+        section in git config
+    """
+
+    from git import GitConfigParser
+
+    # Note: This would fail with a .git file
+    # We might need to have a git.Repo to access it's config_reader.
+    # Also note, that to make instantiation of git.Repo cheaper, we could
+    # fake an ObjectDB class with an empty constructor, since we actually need
+    # the discovery of correct git config only.
+    cp = GitConfigParser(opj(repo.path, '.git', 'config'), read_only=True)
+    remotes = []
+    for r_sec in [sec for sec in cp.sections() if sec.startswith("remote")]:
+        remote = (r_sec[8:-1], dict())
+        for r_opt in cp.options(section=r_sec):
+            remote[1][r_opt] = cp.get_value(r_sec, r_opt)
+        remotes.append(remote)
+
+    return remotes
