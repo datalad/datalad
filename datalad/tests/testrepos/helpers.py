@@ -9,10 +9,22 @@
 """Helpers for internal use by test repositories
 """
 
+import logging
 from os import linesep
 from os.path import join as opj
 from ...support.exceptions import CommandError
 from ...dochelpers import exc_str
+
+lgr = logging.getLogger('datalad.tests.testrepos.helpers')
+
+
+def log(*args, **kwargs):
+    """helper to log at a default level
+
+    since this is not even about actual datalad tests, not to speak of actual
+    datalad code, log at pretty low level.
+    """
+    lgr.log(5, *args, **kwargs)
 
 
 def _excute_by_item(cmd, item, exc=None, runner=None, cwd=None):
@@ -35,6 +47,7 @@ def _excute_by_item(cmd, item, exc=None, runner=None, cwd=None):
     cwd = cwd or (dirname(item.path) if isinstance(item, ItemFile)
                   else item.path)
 
+    log("run %s from within %s", cmd, cwd)
     try:
         out, err = runner.run(cmd, cwd=cwd)
     except CommandError as e:
@@ -89,10 +102,10 @@ def _get_commits_from_disc(item, exc=None, runner=None, cwd=None):
     lines = out.splitlines()
     commits = []
     line_idx = 0
-    while line_idx in range(len(lines)):
+    while line_idx < len(lines):
         commit_sha = lines[line_idx]
         try:
-            next_empty = lines[line_idx:].index('')
+            next_empty = line_idx + lines[line_idx:].index('')
         except ValueError:
             next_empty = len(lines)
         commit_msg = linesep.join(lines[line_idx+1:next_empty])
@@ -159,3 +172,25 @@ def _get_remotes_from_config(repo):
         remotes.append(remote)
 
     return remotes
+
+
+def _get_submodules_from_disc(item, exc=None, runner=None, cwd=None):
+
+    lookup_submodules_cmd = ['git', '--work-tree=.', 'submodule']
+
+    out, err = _excute_by_item(lookup_submodules_cmd, item=item, exc=exc,
+                               runner=runner, cwd=cwd)
+
+    submodules = []
+    for line in out.splitlines():
+        st = line[0]
+        sha = line[1:41]
+        start_ref = line[42:].find('(')
+        if start_ref > -1:
+            path = line[42:42+start_ref-1]
+            ref = line[42+start_ref:].lstrip('(').rstrip(')')
+        else:
+            path = line[42:]
+            ref = None
+        submodules.append((st, sha, path, ref))
+    return submodules
