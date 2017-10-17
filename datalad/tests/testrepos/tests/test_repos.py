@@ -117,8 +117,12 @@ def test_BasicMixed_instantiation(path):
 
 
 @with_tempfile
-def test_MixedSubmodules_instantiation(path):
-    tr = MixedSubmodules(path)
+def test_MixedSubmodulesOldOneLevel_instantiation(path):
+    tr = MixedSubmodulesOldOneLevel(path)
 
+
+@with_tempfile
+def test_MixedSubmodulesOldNested_instantiation(path):
+    tr = MixedSubmodulesOldNested(path)
 
 

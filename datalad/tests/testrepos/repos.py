@@ -81,6 +81,20 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         runner: Runner or None
         """
 
+        # RF: to have a function specifying that a certain kwarg needs
+        # to be an Item from path. Accept actual Items as well.
+        # What are the requirements for those items in terms of being known to
+        # TestRepo?
+
+        # include src in the list of things, that have to be an item
+        # exception? We don't need to know anything about an annex-addurl'ed file except it's path and may be contetn.
+        # If it's going to be an ItemFile, it does not have a repo!
+
+
+
+
+
+
         # TODO: Probably the same mechanism has to be applied for
         # ItemFile(src=...) in order to be able to assign predefined
         # ItemFile instances!
@@ -504,12 +518,15 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
         # default implementation:
         for item, index in zip(self._execution, range(len(self._execution))):
             try:
-                item.create()
+                new_items = item.create()
             except TestRepoCreationError as e:
                 # add information the Item classes can't know:
                 e.repo = self.__class__
                 e.index = index
                 raise e
+            for it in new_items:
+                # TODO: insert in _items dict, but check for conflicts and make sure to use correct path as a key
+                pass
 
 
 #
@@ -714,7 +731,7 @@ class BasicAnnexDirty(BasicAnnex):
 # v6 adjusted branch ...
 
 
-class MixedSubmodules(TestRepo_NEW):
+class MixedSubmodulesOldOneLevel(TestRepo_NEW):
     """Hierarchy of repositories with files in git and in annex
 
     It consists of three instances of BasicMixed (one at top-level and two as
@@ -727,27 +744,87 @@ class MixedSubmodules(TestRepo_NEW):
     general one.
     """
 
+    # TODO: Actually, it's still not entirely the same as before, since we add
+    # those submodules inplace, instead of having them cloned via submodule-add
+    # and then initialized. Checkout whether this makes a difference in the
+    # setup (if anything it's about .git probably)
+
     version = '0.1'
 
     # old name to be used by a transition decorator to ease RF'ing
     RF_str = 'submodule_annex'
 
+    # Note, that we can simply extend the definition list of BasicMixed here:
+    _cls_item_definitions = BasicMixed._cls_item_definitions + \
+        [
+            # Here we specify a clone of a persistent instance of BasicMixed:
+            (ItemRepo, {'path': 'subm 1',
+                        'src': get_persistent_testrepo(BasicMixed).path,
+                        'annex': True,
+                        'annex_init': True}),
+            (ItemRepo, {'path': '2',
+                        'src': get_persistent_testrepo(BasicMixed).path,
+                        'annex': True,
+                        'annex_init': True}),
+            # Add both ItemRepos as submodules and commit:
+            (ItemAddSubmodule, {'cwd': '.',
+                                'repo': '.',
+                                'item': ['subm 1', '2'],
+                                'commit': True,
+                                'commit_msg': "Adding submodules 'subm 1' "
+                                              "and '2'"}),
+        ]
+
+
+class MixedSubmodulesOldNested(TestRepo_NEW):
+    """Hierarchy of repositories with files in git and in annex
+
+    It consists of three instances of MixedSubmodulesOldOneLevel (one at
+    top-level and one as its submodule and another one as a submodule of the
+    second one) and does so to resemble the old `NestedDataset`.
+
+    RF'ing note: This resembles the old `NestedDataset`. The only difference
+    is the content of INFO.txt, which is now more detailed. In particular it
+    includes the entire definition of this test repository. Whenever tests are
+    rewritten to not explicitly rely on this one, it might go in favor of a more
+    general one.
+    """
+
+    version = '0.1'
+
+    # old name to be used by a transition decorator to ease RF'ing
+    RF_str = 'nested_submodule_annex'
+
     _cls_item_definitions = [
-        (BasicMixed, {'path': '.'}),
-        (ItemRepo, {'path': 'subm 1',
-                    'src': get_persistent_testrepo(BasicMixed).path,
+        # Use BasicMix as an item in that list just for demo:
+        # it's effect is the same as extending BasicMixed._cls_item_definition
+        # as it's done in MixedSubmodulesOldOneLevel above:
+        (MixedSubmodulesOldOneLevel, {'path': '.'}),
+
+        (ItemRepo, {'path': 'sub dataset1',
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).path,
                     'annex': True,
                     'annex_init': True}),
-        (ItemRepo, {'path': '2',
-                    'src': get_persistent_testrepo(BasicMixed).path,
+        # Now, one level deeper:
+        (ItemRepo, {'path': opj('sub dataset1', 'sub sub dataset1'),
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).path,
                     'annex': True,
                     'annex_init': True}),
+        (ItemAddSubmodule, {'cwd': 'sub dataset1',
+                            'repo': 'sub dataset1',
+                            'item': opj('sub dataset1', 'sub sub dataset1'),
+                            'commit': True,
+                            'commit_msg': "Added sub dataset"}),
+        # And add/commit the entire subtree:
         (ItemAddSubmodule, {'cwd': '.',
                             'repo': '.',
-                            'item': ['subm 1', '2'],
+                            'item': 'sub dataset1',
                             'commit': True,
-                            'commit_msg': "Adding submodules 'subm 1' and '2'"}),
-    ]
+                            'commit_msg': "Added subdatasets."}),
+        (ItemCommand, {''})#cmd, runner=None, item=None, cwd=None, repo=None
 
+
+
+    ]
 
 # Datasets (.datalad/config, .datalad/metadata ...) ?
