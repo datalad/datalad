@@ -238,7 +238,9 @@ class ItemRepo(Item):
 
         # and we got at least one branch:
         # TODO: Actually check src's HEAD instead of assuming 'master'!
-        self._branches.add('master')
+        self._branches.add('annex/direct/master'
+                           if src.is_direct_mode
+                           else 'master')
 
         self._annex = src.is_annex
 
@@ -484,7 +486,6 @@ class ItemRepo(Item):
     def files(self):
         return self.get_files(return_paths=False)
 
-
     def _call_annex_init(self):
 
         annex_cmd = ['git', 'annex', 'init']
@@ -497,6 +498,19 @@ class ItemRepo(Item):
                         )
 
         self._branches.add('git-annex')
+        # if we are on a fresh clone of direct mode src, we had
+        # 'annex/direct/master' (or whatever HEAD) and now got the actual
+        # 'master' in addition. Note, that this may be different if direct mode
+        # is enforced by annex itself and therefore during annex-init. This
+        # might prevent 'master' from coming alive.
+        # TODO: double check on windows!
+        # For now, simply:
+        if 'annex/direct/master' in self.branches and \
+                len([b for b in self.branches
+                     if not b.startswith('remotes/')]) == 2:
+            # just added git-annex and nothing but annex/direct/master before
+            # TODO: still wrong. If it's at detached HEAD ...
+            self._branches.add('master')
 
         # TODO: This is code from old test repos that still uses actual
         # datalad code (AnnexRepo in particular). Should be replaced.
@@ -517,15 +531,15 @@ class ItemRepo(Item):
                             exc=TestRepoCreationError(
                                 "Failed to switch to direct mode")
                             )
-            if not self._src:
-                # We just created the repo (not cloned). Go for 'master'.
-                self._branches.add('annex/direct/master')
+            # TODO: we need to figure out what branch HEAD is pointing to or
+            # what branch we just cloned from self._src. For now, just go
+            # for 'master':
+            self._branches.add('annex/direct/master')
         else:
             # TODO: we didn't want direct mode (False) or didn't care (None).
             # check whether it was enforced by annex and adjust attribute or
             # raise
             pass
-
 
     def create(self):
         """Creates the physical repository
