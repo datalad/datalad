@@ -130,7 +130,9 @@ def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
     lookup_branch_cmd = ['git', 'branch', '--contains', commit]
     out, err = _excute_by_item(lookup_branch_cmd, item=item, exc=exc,
                                runner=runner, cwd=cwd)
-    return [line[2:] for line in out.splitlines()]
+    return [line[2:]
+            for line in out.splitlines()
+            if "HEAD detached" not in line]
 
 
 def _get_branches_from_disc(item, exc=None, runner=None, cwd=None):
@@ -138,7 +140,9 @@ def _get_branches_from_disc(item, exc=None, runner=None, cwd=None):
     branch_cmd = ['git', 'branch', '-a']
     out, err = _excute_by_item(branch_cmd, item=item, exc=exc,
                                runner=runner, cwd=cwd)
-    return [line[2:].split()[0] for line in out.splitlines()]
+    return [line[2:].split()[0]
+            for line in out.splitlines()
+            if "HEAD detached" not in line]
 
 
 def _get_remotes_from_config(repo):
@@ -156,20 +160,25 @@ def _get_remotes_from_config(repo):
         section in git config
     """
 
-    from git import GitConfigParser
+    from git import GitConfigParser, Repo
 
     # Note: This would fail with a .git file
     # We might need to have a git.Repo to access it's config_reader.
     # Also note, that to make instantiation of git.Repo cheaper, we could
     # fake an ObjectDB class with an empty constructor, since we actually need
     # the discovery of correct git config only.
-    cp = GitConfigParser(opj(repo.path, '.git', 'config'), read_only=True)
-    remotes = []
-    for r_sec in [sec for sec in cp.sections() if sec.startswith("remote")]:
-        remote = (r_sec[8:-1], dict())
-        for r_opt in cp.options(section=r_sec):
-            remote[1][r_opt] = cp.get_value(r_sec, r_opt)
-        remotes.append(remote)
+    class FakeDB(object):
+        def __init__(self, *args):
+            pass
+
+    with Repo(repo.path, odbt=FakeDB) as r:
+        cp = r.config_reader(config_level='repository')
+        remotes = []
+        for r_sec in [sec for sec in cp.sections() if sec.startswith("remote")]:
+            remote = (r_sec[8:-1], dict())
+            for r_opt in cp.options(section=r_sec):
+                remote[1][r_opt] = cp.get_value(r_sec, r_opt)
+            remotes.append(remote)
 
     return remotes
 

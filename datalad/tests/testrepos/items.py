@@ -36,6 +36,8 @@ from .helpers import _get_last_commit_from_disc
 from .helpers import _get_branch_from_commit
 from .helpers import _get_remotes_from_config
 from .helpers import _get_submodules_from_disc
+from .helpers import _get_branches_from_disc, _get_commits_from_disc
+
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
 
@@ -55,7 +57,7 @@ class Item(object):
     """(Partially abstract) base class for test repository definition items
     """
 
-    def __init__(self, path, runner=None):
+    def __init__(self, path, runner=None, check_definition=True):
         """
 
         Parameters
@@ -131,7 +133,7 @@ class ItemRepo(Item):
 
     def __init__(self, path, src=None, runner=None,
                  annex=True, annex_version=None, annex_direct=None,
-                 annex_init=None, subm_init=True, check_definition=True):
+                 annex_init=None, check_definition=True):
         """Initializes a new ItemRepo
 
         By default this comes with an extensive check on whether or not this
@@ -162,8 +164,6 @@ class ItemRepo(Item):
             is True. By default it is set to True, if `annex` is True. Set to
             False if you want to clone an annex and not annex-init that clone.
             It doesn't make sense in other cases.
-        subm_init: bool
-            whether or not to initialize submodules after cloning
         check_definition: bool
             whether or not to check for valid definition of the item. Disable
             only if you know what you are doing.
@@ -194,14 +194,15 @@ class ItemRepo(Item):
             self._check_definition(path=path, src=src, runner=runner,
                                    annex=annex, annex_version=annex_version,
                                    annex_direct=annex_direct,
-                                   annex_init=annex_init, subm_init=subm_init,
+                                   annex_init=annex_init,
                                    version_from_config=version_from_config,
                                    direct_from_config=direct_from_config)
 
         if annex and annex_init is None:
             annex_init = True
 
-        super(ItemRepo, self).__init__(path=path, runner=runner)
+        super(ItemRepo, self).__init__(path=path, runner=runner,
+                                       check_definition=check_definition)
 
         # generally we have a valid definition now
         # set unspecified parameters from datalad config
@@ -211,7 +212,6 @@ class ItemRepo(Item):
             annex_direct = direct_from_config
 
         self._src = src
-        self._init_subs = subm_init
         self._annex = annex
         self._annex_version = annex_version if annex else None
         self._annex_direct = annex_direct if annex else False
@@ -222,17 +222,23 @@ class ItemRepo(Item):
         self._remotes = set()  # ... of tuple (name, url)  # For now
         self._super = None  # ItemRepo
         self._created_items = set()  # additional items instantiated during creation
-        self._is_initialized = False
+        self._is_initialized = False  # not yet created/initialized
 
     def _update_from_src(self, src=None):
         """update all information self retrieved the moment it was cloned from
         self._src
         """
+
+        new_items = set()
         if src is None:
             src = self._src
 
         # we cloned, so we have a remote 'origin':
         self._remotes.add(('origin', src.url))
+
+        # and we got at least one branch:
+        # TODO: Actually check src's HEAD instead of assuming 'master'!
+        self._branches.add('master')
 
         self._annex = src.is_annex
 
@@ -249,14 +255,11 @@ class ItemRepo(Item):
                 annex_version=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
                 annex_direct=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
                 annex_init=sub._annex_init,  # TODO: double check! ATM inherit from its source!
-                subm_init=self._init_subs,  # TODO: double check! ATM inherit from self!
                 check_definition=False
             )
             new_sub._super = self
             self._items.add(new_sub)
-            self._created_items.add(new_sub)
-
-            # Note: submodule init has to set _is_initialized and remotes for that item!
+            new_items.add(new_sub)
 
         # files:
         for f_ in src.files:
@@ -283,16 +286,28 @@ class ItemRepo(Item):
             new_file._commits = deepcopy(f_.commits)
 
             self._items.add(new_file)
-            self._created_items.add(new_file)
+            new_items.add(new_file)
 
         # commits:
         self._commits = self._commits.union(src.commits)
+        # for now, fix by looking up from FS:
+        commits = _get_commits_from_disc(
+            item=self, exc=TestRepoCreationError(
+                msg="Failed to lookup commits on fresh clone")
+        )
+
+        [self._commits.add(c) for c in commits]
 
         # branches:
-        self._branches = self._branches.union(src.branches)
+        #  TODO: Actually, we don't get all of them in general
+        self._branches.update({'remotes/origin/%s' % b
+                               for b in src.branches
+                               if not b.startswith('remotes/')},
+                              {'remotes/origin/HEAD'})
+        return new_items
 
     def _check_definition(self, path, src, runner, annex, annex_version,
-                          annex_direct, annex_init, subm_init,
+                          annex_direct, annex_init,
                           version_from_config, direct_from_config):
 
         log("Processing definition of %s(%s)", self.__class__, path)
@@ -469,6 +484,49 @@ class ItemRepo(Item):
     def files(self):
         return self.get_files(return_paths=False)
 
+
+    def _call_annex_init(self):
+
+        annex_cmd = ['git', 'annex', 'init']
+        if self._annex_version:
+            annex_cmd.append('--version=%s' % self._annex_version)
+
+        _excute_by_item(cmd=annex_cmd, item=self,
+                        exc=TestRepoCreationError(
+                            "Failed to initialize annex")
+                        )
+
+        self._branches.add('git-annex')
+
+        # TODO: This is code from old test repos that still uses actual
+        # datalad code (AnnexRepo in particular). Should be replaced.
+        # Furthermore "datalad.tests.dataladremote" needs a default to
+        # use obtain()
+        from datalad.config import anything2bool
+        if anything2bool(cfg.get("datalad.tests.dataladremote")):
+            # For additional testing of our datalad remote to not interfere
+            # and manage to handle all http urls and requests:
+            init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
+                                'datalad', autoenable=True)
+            # TODO: self._remotes.add(('datalad', {'annex-externaltype': 'datalad'}))
+            self._remotes.add(('datalad', ''))
+
+        if self._annex_direct:
+            annex_cmd = ['git', 'annex', 'direct']
+            _excute_by_item(cmd=annex_cmd, item=self,
+                            exc=TestRepoCreationError(
+                                "Failed to switch to direct mode")
+                            )
+            if not self._src:
+                # We just created the repo (not cloned). Go for 'master'.
+                self._branches.add('annex/direct/master')
+        else:
+            # TODO: we didn't want direct mode (False) or didn't care (None).
+            # check whether it was enforced by annex and adjust attribute or
+            # raise
+            pass
+
+
     def create(self):
         """Creates the physical repository
         """
@@ -504,83 +562,11 @@ class ItemRepo(Item):
 
         if self._src:
             # we just cloned
-            self._update_from_src()
-            if self.submodules and self._init_subs:
-                # TODO: submodule update --init --recursive?
-                # Those ItemRepos need to be (recursively?) updated in return;
-                # see _update_from_src()
-                pass
+            self._created_items.update(self._update_from_src())
 
         # we want to make it an annex
         if self._annex and self._annex_init:
-            annex_cmd = ['git', 'annex', 'init']
-            if self._annex_version:
-                annex_cmd.append('--version=%s' % self._annex_version)
-
-            _excute_by_item(cmd=annex_cmd, item=self,
-                            exc=TestRepoCreationError(
-                                "Failed to initialize annex")
-                            )
-
-            self._branches.add('git-annex')
-
-            # TODO: This is code from old test repos that still uses actual
-            # datalad code (AnnexRepo in particular). Should be replaced.
-            # Furthermore "datalad.tests.dataladremote" needs a default to
-            # use obtain()
-            from datalad.config import anything2bool
-            if anything2bool(cfg.get("datalad.tests.dataladremote")):
-                # For additional testing of our datalad remote to not interfere
-                # and manage to handle all http urls and requests:
-                init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
-                                    'datalad', autoenable=True)
-                # TODO: self._remotes.add(('datalad', {'annex-externaltype': 'datalad'}))
-                self._remotes.add(('datalad', ''))
-
-            if self._annex_direct:
-                annex_cmd = ['git', 'annex', 'direct']
-                _excute_by_item(cmd=annex_cmd, item=self,
-                                exc=TestRepoCreationError(
-                                    "Failed to switch to direct mode")
-                                )
-                if not self._src:
-                    # We just created the repo (not cloned). Go for 'master'.
-                    self._branches.add('annex/direct/master')
-            else:
-                # TODO: we didn't want direct mode (False) or didn't care (None).
-                # check whether it was enforced by annex and adjust attribute or
-                # raise
-                pass
-
-        if self._src:
-            # TODO: This is ugly. We need a better way to get everything from a
-            # clone. In particular, this way we make what happened when cloning
-            # the defined SHOULD-BE state of that clone. This is okay-ish for
-            # the purpose of checking later on, whether or not an actual test
-            # changed anything (we have a defined BEFORE stat), but it prevents
-            # us from noticing, that cloning went wrong (or at least unexpected)
-            # in the first place.
-
-            # we cloned it and need to get info on branches, commits, files
-            from .helpers import _get_branches_from_disc, _get_commits_from_disc
-            branches = _get_branches_from_disc(
-                item=self, exc=TestRepoCreationError(
-                    msg="Failed to lookup branches on fresh clone")
-            )
-            commits = _get_commits_from_disc(
-                item=self, exc=TestRepoCreationError(
-                    msg="Failed to lookup commits on fresh clone")
-            )
-            [self._branches.add(b) for b in branches]
-            [self._commits.add(c) for c in commits]
-            submodules = _get_submodules_from_disc(
-                item=self, exc=TestRepoCreationError(
-                    msg="Failed to lookup submodules on fresh clone"
-                )
-            )
-            # TODO: How to store those discovered submodules? We can't easily
-            # get an ItemRepo from them
-            # TODO: files! submodules!
+            self._call_annex_init()
 
         return self._created_items
 
@@ -671,12 +657,10 @@ class ItemRepo(Item):
             # TODO: files! listdir ... But: ignore .git/, .gitmodules, ...
 
             # branches
-            out, err = _excute_by_item(['git', 'branch', '-a'], item=self,
-                                       exc=TestRepoAssertionError(
-                                           "Failed to look up branches")
-                                       )
-
-            branches_from_disc = [line[2:].split()[0] for line in out.splitlines()]
+            branches_from_disc = _get_branches_from_disc(
+                item=self,
+                exc=TestRepoAssertionError("Failed to look up branches")
+            )
             eq_(set(branches_from_disc), self.branches)
             # TODO: are branches pointing to and containing the right commits?
 
@@ -710,7 +694,7 @@ class ItemRepo(Item):
             except Exception as e:
                 raise TestRepoAssertionError(
                     msg="Failed to read remotes for {r}({p}): {exc}"
-                        "".format(r=self.__class,
+                        "".format(r=self.__class__,
                                   p=self.path,
                                   exc=exc_str(e)),
                     item=self.__class__
@@ -726,7 +710,6 @@ class ItemRepo(Item):
         else:
             # not initialized
             assert(not exists(opj(self.path, '.git')))
-
 
         if self.is_annex and self._is_initialized and self.annex_is_initialized:
             # either .git is a dir and has an annex subdir or it's a file
@@ -753,8 +736,6 @@ class ItemRepo(Item):
                    git_file_has_annex(self.path))
 
             # TODO: Verify annex_version and annex_direct from .git/config
-
-
 
 
 @auto_repr
@@ -851,7 +832,8 @@ class ItemFile(Item):
                                    commit_msg=commit_msg, annexed=annexed,
                                    key=key, src=src, locked=locked)
 
-        super(ItemFile, self).__init__(path=path, runner=runner)
+        super(ItemFile, self).__init__(path=path, runner=runner,
+                                       check_definition=check_definition)
         self._repo = repo
         self._content = content
         self._state_index = state[0]
@@ -1359,7 +1341,8 @@ class ItemCommand(Item):
         if not cwd:
             cwd = repo.path
 
-        super(ItemCommand, self).__init__(path=cwd, runner=runner)
+        super(ItemCommand, self).__init__(path=cwd, runner=runner,
+                                          check_definition=check_definition)
 
         if isinstance(cmd, string_types):
             self._cmd = shlex.split(cmd, posix=not on_windows)
@@ -1444,7 +1427,8 @@ class ItemCommit(ItemCommand):
         # Note, that items will be appended by super class
 
         super(ItemCommit, self).__init__(runner=runner, item=item, cwd=cwd,
-                                         cmd=commit_cmd, repo=repo)
+                                         cmd=commit_cmd, repo=repo,
+                                         check_definition=check_definition)
 
     def _check_definition(self, runner, item, cwd, msg, repo):
         log("Processing definition of %s", self.__class__)
@@ -1520,7 +1504,8 @@ class ItemDropFile(ItemCommand):
         drop_cmd = ['git', 'annex', 'drop']
 
         super(ItemDropFile, self).__init__(cmd=drop_cmd, runner=runner,
-                                           item=item, cwd=cwd, repo=repo)
+                                           item=item, cwd=cwd, repo=repo,
+                                           check_definition=check_definition)
 
     def _check_definition(self, runner, item, cwd, repo):
 
@@ -1594,7 +1579,8 @@ class ItemAddSubmodule(ItemCommand):
         # it, when changing this implementation.
         cmd = ['git', '--work-tree=.', 'submodule', 'add']
         super(ItemAddSubmodule, self).__init__(cmd, runner=runner, item=item,
-                                               cwd=cwd, repo=repo)
+                                               cwd=cwd, repo=repo,
+                                               check_definition=check_definition)
         # Cut self._cmd back (see the note above)
         self._cmd = self._cmd[:4]
 
@@ -1704,6 +1690,78 @@ class ItemAddSubmodule(ItemCommand):
             self._repo._commits.add(_get_last_commit_from_disc(
                 item=self,
                 exc=TestRepoCreationError("Failed to look up commit SHA")))
+
+
+@auto_repr
+class ItemUpdateSubmodules(ItemCommand):
+
+    def __init__(self, repo, init=False, runner=None, cwd=None, check_definition=True):
+        """
+
+        :param init: bool
+        :param runner:
+        :param cwd:
+        :param repo:
+        :param check_definition:
+        :return:
+        """
+
+        if check_definition:
+            self._check_definition(init=init, runner=runner, cwd=cwd, repo=repo)
+
+        cmd = ['git', '--work-tree=.', 'submodule', 'update']
+        if init:
+            cmd.append('--init')
+
+        # TODO: --recursive would need us to update/create ItemRepos recursively
+        # and return created items. It's not just adding the option!
+
+        super(ItemUpdateSubmodules, self).__init__(
+            cmd=cmd, runner=runner, item=None, cwd=cwd, repo=repo,
+            check_definition=check_definition
+        )
+        self._init = init
+
+    def _check_definition(self, init, runner, cwd, repo):
+        log("Processing definition of %s", self.__class__)
+        # ATM nothing to do
+
+    def create(self):
+        log("Executing %s in %s", self.__class__, self.path)
+
+        # Note, that we couldn't discover submodules to be updated/init'ed
+        # during instantiation (thus self._ref_item is empty).
+        # self._repo.create() may have created them since.
+        # Therefore, let's get them now and include them explicitly in the call
+        self._ref_items = [sm for sm in self._repo.submodules]
+
+        # If there are none, we have nothing to do
+        if not self._ref_items:
+            log("Found no submodules in %s(%s).", self._repo, self._repo.path)
+            return
+
+        self._cmd.append('--')
+        # Note, this might be wrong if there's heavy use of runner/cwd option!
+        self._cmd.extend([os.path.relpath(sm.path, self._repo.path)
+                          for sm in self._ref_items])
+
+        # run the command:
+        super(ItemUpdateSubmodules, self).create()
+
+        new_items = set()
+        if self._init:
+            # we possibly init'ed submodules
+            # => ItemRepo instances need to be updated
+            for sm in self._ref_items:
+                if not sm._is_initialized:
+                    # wasn't initialized before, is now
+                    sm._is_initialized = True
+                    new_items.update(sm._update_from_src())
+                    sm._remotes.add(('origin', sm._src.url))
+                    if sm.is_annex and sm._annex_init:
+                        sm._call_annex_init()
+
+        return new_items
 
 
 @auto_repr

@@ -26,7 +26,7 @@ from datalad.support.network import get_local_file_url
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
     TestRepoCreationError
 from datalad.tests.testrepos.items import Item, ItemRepo, ItemSelf, ItemFile, \
-    ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile, ItemAddSubmodule
+    ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile, ItemAddSubmodule, ItemUpdateSubmodules
 from datalad.tests.utils import eq_, assert_is_instance, assert_in
 
 from datalad.utils import assure_list
@@ -754,6 +754,8 @@ class BasicAnnexDirty(BasicAnnex):
 # v6 adjusted branch ...
 
 
+# TODO: Do not request actual instances in definition! Just paths.
+
 class MixedSubmodulesOldOneLevel(TestRepo_NEW):
     """Hierarchy of repositories with files in git and in annex
 
@@ -824,15 +826,20 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
         # as it's done in MixedSubmodulesOldOneLevel above:
         (MixedSubmodulesOldOneLevel, {'path': '.'}),
 
+        # get a clone of MixedSubmodulesOldOneLevel:
         (ItemRepo, {'path': 'sub dataset1',
                     'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
                     'annex': True,
                     'annex_init': True}),
+        (ItemUpdateSubmodules, {'repo': 'sub dataset1',
+                                'init': True}),
         # Now, one level deeper:
         (ItemRepo, {'path': opj('sub dataset1', 'sub sub dataset1'),
                     'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
                     'annex': True,
                     'annex_init': True}),
+        (ItemUpdateSubmodules, {'repo': opj('sub dataset1', 'sub sub dataset1'),
+                                'init': True}),
         (ItemAddSubmodule, {'cwd': 'sub dataset1',
                             'repo': 'sub dataset1',
                             'item': opj('sub dataset1', 'sub sub dataset1'),
