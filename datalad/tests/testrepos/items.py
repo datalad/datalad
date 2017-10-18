@@ -25,18 +25,21 @@ from datalad.cmd import GitRunner
 from datalad.customremotes.base import init_datalad_remote
 from datalad.dochelpers import borrowdoc, single_or_plural, exc_str
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
 from datalad.support.network import get_local_file_url
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
-    TestRepoCreationError, TestRepoAssertionError
+    TestRepoCreationError, TestRepoAssertionError, TestRepoError
 from datalad.utils import auto_repr, assure_list, on_windows
 from .helpers import _excute_by_item
 from .helpers import _get_last_commit_from_disc
 from .helpers import _get_branch_from_commit
 from .helpers import _get_remotes_from_config
 from .helpers import _get_submodules_from_disc
-from .helpers import _get_branches_from_disc, _get_commits_from_disc
+from .helpers import _get_branches_from_disc
+from .helpers import get_ancestry
+
+from .helpers import _get_commits_from_disc
+from datalad.utils import unique
 
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
@@ -49,6 +52,238 @@ def log(*args, **kwargs):
     datalad code, log at pretty low level.
     """
     lgr.log(5, *args, **kwargs)
+
+
+class Branch(object):
+
+    def __init__(self, name, repo, commit=None, upstream=None,
+                 points_to=None, is_active=False):
+        """
+
+        Parameters
+        ----------
+        name: str
+        repo: ItemRepo
+        commit: Commit or str
+        upstream: Branch or str
+        points_to: Branch or str
+        is_active: bool
+        """
+        self.repo = repo
+        self.name = name
+
+        if commit is None:
+            self._commit = self._commit_short = None
+        elif isinstance(commit, Commit):
+            self._commit = commit
+        else:
+            # assuming str (SHA)
+            # could be long or short, but assume short and match in property
+            # `commit` via startswith, so the full SHA would work, too. Note,
+            # that we need to be robust against different lengths of short SHA
+            # anyway.
+            self._commit_short = commit
+        if upstream is None:
+            self._upstream = self._upstream_name = None
+        elif isinstance(upstream, Branch):
+            self._upstream = upstream
+        else:
+            # assume just name
+            self._upstream_name = upstream
+
+        if points_to is None:
+            self._head_points_to = self._head_points_to_name = None
+        elif isinstance(points_to, Branch):
+            self._head_points_to = points_to
+        else:
+            # assume just name
+            self._head_points_to_name = points_to
+
+        self.is_active = is_active
+
+    # TODO: setter
+    @property
+    def commit(self):
+        """
+        Returns
+        -------
+        Commit or None
+        """
+
+        if not self._commit:
+            if self._commit_short:
+                # search for it
+                hit_commits = [c for c in self.repo.commits
+                               if c.sha.startswith(self._commit_short)]
+                if len(hit_commits) > 1:
+                    raise TestRepoAssertionError(
+                        msg="Branch '{self}': (Short) SHA collision in "
+                            "{repo}({p}) for {short}:{ls}{commits}"
+                            "".format(self=self.name,
+                                      repo=self.repo,
+                                      p=self.repo.path,
+                                      short=self._commit_short,
+                                      ls=os.linesep,
+                                      commits=os.linesep.join(hit_commits))
+                        )
+                if not hit_commits:
+                    raise TestRepoAssertionError(
+                        msg="Branch '{self}': pointing to {short}, but commit "
+                            "not found in {repo}({p})"
+                            "".format(self=self.name,
+                                      short=self._commit_short,
+                                      repo=self.repo,
+                                      p=self.repo.path)
+                        )
+                self._commit = hit_commits[0]
+
+        return self._commit
+
+    # TODO: setter
+    @property
+    def upstream(self):
+        """
+        Returns
+        -------
+        Branch or None
+        """
+        if not self._upstream:
+            if self._upstream_name:
+                # search for it
+                hit_upstream = [b for b in self.repo.branches
+                                if b.name == self._upstream_name]
+                if len(hit_upstream) > 1:
+                    raise TestRepoAssertionError(
+                        msg="'{name}' is upstream for branch '{branch}', but "
+                            "is ambiguous in {repo}({p}):{ls}{hits}"
+                            "".format(name=self._upstream_name,
+                                      branch=self.name,
+                                      repo=self.repo,
+                                      p=self.repo.path,
+                                      ls=os.linesep,
+                                      hits=os.linesep.join([b.name for b in
+                                                            hit_upstream])
+                                      )
+                    )
+                if not hit_upstream:
+                    raise TestRepoAssertionError(
+                        msg="'{name}' is upstream for branch '{branch}', but "
+                            "isn't known by {repo}({p})"
+                            "".format(name=self._upstream_name,
+                                      branch=self.name,
+                                      repo=self.repo,
+                                      p=self.repo.path,
+                                      )
+                    )
+                self._upstream = hit_upstream[0]
+        return self._upstream
+
+    # TODO: setter
+    @property
+    def points_to(self):
+        """
+        Returns
+        -------
+        Branch or None
+        """
+        if not self._head_points_to:
+            if self._head_points_to_name:
+                # search for it
+                hit_branches = [b for b in self.repo.branches
+                                if b.name == self._head_points_to_name]
+                if len(hit_branches) > 1:
+                    raise TestRepoAssertionError(
+                        msg="'{name}' is registered to be pointed at by branch "
+                            "'{branch}', but is ambiguous in {repo}({p}):"
+                            "{ls}{hits}"
+                            "".format(name=self._head_points_to_name,
+                                      branch=self.name,
+                                      repo=self.repo,
+                                      p=self.repo.path,
+                                      ls=os.linesep,
+                                      hits=os.linesep.join([b.name for b in
+                                                            hit_branches])
+                                      )
+                    )
+                if not hit_branches:
+                    raise TestRepoAssertionError(
+                        msg="'{name}' is registered to be pointed at by branch "
+                            "'{branch}', but isn't known by {repo}({p})"
+                            "".format(name=self._head_points_to_name,
+                                      branch=self.name,
+                                      repo=self.repo,
+                                      p=self.repo.path,
+                                      )
+                    )
+                self._head_points_to = hit_branches[0]
+        return self._head_points_to
+
+    def copy_to(self, repo):
+        # Note: copies references, but NOT the reference objects!
+        # is_active always False!
+        b = Branch(name=self.name,
+                   repo=repo,
+                   is_active=False)
+        b._commit_short = self.commit.short,
+        b._upstream_name = self.upstream.name
+        b._head_points_to_name = self.points_to.name
+
+
+class Commit(object):
+
+    def __init__(self, sha, repo, short=None, parents=None, message=None,
+                 paths=None):
+        """
+        Parameters
+        ----------
+        sha: str
+        repo: ItemRepo
+        short: str or None
+        parents: str or Commit or list
+        message: str or None
+        paths: str or list or None
+        """
+
+        self.repo = repo
+        self.sha = sha
+        self.short = short
+        self._parent_shas = []
+        self._parents = []
+        parents = assure_list(parents)
+        # Note, that we might not yet be able to match a parent's SHA with an
+        # actual Commit instance in `self.repo` at the moment we are creating
+        # `self`.
+        for p in parents:
+            if isinstance(p, string_types):
+                self._parent_shas.append(p)
+            elif isinstance(p, Commit):
+                self._parents.append(p)
+        self.message = message  # property instead?
+        self._paths = assure_list(paths)  # Note: relative to self.repo!
+
+    # TODO: setter
+    @property
+    def parents(self):
+        from_sha = [c for c in self.repo.commits
+                    for p in self._parent_shas
+                    if p == c.sha]
+        assert(len(from_sha) == len(self._parent_shas))
+        return unique(from_sha + self._parents)
+
+    # TODO: setter
+    @property
+    def items(self):
+        return [it for it in self.repo._items
+                for p in self._paths
+                if it.path == opj(self.repo.path, p)]
+
+    def copy_to(self, repo):
+        return Commit(sha=self.sha,
+                      repo=repo,
+                      short=self.short,
+                      parents=[p.sha for p in self.parents],
+                      message=self.message,
+                      paths=self._paths)
 
 
 @auto_repr
@@ -216,102 +451,195 @@ class ItemRepo(Item):
         self._annex_version = annex_version if annex else None
         self._annex_direct = annex_direct if annex else False
         self._annex_init = annex_init if annex else False
-        self._items = set()  # ... of Item
-        self._commits = set()  # ... of tuple (SHA, msg)  # For now
-        self._branches = set()
-        self._remotes = set()  # ... of tuple (name, url)  # For now
+
+        # TODO: we must not use set; let it be lists and use datalad.utils.unique
+        self._items = []  # ... of Item
+        self._commits = []  # ... of Commit
+        self._branches = [] # ... of Branch
+        self._remotes = []  # ... of tuple (name, url)  # For now
         self._super = None  # ItemRepo
-        self._created_items = set()  # additional items instantiated during creation
+        self._created_items = []  # additional items instantiated during creation # TODO: should that be an actual attribute? Can be local for create(), I guess
         self._is_initialized = False  # not yet created/initialized
 
     @property
     def src(self):
         # self._src might be a callable:
-        return self._src() if self._src and not isinstance(self._src, ItemRepo) else self._src
+        return self._src() if self._src and \
+                              not isinstance(self._src, ItemRepo) else self._src
+
+    @property
+    def branches(self):
+        # For easier comparison within assert_intact as well as within actual
+        # datalad tests, exclude 'HEAD' from being returned as a branch.
+        return [b for b in self._branches if b.name != 'HEAD']
+
+    @property
+    def head(self):
+        candidates = [b for b in self._branches if b.name == 'HEAD']
+        if len(candidates) > 1:
+            raise TestRepoError(msg="Found more than one 'HEAD' in {repo}"
+                                    "".format(repo=self),
+                                item=self.__class__)
+        elif not candidates:
+            return None
+        else:
+            return candidates[0]
 
     def _update_from_src(self, src=None):
-        """update all information self retrieved the moment it was cloned from
-        self.src
+        """update all information `self` retrieved the moment it was cloned from
+        self.src (or submodule-update'd instead of git-clone'd)
         """
 
-        new_items = set()
+        # TODO: We probably need to RF further and consider to use (most of)
+        # this for an update after fetch/pull, too!
+
         if src is None:
             src = self.src
 
-        # we cloned, so we have a remote 'origin':
-        self._remotes.add(('origin', src.url))
-
-        # and we got at least one branch:
-        # TODO: Actually check src's HEAD instead of assuming 'master'!
-        self._branches.add('annex/direct/master'
-                           if src.is_direct_mode
-                           else 'master')
-
         self._annex = src.is_annex
 
-        # TODO: For now get almost everything, but actually depends on cloned branch! (+annex-init)
+        # we cloned, so we have a remote 'origin':
+        # TODO: can that be different if were submodule-update'd?
+        #       -> However: it can once we also consider fetch/pull
+        self._remotes.add(('origin', src.url))
 
-        # submodules:
-        for sub in [sm for sm in src.submodules if sm.superproject is src]:
-            # Note, that at this point this currently is a non-initialized
-            # submodule. There are no branches, etc. to assign yet.
-            new_sub = ItemRepo(
-                path=opj(self.path, os.path.relpath(sub.path, src.path)),
-                src=sub,
-                annex=sub.is_annex,
-                annex_version=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
-                annex_direct=None,  # TODO: double check! ATM go for default. Could inherit from self instead ...
-                annex_init=sub._annex_init,  # TODO: double check! ATM inherit from its source!
-                check_definition=False
-            )
-            new_sub._super = self
-            self._items.add(new_sub)
-            new_items.add(new_sub)
+        #
+        # ### branches and their commits: ###
+        #
+        branches_to_add = []
+        commits_to_add = []
+        # Whether we got here by git-clone or git-submodule-update, we get all
+        # local branches from src:
+        for src_branch in src.branches:
+            # except remote branches in src:
+            if src_branch.name.startswith('remotes/'):
+                continue
+            branches_to_add.append(Branch(name='remotes/origin/' + src_branch.name,
+                                          repo=self,
+                                          commit=src_branch.commit.sha,
+                                          upstream=None,
+                                          points_to=None,
+                                          is_active=False))
+            # we need the commit that branch is pointing to and its ancestry:
+            commits_to_add.extend([c.copy_to(self) for c in
+                                   get_ancestry(src_branch.commit)])
 
-        # files:
-        for f_ in src.files:
-            new_file = ItemFile(
-                path=opj(self.path, os.path.relpath(f_.path, src.path)),
-                repo=self,
-                content=f_._content,
-                src=f_._src,
-                state=(f_._state_index, f_._state_worktree),
-                annexed=f_.annexed,
-                key=f_.annex_key,
-                check_definition=False)
-            # we are in a fresh clone. Annexed files have no content present:
-            new_file._content_present = False if f_.annexed else None
-            # TODO: double check 'lock'; also for ItemFile.__init__ and ItemFile.create()!
-            # locked state depends on v6:
-            # if original repo and new one are annex V6 and we initialize
-            # annex accordingly, the committed lock-state probably is inherited
-            # for now ignore and set to None
-            new_file._locked=None
-            # TODO: double check commits, once we have full representation of
-            # connections between branches and commits. We can have commits we
-            # actually retrieved by cloning only.
-            new_file._commits = deepcopy(f_.commits)
+        # Now HEAD:
+        # derive our 'HEAD' from src:
+        if self.superproject is not None:
+            # we are a submodule already, so it wasn't cloning but
+            # submodule-update.
+            # -> HEAD is detached
+            # -> HEAD is active branch
+            # Note: We are considering default update only for now.
+            # Theoretically, we can have a submodule-update using merge/rebase
+            # or whatever strategy. This would change things.
+            # TODO: The note above is just another reason to RF this into more
+            # fine-grained pieces.
+            head_points_to = None
+            head_active = True
+        else:
+            # assuming clone:
+            head_points_to = src.head.points_to
+            head_active = False
 
-            self._items.add(new_file)
-            new_items.add(new_file)
+        branches_to_add.append(Branch(name='HEAD',
+                                      repo=self,
+                                      commit=src.head.commit.sha,
+                                      upstream=None,
+                                      points_to=head_points_to.name,
+                                      is_active=head_active))
+        if src.head.points_to:
+            # src.head points to an actual branch, that's the one we now have as
+            # a local branch
+            hit_branches = [b for b in src.branches
+                            if b.name == src.head.points_to.name]
+            assert(len(hit_branches) == 1)
+            local_branch = hit_branches[0]
+            branches_to_add.append(Branch(name=local_branch.name,
+                                          repo=self,
+                                          commit=local_branch.commit.sha,
+                                          upstream='remotes/origin/' + local_branch.name,
+                                          points_to=None,
+                                          is_active=not head_active))
+        else:
+            # src is at detached HEAD
+            pass
 
-        # commits:
-        self._commits = self._commits.union(src.commits)
-        # for now, fix by looking up from FS:
-        commits = _get_commits_from_disc(
-            item=self, exc=TestRepoCreationError(
-                msg="Failed to lookup commits on fresh clone")
-        )
+        # we need the commit HEAD is pointing to and its ancestry:
+        commits_to_add.extend([c.copy_to(self) for c in
+                               get_ancestry(src.head.commit)])
 
-        [self._commits.add(c) for c in commits]
+        # we got all the commits from the branches we got backwards;
+        # TODO: Make sure, this is correct. It would mean to exclude commits in
+        # src, that are part of remote branches only (from the POV of src). It
+        # also would exclude detached commits in src, that are not reachable by
+        # exploring the history of branches we got.
+        # Is this true for git-clone/git-submodule-update?
+        # Otherwise we need to add relevant commits here.
 
-        # branches:
-        #  TODO: Actually, we don't get all of them in general
-        self._branches.update({'remotes/origin/%s' % b
-                               for b in src.branches
-                               if not b.startswith('remotes/')},
-                              {'remotes/origin/HEAD'})
-        return new_items
+        #
+        # items:
+        #
+        # Based on the commits we retrieved, we know what files and submodules
+        # to get
+        items_to_add = []
+        for c in commits_to_add:
+            for it in c.items:
+                new_path = opj(self.path, os.path.relpath(it.path, src.path))
+                if new_path in [n.path for n in items_to_add]:
+                    # we got it already
+                    continue
+                if issubclass(it, ItemRepo):
+                    # we got a submodule. However, keep in mind we are updating
+                    # `self` after cloning or submodule-update, meaning that
+                    # this is a non-initialized one and we barely know anything
+                    # about it. This is what needs to be represented in the
+                    # corresponding item.
+                    new = ItemRepo(path=new_path,
+                                   src=it,
+                                   annex=it.is_annex,
+                                   annex_version=None, # TODO: do we inherit anything from self or it or src here?
+                                   annex_direct=None, # TODO: do we inherit anything from self or it or src here?
+                                   annex_init=None,  # TODO: do we inherit anything from self or it or src here?
+                                   check_definition=True  # not sure yet
+                                   )
+                    new._is_initialized = False
+                    new._super = self
+                    items_to_add.append(new)
+                elif issubclass(it, ItemFile):
+                    # we got a file
+                    # Note, that we got it by cloning and therefore can't just
+                    # copy everything
+                    new = ItemFile(path=new_path,
+                                   repo=self,
+                                   content=it.content,
+                                   state=(ItemFile.UNMODIFIED, ItemFile.UNMODIFIED),
+                                   annexed=it.annexed,
+                                   key=it.key,
+                                   src=None,
+                                   locked=None,  # TODO: tricky with V6
+                                   check_definition=True  # not sure yet
+                                   )
+                    new._content_present = False if it.annexed else None
+                    items_to_add.append(new)
+                else:
+                    # WTF?
+                    raise TestRepoCreationError(
+                        msg="Unexpected item class {it}({p}) referenced when"
+                            "updating {self}({p2}).".format(it=it.__class__,
+                                                            p=it.path,
+                                                            self=self,
+                                                            p2=self.path),
+                        item=self.__class__
+                    )
+
+        # TODO: Are we missing some cross references?
+        self._branches.extend(branches_to_add)
+        self._commits.extend(commits_to_add)
+        self._items.extend(items_to_add)
+
+        return items_to_add
 
     def _check_definition(self, path, src, runner, annex, annex_version,
                           annex_direct, annex_init,
@@ -438,18 +766,10 @@ class ItemRepo(Item):
         """
         return self._annex_init
 
-    # TODO: How to represent commits? SHAs, messages are kind of obvious but
-    # what about structure?
-    # Just a plain list? A list per branch?
-    # right now, it's a set of tuples (sha, msg)
     @property
     def commits(self):
         return self._commits
 
-    # TODO: How to represent branches? Just the names or names plus commit SHAs?
-    @property
-    def branches(self):
-        return self._branches
 
     # TODO: How to represent remotes? Just the names or names plus url(s)?
     # What about special remotes?
@@ -865,7 +1185,6 @@ class ItemFile(Item):
         self._locked = locked  # TODO: consider direct mode. There's no lock ...
         self._annexed = annexed
         self._key = key
-        self._commits = set()
         self._content_present = None  # to be set when actually adding the file
                                       # to annex
 
@@ -1017,6 +1336,7 @@ class ItemFile(Item):
             (str, str)
             First element is the commit's SHA, the second its message
         """
+        # TODO: derive from self.repo instead!
         return [c for c in self._commits]
 
     def _get_annex_key_from_disc(self, exc=None):
@@ -1779,7 +2099,6 @@ class ItemUpdateSubmodules(ItemCommand):
                     # wasn't initialized before, is now
                     sm._is_initialized = True
                     new_items.update(sm._update_from_src())
-                    sm._remotes.add(('origin', sm.src.url))
                     if sm.is_annex and sm._annex_init:
                         sm._call_annex_init()
 

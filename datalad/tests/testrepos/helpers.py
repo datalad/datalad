@@ -65,53 +65,177 @@ def _excute_by_item(cmd, item, exc=None, runner=None, cwd=None):
     return out, err
 
 
-def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
-    """convenience helper
+def _get_commits_from_disc(item, exc=None, runner=None, cwd=None, options=None):
 
-    Probably to RF, since we'll need similar ones. Just have them in one place
-    already, in particular to have output parsing at a glance
+    lookup_commits_cmd = ['git', 'log', '--name-only']
+    if options:
+        lookup_commits_cmd.extend(options)
+    lookup_commits_cmd.append('--pretty=format:start commit: %H %h%nparents: %P'
+                              '%nmessage: %B%nend commit')
 
-    Returns
-    -------
-    tuple of str
-        (commit SHA, commit message)
-    """
+    #   --name-only
+    #       Show only names of changed files.
+    # TODO: At some point we might want to switch to even record the status
+    # files were committed with:
+    #   --name-status
+    #       Show only names and status of changed files.
 
-    # TODO: - We probably need the date, too, in order to sort
-    #       - or the parents
-    #       => depends on how we get to discover structure of history. Right
-    #       now, not everything can be set during creation.
-    #       - If we ever get to test it, we may also need author etc.
-    lookup_sha_cmd = ['git', 'log', '-n', '1',
-                      "--pretty=format:%H%n%B"]
-    out, err = _excute_by_item(cmd=lookup_sha_cmd, item=item, exc=exc,
-                               runner=runner, cwd=cwd)
-    lines = out.splitlines()
-    commit_sha = lines[0]
-    commit_msg = linesep.join(lines[1:])
+    # placeholders to use in format string:
 
-    return commit_sha, commit_msg
+    # %n: newline (=> works for others as well)
 
+    # %H: commit hash
+    # %h: abbreviated commit hash
+    # %P: parent hashes (=>  space separated)
+    # %p: abbreviated parent hashes
+    # %d: ref names, like the --decorate option of git-log(1)
+    # %D: ref names without the " (", ")" wrapping.
+    # %s: subject
+    # %f: sanitized subject line, suitable for a filename
+    # %b: body
+    # %B: raw body (unwrapped subject and body)
 
-def _get_commits_from_disc(item, exc=None, runner=None, cwd=None):
-
-    lookup_commits_cmd = ['git', 'log', "--pretty=format:%H%n%B"]
     out, err = _excute_by_item(cmd=lookup_commits_cmd, item=item, exc=exc,
                                runner=runner, cwd=cwd)
 
+    from .items import Commit
     lines = out.splitlines()
     commits = []
-    line_idx = 0
-    while line_idx < len(lines):
-        commit_sha = lines[line_idx]
-        try:
-            next_empty = line_idx + lines[line_idx:].index('')
-        except ValueError:
-            next_empty = len(lines)
-        commit_msg = linesep.join(lines[line_idx+1:next_empty])
-        commits.append((commit_sha, commit_msg))
-        line_idx = next_empty + 1
+    paths = []
+    full_sha = None
+    short_sha = None
+    parent_shas = None
+    lineidx = 0
+    while lineidx < len(lines):
+        if lines[lineidx].startswith('start commit: '):
+            full_sha, short_sha = lines[lineidx][14:].split()
+            lineidx += 1
+            continue
+        if lines[lineidx].startswith('parents: '):
+            parent_shas = lines[lineidx][9:].split()
+            lineidx += 1
+            continue
+        if lines[lineidx].startswith('message: '):
+            message = lines[lineidx][9:]
+            lineidx += 1
+            while not lines[lineidx].startswith('end commit'):
+                message += lines[lineidx]
+                lineidx += 1
+            while not lines[lineidx].startswith('start commit: '):
+                # we have a path to register with this commit
+                if lines[lineidx]:
+                    paths.append(lines[lineidx].strip())
+                lineidx += 1
+
+            # we retrieved everything. build the commit:
+            commits.append(Commit(repo=item, sha=full_sha, short=short_sha,
+                                  parents=parent_shas, message=message,
+                                  paths=paths))
+            # reset everything and proceed
+            paths = []
+            full_sha = None
+            short_sha = None
+            parent_shas = None
+            continue
+        # we should never get here
+        # either format was changed, without adjusting parsing accordingly or
+        # something unexpected happened.
+
+        msg = "Output parsing for git-log failed at line {idx}:{ls}{line}" \
+              "".format(idx=lineidx,
+                        ls=linesep,
+                        line=lines[lineidx])
+        if exc:
+            exc.message += msg
+        else:
+            exc = RuntimeError(msg)
+        raise exc
+
     return commits
+
+
+def _get_last_commit_from_disc(item, exc=None, runner=None, cwd=None):
+    """convenience helper
+
+    Returns
+    -------
+    Commit
+    """
+
+    commit = _get_commits_from_disc(item=item, exc=exc, runner=runner, cwd=cwd,
+                                    options=['-n', '1'])
+    assert(len(commit) == 1)
+    return commit[0]
+
+
+def _get_branches_from_disc(item, exc=None, runner=None, cwd=None,
+                            options=None):
+
+    from .items import Branch
+
+    branch_cmd = ['git', 'branch']
+    if options:
+        branch_cmd.extend(options)
+    branch_cmd.extend(['-a', '-v', '-v'])
+
+    out, err = _excute_by_item(branch_cmd, item=item, exc=exc,
+                               runner=runner, cwd=cwd)
+
+    # Example outputs including remote branches, possible tracking branches, commits, ...
+    # % git branch -a -v -v
+    #  0.5.x                                                    28beca1a [origin/0.5.x: behind 4] Merge pull request #1534 from yarikoptic/bf-sphinx
+    #  bf-1275                                                  0d5d41c5 [gh-mih/bf-1275] RF: Do not place default push config on publish anymore
+    #  bf-1319                                                  af3be13d BF: Correct assertion to check what we are actually interested in. (Closes #1319)
+    #* rf-testrepos                                             6d0f4caa ENH: Make TestRepos actually lazy. We need to reference persistent ones in other TestRepos using them. Therefore the laziness wasn't real, since the simple import of repos.py instantiated all of them, that were referenced this way. Now, the 'src' parameter of an ItemRepo isn't required to be an ItemRepo anymore, but is allowed to be a callable.
+    #  remotes/origin/HEAD                                      -> origin/master
+    #* (HEAD detached at 94ac5bf)                               94ac5bf Adding a rudimentary git-annex load file
+
+    branches = []
+    lines = out.splitlines()
+    for line in lines:
+
+        # TODO: points_to and upstream need a 'remotes/' - prefix (sometimes)
+
+        is_head = False
+        if line[0] == '*':
+            is_head = True
+        if "HEAD detached" in line:
+            if not is_head:
+                # WTF?
+                raise
+            name = 'HEAD'
+            (head, sep, tail) = line.partition(')')
+            remainder = tail.lstrip()
+        else:
+            name = line[2:].split()[0]
+            remainder = line[3+len(name):].lstrip()
+        if remainder.startswith('->'):
+            points_to = remainder[2:].strip()
+            short_sha = None
+            upstream = None
+        else:
+            points_to = None
+            short_sha = remainder.split()[0]
+            remainder = remainder[len(short_sha)+1:]
+            if remainder.startswith('['):
+                idx = remainder.find(']')
+                upstream = remainder[1:idx].split()[0].rstrip(':')
+                # remainder = remainder[idx+1:] # Not used currently
+            else:
+                upstream = None
+            # message = remainder.strip() # Not used currently
+
+        branches.append(Branch(name=name, repo=item, short_sha=short_sha,
+                               upstream=upstream, head_points_to=points_to,
+                               is_active=is_head))
+        if is_head and name != 'HEAD':
+            # derive special branch 'HEAD' in addition:
+            branches.append(Branch(name='HEAD', repo=item, short_sha=None,
+                                   upstream=None, head_points_to=name,
+                                   is_active=False)
+                            )
+
+    return branches
 
 
 def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
@@ -124,25 +248,11 @@ def _get_branch_from_commit(item, commit, exc=None, runner=None, cwd=None):
 
     Returns
     -------
-    list of str
+    list of Branch
     """
 
-    lookup_branch_cmd = ['git', 'branch', '--contains', commit]
-    out, err = _excute_by_item(lookup_branch_cmd, item=item, exc=exc,
-                               runner=runner, cwd=cwd)
-    return [line[2:]
-            for line in out.splitlines()
-            if "HEAD detached" not in line]
-
-
-def _get_branches_from_disc(item, exc=None, runner=None, cwd=None):
-
-    branch_cmd = ['git', 'branch', '-a']
-    out, err = _excute_by_item(branch_cmd, item=item, exc=exc,
-                               runner=runner, cwd=cwd)
-    return [line[2:].split()[0]
-            for line in out.splitlines()
-            if "HEAD detached" not in line]
+    return _get_branches_from_disc(item=item, exc=exc, runner=runner, cwd=cwd,
+                                   options=['--contains', commit.sha])
 
 
 def _get_remotes_from_config(repo):
@@ -203,3 +313,15 @@ def _get_submodules_from_disc(item, exc=None, runner=None, cwd=None):
             ref = None
         submodules.append((st, sha, path, ref))
     return submodules
+
+
+def get_ancestry(commit, include=True):
+
+    if not commit.parents:
+        return [commit] if include else []
+
+    parents = []
+    for c in commit.parents:
+        parents.extend(get_ancestry(c))
+
+    return parents

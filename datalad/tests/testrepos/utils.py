@@ -35,9 +35,8 @@ from .repos import *
 #         apply. This would just copy the Item from TestRepo, inject the changes
 #         and call assert_intact() without ever calling create()
 
-
-
 # TODO: can we stack with_testrepos_new in order to set read_only for just some of it? (for example: everything without a submodule can be read_only, since we want to just notice that fact and fail accordingly. More test code is then to be executed for the ones that have submodules only)
+
 
 @optional_args
 def with_testrepos_new(t, read_only=False, selector='all'):
