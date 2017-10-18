@@ -717,7 +717,7 @@ class BasicMixed(TestRepo_NEW):
                       'item': ['test.dat', 'INFO.txt'],
                       'msg': "Adding a basic INFO file and "
                              "rudimentary load file for annex "
-                             "testing\nsome\nadditional\nlines"}),
+                             "testing"}),
         (ItemFile, {'path': 'test-annex.dat',
                     'src': get_local_file_url(get_persistent_file('test-annex.dat')),
                     'state': (ItemFile.ADDED,
@@ -796,8 +796,7 @@ class MixedSubmodulesOldOneLevel(TestRepo_NEW):
                                 'repo': '.',
                                 'item': ['subm 1', '2'],
                                 'commit': True,
-                                'commit_msg': "Adding submodules 'subm 1' "
-                                              "and '2'"}),
+                                'commit_msg': "Added subm 1 and 2."}),
         ]
 
 
@@ -824,7 +823,7 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
         # Use BasicMix as an item in that list just for demo:
         # it's effect is the same as extending BasicMixed._cls_item_definition
         # as it's done in MixedSubmodulesOldOneLevel above:
-        (MixedSubmodulesOldOneLevel, {'path': '.'}),
+        (BasicMixed, {'path': '.'}),
 
         # get a clone of MixedSubmodulesOldOneLevel:
         (ItemRepo, {'path': 'sub dataset1',
