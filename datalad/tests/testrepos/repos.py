@@ -559,7 +559,7 @@ class TestRepo_NEW(object):  # object <=> ItemRepo?
 # To be enhanced if needed. See BasicMixed testrepo for an example on how it
 # is used.
 # Each file is a tuple of a content str and a path. The paths are relative to
-# the _persistent_store
+# the _persistent_store_root
 remote_file_list = [('test-annex.dat', "content to be annex-addurl'd")]
 
 
@@ -573,9 +573,16 @@ remote_file_list = [('test-annex.dat', "content to be annex-addurl'd")]
 
 
 def _make_persistent_store():
-    """create a temp directory, where to store files and repos persistently
+    """Creates a store for files and TestRepo instances, that are persistent
+    across tests
+
+    create a temp directory, where to store files and repos persistently
     across tests; this is needed for files, that should be annex-addurl'd by
     definition of a TestRepo for example and for persistent TestRepos.
+
+    Additionally, have
+
+
     """
     # TODO: We might want to be able to configure a non-temporary location for
     # this store to be persistent even across test runs
@@ -589,7 +596,7 @@ def _make_persistent_store():
     os.makedirs(opj(path, 'testrepos'))
     return path
 
-_persistent_store = _make_persistent_store()
+_persistent_store_root = _make_persistent_store()
 _persistent_repo_store = dict()
 
 
@@ -610,7 +617,7 @@ def get_persistent_file(path):
             msg="Ambiguous definition of persisten file {p}".format(p=path)
         )
     entry = entry[0]
-    real_path = opj(_persistent_store, 'files', path)
+    real_path = opj(_persistent_store_root, 'files', path)
     if not os.path.exists(real_path):
         # check for possible subdirs to make:
         dir_ = os.path.dirname(real_path)
@@ -622,7 +629,7 @@ def get_persistent_file(path):
     return real_path
 
 
-def get_persistent_testrepo(cls):
+def get_persistent_testrepo(cls, attr=None):
     """Get persistent instance of `cls`
 
     Creates that TestRepo if required and checks its integrity via assert_intact
@@ -634,14 +641,24 @@ def get_persistent_testrepo(cls):
             msg="{cl} is not a subclass of TestRepo".format(cl=cls)
         )
 
-    if cls.__name__ not in _persistent_repo_store:
-        # Note: instead of lower() we might want to base the path on CamelCase
-        # conversion like camel_case
-        _persistent_repo_store[cls.__name__] = \
-            cls(path=opj(_persistent_store, 'testrepos', cls.__name__.lower()))
-    else:
-        _persistent_repo_store[cls.__name__].assert_intact()
-    return _persistent_repo_store[cls.__name__]
+    def lazy_delivery():
+        if cls.__name__ not in _persistent_repo_store:
+            # Note: instead of lower() we might want to base the path on
+            # CamelCase conversion like camel_case
+            _persistent_repo_store[cls.__name__] = \
+                cls(path=opj(_persistent_store_root, 'testrepos',
+                             cls.__name__.lower()
+                             )
+                    )
+        else:
+            _persistent_repo_store[cls.__name__].assert_intact()
+
+        if attr is None:
+            return _persistent_repo_store[cls.__name__]
+        else:
+            return getattr(_persistent_repo_store[cls.__name__], attr)
+
+    return lazy_delivery
 # apparently required to make nose not try to run it:
 get_persistent_testrepo.__test__ = False
 
@@ -784,11 +801,11 @@ class MixedSubmodulesOldOneLevel(TestRepo_NEW):
         [
             # Here we specify a clone of a persistent instance of BasicMixed:
             (ItemRepo, {'path': 'subm 1',
-                        'src': get_persistent_testrepo(BasicMixed).repo,
+                        'src': get_persistent_testrepo(BasicMixed, 'repo'),
                         'annex': True,
                         'annex_init': True}),
             (ItemRepo, {'path': '2',
-                        'src': get_persistent_testrepo(BasicMixed).repo,
+                        'src': get_persistent_testrepo(BasicMixed, 'repo'),
                         'annex': True,
                         'annex_init': True}),
             # Add both ItemRepos as submodules and commit:
@@ -827,14 +844,14 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
 
         # get a clone of MixedSubmodulesOldOneLevel:
         (ItemRepo, {'path': 'sub dataset1',
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel, 'repo'),
                     'annex': True,
                     'annex_init': True}),
         (ItemUpdateSubmodules, {'repo': 'sub dataset1',
                                 'init': True}),
         # Now, one level deeper:
         (ItemRepo, {'path': opj('sub dataset1', 'sub sub dataset1'),
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel).repo,
+                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel, 'repo'),
                     'annex': True,
                     'annex_init': True}),
         (ItemUpdateSubmodules, {'repo': opj('sub dataset1', 'sub sub dataset1'),

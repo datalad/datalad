@@ -224,14 +224,19 @@ class ItemRepo(Item):
         self._created_items = set()  # additional items instantiated during creation
         self._is_initialized = False  # not yet created/initialized
 
+    @property
+    def src(self):
+        # self._src might be a callable:
+        return self._src() if self._src and not isinstance(self._src, ItemRepo) else self._src
+
     def _update_from_src(self, src=None):
         """update all information self retrieved the moment it was cloned from
-        self._src
+        self.src
         """
 
         new_items = set()
         if src is None:
-            src = self._src
+            src = self.src
 
         # we cloned, so we have a remote 'origin':
         self._remotes.add(('origin', src.url))
@@ -324,10 +329,13 @@ class ItemRepo(Item):
                 item=self.__class__
             )
 
-        if src is not None and not isinstance(src, ItemRepo):
+        if src is not None and \
+                not isinstance(src, ItemRepo) and \
+                not callable(src):
             raise InvalidTestRepoDefinitionError(
-                msg="Parameter 'src' is expected to be an ItemRepo but was: "
-                    "{src}".format(src=src),
+                msg="Parameter 'src' is expected to be an ItemRepo or a "
+                    "callable returning an ItemRepo but was: {src}"
+                    "".format(src=src),
                 item=self.__class__
             )
 
@@ -532,7 +540,7 @@ class ItemRepo(Item):
                                 "Failed to switch to direct mode")
                             )
             # TODO: we need to figure out what branch HEAD is pointing to or
-            # what branch we just cloned from self._src. For now, just go
+            # what branch we just cloned from self.src. For now, just go
             # for 'master':
             self._branches.add('annex/direct/master')
         else:
@@ -565,8 +573,8 @@ class ItemRepo(Item):
 
         # create the git repository:
         create_cmd = ['git']
-        create_cmd.extend(['clone', self._src.url, os.curdir]
-                          if self._src else ['init'])
+        create_cmd.extend(['clone', self.src.url, os.curdir]
+                          if self.src else ['init'])
 
         _excute_by_item(cmd=create_cmd, item=self,
                         exc=TestRepoCreationError(
@@ -574,7 +582,7 @@ class ItemRepo(Item):
                         )
         self._is_initialized = True
 
-        if self._src:
+        if self.src:
             # we just cloned
             self._created_items.update(self._update_from_src())
 
@@ -607,19 +615,19 @@ class ItemRepo(Item):
                 assert(self.annex_is_initialized is True)
             if not self.annex_is_initialized:
                 # This needs to be a clone
-                assert(self._src)
-                assert(('origin', self._src) in self.remotes)
+                assert(self.src)
+                assert(('origin', self.src) in self.remotes)
             else:
                 # TODO: V6 adjusted branch
                 any(b == 'git-annex' or 'annex/direct' in b
                     for b in self.branches)
 
-        if self._src and self._is_initialized:
-            # Note: self._src indicates that we cloned the repo from somewhere.
+        if self.src and self._is_initialized:
+            # Note: self.src indicates that we cloned the repo from somewhere.
             # Therefore we have 'origin'. Theoretically there could be an
-            # ItemCommand that removed that remote, but left self._src.
+            # ItemCommand that removed that remote, but left self.src.
             # If that happens, that ItemCommand probably should be adapted to
-            # also remove self._src.
+            # also remove self.src.
             assert(self.remotes)
 
         assert_is_instance(self.branches, set)
@@ -1771,7 +1779,7 @@ class ItemUpdateSubmodules(ItemCommand):
                     # wasn't initialized before, is now
                     sm._is_initialized = True
                     new_items.update(sm._update_from_src())
-                    sm._remotes.add(('origin', sm._src.url))
+                    sm._remotes.add(('origin', sm.src.url))
                     if sm.is_annex and sm._annex_init:
                         sm._call_annex_init()
 
