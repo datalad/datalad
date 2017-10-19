@@ -132,6 +132,10 @@ matrix:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  # run if git-annex version in neurodebian -devel differs
+  - python: 2.7
+    env:
+    - _DATALAD_DEVEL_ANNEX=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
