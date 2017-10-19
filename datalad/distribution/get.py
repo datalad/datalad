@@ -107,15 +107,23 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False))
 
-        # attempt: provided (configured?) submodule URL
-        # TODO: consider supporting DataLadRI here?  or would confuse
-        #  git and we wouldn't want that (i.e. not allow pure git clone
-        #  --recursive)
-        if sm_url:
-            clone_urls += _get_flexible_source_candidates(
-                sm_url,
-                remote_url if remote_url else ds.path,
-                alternate_suffix=False)
+            # attempt: provided (configured?) submodule URL
+            # TODO: consider supporting DataLadRI here?  or would confuse
+            #  git and we wouldn't want that (i.e. not allow pure git clone
+            #  --recursive)
+            if sm_url:
+                clone_urls += _get_flexible_source_candidates(
+                    sm_url,
+                    remote_url,
+                    alternate_suffix=False
+                )
+
+    # Do based on the ds.path as the last resort
+    if sm_url:
+        clone_urls += _get_flexible_source_candidates(
+            sm_url,
+            ds.path,
+            alternate_suffix=False)
 
     return unique(clone_urls)
 
