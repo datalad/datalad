@@ -151,6 +151,10 @@ matrix:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+  # run if git-annex version in neurodebian -devel differs
+  - python: 2.7
+    env:
+    - _DATALAD_DEVEL_ANNEX=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -174,6 +178,8 @@ before_install:
   - eatmydata npm install grunt-cli
   # Install optionally upstream current development so we are sure that they break nothing important for us
   - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
+  # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
+  - if [ ! -z "${_DATALAD_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
