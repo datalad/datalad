@@ -847,6 +847,7 @@ def test_install_subds_with_space(opath, tpath):
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
+@skip_ssh
 @usecase
 @with_tempfile(mkdir=True)
 def test_install_subds_from_another_remote(topdir):
@@ -857,7 +858,7 @@ def test_install_subds_from_another_remote(topdir):
         clone2_ = 'clone2'
 
         origin = create(origin_, no_annex=True)
-        clone1 = install(source=origin_, path=clone1_)
+        clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
         clone1.create_sibling('ssh://localhost%s/%s' % (getpwd(), clone2_), name=clone2_)
 
