@@ -74,23 +74,22 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     parent's module tracking branch remote.
     """
     clone_urls = []
-    # if we have a remote, let's check the location of that remote
-    # for the presence of the desired submodule
-    try:
-        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
-    except StopIteration:
-        # no commit for it -- strange! what to do?
-        raise RuntimeError(
-            "Expected at least  a single commit to be known for %s/%s"
-            % (ds.path, sm_path)
-        )
+
     # should be our first candidate
     tracking_remote, tracking_branch = ds.repo.get_tracking_branch()
     candidate_remotes = [tracking_remote] if tracking_remote else []
 
-    # ideally should also give preference to the remotes which have
-    # the same branch checked out I guess
-    candidate_remotes += list(ds.repo._gen_remotes_having_commit(last_commit))
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+    try:
+        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
+        # ideally should also give preference to the remotes which have
+        # the same branch checked out I guess
+        candidate_remotes += list(ds.repo._gen_remotes_having_commit(last_commit))
+    except StopIteration:
+        # no commit for it known yet, ... oh well
+        pass
+
     for remote in unique(candidate_remotes):
         remote_url = ds.repo.get_remote_url(remote, push=False)
 
