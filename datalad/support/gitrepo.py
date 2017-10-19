@@ -1262,6 +1262,21 @@ class GitRepo(RepoInterface):
         """
         return gitpy.objects.commit.Commit.iter_items(self.repo, branch, paths=files)
 
+    def _gen_remotes_having_commit(self, commit_hexsha, with_urls_only=True):
+        """Traverse all branches of the remote and check if commit in any of their ancestry
+
+        It is a generator yielding names of the remotes
+        """
+        for remote_obj in self.repo.remotes:
+            if with_urls_only and \
+                    not self.config.get('remote.%s.url' % remote_obj.name):
+                continue
+            for ref in remote_obj.refs:
+                if any(c.hexsha == commit_hexsha
+                        for c in self.repo.merge_base(ref.commit, commit_hexsha)):
+                    yield remote_obj.name
+                    break
+
     def _gitpy_custom_call(self, cmd, cmd_args=None, cmd_options=None,
                            git_options=None, env=None,
 
