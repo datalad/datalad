@@ -14,6 +14,7 @@ from os import linesep
 from os.path import join as opj
 from ...support.exceptions import CommandError
 from ...dochelpers import exc_str
+from .exc import TestRepoError
 
 lgr = logging.getLogger('datalad.tests.testrepos.helpers')
 
@@ -99,6 +100,19 @@ def _get_commits_from_disc(item, exc=None, runner=None, cwd=None, options=None):
                                runner=runner, cwd=cwd)
 
     from .items import Commit
+
+    # ... circular import?
+    from .items import ItemRepo
+    if isinstance(item, ItemRepo):
+        repo = item
+    elif hasattr(item, 'repo'):
+        repo = item.repo
+    elif hasattr(item, '_repo'):
+        repo = item._repo
+    else:
+        # WTF
+        raise TestRepoError("MEEEEH")
+
     lines = out.splitlines()
     commits = []
     paths = []
@@ -121,14 +135,15 @@ def _get_commits_from_disc(item, exc=None, runner=None, cwd=None, options=None):
             while not lines[lineidx].startswith('end commit'):
                 message += lines[lineidx]
                 lineidx += 1
-            while not lines[lineidx].startswith('start commit: '):
+            while lineidx < len(lines) and \
+                    not lines[lineidx].startswith('start commit: '):
                 # we have a path to register with this commit
                 if lines[lineidx]:
                     paths.append(lines[lineidx].strip())
                 lineidx += 1
 
             # we retrieved everything. build the commit:
-            commits.append(Commit(repo=item, sha=full_sha, short=short_sha,
+            commits.append(Commit(repo=repo, sha=full_sha, short=short_sha,
                                   parents=parent_shas, message=message,
                                   paths=paths))
             # reset everything and proceed
@@ -192,9 +207,20 @@ def _get_branches_from_disc(item, exc=None, runner=None, cwd=None,
 
     branches = []
     lines = out.splitlines()
-    for line in lines:
 
-        # TODO: points_to and upstream need a 'remotes/' - prefix (sometimes)
+    # ... circular import?
+    from .items import ItemRepo
+    if isinstance(item, ItemRepo):
+        repo = item
+    elif hasattr(item, 'repo'):
+        repo = item.repo
+    elif hasattr(item, '_repo'):
+        repo = item._repo
+    else:
+        # WTF
+        raise TestRepoError("MEEEEH")
+
+    for line in lines:
 
         is_head = False
         if line[0] == '*':
@@ -211,6 +237,7 @@ def _get_branches_from_disc(item, exc=None, runner=None, cwd=None,
             remainder = line[3+len(name):].lstrip()
         if remainder.startswith('->'):
             points_to = remainder[2:].strip()
+            points_to = "remotes/" + points_to
             short_sha = None
             upstream = None
         else:
@@ -220,18 +247,21 @@ def _get_branches_from_disc(item, exc=None, runner=None, cwd=None,
             if remainder.startswith('['):
                 idx = remainder.find(']')
                 upstream = remainder[1:idx].split()[0].rstrip(':')
+                upstream = "remotes/" + upstream
                 # remainder = remainder[idx+1:] # Not used currently
             else:
                 upstream = None
             # message = remainder.strip() # Not used currently
 
-        branches.append(Branch(name=name, repo=item, short_sha=short_sha,
-                               upstream=upstream, head_points_to=points_to,
+        branches.append(Branch(name=name, repo=repo,
+                               commit=short_sha,
+                               upstream=upstream,
+                               points_to=points_to,
                                is_active=is_head))
         if is_head and name != 'HEAD':
             # derive special branch 'HEAD' in addition:
-            branches.append(Branch(name='HEAD', repo=item, short_sha=None,
-                                   upstream=None, head_points_to=name,
+            branches.append(Branch(name='HEAD', repo=repo, commit=None,
+                                   upstream=None, points_to=name,
                                    is_active=False)
                             )
 

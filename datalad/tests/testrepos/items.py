@@ -72,6 +72,13 @@ class Branch(object):
         self.repo = repo
         self.name = name
 
+        self.commit = commit
+        self.upstream = upstream
+        self.points_to = points_to
+
+        self.is_active = is_active
+
+    def set_commit(self, commit):
         if commit is None:
             self._commit = self._commit_short = None
         elif isinstance(commit, Commit):
@@ -83,27 +90,8 @@ class Branch(object):
             # that we need to be robust against different lengths of short SHA
             # anyway.
             self._commit_short = commit
-        if upstream is None:
-            self._upstream = self._upstream_name = None
-        elif isinstance(upstream, Branch):
-            self._upstream = upstream
-        else:
-            # assume just name
-            self._upstream_name = upstream
 
-        if points_to is None:
-            self._head_points_to = self._head_points_to_name = None
-        elif isinstance(points_to, Branch):
-            self._head_points_to = points_to
-        else:
-            # assume just name
-            self._head_points_to_name = points_to
-
-        self.is_active = is_active
-
-    # TODO: setter
-    @property
-    def commit(self):
+    def get_commit(self):
         """
         Returns
         -------
@@ -139,9 +127,18 @@ class Branch(object):
 
         return self._commit
 
-    # TODO: setter
-    @property
-    def upstream(self):
+    commit = property(get_commit, set_commit)
+
+    def set_upstream(self, upstream):
+        if upstream is None:
+            self._upstream = self._upstream_name = None
+        elif isinstance(upstream, Branch):
+            self._upstream = upstream
+        else:
+            # assume just name
+            self._upstream_name = upstream
+
+    def get_upstream(self):
         """
         Returns
         -------
@@ -178,9 +175,18 @@ class Branch(object):
                 self._upstream = hit_upstream[0]
         return self._upstream
 
-    # TODO: setter
-    @property
-    def points_to(self):
+    upstream = property(get_upstream, set_upstream)
+
+    def set_points_to(self, points_to):
+        if points_to is None:
+            self._head_points_to = self._head_points_to_name = None
+        elif isinstance(points_to, Branch):
+            self._head_points_to = points_to
+        else:
+            # assume just name
+            self._head_points_to_name = points_to
+
+    def get_points_to(self):
         """
         Returns
         -------
@@ -217,6 +223,8 @@ class Branch(object):
                     )
                 self._head_points_to = hit_branches[0]
         return self._head_points_to
+
+    points_to = property(get_points_to, set_points_to)
 
     def copy_to(self, repo):
         # Note: copies references, but NOT the reference objects!
@@ -458,7 +466,6 @@ class ItemRepo(Item):
         self._branches = [] # ... of Branch
         self._remotes = []  # ... of tuple (name, url)  # For now
         self._super = None  # ItemRepo
-        self._created_items = []  # additional items instantiated during creation # TODO: should that be an actual attribute? Can be local for create(), I guess
         self._is_initialized = False  # not yet created/initialized
 
     @property
@@ -475,10 +482,53 @@ class ItemRepo(Item):
 
     @property
     def head(self):
+        """Get special branch 'HEAD'
+
+        Note, that HEAD is supposed to usually just point to another branch.
+        If `points_to` is None, HEAD is detached.
+        This also implicates, that `commit` is None usually and only references
+        an actual `Commit` if HEAD is detached.
+        If that is not what you want, you might want to use active_branch
+        instead.
+
+        Returns
+        -------
+        Branch or None
+        """
         candidates = [b for b in self._branches if b.name == 'HEAD']
         if len(candidates) > 1:
-            raise TestRepoError(msg="Found more than one 'HEAD' in {repo}"
-                                    "".format(repo=self),
+            raise TestRepoError(msg="Found more than one 'HEAD' in "
+                                    "{repo}:{ls}{hits}"
+                                    "".format(repo=self,
+                                              ls=os.linesep,
+                                              hits=os.linesep.join([b.name
+                                                                    for b in
+                                                                    candidates])
+                                              ),
+                                item=self.__class__)
+        elif not candidates:
+            return None
+        else:
+            return candidates[0]
+
+    @property
+    def active_branch(self):
+        """
+
+        Returns
+        -------
+        Branch or None
+        """
+        candidates = [b for b in self._branches if b.is_active]
+        if len(candidates) > 1:
+            raise TestRepoError(msg="Found more than one active branch in "
+                                    "{repo}:{ls}{hits}"
+                                    "".format(repo=self,
+                                              ls=os.linesep,
+                                              hits=os.linesep.join([b.name
+                                                                    for b in
+                                                                    candidates])
+                                              ),
                                 item=self.__class__)
         elif not candidates:
             return None
@@ -501,7 +551,7 @@ class ItemRepo(Item):
         # we cloned, so we have a remote 'origin':
         # TODO: can that be different if were submodule-update'd?
         #       -> However: it can once we also consider fetch/pull
-        self._remotes.add(('origin', src.url))
+        self._remotes.append(('origin', src.url))
 
         #
         # ### branches and their commits: ###
@@ -514,7 +564,8 @@ class ItemRepo(Item):
             # except remote branches in src:
             if src_branch.name.startswith('remotes/'):
                 continue
-            branches_to_add.append(Branch(name='remotes/origin/' + src_branch.name,
+            branches_to_add.append(Branch(name='remotes/origin/' +
+                                               src_branch.name,
                                           repo=self,
                                           commit=src_branch.commit.sha,
                                           upstream=None,
@@ -545,9 +596,13 @@ class ItemRepo(Item):
 
         branches_to_add.append(Branch(name='HEAD',
                                       repo=self,
-                                      commit=src.head.commit.sha,
+                                      commit=src.head.points_to.commit.sha
+                                      if src.head.points_to
+                                      else src.head.commit.sha,  # src.head detached
                                       upstream=None,
-                                      points_to=head_points_to.name,
+                                      points_to=head_points_to.name
+                                      if head_points_to
+                                      else head_points_to,  # HEAD detached
                                       is_active=head_active))
         if src.head.points_to:
             # src.head points to an actual branch, that's the one we now have as
@@ -559,7 +614,8 @@ class ItemRepo(Item):
             branches_to_add.append(Branch(name=local_branch.name,
                                           repo=self,
                                           commit=local_branch.commit.sha,
-                                          upstream='remotes/origin/' + local_branch.name,
+                                          upstream='remotes/origin/' +
+                                                   local_branch.name,
                                           points_to=None,
                                           is_active=not head_active))
         else:
@@ -568,7 +624,9 @@ class ItemRepo(Item):
 
         # we need the commit HEAD is pointing to and its ancestry:
         commits_to_add.extend([c.copy_to(self) for c in
-                               get_ancestry(src.head.commit)])
+                               get_ancestry(src.head.points_to.commit
+                                            if src.head.points_to
+                                            else src.head.commit)])
 
         # we got all the commits from the branches we got backwards;
         # TODO: Make sure, this is correct. It would mean to exclude commits in
@@ -614,7 +672,8 @@ class ItemRepo(Item):
                     new = ItemFile(path=new_path,
                                    repo=self,
                                    content=it.content,
-                                   state=(ItemFile.UNMODIFIED, ItemFile.UNMODIFIED),
+                                   state=(ItemFile.UNMODIFIED,
+                                          ItemFile.UNMODIFIED),
                                    annexed=it.annexed,
                                    key=it.key,
                                    src=None,
@@ -778,14 +837,17 @@ class ItemRepo(Item):
         # Note: names and url(s)
         return self._remotes
 
-    @property
-    def submodules(self, return_paths=False):  # doesn't work; see files
+    def get_submodules(self, return_paths=False):
         items = [it for it in self._items
                  if isinstance(it, ItemRepo) and it.superproject is self]
         if return_paths:
             return [os.path.relpath(it.path, self.path) for it in items]
         else:
             return items
+
+    @property
+    def submodules(self):
+        return self.get_submodules(return_paths=False)
 
     @property
     def superproject(self):
@@ -816,6 +878,7 @@ class ItemRepo(Item):
 
     def _call_annex_init(self):
 
+        active_before = self.active_branch
         annex_cmd = ['git', 'annex', 'init']
         if self._annex_version:
             annex_cmd.append('--version=%s' % self._annex_version)
@@ -825,20 +888,41 @@ class ItemRepo(Item):
                             "Failed to initialize annex")
                         )
 
-        self._branches.add('git-annex')
+        # TODO: Do we know more than just the name?
+        # Don't think so. This one we need to read from FS.
+        self._branches.append(Branch(name='git-annex', repo=self,
+                                     commit=None,
+                                     upstream=None,
+                                     points_to=None))
         # if we are on a fresh clone of direct mode src, we had
         # 'annex/direct/master' (or whatever HEAD) and now got the actual
         # 'master' in addition. Note, that this may be different if direct mode
         # is enforced by annex itself and therefore during annex-init. This
         # might prevent 'master' from coming alive.
-        # TODO: double check on windows!
-        # For now, simply:
-        if 'annex/direct/master' in self.branches and \
-                len([b for b in self.branches
-                     if not b.startswith('remotes/')]) == 2:
-            # just added git-annex and nothing but annex/direct/master before
-            # TODO: still wrong. If it's at detached HEAD ...
-            self._branches.add('master')
+        # TODO: double check the note above on windows!
+        # For now, this is valid only if direct mode wasn't enforced by annex
+        # itself:
+        if active_before and active_before.name.startswith('annex/direct'):
+            # This is an example of what we get, when 'annex/direct/master' was
+            # the active (and the only) branch before:
+            #   git-annex                          d08c9d0 update
+            # * master                             52c8801 bla
+            #   remotes/origin/HEAD                -> origin/annex/direct/master
+            #   remotes/origin/annex/direct/master 52c8801 bla
+            #   remotes/origin/git-annex           e7d22ae update
+            #   remotes/origin/master              52c8801 bla
+
+            # the new active branch:
+            active_after = Branch(# cut off leading 'annex/direct/':
+                                  name=active_before.name[13:],
+                                  repo=self,
+                                  commit=active_before.commit.sha,
+                                  upstream=None,
+                                  points_to=None,
+                                  is_active=True)
+            self.head.points_to = active_after
+            self._branches.append(active_after)
+            self._branches.remove(active_before)
 
         # TODO: This is code from old test repos that still uses actual
         # datalad code (AnnexRepo in particular). Should be replaced.
@@ -850,8 +934,8 @@ class ItemRepo(Item):
             # and manage to handle all http urls and requests:
             init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
                                 'datalad', autoenable=True)
-            # TODO: self._remotes.add(('datalad', {'annex-externaltype': 'datalad'}))
-            self._remotes.add(('datalad', ''))
+            # TODO: full dict!
+            self._remotes.append(('datalad', {'annex-externaltype': 'datalad'}))
 
         if self._annex_direct:
             annex_cmd = ['git', 'annex', 'direct']
@@ -859,10 +943,18 @@ class ItemRepo(Item):
                             exc=TestRepoCreationError(
                                 "Failed to switch to direct mode")
                             )
-            # TODO: we need to figure out what branch HEAD is pointing to or
-            # what branch we just cloned from self.src. For now, just go
-            # for 'master':
-            self._branches.add('annex/direct/master')
+            if not self.active_branch.name.startswith('annex/direct'):
+                # If we were in direct mode before, there's nothing to do
+                direct_branch = Branch(name='annex/direct/' +
+                                            self.active_branch.name,
+                                       repo=self,
+                                       commit=self.active_branch.commit.sha,
+                                       upstream=None,
+                                       points_to=None,
+                                       is_active=True)
+                self._branches.append(direct_branch)
+                self.head.points_to = direct_branch
+                self.head.commit = None
         else:
             # TODO: we didn't want direct mode (False) or didn't care (None).
             # check whether it was enforced by annex and adjust attribute or
@@ -874,6 +966,10 @@ class ItemRepo(Item):
         """
 
         log("Creating %s(%s)", self.__class__, self.path)
+
+        # Items we might need to create in addition
+        # (on cloning for example)
+        new_items = []
 
         # Note: self.path is the directory we want to create in. But it's also
         # CWD of the default Runner. Therefore we need to make sure the
@@ -903,14 +999,20 @@ class ItemRepo(Item):
         self._is_initialized = True
 
         if self.src:
-            # we just cloned
-            self._created_items.update(self._update_from_src())
+            # we just cloned; update `self` from src:
+            new_items.extend(self._update_from_src())
+        else:
+            # fresh git repo
+            # create a dummy HEAD to be modified by follow up actions
+            self._branches.append(Branch(name='HEAD', repo=self, commit=None,
+                                         upstream=None, points_to=None,
+                                         is_active=False))
 
         # we want to make it an annex
         if self._annex and self._annex_init:
             self._call_annex_init()
 
-        return self._created_items
+        return new_items
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -936,10 +1038,10 @@ class ItemRepo(Item):
             if not self.annex_is_initialized:
                 # This needs to be a clone
                 assert(self.src)
-                assert(('origin', self.src) in self.remotes)
+                assert(('origin', self.src.url) in self.remotes)
             else:
                 # TODO: V6 adjusted branch
-                any(b == 'git-annex' or 'annex/direct' in b
+                any(b.name == 'git-annex' or 'annex/direct' in b.name
                     for b in self.branches)
 
         if self.src and self._is_initialized:
@@ -948,21 +1050,29 @@ class ItemRepo(Item):
             # ItemCommand that removed that remote, but left self.src.
             # If that happens, that ItemCommand probably should be adapted to
             # also remove self.src.
-            assert(self.remotes)
+            assert(('origin', self.src.url) in self.remotes)
 
-        assert_is_instance(self.branches, set)
-        [assert_is_instance(b, string_types) for b in self.branches]
+        assert_is_instance(self.branches, list)
+        [assert_is_instance(b, Branch) for b in self.branches]
 
-        if self.branches:
-            assert self.commits
-            # TODO: Not necessarily vice versa? Could be just detached HEAD, I guess
+        # we have a 'special' branch HEAD, that might be detached
+        # (point_to == None). So, even in that case a commit implicates a branch
+        # and vice versa.
+        assert bool(self.commits) == bool(self.branches)
 
-        assert_is_instance(self.commits, set)
-        for c in self.commits:
-            assert_is_instance(c, tuple)
-            eq_(len(c), 2)
-            assert_is_instance(c[0], string_types)  # SHA
-            assert_is_instance(c[1], string_types)  # message
+        assert_is_instance(self.commits, list)
+        [assert_is_instance(c, Commit) for c in self.commits]
+
+        [assert_in(b.commit, self.commits) for b in self.branches]
+
+        # TODO: Are there cases where we loose commits, that are referenced to
+        # be a parent of another one we have?
+        [assert_in(p, self.commits) for c in self.commits for p in c.parents]
+
+        # TODO: we know every item, that is referenced by a commit
+        # => implementation requires us to implement a representation of a
+        # notion of "worktree" for ItemFile/ItemRepo, since the physical
+        # presence isn't required for all of those files/submodules
 
         assert_is_instance(self.files, list)
         [assert_is_instance(f_, ItemFile) for f_ in self.files]
@@ -981,8 +1091,6 @@ class ItemRepo(Item):
             assert(it.path.startswith(self.path))
             assert(it.superproject is self)
             it.assert_intact()
-            # TODO: For now, there is no place to easily check for commits that
-            # changed submodules (not commits WITHIN them)
 
         # physical appearance:
 
@@ -991,6 +1099,7 @@ class ItemRepo(Item):
 
         assert(exists(self.path))
         assert(isdir(self.path))
+
 
         if self._is_initialized:
             # it's a valid repository:
@@ -1003,8 +1112,8 @@ class ItemRepo(Item):
                 item=self,
                 exc=TestRepoAssertionError("Failed to look up branches")
             )
-            eq_(set(branches_from_disc), self.branches)
-            # TODO: are branches pointing to and containing the right commits?
+            eq_(set(branches_from_disc), set(self.branches))
+
 
             # state: tested on a per file basis?
             #        may be some overall test? (ignore submodules)
@@ -1332,12 +1441,10 @@ class ItemFile(Item):
 
         Returns
         -------
-        tuple
-            (str, str)
-            First element is the commit's SHA, the second its message
+        list of Commit
         """
-        # TODO: derive from self.repo instead!
-        return [c for c in self._commits]
+        return [c for c in self._repo.commits if self.path in
+                [it.path for it in c.items]]
 
     def _get_annex_key_from_disc(self, exc=None):
         """get the key of the file as git-annex reports it
@@ -1376,7 +1483,7 @@ class ItemFile(Item):
                 )
 
         # file actually exists now, add to repo:
-        self._repo._items.add(self)
+        self._repo._items.append(self)
 
         # Furthermore, we can git-add, git-annex-add and commit the new file.
         # Anything more complex (like add, commit, change the content,
@@ -1482,27 +1589,32 @@ class ItemFile(Item):
                 item=self,
                 exc=TestRepoCreationError("Failed to look up commit SHA")
             )
-            self._commits.add(commit)
-            self._repo._commits.add(commit)
+            assert(self.path in [it.path for it in commit.items])
+            self._repo._commits.append(commit)
 
             # we may have just created a branch 'repo' should know about. In
-            # particular when this is the first commit ever and thereby
+            # particular when this is the first commit ever and we are thereby
             # "creating" 'master'.
             # get the branch and notify repo, that it has that branch:
-            branches = _get_branch_from_commit(item=self, commit=commit[0],
-                                               exc=TestRepoCreationError(
-                                                   "Failed to look up branch")
-                                               )
-            if len(branches) > 1:
-                # we just simply committed. It couldn't rightfully end up in
-                # several branches
-                raise TestRepoCreationError(
-                    msg="Unexpectedly found commit {cmt} in multiple branches: "
-                        "{branches}".format(cmt="%s (%s)" % commit,
-                                            branches=branches),
-                    item=self.__class__
-                )
-            self._repo._branches.add(branches[0])
+            if not self._repo.active_branch:
+                # assuming we just created the first commit
+                if self._repo.is_annex and self._repo.annex_direct:
+                    master_name = 'annex/direct/master'
+                else:
+                    master_name = 'master'
+                new_master = Branch(name=master_name,
+                                    repo=self._repo,
+                                    commit=commit,
+                                    upstream=None,
+                                    points_to=None,
+                                    is_active=True
+                                    )
+                self._repo._branches.append(new_master)
+                self._repo.head.commit = None
+                self._repo.head.points_to = new_master
+            else:
+                # Otherwise just adjust the active branch for the new commit
+                self._repo.active_branch.commit = commit
 
     def assert_intact(self):
         """This supposed to make basic tests on whether or not what is stored in
@@ -1797,35 +1909,39 @@ class ItemCommit(ItemCommand):
                                                 "Failed to look up commit SHA")
                                             )
 
-        self._repo._commits.add(commit)
+        self._repo._commits.append(commit)
         for it in self._ref_items:
-            it._commits.add(commit)
             it._state_index = ItemFile.UNMODIFIED
             # TODO: Does "git commit -- myfile" stage that file before?
             # If so: adjust it._state_worktree as well!
 
             # If ItemRepo didn't know about the committed items, it definitely
             # should now!
-            self._repo._items.add(it)
+            self._repo._items.append(it)
 
         # we may have just created a branch 'repo' should know about. In
-        # particular when this is the first commit ever and thereby "creating"
-        # 'master'.
+        # particular when this is the first commit ever and we are thereby
+        # "creating" 'master'.
         # get the branch and notify repo, that it has that branch:
-        branches = _get_branch_from_commit(item=self, commit=commit[0],
-                                           exc=TestRepoCreationError(
-                                               "Failed to look up branch")
-                                           )
-        if len(branches) > 1:
-            # we just simply committed. It couldn't rightfully end up in several
-            # branches
-            raise TestRepoCreationError(
-                msg="Unexpectedly found commit {cmt} in multiple branches: "
-                    "{branches}".format(cmt="%s (%s)" % commit,
-                                        branches=branches),
-                item=self.__class__
-            )
-        self._repo._branches.add(branches[0])
+        if not self._repo.active_branch:
+            # assuming we just created the first commit
+            if self._repo.is_annex and self._repo.is_direct_mode:
+                master_name = 'annex/direct/master'
+            else:
+                master_name = 'master'
+            new_master = Branch(name=master_name,
+                                repo=self._repo,
+                                commit=commit,
+                                upstream=None,
+                                points_to=None,
+                                is_active=True
+                                )
+            self._repo._branches.append(new_master)
+            self._repo.head.commit = None
+            self._repo.head.points_to = new_master
+        else:
+            # Otherwise just adjust the active branch for the new commit
+            self._repo.active_branch.commit = commit
 
 
 @auto_repr
@@ -2029,15 +2145,41 @@ class ItemAddSubmodule(ItemCommand):
                                     list_of_subs,
                                 item=self)
                             )
-            self._repo._commits.add(_get_last_commit_from_disc(
+            commit = _get_last_commit_from_disc(
                 item=self,
-                exc=TestRepoCreationError("Failed to look up commit SHA")))
+                exc=TestRepoCreationError("Failed to look up commit SHA"))
+            self._repo._commits.append(commit)
+
+            # we may have just created a branch 'repo' should know about. In
+            # particular when this is the first commit ever and we are thereby
+            # "creating" 'master'.
+            # get the branch and notify repo, that it has that branch:
+            if not self._repo.active_branch:
+                # assuming we just created the first commit
+                if self._repo.is_annex and self._repo.annex_direct:
+                    master_name = 'annex/direct/master'
+                else:
+                    master_name = 'master'
+                new_master = Branch(name=master_name,
+                                    repo=self._repo,
+                                    commit=commit,
+                                    upstream=None,
+                                    points_to=None,
+                                    is_active=True
+                                    )
+                self._repo._branches.append(new_master)
+                self._repo.head.commit = None
+                self._repo.head.points_to = new_master
+            else:
+                # Otherwise just adjust the active branch for the new commit
+                self._repo.active_branch.commit = commit
 
 
 @auto_repr
 class ItemUpdateSubmodules(ItemCommand):
 
-    def __init__(self, repo, init=False, runner=None, cwd=None, check_definition=True):
+    def __init__(self, repo, init=False, runner=None, cwd=None,
+                 check_definition=True):
         """
 
         :param init: bool
@@ -2101,6 +2243,8 @@ class ItemUpdateSubmodules(ItemCommand):
                     new_items.update(sm._update_from_src())
                     if sm.is_annex and sm._annex_init:
                         sm._call_annex_init()
+
+        # TODO: else! Still some update required
 
         return new_items
 
