@@ -37,10 +37,8 @@ from .helpers import _get_remotes_from_config
 from .helpers import _get_submodules_from_disc
 from .helpers import _get_branches_from_disc
 from .helpers import get_ancestry
-
 from .helpers import _get_commits_from_disc
-from datalad.utils import unique
-
+from .helpers import unique_via_equals
 
 lgr = logging.getLogger('datalad.tests.testrepos.items')
 
@@ -69,14 +67,51 @@ class Branch(object):
         points_to: Branch or str
         is_active: bool
         """
+
+        # init protected members for properties:
+        self._commit = self._commit_short = None
+        self._upstream = self._upstream_name = None
+        self._head_points_to = self._head_points_to_name = None
+
         self.repo = repo
         self.name = name
-
         self.commit = commit
         self.upstream = upstream
         self.points_to = points_to
 
         self.is_active = is_active
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        # special case: 'git-annex' branch. For now we can't really know and
+        # track what commits in git-annex branch should be there under what
+        # circumstances. Therefore comparison simply ignores anything but the
+        # name ATM:
+        if self.name.endswith('git-annex') or other.name.endswith('git-annex'):
+            return self.name == other.name
+
+        # Note: for `commit`, `upstream` and `points_to` check the references
+        # only, since otherwise we would end up in an endless recursion ping
+        # pong. Whether or not the referenced objects match is to be checked
+        # elsewhere.
+        # TODO: Not sure, whether repo comparison should be "is" or "=="
+        if self.repo is other.repo and \
+           self.name == other.name and \
+           self.is_active == other.is_active and \
+           ((self.commit is None and other.commit is None) or
+            (self.commit.sha == other.commit.sha)
+            ) and \
+           ((self.upstream is None and other.upstream is None) or
+            (self.upstream.name == other.upstream.name)
+            ) and \
+           ((self.points_to is None and other.points_to is None) or
+            (self.points_to.name == other.points_to.name)
+            ):
+            return True
+        else:
+            return False
 
     def set_commit(self, commit):
         if commit is None:
@@ -101,8 +136,9 @@ class Branch(object):
         if not self._commit:
             if self._commit_short:
                 # search for it
-                hit_commits = [c for c in self.repo.commits
-                               if c.sha.startswith(self._commit_short)]
+                hit_commits = unique_via_equals(
+                    [c for c in self.repo.commits
+                     if c.sha.startswith(self._commit_short)])
                 if len(hit_commits) > 1:
                     raise TestRepoAssertionError(
                         msg="Branch '{self}': (Short) SHA collision in "
@@ -112,7 +148,10 @@ class Branch(object):
                                       p=self.repo.path,
                                       short=self._commit_short,
                                       ls=os.linesep,
-                                      commits=os.linesep.join(hit_commits))
+                                      commits=os.linesep.join(
+                                          ["%s: %s" % (c.sha, c.message)
+                                           for c in hit_commits])
+                                      )
                         )
                 if not hit_commits:
                     raise TestRepoAssertionError(
@@ -252,11 +291,13 @@ class Commit(object):
         paths: str or list or None
         """
 
+        # init protected members for properties:
+        self._parent_shas = []
+        self._parents = []
+
         self.repo = repo
         self.sha = sha
         self.short = short
-        self._parent_shas = []
-        self._parents = []
         parents = assure_list(parents)
         # Note, that we might not yet be able to match a parent's SHA with an
         # actual Commit instance in `self.repo` at the moment we are creating
@@ -269,14 +310,33 @@ class Commit(object):
         self.message = message  # property instead?
         self._paths = assure_list(paths)  # Note: relative to self.repo!
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        # Note: for `parents` and `items` check the references only, since
+        # otherwise we would end up in an endless recursion ping pong.
+        # Whether or not the referenced objects match is to be checked elsewhere
+        if self.repo is other.repo and \
+           self.sha == other.sha and \
+           (set([p_self.sha for p_self in self.parents]) ==
+            set([p_other.sha for p_other in other.parents])) and \
+            self.message == other.message and \
+           (set([it_self.path for it_self in self.items]) ==
+            set([it_other.path for it_other in other.items])):
+
+            return True
+        else:
+            return False
+
     # TODO: setter
     @property
     def parents(self):
-        from_sha = [c for c in self.repo.commits
-                    for p in self._parent_shas
-                    if p == c.sha]
+        from_sha = unique_via_equals([c for c in self.repo.commits
+                                      for p in self._parent_shas
+                                      if p == c.sha])
         assert(len(from_sha) == len(self._parent_shas))
-        return unique(from_sha + self._parents)
+        return from_sha + self._parents
 
     # TODO: setter
     @property
@@ -564,16 +624,25 @@ class ItemRepo(Item):
             # except remote branches in src:
             if src_branch.name.startswith('remotes/'):
                 continue
+
+            # special case, since we don't track git-annex branch ATM.
+            # In all other cases we expect `src_branch.commit` to not be None,
+            # since HEAD is not included in property `branches` and this would
+            # be the only other valid case where `commit` is None.
+            commit_sha = None if src_branch.name == 'git-annex' \
+                else src_branch.commit.sha
+
             branches_to_add.append(Branch(name='remotes/origin/' +
                                                src_branch.name,
                                           repo=self,
-                                          commit=src_branch.commit.sha,
+                                          commit=commit_sha,
                                           upstream=None,
                                           points_to=None,
                                           is_active=False))
             # we need the commit that branch is pointing to and its ancestry:
-            commits_to_add.extend([c.copy_to(self) for c in
-                                   get_ancestry(src_branch.commit)])
+            if src_branch.name != 'git-annex':
+                commits_to_add.extend([c.copy_to(self) for c in
+                                       get_ancestry(src_branch.commit)])
 
         # Now HEAD:
         # derive our 'HEAD' from src:
@@ -596,14 +665,26 @@ class ItemRepo(Item):
 
         branches_to_add.append(Branch(name='HEAD',
                                       repo=self,
-                                      commit=src.head.points_to.commit.sha
-                                      if src.head.points_to
-                                      else src.head.commit.sha,  # src.head detached
+                                      commit=src.head.commit.sha
+                                      if not src.head.points_to # src.head detached
+                                      else None,
                                       upstream=None,
                                       points_to=head_points_to.name
                                       if head_points_to
                                       else head_points_to,  # HEAD detached
                                       is_active=head_active))
+        # plus 'remote/origin/HEAD':
+        branches_to_add.append(Branch(name='remotes/origin/HEAD',
+                                      repo=self,
+                                      commit=src.head.commit.sha
+                                      if not src.head.points_to # src.head detached
+                                      else None,
+                                      upstream=None,
+                                      points_to='remotes/origin/' +
+                                                src.head.points_to.name
+                                      if src.head.points_to
+                                      else None,
+                                      is_active=False))
         if src.head.points_to:
             # src.head points to an actual branch, that's the one we now have as
             # a local branch
@@ -828,7 +909,6 @@ class ItemRepo(Item):
     @property
     def commits(self):
         return self._commits
-
 
     # TODO: How to represent remotes? Just the names or names plus url(s)?
     # What about special remotes?
@@ -1063,7 +1143,8 @@ class ItemRepo(Item):
         assert_is_instance(self.commits, list)
         [assert_is_instance(c, Commit) for c in self.commits]
 
-        [assert_in(b.commit, self.commits) for b in self.branches]
+        # Note, that 'HEAD' might have no commit
+        [assert_in(b.commit, self.commits) for b in self.branches if b.commit]
 
         # TODO: Are there cases where we loose commits, that are referenced to
         # be a parent of another one we have?
@@ -1100,7 +1181,6 @@ class ItemRepo(Item):
         assert(exists(self.path))
         assert(isdir(self.path))
 
-
         if self._is_initialized:
             # it's a valid repository:
             assert(exists(opj(self.path, '.git')))
@@ -1112,8 +1192,12 @@ class ItemRepo(Item):
                 item=self,
                 exc=TestRepoAssertionError("Failed to look up branches")
             )
-            eq_(set(branches_from_disc), set(self.branches))
 
+            self_branches = self.branches + [self.head]
+            assert all(any(b_self == b_real for b_real in branches_from_disc)
+                       for b_self in self_branches)
+            assert all(any(b_self == b_real for b_self in self_branches)
+                       for b_real in branches_from_disc)
 
             # state: tested on a per file basis?
             #        may be some overall test? (ignore submodules)
@@ -2109,7 +2193,7 @@ class ItemAddSubmodule(ItemCommand):
 
             # notify items:
             it._super = self._repo
-            self._repo._items.add(it)
+            self._repo._items.append(it)
 
         if self._commit:
             # used in commit- and error-message

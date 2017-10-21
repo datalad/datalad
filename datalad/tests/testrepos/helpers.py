@@ -350,8 +350,20 @@ def get_ancestry(commit, include=True):
     if not commit.parents:
         return [commit] if include else []
 
-    parents = []
+    parents = [commit] if include else []
     for c in commit.parents:
-        parents.extend(get_ancestry(c))
+        parents.extend(get_ancestry(c, include=True))
 
     return parents
+
+
+# TODO: melt in with datalad.utils.unique
+def unique_via_equals(seq):
+
+    seen = set()
+    seen_add = seen.add
+
+    def in_seen(x):
+        return any(x == i for i in seen)
+
+    return [x for x in seq if not (in_seen(x) or seen_add(x))]
