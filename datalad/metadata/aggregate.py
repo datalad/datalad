@@ -201,7 +201,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds)]
+    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds, jsondump)]
 
     # do not store content metadata if either the source or the target dataset
     # do not want it
@@ -214,7 +214,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
                 default=True,
                 valtype=EnsureBool()):
         metasources.append((
-            'cn', 'content', contentmeta, aggfrom_ds))
+            'cn', 'content', contentmeta, aggfrom_ds, jsondump))
 
     if len(metasources) > 1 and contentmeta and aggfrom_ds != agginto_ds:
         # we have content metadata and we are aggregation into another dataset,
@@ -223,10 +223,11 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
             'fs',
             'filepath',
             relevant_paths,
-            agginto_ds))
+            agginto_ds,
+            jsondump))
 
     # for both types of metadata
-    for label, mtype, meta, dest in metasources:
+    for label, mtype, meta, dest, store in metasources:
         if not meta:
             continue
         # only write to disk if there is something
@@ -239,7 +240,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
             dest.unlock(objpath)
         # TODO actually dump a compressed file when annexing is possible
         # to speed up on-demand access
-        jsondump(meta, objpath)
+        store(meta, objpath)
         # stage for dataset.save()
         to_save.append(dict(path=objpath, type='file'))
 
