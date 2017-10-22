@@ -50,7 +50,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.json_py import dump as jsondump
+from datalad.support import json_py
 
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import assure_list
@@ -201,7 +201,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds, jsondump)]
+    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds, json_py.dump)]
 
     # do not store content metadata if either the source or the target dataset
     # do not want it
@@ -214,17 +214,12 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
                 default=True,
                 valtype=EnsureBool()):
         metasources.append((
-            'cn', 'content', contentmeta, aggfrom_ds, jsondump))
-
-    if len(metasources) > 1 and contentmeta and aggfrom_ds != agginto_ds:
-        # we have content metadata and we are aggregation into another dataset,
-        # grab and store list of metadata-relevant files
-        metasources.append((
-            'fs',
-            'filepath',
-            relevant_paths,
-            agginto_ds,
-            jsondump))
+            'cn',
+            'content',
+            # sort by path key to get deterministic dump content
+            (dict(contentmeta[k], path=k) for k in sorted(contentmeta)),
+            aggfrom_ds,
+            json_py.dump2xzstream))
 
     # for both types of metadata
     for label, mtype, meta, dest, store in metasources:
@@ -458,7 +453,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
     if not ds_agginfos:
         return
 
-    jsondump(ds_agginfos, agginfo_fpath)
+    json_py.dump(ds_agginfos, agginfo_fpath)
     ds.add(agginfo_fpath, save=False, to_git=True,
            result_renderer=None, return_type=list)
     # queue for save, and mark as staged

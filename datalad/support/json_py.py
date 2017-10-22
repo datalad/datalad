@@ -11,6 +11,7 @@
 
 
 from io import open
+import lzma
 import codecs
 from os.path import dirname
 from os.path import exists
@@ -32,6 +33,13 @@ json_dump_kwargs = dict(
     ensure_ascii=False,
     encoding='utf-8', )
 
+# achieve minimal representation, but still deterministic
+compressed_json_dump_kwargs = dict(
+    json_dump_kwargs,
+    indent=None,
+    separators=(',', ':'))
+
+
 # Let's just reuse top level one for now
 from ..log import lgr
 from ..dochelpers import exc_str
@@ -50,6 +58,14 @@ def dump2fileobj(obj, fileobj):
         obj,
         codecs.getwriter('utf-8')(fileobj),
         **json_dump_kwargs)
+
+
+def dump2xzstream(obj, fname):
+    with lzma.LZMAFile(fname, mode='w') as f:
+        jwriter = codecs.getwriter('utf-8')(f)
+        for o in obj:
+            jsondump(o, jwriter, **compressed_json_dump_kwargs)
+            f.write('\n')
 
 
 def load(fname, fixup=True, **kw):
