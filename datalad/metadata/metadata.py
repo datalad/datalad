@@ -646,7 +646,7 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                     mtype, ds, loc, repr(meta))
                 errored = True
             elif meta:
-                if loc in meta:
+                if loc in contentmeta:
                     # we already have this on record -> merge
                     getattr(contentmeta[loc], 'merge_{}'.format(merge_mode))(meta)
                 else:
