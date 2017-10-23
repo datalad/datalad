@@ -9,7 +9,6 @@
 """Audio metadata parser"""
 from __future__ import absolute_import
 
-import re
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.audio')
@@ -54,7 +53,7 @@ class MetadataParser(BaseMetadataParser):
                         # duration comes in seconds, cap at millisecond level
                         val = round(val, 3)
                     meta[vocab_map.get(k, 'comment<{}>'.format(k))] = val
-            contentmeta.append((re.escape(f), meta))
+            contentmeta.append((f, meta))
 
         return {
             '@context': {

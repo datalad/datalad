@@ -68,8 +68,8 @@ def _process_tree(tree, nstag):
         ('description', 'description', True, _unwrap, _merge),
         ('version', 'version', False, None, None),
         ('sameas', "identifier[@identifierType='DOI']", False, None, None),
-		# conflicts with our notion for having a "type" to be internal and to demarkate a Dataset
-		# here might include the field e.g. Dataset/Neurophysiology, so skipping for now
+        # conflicts with our notion for having a "type" to be internal and to demarkate a Dataset
+        # here might include the field e.g. Dataset/Neurophysiology, so skipping for now
         # ('type', "resourceType[@resourceTypeGeneral='Dataset']", False, None, None),
         ('citation', "relatedIdentifier", True, None, None),
         ('tag', "subject", True, None, None),

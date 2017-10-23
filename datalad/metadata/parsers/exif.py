@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """EXIF metadata parser"""
 
-import re
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.exif')
@@ -45,7 +44,7 @@ class MetadataParser(BaseMetadataParser):
                 continue
             meta = {'exif:{}'.format(k.split()[-1]): _return_as_appropriate_dtype(info[k].printable)
                     for k in info}
-            contentmeta.append((re.escape(f), meta))
+            contentmeta.append((f, meta))
 
         return {
             '@context': {

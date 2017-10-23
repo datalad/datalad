@@ -78,7 +78,7 @@ class MetadataParser(BaseMetadataParser):
             # compact
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in meta.items()}
 
-            contentmeta.append((re.escape(f), meta))
+            contentmeta.append((f, meta))
 
         return {
             '@context': context,
