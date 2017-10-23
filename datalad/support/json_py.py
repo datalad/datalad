@@ -68,6 +68,12 @@ def dump2xzstream(obj, fname):
             f.write('\n')
 
 
+def load_xzstream(fname):
+    with lzma.LZMAFile(fname, mode='r') as f:
+        for line in f:
+            yield loads(line)
+
+
 def load(fname, fixup=True, **kw):
     """Load JSON from a file, possibly fixing it up if initial load attempt fails
 

@@ -47,6 +47,7 @@ from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
 from datalad.support.json_py import dump as jsondump
 from datalad.support.json_py import load as jsonload
+from datalad.support.json_py import load_xzstream
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import merge_native_opt
@@ -234,6 +235,18 @@ def _load_json_object(fpath, cache=None):
     return obj
 
 
+def _load_xz_json_stream(fpath, cache=None):
+    if cache is None:
+        cache = {}
+    obj = cache.get(
+        fpath,
+        {s['path']: {k: v for k, v in s.items() if k != 'path'}
+         # take out the 'path' from the payload
+         for s in load_xzstream(fpath)} if exists(fpath) else {})
+    cache[fpath] = obj
+    return obj
+
+
 def _get_metadatarelevant_paths(ds, subds_relpaths):
     return (f for f in ds.repo.get_files()
             if not any(f.startswith(_with_sep(ex)) or
@@ -277,7 +290,7 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
                                **kwargs):
     """Query the aggregated metadata in a dataset
 
-    Query paths (`aps`) have to be compose in an intelligent fashion
+    Query paths (`aps`) have to be composed in an intelligent fashion
     by the caller of this function, i.e. it should have been decided
     outside which dataset to query for any given path.
 
@@ -304,7 +317,7 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
     generator
       Of result dictionaries.
     """
-    # TODO recursive! TODO recursion_limit (will be trickier)
+    # TODO recursion_limit
 
     # TODO rename function and query datalad/annex own metadata
     # for all actually present dataset after looking at aggregated data
@@ -443,12 +456,17 @@ def _query_aggregated_metadata_singlepath(
     # content info dicts have metadata stored under paths that are relative
     # to the dataset they were aggregated from
     rparentpath = relpath(rpath, start=containing_ds)
-    # get the list of files to evaluate
-    # if the containing dataset is present we can get the files directly from it
-    # this is only the case if the containing dataset is '.', otherwise
-    # this query would have gone to a subdataset instead
-    filepathinfo_objloc = dsinfo.get('filepath_info', None)
-    if containing_ds == curdir:
+
+    annex_meta = {}
+    # TODO this condition is inadequate once we query something in an aggregated subdataset
+    # but through the dataset at curdir
+    if containing_ds == curdir and ds.config.obtain(
+            # TODO this is actuall about requerying present datasets
+            # and is a major slow-down on datasets with many files...
+            # dedicated switch?
+            'datalad.metadata.aggregate-content-datalad-core',
+            default=True,
+            valtype=EnsureBool()):
         if cache['subds_relpaths'] is None:
             subds_relpaths = ds.subdatasets(
                 fulfilled=None,
@@ -460,35 +478,6 @@ def _query_aggregated_metadata_singlepath(
         # because this will be much faster than doing it multiple times for
         # multiple queries within the same dataset
         files = _get_metadatarelevant_paths(ds, cache['subds_relpaths'])
-    elif filepathinfo_objloc:
-        obj_path = opj(agg_base_path, filepathinfo_objloc)
-        # TODO get annexed obj file
-        #ds.get(path=[obj_path], result_renderer=None)
-        files = _load_json_object(
-            obj_path,
-            cache=cache['objcache'])
-    else:
-        files = None
-
-    if files is None:
-        # no files at all, done
-        return
-
-    # get matching files
-    files = [f for f in files
-             if rparentpath == curdir or f == rparentpath or f.startswith(_with_sep(rparentpath))]
-
-    if not files:
-        # no relevant files or no info about them available, done
-        return
-
-    annex_meta = {}
-    # TODO this condition is inadequate once we query something in an aggregated subdataset
-    # but through the dataset at curdir
-    if containing_ds == curdir and ds.config.obtain(
-            'datalad.metadata.aggregate-content-datalad-core',
-            default=True,
-            valtype=EnsureBool()):
         # we are querying this dataset itself, which we know to be present
         # get uptodate file metadata from git-annex to reflect potential local
         # modifications since the last aggregation
@@ -499,16 +488,16 @@ def _query_aggregated_metadata_singlepath(
         # without having to recompute
         annex_meta.update(DLCP(ds, [])._get_content_metadata(files))
 
+    # TODO load and turn into a lookup dict -> cache
     # so we have some files to query, and we also have some content metadata
-    contentmeta = _load_json_object(
+    contentmeta = _load_xz_json_stream(
         opj(agg_base_path, contentinfo_objloc),
         cache=cache['objcache']) if contentinfo_objloc else {}
-    # content info dicts have metadata stored under paths that are relative
-    # to the dataset they were aggregated from
-    rparentpath = relpath(rpath, start=containing_ds)
 
-    compiled_exp = {pathexp: re.compile(pathexp) for pathexp in contentmeta}
-    for fpath in files:
+    for fpath in [f for f in contentmeta.keys()
+                  if rparentpath == curdir or
+                  f == rparentpath or
+                  f.startswith(_with_sep(rparentpath))]:
         # we might be onto something here, prepare result
         # start with the current annex metadata for this path, if anything
         metadata = MetadataDict(annex_meta.get(fpath, {}))
@@ -525,11 +514,8 @@ def _query_aggregated_metadata_singlepath(
             if s in dsinfo:
                 res[d] = dsinfo[s]
 
-        # loop over all records, check if path matched and merge properties
-        for pathexp in contentmeta:
-            if not compiled_exp[pathexp].match(fpath):
-                continue
-            metadata.merge_add(contentmeta[pathexp])
+        # merge records for any matching path
+        metadata.merge_add(contentmeta.get(fpath, {}))
 
         yield res
 

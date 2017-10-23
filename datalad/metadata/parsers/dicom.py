@@ -35,7 +35,6 @@ def _is_good_type(v):
         return False
 
 
-# TODO allow for blacklisting fields
 class MetadataParser(BaseMetadataParser):
     def get_metadata(self, dataset, content):
         imgseries = {}
@@ -73,9 +72,8 @@ class MetadataParser(BaseMetadataParser):
                     'type': vocabulary_id}}},
             # TODO test whether regex compaction would work for a particular file
             # set and use a compacted regex if it does (hachoir_regex module)
-            (('({})'.format(
-                '|'.join(re.escape(f) for f in files)),
-             {'dicom:{}'.format(k): v for k, v in info.items()
+            ((f,
+              {'dicom:{}'.format(k): v for k, v in info.items()
 				                    if _is_good_type(v)})
-             for info, files in imgseries.values())
+             for info, files in imgseries.values() for f in files)
         )
