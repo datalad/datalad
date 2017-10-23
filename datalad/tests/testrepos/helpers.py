@@ -301,6 +301,7 @@ def _get_remotes_from_config(repo):
     """
 
     from git import GitConfigParser, Repo
+    from .items import Remote
 
     # Note: This would fail with a .git file
     # We might need to have a git.Repo to access it's config_reader.
@@ -315,10 +316,11 @@ def _get_remotes_from_config(repo):
         cp = r.config_reader(config_level='repository')
         remotes = []
         for r_sec in [sec for sec in cp.sections() if sec.startswith("remote")]:
-            remote = (r_sec[8:-1], dict())
+            name = r_sec[8:-1]
+            settings = dict()
             for r_opt in cp.options(section=r_sec):
-                remote[1][r_opt] = cp.get_value(r_sec, r_opt)
-            remotes.append(remote)
+                settings[r_opt] = cp.get_value(r_sec, r_opt)
+            remotes.append(Remote(name, settings))
 
     return remotes
 

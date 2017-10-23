@@ -355,6 +355,54 @@ class Commit(object):
                              for it in self.items])
 
 
+class Remote(object):
+
+    def __init__(self, name, settings=None):
+        """
+
+        Parameters
+        ----------
+        name: str
+            name of the remote
+        settings dict or None
+        """
+        self.name = name
+        self.settings = settings
+
+    def __eq__(self, other):
+
+        if not isinstance(other, self.__class__):
+            return False
+
+        if self.name != other.name:
+            return False
+
+        if (self.settings and 'annex-externaltype' in self.settings) or \
+                (other.settings and 'annex-externaltype' in other.settings):
+            # annex special remote
+            # for now it's a special case
+            # don't know yet, how to derive uuid etc. without reading it from FS
+            # => no point in comparing things we can't properly represent
+            try:
+                return self.settings['annex-externaltype'] == \
+                            other.settings['annex-externaltype']
+            except KeyError:
+                return False
+
+        if (self.settings and 'url' in self.settings) or \
+                (other.settings and 'url' in other.settings):
+            # TODO: For now a "special case", too. Just compare urls for
+            # ordinary remotes; In order to be complete, we need to figure out,
+            # when to set 'annex-uuid', 'fetch', etc and what to set to.
+            try:
+                return self.settings['url'] == other.settings['url']
+            except KeyError:
+                return False
+
+        # TODO: This is the ultimate goal here:
+        #return self.settings == other.settings
+
+
 @auto_repr
 @add_metaclass(ABCMeta)
 class Item(object):
@@ -389,7 +437,11 @@ class Item(object):
 
         Something like: file:///that/is/where/my/item/lives
         """
-        return get_local_file_url(self._path)
+
+        # Note: For now unquote, since everything we might compare this to
+        # (like 'url' in .git/config) stores an unquoted version
+        from six.moves.urllib.parse import unquote
+        return unquote(get_local_file_url(self._path))
     # TODO: use serve_path_via_http in an additional property?
 
     # TODO: abstractmethod is insufficient. The way Items call it, is actually
@@ -521,11 +573,10 @@ class ItemRepo(Item):
         self._annex_direct = annex_direct if annex else False
         self._annex_init = annex_init if annex else False
 
-        # TODO: we must not use set; let it be lists and use datalad.utils.unique
         self._items = []  # ... of Item
         self._commits = []  # ... of Commit
-        self._branches = [] # ... of Branch
-        self._remotes = []  # ... of tuple (name, url)  # For now
+        self._branches = []  # ... of Branch
+        self._remotes = []  # ... of Remote
         self._super = None  # ItemRepo
         self._is_initialized = False  # not yet created/initialized
 
@@ -612,7 +663,16 @@ class ItemRepo(Item):
         # we cloned, so we have a remote 'origin':
         # TODO: can that be different if were submodule-update'd?
         #       -> However: it can once we also consider fetch/pull
-        self._remotes.append(('origin', src.url))
+        self._remotes.append(Remote('origin', {'url': src.url}))
+
+        # special remotes are special :-)
+        # For now assuming we get them from source
+        # TODO: Not sure yet under what circumstances this is actually true
+        for src_remote in src.remotes:
+            if src_remote.settings and \
+                    'annex-externaltype' in src_remote.settings:
+                self._remotes.append(Remote(src_remote.name,
+                                            src_remote.settings.copy()))
 
         #
         # ### branches and their commits: ###
@@ -925,12 +985,9 @@ class ItemRepo(Item):
     def commits(self):
         return self._commits
 
-    # TODO: How to represent remotes? Just the names or names plus url(s)?
-    # What about special remotes?
     @property
     def remotes(self):
-        # Note: names and url(s)
-        return self._remotes
+        return unique_via_equals(self._remotes)
 
     def get_submodules(self, return_paths=False):
         items = [it for it in self._items
@@ -1025,12 +1082,14 @@ class ItemRepo(Item):
         # use obtain()
         from datalad.config import anything2bool
         if anything2bool(cfg.get("datalad.tests.dataladremote")):
-            # For additional testing of our datalad remote to not interfere
-            # and manage to handle all http urls and requests:
-            init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
-                                'datalad', autoenable=True)
-            # TODO: full dict!
-            self._remotes.append(('datalad', {'annex-externaltype': 'datalad'}))
+            if 'datalad' not in [r.name for r in self._remotes]:
+                # For additional testing of our datalad remote to not interfere
+                # and manage to handle all http urls and requests:
+                init_datalad_remote(AnnexRepo(self._path, init=False, create=False),
+                                    'datalad', autoenable=True)
+                # TODO: full dict!
+                self._remotes.append(Remote('datalad',
+                                            {'annex-externaltype': 'datalad'}))
 
         if self._annex_direct:
             annex_cmd = ['git', 'annex', 'direct']
@@ -1161,7 +1220,9 @@ class ItemRepo(Item):
             # ItemCommand that removed that remote, but left self.src.
             # If that happens, that ItemCommand probably should be adapted to
             # also remove self.src.
-            assert(('origin', self.src.url) in self.remotes)
+            rem_origin = [r for r in self.remotes if r.name == 'origin']
+            assert len(rem_origin) == 1
+            assert rem_origin[0].settings['url'] == self.src.url
 
         assert_is_instance(self.branches, list)
         [assert_is_instance(b, Branch) for b in self.branches]
@@ -1266,9 +1327,10 @@ class ItemRepo(Item):
                     item=self.__class__
                 )
 
-            # just names for now (see TODO)
-            eq_(set([r[0] for r in remotes_from_disc]),
-                set([r[0] for r in self.remotes]))
+            assert all(any(r_self == r_real for r_real in remotes_from_disc)
+                       for r_self in self.remotes)
+            assert all(any(r_self == r_real for r_self in self.remotes)
+                       for r_real in remotes_from_disc)
 
             # TODO: files: locked/unlock must be bool if repo is not in direct mode
             # and file is annexed. ItemFile doesn't know about direct mode.
