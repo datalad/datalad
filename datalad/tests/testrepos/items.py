@@ -1038,8 +1038,22 @@ class ItemRepo(Item):
                             exc=TestRepoCreationError(
                                 "Failed to switch to direct mode")
                             )
-            if not self.active_branch.name.startswith('annex/direct'):
+
+            if self.active_branch and \
+                    self.active_branch.name.startswith('annex/direct'):
                 # If we were in direct mode before, there's nothing to do
+                pass
+            elif not self.active_branch:
+                # No active branch at all - we are in a fresh repo and don't
+                # create any branch, since there's no commit yet
+                assert not self.commits
+            elif self.active_branch.name == 'HEAD':
+                # we are at detached HEAD
+                assert self.head.commit
+                assert self.head.points_to is None
+                # no direct mode branch is created!
+                pass
+            else:
                 direct_branch = Branch(name='annex/direct/' +
                                             self.active_branch.name,
                                        repo=self,
@@ -1047,6 +1061,8 @@ class ItemRepo(Item):
                                        upstream=None,
                                        points_to=None,
                                        is_active=True)
+                # deactivate old active branch and set the one:
+                self.active_branch.is_active = False
                 self._branches.append(direct_branch)
                 self.head.points_to = direct_branch
                 self.head.commit = None
