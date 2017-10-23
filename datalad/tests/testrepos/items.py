@@ -351,7 +351,8 @@ class Commit(object):
                       short=self.short,
                       parents=[p.sha for p in self.parents],
                       message=self.message,
-                      paths=self._paths)
+                      paths=[os.path.relpath(it.path, self.repo.path)
+                             for it in self.items])
 
 
 @auto_repr
@@ -658,26 +659,30 @@ class ItemRepo(Item):
             # fine-grained pieces.
             head_points_to = None
             head_active = True
+            head_commit_sha = src.head.points_to.commit.sha \
+                if src.head.points_to \
+                else src.head.commit.sha
         else:
             # assuming clone:
             head_points_to = src.head.points_to
             head_active = False
+            head_commit_sha = None \
+                if src.head.points_to \
+                else src.head.commit.sha
 
         branches_to_add.append(Branch(name='HEAD',
                                       repo=self,
-                                      commit=src.head.commit.sha
-                                      if not src.head.points_to # src.head detached
-                                      else None,
+                                      commit=head_commit_sha,
                                       upstream=None,
                                       points_to=head_points_to.name
                                       if head_points_to
-                                      else head_points_to,  # HEAD detached
+                                      else None,  # HEAD detached
                                       is_active=head_active))
         # plus 'remote/origin/HEAD':
         branches_to_add.append(Branch(name='remotes/origin/HEAD',
                                       repo=self,
                                       commit=src.head.commit.sha
-                                      if not src.head.points_to # src.head detached
+                                      if not src.head.points_to  # src.head detached
                                       else None,
                                       upstream=None,
                                       points_to='remotes/origin/' +
@@ -724,12 +729,22 @@ class ItemRepo(Item):
         # to get
         items_to_add = []
         for c in commits_to_add:
-            for it in c.items:
-                new_path = opj(self.path, os.path.relpath(it.path, src.path))
+            # these are copied commits from src. So, they are referencing items
+            # that exist in src but not yet in `self`. Meaning: Their property
+            # `items` doesn't return anything yet. Therefore, we need to get the
+            # paths and find them in src to figure out, what kind of item these
+            # paths belong to.
+            for r_path in c._paths:
+                new_path = opj(self.path, r_path)
                 if new_path in [n.path for n in items_to_add]:
                     # we got it already
                     continue
-                if issubclass(it, ItemRepo):
+                # find original item:
+                # TODO: ItemRepo._items not yet unique!
+                orig_it = [src_it for src_it in src._items if opj(src.path, r_path) == src_it.path]
+                it = orig_it[0]
+
+                if issubclass(it.__class__, ItemRepo):
                     # we got a submodule. However, keep in mind we are updating
                     # `self` after cloning or submodule-update, meaning that
                     # this is a non-initialized one and we barely know anything
@@ -746,7 +761,7 @@ class ItemRepo(Item):
                     new._is_initialized = False
                     new._super = self
                     items_to_add.append(new)
-                elif issubclass(it, ItemFile):
+                elif issubclass(it.__class__, ItemFile):
                     # we got a file
                     # Note, that we got it by cloning and therefore can't just
                     # copy everything
@@ -756,7 +771,7 @@ class ItemRepo(Item):
                                    state=(ItemFile.UNMODIFIED,
                                           ItemFile.UNMODIFIED),
                                    annexed=it.annexed,
-                                   key=it.key,
+                                   key=it.annex_key,
                                    src=None,
                                    locked=None,  # TODO: tricky with V6
                                    check_definition=True  # not sure yet
