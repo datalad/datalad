@@ -460,6 +460,7 @@ def _query_aggregated_metadata_singlepath(
     annex_meta = {}
     # TODO this condition is inadequate once we query something in an aggregated subdataset
     # but through the dataset at curdir
+    files = None
     if containing_ds == curdir and ds.config.obtain(
             # TODO this is actuall about requerying present datasets
             # and is a major slow-down on datasets with many files...
@@ -477,7 +478,7 @@ def _query_aggregated_metadata_singlepath(
         # we pull out ALL files at once, not just those matching the query paths
         # because this will be much faster than doing it multiple times for
         # multiple queries within the same dataset
-        files = _get_metadatarelevant_paths(ds, cache['subds_relpaths'])
+        files = list(_get_metadatarelevant_paths(ds, cache['subds_relpaths']))
         # we are querying this dataset itself, which we know to be present
         # get uptodate file metadata from git-annex to reflect potential local
         # modifications since the last aggregation
@@ -494,7 +495,7 @@ def _query_aggregated_metadata_singlepath(
         opj(agg_base_path, contentinfo_objloc),
         cache=cache['objcache']) if contentinfo_objloc else {}
 
-    for fpath in [f for f in contentmeta.keys()
+    for fpath in [f for f in files or contentmeta.keys()
                   if rparentpath == curdir or
                   f == rparentpath or
                   f.startswith(_with_sep(rparentpath))]:
