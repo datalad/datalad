@@ -9,7 +9,7 @@
 """DICOM metadata parser"""
 from __future__ import absolute_import
 
-import re
+from six import string_types
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.dicom')
@@ -25,7 +25,7 @@ except ImportError:
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.parsers.base import BaseMetadataParser
 
-from six import string_types
+
 def _is_good_type(v):
     if isinstance(v, (int, float, string_types)):
         return True
@@ -48,7 +48,11 @@ class MetadataParser(BaseMetadataParser):
                 continue
             if d.SeriesInstanceUID not in imgseries:
                 # start with a copy of the metadata of the first dicom in a series
-                series = {k: getattr(d, k) for k in d.dir() if hasattr(d, k) and getattr(d, k)}
+                series = {k: getattr(d, k)
+                          for k in d.dir()
+                          if hasattr(d, k) and
+                          getattr(d, k) and
+                          _is_good_type(getattr(d, k))}
                 series_files = []
             else:
                 series, series_files = imgseries.get(d.SeriesInstanceUID)
@@ -70,10 +74,8 @@ class MetadataParser(BaseMetadataParser):
                     '@id': 'http://semantic-dicom.org/dcm#',
                     'description': 'DICOM vocabulary (seemingly incomplete)',
                     'type': vocabulary_id}}},
-            # TODO test whether regex compaction would work for a particular file
-            # set and use a compacted regex if it does (hachoir_regex module)
+            # yield the corresponding series description for each file
             ((f,
-              {'dicom:{}'.format(k): v for k, v in info.items()
-				                    if _is_good_type(v)})
+              {'dicom:{}'.format(k): v for k, v in info.items()})
              for info, files in imgseries.values() for f in files)
         )
