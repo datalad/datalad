@@ -250,5 +250,11 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
-
+    'datalad.search.indexercachesize': {
+        'ui': ('question', {
+               'title': 'Maximum cache size for search index (per process)',
+               'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
+        'default': 256,
+        'type': EnsureInt(),
+    },
 }

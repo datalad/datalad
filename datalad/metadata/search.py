@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.metadata.search')
 
+import multiprocessing
 import re
 import os
 from os.path import join as opj, exists
@@ -25,6 +26,7 @@ from six import string_types
 from six import PY3
 from gzip import open as gzopen
 
+from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.utils import eval_results
@@ -262,7 +264,11 @@ def _get_search_index(index_dir, ds, force_reindex):
             # TODO check that the index schema is the same
             # as the one we would have used for reindexing
             # TODO support incremental re-indexing, whoosh can do it
-            return widx.open_dir(index_dir)
+            idx = widx.open_dir(index_dir)
+            lgr.debug(
+                'Search index contains %i documents',
+                idx.doc_count())
+            return idx
         except widx.LockError as e:
             raise e
         except widx.IndexError as e:
@@ -298,12 +304,21 @@ def _get_search_index(index_dir, ds, force_reindex):
     schema, definitions, per_ds_defs = _get_search_schema(ds)
 
     idx_obj = widx.create_in(index_dir, schema)
-    idx = idx_obj.writer()
+    idx = idx_obj.writer(
+        # cache size per process
+        limitmb=cfg.obtain('datalad.search.indexercachesize'),
+        # number of processes for indexing
+        procs=multiprocessing.cpu_count(),
+        # write separate index segments in each process for speed
+        # asks for writer.commit(optimize=True)
+        multisegment=True,
+    )
 
     # load metadata of the base dataset and what it knows about all its subdatasets
     # (recursively)
     old_idx_size = 0
     old_ds_rpath = ''
+    idx_size = 0
     for res in _query_aggregated_metadata(
             reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
             ds=ds,
@@ -322,7 +337,6 @@ def _get_search_index(index_dir, ds, force_reindex):
         meta = res.get('metadata', {})
         meta = MetadataDict(meta)
         if rtype == 'dataset':
-            idx_size = idx.doc_count()
             if old_ds_rpath:
                 lgr.info(
                     'Added %s on dataset %s',
@@ -351,6 +365,7 @@ def _get_search_index(index_dir, ds, force_reindex):
         if 'parentds' in res:
             doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
         _add_document(idx, **doc_props)
+        idx_size += 1
 
     if old_ds_rpath:
         lgr.info(
@@ -358,11 +373,11 @@ def _get_search_index(index_dir, ds, force_reindex):
             single_or_plural(
                 'document',
                 'documents',
-                idx.doc_count() - old_idx_size,
+                idx_size - old_idx_size,
                 include_count=True),
             old_ds_rpath)
 
-    idx.commit()
+    idx.commit(optimize=True)
 
     # "timestamp" the search index to allow for automatic invalidation
     with open(stamp_fname, 'w') as f:
@@ -376,7 +391,7 @@ def _get_search_index(index_dir, ds, force_reindex):
         # or similar) and resolve terms to URLs, if anyhow possible
         jsondump2file(definitions, f)
 
-    lgr.info('Search index contains %i documents', idx.doc_count())
+    lgr.info('Search index contains %i documents', idx_size)
     return idx_obj
 
 
