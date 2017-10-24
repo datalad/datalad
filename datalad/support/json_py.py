@@ -10,7 +10,7 @@
 """
 
 
-from io import open
+import io
 import lzma
 import codecs
 from os.path import dirname
@@ -49,7 +49,7 @@ def dump(obj, fname):
     indir = dirname(fname)
     if not exists(indir):
         makedirs(indir)
-    with open(fname, 'wb') as f:
+    with io.open(fname, 'wb') as f:
         return dump2fileobj(obj, f)
 
 
@@ -85,7 +85,7 @@ def load(fname, fixup=True, **kw):
     **kw
       Passed into the load (and loads after fixups) function
     """
-    with open(fname, 'r', encoding='utf-8') as f:
+    with io.open(fname, 'r', encoding='utf-8') as f:
         try:
             return jsonload(f, **kw)
         except JSONDecodeError as exc:
@@ -95,7 +95,7 @@ def load(fname, fixup=True, **kw):
 
     # Load entire content and replace common "abusers" which break JSON comprehension but in general
     # are Ok
-    with open(fname, 'r', encoding='utf-8') as f:
+    with io.open(fname, 'r', encoding='utf-8') as f:
         s_orig = s = f.read()
 
     for o, r in {
