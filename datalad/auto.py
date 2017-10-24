@@ -17,6 +17,7 @@ import six.moves.builtins as __builtin__
 builtins_name = '__builtin__' if PY2 else 'builtins'
 
 import logging
+import io
 import os
 
 from os.path import dirname, lexists, realpath
@@ -47,6 +48,19 @@ except Exception as exc:
         exc_str(exc)
     )
 
+lzma = None
+try:
+    import lzma
+except ImportError:
+    pass
+except Exception as exc:
+    lgr.warning(
+        "Failed to import lzma, so no automagic handling for it atm: %s",
+        exc_str(exc)
+    )
+
+# TODO: RF to reduce code duplication among cases, also RF tests for the same reason
+
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""
     pass
@@ -61,11 +75,16 @@ class AutomagicIO(object):
     def __init__(self, autoget=True, activate=False):
         self._active = False
         self._builtin_open = __builtin__.open
+        self._io_open = io.open
         self._builtin_exists = os.path.exists
         if h5py:
             self._h5py_File = h5py.File
         else:
             self._h5py_File = None
+        if lzma:
+            self._lzma_LZMAFile = lzma.LZMAFile
+        else:
+            self._lzma_LZMAFile = None
         self._autoget = autoget
         self._in_open = False
         self._log_online = True
@@ -141,8 +160,16 @@ class AutomagicIO(object):
         return self._proxy_open_name_mode(builtins_name + '.open', self._builtin_open,
                                           *args, **kwargs)
 
+    def _proxy_io_open(self, *args, **kwargs):
+        return self._proxy_open_name_mode('io.open', self._io_open,
+                                          *args, **kwargs)
+
     def _proxy_h5py_File(self, *args, **kwargs):
         return self._proxy_open_name_mode('h5py.File', self._h5py_File,
+                                          *args, **kwargs)
+
+    def _proxy_lzma_LZMAFile(self, *args, **kwargs):
+        return self._proxy_open_name_mode('lzma.LZMAFile', self._lzma_LZMAFile,
                                           *args, **kwargs)
 
     def _proxy_exists(self, path):
@@ -207,18 +234,25 @@ class AutomagicIO(object):
             return
         # overloads
         __builtin__.open = self._proxy_open
+        io.open = self._proxy_io_open
         os.path.exists = self._proxy_exists
         if h5py:
             h5py.File = self._proxy_h5py_File
+        if lzma:
+            lzma.LZMAFile = self._proxy_lzma_LZMAFile
         self._active = True
 
     def deactivate(self):
+        lgr.info("Deactivating DataLad's AutoMagicIO")
         if not self.active:
             lgr.warning("%s is not active, can't deactivate" % self)
             return
         __builtin__.open = self._builtin_open
+        io.open = self._io_open
         if h5py:
             h5py.File = self._h5py_File
+        if lzma:
+            lzma.LZMAFile = self._lzma_LZMAFile
         os.path.exists = self._builtin_exists
         self._active = False
 

@@ -9,6 +9,7 @@
 """Test proxying of core IO operations
 """
 
+import io
 import os
 from os.path import join as opj, dirname
 
@@ -172,8 +173,39 @@ def test_proxying_open_regular():
             f.write("123")
 
     def verify_dat(f, mode="r"):
-        with open(f, "r") as f:
+        with open(f, mode) as f:
             eq_(f.read(), "123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+def test_proxying_io_open_regular():
+
+    def generate_dat(f):
+        with io.open(f, "w", encoding='utf-8') as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        with io.open(f, mode, encoding='utf-8') as f:
+            eq_(f.read(), u"123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+from datalad.tests.utils import skip_if_no_module
+
+
+def test_proxying_lzma_LZMAFile():
+    skip_if_no_module('lzma')
+    import lzma
+
+    def generate_dat(f):
+        with lzma.LZMAFile(f, "w") as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        with lzma.LZMAFile(f, mode) as f:
+            eq_(f.read(), u"123")
 
     yield _test_proxying_open, generate_dat, verify_dat
 
