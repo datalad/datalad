@@ -173,7 +173,7 @@ class Remove(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            to_reporemove = []
+            to_reporemove = dict()
             # PLAN any dataset that was not raw_input, uninstall (passing recursive flag)
             # if dataset itself is in paths, skip any nondataset
             # sort reverse so we get subdatasets first
@@ -258,21 +258,23 @@ class Remove(Interface):
                         os.rmdir(ap['path'])
                 else:
                     # anything that is not a dataset can simply be passed on
-                    to_reporemove.append(ap['path'])
+                    to_reporemove[ap['path']] = ap
             # avoid unnecessary git calls when there is nothing to do
             if to_reporemove:
                 if check and hasattr(ds.repo, 'drop'):
-                    for r in _drop_files(ds, to_reporemove, check=True):
+                    for r in _drop_files(ds, [p for p in to_reporemove], check=True):
                         yield r
-                for r in ds.repo.remove(to_reporemove, r=True):
+                for r in ds.repo.remove([p for p in to_reporemove], r=True):
                     # these were removed, but we still need to save the removal
 
-                    # result in r is just a path relative to ds
-                    # lookup corresponding annotated path:
-                    ap = [p for p in paths if p['path'] == opj(ds.path, r)]
-                    assert len(ap) == 1
-                    ap = ap[0]
-
+                    r_abs = opj(ds.path, r)
+                    if r_abs in to_reporemove:
+                        ap = to_reporemove[r_abs]
+                    else:
+                        ap = {'path': r_abs,
+                              'parentds': ds.path,
+                              'refds': refds_path
+                              }
                     ap['unavailable_path_status'] = ''
                     to_save.append(ap)
                     yield get_status_dict(
