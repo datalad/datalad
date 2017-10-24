@@ -51,6 +51,14 @@ dist = platform.dist()
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
 
+# lzma is included in python since 3.3
+req_lzma = []
+try:
+    import lzma
+except ImportError:
+    req_lzma = ['pyliblzma']
+
+
 requires = {
     'core': [
         'appdirs',
@@ -87,7 +95,8 @@ requires = {
     'metadata': [
         'simplejson',
         'whoosh',
-    ],
+        'pyld',
+    ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
         'mutagen',  # audio metadata
