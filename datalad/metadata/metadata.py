@@ -20,12 +20,14 @@ from os.path import relpath
 from os.path import normpath
 from os.path import curdir
 from os.path import exists
+from os.path import lexists
 from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
 from six import binary_type, string_types
 
 from datalad import cfg
+from datalad.auto import AutomagicIO
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.save import Save
@@ -230,7 +232,7 @@ def _load_json_object(fpath, cache=None):
         cache = {}
     obj = cache.get(
         fpath,
-        jsonload(fpath, fixup=True) if exists(fpath) else {})
+        jsonload(fpath, fixup=True) if lexists(fpath) else {})
     cache[fpath] = obj
     return obj
 
@@ -242,7 +244,7 @@ def _load_xz_json_stream(fpath, cache=None):
         fpath,
         {s['path']: {k: v for k, v in s.items() if k != 'path'}
          # take out the 'path' from the payload
-         for s in load_xzstream(fpath)} if exists(fpath) else {})
+         for s in load_xzstream(fpath)} if lexists(fpath) else {})
     cache[fpath] = obj
     return obj
 
@@ -322,63 +324,64 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
     # TODO rename function and query datalad/annex own metadata
     # for all actually present dataset after looking at aggregated data
 
-    # look for and load the aggregation info for the base dataset
-    info_fpath = opj(ds.path, agginfo_relpath)
-    agg_base_path = dirname(info_fpath)
-    agginfos = _load_json_object(info_fpath)
+    with AutomagicIO():
+        # look for and load the aggregation info for the base dataset
+        info_fpath = opj(ds.path, agginfo_relpath)
+        agg_base_path = dirname(info_fpath)
+        agginfos = _load_json_object(info_fpath)
 
-    # cache once loaded metadata objects for additional lookups
-    # TODO possibly supply this cache from outside, if objects could
-    # be needed again -- there filename does not change in a superdataset
-    # if done, cache under relpath, not abspath key
-    cache = {
-        'objcache': {},
-        'subds_relpaths': None,
-    }
-    reported = set()
+        # cache once loaded metadata objects for additional lookups
+        # TODO possibly supply this cache from outside, if objects could
+        # be needed again -- there filename does not change in a superdataset
+        # if done, cache under relpath, not abspath key
+        cache = {
+            'objcache': {},
+            'subds_relpaths': None,
+        }
+        reported = set()
 
-    # for all query paths
-    for ap in aps:
-        # all metadata is registered via its relative path to the
-        # dataset that is being queried
-        rpath = relpath(ap['path'], start=ds.path)
-        if rpath in reported:
-            # we already had this, probably via recursion of some kind
-            continue
+        # for all query paths
+        for ap in aps:
+            # all metadata is registered via its relative path to the
+            # dataset that is being queried
+            rpath = relpath(ap['path'], start=ds.path)
+            if rpath in reported:
+                # we already had this, probably via recursion of some kind
+                continue
 
-        containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
-        if containing_ds is None:
-            # could happen if there was no aggregated metadata at all
-            # or the path is in this dataset, but luckily the queried dataset
-            # is known to be present
-            containing_ds = curdir
+            containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
+            if containing_ds is None:
+                # could happen if there was no aggregated metadata at all
+                # or the path is in this dataset, but luckily the queried dataset
+                # is known to be present
+                containing_ds = curdir
 
-        # build list of datasets and paths to be queried for this annotated path
-        # in the simple case this is just the containing dataset and the actual
-        # query path
-        to_query = [(containing_ds, rpath)]
-        if recursive:
-            # in case of recursion this is also anything in any dataset underneath
-            # the query path
-            matching_subds = [(sub, sub) for sub in sorted(agginfos)
-                              # we already have the base dataset
-                              if (rpath == curdir and sub != curdir) or
-                              sub.startswith(_with_sep(rpath))]
-            to_query.extend(matching_subds)
+            # build list of datasets and paths to be queried for this annotated path
+            # in the simple case this is just the containing dataset and the actual
+            # query path
+            to_query = [(containing_ds, rpath)]
+            if recursive:
+                # in case of recursion this is also anything in any dataset underneath
+                # the query path
+                matching_subds = [(sub, sub) for sub in sorted(agginfos)
+                                  # we already have the base dataset
+                                  if (rpath == curdir and sub != curdir) or
+                                  sub.startswith(_with_sep(rpath))]
+                to_query.extend(matching_subds)
 
-        for qds, qpath in to_query:
-            for r in _query_aggregated_metadata_singlepath(
-                    ds, agginfos, agg_base_path, qpath, qds, reporton,
-                    cache, merge_mode):
-                r.update(kwargs)
-                # if we are coming from `search` we want to record why this is being
-                # reported
-                if 'query_matched' in ap:
-                    r['query_matched'] = ap['query_matched']
-                if r.get('type', None) == 'file':
-                    r['parentds'] = normpath(opj(ds.path, qds))
-                yield r
-                reported.add(qpath)
+            for qds, qpath in to_query:
+                for r in _query_aggregated_metadata_singlepath(
+                        ds, agginfos, agg_base_path, qpath, qds, reporton,
+                        cache, merge_mode):
+                    r.update(kwargs)
+                    # if we are coming from `search` we want to record why this is being
+                    # reported
+                    if 'query_matched' in ap:
+                        r['query_matched'] = ap['query_matched']
+                    if r.get('type', None) == 'file':
+                        r['parentds'] = normpath(opj(ds.path, qds))
+                    yield r
+                    reported.add(qpath)
 
 
 def _query_aggregated_metadata_singlepath(
