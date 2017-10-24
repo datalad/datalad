@@ -15,9 +15,9 @@ import uuid
 
 from os import listdir
 from os.path import isdir
-from os.path import relpath
 from os.path import join as opj
 
+from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.utils import eval_results
@@ -37,7 +37,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
-from datalad.utils import path_startswith
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -360,6 +359,8 @@ class Create(Interface):
             gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
             gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')
             gitattr.write('** annex.largefiles=nothing\n')
+            gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
+                cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
