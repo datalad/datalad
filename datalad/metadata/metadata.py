@@ -879,6 +879,12 @@ class Metadata(Interface):
             doc="""if set, a list of known metadata keys (including the
             origin of their definition) is shown. No other action is
             performed, even if other arguments are given."""),
+        get_aggregates=Parameter(
+            args=('--get-aggregates',),
+            action='store_true',
+            doc="""if set, yields all (sub)datasets for which aggregate
+            metadata are available in the dataset. No other action is
+            performed, even if other arguments are given."""),
         permit_undefined_keys=Parameter(
             args=('--permit-undefined-keys',),
             action='store_true',
@@ -914,6 +920,7 @@ class Metadata(Interface):
             reset=None,
             define_key=None,
             show_keys=False,
+            get_aggregates=False,
             permit_undefined_keys=False,
             apply2global=False,
             reporton='all',
@@ -930,6 +937,24 @@ class Metadata(Interface):
         res_kwargs = dict(action='metadata', logger=lgr)
         if refds_path:
             res_kwargs['refds'] = refds_path
+
+        if get_aggregates:
+            # yield all datasets for which we have aggregated metadata as results
+            # the get actual dataset results, so we can turn them into dataset
+            # instances using generic top-level code if desired
+            if not refds_path:
+                refds_path = os.getcwd()
+            info_fpath = opj(refds_path, agginfo_relpath)
+            if not exists(info_fpath):
+                return
+            agginfos = _load_json_object(info_fpath)
+            for sd in agginfos:
+                yield get_status_dict(
+                    path=normpath(opj(refds_path, sd)),
+                    type='dataset',
+                    status='ok',
+                    **res_kwargs)
+            return
 
         if show_keys:
             # to get into the ds meta branches below
@@ -1258,6 +1283,6 @@ class Metadata(Interface):
             spacer=' ' if len([m for m in meta if m != 'tag']) else '',
             meta=','.join(k for k in sorted(meta.keys())
                           if k not in ('tag', '@context', '@id'))
-                 if meta else ' -',
+                 if meta else ' -' if 'metadata' in res else ' aggregated',
             tags='' if 'tag' not in meta else ' [{}]'.format(
                  ','.join(assure_list(meta['tag'])))))
