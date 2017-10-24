@@ -189,6 +189,8 @@ install:
   # Install standalone build of git-annex for the recent enough version
   - travis_retry sudo eatmydata apt-get install git-annex-standalone zip pandoc
   - travis_retry sudo eatmydata apt-get install shunit2
+  - travis_retry sudo eatmydata apt-get install python-lzma
+  - python -c "import lzma; print(lzma.__file__)"
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
