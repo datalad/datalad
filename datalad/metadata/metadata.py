@@ -489,7 +489,6 @@ def _query_aggregated_metadata_singlepath(
         # without having to recompute
         annex_meta.update(DLCP(ds, [])._get_content_metadata(files))
 
-    # TODO load and turn into a lookup dict -> cache
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_xz_json_stream(
         opj(agg_base_path, contentinfo_objloc),
@@ -675,6 +674,13 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
     # always identify the effective vocabulary - JSON-LD style
     if context:
         dsmeta['@context'] = context
+
+    if paths:
+        # make sure that there is an entry for each path, this takes the place
+        # of a dedicated file list
+        for p in paths:
+            if p not in contentmeta:
+                contentmeta[p] = {}
 
     return dsmeta, contentmeta, errored
 
