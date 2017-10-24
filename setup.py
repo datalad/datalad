@@ -86,6 +86,7 @@ requires = {
     'metadata': [
         'simplejson',
         'pyld',
+        'pyliblzma',
     ],
     'metadata-extra': [
         'PyYAML',  # very optional
