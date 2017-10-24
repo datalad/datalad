@@ -65,7 +65,7 @@ def dump2xzstream(obj, fname):
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
-            f.write('\n')
+            f.write(b'\n')
 
 
 def load_xzstream(fname):
