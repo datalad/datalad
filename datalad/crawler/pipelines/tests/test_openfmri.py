@@ -316,6 +316,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
     ok_file_under_git(t1w_fpath, annexed=True)
 
+    from datalad.metadata.metadata import agginfo_relpath
     target_files = {
         './.datalad/config',
         './.datalad/crawl/crawl.cfg',
@@ -324,7 +325,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/crawl/versions/incoming.json',
         './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv',
-        './.datalad/metadata/aggregate.json',
+        './' + agginfo_relpath,
     }
     target_incoming_files = {
         '.gitattributes',  # we marked default backend right in the incoming

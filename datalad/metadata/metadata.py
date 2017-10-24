@@ -68,7 +68,7 @@ lgr = logging.getLogger('datalad.metadata.metadata')
 valid_key = re.compile(r'^[0-9a-z._-]+$')
 
 db_relpath = opj('.datalad', 'metadata', 'dataset.json')
-agginfo_relpath = opj('.datalad', 'metadata', 'aggregate.json')
+agginfo_relpath = opj('.datalad', 'metadata', 'aggregate_v1.json')
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them

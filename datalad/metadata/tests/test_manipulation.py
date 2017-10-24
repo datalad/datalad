@@ -402,7 +402,7 @@ def test_custom_native_merge(path):
         'metadata': {
             'objects': {
                 'someshasum': '{"homepage": "http://top.example.com"}'},
-            'aggregate.json': """\
+            'aggregate_v1.json': """\
 {
     "sub/deep/some": {
         "dataset_info": "objects/someshasum"
@@ -414,7 +414,7 @@ def test_custom_native_merge(path):
             'metadata': {
                 'objects': {
                     'someotherhash': '{"homepage": "http://sub.example.com"}'},
-                'aggregate.json': """\
+                'aggregate_v1.json': """\
 {
     "deep/some": {
         "dataset_info": "objects/someotherhash"

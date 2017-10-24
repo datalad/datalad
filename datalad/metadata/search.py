@@ -250,10 +250,9 @@ def _get_search_schema(ds):
 
 def _get_search_index(index_dir, ds, force_reindex):
     from whoosh import index as widx
-
+    from .metadata import agginfo_relpath
     # what is the lastest state of aggregated metadata
-    metadata_state = ds.repo.get_last_commit_hash(
-        opj('.datalad', 'metadata', 'aggregate.json'))
+    metadata_state = ds.repo.get_last_commit_hash(agginfo_relpath)
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
     definitions_fname = opj(index_dir, 'datalad_term_definitions.json.gz')
 
