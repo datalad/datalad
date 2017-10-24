@@ -376,7 +376,7 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
                 if 'query_matched' in ap:
                     r['query_matched'] = ap['query_matched']
                 if r.get('type', None) == 'file':
-                    r['parentds'] = opj(ds.path, qds)
+                    r['parentds'] = normpath(opj(ds.path, qds))
                 yield r
                 reported.add(qpath)
 
