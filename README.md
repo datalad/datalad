@@ -9,6 +9,8 @@
 
 The full documentation is available at: http://docs.datalad.org
 
+DON'T MERGE!
+
 # 10000ft overview
 
 DataLad makes data management and data distribution more accessible.
