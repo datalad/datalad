@@ -177,7 +177,7 @@ class Remove(Interface):
             # PLAN any dataset that was not raw_input, uninstall (passing recursive flag)
             # if dataset itself is in paths, skip any nondataset
             # sort reverse so we get subdatasets first
-            for ap in sorted(paths, key=lambda x: x ['path'], reverse=True):
+            for ap in sorted(paths, key=lambda x: x['path'], reverse=True):
                 if ap.get('type', None) == 'dataset':
                     # entire dataset needs to go, uninstall if present, pass recursive!
                     uninstall_failed = False
@@ -266,6 +266,13 @@ class Remove(Interface):
                         yield r
                 for r in ds.repo.remove(to_reporemove, r=True):
                     # these were removed, but we still need to save the removal
+
+                    # result in r is just a path relative to ds
+                    # lookup corresponding annotated path:
+                    ap = [p for p in paths if p['path'] == opj(ds.path, r)]
+                    assert len(ap) == 1
+                    ap = ap[0]
+
                     ap['unavailable_path_status'] = ''
                     to_save.append(ap)
                     yield get_status_dict(
