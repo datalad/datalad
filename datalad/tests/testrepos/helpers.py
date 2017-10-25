@@ -362,8 +362,8 @@ def get_ancestry(commit, include=True):
 # TODO: melt in with datalad.utils.unique
 def unique_via_equals(seq):
 
-    seen = set()
-    seen_add = seen.add
+    seen = list()
+    seen_add = seen.append
 
     def in_seen(x):
         return any(x == i for i in seen)
