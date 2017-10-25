@@ -8,12 +8,14 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 
+from nose import SkipTest
 from .utils import _test_smoke_pipelines
 from ..crcns import pipeline, superdataset_pipeline
 from ..crcns import get_metadata
 
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import ok_startswith
+from datalad.support.exceptions import AccessFailedError
 
 
 def test_smoke_pipelines():
@@ -23,11 +25,17 @@ def test_smoke_pipelines():
 
 @skip_if_no_network
 def test_get_metadata():
-    all_meta = get_metadata()
-    assert len(all_meta) > 50  # so we have for all datasets
-    # and each one of them should be a string (xml)
-    assert all(x.startswith('<?xml') for x in all_meta.values())
 
-    # but we could request one specific one
-    aa1_meta = get_metadata('aa-1')
-    ok_startswith(aa1_meta, '<?xml')
+    try:
+        all_meta = get_metadata()
+        assert len(all_meta) > 50  # so we have for all datasets
+        # and each one of them should be a string (xml)
+        assert all(x.startswith('<?xml') for x in all_meta.values())
+
+        # but we could request one specific one
+        aa1_meta = get_metadata('aa-1')
+        ok_startswith(aa1_meta, '<?xml')
+    except AccessFailedError as e:
+        if e.message.startswith('Access to https://search.datacite.org') and \
+                e.message.endswith('has failed: status code 502'):
+            raise SkipTest("Probably datacite.org blocked us once again")
