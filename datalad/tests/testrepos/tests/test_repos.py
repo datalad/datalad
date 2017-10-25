@@ -10,7 +10,7 @@
 """
 
 from datalad.tests.testrepos.repos import *
-from datalad.tests.utils import with_tempfile, assert_raises, swallow_logs
+from datalad.tests.utils import with_tempfile, assert_raises, swallow_logs, known_failure_v6
 
 
 @with_tempfile
@@ -116,11 +116,27 @@ def test_BasicMixed_instantiation(path):
     eq_(tr.repo.is_direct_mode, direct)
 
 
+# Note: MixedSubmodulesOldOneLevel is supposed to reconstruct former
+# SubmoduleDataset and the same is true for MixedSubmodulesOldNested and
+# NestedDataset respectively. Due to the way files are added to git therein,
+# clones are dirty from the beginning. So, using that kind of repo via git-clone
+# or git-submodule-add fails in V6 (as it should). That's why both classes fail
+# on instantiation from within their assert_intact method.
+# However, as long as there are old tests, that have hardcoded assumptions on
+# how a certain testrepo looks like, we need to have the old ones available and
+# cannot actually fix them, which by now needs to be done by providing a
+# .gitattributes file in addition. This additional unexpected file in the
+# repositories may cause old tests to fail even when not in V6 build.
+#
+# Summary: Keep those two testrepos for now, but skip them in V6 and have new,
+# shiny, better ones for new or rewritten tests.
+@known_failure_v6
 @with_tempfile
 def test_MixedSubmodulesOldOneLevel_instantiation(path):
     tr = MixedSubmodulesOldOneLevel(path)
 
 
+@known_failure_v6
 @with_tempfile
 def test_MixedSubmodulesOldNested_instantiation(path):
     tr = MixedSubmodulesOldNested(path)
