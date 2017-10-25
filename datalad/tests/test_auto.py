@@ -201,11 +201,11 @@ def test_proxying_lzma_LZMAFile():
 
     def generate_dat(f):
         with lzma.LZMAFile(f, "w") as f:
-            f.write(u"123")
+            f.write("123".encode('utf-8'))
 
     def verify_dat(f, mode="r"):
         with lzma.LZMAFile(f, mode) as f:
-            eq_(f.read(), u"123")
+            eq_(f.read().decode('utf-8'), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat
 
