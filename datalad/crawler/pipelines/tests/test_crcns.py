@@ -25,9 +25,12 @@ def test_smoke_pipelines():
 
 @skip_if_no_network
 def test_get_metadata():
-
     try:
         all_meta = get_metadata()
+        # something broke somewhere and ATM returns no hits
+        # Reported to CRCNS folks
+        if len(all_meta) < 2:
+            raise SkipTest("Known to fail: wait for life to become better")
         assert len(all_meta) > 50  # so we have for all datasets
         # and each one of them should be a string (xml)
         assert all(x.startswith('<?xml') for x in all_meta.values())
