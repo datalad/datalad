@@ -520,3 +520,13 @@ def test_drop_nocrash_absent_subds(path):
     ok_clean_git(parent.path)
     with chpwd(path):
         assert_status('notneeded', drop('.', recursive=True))
+
+
+@with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
+def test_remove_more_than_one(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ok_clean_git(path)
+    # ensure #1912 stays resolved
+    ds.remove(['one', 'two'], check=False)
+    ok_clean_git(path)

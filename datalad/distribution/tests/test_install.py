@@ -579,7 +579,7 @@ def test_failed_install(dspath):
     assert_raises(IncompleteResultsError,
                   ds.install,
                   "sub",
-                  source="http://nonexistingreallyanything.somewhere/bla")
+                  source="http://nonexistingreallyanything.datalad.org/bla")
 
 
 @with_testrepos('submodule_annex', flavors=['local'])

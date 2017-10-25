@@ -95,7 +95,7 @@ requires = {
     'metadata': [
         'simplejson',
         'whoosh',
-        'pyld',
+        'pyld<0.8',
     ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
