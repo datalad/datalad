@@ -281,7 +281,7 @@ def test_notclone_known_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_failed_clone(dspath):
     ds = create(dspath)
-    res = ds.clone("http://nonexistingreallyanything.somewhere/bla", "sub",
+    res = ds.clone("http://nonexistingreallyanything.datalad.org/bla", "sub",
                    on_failure='ignore')
     assert_status('error', res)
     assert_message('Failed to clone data from any candidate source URL: %s',
