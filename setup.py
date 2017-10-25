@@ -85,7 +85,7 @@ requires = {
     ],
     'metadata': [
         'simplejson',
-        'pyld<0.8',
+        'pyld<0.8,>=0.8.2',
     ],
     'metadata-extra': [
         'PyYAML',  # very optional
