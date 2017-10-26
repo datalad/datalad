@@ -8,59 +8,45 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
+from __future__ import absolute_import
+# use pybids to evolve with the standard without having to track it too much
+from bids.grabbids import BIDSLayout
+import re
 import csv
 from io import open
 from os.path import join as opj
 from os.path import exists
-from datalad.support.json_py import load as jsonload
 from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.metadata.definitions import vocabulary_id
 
 import logging
-lgr = logging.getLogger('datalad.meta.bids')
+lgr = logging.getLogger('datalad.metadata.parser.bids')
 
 
-# BIDS parser metadata definitions (dlp_bids:)
 vocabulary = {
-    "dlp_bids": {
-        'def': 'TODO',
-        'descr': 'Vocabulary of the DataLad BIDS metadata parser',
-        'type': vocabulary_id},
     # characteristics (metadata keys)
-    "dlp_bids:age(years)": {
+    "bids:age(years)": {
         '@id': "pato:0000011",
         'unit': "uo:0000036",  # year
         'description': "age of a sample (organism) at the time of data acquisition in years"},
-    "dlp_bids:sex": {
-        '@id': "pato:0000047",
-        'description': "biological sex"},
-    # qualities (metadata values)
-    "dlp_bids:female": {
-        '@id': "pato:0000383",
-        'description': "A biological sex quality inhering in an individual or a population that only produces gametes that can be fertilised by male gametes"},
-    "dlp_bids:male": {
-        '@id': "pato:0000384",
-        'description': "A biological sex quality inhering in an individual or a population whose sex organs contain only male gametes"},
 }
 
-# only BIDS metadata properties that match a key in this dict will be considered
-# for reporting
+## only BIDS metadata properties that match a key in this dict will be considered
+## for reporting, the rest becomes 'comment<orig>'
 content_metakey_map = {
-    'age': 'dlp_bids:age(years)',
-    'sex': 'dlp_bids:sex',
+    'participant_id': 'bids:participant_id',
+    'age': 'bids:age(years)',
 }
 
 sex_label_map = {
-    'female': 'dlp_bids:female',
-    'f': 'dlp_bids:female',
-    'male': 'dlp_bids:male',
-    'm': 'dlp_bids:male',
+    'f': 'female',
+    'm': 'male',
 }
 
 
 class MetadataParser(BaseMetadataParser):
-    _core_metadata_filename = 'dataset_description.json'
+    _dsdescr_fname = 'dataset_description.json'
 
     _key2stdkey = {
         'Name': 'name',
@@ -71,18 +57,28 @@ class MetadataParser(BaseMetadataParser):
         'Description': 'description',
     }
 
-    def _get_dataset_metadata(self):
-        meta = {}
-        metadata_path = opj(self.ds.path, self._core_metadata_filename)
-        if not exists(metadata_path):
-            return meta
-        bids = jsonload(metadata_path)
+    def get_metadata(self, dataset, content):
+        # (I think) we need a cheap test to see if there is anything, otherwise
+        # pybids we try to parse any size of directory hierarchy in full
+        if not exists(opj(self.ds.path, self._dsdescr_fname)):
+            return {}, []
+
+        bids = BIDSLayout(self.ds.path)
+        dsmeta = self._get_dsmeta(bids)
+
+        if not content:
+            return dsmeta, []
+
+        return dsmeta, self._get_cnmeta(bids)
+
+    def _get_dsmeta(self, bids):
+        context = {}
+        meta = {self._key2stdkey.get(k, 'comment<{}>'.format(k)): v
+                for k, v in bids.get_metadata(
+                    opj(self.ds.path, self._dsdescr_fname)).items()}
 
         # TODO maybe normalize labels of standard licenses to definition URIs
         # perform mapping
-        for term in self._key2stdkey:
-            if term in bids:
-                meta[self.get_homogenized_key(term)] = bids[term]
 
         README_fname = opj(self.ds.path, 'README')
         if not meta.get('description') and exists(README_fname):
@@ -102,26 +98,53 @@ class MetadataParser(BaseMetadataParser):
             meta['description'] = desc.strip()
 
         # special case
-        if bids.get('BIDSVersion'):
-            meta['conformsto'] = \
-                'http://bids.neuroimaging.io/bids_spec{}.pdf'.format(
-                    bids['BIDSVersion'].strip())
-        else:
-            meta['conformsto'] = 'http://bids.neuroimaging.io'
-        meta['@context'] = vocabulary
+        bids_version = meta.get('comment<BIDSVersion>', '').strip()
+        bids_defurl = 'http://bids.neuroimaging.io'
+        if bids_version:
+            bids_defurl += '/bids_spec{}.pdf'.format(bids_version)
+        meta['conformsto'] = bids_defurl
+        context['bids'] = {
+            # not really a working URL, but BIDS doesn't provide term defs in
+            # any accessible way
+            '@id': '{}#'.format(bids_defurl),
+            'description': 'ad-hoc vocabulary for the Brain Imaging Data Structure (BIDS) standard',
+            'type': vocabulary_id,
+        }
+        context.update(vocabulary)
+        meta['@context'] = context
         return meta
 
-    def _get_content_metadata(self):
+    def _get_cnmeta(self, bids):
+        # TODO any custom handling of participants infos should eventually
+        # be done by pybids in one way or another
+        path_props = {}
         participants_fname = opj(self.ds.path, 'participants.tsv')
         if exists(participants_fname):
             try:
-                for r in yield_participant_info(participants_fname):
-                    yield r
+                for rx, info in yield_participant_info(participants_fname):
+                    path_props[rx] = info
             except Exception as exc:
                 lgr.warning(
                     "Failed to load participants info due to: %s. Skipping the rest of file",
                     exc_str(exc)
                 )
+
+        # now go over all files in the dataset and query pybids for its take
+        # on each of them
+        for f in self.paths:
+            md = {}
+            try:
+                md.update(
+                    {'bids:{}'.format(k): v
+                     for k, v in bids.get_metadata(opj(self.ds.path, f)).items()})
+            except ValueError:
+                lgr.debug('no BIDS metadata for %s in %s', f, self.ds)
+
+            # no check al props from other sources and apply them
+            for rx in path_props:
+                if rx.match(f):
+                    md.update(path_props[rx])
+            yield f, md
 
 
 def yield_participant_info(fname):
@@ -145,9 +168,9 @@ def yield_participant_info(fname):
                 val = row[k]
                 if hk is None:
                     hk = 'comment<{}>'.format(normk)
-                elif hk == 'dlp_bids:sex':
-                    val = sex_label_map.get(row[k].lower(), None)
+                if hk == 'comment<sex>':
+                    val = sex_label_map.get(row[k].lower(), row[k].lower())
                 if val:
                     props[hk] = val
             if props:
-                yield r'^{}/.*'.format(row['participant_id']), props
+                yield re.compile(r'^{}/.*'.format(row['participant_id'])), props

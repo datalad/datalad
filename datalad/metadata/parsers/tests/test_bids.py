@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test BIDS metadata parser """
 
+from os.path import join as opj
 from simplejson import dumps
 from datalad.api import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
@@ -36,11 +37,12 @@ from datalad.tests.utils import assert_in
 participant_id\tgender\tage\thandedness\thearing_problems_current
 sub-01\tm\t30-35\tr\tn
 sub-03\tf\t20-25\tr\tn
-"""})
+""",
+    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}}})
 def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, [])._get_dataset_metadata()
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -54,6 +56,7 @@ def test_get_metadata(path):
   "citation": [
     "http://studyforrest.org"
   ],
+  "comment<BIDSVersion>": "1.0.0-rc3",
   "conformsto": "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf",
   "description": "Some description",
   "fundedby": "We got money from collecting plastic bottles",
@@ -61,12 +64,14 @@ def test_get_metadata(path):
   "name": "studyforrest_phase2"
 }""")
 
-    cmeta = list(MetadataParser(ds, [])._get_content_metadata())
-    assert_equal(len(cmeta), 2)
-    for cm in cmeta:
-        if cm[0].startswith('^sub'):
-            # unknown keys come out as comments
-            assert_in('comment<handedness>', cm[1])
+    test_fname = opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')
+    cmeta = list(MetadataParser(
+        ds,
+        [opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')]
+    ).get_metadata(False, True)[1])
+    assert_equal(len(cmeta), 1)
+    assert_equal(cmeta[0][0], test_fname)
+    assert_in('comment<handedness>', cmeta[0][1])
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -82,7 +87,7 @@ description
 def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, [])._get_dataset_metadata()
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -108,7 +113,7 @@ description с юникодом
 """})
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, [])._get_dataset_metadata()
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(

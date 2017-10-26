@@ -155,17 +155,18 @@ def test_aggregation(path):
     _compare_metadata_helper(origres, clone)
 
     # query smoke test
-    assert_result_count(clone.search('mother*'), 1)
-    assert_result_count(clone.search('MoTHER*'), 1)  # case insensitive
+    assert_result_count(clone.search('mother*'), 2)  # one ds, one file
+    assert_result_count(clone.search('MoTHER*'), 2)  # case insensitive
 
     child_res = clone.search('*child*')
-    assert_result_count(child_res, 2)
+    assert_result_count(child_res, 4)  # the datasets and a file each
     for r in child_res:
-        eq_(r['query_matched']['name'], r['metadata']['name'])
+        if r['metadata']['type'] == 'dataset':
+            eq_(r['query_matched']['name'], r['metadata']['name'])
 
     # Test 'and' for multiple search entries
     assert_result_count(clone.search(['*child*', '*bids*']), 2)
-    assert_result_count(clone.search(['*child*', '*subsub*']), 1)
+    assert_result_count(clone.search(['*child*', '*subsub*']), 2)  # ds + file
     assert_result_count(clone.search(['*bids*', '*sub*']), 2)
 
     assert_result_count(clone.search(['*', 'type:dataset']), 3)
