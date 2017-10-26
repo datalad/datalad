@@ -24,7 +24,7 @@ from datalad.cmd import GitRunner
 from datalad.support.network import get_local_file_url
 
 from datalad.tests.testrepos.exc import InvalidTestRepoDefinitionError, \
-    TestRepoCreationError
+    TestRepoCreationError, TestRepoError
 from datalad.tests.testrepos.items import Item, ItemRepo, ItemSelf, ItemFile, \
     ItemInfoFile, ItemCommand, ItemCommit, ItemDropFile, ItemAddSubmodule, ItemUpdateSubmodules
 from datalad.tests.utils import eq_, assert_is_instance, assert_in
@@ -589,7 +589,7 @@ def _make_persistent_store():
 
     # TODO: prefix='testrepo': Somehow failed when prefix was changed. Need to
     # dig into it at some point.
-    path = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+    path = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='testrepo_store'))
     _TEMP_PATHS_GENERATED.append(path)
     # subdirs for files and testrepos
     os.makedirs(opj(path, 'files'))
@@ -641,17 +641,23 @@ def get_persistent_testrepo(cls, attr=None):
             msg="{cl} is not a subclass of TestRepo".format(cl=cls)
         )
 
+    # Note: instead of lower() we might want to base the path on
+    # CamelCase conversion like camel_case
+    path = opj(_persistent_store_root, 'testrepos', cls.__name__.lower())
+
     def lazy_delivery():
         if cls.__name__ not in _persistent_repo_store:
-            # Note: instead of lower() we might want to base the path on
-            # CamelCase conversion like camel_case
-            _persistent_repo_store[cls.__name__] = \
-                cls(path=opj(_persistent_store_root, 'testrepos',
-                             cls.__name__.lower()
-                             )
-                    )
+            _persistent_repo_store[cls.__name__] = cls(path=path)
         else:
-            _persistent_repo_store[cls.__name__].assert_intact()
+            try:
+                _persistent_repo_store[cls.__name__].assert_intact()
+            except (TestRepoError, AssertionError) as e:
+                lgr.debug("Persistent TestRepo '{c}' damaged ({exc}). "
+                          "Recreating.".format(c=cls.__name__,
+                                               exc=exc_str(e)))
+                from datalad.utils import rmtree
+                rmtree(path)
+                _persistent_repo_store[cls.__name__] = cls(path=path)
 
         if attr is None:
             return _persistent_repo_store[cls.__name__]

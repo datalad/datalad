@@ -13,14 +13,17 @@
 import os
 from os.path import join as opj
 import tempfile
+import logging
 
 from .. import _TEMP_PATHS_GENERATED
 from ..utils import get_tempfile_kwargs
+from ...utils import make_tempfile
 from ...utils import better_wraps
 from ...utils import optional_args
 from .repos import *
 
 
+lgr = logging.getLogger('datalad.tests.testrepos.utils')
 # TODO: - use the power!
 #       - Items themselves represent a SHOULD-BE state of things. If we don't
 #         call create(), they simply define what to test for and we can still
@@ -46,33 +49,32 @@ def with_testrepos_new(t, read_only=False, selector='all'):
     #    `is_annex`, `has_submodules`, ... and have list or dict as a parameter,
     #    specifying what properties are required to have what values
 
-    # TODO: if possible provide a signature that's (temporarily) compatible with
-    # old one to ease RF'ing
-
-    # TODO: if assert_intact fails and readonly == True, re-create for other tests
+    # TODO: For now, let `selector` be a list of classes. We need to figure out
+    # a proper approach on that one.
+    if selector == 'all':
+        selected_classes = [BasicGit, BasicMixed, MixedSubmodulesOldOneLevel,
+                            MixedSubmodulesOldNested]
+    else:
+        selected_classes = selector
 
     @better_wraps(t)
     def new_func(*arg, **kw):
 
-        # get selected classes
-        # for each class
-        #   if read_only, get persistent instance and call assert_intact
-        #      if assert_intact failed, rmtree the thing and recreate
-        #   else create at a new temp location
-        #
-        #  - include some parameter or sth for with_testrepos, to let it know
-        #    about known_failures to decorate certain calls with
-        #    Otherwise, known_failure_XXX needs opt_arg 'testrepo' to pass the
-        #    TestRepo class(es) the test does fail on and would need to be used
-        #    beneath with_testrepos to get that info.
+        for cls_ in selected_classes:
+            lgr.debug("delivering testrepo '%s'", cls_.__name__)
+            if read_only:
+                # Note, that `get_persistent_testrepo` calls assert_intact
+                # already and re-creates if needed.
+                testrepo = get_persistent_testrepo(cls_)()
+                t(*(arg + (testrepo,)), **kw)
+                testrepo.assert_intact()
+            else:
+                # create a new one in a temp location:
+                with make_tempfile(wrapped=t, mkdir=True) as path:
+                    testrepo = cls_(path=path)
+                    t(*(arg + (testrepo,)), **kw)
 
-        #  either just call or yield - not yet sure
-        #  t(*(arg + (instance,)), **kw)
-        #
-        #  if read_only: assert_intact again (Note: recreate not necessary,
-        #  since this would be done anyway by the next test requesting this
-        # instance. See above.
-        pass
+    return new_func
 
 
 @optional_args
