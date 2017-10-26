@@ -398,6 +398,19 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     clone.pull()
     assert_true(exists(opj(clone_path, filename)))
 
+    # While at it, let's test _get_remotes_having_commit a bit
+    clone.add_remote("very_origin", test_path)
+    clone.fetch("very_origin")
+    assert_equal(
+        clone._get_remotes_having_commit(clone.get_hexsha()),
+        ['origin']
+    )
+    prev_commit = clone.get_hexsha('HEAD^')
+    assert_equal(
+        set(clone._get_remotes_having_commit(prev_commit)),
+        {'origin', 'very_origin'}
+    )
+
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile

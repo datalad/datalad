@@ -1267,17 +1267,20 @@ class GitRepo(RepoInterface):
 
         It is a generator yielding names of the remotes
         """
-        remote_branches = self._git_custom_command(
+        out, err = self._git_custom_command(
             '', 'git branch -r --contains ' + commit_hexsha
         )
-        from datalad.utils import unique
-        # assuming that no remote name would have a slash in it
-        remotes = unique(rb.split('/', 1)[0].lstrip() for rb in remote_branches if rb)
-
-        if with_urls_only:
-            return [r for r in remotes if self.config.get('remote.%s.url' % r)]
-        else:
-            return remotes
+        # sanitize a bit (all the spaces and new lines)
+        remote_branches = [
+            b  # could be origin/HEAD -> origin/master, we just skip ->
+            for b in filter(bool, out.split())
+            if b != '->'
+        ]
+        return [
+            remote
+            for remote in self.get_remotes(with_urls_only=with_urls_only)
+            if any(rb.startswith(remote + '/') for rb in remote_branches)
+        ]
 
     def _gitpy_custom_call(self, cmd, cmd_args=None, cmd_options=None,
                            git_options=None, env=None,
