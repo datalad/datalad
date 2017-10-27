@@ -96,6 +96,10 @@ def setup_package():
     if 'GIT_HOME' in os.environ:
         os.environ['HOME'] = os.environ['GIT_HOME']
 
+    # For now we will just verify that it is ready to run the tests
+    from datalad.support.gitrepo import check_git_configured
+    check_git_configured()
+
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
     # But then haskell libraries do not digest empty value nicely, so we just

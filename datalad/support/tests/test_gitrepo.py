@@ -1216,3 +1216,16 @@ def test_get_git_attributes(path):
     # ATM we do not do any translation of values, so if it is just a tag, it
     # would be what git returns -- "set"
     eq_(gr.get_git_attributes(), {'tag': 'set', 'sec.key': 'val'})
+
+
+@with_tempfile(mkdir=True)
+def test_check_git_configured(newhome):
+    try:
+        old = GitRepo._config_checked
+        GitRepo._config_checked = False
+        with patch.dict('os.environ', {'HOME': newhome}):
+            # clear clear home
+            assert_raises(RuntimeError, GitRepo, newhome, create=True)
+        # But then if we
+    finally:
+        GitRepo._config_checked = old
