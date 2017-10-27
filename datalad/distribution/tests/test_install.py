@@ -25,6 +25,8 @@ from os.path import dirname
 
 from mock import patch
 
+from datalad.utils import getpwd
+
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
@@ -843,3 +845,30 @@ def test_install_subds_with_space(opath, tpath):
     # do via ssh!
     install(tpath, source="localhost:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
+@skip_ssh
+@usecase
+@with_tempfile(mkdir=True)
+def test_install_subds_from_another_remote(topdir):
+    # https://github.com/datalad/datalad/issues/1905
+    with chpwd(topdir):
+        origin_ = 'origin'
+        clone1_ = 'clone1'
+        clone2_ = 'clone2'
+
+        origin = create(origin_, no_annex=True)
+        clone1 = install(source=origin, path=clone1_)
+        # print("Initial clone")
+        clone1.create_sibling('ssh://localhost%s/%s' % (getpwd(), clone2_), name=clone2_)
+
+        # print("Creating clone2")
+        clone1.publish(to=clone2_)
+        clone2 = Dataset(clone2_)
+        # print("Initiating subdataset")
+        clone2.create('subds1')
+
+        # print("Updating")
+        clone1.update(merge=True, sibling=clone2_)
+        # print("Installing within updated dataset -- should be able to install from clone2")
+        clone1.install('subds1')
