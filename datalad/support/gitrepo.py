@@ -324,6 +324,27 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     return newfunc
 
 
+def check_git_configured():
+    """Do a check if git is configured (user.name and user.email are set)
+
+    Raises
+    ------
+    RuntimeError  if any of those two ariables are not set
+    """
+
+    check_runner = GitRunner()
+    for c in 'user.name', 'user.email':
+        try:
+            check_runner.run(['git', 'config', '--global', c])
+        except CommandError as exc:
+            lgr.debug("Failed to verify that git is configured: %s",
+                      exc_str(exc))
+            raise RuntimeError(
+                "You must configure git first (set both user.name and "
+                "user.email) settings before using DataLad."
+            )
+
+
 def _remove_empty_items(list_):
     """Remove empty entries from list
 
@@ -392,6 +413,10 @@ class GitRepo(RepoInterface):
     # must be implemented, since abstract in RepoInterface:
     def sth_like_file_has_content(self):
         return "Yes, if it's in the index"
+
+    # We must check git config to have name and email set, but
+    # should do it once
+    _config_checked = False
 
     # Begin Flyweight:
 
@@ -496,6 +521,10 @@ class GitRepo(RepoInterface):
                 version="0.5.0",
                 msg="RF: url passed to init()"
             )
+
+        if not GitRepo._config_checked:
+            check_git_configured()
+            GitRepo._config_checked = True
 
         self.realpath = realpath(path)
         # note: we may also want to distinguish between a path to the worktree
