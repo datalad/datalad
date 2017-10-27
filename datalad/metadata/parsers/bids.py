@@ -168,8 +168,8 @@ def yield_participant_info(fname):
                 hk = content_metakey_map.get(normk, None)
                 val = row[k]
                 if hk is None:
-                    hk = 'comment<{}>'.format(normk)
-                if hk == 'comment<sex>':
+                    hk = 'comment<participant#{}>'.format(normk)
+                if hk == 'comment<participant#sex>':
                     val = sex_label_map.get(row[k].lower(), row[k].lower())
                 if val:
                     props[hk] = val
