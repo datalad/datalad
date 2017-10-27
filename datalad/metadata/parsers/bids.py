@@ -137,8 +137,9 @@ class MetadataParser(BaseMetadataParser):
                 md.update(
                     {'bids:{}'.format(k): v
                      for k, v in bids.get_metadata(opj(self.ds.path, f)).items()})
-            except ValueError:
-                lgr.debug('no BIDS metadata for %s in %s', f, self.ds)
+            except Exception as e:
+                lgr.debug('no usable BIDS metadata for %s in %s: %s',
+                          f, self.ds, exc_str(e))
 
             # no check al props from other sources and apply them
             for rx in path_props:
