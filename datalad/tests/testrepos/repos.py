@@ -629,7 +629,7 @@ def get_persistent_file(path):
     return real_path
 
 
-def get_persistent_testrepo(cls, attr=None):
+def get_persistent_setup(cls, attr=None):
     """Get persistent instance of `cls`
 
     Creates that TestRepo if required and checks its integrity via assert_intact
@@ -665,8 +665,6 @@ def get_persistent_testrepo(cls, attr=None):
             return getattr(_persistent_repo_store[cls.__name__], attr)
 
     return lazy_delivery
-# apparently required to make nose not try to run it:
-get_persistent_testrepo.__test__ = False
 
 
 #
@@ -757,18 +755,18 @@ class BasicMixed(TestRepo_NEW):
     ]
 
 
-class BasicAnnex(TestRepo_NEW):
-    pass
+#class BasicAnnex(TestRepo_NEW):
+#    pass
 
 
 # 4 times: untracked, modified, staged, all of them
-class BasicGitDirty(BasicGit):
-    pass
+#class BasicGitDirty(BasicGit):
+#    pass
 
 
 # see above (staged: annex, git, both)
-class BasicAnnexDirty(BasicAnnex):
-    pass
+#class BasicAnnexDirty(BasicAnnex):
+#    pass
 
 
 # ....
@@ -807,11 +805,11 @@ class MixedSubmodulesOldOneLevel(TestRepo_NEW):
         [
             # Here we specify a clone of a persistent instance of BasicMixed:
             (ItemRepo, {'path': 'subm 1',
-                        'src': get_persistent_testrepo(BasicMixed, 'repo'),
+                        'src': get_persistent_setup(BasicMixed, 'repo'),
                         'annex': True,
                         'annex_init': True}),
             (ItemRepo, {'path': '2',
-                        'src': get_persistent_testrepo(BasicMixed, 'repo'),
+                        'src': get_persistent_setup(BasicMixed, 'repo'),
                         'annex': True,
                         'annex_init': True}),
             # Add both ItemRepos as submodules and commit:
@@ -850,14 +848,14 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
 
         # get a clone of MixedSubmodulesOldOneLevel:
         (ItemRepo, {'path': 'sub dataset1',
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel, 'repo'),
+                    'src': get_persistent_setup(MixedSubmodulesOldOneLevel, 'repo'),
                     'annex': True,
                     'annex_init': True}),
         (ItemUpdateSubmodules, {'repo': 'sub dataset1',
                                 'init': True}),
         # Now, one level deeper:
         (ItemRepo, {'path': opj('sub dataset1', 'sub sub dataset1'),
-                    'src': get_persistent_testrepo(MixedSubmodulesOldOneLevel, 'repo'),
+                    'src': get_persistent_setup(MixedSubmodulesOldOneLevel, 'repo'),
                     'annex': True,
                     'annex_init': True}),
         (ItemUpdateSubmodules, {'repo': opj('sub dataset1', 'sub sub dataset1'),

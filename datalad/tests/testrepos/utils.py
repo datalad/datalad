@@ -41,6 +41,19 @@ lgr = logging.getLogger('datalad.tests.testrepos.utils')
 # TODO: can we stack with_testrepos_new in order to set read_only for just some of it? (for example: everything without a submodule can be read_only, since we want to just notice that fact and fail accordingly. More test code is then to be executed for the ones that have submodules only)
 
 
+def _get_all_setups():
+
+    import inspect
+    module = inspect.getmodule(TestRepo_NEW)
+
+    return [module.__dict__[x] for x in module.__dict__
+            if inspect.isclass(module.__dict__[x]) and
+            issubclass(module.__dict__[x], TestRepo_NEW) and
+            module.__dict__[x] is not TestRepo_NEW]
+
+_all_setups = _get_all_setups()
+
+
 @optional_args
 def with_testrepos_new(t, read_only=False, selector='all'):
     # selector: regex again?
@@ -52,29 +65,35 @@ def with_testrepos_new(t, read_only=False, selector='all'):
     # TODO: For now, let `selector` be a list of classes. We need to figure out
     # a proper approach on that one.
     if selector == 'all':
-        selected_classes = [BasicGit, BasicMixed, MixedSubmodulesOldOneLevel,
-                            MixedSubmodulesOldNested]
+        selected_classes = _all_setups
     else:
         selected_classes = selector
 
-    @better_wraps(t)
-    def new_func(*arg, **kw):
+    from functools import wraps, partial
+
+    # TODO: Why in hell `better_wraps` prevents nose from discovering the
+    # decorated test, while: 1. `functools.wraps` doesn't AND
+    #                        2. `optional_args` uses `better_wraps`, too, and
+    #                           still works?
+    #@better_wraps(t)
+    @wraps(t)
+    def newfunc(*arg, **kw):
 
         for cls_ in selected_classes:
             lgr.debug("delivering testrepo '%s'", cls_.__name__)
             if read_only:
-                # Note, that `get_persistent_testrepo` calls assert_intact
+                # Note, that `get_persistent_setup` calls assert_intact
                 # already and re-creates if needed.
-                testrepo = get_persistent_testrepo(cls_)()
-                t(*(arg + (testrepo,)), **kw)
+                testrepo = get_persistent_setup(cls_)()
+                yield partial(t, *arg, **kw), testrepo
                 testrepo.assert_intact()
             else:
                 # create a new one in a temp location:
                 with make_tempfile(wrapped=t, mkdir=True) as path:
                     testrepo = cls_(path=path)
-                    t(*(arg + (testrepo,)), **kw)
-
-    return new_func
+                    yield partial(t, *arg, **kw), testrepo
+    return newfunc
+with_testrepos_new.__test__ = False
 
 
 @optional_args
