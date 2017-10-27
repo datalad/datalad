@@ -169,7 +169,7 @@ def yield_participant_info(fname):
                 val = row[k]
                 if hk is None:
                     hk = 'comment<participant#{}>'.format(normk)
-                if hk == 'comment<participant#sex>':
+                if hk in ('comment<participant#sex>', 'comment<participant#gender>'):
                     val = sex_label_map.get(row[k].lower(), row[k].lower())
                 if val:
                     props[hk] = val
