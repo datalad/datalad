@@ -315,10 +315,10 @@ def _get_latest_refcommit(ds, subds_relpaths):
 def _get_obj_location(hash_str, ref_type):
     return opj(
         'objects',
-        hash_str[:3],
+        hash_str[:2],
         '{}-{}'.format(
             ref_type,
-            hash_str[3:]))
+            hash_str[2:]))
 
 
 def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
