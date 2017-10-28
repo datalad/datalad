@@ -20,6 +20,8 @@ from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.metadata.definitions import vocabulary_id
 
+from datalad import cfg
+
 import logging
 lgr = logging.getLogger('datalad.metadata.parser.bids')
 
@@ -147,6 +149,8 @@ class MetadataParser(BaseMetadataParser):
             except Exception as e:
                 lgr.debug('no usable BIDS metadata for %s in %s: %s',
                           f, self.ds, exc_str(e))
+                if cfg.get('datalad.runtime.raiseonerror'):
+                    raise e
 
             # no check al props from other sources and apply them
             for rx in path_props:
