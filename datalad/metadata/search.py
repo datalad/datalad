@@ -306,11 +306,12 @@ def _get_search_index(index_dir, ds, force_reindex):
     idx = idx_obj.writer(
         # cache size per process
         limitmb=cfg.obtain('datalad.search.indexercachesize'),
-        # number of processes for indexing
-        procs=multiprocessing.cpu_count(),
-        # write separate index segments in each process for speed
-        # asks for writer.commit(optimize=True)
-        multisegment=True,
+        # disable parallel indexing for now till #1927 is resolved
+        ## number of processes for indexing
+        #procs=multiprocessing.cpu_count(),
+        ## write separate index segments in each process for speed
+        ## asks for writer.commit(optimize=True)
+        #multisegment=True,
     )
 
     # load metadata of the base dataset and what it knows about all its subdatasets
