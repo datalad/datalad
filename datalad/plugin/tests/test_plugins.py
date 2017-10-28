@@ -87,10 +87,10 @@ def test_plugin_call(path, dspath):
                     fake_dummy_spec['nodocs']['file']))
         with swallow_outputs() as cmo:
             plugin(['dummy'], showpluginhelp=True)
-            eq_(cmo.out.rstrip(), "mydocstring")
+            eq_(cmo.out.rstrip(), "Usage: dummy(dataset, noval, withval='test')\n\nmydocstring")
         with swallow_outputs() as cmo:
             plugin(['nodocs'], showpluginhelp=True)
-            eq_(cmo.out.rstrip(), "This plugin has no documentation")
+            eq_(cmo.out.rstrip(), "Usage: nodocs()\n\nThis plugin has no documentation")
         # loading fails, no docs
         assert_raises(ValueError, plugin, ['broken'], showpluginhelp=True)
 
