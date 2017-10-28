@@ -96,18 +96,18 @@ class Plugin(Interface):
 
     To run a specific plugin, provide the plugin name as an argument::
 
-      datalad plugin export_tarball
+      datalad plugin export_archive
 
     A plugin may come with its own documentation which can be displayed upon
     request::
 
-      datalad plugin export_tarball -H
+      datalad plugin export_archive -H
 
     If a plugin supports (optional) arguments, they can be passed to the plugin
     as key=value pairs with the name and the respective value of an argument,
     e.g.::
 
-      datalad plugin export_tarball output=myfile
+      datalad plugin export_archive filename=myfile
 
     Any number of arguments can be given. Only arguments with names supported
     by the respective plugin are passed to the plugin. If unsupported arguments

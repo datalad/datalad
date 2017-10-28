@@ -6,21 +6,26 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""export a dataset as a TAR archive"""
+"""export a dataset as a TAR/ZIP archive"""
 
 __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def dlplugin(dataset, filename=None, on_failure='error'):
-    """Export the content of a dataset as a TAR archive.
+def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
+             on_failure='error'):
+    """Export the content of a dataset as a TAR/ZIP archive.
 
     Parameters
     ----------
     filename : str, optional
       File name of the generated TAR archive. If no file name is given
       the archive will be generated in the current directory and will
-      be named: datalad_<dataset_uuid>.tar.gz.
+      be named: datalad_<dataset_uuid>.(tar.*|zip).
+    archivetype : {'tar', 'zip'}
+      Type of archive to generate.
+    compression : {'', 'gz', 'bz2')
+      Compression method to use. 'bz2' is not supported for ZIP archives.
     on_failure : {'error', 'continue', 'ignore'}, optional
       By default, any issue accessing a file in the dataset while adding
       it to the TAR archive will result in an error and the plugin is
@@ -33,6 +38,7 @@ def dlplugin(dataset, filename=None, on_failure='error'):
     """
     import os
     import tarfile
+    import zipfile
     from mock import patch
     from os.path import join as opj, dirname, normpath, isabs
     from datalad.utils import file_basename
@@ -40,7 +46,7 @@ def dlplugin(dataset, filename=None, on_failure='error'):
     from datalad.dochelpers import exc_str
 
     import logging
-    lgr = logging.getLogger('datalad.plugin.tarball')
+    lgr = logging.getLogger('datalad.plugin.export_archive')
 
     repo = dataset.repo
     committed_date = repo.get_committed_date()
@@ -54,12 +60,18 @@ def dlplugin(dataset, filename=None, on_failure='error'):
         # degree of our abilities
         ti.mtime = committed_date
         return ti
+    tar_args = dict(recursive=False, filter=_filter_tarinfo)
+
+    file_extension = '.{}{}'.format(
+        archivetype,
+        '{}{}'.format(
+            '.' if compression else '',
+            compression) if archivetype == 'tar' else '')
 
     if filename is None:
-        filename = "datalad_{}.tar.gz".format(dataset.id)
-    else:
-        if not filename.endswith('.tar.gz'):
-            filename += '.tar.gz'
+        filename = "datalad_{}".format(dataset.id)
+    if not filename.endswith(file_extension):
+        filename += file_extension
 
     root = dataset.path
     # use dir inside matching the output filename
@@ -69,7 +81,13 @@ def dlplugin(dataset, filename=None, on_failure='error'):
 
     # workaround for inability to pass down the time stamp
     with patch('time.time', return_value=committed_date), \
-            tarfile.open(filename, "w:gz") as tar:
+            tarfile.open(filename, "w:{}".format(compression)) \
+            if archivetype == 'tar' \
+            else zipfile.ZipFile(
+                filename, 'w',
+                zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED) \
+            as archive:
+        add_method = archive.add if archivetype == 'tar' else archive.write
         repo_files = sorted(repo.get_indexed_files())
         if isinstance(repo, AnnexRepo):
             annexed = repo.is_under_annex(
@@ -84,14 +102,13 @@ def dlplugin(dataset, filename=None, on_failure='error'):
                 if not isabs(link_target):
                     link_target = normpath(opj(dirname(fpath), link_target))
                 fpath = link_target
-            # name in the tarball
+            # name in the archive
             aname = normpath(opj(leading_dir, rpath))
             try:
-                tar.add(
+                add_method(
                     fpath,
                     arcname=aname,
-                    recursive=False,
-                    filter=_filter_tarinfo)
+                    **(tar_args if archivetype == 'tar' else {}))
             except OSError as e:
                 if on_failure in('ignore', 'continue'):
                     (lgr.warning if on_failure == 'continue' else lgr.debug)(
@@ -105,5 +122,5 @@ def dlplugin(dataset, filename=None, on_failure='error'):
         status='ok',
         path=filename,
         type='file',
-        action='export_tarball',
+        action='export_archive',
         logger=lgr)

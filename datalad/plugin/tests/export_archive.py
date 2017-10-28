@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test tarball exporter"""
+"""Test archive exporter"""
 
 import os
 import time
@@ -42,32 +42,32 @@ def test_failure(path):
     # unknown pluginer
     assert_raises(ValueError, ds.plugin, 'nah')
     # non-existing dataset
-    assert_raises(ValueError, plugin, 'export_tarball', Dataset('nowhere'))
+    assert_raises(ValueError, plugin, 'export_archive', Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)
-def test_tarball(path):
+def test_archive(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.add('.')
     committed_date = ds.repo.get_committed_date()
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
     with chpwd(path):
-        res = list(ds.plugin('export_tarball'))
+        res = list(ds.plugin('export_archive'))
         assert_status('ok', res)
         assert_result_count(res, 1)
         assert(isabs(res[0]['path']))
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension
-    ds.plugin('export_tarball', output=custom_outname[:-7])
+    ds.plugin('export_archive', output=custom_outname[:-7])
     assert_true(os.path.exists(custom_outname))
     custom1_md5 = md5sum(custom_outname)
-    # encodes the original tarball filename -> different checksum, despit
+    # encodes the original archive filename -> different checksum, despit
     # same content
     assert_not_equal(md5sum(default_outname), custom1_md5)
     # should really sleep so if they stop using time.time - we know
     time.sleep(1.1)
-    ds.plugin('export_tarball', output=custom_outname)
+    ds.plugin('export_archive', output=custom_outname)
     # should not encode mtime, so should be identical
     assert_equal(md5sum(custom_outname), custom1_md5)
 
