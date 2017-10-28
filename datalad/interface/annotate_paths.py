@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import textwrap
+from collections import OrderedDict
 
 from os import curdir
 from os.path import join as opj
@@ -94,7 +95,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
       type as dict values) for all annotated paths that have no associated
       parent dataset (i.e. nondataset paths) -- this list will be empty by
       default, unless `nondataset_path_status` was set to ''."""
-    content_by_ds = {}
+    content_by_ds = OrderedDict()
     ds_props = {}
     nondataset_paths = []
     completed = []
@@ -110,7 +111,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
             continue
         parentds = r.get('parentds', None)
         if r.get('type', None) == 'dataset':
-            # to dataset handling first, it is the more complex beast
+            # do dataset handling first, it is the more complex beast
             orig_request = r.get('orig_request', None)
             if parentds is None or refds_path is None or \
                     r.get('process_content', False) or (orig_request and (

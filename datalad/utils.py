@@ -504,6 +504,7 @@ def assure_unicode(s, encoding='utf-8'):
     """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
     return s.decode(encoding) if isinstance(s, binary_type) else s
 
+
 def assure_bool(s):
     """Convert value into boolean following convention for strings
 

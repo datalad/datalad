@@ -6,14 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS meta data parser """
+"""Test datacite metadata parser """
 
-from os.path import join as opj
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.datacite import MetadataParser
-from nose.tools import assert_true, assert_false, assert_equal
-from datalad.tests.utils import with_tree, with_tempfile
+from nose.tools import assert_equal
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import assert_raises
+from datalad.support.exceptions import IncompleteResultsError
 
 
 @with_tree(tree={'.datalad': {'meta.datacite.xml': """\
@@ -61,17 +62,12 @@ from datalad.tests.utils import with_tree, with_tempfile
 </resource>
 """}})
 def test_get_metadata(path):
-    ds = Dataset(path)
-    meta = MetadataParser(ds).get_metadata('ID')
+    ds = Dataset(path).create(force=True)
+    meta = MetadataParser(ds, [])._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
-  "@id": "ID",
   "author": [
     "Last1, First1",
     "Last2, First2"
@@ -79,19 +75,17 @@ def test_get_metadata(path):
   "citation": [
     "10.1016/j.cub.2011.08.031"
   ],
-  "dcterms:conformsTo": "http://docs.datalad.org/metadata.html#v0-1",
   "description": "Some long description.",
-  "doap:Version": "1.0",
-  "doap:shortdesc": "Main title",
   "formats": [
     "application/matlab",
     "NIFTY"
   ],
-  "keywords": [
+  "name": "CRCNS.org xxx-1",
+  "sameas": "10.6080/K0QN64NG",
+  "shortdescription": "Main title",
+  "tag": [
     "Neuroscience",
     "fMRI"
   ],
-  "name": "CRCNS.org xxx-1",
-  "sameAs": "10.6080/K0QN64NG",
-  "title": "Main title"
+  "version": "1.0"
 }""")

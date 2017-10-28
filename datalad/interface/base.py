@@ -386,10 +386,10 @@ class Interface(object):
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
         if cls.__name__ not in (
-                'AddArchiveContent', 'AggregateMetaData',
+                'AddArchiveContent',
                 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
                 'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
-                'SSHRun', 'Search', 'Test'):
+                'SSHRun', 'Test'):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -402,7 +402,10 @@ class Interface(object):
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = \
-                    lambda x, **kwargs: ui.message(args.common_output_format.format(**x))
+                    lambda x, **kwargs: ui.message(args.common_output_format.format(
+                        **{k: {k_.replace(':', '#'): v_ for k_, v_ in v.items()}
+                           if isinstance(v, dict) else v
+                           for k, v in x.items()}))
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
@@ -434,7 +437,10 @@ class Interface(object):
     def get_refds_path(cls, dataset):
         """Return a resolved reference dataset path from a `dataset` argument"""
         # theoretically a dataset could come in as a relative path -> resolve
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if dataset is None:
+            return dataset
+        refds_path = dataset.path if isinstance(dataset, Dataset) \
+            else Dataset(dataset).path
         if refds_path:
             refds_path = resolve_path(refds_path)
         return refds_path

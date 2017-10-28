@@ -16,6 +16,7 @@ from setuptools import findall
 from setuptools import setup, find_packages
 
 from setup_support import BuildConfigInfo
+from setup_support import BuildSchema
 from setup_support import BuildManPage, setup_entry_points
 from setup_support import BuildRSTExamplesFromScripts
 from setup_support import get_version
@@ -49,6 +50,14 @@ dist = platform.dist()
 # on oldstable Debian let's ask for lower versions of keyring
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
+
+# lzma is included in python since 3.3
+req_lzma = []
+try:
+    import lzma
+except ImportError:
+    req_lzma = ['pyliblzma']
+
 
 requires = {
     'core': [
@@ -85,10 +94,16 @@ requires = {
     ],
     'metadata': [
         'simplejson',
-        'pyld',  # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
-    ],
+        'whoosh',
+        'pyld', # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
+    ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
+        'mutagen',  # audio metadata
+        'exifread',  # EXIF metadata
+        'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
+        'pydicom',  # DICOM metadata
+        'pybids',  # BIDS metadata
     ]
 }
 
@@ -133,6 +148,7 @@ cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
+    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 

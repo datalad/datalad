@@ -217,4 +217,50 @@ definitions = {
         'type': EnsureInt(),
         'default': 5,
     },
+    'datalad.metadata.maxfieldsize': {
+        'ui': ('question', {
+               'title': 'Maximum metadata field size',
+               'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
+        'default': 200,
+        'type': EnsureInt(),
+    },
+    'datalad.metadata.nativetype': {
+        'ui': ('question', {
+               'title': 'Native dataset metadata scheme',
+               'text': 'Set this label to engage a particular metadata extraction parser'}),
+    },
+    'datalad.metadata.store-aggregate-content': {
+        'ui': ('question', {
+               'title': 'Aggregated content metadata storage',
+               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
+    'datalad.metadata.searchindex-documenttype': {
+        'ui': ('question', {
+               'title': 'Type of search index documents',
+               'text': 'Labels of document types to include in a search index'}),
+        'type': EnsureChoice('all', 'datasets', 'files'),
+        'default': 'all',
+    },
+    'datalad.metadata.create-aggregate-annex-limit': {
+        'ui': ('question', {
+               'title': 'Limit configuration annexing aggregated metadata in new dataset',
+               'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
+        'default': 'largerthan=20kb',
+    },
+    'datalad.runtime.raiseonerror': {
+        'ui': ('question', {
+               'title': 'Error behavior',
+               'text': 'Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.search.indexercachesize': {
+        'ui': ('question', {
+               'title': 'Maximum cache size for search index (per process)',
+               'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
+        'default': 256,
+        'type': EnsureInt(),
+    },
 }

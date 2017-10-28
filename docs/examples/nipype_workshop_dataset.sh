@@ -192,17 +192,19 @@ datalad add -d . nipype-2017
 
 # created some dataset_description.json (following BIDS format lazy me)
 echo '{"Name": "Datasets for various workshops"}' > dataset_description.json
+# and tell datalad that this is using the BIDS metadata standard
+git config --file .datalad/config --add datalad.metadata.nativetype bids
 # add that file to git
 datalad add --to-git --nosave dataset_description.json
 # discover and aggregate all meta-data within workshops
-datalad aggregate-metadata --guess-native-type --nosave -r
+datalad aggregate-metadata --nosave -r
 # and finally save all accumulated changes from above commands
 # while also updating the topmost superdataset about this changes under 'workshops'
 datalad save -S -m "Added dataset description and aggregated meta-data" -r
 # go upstairs and aggregate meta-information across its direct datasets without recursing
 # (since might take awhile)
 cd ..
-datalad aggregate-metadata --guess-native-type
+datalad aggregate-metadata
 
 #%
 # Publishing

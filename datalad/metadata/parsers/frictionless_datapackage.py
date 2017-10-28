@@ -10,6 +10,7 @@
 (http://specs.frictionlessdata.io/data-packages)
 """
 
+from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
 from datalad.metadata.parsers.base import BaseMetadataParser
 
@@ -31,23 +32,37 @@ def _compact_author(obj):
 def _compact_license(obj):
     if isinstance(obj, dict):
         # With obj itself if no url or type
-        return obj.get('url', obj.get('type', obj))
+        obj = obj.get('path', obj.get('type', obj))
+        if isinstance(obj, dict) and len(obj) == 1:
+            # didn't get lucky with compacting, try one more
+            obj = obj.popitem()[1]
+        return obj
     else:
         return obj
 
 
 class MetadataParser(BaseMetadataParser):
-    _core_metadata_filenames = ['datapackage.json']
+    metadatasrc_fname = 'datapackage.json'
 
-    def _get_metadata(self, ds_identifier, meta, full):
-        foreign = jsonload(
-            self.get_core_metadata_filenames()[0])
+    _key2stdkey = {
+        'name': 'name',
+        'title': 'shortdescription',
+        'description': 'description',
+        'keywords': 'tag',
+        'version': 'version',
+        'homepage': 'homepage',
+    }
 
-        for term in (
-                'name', 'title', 'description', 'keywords', 'version',
-                'homepage'):
+    def _get_dataset_metadata(self):
+        meta = {}
+        metadata_path = opj(self.ds.path, self.metadatasrc_fname)
+        if not exists(metadata_path):
+            return meta
+        foreign = jsonload(metadata_path)
+
+        for term in self._key2stdkey:
             if term in foreign:
-                meta[term] = foreign[term]
+                meta[self.get_homogenized_key(term)] = foreign[term]
         if 'author' in foreign:
             meta['author'] = _compact_author(foreign['author'])
         if 'contributors' in foreign:
@@ -59,8 +74,9 @@ class MetadataParser(BaseMetadataParser):
         if 'licenses' in foreign:
             meta['license'] = [_compact_license(l) for l in foreign['licenses']]
 
-        meta['dcterms:conformsTo'] = [
-            'http://specs.frictionlessdata.io/data-packages',
-            'http://docs.datalad.org/metadata.html#v0-1']
+        meta['conformsto'] = 'http://specs.frictionlessdata.io/data-packages'
 
         return meta
+
+    def _get_content_metadata(self):
+        return []

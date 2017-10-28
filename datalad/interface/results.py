@@ -176,6 +176,7 @@ known_result_xfms = {
     'successdatasets-or-none': YieldDatasets(success_only=True),
     'paths': YieldField('path'),
     'relpaths': YieldRelativePaths(),
+    'metadata': YieldField('metadata'),
 }
 
 translate_annex_notes = {
@@ -215,6 +216,11 @@ def annexjson2result(d, ds, **kwargs):
         res['action'] = d['command']
     if 'key' in d:
         res['annexkey'] = d['key']
+    if 'fields' in d:
+        # this is annex metadata, filter out timestamps
+        res['metadata'] = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
+                           for k, v in d['fields'].items()
+                           if not k.endswith('lastchanged')}
     # avoid meaningless standard messages
     if 'note' in d and (
             d['note'] != 'checksum...' and
@@ -278,7 +284,8 @@ def is_result_matching_pathsource_argument(res, **kwargs):
 
 
 def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
-                              noinfo_dir_msg, noinfo_file_msg, **kwargs):
+                              noinfo_dir_msg, noinfo_file_msg, noinfo_status='notneeded',
+                              **kwargs):
     """Helper to yield results based on what information git annex did no give us.
 
     The helper assumes that the annex command returned without an error code,
@@ -308,6 +315,8 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
     noinfo_file_msg : str
       Message to inject into the result for a requested file that `git
       annex` was silent about.
+    noinfo_status : str
+      Status to report when annex provides no information
     **kwargs
       Any further kwargs are included in the yielded result dictionary.
     """
@@ -344,7 +353,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                     fp for fp in respath_by_status.get('success', [])
                     if fp.startswith(_with_sep(p))]
                 yield get_status_dict(
-                    status='ok' if success_results else 'notneeded',
+                    status='ok' if success_results else noinfo_status,
                     message=None if success_results else (noinfo_dir_msg, p),
                     type='directory', **common_report)
             continue
@@ -353,6 +362,6 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
             # yet no exception, hence the file was most probably
             # already in the desired state
             yield get_status_dict(
-                status='notneeded', type='file',
+                status=noinfo_status, type='file',
                 message=noinfo_file_msg,
                 **common_report)

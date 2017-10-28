@@ -6,31 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS meta data parser """
+"""Test BIDS metadata parser """
 
 from os.path import join as opj
 from simplejson import dumps
-from datalad.distribution.dataset import Dataset
+from datalad.api import Dataset
 from datalad.metadata.parsers.bids import MetadataParser
-from nose.tools import assert_true, assert_false, assert_equal
-from datalad.tests.utils import with_tree, with_tempfile
-
-
-@with_tree(tree={'dataset_description.json': '{}'})
-def test_has_metadata(path):
-    ds = Dataset(path)
-    p = MetadataParser(ds)
-    assert_true(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(),
-                 [opj(path, 'dataset_description.json')])
-
-
-@with_tempfile(mkdir=True)
-def test_has_no_metadata(path):
-    ds = Dataset(path)
-    p = MetadataParser(ds)
-    assert_false(p.has_metadata())
-    assert_equal(p.get_core_metadata_filenames(), [])
+from nose.tools import assert_equal
+from datalad.tests.utils import with_tree
+from datalad.tests.utils import assert_in
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -48,20 +32,23 @@ def test_has_no_metadata(path):
         "http://studyforrest.org"
     ]
 }
-"""})
+""",
+    'participants.tsv': """\
+participant_id\tgender\tage\thandedness\thearing_problems_current
+sub-01\tm\t30-35\tr\tn
+sub-03\tf\t20-25\tr\tn
+""",
+    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}}})
 def test_get_metadata(path):
 
-    ds = Dataset(path)
-    meta = MetadataParser(ds).get_metadata('ID')
+    ds = Dataset(path).create(force=True)
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    del meta['@context']
+    dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
+        dump,
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
-  "@id": "ID",
   "author": [
     "Mike One",
     "Anna Two"
@@ -69,15 +56,22 @@ def test_get_metadata(path):
   "citation": [
     "http://studyforrest.org"
   ],
-  "dcterms:conformsTo": [
-    "http://docs.datalad.org/metadata.html#v0-1",
-    "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf"
-  ],
+  "comment<BIDSVersion>": "1.0.0-rc3",
+  "conformsto": "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf",
   "description": "Some description",
-  "foaf:fundedBy": "We got money from collecting plastic bottles",
+  "fundedby": "We got money from collecting plastic bottles",
   "license": "PDDL",
   "name": "studyforrest_phase2"
 }""")
+
+    test_fname = opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')
+    cmeta = list(MetadataParser(
+        ds,
+        [opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')]
+    ).get_metadata(False, True)[1])
+    assert_equal(len(cmeta), 1)
+    assert_equal(cmeta[0][0], test_fname)
+    assert_in('comment<participant#handedness>', cmeta[0][1])
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -92,21 +86,15 @@ description
 """})
 def test_get_metadata_with_description_and_README(path):
 
-    ds = Dataset(path)
-    meta = MetadataParser(ds).get_metadata('ID')
+    ds = Dataset(path).create(force=True)
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    del meta['@context']
+    dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
+        dump,
         """\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
-  "@id": "ID",
-  "dcterms:conformsTo": [
-    "http://docs.datalad.org/metadata.html#v0-1",
-    "http://bids.neuroimaging.io"
-  ],
+  "conformsto": "http://bids.neuroimaging.io",
   "description": "Some description",
   "name": "test"
 }""")
@@ -124,22 +112,15 @@ A very detailed
 description с юникодом
 """})
 def test_get_metadata_with_README(path):
-    ds = Dataset(path)
-    meta = MetadataParser(ds).get_metadata('ID')
+    ds = Dataset(path).create(force=True)
+    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
         dump,
         u"""\
 {
-  "@context": {
-    "@vocab": "http://schema.org/",
-    "doap": "http://usefulinc.com/ns/doap#"
-  },
-  "@id": "ID",
-  "dcterms:conformsTo": [
-    "http://docs.datalad.org/metadata.html#v0-1",
-    "http://bids.neuroimaging.io"
-  ],
+  "conformsto": "http://bids.neuroimaging.io",
   "description": "A very detailed\\ndescription с юникодом",
   "name": "test"
 }""")
