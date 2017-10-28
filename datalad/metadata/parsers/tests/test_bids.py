@@ -71,7 +71,7 @@ def test_get_metadata(path):
     ).get_metadata(False, True)[1])
     assert_equal(len(cmeta), 1)
     assert_equal(cmeta[0][0], test_fname)
-    assert_in('comment<handedness>', cmeta[0][1])
+    assert_in('comment<participant#handedness>', cmeta[0][1])
 
 
 @with_tree(tree={'dataset_description.json': """
