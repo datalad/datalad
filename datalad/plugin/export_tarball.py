@@ -6,19 +6,38 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""export a dataset to a tarball"""
+"""export a dataset as a TAR archive"""
 
 __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def dlplugin(dataset, output=None):
+def dlplugin(dataset, filename=None, on_failure='error'):
+    """Export the content of a dataset as a TAR archive.
+
+    Parameters
+    ----------
+    filename : str, optional
+      File name of the generated TAR archive. If no file name is given
+      the archive will be generated in the current directory and will
+      be named: datalad_<dataset_uuid>.tar.gz.
+    on_failure : {'error', 'continue', 'ignore'}, optional
+      By default, any issue accessing a file in the dataset while adding
+      it to the TAR archive will result in an error and the plugin is
+      aborted. Setting this to 'continue' will issue warnings instead
+      of failing on error. The value 'ignore' will only inform about
+      problem at the 'debug' log level. The latter two can be helpful
+      when generating a TAR archive from a dataset where some file content
+      is not available locally.
+
+    """
     import os
     import tarfile
     from mock import patch
     from os.path import join as opj, dirname, normpath, isabs
     from datalad.utils import file_basename
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.dochelpers import exc_str
 
     import logging
     lgr = logging.getLogger('datalad.plugin.tarball')
@@ -36,21 +55,21 @@ def dlplugin(dataset, output=None):
         ti.mtime = committed_date
         return ti
 
-    if output is None:
-        output = "datalad_{}.tar.gz".format(dataset.id)
+    if filename is None:
+        filename = "datalad_{}.tar.gz".format(dataset.id)
     else:
-        if not output.endswith('.tar.gz'):
-            output += '.tar.gz'
+        if not filename.endswith('.tar.gz'):
+            filename += '.tar.gz'
 
     root = dataset.path
     # use dir inside matching the output filename
     # TODO: could be an option to the export plugin allowing empty value
     # for no leading dir
-    leading_dir = file_basename(output)
+    leading_dir = file_basename(filename)
 
     # workaround for inability to pass down the time stamp
     with patch('time.time', return_value=committed_date), \
-            tarfile.open(output, "w:gz") as tar:
+            tarfile.open(filename, "w:gz") as tar:
         repo_files = sorted(repo.get_indexed_files())
         if isinstance(repo, AnnexRepo):
             annexed = repo.is_under_annex(
@@ -67,18 +86,24 @@ def dlplugin(dataset, output=None):
                 fpath = link_target
             # name in the tarball
             aname = normpath(opj(leading_dir, rpath))
-            tar.add(
-                fpath,
-                arcname=aname,
-                recursive=False,
-                filter=_filter_tarinfo)
+            try:
+                tar.add(
+                    fpath,
+                    arcname=aname,
+                    recursive=False,
+                    filter=_filter_tarinfo)
+            except OSError as e:
+                if on_failure in('ignore', 'continue'):
+                    (lgr.warning if on_failure == 'continue' else lgr.debug)(
+                        'Skipped %s: %s',
+                        fpath, exc_str(e))
 
-    if not isabs(output):
-        output = opj(os.getcwd(), output)
+    if not isabs(filename):
+        filename = opj(os.getcwd(), filename)
 
     yield dict(
         status='ok',
-        path=output,
+        path=filename,
         type='file',
         action='export_tarball',
         logger=lgr)
