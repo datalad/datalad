@@ -132,6 +132,13 @@ class MetadataParser(BaseMetadataParser):
         # now go over all files in the dataset and query pybids for its take
         # on each of them
         for f in self.paths:
+            # BIDS carries a substantial portion of its metadata in JSON
+            # sidecar files. we ignore them here completely
+            # this might yield some false-negatives in theory, but
+            # this case has not been observed in practice yet, hence
+            # doing it cheap for now
+            if f.endswith('.json'):
+                continue
             md = {}
             try:
                 md.update(
