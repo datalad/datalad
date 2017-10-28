@@ -214,20 +214,27 @@ class Plugin(Interface):
                 user_supplied_args.add(argname)
         plugin_call = _load_plugin(plugins[plugin]['file'])
 
+        # check the plugin signature
+        plugin_argspec = inspect.getargspec(plugin_call)
+
         if showpluginhelp:
             # we don't need special docs for the cmdline, standard python ones
             # should be comprehensible enough
             ui.message(
-                dedent_docstring(plugin_call.__doc__)
-                if plugin_call.__doc__
-                else 'This plugin has no documentation')
+                'Usage: {}{}\n\n{}'.format(
+                    plugin,
+                    inspect.formatargspec(*plugin_argspec),
+                    dedent_docstring(plugin_call.__doc__)
+                    if plugin_call.__doc__
+                    else 'This plugin has no documentation'))
             return
 
         #
         # argument preprocessing
         #
-        # check the plugin signature and filter out all unsupported args
-        plugin_args, _, _, arg_defaults = inspect.getargspec(plugin_call)
+        # filter out all unsupported args
+        plugin_args = plugin_argspec[0]
+        arg_defaults = plugin_argspec[3]
         supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
         excluded_args = user_supplied_args.difference(supported_args.keys())
         if excluded_args:
