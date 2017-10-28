@@ -666,8 +666,17 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
             # TODO instead of a set, it could be a set with counts
             vset = unique_cm.get(k, set())
             # prevent nested structures in unique prop list
-            vset.add(', '.join(str(i) if isinstance(i, (int, float)) else i
-                               for i in v) if isinstance(v, (tuple, list)) else v)
+            vset.add(', '.join(str(i)
+                               # force-convert any non-string item
+                               if not isinstance(i, string_types) else i
+                               for i in v)
+                     # any plain sequence
+                     if isinstance(v, (tuple, list))
+                     else v
+                     # keep anything that can live in JSON natively
+                     if isinstance(v, (int, float, bool) + string_types)
+                     # force string-convert anything else
+                     else str(v))
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {
