@@ -59,7 +59,7 @@ def test_archive(path):
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension
-    ds.plugin('export_archive', output=custom_outname[:-7])
+    ds.plugin('export_archive', filename=custom_outname[:-7])
     assert_true(os.path.exists(custom_outname))
     custom1_md5 = md5sum(custom_outname)
     # encodes the original archive filename -> different checksum, despit
@@ -67,7 +67,7 @@ def test_archive(path):
     assert_not_equal(md5sum(default_outname), custom1_md5)
     # should really sleep so if they stop using time.time - we know
     time.sleep(1.1)
-    ds.plugin('export_archive', output=custom_outname)
+    ds.plugin('export_archive', filename=custom_outname)
     # should not encode mtime, so should be identical
     assert_equal(md5sum(custom_outname), custom1_md5)
 
@@ -88,3 +88,16 @@ def test_archive(path):
             assert_equal(nfiles, 4)
     check_contents(default_outname, 'datalad_%s' % ds.id)
     check_contents(custom_outname, 'myexport')
+
+
+@with_tree(_dataset_template)
+def test_zip_archive(path):
+    ds = Dataset(opj(path, 'ds')).create(force=True)
+    ds.add('.')
+    with chpwd(path):
+        ds.plugin('export_archive', filename='my', archivetype='zip')
+        assert_true(os.path.exists('my.zip'))
+        custom1_md5 = md5sum('my.zip')
+        time.sleep(1.1)
+        ds.plugin('export_archive', filename='my', archivetype='zip')
+        assert_equal(md5sum('my.zip'), custom1_md5)
