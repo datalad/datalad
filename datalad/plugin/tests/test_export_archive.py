@@ -89,10 +89,16 @@ def test_archive(path):
     check_contents(default_outname, 'datalad_%s' % ds.id)
     check_contents(custom_outname, 'myexport')
 
+    # now loose some content
+    ds.drop('file_up', check=False)
+    assert_raises(OSError, ds.plugin, 'export_archive', filename='my')
+    ds.plugin('export_archive', filename='partial', on_file_error='ignore')
+    assert_true(os.path.exists('partial.tar.gz'))
+
 
 @with_tree(_dataset_template)
 def test_zip_archive(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True)
+    ds = Dataset(opj(path, 'ds')).create(force=True, no_annex=True)
     ds.add('.')
     with chpwd(path):
         ds.plugin('export_archive', filename='my', archivetype='zip')

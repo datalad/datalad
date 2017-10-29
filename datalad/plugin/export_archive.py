@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 # PLUGIN API
 def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
-             on_failure='error'):
+             on_file_error='error'):
     """Export the content of a dataset as a TAR/ZIP archive.
 
     Parameters
@@ -26,7 +26,7 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
       Type of archive to generate.
     compression : {'', 'gz', 'bz2')
       Compression method to use. 'bz2' is not supported for ZIP archives.
-    on_failure : {'error', 'continue', 'ignore'}, optional
+    on_file_error : {'error', 'continue', 'ignore'}, optional
       By default, any issue accessing a file in the dataset while adding
       it to the TAR archive will result in an error and the plugin is
       aborted. Setting this to 'continue' will issue warnings instead
@@ -110,10 +110,12 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
                     arcname=aname,
                     **(tar_args if archivetype == 'tar' else {}))
             except OSError as e:
-                if on_failure in('ignore', 'continue'):
-                    (lgr.warning if on_failure == 'continue' else lgr.debug)(
+                if on_file_error in('ignore', 'continue'):
+                    (lgr.warning if on_file_error == 'continue' else lgr.debug)(
                         'Skipped %s: %s',
                         fpath, exc_str(e))
+                else:
+                    raise e
 
     if not isabs(filename):
         filename = opj(os.getcwd(), filename)
