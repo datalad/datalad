@@ -205,7 +205,12 @@ def setup_parser(
         for _intfspec in _interfaces:
             # turn the interface spec into an instance
             lgr.log(5, "Importing module %s " % _intfspec[0])
-            _mod = import_module(_intfspec[0], package='datalad')
+            try:
+                _mod = import_module(_intfspec[0], package='datalad')
+            except Exception as e:
+                lgr.error("Internal error, cannot import interface '%s': %s",
+                          _intfspec[0], exc_str(e))
+                continue
             _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
             # deal with optional parser args
