@@ -32,6 +32,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import skip_if_on_windows
 
 
@@ -53,7 +54,8 @@ def test_basics(path, nodspath):
     ds = Dataset(path).create()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
-    with chpwd(path):
+    with chpwd(path), \
+            swallow_outputs():
         # runs nothing, does nothing
         assert_result_count(ds.run(), 0)
         eq_(last_state, ds.repo.get_hexsha())
@@ -81,7 +83,8 @@ def test_basics(path, nodspath):
         eq_(last_state, ds.repo.get_hexsha())
 
     # run outside the dataset, should still work but with limitations
-    with chpwd(nodspath):
+    with chpwd(nodspath), \
+            swallow_outputs():
         res = ds.run(['touch', 'empty2'], message='TEST')
         assert_status('ok', res)
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
@@ -96,7 +99,8 @@ def test_rerun(path, nodspath):
     sub = ds.create('sub')
     probe_path = opj(sub.path, 'sequence')
     # run inside the dataset
-    with chpwd(path):
+    with chpwd(path), \
+            swallow_outputs():
         ds.run('echo x$(cat sub/sequence) > sub/sequence')
     # command ran once, all clean
     ok_clean_git(ds.path)
@@ -104,15 +108,17 @@ def test_rerun(path, nodspath):
     # now, for a rerun we can be anywhere, PWD and all are recorded
     # moreover, rerun must figure out which bits to unlock, even in
     # subdatasets
-    with chpwd(nodspath):
+    with chpwd(nodspath), \
+            swallow_outputs():
         ds.run(rerun=True)
     ok_clean_git(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
     # if I give another command, it will be ignored
-    with chpwd(nodspath):
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            ds.run('30BANG3934', rerun=True)
-            cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
+    with chpwd(nodspath), \
+            swallow_logs(new_level=logging.WARNING) as cml, \
+            swallow_outputs():
+        ds.run('30BANG3934', rerun=True)
+        cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
     ok_clean_git(ds.path)
     eq_('xxx\n', open(probe_path).read())
