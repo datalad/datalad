@@ -23,7 +23,8 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-?
+- `export_tarball` plugin has been generalized to `export_archive` and can now also
+  generate ZIP archives.
 
 
 # 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
