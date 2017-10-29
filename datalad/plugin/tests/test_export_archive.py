@@ -91,9 +91,9 @@ def test_archive(path):
 
     # now loose some content
     ds.drop('file_up', check=False)
-    assert_raises(OSError, ds.plugin, 'export_archive', filename='my')
-    ds.plugin('export_archive', filename='partial', on_file_error='ignore')
-    assert_true(os.path.exists('partial.tar.gz'))
+    assert_raises(OSError, ds.plugin, 'export_archive', filename=opj(path, 'my'))
+    ds.plugin('export_archive', filename=opj(path, 'partial'), on_file_error='ignore')
+    assert_true(os.path.exists(opj(path, 'partial.tar.gz')))
 
 
 @with_tree(_dataset_template)
