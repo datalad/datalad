@@ -1313,5 +1313,24 @@ def safe_print(s):
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
+
+def open_r_encdetect(fname):
+    """Return a file object in read mode with auto-detected encoding
+
+    This is helpful when dealing with files of unknown encoding.
+    """
+    from chardet import detect
+    import io
+    # read some bytes from the file
+    kbyte = open(fname, 'rb').read(1000)
+    enc = detect(kbyte)
+    denc = enc.get('encoding', None)
+    lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
+              denc,
+              fname,
+              enc.get('confidence', 'unkown'))
+    return io.open(fname, encoding=denc)
+
+
 lgr.log(5, "Done importing datalad.utils")
 
