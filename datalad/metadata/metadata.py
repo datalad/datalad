@@ -540,13 +540,19 @@ def _merge_context(ds, old, new):
 
 
 def _filter_metadata_fields(d, maxsize=None, blacklist=None):
+    o = d
     if blacklist:
-        d = {k: v for k, v in d.items()
-             if not any(bl.match(k) for bl in blacklist)}
+        o = {k: v for k, v in o.items()
+             if k.startswith('@') or not any(bl.match(k) for bl in blacklist)}
     if maxsize:
-        d = {k: v for k, v in d.items()
-             if len(str(v) if not isinstance(v, string_types + (binary_type,)) else v) <= maxsize}
-    return d
+        o = {k: v for k, v in o.items()
+             if k.startswith('@') or (len(str(v)
+                                      if not isinstance(v, string_types + (binary_type,))
+                                      else v) <= maxsize)}
+    if len(d) != len(o):
+        lgr.info('Removed metadata field(s) due to blacklisting and max size settings: %s',
+                 set(d.keys()).difference(o.keys()))
+    return o
 
 
 def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
