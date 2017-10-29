@@ -647,14 +647,17 @@ class Search(Interface):
             # disabled: unreliable estimate, often confusing
             #nhits = hits.estimated_min_length()
             # report query stats
+            nresults = len(hits)
             lgr.info('Query completed in {} sec.{}'.format(
                 hits.runtime,
                 ' Reporting {}.'.format(
                     'max. {} top {}'.format(
                         max_nresults,
                         single_or_plural('match', 'matches', max_nresults))
-                    if max_nresults > 0 else 'all matches')
-                if not hits.is_empty() else ''))
+                    if (max_nresults > 0 and nresults >= max_nresults) else 'all matches')
+                if not hits.is_empty()
+                else ' No matches.'
+            ))
 
             if not hits:
                 return
