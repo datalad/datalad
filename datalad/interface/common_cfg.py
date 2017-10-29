@@ -221,7 +221,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Maximum metadata field size',
                'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
-        'default': 200,
+        'default': 100000,
         'type': EnsureInt(),
     },
     'datalad.metadata.nativetype': {
