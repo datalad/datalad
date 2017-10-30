@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 # PLUGIN API
 def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
-             on_file_error='error'):
+             missing_content='error'):
     """Export the content of a dataset as a TAR/ZIP archive.
 
     Parameters
@@ -26,14 +26,13 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
       Type of archive to generate.
     compression : {'', 'gz', 'bz2')
       Compression method to use. 'bz2' is not supported for ZIP archives.
-    on_file_error : {'error', 'continue', 'ignore'}, optional
-      By default, any issue accessing a file in the dataset while adding
-      it to the TAR archive will result in an error and the plugin is
-      aborted. Setting this to 'continue' will issue warnings instead
-      of failing on error. The value 'ignore' will only inform about
-      problem at the 'debug' log level. The latter two can be helpful
-      when generating a TAR archive from a dataset where some file content
-      is not available locally.
+    missing_content : {'error', 'continue', 'ignore'}, optional
+      By default, any discovered file with missing content will result in
+      an error and the plugin is aborted. Setting this to 'continue' will
+      issue warnings instead of failing on error. The value 'ignore' will
+      only inform about problem at the 'debug' log level. The latter two
+      can be helpful when generating a TAR archive from a dataset where
+      some file content is not available locally.
 
     """
     import os
@@ -92,11 +91,23 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
         if isinstance(repo, AnnexRepo):
             annexed = repo.is_under_annex(
                 repo_files, allow_quick=True, batch=True)
+            # remember: returns False for files in Git!
+            has_content = repo.file_has_content(
+                repo_files, allow_quick=True, batch=True)
         else:
             annexed = [False] * len(repo_files)
+            has_content = [True] * len(repo_files)
         for i, rpath in enumerate(repo_files):
             fpath = opj(root, rpath)
             if annexed[i]:
+                if not has_content[i]:
+                    if missing_content in ('ignore', 'continue'):
+                        (lgr.warning if missing_content == 'continue' else lgr.debug)(
+                            'File %s has no content available, skipped', fpath)
+                        continue
+                    else:
+                        raise IOError('File %s has no content available', fpath)
+
                 # resolve to possible link target
                 link_target = os.readlink(fpath)
                 if not isabs(link_target):
@@ -104,18 +115,10 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
                 fpath = link_target
             # name in the archive
             aname = normpath(opj(leading_dir, rpath))
-            try:
-                add_method(
-                    fpath,
-                    arcname=aname,
-                    **(tar_args if archivetype == 'tar' else {}))
-            except OSError as e:
-                if on_file_error in('ignore', 'continue'):
-                    (lgr.warning if on_file_error == 'continue' else lgr.debug)(
-                        'Skipped %s: %s',
-                        fpath, exc_str(e))
-                else:
-                    raise e
+            add_method(
+                fpath,
+                arcname=aname,
+                **(tar_args if archivetype == 'tar' else {}))
 
     if not isabs(filename):
         filename = opj(os.getcwd(), filename)
