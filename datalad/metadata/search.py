@@ -93,7 +93,12 @@ def _meta2index_dict(meta, definitions, ds_defs):
     }
 
 
-def _resolve_term(term, definitions, common_defs):
+def _resolve_term(term, definitions, common_defs, blacklist):
+    if term in blacklist:
+        return
+    if r_url.match(term):
+        # already a plain URL -> done
+        return term
     termdef = common_defs.get(term, {}).get('def', None)
     if termdef is not None:
         if r_url.match(termdef):
@@ -106,7 +111,6 @@ def _resolve_term(term, definitions, common_defs):
     # not in the common vocabulary
     if ':' in term:
         prefix = term.split(':')[0]
-        term = term[len(prefix) + 1:]
         prefix_def = definitions.get(prefix, None)
         prefix_def = prefix_def.get('@id', None) \
             if isinstance(prefix_def, dict) else prefix_def
@@ -118,9 +122,11 @@ def _resolve_term(term, definitions, common_defs):
                 # the vocabulary, we are lost -> ignore this key as it
                 # cannot possibly be resolved
                 lgr.debug(
-                    "Cannot resolve term prefix '%s', no definition found",
-                    prefix)
+                    "Cannot resolve term prefix '%s', no definition found (term: '%s')",
+                    prefix, term)
+                blacklist.add(term)
                 return
+        term = term[len(prefix) + 1:]
         if r_url.match(prefix_def):
             # proper URL, just concat to get full definition
             return u'{}{}'.format(prefix_def, term)
@@ -141,6 +147,9 @@ def _resolve_term(term, definitions, common_defs):
 def _get_search_schema(ds):
     from whoosh import fields as wf
 
+    # haven for terms that have been found to be undefined
+    # (for faster decision-making upon next encounter)
+    undef = set()
     # this will harvest all discovered term definitions
     definitions = {
         '@id': 'unique identifier of an entity',
@@ -150,7 +159,7 @@ def _get_search_schema(ds):
         'parentds': 'path of the datasets that contains an entity',
         # 'type' will not come from a metadata field, hence will not be detected
         'type': {
-            '@id': _resolve_term(common_defs['type']['def'], {}, common_defs),
+            '@id': _resolve_term(common_defs['type']['def'], {}, common_defs, undef),
             'description': common_defs['type']['descr']},
     }
 
@@ -164,8 +173,8 @@ def _get_search_schema(ds):
 
     lgr.info('Scanning for metadata keys')
     # quick 1st pass over all dataset to gather the needed schema fields
-	# sanitization of / should ideally be done while saving, but that would require
-	# fixes in whoosh I guess
+    # sanitization of / should ideally be done while saving, but that would require
+    # fixes in whoosh I guess
     sanitize_key = lambda k: k.replace(' ', '_').replace('/', '_')
     for res in _query_aggregated_metadata(
             reporton='datasets',
@@ -215,6 +224,8 @@ def _get_search_schema(ds):
         # key is a valid candidate for inclusion into the schema
         cand_keys = list(meta)
         cand_keys.extend(meta.get('unique_content_properties', []))
+        # need a copy, we are going to reformat keys of ad-hoc defs
+        final_defs = dict(definitions)
         for k in cand_keys:
             k = sanitize_key(k)
             if k in ('unique_content_properties', '@context'):
@@ -223,29 +234,30 @@ def _get_search_schema(ds):
                 continue
             # check if we have any kind of definitions for this key
             if k not in definitions:
-                termdef = _resolve_term(k, definitions, common_defs)
+                termdef = _resolve_term(k, definitions, common_defs, undef)
                 if termdef is None:
                     # we know nothing about this key, ignore
                     lgr.debug(
                         "Ignoring term '%s', no definition found",
                         k)
                     continue
-                definitions[k] = termdef
+                final_defs[k] = termdef
                 # TODO treat keywords/tags separately
                 schema_fields[k] = wf.TEXT(stored=True)
             else:
                 if isinstance(definitions[k], dict):
-                    definitions[k] = {
+                    final_defs[k] = {
                         k_ if k_ == '@id' else '{} ({})'.format(
-                           k_,
-                           _resolve_term(k_, definitions, common_defs))
-                        : _resolve_term(v, definitions, common_defs)
+                            k_,
+                            _resolve_term(k_, definitions, common_defs, undef))
+                        : _resolve_term(v, definitions, common_defs, undef)
+                        if k_ in ('@id', 'unit') else v
                         for k_, v in definitions[k].items()
                         if v  # skip if value is empty
                     }
 
     schema = wf.Schema(**schema_fields)
-    return schema, definitions, per_ds_defs
+    return schema, final_defs, per_ds_defs
 
 
 def _get_search_index(index_dir, ds, force_reindex):
