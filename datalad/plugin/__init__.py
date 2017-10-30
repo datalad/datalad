@@ -236,7 +236,8 @@ class Plugin(Interface):
         plugin_args = plugin_argspec[0]
         arg_defaults = plugin_argspec[3]
         supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
-        if len(supported_args) < len(kwargs):
+        excluded_args = user_supplied_args.difference(supported_args.keys())
+        if excluded_args:
             lgr.warning("Ignoring plugin argument(s) %s, not supported by plugin %s",
                         list(set(kwargs.keys()).difference(supported_args.keys())),
                         plugin)
