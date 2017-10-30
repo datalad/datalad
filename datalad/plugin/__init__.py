@@ -236,10 +236,10 @@ class Plugin(Interface):
         plugin_args = plugin_argspec[0]
         arg_defaults = plugin_argspec[3]
         supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
-        excluded_args = user_supplied_args.difference(supported_args.keys())
-        if excluded_args:
-            lgr.warning('ignoring plugin argument(s) %s, not supported by plugin',
-                        excluded_args)
+        if len(supported_args) < len(kwargs):
+            lgr.warning("Ignoring plugin argument(s) %s, not supported by plugin %s",
+                        list(set(kwargs.keys()).difference(supported_args.keys())),
+                        plugin)
         # always overwrite the dataset arg if one is needed
         if 'dataset' in plugin_args:
             supported_args['dataset'] = require_dataset(

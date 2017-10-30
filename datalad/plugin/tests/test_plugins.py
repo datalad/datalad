@@ -37,7 +37,7 @@ broken_plugin = """garbage"""
 
 nodocs_plugin = """\
 def dlplugin():
-    pass
+    yield
 """
 
 # functioning plugin dummy
@@ -111,7 +111,7 @@ def test_plugin_call(path, dspath):
             res = list(plugin(['dummy', 'noval=one', 'obscure=some']))
             assert_status('ok', res)
             cml.assert_logged(
-                msg=".*ignoring plugin argument\\(s\\).*obscure.*, not supported by plugin.*",
+                msg=".*Ignoring plugin argument\\(s\\).*obscure.*, not supported by plugin.*",
                 regex=True, level='WARNING')
         # fails on missing positional arg
         assert_raises(TypeError, plugin, ['dummy'])
