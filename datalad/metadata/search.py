@@ -647,18 +647,25 @@ class Search(Interface):
             # disabled: unreliable estimate, often confusing
             #nhits = hits.estimated_min_length()
             # report query stats
+            topstr = '{} top {}'.format(
+                        max_nresults,
+                        single_or_plural('match', 'matches', max_nresults)
+            )
             lgr.info('Query completed in {} sec.{}'.format(
                 hits.runtime,
                 ' Reporting {}.'.format(
-                    'max. {} top {}'.format(
-                        max_nresults,
-                        single_or_plural('match', 'matches', max_nresults))
-                    if max_nresults > 0 else 'all matches')
-                if not hits.is_empty() else ''))
+                    ('up to ' + topstr)
+                    if max_nresults > 0
+                    else 'all matches'
+                )
+                if not hits.is_empty()
+                else ' No matches.'
+            ))
 
             if not hits:
                 return
 
+            nhits = 0
             for hit in hits:
                 res = dict(
                     action='search',
@@ -675,3 +682,10 @@ class Search(Interface):
                 if 'parentds' in hit:
                     res['parentds'] = normpath(opj(ds.path, hit['parentds']))
                 yield res
+                nhits += 1
+
+            if max_nresults and nhits == max_nresults:
+                lgr.info(
+                    "Reached the limit of {}, there could be more which "
+                    "were not reported.".format(topstr)
+                )
