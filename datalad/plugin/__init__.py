@@ -252,6 +252,13 @@ class Plugin(Interface):
                 check_installed=len(arg_defaults) != len(plugin_args),
                 purpose='handover to plugin')
 
+        # final test whether the call is complete
+        missing_args = [k for k in plugin_args[:-len(arg_defaults)]
+                        if k not in supported_args]
+        if missing_args:
+            raise TypeError('Missing value(s) for plugin argument(s): {}'.format(
+                missing_args))
+
         # call as a generator
         for res in plugin_call(**supported_args):
             if not res:
