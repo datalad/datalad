@@ -132,7 +132,7 @@ sample_property_name_map = {
 }
 
 
-def get_bids_metadata(bids_root, basepath):
+def get_bids_metadata(ds, basepath):
     """Query the BIDS meta data JSON file hierarchy
 
     Parameters
@@ -144,6 +144,7 @@ def get_bids_metadata(bids_root, basepath):
       for which meta data shall be queried.
     """
     sidecar_json = '{}.json'.format(basepath)
+    bids_root = ds.path
 
     path_components = psplit(sidecar_json)
     filename_components = path_components[-1].split("_")
@@ -213,10 +214,10 @@ def get_keychains(d, dest, prefix):
     return dest
 
 
-def _get_study_df(bids_directory):
+def _get_study_df(ds):
     subject_ids = []
     study_dict = OrderedDict()
-    for file in glob(opj(bids_directory, "sub-*")):
+    for file in glob(opj(ds.path, "sub-*")):
         if os.path.isdir(file):
             subject_ids.append(psplit(file)[-1][4:])
     subject_ids.sort()
@@ -227,7 +228,7 @@ def _get_study_df(bids_directory):
     study_dict["Sample Name"] = subject_ids
     df = pd.DataFrame(study_dict)
 
-    participants_file = opj(bids_directory, "participants.tsv")
+    participants_file = opj(ds.path, "participants.tsv")
     if not exists(participants_file):
         return df
 
@@ -255,7 +256,7 @@ def _get_study_df(bids_directory):
     return df
 
 
-def _describe_file(fpath, bids_directory):
+def _describe_file(fpath, ds):
     fname = psplit(fpath)[-1]
     fname_components = fname.split(".")[0].split('_')
     info = {
@@ -264,7 +265,7 @@ def _describe_file(fpath, bids_directory):
         # so that, e.g. simultaneous recordings match wrt to the assay name
         # across assay tables
         'Assay Name': '_'.join(fname_components[:-1]),
-        'Raw Data File': fpath[len(bids_directory):],
+        'Raw Data File': fpath[len(ds.path):],
         'Parameter Value[modality]': fname_components[-1]
     }
     comp_dict = dict([c.split('-') for c in fname_components[:-1]])
@@ -277,14 +278,14 @@ def _describe_file(fpath, bids_directory):
     if 'task' in comp_dict:
         info['Factor Value[task]'] = comp_dict['task']
     info['other_fields'] = get_bids_metadata(
-        bids_directory,
+        ds,
         '_'.join(fname_components)
     )
     return info
 
 
-def _describe_mri_file(fpath, bids_directory):
-    info = _describe_file(fpath, bids_directory)
+def _describe_mri_file(fpath, ds):
+    info = _describe_file(fpath, ds)
 
     if nibabel is None or not exists(fpath):
         # this could happen in the case of a dead symlink in,
@@ -331,21 +332,21 @@ def _describe_mri_file(fpath, bids_directory):
     return info
 
 
-def _get_file_matches(bids_directory, glob_pattern):
+def _get_file_matches(ds, glob_pattern):
     files = glob(
-        opj(bids_directory, "sub-*", "*", "sub-{}".format(glob_pattern)))
+        opj(ds.path, "sub-*", "*", "sub-{}".format(glob_pattern)))
     files += glob(
-        opj(bids_directory, "sub-*", "ses-*", "*", "sub-*_ses-{}".format(
+        opj(ds.path, "sub-*", "ses-*", "*", "sub-*_ses-{}".format(
             glob_pattern)))
     return files
 
 
-def _get_mri_assay_df(bids_directory, modality):
+def _get_mri_assay_df(ds, modality):
     # locate MRI files
-    files = _get_file_matches(bids_directory, '*_{}.nii.gz'.format(modality))
+    files = _get_file_matches(ds, '*_{}.nii.gz'.format(modality))
 
     df, params = _get_assay_df(
-        bids_directory,
+        ds,
         modality,
         "Magnetic Resonance Imaging",
         files,
@@ -353,13 +354,13 @@ def _get_mri_assay_df(bids_directory, modality):
     return df, params
 
 
-def _get_assay_df(bids_directory, modality, protocol_ref, files, file_descr):
+def _get_assay_df(ds, modality, protocol_ref, files, file_descr):
     assay_dict = OrderedDict()
     assay_dict["Protocol REF"] = protocol_ref
     finfos = []
     info_keys = set()
     for fname in files:
-        finfo = file_descr(fname, bids_directory)
+        finfo = file_descr(fname, ds)
         info_keys = info_keys.union(finfo.keys())
         finfos.append(finfo)
     collector_dict = dict(zip(info_keys, [[] for i in range(len(info_keys))]))
@@ -403,7 +404,7 @@ def _get_assay_df(bids_directory, modality, protocol_ref, files, file_descr):
         return pd.DataFrame(), []
 
 
-def _get_investigation_template(bids_directory, mri_par_names):
+def _get_investigation_template(ds, mri_par_names):
     this_path = os.path.realpath(
         __file__[:-1] if __file__.endswith('.pyc') else __file__)
     # TODO expose parameter with path to read from
@@ -412,10 +413,10 @@ def _get_investigation_template(bids_directory, mri_par_names):
     #investigation_template = open(template_path).read()
     investigation_template = default_i_investigation_template
 
-    title = psplit(bids_directory)[-1]
+    title = psplit(ds.path)[-1]
 
-    if exists(opj(bids_directory, "dataset_description.json")):
-        with open(opj(bids_directory, "dataset_description.json"), "r") \
+    if exists(opj(ds.path, "dataset_description.json")):
+        with open(opj(ds.path, "dataset_description.json"), "r") \
                 as description_dict_fp:
             description_dict = json.load(description_dict_fp)
             if "Name" in description_dict:
@@ -572,7 +573,7 @@ def _store_beautiful_table(df, output_directory, fname, repository_info=None):
 
 
 def extract(
-        bids_directory,
+        ds,
         output_directory,
         drop_parameter=None,
         repository_info=None):
@@ -589,7 +590,7 @@ def extract(
 
     # generate: s_study.txt
     _store_beautiful_table(
-        _get_study_df(bids_directory),
+        _get_study_df(ds),
         output_directory,
         "s_study.txt")
 
@@ -598,7 +599,7 @@ def extract(
                      'PDmap', 'PDT2', 'inplaneT1', 'inplaneT2', 'angio',
                      'sbref', 'bold', 'defacemask', 'SWImagandphase'):
         # generate: a_assay.txt
-        mri_assay_df, mri_par_names = _get_mri_assay_df(bids_directory, modality)
+        mri_assay_df, mri_par_names = _get_mri_assay_df(ds, modality)
         if not len(mri_assay_df):
             # not files found, try next
             lgr.info(
@@ -613,10 +614,10 @@ def extract(
 
     # physio
     df, params = _get_assay_df(
-        bids_directory,
+        ds,
         'physio',
         "Physiological Measurement",
-        _get_file_matches(bids_directory, '*_physio.tsv.gz'),
+        _get_file_matches(ds, '*_physio.tsv.gz'),
         _describe_file)
     if len(df):
         _store_beautiful_table(
@@ -627,10 +628,10 @@ def extract(
 
     # stimulus
     df, params = _get_assay_df(
-        bids_directory,
+        ds,
         'stim',
         "Stimulation",
-        _get_file_matches(bids_directory, '*_stim.tsv.gz'),
+        _get_file_matches(ds, '*_stim.tsv.gz'),
         _describe_file)
     if len(df):
         _store_beautiful_table(
@@ -641,7 +642,7 @@ def extract(
 
     # generate: i_investigation.txt
     investigation_template = _get_investigation_template(
-        bids_directory, mri_par_names)
+        ds, mri_par_names)
     with open(opj(output_directory, "i_investigation.txt"), "w") as fp:
         fp.write(investigation_template)
 
@@ -696,7 +697,7 @@ def dlplugin(
         output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
 
     extract(
-        dataset.path,
+        dataset,
         output_directory=output,
         drop_parameter=drop_parameter,
         repository_info=[repo_name, repo_accession, repo_url])
