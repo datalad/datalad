@@ -19,6 +19,7 @@ from os.path import exists
 from datalad.dochelpers import exc_str
 from datalad.metadata.parsers.base import BaseMetadataParser
 from datalad.metadata.definitions import vocabulary_id
+from datalad.utils import open_r_encdetect
 
 from datalad import cfg
 
@@ -87,16 +88,7 @@ class MetadataParser(BaseMetadataParser):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            try:
-                desc = open(README_fname, encoding="utf-8").read()
-            except UnicodeDecodeError as exc:
-                lgr.warning(
-                    "Failed to decode content of %s. "
-                    "Re-loading allowing for UTF-8 errors with replacement: %s"
-                    % (README_fname, exc_str(exc))
-                )
-                desc = open(README_fname, encoding="utf-8", errors="replace").read()
-
+            desc = open_r_encdetect(README_fname).read()
             meta['description'] = desc.strip()
 
         # special case
