@@ -36,6 +36,10 @@ common_defs = {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'vocabulary for the description of a project',
         'type': vocabulary_id},
+    "foaf": {
+        'def': "http://xmlns.com/foaf/spec/#term_",
+        'descr': 'vocabulary for describing (social) networks',
+        'type': vocabulary_id},
     "mime": {
         'def': "https://www.iana.org/assignments/media-types/",
         'descr': 'IANA media types, see https://www.iana.org/assignments/media-types/media-types.xhtml',
