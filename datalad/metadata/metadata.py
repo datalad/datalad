@@ -518,7 +518,8 @@ def _query_aggregated_metadata_singlepath(
                 res[d] = dsinfo[s]
 
         # merge records for any matching path
-        metadata.merge_add(contentmeta.get(fpath, {}))
+        # TODO previous `merge_add` is broken for multi-item values
+        metadata.merge_init(contentmeta.get(fpath, {}))
 
         yield res
 
