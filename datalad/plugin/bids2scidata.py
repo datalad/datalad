@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+lgr = logging.getLogger('datalad.plugin.bids2scidata')
 import json
 from collections import OrderedDict
 from glob import glob
@@ -288,7 +289,7 @@ def _describe_mri_file(fpath, bids_directory):
     if nibabel is None or not exists(fpath):
         # this could happen in the case of a dead symlink in,
         # e.g., a git-annex repo
-        logging.warn(
+        lgr.warn(
             "cannot extract meta data from '{}'".format(fpath))
         return info
 
@@ -296,7 +297,7 @@ def _describe_mri_file(fpath, bids_directory):
     spatial_unit = header.get_xyzt_units()[0]
     # by what factor to multiply by to get to 'mm'
     if spatial_unit == 'unknown':
-        logging.warn(
+        lgr.warn(
             "unit of spatial resolution for '{}' unkown, assuming 'millimeter'".format(
                 fpath))
     spatial_unit_conversion = {
@@ -314,7 +315,7 @@ def _describe_mri_file(fpath, bids_directory):
         # got a 4th dimension
         rts_unit = header.get_xyzt_units()[1]
         if rts_unit == 'unknown':
-            logging.warn(
+            lgr.warn(
                 "RTS unit '{}' unkown, assuming 'seconds'".format(
                     fpath))
         # normalize to seconds, if possible
@@ -519,7 +520,7 @@ def _df_with_ontology_info(df):
                 refs.append(ref)
                 acss.append(acs)
                 if v and normval is None:
-                    logging.warn("unknown value '{}' for '{}' (known: {})".format(
+                    lgr.warn("unknown value '{}' for '{}' (known: {})".format(
                         v, col, term_map.keys()))
             new_columns = [(col, normvals),
                            ('Term Source REF', refs),
@@ -576,13 +577,13 @@ def extract(
         drop_parameter=None,
         repository_info=None):
     if pd is None:
-        logging.error(
+        lgr.error(
             "This plugin requires Pandas to be available (error follows)")
         import pandas
         return
 
     if not exists(output_directory):
-        logging.info(
+        lgr.info(
             "creating output directory at '{}'".format(output_directory))
         os.makedirs(output_directory)
 
@@ -600,7 +601,7 @@ def extract(
         mri_assay_df, mri_par_names = _get_mri_assay_df(bids_directory, modality)
         if not len(mri_assay_df):
             # not files found, try next
-            logging.info(
+            lgr.info(
                 "no files match MRI modality '{}', skipping".format(modality))
             continue
         _drop_from_df(mri_assay_df, drop_parameter)
@@ -691,7 +692,9 @@ def dlplugin(
     lgr = logging.getLogger('datalad.plugin.bids2scidata')
     from datalad.plugin.bids2scidata import extract
 
-    # TODO yield something meaningful
+    if not output:
+        output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
+
     extract(
         dataset.path,
         output_directory=output,
@@ -704,7 +707,7 @@ def dlplugin(
     yield dict(
         status='ok',
         path=output,
-        # TODO add switch to make tarball
+        # TODO add switch to make tarball/ZIP
         #type='file',
         type='directory',
         action='bids2scidata',
