@@ -90,6 +90,12 @@ def test_archive(path):
     check_contents(custom_outname, 'myexport')
 
     # now loose some content
+    if ds.repo.is_direct_mode():
+        # in direct mode the add() aove commited directly to the annex/direct/master
+        # branch, hence drop will have no effect (notneeded)
+        # this might be undesired behavior (or not), but this is not the place to test
+        # for it
+        return
     ds.drop('file_up', check=False)
     assert_raises(IOError, ds.plugin, 'export_archive', filename=opj(path, 'my'))
     ds.plugin('export_archive', filename=opj(path, 'partial'), missing_content='ignore')
