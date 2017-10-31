@@ -134,7 +134,10 @@ class AutomagicIO(object):
                         lgr.debug("No name/file was given, avoiding proxying")
                         raise _EarlyExit
                     file = kwargs.get(filearg)
-
+                if isinstance(file, int):
+                    lgr.debug(
+                        "Skipping operation on %i, already a file descriptor", file)
+                    raise _EarlyExit
                 mode = 'r'
                 if len(args) > 1:
                     mode = args[1]
