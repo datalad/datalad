@@ -40,6 +40,10 @@ common_defs = {
         'def': "http://xmlns.com/foaf/spec/#term_",
         'descr': 'vocabulary for describing (social) networks',
         'type': vocabulary_id},
+    "idqa": {
+        'def': "http://purl.obolibrary.org/obo/ID_",
+        'descr': 'vocabulary for Image and Data Quality Assessment for scientific data management',
+        'type': vocabulary_id},
     "mime": {
         'def': "https://www.iana.org/assignments/media-types/",
         'descr': 'IANA media types, see https://www.iana.org/assignments/media-types/media-types.xhtml',

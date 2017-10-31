@@ -22,6 +22,7 @@ for __modname in (
         'dicom',
         'exif',
         'frictionless_datapackage',
+        'nifti1',
         'xmp'):
     try:
         globals()[__modname] = __impmod(

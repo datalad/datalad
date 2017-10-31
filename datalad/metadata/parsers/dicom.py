@@ -71,6 +71,8 @@ class MetadataParser(BaseMetadataParser):
             # from generic code upstairs
             {'@context': {
                 'dicom': {
+                    # switch to http://dicom.nema.org/resources/ontology/DCM/
+                    # but requires mapping plain text terms to numbers
                     '@id': 'http://semantic-dicom.org/dcm#',
                     'description': 'DICOM vocabulary (seemingly incomplete)',
                     'type': vocabulary_id}}},

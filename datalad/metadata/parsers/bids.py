@@ -137,7 +137,10 @@ class MetadataParser(BaseMetadataParser):
             try:
                 md.update(
                     {'bids:{}'.format(k): v
-                     for k, v in bids.get_metadata(opj(self.ds.path, f)).items()})
+                     for k, v in bids.get_metadata(opj(self.ds.path, f)).items()
+                     # no nested structures for now (can be monstrous when DICOM
+                     # metadata is embedded)
+                     if not isinstance(v, dict)})
             except Exception as e:
                 lgr.debug('no usable BIDS metadata for %s in %s: %s',
                           f, self.ds, exc_str(e))
