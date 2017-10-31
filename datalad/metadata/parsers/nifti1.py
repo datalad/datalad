@@ -25,14 +25,14 @@ vocabulary = {
         '@id': 'https://nifti.nimh.nih.gov/nifti-1/documentation/nifti1fields#',
         'description': 'Ad-hoc vocabulary for NIfTI1 header fields',
         'type': vocabulary_id},
-    "3d_spatial_resolution(mm)": {
-        '@id': "",
-        'unit': "",  # mm
-        'description': ""},
+    "spatial_resolution(mm)": {
+        '@id': "idqa:0000162",
+        'unit': "uo:0000016",  # mm
+        'description': "spatial resolution in millimeter"},
     "4d_spacing(s)": {
-        '@id': "",
-        'unit': "",  # mm
-        'description': ""},
+        '@id': "idqa:0000213",
+        'unit': "uo:0000010",  # s
+        'description': "temporal sample distance in 4D (in seconds)"},
 }
 
 
@@ -40,6 +40,21 @@ class MetadataParser(BaseMetadataParser):
 
     _key2stdkey = {
         'descrip': 'description',
+    }
+    _extractors = {
+        'nifti1:datatype': lambda x: x.get_data_dtype().name,
+        'nifti1:intent': lambda x: x.get_intent(code_repr='label')[0],
+        'nifti1:freq_axis': lambda x: x.get_dim_info()[0],
+        'nifti1:phase_axis': lambda x: x.get_dim_info()[1],
+        'nifti1:slice_axis': lambda x: x.get_dim_info()[2],
+    }
+    _ignore = {
+        'datatype',
+        'intent_p1',
+        'intent_p2',
+        'intent_p3',
+        'intent_code',
+        'dim_info',
     }
 
     def get_metadata(self, dataset, content):
@@ -65,11 +80,15 @@ class MetadataParser(BaseMetadataParser):
                     if len(v.shape)
                     # scalar
                     else np.asscalar(v)
-                    for k, v in header.items()}
+                    for k, v in header.items()
+                    if k not in self._ignore}
             # filter useless fields (empty strings and NaNs)
             meta = {k: v for k, v in meta.items()
                     if not (isinstance(v, float) and isnan(v)) and
                     not (hasattr(v, '__len__') and not len(v))}
+            # more convenient info from nibabel's support functions
+            meta.update(
+                {k: v(header) for k, v in self._extractors.items()})
             # a few more convenient targeted extracts from the header
             # spatial resolution in millimeter
             spatial_unit = header.get_xyzt_units()[0]
