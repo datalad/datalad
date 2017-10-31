@@ -180,7 +180,7 @@ class AutomagicIO(object):
         # For now, as long as it is a symlink pointing to under .git/annex
         if exists(path):
             return True
-        return lexists(path) and 'annex/objects' in realpath(path)
+        return lexists(path) and 'annex/objects' in str(realpath(path))
 
     def _dataset_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
