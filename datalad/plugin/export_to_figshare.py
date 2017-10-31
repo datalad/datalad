@@ -10,17 +10,16 @@
 
 __docformat__ = 'restructuredtext'
 
-# whatever -- can move to assistance module later
-import json
-import requests
-
 
 class FigshareRESTLaison(object):
-
+    """A little helper to provide minimal interface to interact with Figshare
+    """
     API_URL = 'https://api.figshare.com/v2'
 
     def __init__(self):
         self._token = None
+        from datalad.ui import ui
+        self.ui = ui  # we will be chatty here
 
     @property
     def token(self):
@@ -38,6 +37,7 @@ class FigshareRESTLaison(object):
 
         to interpolate deposition_id, do basic checks and conversion
         """
+        import json
         if '://' not in url:
             url_ = self.API_URL + '/' + url
         else:
@@ -64,16 +64,16 @@ class FigshareRESTLaison(object):
             return r.content
 
     def put(self, *args, **kwargs):
+        import requests
         return self(requests.put, *args, **kwargs)
 
     def post(self, *args, **kwargs):
+        import requests
         return self(requests.post, *args, **kwargs)
 
     def get(self, *args, **kwargs):
+        import requests
         return self(requests.get, *args, **kwargs)
-
-    # def delete(self, *args, **kwargs):
-    #     return self(requests.delete, *args, **kwargs)
 
     def upload_file(self, fname, files_url):
         # In v2 API seems no easy way to "just upload".  Need to initiate,
@@ -110,31 +110,28 @@ class FigshareRESTLaison(object):
         jcomplete = self.post(file_endpoint, return_json=False)
         return file_info
 
+    def get_article_ids(self):
+        articles = self.get('account/articles')
+        ids = []
+        for item in articles or []:
+            self.ui.message(' {id} {url} - {title}'.format(**item))
+            ids.append(item['id'])
+        return ids
 
-"""
-## https://docs.figshare.com/#private_article_publish
-## swagger API def https://docs.figshare.com/swagger.json
+    def create_article(self, title):
+        data = {
+            'title': title
+        }
+        # we could prefill more fields interactively if desired
+        result = self.post('account/articles', data=data)
+        result = self.get(result['location'])
+        return result
 
-smells like ideally we should find a good swagger client for Python
-and use it across such use-cases
 
-- print all API urls
-
- jq -r '.paths|keys?' figshare-swagger.json
-
-# Get list of files for an article:
-curl -X get "https://api.figshare.com/v2/articles/{article_id}/files"
-
-# details for a file:
-curl -X get "https://api.figshare.com/v2/articles/{article_id}/files/{file_id}"
-
-# publish am article
-curl -X post "https://api.figshare.com/v2/account/articles/{article_id}/publish"
-"""
 # PLUGIN API
 def dlplugin(dataset, filename=None, on_file_error='error',
              annex=True,
-             project_id=None,
+             # project_id=None,  # TODO: support working with projects and articles within them
              article_id=None
              ):
     """Export the content of a dataset as a ZIP archive to figshare
@@ -180,9 +177,6 @@ def dlplugin(dataset, filename=None, on_file_error='error',
     lgr = logging.getLogger('datalad.plugin.export_to_figshare')
 
     from datalad.ui import ui
-    from datalad.ui.progressbars import FileReadProgressbar
-    from datalad.downloaders.providers import Providers
-    from datalad.downloaders.http import HTTPDownloader
     from datalad.api import add_archive_content
 
     # pleasing wonderful plugin system
@@ -205,7 +199,8 @@ def dlplugin(dataset, filename=None, on_file_error='error',
         export_archive(
             dataset,
             filename=filename,
-            archivetype='zip'
+            archivetype='zip',
+            on_file_error=on_file_error
         )
     )
     assert archive_out['status'] == 'ok'
@@ -216,12 +211,27 @@ def dlplugin(dataset, filename=None, on_file_error='error',
 
     if not article_id:
         # TODO: we could make it interactive (just an idea)
-        if False: # ui.is_interactive():
+        if ui.is_interactive:
             # or should we just upload to a new article?
-            article_id = ui.question(
-                "Which of the articles should we upload to.",
-                choices=get_article_ids()
-            )
+            if ui.yesno(
+                "Would you like to create a new article to upload to?  "
+                "If not - we will list existing articles)",
+                title="Article"
+            ):
+                article = figshare.create_article(
+                    title=os.path.basename(dataset.path)
+                )
+                lgr.info(
+                    "Created a new (private) article %(id)s at %(url_private_html)s. "
+                    "Please visit it, enter additional meta-data and make publish",
+                    article
+                )
+                article_id = article['id']
+            else:
+                article_id = int(ui.question(
+                    "Which of the articles should we upload to.",
+                    choices=map(str, figshare.get_article_ids())
+                ))
         if not article_id:
             raise ValueError("We need an article to upload to.")
 
@@ -249,13 +259,14 @@ def dlplugin(dataset, filename=None, on_file_error='error',
         add_archive_content(
             fname,
             annex=dataset.repo,
-            delete_after=True,
-            allow_dirty=True
+            delete_after=True,  # just remove extracted into a temp dir
+            allow_dirty=True,  # since we have a tarball
+            commit=False  # we do not want to commit anything we have done here
         )
 
         lgr.info("Removing generated and now registered in annex archive")
-        repo.drop(key, key=True)
-        repo.remove(fname)  # remove the tarball
+        repo.drop(key, key=True, options=['--force'])
+        repo.remove(fname, force=True)  # remove the tarball
 
         # if annex in {'delete'}:
         #     dataset.repo.remove(fname)
