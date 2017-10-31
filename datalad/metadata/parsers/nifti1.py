@@ -29,10 +29,25 @@ vocabulary = {
         '@id': "idqa:0000162",
         'unit': "uo:0000016",  # mm
         'description': "spatial resolution in millimeter"},
-    "4d_spacing(s)": {
+    "temporal_spacing(s)": {
         '@id': "idqa:0000213",
         'unit': "uo:0000010",  # s
         'description': "temporal sample distance in 4D (in seconds)"},
+}
+
+unit_map = {
+    'meter': ('meter', 'uo:0000008'),
+    'millimeter': ('millimiter', 'uo:0000016'),
+    'mm': ('millimiter', 'uo:0000016'),
+    'micron': ('micrometer', 'uo:0000017'),
+    'second': ('second', 'uo:0000010'),
+    'sec': ('second', 'uo:0000010'),
+    'usec': ('microsecond', 'uo:0000029'),
+    'hertz': ('hertz', 'uo:0000106'),
+    'hz': ('hertz', 'uo:0000106'),
+    'ppm': ('parts per million', 'uo:0000109'),
+    'rad': ('radian', 'uo:0000123'),
+    'rads': ('radian', 'uo:0000123'),
 }
 
 
@@ -47,6 +62,16 @@ class MetadataParser(BaseMetadataParser):
         'nifti1:freq_axis': lambda x: x.get_dim_info()[0],
         'nifti1:phase_axis': lambda x: x.get_dim_info()[1],
         'nifti1:slice_axis': lambda x: x.get_dim_info()[2],
+        'nifti1:xyz_unit': lambda x: '{} ({})'.format(
+            *unit_map[x.get_xyzt_units()[0]]) if x.get_xyzt_units()[0] in unit_map else '',
+        'nifti1:t_unit': lambda x: '{} ({})'.format(
+            *unit_map[x.get_xyzt_units()[1]]) if x.get_xyzt_units()[1] in unit_map else '',
+        'nifti1:qform_code': lambda x: nibabel.nifti1.xform_codes.label[
+            np.asscalar(x.get('qform_code', 0))],
+        'nifti1:sform_code': lambda x: nibabel.nifti1.xform_codes.label[
+            np.asscalar(x.get('sform_code', 0))],
+        'nifti1:slice_order': lambda x: nibabel.nifti1.slice_order_codes.label[
+            np.asscalar(x.get('slice_code', 0))],
     }
     _ignore = {
         'datatype',
@@ -55,6 +80,28 @@ class MetadataParser(BaseMetadataParser):
         'intent_p3',
         'intent_code',
         'dim_info',
+        'xyzt_units',
+        'qform_code',
+        'sform_code',
+        'quatern_b',
+        'quatern_c',
+        'quatern_d',
+        'qoffset_x',
+        'qoffset_y',
+        'qoffset_z',
+        'srow_x',
+        'srow_y',
+        'srow_z',
+        'slice_code',
+        'bitpix',
+        # unused fields in the ANALYZE header
+        'data_type',
+        'db_name',
+        'extents',
+        'session_error',
+        'regular',
+        'glmax',
+        'glmin',
     }
 
     def get_metadata(self, dataset, content):
@@ -82,13 +129,13 @@ class MetadataParser(BaseMetadataParser):
                     else np.asscalar(v)
                     for k, v in header.items()
                     if k not in self._ignore}
+            # more convenient info from nibabel's support functions
+            meta.update(
+                {k: v(header) for k, v in self._extractors.items()})
             # filter useless fields (empty strings and NaNs)
             meta = {k: v for k, v in meta.items()
                     if not (isinstance(v, float) and isnan(v)) and
                     not (hasattr(v, '__len__') and not len(v))}
-            # more convenient info from nibabel's support functions
-            meta.update(
-                {k: v(header) for k, v in self._extractors.items()})
             # a few more convenient targeted extracts from the header
             # spatial resolution in millimeter
             spatial_unit = header.get_xyzt_units()[0]
@@ -106,7 +153,7 @@ class MetadataParser(BaseMetadataParser):
                 lgr.debug("unexpected spatial unit code '{}' from NiBabel".format(
                     spatial_unit))
             # TODO does not see the light of day
-            meta['3d_spatial_resolution(mm)'] = \
+            meta['spatial_resolution(mm)'] = \
                 [(i * spatial_unit_conversion) for i in header.get_zooms()[:3]]
             # time
             if len(header.get_zooms()) > 3:
@@ -121,7 +168,7 @@ class MetadataParser(BaseMetadataParser):
                     'msec': 0.001,
                     'micron': 0.000001}.get(rts_unit, 1.0)
                 if rts_unit not in ('hz', 'ppm', 'rads'):
-                    meta['4d_spacing(s)'] = \
+                    meta['temporal_spacing(s)'] = \
                         header.get_zooms()[3] * rts_unit_conversion
 
             contentmeta.append((f, meta))
