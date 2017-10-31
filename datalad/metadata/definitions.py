@@ -36,6 +36,10 @@ common_defs = {
         'def': "http://usefulinc.com/ns/doap#",
         'descr': 'vocabulary for the description of a project',
         'type': vocabulary_id},
+    "foaf": {
+        'def': "http://xmlns.com/foaf/spec/#term_",
+        'descr': 'vocabulary for describing (social) networks',
+        'type': vocabulary_id},
     "idqa": {
         'def': "http://purl.obolibrary.org/obo/ID_",
         'descr': 'vocabulary for Image and Data Quality Assessment for scientific data management',
