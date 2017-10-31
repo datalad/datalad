@@ -91,7 +91,7 @@ with DataLad.
    :toctree: generated
 
    add_readme
-   export_tarball
+   export_archive
    no_annex
    wtf
 

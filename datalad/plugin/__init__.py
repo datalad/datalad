@@ -96,18 +96,18 @@ class Plugin(Interface):
 
     To run a specific plugin, provide the plugin name as an argument::
 
-      datalad plugin export_tarball
+      datalad plugin export_archive
 
     A plugin may come with its own documentation which can be displayed upon
     request::
 
-      datalad plugin export_tarball -H
+      datalad plugin export_archive -H
 
     If a plugin supports (optional) arguments, they can be passed to the plugin
     as key=value pairs with the name and the respective value of an argument,
     e.g.::
 
-      datalad plugin export_tarball output=myfile
+      datalad plugin export_archive filename=myfile
 
     Any number of arguments can be given. Only arguments with names supported
     by the respective plugin are passed to the plugin. If unsupported arguments
@@ -214,25 +214,33 @@ class Plugin(Interface):
                 user_supplied_args.add(argname)
         plugin_call = _load_plugin(plugins[plugin]['file'])
 
+        # check the plugin signature
+        plugin_argspec = inspect.getargspec(plugin_call)
+
         if showpluginhelp:
             # we don't need special docs for the cmdline, standard python ones
             # should be comprehensible enough
             ui.message(
-                dedent_docstring(plugin_call.__doc__)
-                if plugin_call.__doc__
-                else 'This plugin has no documentation')
+                'Usage: {}{}\n\n{}'.format(
+                    plugin,
+                    inspect.formatargspec(*plugin_argspec),
+                    dedent_docstring(plugin_call.__doc__)
+                    if plugin_call.__doc__
+                    else 'This plugin has no documentation'))
             return
 
         #
         # argument preprocessing
         #
-        # check the plugin signature and filter out all unsupported args
-        plugin_args, _, _, arg_defaults = inspect.getargspec(plugin_call)
+        # filter out all unsupported args
+        plugin_args = plugin_argspec[0]
+        arg_defaults = plugin_argspec[3]
         supported_args = {k: v for k, v in kwargs.items() if k in plugin_args}
         excluded_args = user_supplied_args.difference(supported_args.keys())
         if excluded_args:
-            lgr.warning('ignoring plugin argument(s) %s, not supported by plugin',
-                        excluded_args)
+            lgr.warning("Ignoring plugin argument(s) %s, not supported by plugin %s",
+                        list(set(kwargs.keys()).difference(supported_args.keys())),
+                        plugin)
         # always overwrite the dataset arg if one is needed
         if 'dataset' in plugin_args:
             supported_args['dataset'] = require_dataset(
@@ -243,6 +251,13 @@ class Plugin(Interface):
                 # we have a default for 'dataset' to -> it is optional
                 check_installed=len(arg_defaults) != len(plugin_args),
                 purpose='handover to plugin')
+
+        # final test whether the call is complete
+        missing_args = [k for k in plugin_args[:-len(arg_defaults)]
+                        if k not in supported_args]
+        if missing_args:
+            raise TypeError('Missing value(s) for plugin argument(s): {}'.format(
+                missing_args))
 
         # call as a generator
         for res in plugin_call(**supported_args):
