@@ -768,11 +768,11 @@ def _enable_remote(
         if cred and cred.is_known:
             cred.delete()
         result_props['status'] = 'error'
-        result_props['message'] = e.message
+        result_props['message'] = str(e)
     except AccessFailedError as e:
         # some kind of connection issue
         result_props['status'] = 'error'
-        result_props['message'] = e.message
+        result_props['message'] = str(e)
     except Exception as e:
         # something unexpected
         raise e
