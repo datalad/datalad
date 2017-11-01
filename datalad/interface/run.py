@@ -158,7 +158,7 @@ class Run(Interface):
             except Exception as e:
                 yield dict(
                     err_info, status='error',
-                    message=('cannot re-run command, command specification is not valid JSON: %s', e.message))
+                    message=('cannot re-run command, command specification is not valid JSON: %s', str(e)))
                 return
             if 'cmd' not in runinfo:
                 yield dict(
