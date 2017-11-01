@@ -1809,7 +1809,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # since it is not true for submodules, whose '.git' is a
                     # symlink and being resolved to some
                     # '.git/modules/.../annex/objects'
-                    out.append(exists(target_path) and 'annex/objects' in target_path)
+                    out.append(exists(target_path) and 'annex/objects' in str(target_path))
                 else:
                     out.append(False)
             return out
@@ -1850,7 +1850,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # '.git/modules/.../annex/objects'
                 out.append(
                     islink(filepath)
-                    and 'annex/objects' in realpath(filepath)  # realpath OK
+                    and 'annex/objects' in str(realpath(filepath))  # realpath OK
                 )
             return out
 
@@ -2685,7 +2685,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     self.commit(msg, options, _datalad_msg=_datalad_msg,
                                 careless=careless, files=files, proxy=True)
                 else:
-                    raise 
+                    raise
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
