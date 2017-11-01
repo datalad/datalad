@@ -39,6 +39,6 @@ def test_get_metadata():
         aa1_meta = get_metadata('aa-1')
         ok_startswith(aa1_meta, '<?xml')
     except AccessFailedError as e:
-        if e.message.startswith('Access to https://search.datacite.org') and \
-                e.message.endswith('has failed: status code 502'):
+        if str(e).startswith('Access to https://search.datacite.org') and \
+                str(e).endswith('has failed: status code 502'):
             raise SkipTest("Probably datacite.org blocked us once again")

@@ -966,8 +966,8 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
             try:
                 acl = e.get_acl()
-            except S3ResponseError as err:
-                acl = err.message
+            except S3ResponseError as e:
+                acl = str(e)
 
             content = ""
             if list_content:
@@ -987,7 +987,7 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
                         raise ValueError(list_content)
                     # content = "[S3: OK]"
                 except S3ResponseError as err:
-                    content = err.message
+                    content = str(err)
                 finally:
                     content = " " + content
             if long_:
