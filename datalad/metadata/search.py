@@ -41,7 +41,7 @@ from datalad.support.json_py import dump2fileobj as jsondump2file
 from simplejson import load as jsonload
 from datalad.metadata.definitions import common_defs
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.metadata import _query_aggregated_metadata
+from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
 from datalad.consts import LOCAL_CENTRAL_PATH
@@ -178,7 +178,7 @@ def _get_search_schema(ds):
     # sanitization of / should ideally be done while saving, but that would require
     # fixes in whoosh I guess
     sanitize_key = lambda k: k.replace(' ', '_').replace('/', '_')
-    for res in _query_aggregated_metadata(
+    for res in query_aggregated_metadata(
             reporton='datasets',
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
@@ -333,7 +333,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     old_idx_size = 0
     old_ds_rpath = ''
     idx_size = 0
-    for res in _query_aggregated_metadata(
+    for res in query_aggregated_metadata(
             reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
