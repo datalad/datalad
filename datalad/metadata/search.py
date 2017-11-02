@@ -64,7 +64,9 @@ r_url = re.compile(r"^https?://")
 
 
 def _any2unicode(val):
-    return str_contructor(val) if isinstance(val, (int, float)) else assure_unicode(val)
+    return str_contructor(val) \
+        if isinstance(val, (int, float, tuple, list, dict)) \
+        else assure_unicode(val)
 
 
 def _add_document(idx, **kwargs):
