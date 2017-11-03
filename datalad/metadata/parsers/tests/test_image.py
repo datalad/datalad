@@ -12,7 +12,7 @@ from datalad.tests.utils import SkipTest
 try:
     import PIL
 except ImportError:
-    raise SkipTest
+    raise SkipTest("No PIL module available")
 
 from shutil import copy
 from os.path import dirname
