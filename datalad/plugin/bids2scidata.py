@@ -13,17 +13,17 @@ __docformat__ = 'restructuredtext'
 
 import logging
 lgr = logging.getLogger('datalad.plugin.bids2scidata')
-import json
+
 from collections import OrderedDict
 from glob import glob
 import os
-from os.path import exists, join as opj, split as psplit
+import re
+from os.path import exists
+from os.path import relpath
+from os.path import join as opj
+from os.path import split as psplit
 
-# non-standard deps
-try:
-    import nibabel
-except ImportError:
-    nibabel = None
+from datalad.metadata.metadata import query_aggregated_metadata
 
 try:
     import pandas as pd
@@ -102,26 +102,6 @@ ontology_term_map = {
     'Parameter Value[parallel acquisition technique]': None,
 }
 
-# translate from what we find in BIDS or a DICOM dump into the
-# names that ScientificData prefers
-# matching will be done on lower case string
-# add any synonyms or additions as entries toi this dictionary
-parameter_name_map = {
-    "manufacturermodelname": "instrument name",
-    "manufacturer": "instrument manufacturer",
-    "hardcopydevicesoftwareversion": "instrument software version",
-    "receivecoilname": "coil type",
-    "magneticfieldstrength": "magnetic field strength",
-    "receivecoilname": "coil type",
-    "echotime": "echo time",
-    "repetitiontime": "repetition time",
-    "flipangle": "flip angle",
-    "pulsesequencetype": "sequence",
-    "parallelacquisitiontechnique": "parallel acquisition technique",
-    "samplingfrequency": "sampling frequency",
-    "contentdescription": "content description",
-}
-
 # standardize columns from participants.tsv
 sample_property_name_map = {
     "age": "Characteristics[age at scan]",
@@ -131,87 +111,53 @@ sample_property_name_map = {
     "sex": "Characteristics[sex]",
 }
 
+# map datalad ontology prefixes to ontology labels recognized by scidata
+ontology_map = {
+    'uo': 'UO',
+    'pato': 'PATO',
+}
 
-def get_bids_metadata(ds, basepath):
-    """Query the BIDS meta data JSON file hierarchy
+# this defines both the mapping and order of assay properties as they
+# will be presented in an assay table
+# case 0: any term is properly defined in the metadata context
+# (datalad_term, isatab_term)
+# if datalad term is None, it needs to come from somewhere else -> special case
+# if datalad term is '', it comes from the filename
+# case 1: the defintion for a term value comes from another metadata field
+# (datalad_term, isatab_term, datalad_valuedef
+# case 2: we take the value as-is and define a unit for it
+# (datalad_term, isatab_term, isatab_unitvalue, isatab_unitdef
+recognized_props = (
+    ('bids:participant_id', "Sample Name"),
+    (None, "Protocol REF"),
+    # BIDS repetition time by default, but override with info from
+    # file if possible
+    ("bids:RepetitionTime", "Parameter Value[4d spacing]"),
+    ("temporal_spacing(s)", 'Parameter Value[4d spacing]'),
+    ("spatial_resolution(mm)", "Parameter Value[resolution]"),
+    ("bids:EchoTime", "Parameter Value[echo time]", "second", 'UO:0000010'),
+    ("bids:FlipAngle", "Parameter Value[flip angle]", "", ''),
+    ('', "Parameter Value[modality]"),
+    ("bids:Manufacturer", "Parameter Value[instrument manufacturer]"),
+    ("bids:ManufacturerModelName", 'Parameter Value[instrument name]'),
+    ("bids:HardcopyDeviceSoftwareVersion", 'Parameter Value[instrument software version]'),
+    ("bids:MagneticFieldStrength", 'Parameter Value[magnetic field strength]', '', ''),
+    ("bids:ReceiveCoilName", "Parameter Value[coil type]"),
+    ("bids:PulseSequenceType", "Parameter Value[sequence]"),
+    ("bids:ParallelAcquisitionTechnique", "Parameter Value[parallel acquisition technique]"),
+    ('', "Assay Name"),
+    ('', "Raw Data File"),
+    (None, "Comment[Data Repository]"),
+    (None, "Comment[Data Record Accession]"),
+    (None, "Comment[Data Record URI]"),
+    ("bids:TaskName", "Factor Value[task]", "bids:CogAtlasID"),
+)
 
-    Parameters
-    ----------
-    bids_root : path
-      Path to the root of the BIDS dataset
-    basepath : path
-      Relative path to the file (filename without extension, e.g. no '.nii.gz')
-      for which meta data shall be queried.
-    """
-    sidecar_json = '{}.json'.format(basepath)
-    bids_root = ds.path
-
-    path_components = psplit(sidecar_json)
-    filename_components = path_components[-1].split("_")
-    session_level_componentList = []
-    subject_level_componentList = []
-    top_level_componentList = []
-    ses = None
-    sub = None
-
-    for filename_component in filename_components:
-        if filename_component[:3] != "run":
-            session_level_componentList.append(filename_component)
-            if filename_component[:3] == "ses":
-                ses = filename_component
-            else:
-                subject_level_componentList.append(filename_component)
-                if filename_component[:3] == "sub":
-                    sub = filename_component
-                else:
-                    top_level_componentList.append(filename_component)
-
-    # the top-level should have at least two components, e.g. task and modality
-    # but could also have more, e.g. task, recording and modality
-    # query sidecars for each single-component plus modality
-    potential_jsons = []
-    for comp in top_level_componentList[:-1]:
-        potential_jsons.append(
-            opj(bids_root, "_".join([comp, top_level_componentList[-1]])))
-    # and one for all components combined
-    potential_jsons.append(opj(bids_root, "_".join(top_level_componentList)))
-
-    subject_level_json = opj(bids_root, sub, "_".join(subject_level_componentList))
-    potential_jsons.append(subject_level_json)
-
-    if ses:
-        session_level_json = opj(bids_root, sub, ses, "_".join(session_level_componentList))
-        potential_jsons.append(session_level_json)
-
-    potential_jsons.append(sidecar_json)
-
-    merged_param_dict = {}
-    for json_file_path in potential_jsons:
-        if exists(json_file_path):
-            param_dict = json.load(open(json_file_path, "r"))
-            merged_param_dict.update(param_dict)
-
-    return merged_param_dict
-
-
-def get_chainvalue(chain, src):
-    try:
-        for key in chain:
-            src = src[key]
-        return src
-    except KeyError:
-        return None
-
-
-def get_keychains(d, dest, prefix):
-    if isinstance(d, dict):
-        for item in d:
-            dest = get_keychains(d[item], dest, prefix + [item])
-    else:
-        if d and not (d == 'UNDEFINED'):
-            # ignore empty stuff
-            dest = dest.union((tuple(prefix),))
-    return dest
+# functors to send a sequence of stringified sequence elements to
+# build the table representation of a value
+repr_props = {
+    "Parameter Value[resolution]": 'x'.join,
+}
 
 
 def _get_study_df(ds):
@@ -256,18 +202,20 @@ def _get_study_df(ds):
     return df
 
 
-def _describe_file(fpath, ds):
+def _describe_file(fpath, db):
+    fmeta = db[fpath]
     fname = psplit(fpath)[-1]
     fname_components = fname.split(".")[0].split('_')
     info = {
-        'Sample Name': fname_components[0][4:],
+        'Sample Name': fmeta.get("bids:participant_id", fname_components[0]),
         # assay name is the entire filename except for the modality suffix
         # so that, e.g. simultaneous recordings match wrt to the assay name
         # across assay tables
         'Assay Name': '_'.join(fname_components[:-1]),
-        'Raw Data File': fpath[len(ds.path):],
+        'Raw Data File': fpath,
         'Parameter Value[modality]': fname_components[-1]
     }
+    # more optional info that could be pulled from the filename
     comp_dict = dict([c.split('-') for c in fname_components[:-1]])
     for l in ('rec', 'recording'):
         if l in comp_dict:
@@ -277,295 +225,112 @@ def _describe_file(fpath, ds):
             info['Parameter Value[acquisition label]'] = comp_dict[l]
     if 'task' in comp_dict:
         info['Factor Value[task]'] = comp_dict['task']
-    info['other_fields'] = get_bids_metadata(
-        ds,
-        '_'.join(fname_components)
-    )
+
+    # now pull in the value of all recognized properties
+    # perform any necessary conversion to achieve final
+    # form for ISATAB table
+    for prop in recognized_props:
+        src, dst = prop[:2]
+        if src is None:
+            # special case, not handled here
+            continue
+        if src in fmeta:
+            # pull out the value from datalad metadata directly,
+            # unless we have a definition URL in another field,
+            # in which case put it into a 2-tuple also
+            val = fmeta[src] \
+                if len(prop) in (2, 4) \
+                else (fmeta[src], fmeta.get(prop[2], None))
+            if dst in repr_props and isinstance(val, (list, tuple)):
+                val = repr_props[dst](str(i) for i in val)
+            info[dst] = val
     return info
 
 
-def _describe_mri_file(fpath, ds):
-    info = _describe_file(fpath, ds)
-
-    if nibabel is None or not exists(fpath):
-        # this could happen in the case of a dead symlink in,
-        # e.g., a git-annex repo
-        lgr.warn(
-            "cannot extract meta data from '{}'".format(fpath))
-        return info
-
-    header = nibabel.load(fpath).get_header()
-    spatial_unit = header.get_xyzt_units()[0]
-    # by what factor to multiply by to get to 'mm'
-    if spatial_unit == 'unknown':
-        lgr.warn(
-            "unit of spatial resolution for '{}' unkown, assuming 'millimeter'".format(
-                fpath))
-    spatial_unit_conversion = {
-        'unknown': 1,
-        'meter': 1000,
-        'mm': 1,
-        'micron': 0.001}.get(spatial_unit, None)
-    if spatial_unit_conversion is None:
-        raise RuntimeError("unexpected spatial unit code '{}' from NiBabel".format(
-            spatial_unit))
-
-    info['Parameter Value[resolution]'] = "x".join(
-        [str(i * spatial_unit_conversion) for i in header.get_zooms()[:3]])
-    if len(header.get_zooms()) > 3:
-        # got a 4th dimension
-        rts_unit = header.get_xyzt_units()[1]
-        if rts_unit == 'unknown':
-            lgr.warn(
-                "RTS unit '{}' unkown, assuming 'seconds'".format(
-                    fpath))
-        # normalize to seconds, if possible
-        rts_unit_conversion = {
-            'msec': 0.001,
-            'micron': 0.000001}.get(rts_unit, 1.0)
-        info['Parameter Value[4d spacing]'] = header.get_zooms()[3] * rts_unit_conversion
-        if rts_unit in ('hz', 'ppm', 'rads'):
-            # not a time unit
-            info['Parameter Unit[4d spacing]'] = rts_unit
-        else:
-            info['Parameter Unit[4d spacing]'] = 'second'
-    return info
+def _get_file_matches(db, pattern):
+    expr = re.compile(pattern)
+    return [f for f in db if expr.match(f)]
 
 
-def _get_file_matches(ds, glob_pattern):
-    files = glob(
-        opj(ds.path, "sub-*", "*", "sub-{}".format(glob_pattern)))
-    files += glob(
-        opj(ds.path, "sub-*", "ses-*", "*", "sub-*_ses-{}".format(
-            glob_pattern)))
-    return files
+def _get_colkey(idx, colname):
+    return '{0:0>5}_{1}'.format(idx, colname)
 
 
-def _get_mri_assay_df(ds, modality):
-    # locate MRI files
-    files = _get_file_matches(ds, '*_{}.nii.gz'.format(modality))
-
-    df, params = _get_assay_df(
-        ds,
-        modality,
-        "Magnetic Resonance Imaging",
-        files,
-        _describe_mri_file)
-    return df, params
-
-
-def _get_assay_df(ds, modality, protocol_ref, files, file_descr):
-    assay_dict = OrderedDict()
-    assay_dict["Protocol REF"] = protocol_ref
+def _get_assay_df(
+        db, modality, protocol_ref, files, file_descr,
+        repository_info=None):
+    if not repository_info:
+        repository_info = {}
+    # main assays
+    # we cannot use a dict to collect the data before going to
+    # a data frame, because we will have multiple columns with
+    # the same name carrying the ontology info for preceeding
+    # columns
+    # --> prefix with some index, create dataframe and rename
+    # the column names in the dataframe with the prefix stripped
+    assay_dict = {}
+    # get all files described and determine the union of all keys
     finfos = []
     info_keys = set()
     for fname in files:
-        finfo = file_descr(fname, ds)
+        # get file metadata in ISATAB notation
+        finfo = file_descr(fname, db)
         info_keys = info_keys.union(finfo.keys())
         finfos.append(finfo)
+    # receiver for data in all columns of the table
     collector_dict = dict(zip(info_keys, [[] for i in range(len(info_keys))]))
+    # expand data with missing values across all files/rows
     for finfo in finfos:
         for spec in info_keys:
             fspec = finfo.get(spec, None)
             collector_dict[spec].append(fspec)
-    for k in collector_dict:
-        if k == 'other_fields':
-            # special case dealt with below
+    # build the table order
+    idx = 1
+    idx_map = {}
+    assay_name_key = None
+    for prop in recognized_props:
+        colname = prop[1]
+        if prop[0] is None:
+            # special case handling
+            if colname == 'Protocol REF':
+                assay_dict[_get_colkey(idx, colname)] = protocol_ref
+                idx += 1
+            elif colname in repository_info:
+                assay_dict[_get_colkey(idx, colname)] = repository_info[colname]
+                idx += 1
+            continue
+
+        elif colname not in collector_dict:
+            # we got nothing for this column
             continue
         # skip empty
-        if not all([v is None for v in collector_dict[k]]):
-            assay_dict[k] = collector_dict[k]
+        if not all([v is None for v in collector_dict[colname]]):
+            # be able to look up the actual column key in case
+            # prev information needs to be replaced by a value from
+            # a better source (as determined by the order)
+            colkey = idx_map.get(colname, _get_colkey(idx, colname))
+            idx_map[colname] = colkey
+            assay_dict[colkey] = collector_dict[colname]
+            idx += 1
+            if colname == 'Assay Name':
+                assay_name_key = colkey
 
-    # record order of parameters; needs to match order in above loop
-    mri_par_names = ["Resolution", "Modality"]
+    if assay_name_key is None:
+        # we didn't get a single meaningful file
+        return None
 
-    # determine the union of any additional fields found for any file
-    new_fields = set()
-    for d in collector_dict.get('other_fields', []):
-        new_fields = get_keychains(d, new_fields, [])
-    # create a parameter column for each of them
-    for field in new_fields:
-        # deal with nested structures by concatenating the field names
-        field_name = ':'.join(field)
-        # normalize parameter names
-        field_name = parameter_name_map.get(field_name.lower(), field_name)
-        # final column ID
-        column_id = "Parameter Value[{}]".format(field_name)
-        assay_dict[column_id] = []
-        # and fill with content from files
-        for d in collector_dict['other_fields']:
-            assay_dict[column_id].append(get_chainvalue(field, d))
-
-    if 'Assay Name' in assay_dict:
-        df = pd.DataFrame(assay_dict)
-        df = df.sort_values(['Assay Name'])
-        return df, mri_par_names  # TODO investigate necessity for 2nd return value
-    else:
-        return pd.DataFrame(), []
-
-
-def _get_investigation_template(ds, mri_par_names):
-    this_path = os.path.realpath(
-        __file__[:-1] if __file__.endswith('.pyc') else __file__)
-    # TODO expose parameter with path to read from
-    #template_path = opj(
-    #    *(psplit(this_path)[:-1] + ("i_investigation_template.txt", )))
-    #investigation_template = open(template_path).read()
-    investigation_template = default_i_investigation_template
-
-    title = psplit(ds.path)[-1]
-
-    if exists(opj(ds.path, "dataset_description.json")):
-        with open(opj(ds.path, "dataset_description.json"), "r") \
-                as description_dict_fp:
-            description_dict = json.load(description_dict_fp)
-            if "Name" in description_dict:
-                title = description_dict["Name"]
-
-    investigation_template = investigation_template.replace(
-        "[TODO: TITLE]", title)
-    investigation_template = investigation_template.replace(
-        "[TODO: MRI_PAR_NAMES]", ";".join(mri_par_names))
-    return investigation_template
-
-
-def _drop_from_df(df, drop):
-    if drop is None:
-        return df
-    elif drop == 'unknown':
-        # remove anything that isn't white-listed
-        drop = [k for k in df.keys() if not k in ontology_term_map]
-    elif isinstance(drop, (tuple, list)):
-        # is list of parameter names to drop
-        drop = ['Parameter Value[{}]'.format(d) for d in drop]
-
-    # at this point drop is some iterable
-    # filter assay table and take out matching parameters
-    for k in df.keys():
-        if k in drop:
-            print('dropping %s from output' % k)
-            df.drop(k, axis=1, inplace=True)
+    # TODO use assay name as index! for join with deface later on
+    df = pd.DataFrame(assay_dict, index=assay_dict[assay_name_key])
+    # rename columns to strip index
+    df.columns = [c[6:] for c in df.columns]
     return df
 
 
-def _item_sorter_key(item):
-    # define custom column order for tables
-    name = item[0]
-    if name in ('Sample Name', 'Source Name'):
-        return 0
-    elif name.startswith('Characteristics['):
-        return 1
-    elif name.startswith('Factor Value['):
-        return 2
-    elif name.startswith('Protocol REF'):
-        return 3
-    elif name == 'Assay Name':
-        return 4
-    elif name.startswith('Parameter Value['):
-        return 5
-    elif name == 'Raw Data File':
-        return 6
-    elif name.startswith('Comment['):
-        return 10
-    elif name.startswith('Parameter Unit['):
-        # put them at the very end so we discover them last when adding
-        # ontology terms
-        return 99
-
-
-def _sort_df(df):
-    return pd.DataFrame.from_items(sorted(df.iteritems(), key=_item_sorter_key))
-
-
-def _extend_column_list(clist, addition, after=None):
-    if after is None:
-        for a in addition:
-            clist.append(a)
-    else:
-        tindex = None
-        for i, c in enumerate(clist):
-            if c[0] == after:
-                tindex = i
-        if tindex is None:
-            raise ValueError("cannot find column '{}' in list".format(after))
-        for a in addition:
-            clist.insert(tindex + 1, a)
-            tindex += 1
-
-
-def _df_with_ontology_info(df):
-    items = []
-    # check whether we need ontology info for a task factor
-    need_task_terms = False
-    for col, val in df.iteritems():
-        # check if we know something about this column
-        term_map = ontology_term_map.get(col, None)
-        if term_map is None:
-            new_columns = [(col, val)]
-        elif isinstance(term_map, tuple):
-            # this is quantitative information -> 4-column group
-            new_columns = [(col, val),
-                           ('Unit', term_map[2]),
-                           ('Term Source REF', term_map[0]),
-                           ('Term Accession Number', term_map[1])]
-        elif isinstance(term_map, dict):
-            # this is qualitative information -> 3-column group
-            normvals = []
-            refs = []
-            acss = []
-            for v in val:
-                normval, ref, acs = term_map.get(
-                    v.lower() if hasattr(v, 'lower') else v,
-                    (None, None, None))
-                normvals.append(normval)
-                refs.append(ref)
-                acss.append(acs)
-                if v and normval is None:
-                    lgr.warn("unknown value '{}' for '{}' (known: {})".format(
-                        v, col, term_map.keys()))
-            new_columns = [(col, normvals),
-                           ('Term Source REF', refs),
-                           ('Term Accession Number', acss)]
-        # merged addition with current set of columns
-        if col.startswith('Parameter Unit['):
-            # we have a unit column plus terms, insert after matching
-            # parameter value column
-            after = 'Parameter Value[{}]'.format(col[15:-1])
-            new_columns[0] = ('Unit', new_columns[0][1])
-        elif col == 'Factor Value[task]':
-            # flag that we ought to be looking for task info
-            need_task_terms = True
-        elif col in ('Parameter Value[CogPOID]',
-                     'Parameter Value[CogAtlasID]'):
-            if not need_task_terms:
-                after = None
-                new_columns = []
-            else:
-                after = 'Factor Value[task]'
-                # TODO check with Varsha how those could be formated
-                terms = [v.strip('/').split('/')[-1] if v is not None else None
-                         for v in val]
-                source_refs = [v[:-(len(terms[i]))] if terms[i] is not None else None
-                               for i, v in enumerate(val)]
-                new_columns = [('Term Source REF', source_refs),
-                               ('Term Accession Number', terms)]
-                # ignore a possible second term set
-                need_task_terms = False
-        else:
-            # straight append
-            after = None
-        _extend_column_list(items, new_columns, after)
-
-    return pd.DataFrame.from_items(items)
-
-
-def _store_beautiful_table(df, output_directory, fname, repository_info=None):
-    df = _sort_df(df)
-    df = _df_with_ontology_info(df)
-    if repository_info:
-        df['Comment[Data Repository]'] = repository_info[0]
-        df['Comment[Data Record Accession]'] = repository_info[1]
-        df['Comment[Data Record URI]'] = repository_info[2]
+def _store_beautiful_table(df, output_directory, fname):
+    if df is None:
+        return
+    if 'Assay Name' in df:
+        df = df.sort_values(['Assay Name'])
     df.to_csv(
         opj(output_directory, fname),
         sep="\t",
@@ -575,7 +340,6 @@ def _store_beautiful_table(df, output_directory, fname, repository_info=None):
 def extract(
         ds,
         output_directory,
-        drop_parameter=None,
         repository_info=None):
     if pd is None:
         lgr.error(
@@ -588,63 +352,96 @@ def extract(
             "creating output directory at '{}'".format(output_directory))
         os.makedirs(output_directory)
 
+    # pull out everything we know about any file in the dataset
+    metadb = {
+        relpath(r['path'], ds.path): r.get('metadata', {})
+        for r in query_aggregated_metadata(
+            'files',
+            ds,
+            [dict(path='.', type='directory')],
+            'init')
+    }
+
     # generate: s_study.txt
     _store_beautiful_table(
         _get_study_df(ds),
         output_directory,
         "s_study.txt")
 
+    deface_df = None
     # all imaging modalities recognized in BIDS
-    for modality in ('T1w', 'T2w', 'T1map', 'T2map', 'FLAIR', 'FLASH', 'PD',
+    #TODO maybe fold 'defacemask' into each modality as a derivative
+    for modality in ('defacemask',
+                     'T1w', 'T2w', 'T1map', 'T2map', 'FLAIR', 'FLASH', 'PD',
                      'PDmap', 'PDT2', 'inplaneT1', 'inplaneT2', 'angio',
-                     'sbref', 'bold', 'defacemask', 'SWImagandphase'):
-        # generate: a_assay.txt
-        mri_assay_df, mri_par_names = _get_mri_assay_df(ds, modality)
-        if not len(mri_assay_df):
+                     'sbref', 'bold', 'SWImagandphase'):
+        # what files do we have for this modality
+        modfiles = _get_file_matches(
+            metadb,
+            '^sub-.*_{}\.nii\.gz$'.format(modality))
+        if not len(modfiles):
             # not files found, try next
             lgr.info(
                 "no files match MRI modality '{}', skipping".format(modality))
             continue
-        _drop_from_df(mri_assay_df, drop_parameter)
-        _store_beautiful_table(
-            mri_assay_df,
-            output_directory,
-            "a_assay_mri_{}.txt".format(modality.lower()),
-            repository_info)
 
-    # physio
-    df, params = _get_assay_df(
-        ds,
-        'physio',
-        "Physiological Measurement",
-        _get_file_matches(ds, '*_physio.tsv.gz'),
-        _describe_file)
-    if len(df):
-        _store_beautiful_table(
-            _drop_from_df(df, drop_parameter),
-            output_directory,
-            'a_assay_physiology.txt',
+        df = _get_assay_df(
+            metadb,
+            modality,
+            "Magnetic Resonance Imaging",
+            modfiles,
+            _describe_file,
             repository_info)
+        if df is None:
+            continue
+        if modality == 'defacemask':
+            # TODO filter/transform
+            df.rename(columns={'Raw Data File': 'Derived Data File'}, inplace=True)
+            df.drop(
+                ['Assay Name', 'Sample Name'] +
+                [c for c in df.columns if c.startswith('Factor')],
+                axis=1,
+                inplace=True)
+            deface_df = df
+            # do not save separate, but include into the others as a derivative
+            continue
+        elif deface_df is not None:
+            # get any factors, put last in final table
+            factors = [c for c in df.columns if c.startswith('Factor')]
+            factor_df = df[factors]
+            df.drop(factors, axis=1, inplace=True)
+            # merge relevant rows from deface df (hstack), by matching assay name
+            df = df.join(deface_df, rsuffix='_deface')
+            df.columns = [c[:-7] if c.endswith('_deface') else c for c in df.columns]
+            # cannot have overlapping columns, we removed the factor before
+            df = df.join(factor_df)
+        _store_beautiful_table(
+            df,
+            output_directory,
+            "a_mri_{}.txt".format(modality.lower()))
 
-    # stimulus
-    df, params = _get_assay_df(
-        ds,
-        'stim',
-        "Stimulation",
-        _get_file_matches(ds, '*_stim.tsv.gz'),
-        _describe_file)
-    if len(df):
-        _store_beautiful_table(
-            _drop_from_df(df, drop_parameter),
-            output_directory,
-            'a_assay_stimulation.txt',
+    # non-MRI modalities
+    for modlabel, assaylabel, protoref in (
+            ('physio', 'physio', "Physiological Measurement"),
+            ('stim', 'stimulation', "Stimulation")):
+        df = _get_assay_df(
+            metadb,
+            modlabel,
+            protoref,
+            _get_file_matches(metadb, '^sub-.*_{}.tsv.gz$'.format(modlabel)),
+            _describe_file,
             repository_info)
+        _store_beautiful_table(
+            df,
+            output_directory,
+            'a_{}.txt'.format(assaylabel))
 
     # generate: i_investigation.txt
-    investigation_template = _get_investigation_template(
-        ds, mri_par_names)
-    with open(opj(output_directory, "i_investigation.txt"), "w") as fp:
-        fp.write(investigation_template)
+    # TODO
+    #investigation_template = _get_investigation_template(
+    #    ds, mri_par_names)
+    #with open(opj(output_directory, "i_investigation.txt"), "w") as fp:
+    #    fp.write(investigation_template)
 
 
 #
@@ -655,9 +452,7 @@ def dlplugin(
         repo_name,
         repo_accession,
         repo_url,
-        output=None,
-        keep_unknown=None,
-        drop_parameter=None):
+        output=None):
     """BIDS to ISA-Tab converter
 
     Parameters
@@ -675,19 +470,6 @@ def dlplugin(
         Example: https://openfmri.org/dataset/ds000113d
     output : str, optional
       directory where ISA-TAB files will be stored
-    keep_unknown : bool, optional
-      by default only explicitely white-listed parameters and
-      characteristics are considered. This option will force inclusion of
-      any discovered information. See `drop_parameter` for additional
-      tuning.
-    drop_parameter : list, optional
-      parameter to ignore when composing the assay table. See the generated
-      table for column IDs to ignore. For example, to remove column
-      'Parameter Value[time:samples:ContentTime]', specify
-      `drop_parameter=time:samples:ContentTime`. Only considered together
-      `keep_unknown`.
-    i_investigation_template : str
-      path to a file with the template content
     """
     import logging
     lgr = logging.getLogger('datalad.plugin.bids2scidata')
@@ -699,11 +481,12 @@ def dlplugin(
     extract(
         dataset,
         output_directory=output,
-        drop_parameter=drop_parameter,
-        repository_info=[repo_name, repo_accession, repo_url])
+        repository_info={
+            'Comment[Data Repository]': repo_name,
+            'Comment[Data Record Accession]': repo_accession,
+            'Comment[Data Record URI]': repo_url},
+    )
         # TODO
-        #keep_unknown
-        #drop_parameter
         #i_investigation_template
     yield dict(
         status='ok',
