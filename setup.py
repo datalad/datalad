@@ -101,6 +101,7 @@ requires = {
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'pydicom',  # DICOM metadata
         'pybids',  # BIDS metadata
+        'Pillow',  # generic image metadata
     ]
 }
 
