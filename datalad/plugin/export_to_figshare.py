@@ -129,7 +129,8 @@ class FigshareRESTLaison(object):
 
 
 # PLUGIN API
-def dlplugin(dataset, filename=None, on_file_error='error',
+def dlplugin(dataset, filename=None,
+             missing_content='error',
              annex=True,
              # project_id=None,  # TODO: support working with projects and articles within them
              article_id=None
@@ -152,14 +153,13 @@ def dlplugin(dataset, filename=None, on_file_error='error',
       File name of the generated ZIP archive. If no file name is given
       the archive will be generated in the current directory and will
       be named: datalad_<dataset_uuid>.zip.
-    on_file_error : {'error', 'continue', 'ignore'}, optional
-      By default, any issue accessing a file in the dataset while adding
-      it to the TAR archive will result in an error and the plugin is
-      aborted. Setting this to 'continue' will issue warnings instead
-      of failing on error. The value 'ignore' will only inform about
-      problem at the 'debug' log level. The latter two can be helpful
-      when generating a TAR archive from a dataset where some file content
-      is not available locally.
+    missing_content : {'error', 'continue', 'ignore'}, optional
+      By default, any discovered file with missing content will result in
+      an error and the plugin is aborted. Setting this to 'continue' will
+      issue warnings instead of failing on error. The value 'ignore' will
+      only inform about problem at the 'debug' log level. The latter two
+      can be helpful when generating a TAR archive from a dataset where
+      some file content is not available locally.
     annex : bool, optional
       If True generated .zip file would be added to annex, and all files
       would get registered in git-annex to be available from such a tarball. Also
@@ -200,7 +200,7 @@ def dlplugin(dataset, filename=None, on_file_error='error',
             dataset,
             filename=filename,
             archivetype='zip',
-            on_file_error=on_file_error
+            missing_content=missing_content
         )
     )
     assert archive_out['status'] == 'ok'
