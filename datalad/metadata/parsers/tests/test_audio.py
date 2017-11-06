@@ -39,6 +39,8 @@ def test_audio(path):
     assert_result_count(res, 1)
     # compare full expected metadata set to catch any change of mind on the
     # side of the mutagen package
+    # but not the bitrate, to variable estimate across decoders
+    res[0]['metadata'].pop("comment<bitrate>", None)
     assert_result_count(
         res, 1,
         metadata={
