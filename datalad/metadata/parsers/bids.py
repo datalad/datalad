@@ -92,7 +92,8 @@ class MetadataParser(BaseMetadataParser):
             meta['description'] = desc.strip()
 
         # special case
-        bids_version = meta.get('comment<BIDSVersion>', '').strip()
+        # Could be None which we can't strip so or ''
+        bids_version = (meta.get('comment<BIDSVersion>', '') or '').strip()
         bids_defurl = 'http://bids.neuroimaging.io'
         if bids_version:
             bids_defurl += '/bids_spec{}.pdf'.format(bids_version)
