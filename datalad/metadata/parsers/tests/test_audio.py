@@ -50,7 +50,6 @@ def test_audio(path):
            "music:channels": 1,
            "music:sample_rate": 44100,
            "music:Genre": "dlgenre",
-           "comment<bitrate>": 43928,
            "comment<date>": "",
            "comment<tracknumber>": "dltracknumber",
         })
