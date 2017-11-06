@@ -146,7 +146,7 @@ class MetadataParser(BaseMetadataParser):
                 lgr.debug('no usable BIDS metadata for %s in %s: %s',
                           f, self.ds, exc_str(e))
                 if cfg.get('datalad.runtime.raiseonerror'):
-                    raise e
+                    raise
 
             # no check al props from other sources and apply them
             for rx in path_props:
