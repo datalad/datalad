@@ -24,6 +24,10 @@ from os.path import join as opj
 from os.path import split as psplit
 
 from datalad.metadata.metadata import query_aggregated_metadata
+from datalad.metadata.search import r_url
+from urlparse import urlsplit
+from urlparse import urlunsplit
+from posixpath import split as posixsplit
 
 try:
     import pandas as pd
@@ -136,12 +140,12 @@ recognized_props = (
     ("temporal_spacing(s)", 'Parameter Value[4d spacing]'),
     ("spatial_resolution(mm)", "Parameter Value[resolution]"),
     ("bids:EchoTime", "Parameter Value[echo time]", "second", 'UO:0000010'),
-    ("bids:FlipAngle", "Parameter Value[flip angle]", "", ''),
+    ("bids:FlipAngle", "Parameter Value[flip angle]", "degree", 'UO:0000185'),
     ('', "Parameter Value[modality]"),
     ("bids:Manufacturer", "Parameter Value[instrument manufacturer]"),
     ("bids:ManufacturerModelName", 'Parameter Value[instrument name]'),
     ("bids:HardcopyDeviceSoftwareVersion", 'Parameter Value[instrument software version]'),
-    ("bids:MagneticFieldStrength", 'Parameter Value[magnetic field strength]', '', ''),
+    ("bids:MagneticFieldStrength", 'Parameter Value[magnetic field strength]', 'tesla', 'UO:0000228'),
     ("bids:ReceiveCoilName", "Parameter Value[coil type]"),
     ("bids:PulseSequenceType", "Parameter Value[sequence]"),
     ("bids:ParallelAcquisitionTechnique", "Parameter Value[parallel acquisition technique]"),
@@ -158,6 +162,31 @@ recognized_props = (
 repr_props = {
     "Parameter Value[resolution]": 'x'.join,
 }
+
+
+def split_term_source_accession(val):
+    if val is None:
+        return '', ''
+    if not r_url.match(val):
+        # no URL
+        if ':' in val:
+            val_l = val.split(':')
+            vocab = ontology_map.get(val_l[0], val_l[0])
+            return vocab, '{}:{}'.format(vocab, val[len(val_l[0]) + 1:])
+        else:
+            # no idea
+            lgr.warn("Could not identify term source REF in: '%s'", val)
+            return '', val
+    else:
+        try:
+            # this is a URL, assume simple: last path segment is accession id
+            url_s = urlsplit(val)
+            urlpath, accession = posixsplit(url_s.path)
+            term_source = urlunsplit((url_s[0], url_s[1], urlpath, url_s[3], url_s[4]))
+            return ontology_map.get(term_source, term_source), accession
+        except Exception as e:
+            lgr.warn("Could not identify term source REF in: '%s' [%s]", val, exc_str(e))
+            return '', val
 
 
 def _get_study_df(ds):
@@ -238,12 +267,31 @@ def _describe_file(fpath, db):
             # pull out the value from datalad metadata directly,
             # unless we have a definition URL in another field,
             # in which case put it into a 2-tuple also
-            val = fmeta[src] \
-                if len(prop) in (2, 4) \
-                else (fmeta[src], fmeta.get(prop[2], None))
+            val = fmeta[src]
             if dst in repr_props and isinstance(val, (list, tuple)):
                 val = repr_props[dst](str(i) for i in val)
             info[dst] = val
+            if len(prop) == 4:
+                # we have a unit definition
+                info['{}_unit_label'.format(dst)] = prop[2]
+            term_source = term_accession = None
+            if len(prop) > 2:
+                term_source, term_accession = split_term_source_accession(
+                    fmeta.get(prop[2], None) if len(prop) == 3 else prop[3])
+            elif prop[0] and prop[1] != 'Sample Name':
+                # exclude all info source outside the metadata
+                # this plugin has no vocabulary info for this field
+                # we need to look into the dataset context to see if we know
+                # anything
+                termdef = db['.'].get('@context', {}).get(src, {})
+                term_source, term_accession = split_term_source_accession(
+                    termdef.get('unit' if 'unit' in termdef else '@id', None))
+                if 'unit_label' in termdef:
+                    info['{}_unit_label'.format(dst)] = termdef['unit_label']
+            if term_accession is not None:
+                info['{}_term_source'.format(dst)] = term_source
+                info['{}_term_accession'.format(dst)] = term_accession
+
     return info
 
 
@@ -314,6 +362,16 @@ def _get_assay_df(
             idx += 1
             if colname == 'Assay Name':
                 assay_name_key = colkey
+            for aux_info, aux_colname in (
+                    ('unit_label', 'Unit'),
+                    ('term_source', 'Term Source REF'),
+                    ('term_accession', 'Term Accession Number')):
+                aux_source = '{}_{}'.format(colname, aux_info)
+                if aux_source not in collector_dict:
+                    # we got nothing on this from any file
+                    continue
+                assay_dict[_get_colkey(idx, aux_colname)] = collector_dict[aux_source]
+                idx += 1
 
     if assay_name_key is None:
         # we didn't get a single meaningful file
@@ -321,8 +379,6 @@ def _get_assay_df(
 
     # TODO use assay name as index! for join with deface later on
     df = pd.DataFrame(assay_dict, index=assay_dict[assay_name_key])
-    # rename columns to strip index
-    df.columns = [c[6:] for c in df.columns]
     return df
 
 
@@ -352,11 +408,12 @@ def extract(
             "creating output directory at '{}'".format(output_directory))
         os.makedirs(output_directory)
 
-    # pull out everything we know about any file in the dataset
+    # pull out everything we know about any file in the dataset, and the dataset
+    # itself
     metadb = {
         relpath(r['path'], ds.path): r.get('metadata', {})
         for r in query_aggregated_metadata(
-            'files',
+            'all',
             ds,
             [dict(path='.', type='directory')],
             'init')
@@ -395,7 +452,8 @@ def extract(
         if df is None:
             continue
         if modality == 'defacemask':
-            # TODO filter/transform
+            # rename columns to strip index
+            df.columns = [c[6:] for c in df.columns]
             df.rename(columns={'Raw Data File': 'Derived Data File'}, inplace=True)
             df.drop(
                 ['Assay Name', 'Sample Name'] +
@@ -403,11 +461,18 @@ def extract(
                 axis=1,
                 inplace=True)
             deface_df = df
+            # re-prefix for merge logic compatibility below
+            deface_df.columns = [_get_colkey(i, c) for i, c in enumerate(df.columns)]
             # do not save separate, but include into the others as a derivative
             continue
         elif deface_df is not None:
-            # get any factors, put last in final table
-            factors = [c for c in df.columns if c.startswith('Factor')]
+            # get any factor columns, put last in final table
+            factors = []
+            # find where they stat
+            for i, c in enumerate(df.columns):
+                if '_Factor Value[' in c:
+                    factors = df.columns[i:]
+                    break
             factor_df = df[factors]
             df.drop(factors, axis=1, inplace=True)
             # merge relevant rows from deface df (hstack), by matching assay name
@@ -415,6 +480,8 @@ def extract(
             df.columns = [c[:-7] if c.endswith('_deface') else c for c in df.columns]
             # cannot have overlapping columns, we removed the factor before
             df = df.join(factor_df)
+        # rename columns to strip index
+        df.columns = [c[6:] for c in df.columns]
         _store_beautiful_table(
             df,
             output_directory,
@@ -431,6 +498,10 @@ def extract(
             _get_file_matches(metadb, '^sub-.*_{}.tsv.gz$'.format(modlabel)),
             _describe_file,
             repository_info)
+        if df is None:
+            continue
+        # rename columns to strip index
+        df.columns = [c[6:] for c in df.columns]
         _store_beautiful_table(
             df,
             output_directory,
