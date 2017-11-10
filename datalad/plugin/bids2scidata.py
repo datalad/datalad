@@ -131,7 +131,7 @@ ontology_map = {
 # (datalad_term, isatab_term, datalad_valuedef
 # case 2: we take the value as-is and define a unit for it
 # (datalad_term, isatab_term, isatab_unitvalue, isatab_unitdef
-recognized_props = (
+recognized_assay_props = (
     ('bids:participant_id', "Sample Name"),
     (None, "Protocol REF"),
     # BIDS repetition time by default, but override with info from
@@ -258,7 +258,7 @@ def _describe_file(fpath, db):
     # now pull in the value of all recognized properties
     # perform any necessary conversion to achieve final
     # form for ISATAB table
-    for prop in recognized_props:
+    for prop in recognized_assay_props:
         src, dst = prop[:2]
         if src is None:
             # special case, not handled here
@@ -336,7 +336,7 @@ def _get_assay_df(
     idx = 1
     idx_map = {}
     assay_name_key = None
-    for prop in recognized_props:
+    for prop in recognized_assay_props:
         colname = prop[1]
         if prop[0] is None:
             # special case handling
