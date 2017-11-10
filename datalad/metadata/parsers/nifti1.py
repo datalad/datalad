@@ -27,11 +27,13 @@ vocabulary = {
         'type': vocabulary_id},
     "spatial_resolution(mm)": {
         '@id': "idqa:0000162",
-        'unit': "uo:0000016",  # mm
+        'unit': "uo:0000016",
+        'unit_label': 'millimeter',
         'description': "spatial resolution in millimeter"},
     "temporal_spacing(s)": {
         '@id': "idqa:0000213",
-        'unit': "uo:0000010",  # s
+        'unit': "uo:0000010",
+        'unit_label': 'second',
         'description': "temporal sample distance in 4D (in seconds)"},
 }
 

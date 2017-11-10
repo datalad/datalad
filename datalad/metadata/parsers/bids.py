@@ -31,7 +31,8 @@ vocabulary = {
     # characteristics (metadata keys)
     "bids:age(years)": {
         '@id': "pato:0000011",
-        'unit': "uo:0000036",  # year
+        'unit': "uo:0000036",
+        'unit_label': "year",
         'description': "age of a sample (organism) at the time of data acquisition in years"},
 }
 
