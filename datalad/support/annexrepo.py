@@ -1407,7 +1407,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             # TODO: note that below we would use 'add with --dry-run
             # so passed here options might need to be passed into it??
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
@@ -2004,7 +2004,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add_url_to_file: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
@@ -2075,7 +2075,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add_urls: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
