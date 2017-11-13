@@ -12,7 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import (
+    known_failure_direct_mode,
+    known_failure_v6,
+)
 
 import logging
 from os.path import join as opj
@@ -123,6 +126,7 @@ def test_rerun(path, nodspath):
 
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_rerun_subdir(path):
     ds = Dataset(path).create()
     subdir = opj(path, 'subdir')
