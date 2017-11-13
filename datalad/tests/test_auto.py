@@ -200,7 +200,10 @@ def test_proxying_lzma_LZMAFile():
     import lzma
 
     def generate_dat(f):
-        with lzma.LZMAFile(f, "w") as f:
+        # again https://github.com/datalad/datalad/issues/1930
+        lzma_file = lzma.LZMAFile(f, "w")
+        dir(lzma_file)
+        with lzma_file as f:
             f.write("123".encode('utf-8'))
 
     def verify_dat(f, mode="r"):
