@@ -12,10 +12,14 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import (
+    known_failure_direct_mode,
+    known_failure_v6,
+)
 
 import logging
 from os.path import join as opj
+from os import mkdir
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
@@ -23,9 +27,11 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils import ok_
 from datalad.api import run
+from datalad.interface.run import get_commit_runinfo
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
@@ -116,3 +122,36 @@ def test_rerun(path, nodspath):
             cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
     ok_clean_git(ds.path)
     eq_('xxx\n', open(probe_path).read())
+
+
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_rerun_subdir(path):
+    ds = Dataset(path).create()
+    subdir = opj(path, 'subdir')
+    mkdir(subdir)
+    with chpwd(subdir):
+        run("python -c 'open(\"test.dat\", \"wb\").close()'")
+    ok_clean_git(ds.path)
+    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+    rec_msg, runinfo = get_commit_runinfo(ds.repo)
+    eq_(runinfo['pwd'], 'subdir')
+    # now, rerun within root of the dataset
+    with chpwd(ds.path):
+        ds.run(rerun=True)
+    ok_clean_git(ds.path)
+    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+    # and not on top
+    assert_raises(AssertionError, ok_file_under_git, opj(ds.path, "test.dat"), annexed=True)
+
+    # but if we run ds.run -- runs within top of the dataset
+    with chpwd(subdir):
+        ds.run("python -c 'open(\"test2.dat\", \"wb\").close()'")
+    ok_clean_git(ds.path)
+    ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
+    rec_msg, runinfo = get_commit_runinfo(ds.repo)
+    eq_(runinfo['pwd'], '.')
+    # now, rerun within subdir -- smoke for now
+    with chpwd(subdir):
+        ds.run(rerun=True)
