@@ -26,6 +26,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from datalad.support.json_py import LZMAFile
 
 try:
     import h5py
@@ -200,11 +201,11 @@ def test_proxying_lzma_LZMAFile():
     import lzma
 
     def generate_dat(f):
-        with lzma.LZMAFile(f, "w") as f:
+        with LZMAFile(f, "w") as f:
             f.write("123".encode('utf-8'))
 
     def verify_dat(f, mode="r"):
-        with lzma.LZMAFile(f, mode) as f:
+        with LZMAFile(f, mode) as f:
             eq_(f.read().decode('utf-8'), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat

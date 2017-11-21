@@ -59,14 +59,19 @@ def dump2fileobj(obj, fileobj):
         codecs.getwriter('utf-8')(fileobj),
         **json_dump_kwargs)
 
+def LZMAFile(*args, **kwargs):
+    """A little decorator to overcome a bug in lzma
+
+    A unique to yoh and some others bug with pyliblzma
+    calling dir() helps to avoid AttributeError __exit__
+    see https://bugs.launchpad.net/pyliblzma/+bug/1219296
+	"""
+    lzmafile = lzma.LZMAFile(*args, **kwargs)
+    dir(lzmafile)
+	return lzmafile
 
 def dump2xzstream(obj, fname):
-    # A unique to yoh and some others bug with pyliblzma
-    # calling dir() helps to avoid AttributeError __exit__
-    # see https://bugs.launchpad.net/pyliblzma/+bug/1219296
-    lzmafile = lzma.LZMAFile(fname, mode='w')
-    dir(lzmafile)
-    with lzmafile as f:
+	with LZMAFile(fname, mode='w') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
@@ -74,7 +79,7 @@ def dump2xzstream(obj, fname):
 
 
 def load_xzstream(fname):
-    with lzma.LZMAFile(fname, mode='r') as f:
+    with LZMAFile(fname, mode='r') as f:
         for line in f:
             yield loads(line)
 
