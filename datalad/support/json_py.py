@@ -65,13 +65,13 @@ def LZMAFile(*args, **kwargs):
     A unique to yoh and some others bug with pyliblzma
     calling dir() helps to avoid AttributeError __exit__
     see https://bugs.launchpad.net/pyliblzma/+bug/1219296
-	"""
+    """
     lzmafile = lzma.LZMAFile(*args, **kwargs)
     dir(lzmafile)
-	return lzmafile
+    return lzmafile
 
 def dump2xzstream(obj, fname):
-	with LZMAFile(fname, mode='w') as f:
+    with LZMAFile(fname, mode='w') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
