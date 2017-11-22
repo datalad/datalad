@@ -1407,7 +1407,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             # TODO: note that below we would use 'add with --dry-run
             # so passed here options might need to be passed into it??
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
@@ -2004,7 +2004,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add_url_to_file: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
@@ -2075,7 +2075,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         if git_options:
-            lgr.warning("git_options not yet implemented. Ignored.")
+            lgr.warning("add_urls: git_options not yet implemented. Ignored.")
 
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
@@ -3430,7 +3430,7 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
-
+        target_size = None
         if 'command' in j and 'key' in j:
             # might be the finish line message
             j_download_id = (j['command'], j['key'])
@@ -3446,8 +3446,8 @@ class ProcessAnnexProgressIndicators(object):
                         size_j = self.expected[j['key']]
                     except:
                         size_j = None
-                    size = size_j or AnnexRepo.get_size_from_key(j['key'])
-                    self.total_pbar.update(size, increment=True)
+                    target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
+                    self.total_pbar.update(target_size, increment=True)
             else:
                 self._failed += 1
 
@@ -3475,7 +3475,8 @@ class ProcessAnnexProgressIndicators(object):
             return line
 
         def get_size_from_perc_complete(count, perc):
-            return int(math.ceil(int(count) / (float(perc) / 100.)))
+            return int(math.ceil(int(count) / (float(perc) / 100.))) \
+                if perc else 0
 
         # so we have a progress indicator, let's dead with it
         action = j['action']
@@ -3490,12 +3491,14 @@ class ProcessAnnexProgressIndicators(object):
             # for now deduce from key or approx from '%'
             # TODO: unittest etc to check when we have a relaxed
             # URL without any size known in advance
-            target_size = \
-                AnnexRepo.get_size_from_key(action.get('key')) or \
-                get_size_from_perc_complete(
-                    j['byte-progress'],
-                    j['percent-progress'].rstrip('%')
-                )
+            if not target_size:
+                target_size = \
+                    AnnexRepo.get_size_from_key(action.get('key')) or \
+                    get_size_from_perc_complete(
+                        j['byte-progress'],
+                        j.get('percent-progress', '').rstrip('%')
+                    ) or \
+                    0
             w, h = ui_utils.get_terminal_size()
             w = w or 80  # default to 80
             title = str(download_item)
