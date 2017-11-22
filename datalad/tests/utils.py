@@ -99,6 +99,29 @@ def skip_if_url_is_not_available(url, regex=None):
         raise SkipTest("%s failed to download" % url)
 
 
+# TODO: eventually we might want to make use of attr module
+class File(object):
+    """Helper for a file entry in the create_tree/@with_tree
+
+    It allows to define additional settings for entries
+    """
+    def __init__(self, name, executable=False):
+        """
+
+        Parameters
+        ----------
+        name : str
+          Name of the file
+        executable: bool, optional
+          Make it executable
+        """
+        self.name = name
+        self.executable = executable
+
+    def __str__(self):
+        return self.name
+
+
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
@@ -132,7 +155,13 @@ def create_tree(path, tree, archives_leading_dir=True):
     if isinstance(tree, dict):
         tree = tree.items()
 
-    for name, load in tree:
+    for file_, load in tree:
+        if isinstance(file_, File):
+            executable = file_.executable
+            name = file_.name
+        else:
+            executable = False
+            name = file_
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
@@ -147,6 +176,8 @@ def create_tree(path, tree, archives_leading_dir=True):
                 if PY2 and isinstance(load, text_type):
                     load = load.encode('utf-8')
                 f.write(load)
+        if executable:
+            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 #
 # Addition "checkers"
