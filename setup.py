@@ -102,6 +102,7 @@ requires = {
         'pydicom',  # DICOM metadata
         'pybids',  # BIDS metadata
         'Pillow',  # generic image metadata
+        'nibabel',  # NIfTI metadata
     ]
 }
 

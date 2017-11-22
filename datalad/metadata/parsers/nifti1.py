@@ -50,6 +50,8 @@ unit_map = {
     'rads': ('radian', 'uo:0000123'),
 }
 
+# to serve as a default for when expect 0 to be consumable by np.asscalar
+_array0 = np.array(0)
 
 class MetadataParser(BaseMetadataParser):
 
@@ -67,11 +69,11 @@ class MetadataParser(BaseMetadataParser):
         'nifti1:t_unit': lambda x: '{} ({})'.format(
             *unit_map[x.get_xyzt_units()[1]]) if x.get_xyzt_units()[1] in unit_map else '',
         'nifti1:qform_code': lambda x: nibabel.nifti1.xform_codes.label[
-            np.asscalar(x.get('qform_code', 0))],
+            np.asscalar(x.get('qform_code', _array0))],
         'nifti1:sform_code': lambda x: nibabel.nifti1.xform_codes.label[
-            np.asscalar(x.get('sform_code', 0))],
+            np.asscalar(x.get('sform_code', _array0))],
         'nifti1:slice_order': lambda x: nibabel.nifti1.slice_order_codes.label[
-            np.asscalar(x.get('slice_code', 0))],
+            np.asscalar(x.get('slice_code', _array0))],
     }
     _ignore = {
         'datatype',
