@@ -39,6 +39,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import ignore_nose_capturing_stdout
 
 
 @with_tempfile(mkdir=True)
@@ -52,6 +53,7 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
+@ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -93,6 +95,7 @@ def test_basics(path, nodspath):
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
 
 
+@ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -124,6 +127,7 @@ def test_rerun(path, nodspath):
     eq_('xxx\n', open(probe_path).read())
 
 
+@ignore_nose_capturing_stdout
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
