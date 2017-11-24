@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""export a dataset as a TAR/ZIP archive"""
+"""export a dataset as a compressed TAR/ZIP archive"""
 
 __docformat__ = 'restructuredtext'
 
