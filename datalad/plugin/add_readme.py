@@ -12,7 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 # PLUGIN API
-def dlplugin(dataset, filename='README.rst', existing='skip'):
+def dlplugin(dataset, filename='README.md', existing='skip'):
     """Add basic information about DataLad datasets to a README file
 
     The README file is added to the dataset and the addition is saved
@@ -23,7 +23,7 @@ def dlplugin(dataset, filename='README.rst', existing='skip'):
     dataset : Dataset
       dataset to add information to
     filename : str, optional
-      path of the README file within the dataset. Default: 'README.rst'
+      path of the README file within the dataset. Default: 'README.md'
     existing : {'skip', 'append', 'replace'}
       how to react if a file with the target name already exists:
       'skip': do nothing; 'append': append information to the existing
@@ -34,17 +34,11 @@ def dlplugin(dataset, filename='README.rst', existing='skip'):
 
     from os.path import lexists
     from os.path import join as opj
+    from io import open
+    import logging
+    lgr = logging.getLogger('datalad.plugin.add_readme')
+    from datalad.utils import assure_list
 
-    default_content="""\
-About this dataset
-==================
-
-This is a DataLad dataset{id}.
-
-For more information on DataLad and on how to work with its datasets,
-see the DataLad documentation at: http://docs.datalad.org
-""".format(
-        id=' (id: {})'.format(dataset.id) if dataset.id else '')
     filename = opj(dataset.path, filename)
     res_kwargs = dict(action='add_readme', path=filename)
 
@@ -56,11 +50,51 @@ see the DataLad documentation at: http://docs.datalad.org
         return
 
     # unlock, file could be annexed
-    # TODO yield
     if lexists(filename):
         dataset.unlock(filename)
 
-    with open(filename, 'a' if existing == 'append' else 'w') as fp:
+    # get any metadata on the dataset itself
+    dsinfo = dataset.metadata('.', reporton='datasets', return_type='item-or-list')
+    if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
+        lgr.warn("Could not obtain dataset metadata, proceeding without")
+        dsinfo = {}
+        meta = {}
+    else:
+        meta = dsinfo['metadata']
+
+    metainfo = ''
+    for label, content in (
+            ('', meta.get('description', meta.get('shortdescription', ''))),
+            ('Author{}'.format('s' if isinstance(meta.get('author', None), list) else ''),
+                u'\n'.join([u'- {}'.format(a) for a in assure_list(meta.get('author', []))])),
+            ('Homepage', meta.get('homepage', '')),
+            ('Reference', meta.get('citation', '')),
+            ('License', meta.get('license', '')),
+            ('Keywords', u', '.join([u'`{}`'.format(k) for k in assure_list(meta.get('tag', []))])),
+            ('Funding', meta.get('fundedby', '')),
+            ):
+        if label and content:
+            metainfo += u'\n\n### {}\n\n{}'.format(label, content)
+        elif content:
+            metainfo += u'\n\n{}'.format(content)
+
+    default_content=u"""\
+# {title}{metainfo}
+
+## General information
+
+This is a DataLad dataset{id}.
+
+For more information on DataLad and on how to work with its datasets,
+see the DataLad documentation at: http://docs.datalad.org
+""".format(
+        title='Dataset "{}"'.format(meta['name']) if 'name' in meta else 'About this dataset',
+        metainfo=metainfo,
+        id=u' (id: {})'.format(dataset.id) if dataset.id else '',
+        )
+
+    print(meta)
+    with open(filename, 'a' if existing == 'append' else 'w', encoding='utf-8') as fp:
         fp.write(default_content)
         yield dict(
             status='ok',
