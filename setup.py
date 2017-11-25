@@ -84,6 +84,7 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        'duecredit',
         'simplejson',
         'pyld',  # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
     ],
