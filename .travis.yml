@@ -183,7 +183,7 @@ before_install:
   - eatmydata npm install grunt-cli
   # Install optionally upstream current development so we are sure that they break nothing important for us
   - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
-  - if [ ! -z "${_DATALAD_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; export PATH=/usr/local/lib/git-annex.linux:$PATH;  fi
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/;  fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DATALAD_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
 
