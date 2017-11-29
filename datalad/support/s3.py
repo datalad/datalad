@@ -139,6 +139,10 @@ class VersionedFilesPool(object):
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
+    # TODO: here we would need to encode the name since urlquote actually
+    # can't do that on its own... but then we should get a copy of the thing
+    # so we could still do the .format....
+    # ... = e.name.encode('utf-8')  # unicode isn't advised in URLs
     e.name_urlquoted = urlquote(e.name)
     if schema == 'http':
         fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name_urlquoted}"
