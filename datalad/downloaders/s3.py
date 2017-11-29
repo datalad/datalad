@@ -154,10 +154,7 @@ class S3Downloader(BaseDownloader):
         # magical check, which would fail if someone had % followed by two digits
         filepath = rec.path.lstrip('/')
         if re.search('%[0-9a-fA-F]{2}', filepath):
-            lgr.debug(
-                "URL decoding S3 URL filepath portion to be a simple key",
-                filepath
-            )
+            lgr.debug("URL unquoting S3 URL filepath %s", filepath)
             filepath = urlunquote(filepath)
         # TODO: needs replacement to assure_ since it doesn't
         # deal with non key=value
