@@ -350,28 +350,44 @@ class SSHManager(object):
         not_supported_on_windows("TODO: Make this an abstraction to "
                                  "interface platform dependent SSH")
 
-        self._connections = dict()
         self._socket_dir = None
-
-        from os import listdir
-        from os.path import isdir
-        self._prev_connections = [opj(self.socket_dir, p)
-                                  for p in listdir(self.socket_dir)
-                                  if not isdir(opj(self.socket_dir, p))]
-        lgr.log(5,
-                "Found %d previous connections",
-                len(self._prev_connections))
+        self._connections = dict()
+        # Initialization of prev_connections is happening during initial
+        # handling of socket_dir, so we do not define them here explicitly
+        # to an empty list to fail if logic is violated
+        self._prev_connections = None
 
     @property
     def socket_dir(self):
+        """Return socket_dir, and if was not defined before,
+        and also pick up all previous connections (if any)
+        """
         if self._socket_dir is None:
+
             from ..config import ConfigManager
             from os import chmod
             cfg = ConfigManager()
             self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
                                    'sockets')
             assure_dir(self._socket_dir)
-            chmod(self._socket_dir, 0o700)
+            try:
+                chmod(self._socket_dir, 0o700)
+            except OSError as exc:
+                lgr.warning(
+                    "Failed to (re)set permissions on the %s. "
+                    "Most likely future communications would be impaired or fail. "
+                    "Original exception: %s",
+                    self._socket_dir, exc_str(exc)
+                )
+
+            from os import listdir
+            from os.path import isdir
+            self._prev_connections = [opj(self.socket_dir, p)
+                                      for p in listdir(self.socket_dir)
+                                      if not isdir(opj(self.socket_dir, p))]
+            lgr.log(5,
+                    "Found %d previous connections",
+                    len(self._prev_connections))
 
         return self._socket_dir
 
