@@ -331,6 +331,10 @@ def test_add_archive_use_archive_dir(repo_path):
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
+        # check it gives informative error if archive is not already added
+        with assert_raises(RuntimeError), swallow_outputs() as cm:
+            add_archive_content(archive_path)
+            assert_in("You should run datalad add", cm.err)
         with swallow_outputs():
             repo.add(archive_path)
         repo.commit("added 1.tar.gz")
