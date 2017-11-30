@@ -36,6 +36,7 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - _DATALAD_UPSTREAM_GITPYTHON=1
+    - _DATALAD_UPSTREAM_GITANNEX=1
     - _DATALAD_NONPR_ONLY=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
@@ -182,12 +183,13 @@ before_install:
   - eatmydata npm install grunt-cli
   # Install optionally upstream current development so we are sure that they break nothing important for us
   - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
+  - if [ ! -z "${_DATALAD_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DATALAD_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo eatmydata apt-get install git-annex-standalone zip pandoc
+  - travis_retry sudo eatmydata apt-get install zip pandoc
   - travis_retry sudo eatmydata apt-get install shunit2
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
@@ -218,6 +220,10 @@ script:
   - grunt test --verbose
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
   - if [ $DATALAD_TESTS_SSH != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then echo "skipping due spaces in $TMPDIR"; else $NOSE_WRAPPER tools/testing/run_doc_examples; fi
+  # Test installation system-wide
+  - sudo pip install .
+  # Report WTF information using system wide installed version
+  - datalad plugin wtf
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*
