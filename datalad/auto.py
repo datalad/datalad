@@ -77,6 +77,7 @@ class AutomagicIO(object):
         self._builtin_open = __builtin__.open
         self._io_open = io.open
         self._builtin_exists = os.path.exists
+        self._builtin_isfile = os.path.isfile
         if h5py:
             self._h5py_File = h5py.File
         else:
@@ -179,6 +180,11 @@ class AutomagicIO(object):
             return True
         return lexists(path) and 'annex/objects' in realpath(path)
 
+    def _proxy_isfile(self, path):
+        return self._proxy_open_name_mode(
+            'os.path.isfile', self._builtin_isfile, path
+        )
+
     def _dataset_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
 
@@ -236,6 +242,7 @@ class AutomagicIO(object):
         __builtin__.open = self._proxy_open
         io.open = self._proxy_io_open
         os.path.exists = self._proxy_exists
+        os.path.isfile = self._proxy_isfile
         if h5py:
             h5py.File = self._proxy_h5py_File
         if lzma:
@@ -254,6 +261,7 @@ class AutomagicIO(object):
         if lzma:
             lzma.LZMAFile = self._lzma_LZMAFile
         os.path.exists = self._builtin_exists
+        os.path.isfile = self._builtin_isfile
         self._active = False
 
     def __del__(self):
