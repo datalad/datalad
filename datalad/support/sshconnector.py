@@ -356,40 +356,46 @@ class SSHManager(object):
         # handling of socket_dir, so we do not define them here explicitly
         # to an empty list to fail if logic is violated
         self._prev_connections = None
+        # and no explicit initialization in the constructor
+        # self.assure_initialized()
 
     @property
     def socket_dir(self):
         """Return socket_dir, and if was not defined before,
         and also pick up all previous connections (if any)
         """
-        if self._socket_dir is None:
-
-            from ..config import ConfigManager
-            from os import chmod
-            cfg = ConfigManager()
-            self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
-                                   'sockets')
-            assure_dir(self._socket_dir)
-            try:
-                chmod(self._socket_dir, 0o700)
-            except OSError as exc:
-                lgr.warning(
-                    "Failed to (re)set permissions on the %s. "
-                    "Most likely future communications would be impaired or fail. "
-                    "Original exception: %s",
-                    self._socket_dir, exc_str(exc)
-                )
-
-            from os import listdir
-            from os.path import isdir
-            self._prev_connections = [opj(self.socket_dir, p)
-                                      for p in listdir(self.socket_dir)
-                                      if not isdir(opj(self.socket_dir, p))]
-            lgr.log(5,
-                    "Found %d previous connections",
-                    len(self._prev_connections))
-
+        self.assure_initialized()
         return self._socket_dir
+
+    def assure_initialized(self):
+        """Assures that manager is initialized - knows socket_dir, previous connections
+        """
+        if self._socket_dir is not None:
+            return
+        from ..config import ConfigManager
+        from os import chmod
+        cfg = ConfigManager()
+        self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
+                               'sockets')
+        assure_dir(self._socket_dir)
+        try:
+            chmod(self._socket_dir, 0o700)
+        except OSError as exc:
+            lgr.warning(
+                "Failed to (re)set permissions on the %s. "
+                "Most likely future communications would be impaired or fail. "
+                "Original exception: %s",
+                self._socket_dir, exc_str(exc)
+            )
+
+        from os import listdir
+        from os.path import isdir
+        self._prev_connections = [opj(self.socket_dir, p)
+                                  for p in listdir(self.socket_dir)
+                                  if not isdir(opj(self.socket_dir, p))]
+        lgr.log(5,
+                "Found %d previous connections",
+                len(self._prev_connections))
 
     def get_connection(self, url):
         """Get a singleton, representing a shared ssh connection to `url`
