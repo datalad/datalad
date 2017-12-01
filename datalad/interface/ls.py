@@ -961,8 +961,8 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
             try:
                 acl = e.get_acl()
-            except S3ResponseError as e:
-                acl = str(e)
+            except S3ResponseError as exc:
+                acl = exc.code if exc.code in ('AccessDenied',) else str(exc)
 
             content = ""
             if list_content:
@@ -985,10 +985,12 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
                     content = str(err)
                 finally:
                     content = " " + content
-            if long_:
-                ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
-            else:
-                ui.message('')
+            ui.message(
+                "ver:%-32s  acl:%s  %s [%s]%s"
+                % (getattr(e, 'version_id', None),
+                   acl, url, urlok, content)
+                if long_ else ''
+            )
         else:
             ui.message(base_msg + " " + str(type(e)).split('.')[-1].rstrip("\"'>"))
     return results
