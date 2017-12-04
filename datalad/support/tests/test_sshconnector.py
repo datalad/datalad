@@ -33,7 +33,10 @@ from ..sshconnector import get_connection_hash
 def test_ssh_get_connection():
 
     manager = SSHManager()
+    assert manager._socket_dir is None, \
+        "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
     c1 = manager.get_connection('ssh://localhost')
+    assert manager._socket_dir, "Should be set after interactions with the manager"
     assert_is_instance(c1, SSHConnection)
 
     # subsequent call returns the very same instance:
@@ -130,6 +133,8 @@ def test_ssh_manager_close_no_throw(bogus_socket):
                 f.write("whatever")
             return bogus_socket
 
+    # since we are digging into protected area - should also set _prev_connections
+    manager._prev_connections = {}
     manager._connections['bogus'] = bogus()
     assert_raises(Exception, manager.close)
     assert_raises(Exception, manager.close)
