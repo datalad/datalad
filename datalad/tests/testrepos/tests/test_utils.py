@@ -11,11 +11,13 @@
 
 
 from six import string_types
+
+from functools import wraps
 from ..repos import *
 from ..utils import with_testrepos_new, _all_setups
 
-from datalad.tests.utils import assert_is_instance, assert_raises, with_tempfile
-from nose.tools import assert_is_not
+from datalad.tests.utils import assert_is_instance, assert_raises, with_tempfile, swallow_outputs
+from nose.tools import assert_is_not, assert_not_in
 
 
 @with_testrepos_new(read_only=True)
@@ -33,7 +35,8 @@ def test_with_testrepos_yields(repo, path):
 def test_with_testrepos_new_read_only():
 
     # Note: Calls to the "tests" look a bit weird, since with_testrepos_new
-    # is yielding parametric tests to be discovered and executed by nose
+    # is yielding parametric tests to be discovered and executed by nose. We
+    # need to simulate the "outside" point of view of nose here.
 
     sometest_repos = []
 
@@ -98,9 +101,116 @@ def test_with_testrepos_new_read_only():
 
 
 def test_with_testrepos_new_selector():
-    pass
+
+    # Note: Calls to the "tests" look a bit weird, since with_testrepos_new
+    # is yielding parametric tests to be discovered and executed by nose. We
+    # need to simulate the "outside" point of view of nose here.
+
+    sometest_repos = []
+
+    @with_testrepos_new(read_only=True)
+    def sometest(repo):
+        assert_is_instance(repo, TestRepo_NEW)
+        sometest_repos.append(repo)
+
+    someothertest_repos = []
+
+    @with_testrepos_new(read_only=True, selector=[('all',)])
+    def someothertest(repo):
+        assert_is_instance(repo, TestRepo_NEW)
+        someothertest_repos.append(repo)
+
+    additionaltest_repos = []
+
+    @with_testrepos_new(read_only=True, selector=[(BasicGit,), (BasicMixed,)])
+    def additionaltest(repo):
+        assert_is_instance(repo, TestRepo_NEW)
+        additionaltest_repos.append(repo)
+
+    # sometest got all TestRepo classes:
+    [x[0](*(x[1:])) for x in sometest()]
+    assert all(any(isinstance(x, cls) for x in sometest_repos)
+               for cls in _all_setups)
+
+    # someothertest got all TestRepo classes:
+    [x[0](*(x[1:])) for x in someothertest()]
+    assert all(any(isinstance(x, cls) for x in someothertest_repos)
+               for cls in _all_setups)
+
+    # additionaltest got just BasicGit and BasicMixed:
+    [x[0](*(x[1:])) for x in additionaltest()]
+    assert all(any(isinstance(x, cls) for x in additionaltest_repos)
+               for cls in [BasicGit, BasicMixed])
 
 
-def test_with_testrepos_new_known_failure():
-    pass
+def test_with_testrepos_new_decorators():
+
+    def first_decorator(t):
+        @wraps(t)
+        def newfunc(*arg, **kw):
+            print("first_decorator called")
+            return t(*arg, **kw)
+        return newfunc
+
+    def second_decorator(t):
+        @wraps(t)
+        def newfunc(*arg, **kw):
+            print("second_decorator called")
+            return t(*arg, **kw)
+        return newfunc
+
+    @with_testrepos_new(read_only=True,
+                        selector=[
+                            # this is making first_decorator the default for all
+                            # test setups and simultaneously making sure all of
+                            # them are used with this test ('sometest'):
+                            ('all', first_decorator),
+                            # now, this overrides the decorator for the
+                            # invocation using BasicGit:
+                            (BasicGit, second_decorator),
+                            # this one is passing a stack of decorators:
+                            # Note, that just first_decorator(second_decorator)
+                            # wouldn't work as expected! This is somewhat hard
+                            # to get one's head around, since we are passing a
+                            # callable into a decorator which is then using it
+                            # inside the function it is supposed to return to
+                            # decorate the function it is decorating itself.
+                            # This leads to easy confusion of what happens
+                            # during "compile" time and run time.
+                            # So, just note: That's the way you can do it.
+                            (BasicMixed, lambda x: first_decorator(second_decorator(x))),
+                            # and finally this one shouldn't do anything, since
+                            # there is no decorator passed to override the
+                            # default one:
+                            (MixedSubmodulesOldOneLevel,)
+                                  ]
+                        )
+    def sometest(repo):
+        print("sometest called with %s: " % repo.__class__.__name__)
+
+    # calling sometest now, should lead to the test being executed with all
+    # available test setups, but differently decorated:
+    # All invocations should call the first decorator by default with the
+    # following exceptions:
+    # - invocation with BasicGit should call second decorator instead
+    # - invocation with BasicMixed should call first_decorator and
+    #   second_decorator
+
+    for x in sometest():
+        with swallow_outputs() as cmo:
+            x[0](*(x[1:]))
+
+            assert_in("sometest called with %s:" % x[1].__class__.__name__,
+                      cmo.out)
+
+            if x[1].__class__ == BasicGit:
+                assert_in("second_decorator called", cmo.out)
+                assert_not_in("first_decorator called", cmo.out)
+            elif x[1].__class__ == BasicMixed:
+                # note, that this is testing for correct order of execution:
+                assert_in("first_decorator called\nsecond_decorator called", cmo.out)
+            else:
+                assert_not_in("second_decorator called", cmo.out)
+                assert_in("first_decorator called", cmo.out)
+
 

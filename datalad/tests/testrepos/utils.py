@@ -14,6 +14,8 @@ import os
 from os.path import join as opj
 import tempfile
 import logging
+from functools import wraps, partial
+
 
 from .. import _TEMP_PATHS_GENERATED
 from ..utils import get_tempfile_kwargs
@@ -42,6 +44,7 @@ lgr = logging.getLogger('datalad.tests.testrepos.utils')
 
 
 def _get_all_setups():
+    """helper function to get a list of all subclasses of TestRepo_NEW"""
 
     import inspect
     module = inspect.getmodule(TestRepo_NEW)
@@ -55,7 +58,7 @@ _all_setups = _get_all_setups()
 
 
 @optional_args
-def with_testrepos_new(t, read_only=False, selector='all'):
+def with_testrepos_new(t, read_only=False, selector=None):
     # selector: regex again?
     # based on class names or name/keyword strings instead?
     # -> May be have TestRepo properties (ItemSelf respectively) like
@@ -64,35 +67,74 @@ def with_testrepos_new(t, read_only=False, selector='all'):
 
     # TODO: For now, let `selector` be a list of classes. We need to figure out
     # a proper approach on that one.
-    if selector == 'all':
-        selected_classes = _all_setups
-    else:
-        selected_classes = selector
 
-    from functools import wraps, partial
+    # default selection: all available test setups; not decorated
+    selector = [('all',)] if selector is None else selector[:]
+
+    def empty_decorator(f):
+        @wraps(f)
+        def newfunc(*args, **kw):
+            f(*args, **kw)
+        return newfunc
+
+    selected_classes = dict()
+    for sel in selector:
+        if sel[0] == 'all':
+            # special case for convenience: use all available test setups and
+            # optionally apply an additional decorator to the test, which is
+            # technically applied on a per test setup basis
+            for cls_ in _all_setups:
+                if cls_.__name__ not in selected_classes:
+                    # initialize entry for that class, if there wasn't one
+                    # before:
+                    selected_classes[cls_.__name__] = dict()
+                    selected_classes[cls_.__name__]['class'] = cls_
+                    selected_classes[cls_.__name__]['decorator'] = lambda x: x
+
+                if len(sel) > 1:
+                    # apply decorator:
+                    selected_classes[cls_.__name__]['decorator'] = sel[1]
+        else:
+            if sel[0].__name__ not in selected_classes:
+                # initialize entry for that class, if there wasn't one
+                # before:
+                selected_classes[sel[0].__name__] = dict()
+                selected_classes[sel[0].__name__]['class'] = sel[0]
+                selected_classes[sel[0].__name__]['decorator'] = lambda x: x
+            if len(sel) > 1:
+                # apply decorator:
+                selected_classes[sel[0].__name__]['decorator'] = sel[1]
 
     # TODO: Why in hell `better_wraps` prevents nose from discovering the
-    # decorated test, while: 1. `functools.wraps` doesn't AND
-    #                        2. `optional_args` uses `better_wraps`, too, and
-    #                           still works?
-    #@better_wraps(t)
+    # decorated test (when yielding them), while:
+    #     1. `functools.wraps` doesn't AND
+    #     2. `optional_args` uses `better_wraps`, too, and
+    #        still works?
+    # @better_wraps(t)
     @wraps(t)
     def newfunc(*arg, **kw):
 
-        for cls_ in selected_classes:
-            lgr.debug("delivering testrepo '%s'", cls_.__name__)
+        for class_name in selected_classes:
+            lgr.debug("delivering testrepo '%s'", class_name)
+            decorated_test = selected_classes[class_name]['decorator'](t)
+
             if read_only:
                 # Note, that `get_persistent_setup` calls assert_intact
                 # already and re-creates if needed.
-                testrepo = get_persistent_setup(cls_)()
-                yield partial(t, *arg, **kw), testrepo
+                testrepo = get_persistent_setup(
+                    selected_classes[class_name]['class'])()
+
+                yield partial(decorated_test, *arg, **kw), testrepo
+                #decorated_test(*(arg + (testrepo,)), **kw)
                 testrepo.assert_intact()
             else:
                 # create a new one in a temp location:
                 with make_tempfile(wrapped=t, mkdir=True) as path:
-                    testrepo = cls_(path=path)
-                    yield partial(t, *arg, **kw), testrepo
+                    testrepo = selected_classes[class_name]['class'](path=path)
+                    yield partial(decorated_test, *arg, **kw), testrepo
+                    #decorated_test(*(arg + (testrepo,)), **kw)
     return newfunc
+# don't let nose consider this function to be a test (based on its name):
 with_testrepos_new.__test__ = False
 
 
