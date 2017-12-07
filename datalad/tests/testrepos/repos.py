@@ -37,6 +37,8 @@ from .. import _TEMP_PATHS_GENERATED
 from ..utils import get_tempfile_kwargs
 import os
 
+from datalad.tests.utils import known_failure_v6
+
 
 
 lgr = logging.getLogger('datalad.tests.testrepos.repos')
@@ -656,8 +658,10 @@ def get_persistent_setup(cls, attr=None):
                 # behind
                 lgr.error("Failed to create persistent instance of %s" %
                           cls.__name__)
-                rmtree(path)
+                if os.path.exists(path):
+                    rmtree(path)
                 raise e
+
         else:
             try:
                 _persistent_repo_store[cls.__name__].assert_intact()
@@ -829,6 +833,20 @@ class MixedSubmodulesOldOneLevel(TestRepo_NEW):
                                 'commit_msg': "Added subm 1 and 2."}),
         ]
 
+    # Note: This is quite a hack.
+    # MixedSubmodulesOldOneLevel and MixedSubmodulesOldNested are supposed to
+    # replicate former test repositories we had, which is why they need to be
+    # build the same way. Unfortunately, this way of creating them is invalid
+    # for V6. Therefore the integrity test right after creation would fail in
+    # V6. We can't "solve" this by marking the actual tests using those
+    # testrepos as a "known_failure_v6", since the failure does NOT happen in
+    # the tests operating on those repositories, but before.
+    # However, they are meant to be delivered by with_testrepos_new decorator,
+    # which yields parametric tests (one per delivered test setup). So, we can
+    # achieve the skipping by raising SkipTest right here if we are in V6 mode.
+    def __init__(self, path, runner=None):
+        known_failure_v6(super(MixedSubmodulesOldOneLevel, self).__init__)(path, runner)
+
 
 class MixedSubmodulesOldNested(TestRepo_NEW):
     """Hierarchy of repositories with files in git and in annex
@@ -882,8 +900,12 @@ class MixedSubmodulesOldNested(TestRepo_NEW):
                             'commit_msg': "Added subdatasets."}),
         #(ItemCommand, {''})#cmd, runner=None, item=None, cwd=None, repo=None
 
-
-
     ]
 
+    # Note: See MixedSubmodulesOldOneLevel.create()
+    def __init__(self, path, runner=None):
+        known_failure_v6(super(MixedSubmodulesOldNested, self).__init__)(path, runner)
+
+
 # Datasets (.datalad/config, .datalad/metadata ...) ?
+

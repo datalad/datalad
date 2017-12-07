@@ -71,12 +71,6 @@ def with_testrepos_new(t, read_only=False, selector=None):
     # default selection: all available test setups; not decorated
     selector = [('all',)] if selector is None else selector[:]
 
-    def empty_decorator(f):
-        @wraps(f)
-        def newfunc(*args, **kw):
-            f(*args, **kw)
-        return newfunc
-
     selected_classes = dict()
     for sel in selector:
         if sel[0] == 'all':
@@ -114,6 +108,16 @@ def with_testrepos_new(t, read_only=False, selector=None):
     @wraps(t)
     def newfunc(*arg, **kw):
 
+        from nose import SkipTest
+
+        @optional_args
+        def assure_raise(func):
+            """decorator to help mimic the raise came from within the test"""
+            @wraps(func)
+            def newfunc(cls_, exc, **kw):
+                raise exc
+            return newfunc
+
         for class_name in selected_classes:
             lgr.debug("delivering testrepo '%s'", class_name)
             decorated_test = selected_classes[class_name]['decorator'](t)
@@ -121,18 +125,43 @@ def with_testrepos_new(t, read_only=False, selector=None):
             if read_only:
                 # Note, that `get_persistent_setup` calls assert_intact
                 # already and re-creates if needed.
-                testrepo = get_persistent_setup(
-                    selected_classes[class_name]['class'])()
+                try:
+                    testrepo = get_persistent_setup(
+                        selected_classes[class_name]['class'])()
+                except SkipTest as e:
+                    # We got a SkipTest on creation.
+                    # At this point nose doesn't recognize we are actually
+                    # building several tests. So we need to yield a function,
+                    # that raises SkipTest and still provides the tests name and
+                    # arguments in order to have a telling output by nose.
+                    yield partial(assure_raise(decorated_test),
+                                  exc=e, *arg, **kw), \
+                          selected_classes[class_name]['class']
+                    continue
 
                 yield partial(decorated_test, *arg, **kw), testrepo
-                #decorated_test(*(arg + (testrepo,)), **kw)
                 testrepo.assert_intact()
+
             else:
                 # create a new one in a temp location:
                 with make_tempfile(wrapped=t, mkdir=True) as path:
-                    testrepo = selected_classes[class_name]['class'](path=path)
+                    try:
+                        testrepo = \
+                            selected_classes[class_name]['class'](path=path)
+                    except SkipTest as e:
+                        # We got a SkipTest on creation.
+                        # At this point nose doesn't recognize we are actually
+                        # building several tests. So we need to yield a
+                        # function, that raises SkipTest and still provides the
+                        # tests name and arguments in order to have a telling
+                        # output by nose.
+                        yield partial(assure_raise(decorated_test),
+                                      exc=e, *arg, **kw), \
+                              selected_classes[class_name]['class']
+                        continue
+
                     yield partial(decorated_test, *arg, **kw), testrepo
-                    #decorated_test(*(arg + (testrepo,)), **kw)
+
     return newfunc
 # don't let nose consider this function to be a test (based on its name):
 with_testrepos_new.__test__ = False

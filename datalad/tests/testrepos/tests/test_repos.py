@@ -129,14 +129,15 @@ def test_BasicMixed_instantiation(path):
 # repositories may cause old tests to fail even when not in V6 build.
 #
 # Summary: Keep those two testrepos for now, but skip them in V6 and have new,
-# shiny, better ones for new or rewritten tests.
-@known_failure_v6
+# shiny, better ones for new or rewritten tests. Note, that this skipping is
+# done from within their create() method, since we need to skip BUILDING them in
+# V6, not just the execution of tests operating on them.
+
 @with_tempfile
 def test_MixedSubmodulesOldOneLevel_instantiation(path):
     tr = MixedSubmodulesOldOneLevel(path)
 
 
-@known_failure_v6
 @with_tempfile
 def test_MixedSubmodulesOldNested_instantiation(path):
     tr = MixedSubmodulesOldNested(path)

@@ -10,14 +10,23 @@
 """
 
 
+import logging
 from six import string_types
-
+from nose import SkipTest
+from nose.tools import assert_is_not
 from functools import wraps
+
+from datalad.tests.utils import assert_is_instance
+from datalad.tests.utils import assert_raises
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import assert_not_in
+
 from ..repos import *
 from ..utils import with_testrepos_new, _all_setups
 
-from datalad.tests.utils import assert_is_instance, assert_raises, with_tempfile, swallow_outputs
-from nose.tools import assert_is_not, assert_not_in
+
+lgr = logging.getLogger('datalad.tests.testrepos.test_utils')
 
 
 @with_testrepos_new(read_only=True)
@@ -28,15 +37,24 @@ def test_with_testrepos_yields(repo, path):
     # TestRepo delivered)
     # ATM this is just for seeing this happen "manually" when looking at nose's
     # output
-    assert isinstance(repo, TestRepo_NEW)
-    assert isinstance(path, string_types)
+    assert_is_instance(repo, TestRepo_NEW)
+    assert_is_instance(path, string_types)
 
 
 def test_with_testrepos_new_read_only():
 
     # Note: Calls to the "tests" look a bit weird, since with_testrepos_new
     # is yielding parametric tests to be discovered and executed by nose. We
-    # need to simulate the "outside" point of view of nose here.
+    # need to simulate the "outside" point of view of nose here. This also leads
+    # to the need of catching possible SkipTest exceptions, that may be raised
+    # when building MixedSubmodulesOld* in annex V6 mode for example.
+    # This is why we call those decorated test functions like:
+    #
+    # for x in sometest():
+    #     try:
+    #         x[0](*(x[1:])
+    #     except SkipTest
+    #        ...
 
     sometest_repos = []
 
@@ -69,19 +87,60 @@ def test_with_testrepos_new_read_only():
         repo.assert_intact = fake
 
     # they got all TestRepo classes:
-    [x[0](*(x[1:])) for x in sometest()]
+    all_classes = set(_all_setups)
+    for x in sometest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped sometest() with %s:\n%s" % (x[1:], str(e)))
+            all_classes.remove(x[1])
+
     assert all(any(isinstance(x, cls) for x in sometest_repos)
-               for cls in _all_setups)
+               for cls in all_classes)
 
     # next test gets the very same objects:
-    [x[0](*(x[1:])) for x in anothertest()]
+    for x in anothertest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped anothertest() with %s:\n%s" % (x[1:], str(e)))
+
     assert all(any(a is b for b in anothertest_repos) for a in sometest_repos)
 
     # third test gets its own instances:
-    [x[0](*(x[1:])) for x in thirdtest()]
+    for x in thirdtest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped thirdtest() with %s:\n%s" % (x[1:], str(e)))
     assert all(not any(a is b for b in thirdtest_repos) for a in sometest_repos)
 
     # messuptest fails:
+    #
+    # Note: This test is somewhat incomplete, since AssertionError will be
+    # raised by the first yielded function, not considering the remaining ones.
+    # For now, didn't find a way to write a proper test, that is in addition
+    # also accounting for possible SkipTest raised. Due to the way the generator
+    # works (with_testrepo_new) the AssertionError would be raised only, when
+    # the next function is yielded. So, assertions herein would be
+    # "phase shifted".
+    # Proper test probably needs to look similar to the following code, but
+    # couldn't figure it out entirely yet:
+    # g = messuptest()
+    # x = g.next()
+    # while True:
+    #     lgr.debug("Calling with %s" % x[1:])
+    #     try:
+    #         x[0](*(x[1:]))
+    #     except SkipTest as e:
+    #         lgr.debug("Skipped messuptest() with %s:\n%s" % (x[1:], str(e)))
+    #     try:
+    #         lgr.debug("Yielding next")
+    #         with assert_raises(AssertionError):
+    #             x = g.next()
+    #     except StopIteration:
+    #         break
+
     with assert_raises(AssertionError):
         [x[0](*(x[1:])) for x in messuptest()]
 
@@ -90,7 +149,12 @@ def test_with_testrepos_new_read_only():
     # This one should be replaced and therefore the next test gets a new
     # instance, while the others are still the same:
     anothertest_repos = []
-    [x[0](*(x[1:])) for x in anothertest()]
+    for x in anothertest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped anothertest() with %s:\n%s" % (x[1:], str(e)))
+
     assert all(any(a is b for b in anothertest_repos[1:])
                for a in sometest_repos[1:])
     assert_is_not(anothertest_repos[0], sometest_repos[0])
@@ -128,17 +192,37 @@ def test_with_testrepos_new_selector():
         additionaltest_repos.append(repo)
 
     # sometest got all TestRepo classes:
-    [x[0](*(x[1:])) for x in sometest()]
+
+    all_classes = set(_all_setups)
+    for x in sometest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped sometest() with %s:\n%s" % (x[1:], str(e)))
+            all_classes.remove(x[1])
+
     assert all(any(isinstance(x, cls) for x in sometest_repos)
-               for cls in _all_setups)
+               for cls in all_classes)
 
     # someothertest got all TestRepo classes:
-    [x[0](*(x[1:])) for x in someothertest()]
+    all_classes = set(_all_setups)
+    for x in someothertest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped someothertest() with %s:\n%s" % (x[1:], str(e)))
+            all_classes.remove(x[1])
+
     assert all(any(isinstance(x, cls) for x in someothertest_repos)
-               for cls in _all_setups)
+               for cls in all_classes)
 
     # additionaltest got just BasicGit and BasicMixed:
-    [x[0](*(x[1:])) for x in additionaltest()]
+    for x in additionaltest():
+        try:
+            x[0](*(x[1:]))
+        except SkipTest as e:
+            lgr.debug("Skipped additionaltest() with %s:\n%s" % (x[1:], str(e)))
+
     assert all(any(isinstance(x, cls) for x in additionaltest_repos)
                for cls in [BasicGit, BasicMixed])
 
@@ -198,7 +282,11 @@ def test_with_testrepos_new_decorators():
 
     for x in sometest():
         with swallow_outputs() as cmo:
-            x[0](*(x[1:]))
+            try:
+                x[0](*(x[1:]))
+            except SkipTest as e:
+                lgr.debug("Skipped sometest() with %s:\n%s" % (x[1:], str(e)))
+                continue
 
             assert_in("sometest called with %s:" % x[1].__class__.__name__,
                       cmo.out)
