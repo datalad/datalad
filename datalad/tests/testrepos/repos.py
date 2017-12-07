@@ -646,8 +646,18 @@ def get_persistent_setup(cls, attr=None):
     path = opj(_persistent_store_root, 'testrepos', cls.__name__.lower())
 
     def lazy_delivery():
+        from datalad.utils import rmtree
+
         if cls.__name__ not in _persistent_repo_store:
-            _persistent_repo_store[cls.__name__] = cls(path=path)
+            try:
+                _persistent_repo_store[cls.__name__] = cls(path=path)
+            except AssertionError as e:
+                # if from scratch creation fails, make sure we don't leave stuff
+                # behind
+                lgr.error("Failed to create persistent instance of %s" %
+                          cls.__name__)
+                rmtree(path)
+                raise e
         else:
             try:
                 _persistent_repo_store[cls.__name__].assert_intact()
@@ -655,7 +665,6 @@ def get_persistent_setup(cls, attr=None):
                 lgr.debug("Persistent TestRepo '{c}' damaged ({exc}). "
                           "Recreating.".format(c=cls.__name__,
                                                exc=exc_str(e)))
-                from datalad.utils import rmtree
                 rmtree(path)
                 _persistent_repo_store[cls.__name__] = cls(path=path)
 

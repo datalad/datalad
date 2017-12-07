@@ -1701,7 +1701,7 @@ class ItemFile(Item):
             # TODO: This part needs attention for V6. See gh-1798
             add_cmd = ['git']
             if self._annexed:
-                # git-annex
+                # add to git-annex
                 add_cmd.append('annex')
                 if self._src:
                     # we want to annex-addurl
@@ -1710,8 +1710,25 @@ class ItemFile(Item):
                     # we want to annex-add
                     add_cmd.extend(['add', self.path])
             else:
-                # git-add
-                add_cmd.extend(['--work-tree=.', 'add', self.path])
+                # add to git
+                if self._repo.is_annex:
+                    if self._repo.annex_version >= 6:
+                        # we actually use annex, not plain git, so we can pass
+                        # required annex option to add the file to git instead
+                        # of annex.
+
+                        # TODO: See TODO above (gh-1798). We probably need to
+                        # record this file in gitattributes.
+                        add_cmd.extend(['annex', 'add', '-c',
+                                        'annex.largefiles=nothing'])
+                    else:
+                        # for older annex repo version we go for git-add
+                        # directly, but pass work-tree option to
+                        add_cmd.extend(['--work-tree=.', 'add'])
+                else:
+                    # just a plain git-add
+                    add_cmd.append('add')
+                add_cmd.append(self.path)
 
             _excute_by_item(cmd=add_cmd, item=self,
                             exc=TestRepoCreationError("Failed to add")
