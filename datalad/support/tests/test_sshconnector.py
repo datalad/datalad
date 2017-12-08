@@ -44,7 +44,15 @@ def test_ssh_get_connection():
 
     # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
-    assert_raises(ValueError, manager.get_connection, 'localhost')
+    #assert_raises(ValueError, manager.get_connection, 'localhost')
+    # we now allow those simple specifications of host to get_connection
+    c2 = manager.get_connection('localhost')
+    assert_is_instance(c2, SSHConnection)
+
+    # but should fail if it looks like something else
+    assert_raises(ValueError, manager.get_connection, 'localhost/')
+    assert_raises(ValueError, manager.get_connection, ':localhost')
+
     # we can do what urlparse cannot
     # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
     # next one is considered a proper url by urlparse (netloc:'',

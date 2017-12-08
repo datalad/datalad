@@ -411,6 +411,10 @@ class SSHManager(object):
         """
         # parse url:
         from datalad.support.network import RI, is_ssh
+        if ':' not in url and '/' not in url:
+            # it is just a hostname
+            lgr.debug("Assuming %r is just a hostname for ssh connection", url)
+            url += ':'
         sshri = RI(url) if not isinstance(url, RI) else url
 
         if not is_ssh(sshri):
