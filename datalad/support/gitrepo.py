@@ -335,7 +335,7 @@ def check_git_configured():
     check_runner = GitRunner()
     for c in 'user.name', 'user.email':
         try:
-            check_runner.run(['git', 'config', '--global', c])
+            check_runner.run(['git', 'config', c])
         except CommandError as exc:
             lgr.debug("Failed to verify that git is configured: %s",
                       exc_str(exc))
