@@ -341,7 +341,7 @@ def check_git_configured():
                       exc_str(exc))
             raise RuntimeError(
                 "You must configure git first (set both user.name and "
-                "user.email) settings before using DataLad."
+                "user.email) before using DataLad."
             )
 
 
