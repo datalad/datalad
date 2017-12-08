@@ -329,7 +329,7 @@ def check_git_configured():
 
     Raises
     ------
-    RuntimeError  if any of those two ariables are not set
+    RuntimeError if any of those two variables are not set
     """
 
     check_runner = GitRunner()
