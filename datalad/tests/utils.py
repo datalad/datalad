@@ -1231,7 +1231,7 @@ def ignore_nose_capturing_stdout(func):
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
             if message.find('StringIO') > -1 and message.find('fileno') > -1:
-                pass
+                raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
     return newfunc

@@ -522,6 +522,10 @@ class GitRepo(RepoInterface):
                 msg="RF: url passed to init()"
             )
 
+        # So that we "share" control paths with git/git-annex
+        if ssh_manager:
+            ssh_manager.assure_initialized()
+
         if not GitRepo._config_checked:
             check_git_configured()
             GitRepo._config_checked = True
