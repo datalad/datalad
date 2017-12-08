@@ -23,6 +23,7 @@ from os.path import relpath
 from os.path import join as opj
 from os.path import split as psplit
 
+from datalad.utils import assure_list
 from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.metadata.search import r_url
 from urlparse import urlsplit
@@ -34,77 +35,6 @@ try:
 except ImportError:
     pd = None
 
-
-# map column titles to ontology specs
-# based on this info the appropriate additonal column in the ISATab tables are
-# generated
-ontology_term_map = {
-    # qualitative information
-    "Characteristics[organism]": {
-        'homo sapiens': ('homo sapiens', 'NCBITAXON', 'NCBITaxon:9606'),
-    },
-    "Characteristics[organism part]": {
-        'brain': ('brain', 'UBERON', 'UBERON:0000955'),
-    },
-    "Characteristics[sex]": {
-        'female': ('female', 'PATO', 'PATO:0000383'),
-        'f': ('female', 'PATO', 'PATO:0000383'),
-        'male': ('male', 'PATO', 'PATO:0000384'),
-        'm': ('male', 'PATO', 'PATO:0000384'),
-    },
-    "Characteristics[handedness]": {
-        'right':  ('right', 'PATO', 'PATO:0002203'),
-        'r':  ('right', 'PATO', 'PATO:0002203'),
-        'left': ('left', 'PATO', 'PATO:0002202'),
-        'l': ('left', 'PATO', 'PATO:0002202'),
-        'ambidextrous': ('ambidextrous', 'PATO', 'PATO:0002204'),
-        'r;l': ('ambidextrous', 'PATO', 'PATO:0002204'),
-        'l;r': ('ambidextrous', 'PATO', 'PATO:0002204'),
-    },
-    # take as is ...
-    'Parameter Value[4d spacing]': None,
-    # ...but have dedicated unit column
-    'Parameter Unit[4d spacing]': {
-        'millimeter': ('millimiter', 'UO', 'UO:0000016'),
-        'second': ('second', 'UO', 'UO:0000010'),
-        'hertz': ('hertz', 'UO', 'UO:0000106'),
-        'hz': ('hertz', 'UO', 'UO:0000106'),
-        'ppm': ('parts per million', 'UO', 'UO:0000109'),
-        'rad': ('radian', 'UO', 'UO:0000123'),
-        'rads': ('radian', 'UO', 'UO:0000123'),
-    },
-    # quantitative information
-    "Characteristics[age at scan]": ('UO', 'UO:0000036', 'year'),
-    "Parameter Value[resolution]": ('UO', 'UO:0000016', 'millimeter'),
-    "Parameter Value[repetition time]": ('UO', 'UO:0000010', 'second'),
-    "Parameter Value[magnetic field strength]": ('UO', 'UO:0000228', 'tesla'),
-    "Parameter Value[flip angle]": ('UO', 'UO:0000185', 'degree'),
-    "Parameter Value[echo time]": ('UO', 'UO:0000010', 'second'),
-    "Parameter Value[sampling frequency]": ('UO', 'UO:0000106', 'hertz'),
-    # no associated term, keep but leave untouched
-    "Parameter Value[instrument name]": None,
-    "Parameter Value[instrument manufacturer]": None,
-    "Parameter Value[instrument software version]": None,
-    "Parameter Value[coil type]": None,
-    "Parameter Value[sequence]": None,
-    # TODO next two maybe factor values?
-    "Parameter Value[recording label]": None,
-    "Parameter Value[acquisition label]": None,
-    "Parameter Value[content description]": None,
-    # Keep any task factor, and any of the two task term sources
-    # of which one will get used (whatever is found first)
-    "Factor Value[task]": None,
-    'Parameter Value[CogAtlasID]': None,
-    'Parameter Value[CogPOID]': None,
-    'Protocol REF': None,
-    'Sample Name': None,
-    'Assay Name': None,
-    'Raw Data File': None,
-    # modality should get proper terms attached
-    'Parameter Value[modality]': None,
-    # not sure if there are terms for SENSE and GRAPPA etc. anywhere
-    'Parameter Value[parallel acquisition technique]': None,
-}
 
 # standardize columns from participants.tsv
 sample_property_name_map = {
@@ -161,6 +91,34 @@ recognized_assay_props = (
 # build the table representation of a value
 repr_props = {
     "Parameter Value[resolution]": 'x'.join,
+}
+
+# properties of assay tables to track
+assay_props = (
+    'assay_fname',
+    'assay_techtype', 'assay_techtype_term', 'assay_techtype_termsrc',
+    'assay_measurementtype', 'assay_measurementtype_term',
+    'assay_measurementtype_termsrc',
+)
+
+# properties of study protocols to track
+protocol_props = (
+    'protocol_name',
+    'protocol_type',
+    'protocol_term',
+    'protocol_termsrc',
+    'protocol_parameters',
+)
+
+protocol_defs = {
+    'Participant recruitment': {
+        'type': 'selection',
+        'term': 'OBI:0001928',
+        'termsrc': 'OBI'},
+    'Magnetic Resonance Imaging': {
+        'type': 'nuclear magnetic resonance',
+        'term': 'OBI:0000182',
+        'termsrc': 'OBI'},
 }
 
 
@@ -393,6 +351,25 @@ def _store_beautiful_table(df, output_directory, fname):
         index=False)
 
 
+def _gather_protocol_parameters_from_df(df, protocols):
+    params = set()
+    protos = None
+    for i, col in enumerate(list(df.columns) + ['Protocol REF']):
+        if col == 'Protocol REF':
+            if protos is not None:
+                # we had some before, store
+                for p in protos:
+                    pdef = protocols.get(p, set()).union(params)
+                    protocols[p] = pdef
+                if i > len(df.columns) - 1:
+                    break
+            # this is a protocol definition column,
+            # make entry for each unique value
+            protos = df.ix[:, i].unique()
+        if col.startswith('Parameter Value['):
+            params.add(col[16:-1])
+
+
 def extract(
         ds,
         output_directory,
@@ -403,6 +380,9 @@ def extract(
         import pandas
         return
 
+    # collect infos about dataset and ISATAB structure for use in investigator
+    # template
+    info = {}
     if not exists(output_directory):
         lgr.info(
             "creating output directory at '{}'".format(output_directory))
@@ -419,11 +399,25 @@ def extract(
             'init')
     }
 
+    # prep for assay table info
+    protocols = OrderedDict()
+    for prop in assay_props:
+        info[prop] = []
+
+    # pull out essential metadata bits about the dataset itself
+    # for study description)
+    dsmeta = metadb.get('.', {})
+    info['name'] = dsmeta.get('shortdescription', dsmeta.get('name', 'TODO'))
+    info['author'] = '\t'.join(assure_list(dsmeta.get('author', [])))
+    info['keywords'] = '\t'.join(assure_list(dsmeta.get('tag', [])))
     # generate: s_study.txt
+    study_df = _get_study_df(ds)
+    _gather_protocol_parameters_from_df(study_df, protocols)
     _store_beautiful_table(
-        _get_study_df(ds),
+        study_df,
         output_directory,
         "s_study.txt")
+    info['studytab_filename'] = 's_study.txt'
 
     deface_df = None
     # all imaging modalities recognized in BIDS
@@ -482,10 +476,21 @@ def extract(
             df = df.join(factor_df)
         # rename columns to strip index
         df.columns = [c[6:] for c in df.columns]
+        # parse df to gather protocol info
+        _gather_protocol_parameters_from_df(df, protocols)
+        # store
+        assay_fname = "a_mri_{}.txt".format(modality.lower())
         _store_beautiful_table(
             df,
             output_directory,
-            "a_mri_{}.txt".format(modality.lower()))
+            assay_fname)
+        info['assay_fname'].append(assay_fname)
+        info['assay_techtype'].append('nuclear magnetic resonance')
+        info['assay_techtype_term'].append('OBI:0000182')
+        info['assay_techtype_termsrc'].append('OBI')
+        info['assay_measurementtype'].append('MRI Scanner')
+        info['assay_measurementtype_term'].append('ERO:MRI_Scanner')
+        info['assay_measurementtype_termsrc'].append('ERO')
 
     # non-MRI modalities
     for modlabel, assaylabel, protoref in (
@@ -502,18 +507,31 @@ def extract(
             continue
         # rename columns to strip index
         df.columns = [c[6:] for c in df.columns]
+        assay_fname = "a_{}.txt".format(assaylabel)
         _store_beautiful_table(
             df,
             output_directory,
-            'a_{}.txt'.format(assaylabel))
+            assay_fname)
+        info['assay_fname'].append(assay_fname)
+        # ATM we cannot say anything definitive about these
+        info['assay_techtype'].append('TODO')
+        info['assay_techtype_term'].append('TODO')
+        info['assay_techtype_termsrc'].append('TODO')
+        info['assay_measurementtype'].append(assaylabel)
+        info['assay_measurementtype_term'].append('TODO')
+        info['assay_measurementtype_termsrc'].append('TODO')
 
-    # generate: i_investigation.txt
-    # TODO
-    #investigation_template = _get_investigation_template(
-    #    ds, mri_par_names)
-    #with open(opj(output_directory, "i_investigation.txt"), "w") as fp:
-    #    fp.write(investigation_template)
+    # post-proc assay-props for output
+    for prop in assay_props:
+        info[prop] = '\t'.join(assure_list(info[prop]))
 
+    info['protocol_name'] = '\t'.join(protocols.keys())
+    for k in ('type', 'term', 'termsrc'):
+        info['protocol_{}'.format(k)] = '\t'.join(
+            protocol_defs.get(p, {}).get(k, 'TODO') for p in protocols)
+    info['protocol_parameters'] = '\t'.join(
+            '; '.join(sorted(protocols[p])) for p in protocols)
+    return info
 
 #
 # Make it work seamlessly as a datalad export plugin
@@ -542,14 +560,25 @@ def dlplugin(
     output : str, optional
       directory where ISA-TAB files will be stored
     """
+    from os.path import dirname
+    from os.path import join as opj
+    from datetime import datetime
+    from io import open
     import logging
     lgr = logging.getLogger('datalad.plugin.bids2scidata')
+    import datalad
+    from datalad import cfg
     from datalad.plugin.bids2scidata import extract
 
     if not output:
         output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
 
-    extract(
+    itmpl_path = cfg.obtain(
+        'datalad.plugin.bids2scidata.investigator.template',
+        default=opj(
+            dirname(datalad.__file__),
+            'resources', 'isatab', 'scidata_bids_investigator.txt'))
+    info = extract(
         dataset,
         output_directory=output,
         repository_info={
@@ -557,8 +586,18 @@ def dlplugin(
             'Comment[Data Record Accession]': repo_accession,
             'Comment[Data Record URI]': repo_url},
     )
-        # TODO
-        #i_investigation_template
+
+    itmpl = open(itmpl_path, encoding='utf-8').read()
+    with open(opj(output, 'i_Investigation.txt'), 'w', encoding='utf-8') as ifile:
+        ifile.write(
+            itmpl.format(
+                datalad_version=datalad.__version__,
+                date=datetime.now().strftime('%Y/%m/%d'),
+                repo_name=repo_name,
+                repo_accession=repo_accession,
+                repo_url=repo_url,
+                **info
+            ))
     yield dict(
         status='ok',
         path=output,
@@ -567,113 +606,3 @@ def dlplugin(
         type='directory',
         action='bids2scidata',
         logger=lgr)
-
-
-default_i_investigation_template = """\
-# Investigation File template generated by BIDS2ISATab. This metadata file is CC0
-ONTOLOGY SOURCE REFERENCE
-Term Source Name	NCBITAXON	UBERON	PATO	UO	NCIT	OBI	ERO
-Term Source File	http://data.bioontology.org/ontologies/NCBITAXON	http://data.bioontology.org/ontologies/UBERON	http://data.bioontology.org/ontologies/PATO	http://data.bioontology.org/ontologies/UO	http://data.bioontology.org/ontologies/NCIT	http://data.bioontology.org/ontologies/OBI	http://data.bioontology.org/ontologies/ERO
-Term Source Version	2015AA	releases/2014-06-15	unknown	unknown	15.05d	2014-08-18	2013-08-02
-Term Source Description	National Center for Biotechnology Information (NCBI) Organismal Classification	Uber Anatomy Ontology	Phenotypic Quality Ontology	Units of Measurement Ontology	National Cancer Institute Thesaurus	Ontology for Biomedical Investigations	Eagle-I Research Resource Ontology
-INVESTIGATION
-Investigation Identifier
-Investigation Title
-Investigation Description
-Investigation Submission Date
-Investigation Public Release Date
-INVESTIGATION PUBLICATIONS
-Investigation PubMed ID
-Investigation Publication DOI
-Investigation Publication Author List
-Investigation Publication Title
-Investigation Publication Status
-Investigation Publication Status Term Accession Number
-Investigation Publication Status Term Source REF
-INVESTIGATION CONTACTS
-Investigation Person Last Name
-Investigation Person Mid Initials
-Investigation Person First Name
-Investigation Person Address
-Investigation Person Phone
-Investigation Person Fax
-Investigation Person Email
-Investigation Person Affiliation
-Investigation Person Roles
-Investigation Person Roles Term Accession Number
-Investigation Person Roles Term Source REF
-STUDY
-Study Identifier	[TODO: IDENTIFIER]
-Study Title	[TODO: TITLE]
-Study Submission Date
-Study Public Release Date
-Study Description
-Study File Name	s_study.txt
-Comment[Subject Keywords]
-Comment[Manuscript Licence]
-Comment[Experimental Metadata Licence]
-Comment[Supplementary Information File Name]
-Comment[Supplementary Information File Type]
-Comment[Supplementary Information File URL]
-Comment[Data Repository]
-Comment[Data Record Accession]
-Comment[Data Record URI]
-STUDY DESIGN DESCRIPTORS
-Study Design Type
-Study Design Type Term Accession Number
-Study Design Type Term Source
-STUDY PUBLICATIONS
-Study PubMed ID
-Study Publication DOI
-Study Publication Author List
-Study Publication Title
-Study Publication Status
-Study Publication Status Term Accession Number
-Study Publication Status Term Source REF
-STUDY FACTORS
-Study Factor Name
-Study Factor Type
-Study Factor Type Term Accession Number
-Study Factor Type Term Source REF
-STUDY ASSAYS
-Study Assay Measurement Type	nuclear magnetic resonance assay
-Study Assay Measurement Type Term Accession Number	OBI:0000182
-Study Assay Measurement Type Term Source REF	OBI
-Study Assay Technology Type	MRI Scanner
-Study Assay Technology Type Term Accession Number	ERO:MRI_Scanner
-Study Assay Technology Type Term Source REF	ERO
-Study Assay Technology Platform	
-Study Assay File Name	a_assay.txt
-STUDY PROTOCOLS
-Study Protocol Name	Participant recruitment	Magnetic Resonance Imaging
-Study Protocol Type	selection	nuclear magnetic resonance assay
-Study Protocol Type Term Accession Number	OBI:0001928	OBI:0000182
-Study Protocol Type Term Source REF	OBI	OBI
-Study Protocol Description	""	""
-Study Protocol URI	""	""
-Study Protocol Version	""	""
-Study Protocol Parameters Name	""	[TODO: MRI_PAR_NAMES]
-Study Protocol Parameters Name Term Accession Number	""	""
-Study Protocol Parameters Name Term Source REF	""	""
-Study Protocol Components Name	""	""
-Study Protocol Components Type	""	""
-Study Protocol Components Type Term Accession Number	""	""
-Study Protocol Components Type Term Source REF	""	""
-STUDY CONTACTS
-Study Person Last Name
-Study Person First Name
-Study Person Mid Initials
-Study Person Email
-Study Person Phone
-Study Person Fax
-Study Person Address
-Study Person Affiliation
-Study Person Roles
-Study Person Roles Term Accession Number
-Study Person Roles Term Source REF
-Comment[Study Person ORCID]
-Comment[Funder]
-Comment[FundRef ID]
-Comment[Funder Term Source REF]
-Comment[Grant Identifier]
-"""
