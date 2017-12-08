@@ -330,12 +330,18 @@ def check_git_configured():
     Raises
     ------
     RuntimeError  if any of those two ariables are not set
+
+    Returns
+    -------
+    dict with user.name and user.email entries
     """
 
     check_runner = GitRunner()
+    vals = {}
     for c in 'user.name', 'user.email':
         try:
-            check_runner.run(['git', 'config', '--global', c])
+            v, err = check_runner.run(['git', 'config', '--global', c])
+            vals[c] = v.rstrip('\n')
         except CommandError as exc:
             lgr.debug("Failed to verify that git is configured: %s",
                       exc_str(exc))
@@ -343,6 +349,7 @@ def check_git_configured():
                 "You must configure git first (set both user.name and "
                 "user.email) settings before using DataLad."
             )
+    return vals
 
 
 def _remove_empty_items(list_):
