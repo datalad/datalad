@@ -40,7 +40,6 @@ import os
 from datalad.tests.utils import known_failure_v6
 
 
-
 lgr = logging.getLogger('datalad.tests.testrepos.repos')
 
 
@@ -55,7 +54,7 @@ def log(*args, **kwargs):
 
 @auto_repr
 @add_metaclass(ABCMeta)
-class TestRepo_NEW(object):  # object <=> ItemRepo?
+class TestRepo_NEW(object):
     """Base class for test repositories
     """
 
@@ -653,7 +652,7 @@ def get_persistent_setup(cls, attr=None):
         if cls.__name__ not in _persistent_repo_store:
             try:
                 _persistent_repo_store[cls.__name__] = cls(path=path)
-            except AssertionError as e:
+            except Exception as e:
                 # if from scratch creation fails, make sure we don't leave stuff
                 # behind
                 lgr.error("Failed to create persistent instance of %s" %
