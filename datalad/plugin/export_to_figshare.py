@@ -79,6 +79,8 @@ class FigshareRESTLaison(object):
         # In v2 API seems no easy way to "just upload".  Need to initiate,
         # do uploads
         # and finalize
+        # TODO: check if the file with the same name already available, and offer
+        # to remove/prune it
         import os
         from datalad.utils import md5sum
         from datalad.ui import ui
@@ -193,7 +195,6 @@ def dlplugin(dataset, filename=None,
         raise RuntimeError(
             "Paranoid authors of DataLad refuse to proceed in a dirty repository"
         )
-
     lgr.info("Exporting current tree as an archive since figshare does not support directories")
     archive_out = next(
         export_archive(
@@ -210,12 +211,12 @@ def dlplugin(dataset, filename=None,
     figshare = FigshareRESTLaison()
 
     if not article_id:
-        # TODO: we could make it interactive (just an idea)
+        # TODO: ask if it should be an article within a project
         if ui.is_interactive:
             # or should we just upload to a new article?
             if ui.yesno(
                 "Would you like to create a new article to upload to?  "
-                "If not - we will list existing articles)",
+                "If not - we will list existing articles",
                 title="Article"
             ):
                 article = figshare.create_article(
@@ -223,7 +224,7 @@ def dlplugin(dataset, filename=None,
                 )
                 lgr.info(
                     "Created a new (private) article %(id)s at %(url_private_html)s. "
-                    "Please visit it, enter additional meta-data and make publish",
+                    "Please visit it, enter additional meta-data and make public",
                     article
                 )
                 article_id = article['id']
@@ -281,8 +282,13 @@ def dlplugin(dataset, filename=None,
         lgr.info("Removing generated tarball")
         os.unlink(fname)
 
+    # TODO: add to downloader knowledge about figshare token so it could download-url
+    # those zipballs before they go public
     yield dict(
         status='ok',
+        # TODO: add article url (which needs to be queried if only ID is known
+        message="Published archive {}".format(
+            file_info['download_url']),
         file_info=file_info,
         path=dataset,
         action='export_to_figshare',
