@@ -73,10 +73,12 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path))
 
     # use connection to execute remote command:
-    out, err = c1('ls -a')
+    local_home = os.path.expanduser('~')
+    # we list explicitly local HOME since we override it in module_setup
+    out, err = c1('ls -a %r' % local_home)
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
-    local_ls = os.listdir(os.path.expanduser('~'))
+    local_ls = os.listdir(local_home)
     eq_(set(remote_ls), set(local_ls))
 
     # now test for arguments containing spaces and other pleasant symbols
