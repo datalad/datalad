@@ -12,7 +12,7 @@ import logging
 import os
 import shlex
 from abc import ABCMeta, abstractmethod
-from os.path import exists, lexists, join as opj, isdir
+from os.path import exists, lexists, join as opj, isdir, relpath
 
 from copy import deepcopy
 
@@ -1705,7 +1705,9 @@ class ItemFile(Item):
                 add_cmd.append('annex')
                 if self._src:
                     # we want to annex-addurl
-                    add_cmd.extend(['addurl', self._src, '--file=%s' % self.path])
+                    add_cmd.extend(['addurl', self._src,
+                                    '--file=%s' %
+                                    relpath(self.path, self._repo.path)])
                 else:
                     # we want to annex-add
                     add_cmd.extend(['add', self.path])
