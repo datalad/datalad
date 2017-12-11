@@ -85,16 +85,34 @@ test.__test__ = False
 _test_states = {
     'loglevel': None,
     'DATALAD_LOG_LEVEL': None,
+    'HOME': None,
 }
 
 
 def setup_package():
     import os
 
+    _test_states['HOME'] = os.environ.get('HOME', None)
+
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
         os.environ['HOME'] = os.environ['GIT_HOME']
+    else:
+        # we setup our own new HOME, the BEST and HUGE one
+        from datalad.utils import make_tempfile
+        from datalad.tests import _TEMP_PATHS_GENERATED
+        # TODO: split into a function + context manager
+        with make_tempfile(mkdir=True) as new_home:
+            os.environ['HOME'] = new_home
+        os.makedirs(new_home)
+        with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
+            f.write("""\
+[user]
+	name = DataLad Tester
+	email = test@example.com
+""")
+        _TEMP_PATHS_GENERATED.append(new_home)
 
     # For now we will just verify that it is ready to run the tests
     from datalad.support.gitrepo import check_git_configured
@@ -152,6 +170,9 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
+
+    if _test_states['HOME'] is not None:
+        os.environ['HOME'] = _test_states['HOME']
 
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev

@@ -13,6 +13,7 @@ from .utils import (
     with_tree,
 
     assert_raises,
+    assert_equal,
 )
 
 
@@ -32,3 +33,15 @@ def test_not_under_git(path):
             require_dataset,
             None, check_installed=True, purpose='test'
         )
+
+
+def test_git_config_fixture():
+    # in the setup_package we setup a new HOME with custom config
+    from datalad.support.gitrepo import check_git_configured
+    assert_equal(
+        check_git_configured(),
+        {
+            'user.name': 'DataLad Tester',
+            'user.email': 'test@example.com'
+         }
+    )
