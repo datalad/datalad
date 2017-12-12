@@ -329,19 +329,19 @@ def check_git_configured():
 
     Raises
     ------
-    RuntimeError  if any of those two ariables are not set
+    RuntimeError if any of those two variables are not set
     """
 
     check_runner = GitRunner()
     for c in 'user.name', 'user.email':
         try:
-            check_runner.run(['git', 'config', '--global', c])
+            check_runner.run(['git', 'config', c])
         except CommandError as exc:
             lgr.debug("Failed to verify that git is configured: %s",
                       exc_str(exc))
             raise RuntimeError(
                 "You must configure git first (set both user.name and "
-                "user.email) settings before using DataLad."
+                "user.email) before using DataLad."
             )
 
 
