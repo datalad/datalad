@@ -441,12 +441,17 @@ def test_failon_no_permissions(src_path, target_path):
 def test_replace_and_relative_sshpath(src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653
-    dst_relpath = os.path.relpath(dst_path, os.path.expanduser('~'))
+    # but because we override HOME the HOME on the remote end would be
+    # different even though a localhost. So we need to query it
+    from datalad import ssh_manager
+    ssh = ssh_manager.get_connection('localhost')
+    remote_home, err = ssh('pwd')
+    assert not err
+    dst_relpath = os.path.relpath(dst_path, remote_home)
     url = 'localhost:%s' % dst_relpath
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.add('sub.dat')
-
     ds.create_sibling(url)
     published = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
