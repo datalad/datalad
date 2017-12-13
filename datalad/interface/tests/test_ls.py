@@ -276,13 +276,10 @@ def test_ls_noarg(toppath):
 
 
 def test_ls_formatter():
-    # we will use those unicode symbols only whenever both are supporting
-    # UTF-8
-    for sysenc, sysioenc, OK in (
-            ('ascii', 'ascii', 'OK'),
-            ('ascii', 'UTF-8', 'OK'),
-            ('UTF-8', 'ascii', 'OK'),
-            ('UTF-8', 'UTF-8', u"✓")):
+    # we will use unicode symbols only when sys.stdio supports UTF-8
+    for sysioenc, OK in [(None, "OK"),
+                         ('ascii', 'OK'),
+                         ('UTF-8', u"✓")]:
 
         # we cannot overload sys.stdout.encoding
         class fake_stdout(object):
@@ -290,10 +287,7 @@ def test_ls_formatter():
             def write(self, *args):
                 pass
 
-        with patch.object(sys, 'getdefaultencoding', return_value=sysenc), \
-            patch.object(sys, 'stdout', fake_stdout()):
+        with patch.object(sys, 'stdout', fake_stdout()):
             formatter = LsFormatter()
             assert_equal(formatter.OK, OK)
             assert_in(OK, formatter.convert_field(True, 'X'))
-
-

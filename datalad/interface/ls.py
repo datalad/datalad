@@ -375,23 +375,25 @@ class LsFormatter(string.Formatter):
     # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
     # unicode versions which look better but which blow during tests etc
     # Those might be reset by the constructor
-    OK = u"✓"
-    NOK = u"✗"
-    NONE = u"✗"
+    OK = 'OK'   # u"✓"
+    NOK = 'X'  # u"✗"
+    NONE = '-'  # u"✗"
 
     def __init__(self, *args, **kwargs):
         super(LsFormatter, self).__init__(*args, **kwargs)
-        for setting_encoding in (sys.getdefaultencoding(),
-                                 sys.stdout.encoding):
+        if sys.stdout.encoding is None:
+            lgr.debug("encoding not set, using safe alternatives")
+        else:
             try:
-                u"✓".encode(setting_encoding)
+                u"✓".encode(sys.stdout.encoding)
             except UnicodeEncodeError:
-                lgr.debug("encoding %s found to not support unicode, resetting to safe alternatives", setting_encoding)
-                self.OK = 'OK'   # u"✓"
-                self.NOK = 'X'  # u"✗"
-                self.NONE = '-'  # u"✗"
-                break
-
+                lgr.debug("encoding %s does not support unicode, "
+                          "using safe alternatives",
+                          sys.stdout.encoding)
+            else:
+                self.OK = u"✓"
+                self.NOK = u"✗"
+                self.NONE = u"✗"
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
