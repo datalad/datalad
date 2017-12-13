@@ -383,6 +383,8 @@ class LsFormatter(string.Formatter):
         super(LsFormatter, self).__init__(*args, **kwargs)
         if sys.stdout.encoding is None:
             lgr.debug("encoding not set, using safe alternatives")
+        elif not sys.stdout.isatty():
+            lgr.debug("stdout is not a tty, using safe alternatives")
         else:
             try:
                 u"✓".encode(sys.stdout.encoding)
