@@ -390,9 +390,19 @@ class SSHManager(object):
 
         from os import listdir
         from os.path import isdir
-        self._prev_connections = [opj(self.socket_dir, p)
-                                  for p in listdir(self.socket_dir)
-                                  if not isdir(opj(self.socket_dir, p))]
+        try:
+            self._prev_connections = [opj(self.socket_dir, p)
+                                      for p in listdir(self.socket_dir)
+                                      if not isdir(opj(self.socket_dir, p))]
+        except OSError as exc:
+            self._prev_connections = []
+            lgr.warning(
+                "Failed to list %s for existing sockets. "
+                "Most likely future communications would be impaired or fail. "
+                "Original exception: %s",
+                self._socket_dir, exc_str(exc)
+            )
+
         lgr.log(5,
                 "Found %d previous connections",
                 len(self._prev_connections))
@@ -411,7 +421,15 @@ class SSHManager(object):
         """
         # parse url:
         from datalad.support.network import RI, is_ssh
-        sshri = RI(url) if not isinstance(url, RI) else url
+        if isinstance(url, RI):
+            sshri = url
+        else:
+            if ':' not in url and '/' not in url:
+                # it is just a hostname
+                lgr.debug("Assuming %r is just a hostname for ssh connection",
+                          url)
+                url += ':'
+            sshri = RI(url)
 
         if not is_ssh(sshri):
             raise ValueError("Unsupported SSH URL: '{0}', use "
