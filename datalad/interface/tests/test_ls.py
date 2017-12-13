@@ -84,6 +84,17 @@ def test_ls_repos(toppath):
         _test([relpath(x, toppath) for x in repos])
 
 
+@with_tempfile
+def test_ls_uninstalled(path):
+    ds = Dataset(path)
+    ds.create()
+    ds.create('sub')
+    ds.uninstall('sub', check=False)
+    with swallow_outputs() as cmo:
+        ls([path], recursive=True)
+        assert_in('not installed', cmo.out)
+
+
 def test_machinesize():
     assert_equal(1.0, machinesize(1))
     for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
