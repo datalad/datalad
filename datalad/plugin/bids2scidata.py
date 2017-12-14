@@ -296,6 +296,10 @@ def _get_assay_df(
     assay_name_key = None
     for prop in recognized_assay_props:
         colname = prop[1]
+        if colname in idx_map:
+            # we already know about this column, that means it has multiple sources
+            # and we have processed one already. no need to do anything in addition
+            continue
         if prop[0] is None:
             # special case handling
             if colname == 'Protocol REF':
