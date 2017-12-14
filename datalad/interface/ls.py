@@ -372,9 +372,6 @@ class LsFormatter(string.Formatter):
     else:
         BLUE = RED = GREEN = RESET = DATASET = u""
 
-    # http://stackoverflow.com/questions/9932406/unicodeencodeerror-only-when-running-as-a-cron-job
-    # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
-    # unicode then
     # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
     # unicode versions which look better but which blow during tests etc
     # Those might be reset by the constructor
