@@ -26,8 +26,8 @@ from os.path import split as psplit
 from datalad.utils import assure_list
 from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.metadata.search import r_url
-from urlparse import urlsplit
-from urlparse import urlunsplit
+from six.moves.urllib.parse import urlsplit
+from six.moves.urllib.parse import urlunsplit
 from posixpath import split as posixsplit
 
 try:
