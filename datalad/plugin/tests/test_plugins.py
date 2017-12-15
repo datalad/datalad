@@ -12,14 +12,15 @@
 
 from datalad.tests.utils import known_failure_direct_mode
 
+import os
 import logging
 from os.path import join as opj
 from os.path import exists
 from mock import patch
 
-from datalad.config import ConfigManager
 from datalad.api import plugin
 from datalad.api import create
+from datalad import cfg
 
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
@@ -157,39 +158,32 @@ def test_plugin_call(path, dspath):
                       dataset='rubbish')
 
 
-# MIH: I failed to replace our config manager instance for this test run
-# in order to be able to configure a set of plugins to run prior and after
-# create. A test should not alter a users config, hence I am disabling this
-# for now, and hope somebody can fix it up
-#@with_tempfile(mkdir=True)
-#def test_plugin_config(path):
-#    with patch.dict('os.environ',
-#                    {'HOME': path, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
-#        with patch('datalad.cfg', ConfigManager()) as cfg:
-#            global_gitconfig = opj(path, '.gitconfig')
-#            assert(not exists(global_gitconfig))
-#            # swap out the actual config for this test
-#            assert_in('datalad.sneaky.addition', cfg)
-#            # now we configure a plugin to run before and twice after `create`
-#            cfg.add('datalad.create.run-before',
-#                    'add_readme filename=before.txt',
-#                    where='global')
-#            cfg.add('datalad.create.run-after',
-#                    'add_readme filename=after1.txt',
-#                    where='global')
-#            cfg.add('datalad.create.run-after',
-#                    'add_readme filename=after2.txt',
-#                    where='global')
-#            # force reload to pick up newly populated .gitconfig
-#            cfg.reload(force=True)
-#            assert_in('datalad.create.run-before', cfg)
-#            # and now we create a dataset and expect the two readme files
-#            # to be part of it
-#            ds = create(dataset=opj(path, 'ds'))
-#            ok_clean_git(ds.path)
-#            assert(exists(opj(ds.path, 'before.txt')))
-#            assert(exists(opj(ds.path, 'after1.txt')))
-#            assert(exists(opj(ds.path, 'after2.txt')))
+@with_tempfile(mkdir=True)
+def test_plugin_config(path):
+    # baseline behavior, empty datasets on create
+    ds = create(dataset=opj(path, 'ds1'))
+    eq_(sorted(os.listdir(ds.path)), ['.datalad', '.git', '.gitattributes'])
+    # now we configure a plugin to run twice after `create`
+    cfg.add('datalad.create.run-after',
+            'add_readme filename=after1.txt',
+            where='global')
+    cfg.add('datalad.create.run-after',
+            'add_readme filename=after2.txt',
+            where='global')
+    # force reload to pick up newly populated .gitconfig
+    cfg.reload(force=True)
+    assert_in('datalad.create.run-after', cfg)
+    # and now we create a dataset and expect the two readme files
+    # to be part of it
+    ds = create(dataset=opj(path, 'ds'))
+    ok_clean_git(ds.path)
+    assert(exists(opj(ds.path, 'after1.txt')))
+    assert(exists(opj(ds.path, 'after2.txt')))
+    # cleanup
+    cfg.unset(
+        'datalad.create.run-after',
+        where='global')
+    assert_not_in('datalad.create.run-after', cfg)
 
 
 @with_tempfile(mkdir=True)
