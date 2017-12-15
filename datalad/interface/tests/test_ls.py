@@ -84,6 +84,17 @@ def test_ls_repos(toppath):
         _test([relpath(x, toppath) for x in repos])
 
 
+@with_tempfile
+def test_ls_uninstalled(path):
+    ds = Dataset(path)
+    ds.create()
+    ds.create('sub')
+    ds.uninstall('sub', check=False)
+    with swallow_outputs() as cmo:
+        ls([path], recursive=True)
+        assert_in('not installed', cmo.out)
+
+
 def test_machinesize():
     assert_equal(1.0, machinesize(1))
     for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
@@ -265,13 +276,11 @@ def test_ls_noarg(toppath):
 
 
 def test_ls_formatter():
-    # we will use those unicode symbols only whenever both are supporting
-    # UTF-8
-    for sysenc, sysioenc, OK in (
-            ('ascii', 'ascii', 'OK'),
-            ('ascii', 'UTF-8', 'OK'),
-            ('UTF-8', 'ascii', 'OK'),
-            ('UTF-8', 'UTF-8', u"✓")):
+    # we will use unicode symbols only when sys.stdio supports UTF-8
+    for sysioenc, OK, tty in [(None, "OK", True),
+                              ('ascii', 'OK', True),
+                              ('UTF-8', u"✓", True),
+                              ('UTF-8', "OK", False)]:
 
         # we cannot overload sys.stdout.encoding
         class fake_stdout(object):
@@ -279,10 +288,10 @@ def test_ls_formatter():
             def write(self, *args):
                 pass
 
-        with patch.object(sys, 'getdefaultencoding', return_value=sysenc), \
-            patch.object(sys, 'stdout', fake_stdout()):
+            def isatty(self):
+                return tty
+
+        with patch.object(sys, 'stdout', fake_stdout()):
             formatter = LsFormatter()
             assert_equal(formatter.OK, OK)
             assert_in(OK, formatter.convert_field(True, 'X'))
-
-

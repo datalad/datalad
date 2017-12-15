@@ -135,6 +135,9 @@ def _test_proxying_open(generate_load, verify_load, repo):
         assert_false(annex2.file_has_content(fpath2_2))
         verify_load(fpath2_2)
         assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_true(os.path.isfile(fpath2_2))
 
     # if we override stdout with something not supporting fileno, like tornado
     # does which ruins using get under IPython

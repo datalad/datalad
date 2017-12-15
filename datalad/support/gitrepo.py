@@ -329,20 +329,27 @@ def check_git_configured():
 
     Raises
     ------
-    RuntimeError  if any of those two ariables are not set
+    RuntimeError if any of those two variables are not set
+
+    Returns
+    -------
+    dict with user.name and user.email entries
     """
 
     check_runner = GitRunner()
+    vals = {}
     for c in 'user.name', 'user.email':
         try:
-            check_runner.run(['git', 'config', '--global', c])
+            v, err = check_runner.run(['git', 'config', c])
+            vals[c] = v.rstrip('\n')
         except CommandError as exc:
             lgr.debug("Failed to verify that git is configured: %s",
                       exc_str(exc))
             raise RuntimeError(
                 "You must configure git first (set both user.name and "
-                "user.email) settings before using DataLad."
+                "user.email) before using DataLad."
             )
+    return vals
 
 
 def _remove_empty_items(list_):
@@ -521,6 +528,10 @@ class GitRepo(RepoInterface):
                 version="0.5.0",
                 msg="RF: url passed to init()"
             )
+
+        # So that we "share" control paths with git/git-annex
+        if ssh_manager:
+            ssh_manager.assure_initialized()
 
         if not GitRepo._config_checked:
             check_git_configured()

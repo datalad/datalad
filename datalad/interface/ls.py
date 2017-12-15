@@ -372,29 +372,30 @@ class LsFormatter(string.Formatter):
     else:
         BLUE = RED = GREEN = RESET = DATASET = u""
 
-    # http://stackoverflow.com/questions/9932406/unicodeencodeerror-only-when-running-as-a-cron-job
-    # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
-    # unicode then
     # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
     # unicode versions which look better but which blow during tests etc
     # Those might be reset by the constructor
-    OK = u"✓"
-    NOK = u"✗"
-    NONE = u"✗"
+    OK = 'OK'   # u"✓"
+    NOK = 'X'  # u"✗"
+    NONE = '-'  # u"✗"
 
     def __init__(self, *args, **kwargs):
         super(LsFormatter, self).__init__(*args, **kwargs)
-        for setting_encoding in (sys.getdefaultencoding(),
-                                 sys.stdout.encoding):
+        if sys.stdout.encoding is None:
+            lgr.debug("encoding not set, using safe alternatives")
+        elif not sys.stdout.isatty():
+            lgr.debug("stdout is not a tty, using safe alternatives")
+        else:
             try:
-                u"✓".encode(setting_encoding)
+                u"✓".encode(sys.stdout.encoding)
             except UnicodeEncodeError:
-                lgr.debug("encoding %s found to not support unicode, resetting to safe alternatives", setting_encoding)
-                self.OK = 'OK'   # u"✓"
-                self.NOK = 'X'  # u"✗"
-                self.NONE = '-'  # u"✗"
-                break
-
+                lgr.debug("encoding %s does not support unicode, "
+                          "using safe alternatives",
+                          sys.stdout.encoding)
+            else:
+                self.OK = u"✓"
+                self.NOK = u"✗"
+                self.NONE = u"✗"
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
@@ -500,11 +501,12 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         fmt = fmts[dsm.__class__]
         ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
         safe_print(ds_str)
-        # workaround for explosion of git cat-file --batnch processes
+        # workaround for explosion of git cat-file --batch processes
         # https://github.com/datalad/datalad/issues/1888
-        dsm.repo.repo.close()
-        del dsm.repo
-        dsm.repo = None
+        if dsm.repo is not None:
+            dsm.repo.repo.close()
+            del dsm.repo
+            dsm.repo = None
 
 
 def machinesize(humansize):
@@ -966,8 +968,8 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
             try:
                 acl = e.get_acl()
-            except S3ResponseError as e:
-                acl = str(e)
+            except S3ResponseError as exc:
+                acl = exc.code if exc.code in ('AccessDenied',) else str(exc)
 
             content = ""
             if list_content:
@@ -990,10 +992,12 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
                     content = str(err)
                 finally:
                     content = " " + content
-            if long_:
-                ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
-            else:
-                ui.message('')
+            ui.message(
+                "ver:%-32s  acl:%s  %s [%s]%s"
+                % (getattr(e, 'version_id', None),
+                   acl, url, urlok, content)
+                if long_ else ''
+            )
         else:
             ui.message(base_msg + " " + str(type(e)).split('.')[-1].rstrip("\"'>"))
     return results

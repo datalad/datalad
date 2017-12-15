@@ -227,6 +227,8 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
             continue
         # only write to disk if there is something
         objrelpath = _get_obj_location(objid, label)
+        if store is json_py.dump2xzstream:
+            objrelpath += '.xz'
         # place metadata object into the source dataset
         objpath = opj(dest.path, dirname(agginfo_relpath), objrelpath)
 

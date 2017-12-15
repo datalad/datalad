@@ -59,7 +59,7 @@ req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.1.6',
+        'GitPython>=2.1.7',
         'iso8601',
         'humanize',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
@@ -90,6 +90,7 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        'duecredit',
         'simplejson',
         'whoosh',
         'pyld', # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
