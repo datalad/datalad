@@ -419,12 +419,16 @@ class HTTPDownloader(BaseDownloader):
 
     def get_downloader_session(self, url,
                                allow_redirects=True,
-                               use_redirected_url=True):
+                               use_redirected_url=True,
+                               headers=None):
         # TODO: possibly make chunk size adaptive
         # TODO: make it not this ugly -- but at the moment we are testing end-file size
         # while can't know for sure if content was gunziped and either it all went ok.
         # So safer option -- just request to not have it gzipped
-        headers = {'Accept-Encoding': ''}
+        if headers is None:
+            headers = {}
+        if 'Accept-Encoding' not in headers:
+            headers['Accept-Encoding'] = ''
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
         for retry in range(1, nretries+1):
