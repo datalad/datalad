@@ -146,7 +146,7 @@ def split_term_source_accession(val):
             lgr.warn("Could not identify term source REF in: '%s' [%s]", val, exc_str(e))
             return '', val
 
-
+# TODO pull as this from datalad's aggregated metadata
 def _get_study_df(ds):
     subject_ids = []
     study_dict = OrderedDict()
@@ -169,7 +169,7 @@ def _get_study_df(ds):
     rename_rule = sample_property_name_map.copy()
     # remove all mapping that do not match the columns at hand
     for r in list(rename_rule.keys()):
-        if not r in participants_df.keys():
+        if r not in participants_df.keys():
             del rename_rule[r]
     # turn all unknown properties into comment columns
     for c in participants_df.keys():
@@ -416,6 +416,10 @@ def extract(
     info['keywords'] = '\t'.join(assure_list(dsmeta.get('tag', [])))
     # generate: s_study.txt
     study_df = _get_study_df(ds)
+    if study_df.empty:
+        # no samples, no assays, no metadataset
+        return None
+
     _gather_protocol_parameters_from_df(study_df, protocols)
     _store_beautiful_table(
         study_df,
@@ -590,6 +594,15 @@ def dlplugin(
             'Comment[Data Record Accession]': repo_accession,
             'Comment[Data Record URI]': repo_url},
     )
+    if info is None:
+        yield dict(
+            status='error',
+            message='dataset does not seem to contain relevant metadata',
+            path=dataset.path,
+            type='dataset',
+            action='bids2scidata',
+            logger=lgr)
+        return
 
     itmpl = open(itmpl_path, encoding='utf-8').read()
     with open(opj(output, 'i_Investigation.txt'), 'w', encoding='utf-8') as ifile:
