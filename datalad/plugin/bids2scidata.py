@@ -399,7 +399,7 @@ def extract(
         for r in query_aggregated_metadata(
             'all',
             ds,
-            [dict(path='.', type='directory')],
+            [dict(path=ds.path, type='dataset')],
             'init')
     }
 
