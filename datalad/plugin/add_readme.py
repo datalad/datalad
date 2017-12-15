@@ -93,7 +93,6 @@ see the DataLad documentation at: http://docs.datalad.org
         id=u' (id: {})'.format(dataset.id) if dataset.id else '',
         )
 
-    print(meta)
     with open(filename, 'a' if existing == 'append' else 'w', encoding='utf-8') as fp:
         fp.write(default_content)
         yield dict(
