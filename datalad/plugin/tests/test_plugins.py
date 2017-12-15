@@ -20,10 +20,12 @@ from mock import patch
 from datalad.config import ConfigManager
 from datalad.api import plugin
 from datalad.api import create
+from datalad.api import Dataset
 
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_raises
@@ -232,3 +234,60 @@ def test_no_annex(path):
     # importantly, also .gitattribute is not annexed
     eq_([opj('code', 'inannex')],
         ds.repo.get_annexed_files())
+
+
+_bids_template = {
+    '.datalad': {
+        'config': '''\
+[datalad "metadata"]
+        nativetype = bids
+'''},
+    'dataset_description.json': '''\
+{
+    "Name": "demo_ds",
+    "BIDSVersion": "1.0.0",
+    "Description": "this is for play",
+    "License": "PDDL",
+    "Authors": [
+        "Betty",
+        "Tom"
+    ]
+}
+'''}
+
+
+@with_tree(_bids_template)
+def test_add_readme(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ds.aggregate_metadata()
+    ok_clean_git(ds.path)
+    assert_status('ok', ds.plugin('add_readme'))
+    # should use default name
+    eq_(
+        open(opj(path, 'README.md')).read(),
+        """\
+# Dataset "demo_ds"
+
+this is for play
+
+### Authors
+
+- Betty
+- Tom
+
+### License
+
+PDDL
+
+## General information
+
+This is a DataLad dataset (id: {id}).
+
+For more information on DataLad and on how to work with its datasets,
+see the DataLad documentation at: http://docs.datalad.org
+""".format(
+    id=ds.id))
+
+    # should skip on re-run
+    assert_status('notneeded', ds.plugin('add_readme'))
