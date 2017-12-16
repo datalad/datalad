@@ -580,6 +580,17 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
         '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
             vocabulary_version)}
 
+    fullpathlist = paths
+    if isinstance(ds.repo, AnnexRepo):
+        content_info = zip(paths, ds.repo.file_has_content(paths))
+        paths = [p for p, c in content_info if c]
+        nocontent = len(content_info) - len(paths)
+        if nocontent:
+            lgr.warn(
+                '{} files have no content present, skipped metadata extraction for {}'.format(
+                    nocontent,
+                    'them' if nocontent > 10 else [p for p, c in content_info if not c]))
+
     # keep local, who knows what some parsers might pull in
     from . import parsers
     for mtype in types:
@@ -694,10 +705,10 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
     if context:
         dsmeta['@context'] = context
 
-    if paths:
+    if fullpathlist:
         # make sure that there is an entry for each path, this takes the place
         # of a dedicated file list
-        for p in paths:
+        for p in fullpathlist:
             if p not in contentmeta:
                 contentmeta[p] = {}
 
