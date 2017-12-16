@@ -105,7 +105,7 @@ common_defs = {
         'descr': 'name of a resource'},
     "shortdescription": {
         'def': "doap:shortdesc",
-        'descr': 'sort description or summary or title of a resource'},
+        'descr': 'short description or summary or title of a resource'},
     # wondering why there is no title, eh?
     # MIH: we have name and short description
     #      adding title seems superfluous

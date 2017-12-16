@@ -65,6 +65,7 @@ class MetadataParser(BaseMetadataParser):
                 'duration(s)': {
                     "@id": 'time:Duration',
                     "unit": "uo:0000010",
+                    'unit_label': 'second',
                 },
             },
         }, \

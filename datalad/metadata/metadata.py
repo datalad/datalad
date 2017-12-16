@@ -288,7 +288,7 @@ def _get_containingds_from_agginfo(info, rpath):
     return dspath
 
 
-def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
+def query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
                                **kwargs):
     """Query the aggregated metadata in a dataset
 
@@ -386,7 +386,7 @@ def _query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
 
 def _query_aggregated_metadata_singlepath(
         ds, agginfos, agg_base_path, rpath, containing_ds, reporton, cache, merge_mode):
-    """This is the workhorse of _query_aggregated_metadata for querying for a
+    """This is the workhorse of query_aggregated_metadata() for querying for a
     single path"""
     # info about the dataset that contains the query path
     dsinfo = agginfos.get(containing_ds, dict(id=ds.id))
@@ -1068,7 +1068,7 @@ class Metadata(Interface):
                 if not query_agg:
                     continue
                 # report from aggregated metadata
-                for r in _query_aggregated_metadata(
+                for r in query_aggregated_metadata(
                         reporton, ds, query_agg, merge_native,
                         # recursion was already performed during
                         # path annotation

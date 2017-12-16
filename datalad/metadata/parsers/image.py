@@ -21,6 +21,7 @@ vocabulary = {
     "spatial_resolution(dpi)": {
         '@id': "idqa:0000162",
         'unit': "uo:0000240",  # DPI
+        'unit_label': 'dpi',
         'description': "spatial resolution in dot-per-inch"},
     "color_mode": {
         '@id': 'idqa:0000160',

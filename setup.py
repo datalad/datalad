@@ -103,6 +103,7 @@ requires = {
         'pybids',  # BIDS metadata
         'Pillow',  # generic image metadata
         'nibabel',  # NIfTI metadata
+        'pandas',  # bids2scidata export
     ]
 }
 
