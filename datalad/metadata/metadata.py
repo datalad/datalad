@@ -581,7 +581,7 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
             vocabulary_version)}
 
     fullpathlist = paths
-    if isinstance(ds.repo, AnnexRepo):
+    if paths and isinstance(ds.repo, AnnexRepo):
         content_info = zip(paths, ds.repo.file_has_content(paths))
         paths = [p for p, c in content_info if c]
         nocontent = len(content_info) - len(paths)
