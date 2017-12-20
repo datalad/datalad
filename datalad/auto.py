@@ -72,7 +72,17 @@ class AutomagicIO(object):
     Currently supports builtin open() and h5py.File when those are read
     """
 
-    def __init__(self, autoget=True, activate=False):
+    def __init__(self, autoget=True, activate=False, check_once=False):
+        """
+        
+        Parameters
+        ----------
+        autoget
+        activate
+        check_once: bool, optional
+          If True, paths considered for proxying are remembered, and not subject to
+          datalad checks on subsequent calls
+        """
         self._active = False
         self._builtin_open = __builtin__.open
         self._io_open = io.open
@@ -91,6 +101,7 @@ class AutomagicIO(object):
         self._log_online = True
         from mock import patch
         self._patch = patch
+        self._cache = set() if check_once else None
         if activate:
             self.activate()
 
@@ -121,7 +132,7 @@ class AutomagicIO(object):
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
             with self._patch(origname, origfunc):
-                lgr.log(2, "Proxying open with %r %r", args, kwargs)
+                lgr.log(3, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
                 # deduce arguments
@@ -132,13 +143,22 @@ class AutomagicIO(object):
                     filearg = "name" if PY2 else "file"
                     if filearg not in kwargs:
                         # so the name was missing etc, just proxy into original open call and let it puke
-                        lgr.debug("No name/file was given, avoiding proxying")
+                        lgr.log(2, " skipping since no name/file was given")
                         raise _EarlyExit
                     file = kwargs.get(filearg)
+
                 if isinstance(file, int):
-                    lgr.debug(
-                        "Skipping operation on %i, already a file descriptor", file)
+                    lgr.info(2, " skipping since already a file descriptor")
                     raise _EarlyExit
+
+                if self._cache is not None:
+                    filefull = file if isabs(file) else os.path.abspath(file)
+                    if filefull in self._cache:
+                        lgr.log(2, " skipping since considered before")
+                        raise _EarlyExit
+                    else:
+                        self._cache.add(filefull)
+
                 mode = 'r'
                 if len(args) > 1:
                     mode = args[1]
@@ -148,7 +168,7 @@ class AutomagicIO(object):
                 if 'r' in mode:
                     self._dataset_auto_get(file)
                 else:
-                    lgr.debug("Skipping operation on %s since mode=%r", file, mode)
+                    lgr.debug(" skipping operation on %s since mode=%r", file, mode)
         except _EarlyExit:
             pass
         except Exception as e:
@@ -195,7 +215,7 @@ class AutomagicIO(object):
             return
         # if filepath is not there at all (program just "checked" if it could access it
         if not lexists(filepath):
-            lgr.log(2, "Not testing/getting file %s since it is not there", filepath)
+            lgr.log(2, " skipping file %s since it is not there", filepath)
             return
         # deduce directory for filepath
         filedir = dirname(filepath)
