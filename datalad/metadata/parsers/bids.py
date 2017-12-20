@@ -139,7 +139,9 @@ class MetadataParser(BaseMetadataParser):
             try:
                 md.update(
                     {k: v
-                     for k, v in bids.get_metadata(opj(self.ds.path, f)).items()
+                     for k, v in bids.get_metadata(
+                         opj(self.ds.path, f),
+                         include_entities=True).items()
                      # no nested structures for now (can be monstrous when DICOM
                      # metadata is embedded)
                      if not isinstance(v, dict)})
