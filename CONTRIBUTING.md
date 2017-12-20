@@ -356,7 +356,10 @@ Various hints for developers
 ### Useful Environment Variables
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
-- *DATALAD_LOG_LEVEL*: 
+- *DATALAD_DATASETS_TOPURL*:
+  Used to point to an alternative location for `///` dataset. If running
+  tests preferred to be set to http://datasets-tests.datalad.org
+- *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_LOG_CMD_OUTPUTS*:
   Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
