@@ -324,7 +324,7 @@ def query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
     # TODO rename function and query datalad/annex own metadata
     # for all actually present dataset after looking at aggregated data
 
-    with AutomagicIO():
+    with AutomagicIO(check_once=True):
         # look for and load the aggregation info for the base dataset
         info_fpath = opj(ds.path, agginfo_relpath)
         agg_base_path = dirname(info_fpath)
