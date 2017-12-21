@@ -59,7 +59,7 @@ req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.1.7',
+        'GitPython>=2.1.8',
         'iso8601',
         'humanize',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing

@@ -51,9 +51,12 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
+from ..support.network import RI
 from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
-from ..consts import ARCHIVES_TEMP_DIR
+from ..consts import (
+    ARCHIVES_TEMP_DIR,
+)
 from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
@@ -1379,6 +1382,10 @@ def get_mtimes_and_digests(target_path):
     return digests, mtimes
 
 
+def get_datasets_topdir():
+    """Delayed parsing so it could be monkey patched etc"""
+    from datalad.consts import DATASETS_TOPURL
+    return RI(DATASETS_TOPURL).hostname
 
 #
 # Context Managers

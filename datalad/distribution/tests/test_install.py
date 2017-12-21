@@ -30,7 +30,7 @@ from datalad.utils import getpwd
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad.consts import DATASETS_TOPURL
+from datalad import consts
 from datalad.utils import chpwd
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
@@ -67,6 +67,7 @@ from datalad.tests.utils import put_file_under_git
 from datalad.tests.utils import integration
 from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
+from datalad.tests.utils import get_datasets_topdir
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -94,7 +95,7 @@ def test_installationpath_from_url():
 def test_get_git_url_from_source():
 
     # resolves datalad RIs:
-    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
+    eq_(_get_git_url_from_source('///subds'), consts.DATASETS_TOPURL + 'subds')
     assert_raises(NotImplementedError, _get_git_url_from_source,
                   '//custom/subds')
 
@@ -209,7 +210,7 @@ def test_install_datasets_root(tdir):
     with chpwd(tdir):
         ds = install("///")
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         result = install("///", result_xfm=None, return_type='list')
@@ -325,7 +326,7 @@ def test_install_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl), \
+    with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
         ds = install(path, source='///ds')
     eq_(ds.path, path)
