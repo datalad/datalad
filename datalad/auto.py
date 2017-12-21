@@ -62,8 +62,10 @@ except Exception as exc:
 # TODO: RF to reduce code duplication among cases, also RF tests for the same reason
 
 class _EarlyExit(Exception):
-    """Helper to early escape try/except logic in wrappde open"""
-    pass
+    """Helper to early escape try/except logic in wrapped open"""
+    def __init__(self, msg, *args):
+        self.msg = msg
+        self.args = args
 
 
 class AutomagicIO(object):
@@ -80,8 +82,12 @@ class AutomagicIO(object):
         autoget
         activate
         check_once: bool, optional
-          If True, paths considered for proxying are remembered, and not subject to
-          datalad checks on subsequent calls
+          To speed things up and avoid unnecessary repeated checks, 
+          if True, paths considered for proxying and corresponding repositories
+          are remembered, and are not subject to datalad checks on subsequent calls.
+          This option is to be used if you do not expect new git repositories to not
+          be created and files not to get dropped while operating under 
+          AutomagicIO supervision.
         """
         self._active = False
         self._builtin_open = __builtin__.open
@@ -101,7 +107,8 @@ class AutomagicIO(object):
         self._log_online = True
         from mock import patch
         self._patch = patch
-        self._cache = set() if check_once else None
+        self._paths_cache = set() if check_once else None
+        self._repos_cache = {} if check_once else None
         if activate:
             self.activate()
 
@@ -127,7 +134,7 @@ class AutomagicIO(object):
         # wrap it all for resilience to errors -- proxying must do no harm!
         try:
             if self._in_open:
-                raise _EarlyExit
+                raise _EarlyExit("within open already")
             self._in_open = True  # just in case someone kept alias/assignment
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
@@ -143,22 +150,22 @@ class AutomagicIO(object):
                     filearg = "name" if PY2 else "file"
                     if filearg not in kwargs:
                         # so the name was missing etc, just proxy into original open call and let it puke
-                        lgr.log(2, " skipping since no name/file was given")
-                        raise _EarlyExit
+                        raise _EarlyExit("no name/file was given")
                     file = kwargs.get(filearg)
 
                 if isinstance(file, int):
-                    lgr.info(2, " skipping since already a file descriptor")
-                    raise _EarlyExit
+                    raise _EarlyExit("already a file descriptor")
 
-                if self._cache is not None:
+                if self._paths_cache is not None:
                     filefull = file if isabs(file) else os.path.abspath(file)
-                    if filefull in self._cache:
-                        lgr.log(2, " skipping since considered before")
-                        raise _EarlyExit
+                    if filefull in self._paths_cache:
+                        raise _EarlyExit("considered before")
                     else:
-                        self._cache.add(filefull)
+                        self._paths_cache.add(filefull)
 
+                # TODO: Windows-proof?
+                if '/.git/' in file:
+                    raise _EarlyExit("we ignore paths under .git/")
                 mode = 'r'
                 if len(args) > 1:
                     mode = args[1]
@@ -168,8 +175,9 @@ class AutomagicIO(object):
                 if 'r' in mode:
                     self._dataset_auto_get(file)
                 else:
-                    lgr.debug(" skipping operation on %s since mode=%r", file, mode)
-        except _EarlyExit:
+                    raise _EarlyExit("mode=%r", mode)
+        except _EarlyExit as e:
+            lgr.log(2, " skipping since " + (e.msg % e.args))
             pass
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
@@ -219,16 +227,22 @@ class AutomagicIO(object):
             return
         # deduce directory for filepath
         filedir = dirname(filepath)
-        try:
-            # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
-            # see https://github.com/datalad/datalad/issues/204
-            annex = get_repo_instance(filedir)
-        except (RuntimeError, InvalidGitRepositoryError) as e:
-            # must be not under annex etc
-            return
-        if not isinstance(annex, AnnexRepo):
-            # not an annex -- can do nothing
-            return
+        if self._repos_cache is not None and filedir in self._repos_cache:
+            annex = self._repos_cache[filedir]
+        else:
+            try:
+                # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
+                # see https://github.com/datalad/datalad/issues/204
+                annex = get_repo_instance(filedir)
+                lgr.log(2, "Got the repository %s id:%s containing %s", annex, id(annex), filedir)
+            except (RuntimeError, InvalidGitRepositoryError) as e:
+                # must be not under annex etc
+                return
+            if not isinstance(annex, AnnexRepo):
+                # not an annex -- can do nothing
+                return
+            if self._repos_cache is not None:
+                self._repos_cache[filedir] = annex
 
         # since Git/AnnexRepo functionality treats relative paths relative to the
         # top of the repository and might be outside, get a full path
