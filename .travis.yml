@@ -20,6 +20,7 @@ env:
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
+    - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
   matrix:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_REPO_VERSION=6

@@ -91,8 +91,11 @@ _test_states = {
 
 def setup_package():
     import os
-
+    from datalad import consts
     _test_states['HOME'] = os.environ.get('HOME', None)
+    _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
+    _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
+    os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
@@ -153,6 +156,7 @@ def teardown_package():
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
+    from datalad import consts
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
@@ -173,6 +177,10 @@ def teardown_package():
 
     if _test_states['HOME'] is not None:
         os.environ['HOME'] = _test_states['HOME']
+
+    if _test_states['DATASETS_TOPURL_ENV']:
+        os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
+    consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
