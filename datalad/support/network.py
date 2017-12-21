@@ -39,7 +39,7 @@ from six.moves.urllib.error import URLError
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
 from datalad.utils import assure_dir
-from datalad.consts import DATASETS_TOPURL
+from datalad import consts
 from datalad import cfg
 
 # TODO not sure what needs to use `six` here yet
@@ -761,7 +761,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
         """
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
-        return "{}{}".format(DATASETS_TOPURL, urlquote(self.path))
+        return "{}{}".format(consts.DATASETS_TOPURL, urlquote(self.path))
 
 
 def _split_colon(s, maxsplit=1):
