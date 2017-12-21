@@ -20,7 +20,7 @@ import logging
 import io
 import os
 
-from os.path import dirname, lexists, realpath
+from os.path import dirname, lexists, realpath, sep as pathsep
 from os.path import exists
 from os.path import isabs
 from os.path import join as opj
@@ -30,6 +30,7 @@ from .utils import getpwd
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .cmdline.helpers import get_repo_instance
+from .consts import HANDLE_META_DIR
 
 lgr = logging.getLogger("datalad.auto")
 
@@ -223,13 +224,28 @@ class AutomagicIO(object):
             return
         # if filepath is not there at all (program just "checked" if it could access it
         if not lexists(filepath):
-            lgr.log(2, " skipping file %s since it is not there", filepath)
+            lgr.log(2, " skipping %s since it is not there", filepath)
             return
         # deduce directory for filepath
         filedir = dirname(filepath)
-        if self._repos_cache is not None and filedir in self._repos_cache:
-            annex = self._repos_cache[filedir]
-        else:
+        annex = None
+        if self._repos_cache is not None:
+            filedir_parts = filedir.split(pathsep)
+            # ATM we do not expect subdatasets under .datalad, so we could take the top
+            # level dataset for that
+            try:
+                filedir = pathsep.join(
+                    filedir_parts[:filedir_parts.index(HANDLE_META_DIR)]
+                )
+            except ValueError:
+                # would happen if no .datalad
+                pass
+            try:
+                annex = self._repos_cache[filedir]
+            except KeyError:
+                pass
+
+        if annex is None:
             try:
                 # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
                 # see https://github.com/datalad/datalad/issues/204
@@ -238,12 +254,12 @@ class AutomagicIO(object):
             except (RuntimeError, InvalidGitRepositoryError) as e:
                 # must be not under annex etc
                 return
-            if not isinstance(annex, AnnexRepo):
-                # not an annex -- can do nothing
-                return
             if self._repos_cache is not None:
                 self._repos_cache[filedir] = annex
-
+        if not isinstance(annex, AnnexRepo):
+            # not an annex -- can do nothing
+            lgr.log(2, " skipping %s since the repo is not annex", filepath)
+            return
         # since Git/AnnexRepo functionality treats relative paths relative to the
         # top of the repository and might be outside, get a full path
         if not isabs(filepath):
