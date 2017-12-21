@@ -32,6 +32,9 @@ from .support.annexrepo import AnnexRepo
 from .cmdline.helpers import get_repo_instance
 from .consts import HANDLE_META_DIR
 
+# To be used for a quick detection of path being under .git/
+_DOT_GIT_DIR = pathsep + '.git' + pathsep
+
 lgr = logging.getLogger("datalad.auto")
 
 h5py = None
@@ -164,8 +167,7 @@ class AutomagicIO(object):
                     else:
                         self._paths_cache.add(filefull)
 
-                # TODO: Windows-proof?
-                if '/.git/' in file:
+                if _DOT_GIT_DIR in file:
                     raise _EarlyExit("we ignore paths under .git/")
                 mode = 'r'
                 if len(args) > 1:
