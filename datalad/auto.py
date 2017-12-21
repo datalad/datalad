@@ -277,7 +277,11 @@ class AutomagicIO(object):
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("AutomagicIO: retrieving file content of %s", filepath)
-            annex.get(filepath)
+            out = annex.get(filepath)
+            if not out.get('success', False):
+                # to assure that it is present and without trailing/leading new lines
+                out['note'] = out.get('note', '').strip()
+                lgr.error("Failed to retrieve %(file)s: %(note)s", out)
 
     def activate(self):
         # we should stay below info for this message. With PR #1630 we
