@@ -582,8 +582,9 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
 
     fullpathlist = paths
     if paths and isinstance(ds.repo, AnnexRepo):
-        content_info = zip(paths, ds.repo.file_has_content(paths))
-        paths = [p for p, c in content_info if c]
+        # Ugly? Jep: #2055
+        content_info = zip(paths, ds.repo.file_has_content(paths), ds.repo.is_under_annex(paths))
+        paths = [p for p, c, a in content_info if not a or c]
         nocontent = len(fullpathlist) - len(paths)
         if nocontent:
             lgr.warn(
