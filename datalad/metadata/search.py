@@ -295,7 +295,7 @@ def _get_search_index(index_dir, ds, force_reindex):
             # you're trying to open is either not backward or forward
             # compatible with this version of Whoosh.
             # we try to regenerate
-            # TODO log this
+            lgr.warning(exc_str(e))
             pass
         except widx.OutOfDateError as e:
             # Raised when you try to commit changes to an index which is not
@@ -391,6 +391,7 @@ def _get_search_index(index_dir, ds, force_reindex):
                 include_count=True),
             old_ds_rpath)
 
+    lgr.debug("Committing index")
     idx.commit(optimize=True)
 
     # "timestamp" the search index to allow for automatic invalidation
@@ -400,6 +401,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     # dump the term/field definitions records for later introspection
     # use compressed storage, the is not point in inflating the
     # diskspace requirements
+    lgr.debug("Storing definitions to %s", definitions_fname)
     with gzopen(definitions_fname, 'wb') as f:
         # TODO actually go through all, incl. compound, defintions ('@id' plus 'unit'
         # or similar) and resolve terms to URLs, if anyhow possible
