@@ -45,6 +45,7 @@ from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
 from datalad.consts import LOCAL_CENTRAL_PATH
+from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import assure_list
 from datalad.utils import assure_unicode
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -604,7 +605,7 @@ class Search(Interface):
             return
 
         # where does the bunny have the eggs?
-        index_dir = opj(ds.path, get_git_dir(ds.path), 'datalad', 'search_index')
+        index_dir = opj(ds.path, get_git_dir(ds.path), SEARCH_INDEX_DOTGITDIR)
 
         idx_obj = _get_search_index(
             index_dir, ds, force_reindex)

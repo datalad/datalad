@@ -41,6 +41,8 @@ DATALAD_SPECIAL_REMOTES_UUIDS = {
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
 
+SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
+
 DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
                   or "http://datasets.datalad.org/"
 # safeguard
