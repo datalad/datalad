@@ -590,7 +590,7 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
             lgr.warn(
                 '{} files have no content present, skipped metadata extraction for {}'.format(
                     nocontent,
-                    'them' if nocontent > 10 else [p for p, c in content_info if not c]))
+                    'them' if nocontent > 10 else [p for p, c, a in content_info if not c and a]))
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
