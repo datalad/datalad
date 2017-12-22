@@ -98,12 +98,12 @@ class Clean(Interface):
                 lgr.debug("Considering to clean %s:%s", d, dirpath)
                 if not ((what is None) or (flag in what)):
                     yield get_status_dict(
-                        path=topdir, status='notneeded', type='dir', **res_kwargs)
+                        path=topdir, status='notneeded', type='directory', **res_kwargs)
                     continue
                 paths = glob(opj(topdir, '*'))
                 if not paths:
                     yield get_status_dict(
-                        path=topdir, status='notneeded', type='dir', **res_kwargs)
+                        path=topdir, status='notneeded', type='directory', **res_kwargs)
                     continue
                 pl = len(paths) > 1
                 message = ("Removed %d %s %s: %s",
