@@ -171,6 +171,9 @@ def yield_participant_info(fname):
             if 'participant_id' not in row:
                 # not sure what this is, but we cannot use it
                 break
+            # strip a potential 'sub-' prefix
+            if row['participant_id'].startswith('sub-'):
+                row['participant_id'] = row['participant_id'][4:]
             props = {}
             for k in row:
                 # take away some ambiguity
@@ -184,4 +187,4 @@ def yield_participant_info(fname):
                 if val:
                     props[hk] = val
             if props:
-                yield re.compile(r'^{}/.*'.format(row['participant_id'])), props
+                yield re.compile(r'^sub-{}/.*'.format(row['participant_id'])), props
