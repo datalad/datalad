@@ -1,0 +1,8 @@
+# About this dataset
+
+## General information
+
+This is a DataLad dataset.
+
+For more information on DataLad and on how to work with its datasets,
+see the DataLad documentation at: http://docs.datalad.org
